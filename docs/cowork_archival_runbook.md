@@ -1,0 +1,149 @@
+# Cowork Archival and Acquisition Runbook — MLB Classic DFS
+
+Untracked companion. Last updated: 2026-07-04. Status: operational runbook for
+Claude Cowork on Ben's machine. The engine stays in the claude.ai project where
+certification lives; Cowork owns data acquisition, post-slate archival, and the
+T-minus watch. Nothing in this runbook builds lineups or touches tracked engine
+files.
+
+## Guardrails (read first, every session)
+
+1. Never log, echo, or write API keys. `THE_ODDS_API_KEY` stays in the
+   environment; if a command fails for a missing key, report the failure, not
+   the key.
+2. Never edit tracked engine files. The only files Cowork edits are the
+   untracked companions: `MLB_Classic_Calibration_Ledger.md`,
+   `MLB_Classic_Backlog.md`, and `field_opponent_registry.json`.
+3. Ledger edits are edit-in-place and append-only in the archive. Never drop an
+   invariant section. Diff the structure before saving; if a section
+   disappears, the commit note must say why.
+4. All outputs that the claude.ai project session needs (updated ledger, updated
+   registry, mined JSON, the slate bundle) get returned to that session for
+   upload. Cowork is the hands; the project is the record.
+5. Labels are non-negotiable: everything captured here is an observed outcome or
+   a deterministic descriptive statistic, never a win-rate, ROI, or probability
+   claim.
+
+## Job 1: Post-slate archival (highest value; run after every slate)
+
+Run once per contest entered. This is the direct accelerant for the B-8 gating
+dependency (eight to fifteen archived slates activate the ownership model).
+
+Per contest:
+
+1. Download the contest standings export from DraftKings (Contest page, Export
+   Lineups CSV). Save the raw file untrimmed:
+   `archive/<slate_date>/standings_<contest_id>.csv`. Do not open-and-resave in
+   a spreadsheet app; that strips the BOM contract and can mangle names.
+2. Capture the contest-page trio plus seats into
+   `archive/<slate_date>/contest_<contest_id>.json`:
+
+   ```json
+   {
+     "contest_id": "191787184",
+     "slate_date": "2026-06-29",
+     "name": "MLB $3 Pocket Cup",
+     "entry_fee": 3.0,
+     "field_size": 222,
+     "paid_places": 30,
+     "cash_line_points": 121.5,
+     "payout_structure": [{"place": "1", "prize": 100.0}],
+     "seats": null,
+     "max_entries_per_user": 4
+   }
+   ```
+
+   The standings export omits every one of these fields (ledger 3.1). `seats`
+   is required for satellites; `paid_places` is required for the posture
+   allocator (an UNRESOLVED tier blocks allocation).
+3. Save the slate salary CSV used that day:
+   `archive/<slate_date>/DKSalaries_<slate_date>.csv`. The salary file is
+   authoritative for salary and team; the miner joins on it. If the salary CSV
+   for a past slate is missing, check for the slate's DKEntries upload file
+   first; it embeds the full salary block and restores full coverage. If
+   neither exists, run the miner without `--salary` (the `standings_only`
+   degraded tier): duplication, winner copies, chalk scores, SP pairs, and the
+   registry still land; salary and stack tables report unavailable and the
+   archive block carries the coverage tag.
+4. Record Ben's own Entry IDs for the contest in the contest JSON or a sidecar,
+   for the self-vs-winner decomposition.
+5. Run the miner from the project working copy:
+
+   ```
+   python field_miner.py \
+     --standings archive/<slate_date>/standings_<contest_id>.csv \
+     --salary archive/<slate_date>/DKSalaries_<slate_date>.csv \
+     --contest-id <contest_id> --slate-date <slate_date> \
+     --registry field_opponent_registry.json \
+     --json archive/<slate_date>/mined_<contest_id>.json \
+     --emit-ledger
+   ```
+
+6. Paste the emitted block into the ledger archive under the slate's `A-NNN`
+   entry, newest first. Reconcile the living sections the same session: if the
+   slate contradicts a provisional rule, adjust the rule's grade and note the
+   contest ID.
+7. Verification checklist before closing the contest:
+   - File read cleanly with the BOM (`utf-8-sig`); header matched the ledger
+     3.1 schema.
+   - Salary join rate reported and unmatched names investigated (full tier
+     only; call-ups and suffix variants are the usual causes). At the
+     `standings_only` tier, confirm the coverage tag is in the archive block.
+   - Ownership recompute self-check within 1.5 points of `%Drafted`
+     (ledger 3.7). If it fails, the parse is wrong; fix before archiving.
+   - Duplication table present: distinct lineups, share duplicated, max
+     copies, winner copies.
+   - Contest JSON complete: fee, paid places, cash line, seats where
+     applicable, own Entry IDs.
+
+After all contests on the slate: return the updated ledger, the updated
+registry, and the mined JSON files to the claude.ai project session.
+
+## Job 2: Pre-slate acquisition (run the morning of a slate)
+
+1. Run `python fetch_slate_bundle.py` with `THE_ODDS_API_KEY` set. Output is
+   `slate_bundle.json` (MLB Stats API lineups, DK and FD totals, per-venue
+   weather). Retractable-roof venues are flagged for the manual roof rule.
+2. Save the FanGraphs RosterResource platoon-lineups JSON for the slate (the
+   TBD-lineup fallback input for `platoon_order_adapter`).
+3. Weekly, on the slow-state cadence: refresh the two Baseball Savant
+   expected-stats CSVs (`expected_stats_batting.csv`,
+   `expected_stats_pitching.csv`). They carry a BOM; leave them as downloaded.
+4. Deliver `slate_bundle.json`, the platoon JSON, the DK salary CSV, and the
+   DKEntries reserved template to the claude.ai project session before the
+   build.
+
+## Job 3: T-minus watch (ledger 3.8)
+
+Run the clock against the earliest game's first pitch. Every finding maps to an
+engine action; never a vibe adjustment.
+
+| Time | Check | Engine action on a hit |
+| --- | --- | --- |
+| T-24h | Tail scanner review; platoon projected orders | F1 review flag; `platoon_order_by_player_id` input |
+| T-90m | Diff posted lineups vs projected orders; scratch flags | `refresh_confirmed_lineups`; excludes for scratches |
+| T-45m | Verify every declared SP (opener risk, pushed starts) | `pitcher_roles` reassignment; exposure cap |
+| T-20m | Weather and roof refresh on flagged venues | `compute_f5_factor` recompute |
+| Post-lock | Authorized late-swap window only | `run_late_swap` with `authorized_entry_ids` |
+
+Kill-list template (state it at the pre-build checkpoint, three entries, per
+ledger 3.8):
+
+```
+KILL LIST — slate <date>
+1. Assumption: <the thing that most damages the portfolio if wrong>
+   Verify: <specific check>   Deadline: <T-minus time>
+2. ...
+3. ...
+Override discipline: any discretionary variance injection names its
+non-consensus source and timestamp, or it does not happen.
+```
+
+## File inventory returned to the project session
+
+- `MLB_Classic_Calibration_Ledger.md` (updated, archive appended)
+- `field_opponent_registry.json` (updated)
+- `archive/<slate_date>/mined_<contest_id>.json` (per contest)
+- `slate_bundle.json` and the platoon JSON (pre-slate)
+- Raw standings exports and contest JSONs stay in the local archive tree,
+  retained untrimmed.

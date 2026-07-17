@@ -1,0 +1,66 @@
+# MLB Classic Engineering Backlog
+
+Baseline: audited clean at v2.23.0 on 2026-07-02. 24 active files (23 tracked checksums plus the checksum file itself), 93 of 93 tests passed, all active modules import, and `project_audit.py --run-tests` returns zero errors. Every item below is deferred cleanup or optional hardening. None blocks production use.
+
+How to read this file: each item notes whether it changes file bytes, because any byte change requires regenerating `checksums_sha256_v2_23_0.json` and re-running the audit. The project is at 24 of 26 active files (2 slots remain), so new tracked files have headroom. This backlog is not a tracked artifact; it will surface as a benign "non-active files in directory" audit warning.
+
+## B-1: Document the header version-stamp convention ✓ RESOLVED v2.20.0
+Added a "Versioning convention" paragraph to `MLB_Classic.md` section 13. The policy: `Project_Version` in the manifest is the project authority; each module's `VERSION` constant is the per-module authority; the docstring framework stamp records the last release that file changed functionally and is intentionally not bumped on releases that don't touch it.
+
+## B-2: Converge header stamps opportunistically ✓ PARTIALLY RESOLVED v2.20.0
+`projection_builder.py` docstring updated from v1.1 to v1.2 (the file was edited in this release). Remaining stamps: `contest_allocator.py` (v2.16.0), `dk_entries_manager.py` (v2.16.0), `live_data_adapters.py` (v2.16.0), `slate_intake_manager.py` (v2.16.0) — update these when next edited for a functional reason. The `optimizer_v3.py` lineage block and `contest_allocator.py:1318` comment are correct historical metadata; leave them.
+
+## B-3: Audit check for header-stamp sanity (optional)
+Priority: low. Only if you decide stamps should be machine-tracked.
+Files: `project_audit.py` (bump version), `mlb_v2_20_0_manifest.txt` (`Audit_Version`), re-checksum both.
+Context: B-1 resolved this at the policy level. B-3 is machine enforcement. The convention note in section 13 is sufficient; add B-3 only if future sweeps keep generating false positives despite the documented convention.
+
+## B-4: Pin upper bounds in requirements.txt (optional)
+Priority: low.
+Files: `requirements.txt` (re-checksum).
+Context: Current floors (`numpy>=2.0`, `pandas>=2.2`, `scipy>=1.13`) permit an environment that satisfies the floor but diverges from the tested stack (numpy 2.4.4, pandas 3.0.2, scipy 1.17.1). pandas 3.0 carried breaking changes from 2.x.
+Action: Consider `numpy>=2.0,<3`, `pandas>=2.2,<4`, `scipy>=1.13,<2`, or pin to the tested majors.
+Acceptance: tests still pass on the tested stack.
+Rationale for low priority: tests are green on the tested versions and the floors are satisfied today.
+
+## B-5: Verify the " SE" archetype pattern leading space ✓ RESOLVED v2.20.0
+Confirmed the leading space is intentional: `" se" in title.lower()` correctly rejects "USE IT OR LOSE IT" and "SE GPP" while still matching "Daily $1 SE". Without it, "se" false-matches "USE", "POSE", and similar substrings. Added an explanatory note to `dk_contest_archetypes.csv` row 8. Note: `contest_results_tracker.py` referenced in the original item is parked in `parked/`; the relevant matcher is `dk_entries_manager.infer_contest_archetype`.
+
+## B-6: Decide policy on past-dated override rows ✓ DECIDED v2.20.0
+Decision: retain past-dated override rows. They are harmless (date-gated) and enable reproducibility of past-slate builds. No pruning cadence. The Mexico City rows (2026-04-25, 2026-04-26) and Las Vegas rows (2026-06-08 through 2026-06-14) stay. Add new rows as neutral-site or alternate-venue games arise. Do not prune rows at season end; the table is append-only.
+
+## B-7: Platoon-order adapter ✓ SHIPPED v2.22.0
+Added `platoon_order_adapter.py` (v1.0), a tracked module that reads the FanGraphs platoon-lineups JSON. It delivers a batting-order mispricing review screen and a TBD-lineup projected-order fallback, and wires the projected order into the initial build path via `run_slate(platoon_order_by_player_id=...)` and `_assemble_projection_frame`, setting `Batting_Order` and `F2 = batting_order_factor(slot)` before `build_projections`. This partially resolves the standing "wire the typical-order map into the initial build path" item: the initial build now has a path that derives F2 from a supplied order, not only `refresh_confirmed_lineups`. Still open: an empirically calibrated opportunity curve, a forward-collection step for batting-order history, and integrating a projected-ownership feed so the mispricing screen and contest routing can price contrarian value rather than only route attention and coverage.
+
+## B-8: Calibration ledger shipped; homegrown ownership model is the gating dependency
+Added `MLB_Classic_Calibration_Ledger.md`, an untracked companion on the same footing as this backlog and the integration contract. It is never checksummed because it is edited every slate, so it surfaces as a benign "non-active files in directory" audit warning and does not change `ACTIVE_FILES`, the manifest counts, or the checksum scope. The terse session-start macro hides the warning.
+
+The ledger holds the project invariants (parsing, hygiene, legality, thin-slate feasibility, posture workarounds, bank and objective rules), the inert calibration buckets, a rule-grading model (firm / provisional / open / record-only, with every count conditioned on contest archetype and field size), and an append-only full-decomposition results archive seeded with the first slate (contests 191787184, 191787186, 191823035).
+
+The ledger's calibration content is inert by design and moves no projection. The single gating dependency is a homegrown projected-ownership model fit from the accumulating standings archive: actual `%Drafted` joined to the slate salary file (by name and team, the same crosswalk used in `build_dk_keyed_corrections`), conditioned on archetype and field size. This replaces the paid-feed (Stokastic) line noted in B-7 as the cheaper path, now that we are capturing actual ownership every slate. Order of work: archive every slate in the ledger schema; capture the three fields the DK standings export omits (entry fee, payout structure, cash line) from the contest page; accumulate roughly eight to fifteen of these small slates (pools are about 40 to 50 players, so this is the slower cross-sectional path); then fit the model. Only when it emits a per-slate prediction does the ledger field model turn on and the B-7 contrarian-value routing question become answerable. Projection-magnitude calibration is second and slower; winning-lineup-shape memory stays record-only at current volume.
+This item changes no file bytes in the tracked engine; the new file is untracked.
+2026-07-04: `field_miner.py` (B-11) is now the archival instrument for step 1, and the Cowork archival runbook (B-12) owns the step 2 contest-page capture.
+
+## B-9: v2.23.0 accuracy release ✓ SHIPPED 2026-07-02
+Shipped in-engine: (1) the xwOBA front-door wiring fix with match-report surfacing, a zero-match wiring error, and low-match warnings (`execution_pipeline.py` v1.6); (2) the codified value-sanity guard with a reported opt-out; (3) per-player Ceiling multipliers from expected ISO through the DK-keyed crosswalk (`projection_builder.py` v1.3, `xwoba_base_correction.py` v1.1), consumed via the per-row `Ceiling_Multiplier` column; (4) the deterministic F4 (opposing-SP xwOBA-against quality x platoon hand prior) via `run_slate(f4_by_player_id=...)` with `live_data_adapters.py` v1.1 extractors; (5) seven wiring tests (`ProjectionEnrichmentWiringTests`), suite 86 -> 93. Ledger invariant 3.6 records the no-op lesson.
+
+Still open from the v2.23.0 analysis, deliberately deferred:
+- Pitcher ceiling differentiation and pitcher F4 wait on a K-rate input (Savant expected-stats CSVs carry none). Add K% to the Savant pull or the bundle script, then extend both.
+- F3 (skill) stays 1.0-default; the xwOBA Base correction carries the skill signal for now.
+- Base rebuild for call-ups/small samples: deferred until the ledger magnitude-miss log shows `AvgPointsPerGame` is the binding miss, per the calibrate-on-evidence rule.
+- Platoon priors in `F4_PLATOON_PRIOR` and the archetype temperatures in `ownership_prior.py` are labeled priors awaiting graded evidence; neither moves on a single slate.
+
+## B-10: Ownership prior (untracked) + slate bundle script ✓ SHIPPED 2026-07-02
+`ownership_prior.py` (untracked, v0.1-prior) starts predict-then-grade on slate one: archetype-conditioned structural ownership shares (salary, implied totals, order, probable-SP, optional value) with exact 800/200 budget accounting and a grader (`grade_against_actuals`: MAE, signed error, Spearman, largest misses) feeding the ledger. It is review-only, never auto-applied; the fitted model it scaffolds still takes a tracked slot per B-8, and grading is blocked until the A-001 backfill (slate date, entry fee/payout, slate salary CSV, own entry IDs) lands. `fetch_slate_bundle.py` (untracked, runs on the local machine) bundles MLB Stats API lineups (mlb-lineups feed shape), the-odds-api DK+FD totals (raw payload for `parse_the_odds_api_totals`; key via `THE_ODDS_API_KEY`, never logged), and Open-Meteo per-venue hourly weather (coords from `team_to_venue.csv`, fixed domes skipped, retractable venues flagged for the manual roof rule) into one `slate_bundle.json`, collapsing intake to two artifacts with zero engine changes.
+
+## B-11: Field layer shipped untracked (2026-07-04)
+Added `field_miner.py` (v0.1-review) and `posture_allocator.py` (v0.1-review), both untracked companions on the B-10 footing, plus ledger invariants 3.7 to 3.9 and calibration bucket 4.6. Scope: full-field standings decomposition (every entrant lineup from the export's `Lineup` column; exact-lineup duplication tables; stack, salary-usage, and SP-pair field distributions; the opponent-recurrence registry `field_opponent_registry.json`; a paste-ready ledger-block emitter; a structural duplication-risk screen for candidate lineups; an ownership recompute self-check that validates the parse against `%Drafted`) and the waterfall tier policy (F/A/V classification over payout breadth, archetype-to-tier mapping, fee-share policy checks, satellite family diversification notes, and an explicit `contest_postures` dict emitted per ledger 3.4). Both carry `--selftest` fixtures and truthful-label headers; every output is an observed outcome, a deterministic descriptive statistic, or a stated bankroll policy prior, never a win-rate, ROI, or probability claim, and nothing auto-applies.
+
+Changes no tracked bytes; the audit stays PASS v2.23.0 24 files 93 tests. Both open tracked slots remain reserved for the fitted ownership model (B-8, `ownership_prior.py` header). field_miner's graduation path is to merge into that model's slot as its data layer once the construction and duplication features have repeated across archetype-conditioned slates; posture_allocator stays a companion unless posture policy proves it needs certification.
+
+Deferred engine wiring, deliberately: (a) a `kill_list` field in the run_slate checkpoint payload and (b) a duplication-penalty hook in the allocator objective. Both are byte-changing (a v2.24.0) and gated on validated Section 4.6 field tables per the calibrate-on-evidence rule. Until then the kill list runs as protocol (ledger 3.8) and the duplication screen is review-only.
+
+2026-07-04, later the same day: field_miner bumped to v0.3-review after the A-001 mining surfaced that the standings player table is grained per (player, roster position). %Drafted now aggregates to player grain with the raw split preserved in `player_table`, top-owned aggregates the same way, and the selftest carries a split fixture. The ownership recompute self-check caught the grain error in production at 25.23 pts on the 222-entry contest, which is the check working as designed. The correction restated three players' A-001 ownership, Miguel Vargas most materially (46 to 66 percent across the three contests, not 21).
+
+## B-12: Cowork archival and acquisition runbook (2026-07-04)
+Added `cowork_archival_runbook.md` (untracked). Three jobs: (1) post-slate archival per contest (standings download, contest-page trio capture with paid places and any satellite seat count, salary CSV pairing, own Entry IDs, `field_miner.py` run with `--registry` and `--emit-ledger`, ledger append, verification checklist), which is the direct accelerant for the B-8 gating dependency of eight to fifteen archived slates; (2) pre-slate acquisition (`fetch_slate_bundle.py` with `THE_ODDS_API_KEY`, the RosterResource platoon JSON, a weekly Savant expected-stats refresh); (3) the T-minus watch cadence feeding the ledger 3.8 kill list, with every finding mapped to an engine action. The engine stays where certification lives; full migration to Cowork is re-evaluated only if post-slate decompositions show late-swap decisions are a repeated material factor.

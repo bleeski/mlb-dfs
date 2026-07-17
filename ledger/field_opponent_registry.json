@@ -1,0 +1,2756 @@
+{
+ "_label": "opponent-recurrence registry; observed field behavior; record-only, never a prediction",
+ "users": {
+  "137666": {
+   "avg_chalk_score": 33.31,
+   "avg_max_stack": 4.67,
+   "avg_salary_used": 49867.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 3,
+   "last_seen": "2026-06-29",
+   "n_chalk": 3,
+   "n_salary": 3,
+   "n_stack": 3,
+   "sum_chalk": 99.91999999999999,
+   "sum_max_stack": 14,
+   "sum_salary_used": 149600
+  },
+  "420MasterKey420": {
+   "avg_chalk_score": 30.04,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49200.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.04,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49200
+  },
+  "BadMOFO55": {
+   "avg_chalk_score": 33.42,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.42,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "BamaJones": {
+   "avg_chalk_score": 30.87,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49100.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 5,
+   "last_seen": "2026-06-29",
+   "n_chalk": 5,
+   "n_salary": 5,
+   "n_stack": 5,
+   "sum_chalk": 154.34,
+   "sum_max_stack": 25,
+   "sum_salary_used": 245500
+  },
+  "BigRobnAZ": {
+   "avg_chalk_score": 31.13,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.13,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49500
+  },
+  "Bosnia33": {
+   "avg_chalk_score": 31.12,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.12,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49500
+  },
+  "Bruwster42966": {
+   "avg_chalk_score": 32.43,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 32.43,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49800
+  },
+  "Bsmooth715": {
+   "avg_chalk_score": 37.34,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49100.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 37.34,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49100
+  },
+  "Capskate3": {
+   "avg_chalk_score": 26.39,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 26.39,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49500
+  },
+  "CashLineCriminal": {
+   "avg_chalk_score": 42.41,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 42.41,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49900
+  },
+  "ChesterMarcol": {
+   "avg_chalk_score": 31.94,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.94,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49400
+  },
+  "Cobra777666777": {
+   "avg_chalk_score": 35.05,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.05,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "Cussdigg": {
+   "avg_chalk_score": 33.49,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49550.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 66.97999999999999,
+   "sum_max_stack": 8,
+   "sum_salary_used": 99100
+  },
+  "DanDePo": {
+   "avg_chalk_score": 24.83,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 24.83,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49900
+  },
+  "Dave2zone": {
+   "avg_chalk_score": 30.48,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49733.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 3,
+   "last_seen": "2026-06-29",
+   "n_chalk": 3,
+   "n_salary": 3,
+   "n_stack": 3,
+   "sum_chalk": 91.44000000000001,
+   "sum_max_stack": 9,
+   "sum_salary_used": 149200
+  },
+  "DicVec": {
+   "avg_chalk_score": 33.04,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.04,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "Dicskstone32": {
+   "avg_chalk_score": 29.32,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.32,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49500
+  },
+  "Elwaysarmy": {
+   "avg_chalk_score": 34.49,
+   "avg_max_stack": 4.86,
+   "avg_salary_used": 49743.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 241.39999999999995,
+   "sum_max_stack": 34,
+   "sum_salary_used": 348200
+  },
+  "Gerfdawg": {
+   "avg_chalk_score": 31.37,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49867.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 3,
+   "last_seen": "2026-06-29",
+   "n_chalk": 3,
+   "n_salary": 3,
+   "n_stack": 3,
+   "sum_chalk": 94.1,
+   "sum_max_stack": 12,
+   "sum_salary_used": 149600
+  },
+  "GrownManRick11": {
+   "avg_chalk_score": 27.66,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 27.66,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49700
+  },
+  "JJWADDELL": {
+   "avg_chalk_score": 42.07,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 48800.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 42.07,
+   "sum_max_stack": 3,
+   "sum_salary_used": 48800
+  },
+  "JRaab": {
+   "avg_chalk_score": 29.69,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.69,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "Jadrian7": {
+   "avg_chalk_score": 34.82,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.82,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49700
+  },
+  "Jbucna": {
+   "avg_chalk_score": 47.59,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 48700.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 47.59,
+   "sum_max_stack": 4,
+   "sum_salary_used": 48700
+  },
+  "Jo_Jo": {
+   "avg_chalk_score": 34.14,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.14,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49900
+  },
+  "KingRob1976": {
+   "avg_chalk_score": 30.0,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.0,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49800
+  },
+  "MarcoRacin": {
+   "avg_chalk_score": 30.0,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49600.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.0,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49600
+  },
+  "MeatAuction": {
+   "avg_chalk_score": 26.85,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 26.85,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49000
+  },
+  "Moneytime8": {
+   "avg_chalk_score": 30.45,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.45,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49400
+  },
+  "MrDuke2727": {
+   "avg_chalk_score": 33.15,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.15,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49400
+  },
+  "Mrboozer": {
+   "avg_chalk_score": 30.0,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.0,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "Mulligan4J": {
+   "avg_chalk_score": 22.41,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 22.41,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "NJ-Ram": {
+   "avg_chalk_score": 34.95,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787186",
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 69.9,
+   "sum_max_stack": 8,
+   "sum_salary_used": 99800
+  },
+  "PIGBEARMAN": {
+   "avg_chalk_score": 25.68,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 25.68,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49900
+  },
+  "Primetime2194": {
+   "avg_chalk_score": 47.24,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49300.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 47.24,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49300
+  },
+  "Ralfdinero": {
+   "avg_chalk_score": 32.07,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 32.07,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49800
+  },
+  "Ray-Troy": {
+   "avg_chalk_score": 34.78,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.78,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49000
+  },
+  "RaymondAnthonyPablo": {
+   "avg_chalk_score": 44.14,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 44.14,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "RightBehindYou": {
+   "avg_chalk_score": 24.01,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 24.01,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49700
+  },
+  "SHADOWFOG": {
+   "avg_chalk_score": 30.13,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49600.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.13,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49600
+  },
+  "Silverbxxck": {
+   "avg_chalk_score": 46.55,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 46.55,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "SinCitySlumdweller": {
+   "avg_chalk_score": 47.59,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 47.59,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "Skralph": {
+   "avg_chalk_score": 33.23,
+   "avg_max_stack": 3.88,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184",
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 8,
+   "last_seen": "2026-06-29",
+   "n_chalk": 8,
+   "n_salary": 8,
+   "n_stack": 8,
+   "sum_chalk": 265.84000000000003,
+   "sum_max_stack": 31,
+   "sum_salary_used": 398400
+  },
+  "Stree": {
+   "avg_chalk_score": 34.3,
+   "avg_max_stack": 4.57,
+   "avg_salary_used": 49629.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 240.13,
+   "sum_max_stack": 32,
+   "sum_salary_used": 347400
+  },
+  "SupernintendoBraun": {
+   "avg_chalk_score": 33.79,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.79,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49800
+  },
+  "TTTTTTTTurtle": {
+   "avg_chalk_score": 39.13,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 39.13,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "TallCoolOne_32": {
+   "avg_chalk_score": 27.12,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 27.12,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "Tankmon": {
+   "avg_chalk_score": 34.41,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.41,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "Tburke34": {
+   "avg_chalk_score": 33.47,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.47,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "TheBabz": {
+   "avg_chalk_score": 25.05,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 25.05,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49500
+  },
+  "Towmonkey": {
+   "avg_chalk_score": 35.0,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.0,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "UltimateWin4": {
+   "avg_chalk_score": 29.75,
+   "avg_max_stack": 4.71,
+   "avg_salary_used": 49657.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 2,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 208.22,
+   "sum_max_stack": 33,
+   "sum_salary_used": 347600
+  },
+  "WallOfVoodoo": {
+   "avg_chalk_score": 36.09,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49600.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 36.09,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49600
+  },
+  "alrich2919": {
+   "avg_chalk_score": 35.56,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 71.13,
+   "sum_max_stack": 10,
+   "sum_salary_used": 99000
+  },
+  "angerisagift": {
+   "avg_chalk_score": 36.4,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 36.4,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49900
+  },
+  "anickleandapray": {
+   "avg_chalk_score": 30.14,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 3,
+   "entries": 3,
+   "last_seen": "2026-06-29",
+   "n_chalk": 3,
+   "n_salary": 3,
+   "n_stack": 3,
+   "sum_chalk": 90.42,
+   "sum_max_stack": 9,
+   "sum_salary_used": 149700
+  },
+  "apenn21": {
+   "avg_chalk_score": 31.72,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 48900.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.72,
+   "sum_max_stack": 3,
+   "sum_salary_used": 48900
+  },
+  "auweglman": {
+   "avg_chalk_score": 35.38,
+   "avg_max_stack": 3.6,
+   "avg_salary_used": 49920.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 5,
+   "last_seen": "2026-06-29",
+   "n_chalk": 5,
+   "n_salary": 5,
+   "n_stack": 5,
+   "sum_chalk": 176.89,
+   "sum_max_stack": 18,
+   "sum_salary_used": 249600
+  },
+  "bananaspeel": {
+   "avg_chalk_score": 24.73,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 24.73,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49700
+  },
+  "bhall52420": {
+   "avg_chalk_score": 30.41,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49300.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.41,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49300
+  },
+  "bigjay1219": {
+   "avg_chalk_score": 33.47,
+   "avg_max_stack": 3.5,
+   "avg_salary_used": 49150.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 66.94,
+   "sum_max_stack": 7,
+   "sum_salary_used": 98300
+  },
+  "bjbsnoop": {
+   "avg_chalk_score": 36.71,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 36.71,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "blasko541": {
+   "avg_chalk_score": 27.12,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 27.12,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "bleeski": {
+   "avg_chalk_score": 35.48,
+   "avg_max_stack": 4.56,
+   "avg_salary_used": 49267.0,
+   "contests": [
+    "191787184",
+    "191787186",
+    "191823035"
+   ],
+   "dup_entries": 1,
+   "entries": 9,
+   "last_seen": "2026-06-29",
+   "n_chalk": 9,
+   "n_salary": 9,
+   "n_stack": 9,
+   "sum_chalk": 319.33000000000004,
+   "sum_max_stack": 41,
+   "sum_salary_used": 443400
+  },
+  "bradlove12": {
+   "avg_chalk_score": 33.38,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49200.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.38,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49200
+  },
+  "brettclarke": {
+   "avg_chalk_score": 38.87,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 38.87,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "buckstar": {
+   "avg_chalk_score": 35.99,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.99,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49700
+  },
+  "callahanm328": {
+   "avg_chalk_score": 44.83,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 44.83,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49500
+  },
+  "catdaddy0806": {
+   "avg_chalk_score": 41.02,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 82.05,
+   "sum_max_stack": 6,
+   "sum_salary_used": 99600
+  },
+  "coastrat69": {
+   "avg_chalk_score": 29.86,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 2,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 59.72,
+   "sum_max_stack": 10,
+   "sum_salary_used": 99000
+  },
+  "cookie1972": {
+   "avg_chalk_score": 35.95,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.95,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "corruption79": {
+   "avg_chalk_score": 31.73,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 48900.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 63.45,
+   "sum_max_stack": 6,
+   "sum_salary_used": 97800
+  },
+  "cptnspaulding": {
+   "avg_chalk_score": 35.08,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49029.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 245.55,
+   "sum_max_stack": 35,
+   "sum_salary_used": 343200
+  },
+  "darth3raider": {
+   "avg_chalk_score": 37.12,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 37.12,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "davidlobo4": {
+   "avg_chalk_score": 39.41,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 39.41,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49700
+  },
+  "debbiey5": {
+   "avg_chalk_score": 39.19,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 39.19,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "deets27": {
+   "avg_chalk_score": 31.03,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49600.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.03,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49600
+  },
+  "dehighinc": {
+   "avg_chalk_score": 27.48,
+   "avg_max_stack": 3.5,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 54.95,
+   "sum_max_stack": 7,
+   "sum_salary_used": 99600
+  },
+  "dengel2430": {
+   "avg_chalk_score": 34.05,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.05,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "dos-perros": {
+   "avg_chalk_score": 44.83,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 44.83,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "earlbobby": {
+   "avg_chalk_score": 45.86,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 45.86,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49500
+  },
+  "elterrible33": {
+   "avg_chalk_score": 33.61,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.61,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "ep3550": {
+   "avg_chalk_score": 42.9,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 85.8,
+   "sum_max_stack": 8,
+   "sum_salary_used": 99000
+  },
+  "exit154": {
+   "avg_chalk_score": 29.37,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.37,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49400
+  },
+  "fan21": {
+   "avg_chalk_score": 33.65,
+   "avg_max_stack": 3.5,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 67.3,
+   "sum_max_stack": 7,
+   "sum_salary_used": 98800
+  },
+  "ga33": {
+   "avg_chalk_score": 38.11,
+   "avg_max_stack": 4.5,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 76.22,
+   "sum_max_stack": 9,
+   "sum_salary_used": 98800
+  },
+  "gcferraro": {
+   "avg_chalk_score": 32.82,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 3,
+   "last_seen": "2026-06-29",
+   "n_chalk": 3,
+   "n_salary": 3,
+   "n_stack": 3,
+   "sum_chalk": 98.46000000000001,
+   "sum_max_stack": 15,
+   "sum_salary_used": 149700
+  },
+  "giveitu": {
+   "avg_chalk_score": 31.4,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.4,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "gocal1224": {
+   "avg_chalk_score": 34.1,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49200.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.1,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49200
+  },
+  "goofybh207": {
+   "avg_chalk_score": 33.06,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.06,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "griffalicious24": {
+   "avg_chalk_score": 43.1,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 43.1,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "grok": {
+   "avg_chalk_score": 41.03,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49300.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 41.03,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49300
+  },
+  "gustavo0413": {
+   "avg_chalk_score": 51.03,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 51.03,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49500
+  },
+  "hacker33": {
+   "avg_chalk_score": 30.95,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.95,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49000
+  },
+  "hhalley3": {
+   "avg_chalk_score": 34.5,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.5,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49800
+  },
+  "howardwi": {
+   "avg_chalk_score": 40.19,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 80.38,
+   "sum_max_stack": 6,
+   "sum_salary_used": 99600
+  },
+  "huvos_33": {
+   "avg_chalk_score": 28.74,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 28.74,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "jacks666": {
+   "avg_chalk_score": 35.09,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 2,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 70.18,
+   "sum_max_stack": 8,
+   "sum_salary_used": 99000
+  },
+  "jbhintz": {
+   "avg_chalk_score": 32.12,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 32.12,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "jcbu": {
+   "avg_chalk_score": 30.59,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.59,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49800
+  },
+  "jep4576": {
+   "avg_chalk_score": 45.65,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 48200.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 45.65,
+   "sum_max_stack": 5,
+   "sum_salary_used": 48200
+  },
+  "jgorms3322": {
+   "avg_chalk_score": 33.74,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.74,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49700
+  },
+  "jkboxer72": {
+   "avg_chalk_score": 27.07,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49300.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 27.07,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49300
+  },
+  "jklodawizard": {
+   "avg_chalk_score": 44.14,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 44.14,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "jokerdpo": {
+   "avg_chalk_score": 18.7,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 18.7,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49500
+  },
+  "jrj717": {
+   "avg_chalk_score": 35.72,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.72,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49900
+  },
+  "jrsrcbg": {
+   "avg_chalk_score": 27.61,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 27.61,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "justinb4312": {
+   "avg_chalk_score": 35.41,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.41,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "kkbailey": {
+   "avg_chalk_score": 30.63,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.63,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49800
+  },
+  "lasj": {
+   "avg_chalk_score": 34.23,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49600.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.23,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49600
+  },
+  "ldogg431": {
+   "avg_chalk_score": 32.93,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 32.93,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "leonard559": {
+   "avg_chalk_score": 29.1,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49600.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.1,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49600
+  },
+  "louiswat": {
+   "avg_chalk_score": 32.13,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 4,
+   "last_seen": "2026-06-29",
+   "n_chalk": 4,
+   "n_salary": 4,
+   "n_stack": 4,
+   "sum_chalk": 128.54,
+   "sum_max_stack": 12,
+   "sum_salary_used": 199600
+  },
+  "malrenestewart": {
+   "avg_chalk_score": 28.47,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 28.47,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49400
+  },
+  "markabrehamsen": {
+   "avg_chalk_score": 34.41,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.41,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49500
+  },
+  "matttanman2": {
+   "avg_chalk_score": 34.14,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.14,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49900
+  },
+  "miamitim68": {
+   "avg_chalk_score": 35.48,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 70.95,
+   "sum_max_stack": 8,
+   "sum_salary_used": 99800
+  },
+  "minrobertson210": {
+   "avg_chalk_score": 30.57,
+   "avg_max_stack": 4.29,
+   "avg_salary_used": 49471.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 214.01000000000002,
+   "sum_max_stack": 30,
+   "sum_salary_used": 346300
+  },
+  "monkeyman9009": {
+   "avg_chalk_score": 29.59,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49500.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.59,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49500
+  },
+  "mpigg12": {
+   "avg_chalk_score": 30.36,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 30.36,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49400
+  },
+  "mrbig91": {
+   "avg_chalk_score": 33.48,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.48,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "mrvitale": {
+   "avg_chalk_score": 33.06,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.06,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "newulmspeedy": {
+   "avg_chalk_score": 31.3,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.3,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49400
+  },
+  "nickenyon6": {
+   "avg_chalk_score": 43.1,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 43.1,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "ninefive": {
+   "avg_chalk_score": 26.8,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184",
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 53.61,
+   "sum_max_stack": 8,
+   "sum_salary_used": 100000
+  },
+  "nlh46": {
+   "avg_chalk_score": 38.02,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49100.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 38.02,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49100
+  },
+  "oaktownchamps": {
+   "avg_chalk_score": 41.74,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49200.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 41.74,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49200
+  },
+  "odalis6rivera": {
+   "avg_chalk_score": 29.1,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.1,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49000
+  },
+  "peterjpacheco": {
+   "avg_chalk_score": 34.78,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49100.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.78,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49100
+  },
+  "psereda": {
+   "avg_chalk_score": 35.59,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.59,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "puttorney": {
+   "avg_chalk_score": 37.83,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49100.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 37.83,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49100
+  },
+  "qbjjj": {
+   "avg_chalk_score": 35.22,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.22,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "rcollins587": {
+   "avg_chalk_score": 43.45,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 43.45,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "reddevil22": {
+   "avg_chalk_score": 31.08,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.08,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49000
+  },
+  "rictaji": {
+   "avg_chalk_score": 36.21,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 36.21,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49800
+  },
+  "rjw1": {
+   "avg_chalk_score": 30.66,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49150.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 61.31,
+   "sum_max_stack": 8,
+   "sum_salary_used": 98300
+  },
+  "rockymav61832": {
+   "avg_chalk_score": 34.82,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49800.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.82,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49800
+  },
+  "rstash24": {
+   "avg_chalk_score": 30.69,
+   "avg_max_stack": 4.14,
+   "avg_salary_used": 49571.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 214.85999999999999,
+   "sum_max_stack": 29,
+   "sum_salary_used": 347000
+  },
+  "ryclo": {
+   "avg_chalk_score": 33.96,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49200.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.96,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49200
+  },
+  "skygoldenglove": {
+   "avg_chalk_score": 34.05,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.05,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49900
+  },
+  "slophound": {
+   "avg_chalk_score": 32.16,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 32.16,
+   "sum_max_stack": 4,
+   "sum_salary_used": 50000
+  },
+  "sparky162": {
+   "avg_chalk_score": 34.05,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 48700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.05,
+   "sum_max_stack": 5,
+   "sum_salary_used": 48700
+  },
+  "sphere3d": {
+   "avg_chalk_score": 35.63,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 35.63,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "sportsfan14": {
+   "avg_chalk_score": 27.06,
+   "avg_max_stack": 4.43,
+   "avg_salary_used": 49471.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 7,
+   "last_seen": "2026-06-29",
+   "n_chalk": 7,
+   "n_salary": 7,
+   "n_stack": 7,
+   "sum_chalk": 189.4,
+   "sum_max_stack": 31,
+   "sum_salary_used": 346300
+  },
+  "starplay": {
+   "avg_chalk_score": 29.69,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 2,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 59.38,
+   "sum_max_stack": 10,
+   "sum_salary_used": 100000
+  },
+  "stashcash": {
+   "avg_chalk_score": 29.14,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49300.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.14,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49300
+  },
+  "stevmortc": {
+   "avg_chalk_score": 32.03,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 32.03,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49700
+  },
+  "t.jsmith": {
+   "avg_chalk_score": 30.43,
+   "avg_max_stack": 2.5,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 60.86,
+   "sum_max_stack": 5,
+   "sum_salary_used": 99800
+  },
+  "t1mack42": {
+   "avg_chalk_score": 28.87,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49700.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 28.87,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49700
+  },
+  "tampayardie": {
+   "avg_chalk_score": 31.39,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49300.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 31.39,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49300
+  },
+  "thesnod": {
+   "avg_chalk_score": 27.93,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184",
+    "191787186",
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 3,
+   "last_seen": "2026-06-29",
+   "n_chalk": 3,
+   "n_salary": 3,
+   "n_stack": 3,
+   "sum_chalk": 83.80000000000001,
+   "sum_max_stack": 12,
+   "sum_salary_used": 149700
+  },
+  "tigolebitties91": {
+   "avg_chalk_score": 46.09,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 46.09,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "tpyo": {
+   "avg_chalk_score": 39.63,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191787184",
+    "191787186"
+   ],
+   "dup_entries": 0,
+   "entries": 2,
+   "last_seen": "2026-06-29",
+   "n_chalk": 2,
+   "n_salary": 2,
+   "n_stack": 2,
+   "sum_chalk": 79.25999999999999,
+   "sum_max_stack": 10,
+   "sum_salary_used": 98800
+  },
+  "tuggmc": {
+   "avg_chalk_score": 25.63,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 25.63,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "tvielkin": {
+   "avg_chalk_score": 33.45,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 33.45,
+   "sum_max_stack": 5,
+   "sum_salary_used": 50000
+  },
+  "user9420": {
+   "avg_chalk_score": 29.91,
+   "avg_max_stack": 4.75,
+   "avg_salary_used": 49475.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 4,
+   "last_seen": "2026-06-29",
+   "n_chalk": 4,
+   "n_salary": 4,
+   "n_stack": 4,
+   "sum_chalk": 119.63,
+   "sum_max_stack": 19,
+   "sum_salary_used": 197900
+  },
+  "viking2790": {
+   "avg_chalk_score": 38.6,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 50000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 38.6,
+   "sum_max_stack": 3,
+   "sum_salary_used": 50000
+  },
+  "vmwest1103": {
+   "avg_chalk_score": 29.1,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.1,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49000
+  },
+  "waterfowl14": {
+   "avg_chalk_score": 34.05,
+   "avg_max_stack": 4.0,
+   "avg_salary_used": 49900.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 34.05,
+   "sum_max_stack": 4,
+   "sum_salary_used": 49900
+  },
+  "wcmart": {
+   "avg_chalk_score": 42.41,
+   "avg_max_stack": 3.0,
+   "avg_salary_used": 49400.0,
+   "contests": [
+    "191823035"
+   ],
+   "dup_entries": 0,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 42.41,
+   "sum_max_stack": 3,
+   "sum_salary_used": 49400
+  },
+  "wondertwins17": {
+   "avg_chalk_score": 29.1,
+   "avg_max_stack": 5.0,
+   "avg_salary_used": 49000.0,
+   "contests": [
+    "191787184"
+   ],
+   "dup_entries": 1,
+   "entries": 1,
+   "last_seen": "2026-06-29",
+   "n_chalk": 1,
+   "n_salary": 1,
+   "n_stack": 1,
+   "sum_chalk": 29.1,
+   "sum_max_stack": 5,
+   "sum_salary_used": 49000
+  }
+ }
+}

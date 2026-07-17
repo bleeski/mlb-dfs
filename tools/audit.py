@@ -1,0 +1,206 @@
+"""MLB DFS engine audit v3.0 (package layout).
+
+Ported from project_audit.py v2.2 at the Cowork migration. Kept:
+version-coherence, CSV schema, venue-factor join, compile, scipy.milp,
+and the full-suite run with an expected test count. Retired: the SHA-256
+checksum manifest, the manifest txt, and the 26-file cap. Git history is
+provenance now; the retired originals live in docs/legacy/.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import importlib.util
+import json
+import py_compile
+import re
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, List
+
+VERSION = "v3.0"
+PROJECT_VERSION = "v2.26.0"
+LAYOUT_VERSION = "v3.0.0-pre"
+EXPECTED_TEST_COUNT = 119
+
+EXPECTED_VERSION_TEXT = {
+    "MLB_Classic.md": "v2.26.0",
+    "mlb_engine/optimize/optimizer_v3.py": "OPTIMIZER_VERSION = 'v3.18'",
+    "mlb_engine/allocate/contest_allocator.py": 'VERSION = "v1.10"',
+    "mlb_engine/intake/slate_intake_manager.py": 'VERSION = "v1.7"',
+    "mlb_engine/entries/dk_entries_manager.py": 'VERSION = "v1.6"',
+    "mlb_engine/swap/late_swap_manager.py": 'VERSION = "v1.3"',
+    "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.3"',
+    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.9"',
+    "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.4"',
+    "mlb_engine/projections/xwoba_base_correction.py": 'VERSION = "v1.2"',
+    "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.2"',
+    "mlb_engine/optimize/tail_candidate_scanner.py": 'VERSION = "v1.0"',
+    "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.0"',
+}
+
+CSV_REQUIRED = {
+    "data/reference/team_to_venue.csv": {
+        "Home_Team", "Venue", "Roof_Type", "Latitude", "Longitude", "Timezone",
+        "Weather_Required", "Wind_Sensitivity", "Wind_Min_Speed_MPH",
+    },
+    "data/reference/game_venue_overrides.csv": {
+        "Game_Date", "Away_Team", "Home_Team", "Venue", "Projection_F5_Status",
+        "Run_Factor_Applied", "HR_Factor_Applied", "F5_Approval_Note", "Source_URL",
+        "Wind_Sensitivity", "Wind_Min_Speed_MPH",
+    },
+    "data/reference/f5_park_factors.csv": {
+        "Venue", "Run_Factor_Applied", "HR_Factor_Applied", "Wind_Sensitivity",
+    },
+    "data/reference/f5_weather_adjustments.csv": {
+        "Adjustment_Type", "Level", "Direction", "Hitter_Factor", "Pitcher_Factor",
+        "Game_Exposure_Cap", "Exclude_Game",
+    },
+    "data/reference/dk_contest_archetypes.csv": {"pattern", "inferred_type", "confidence"},
+}
+
+
+def csv_header(path: Path) -> List[str]:
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        return next(csv.reader(handle), [])
+
+
+def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
+    errors: List[str] = []
+    warnings: List[str] = []
+    checks: Dict[str, Any] = {}
+
+    missing = [rel for rel in EXPECTED_VERSION_TEXT if not (root / rel).exists()]
+    missing += [rel for rel in CSV_REQUIRED if not (root / rel).exists()]
+    if missing:
+        errors.append(f"missing files: {missing}")
+    checks["inventory"] = {"missing": missing}
+
+    version_failures = []
+    for rel, needle in EXPECTED_VERSION_TEXT.items():
+        path = root / rel
+        if path.exists() and needle not in path.read_text(encoding="utf-8"):
+            version_failures.append(rel)
+    if version_failures:
+        errors.append(f"version text mismatch: {version_failures}")
+    checks["versions"] = {"passed": not version_failures, "failures": version_failures}
+
+    csv_failures = {}
+    for rel, required in CSV_REQUIRED.items():
+        path = root / rel
+        if not path.exists():
+            continue
+        absent = sorted(required - set(csv_header(path)))
+        if absent:
+            csv_failures[rel] = absent
+    if csv_failures:
+        errors.append(f"CSV schema failures: {csv_failures}")
+    checks["csv_schemas"] = {"passed": not csv_failures, "failures": csv_failures}
+
+    venue_join_missing = []
+    tv = root / "data/reference/team_to_venue.csv"
+    pf = root / "data/reference/f5_park_factors.csv"
+    if tv.exists() and pf.exists():
+        with tv.open(newline="", encoding="utf-8-sig") as handle:
+            team_venues = {row["Venue"] for row in csv.DictReader(handle)}
+        with pf.open(newline="", encoding="utf-8-sig") as handle:
+            factor_venues = {row["Venue"] for row in csv.DictReader(handle)}
+        venue_join_missing = sorted(team_venues - factor_venues)
+        if venue_join_missing:
+            errors.append(f"venues missing park factors: {venue_join_missing}")
+    checks["venue_factor_join"] = {"passed": not venue_join_missing, "missing": venue_join_missing}
+
+    compile_failures = []
+    py_files = sorted(
+        p for d in ("mlb_engine", "tools", "tests")
+        for p in (root / d).rglob("*.py")
+        if "__pycache__" not in p.parts
+    )
+    for path in py_files:
+        try:
+            py_compile.compile(str(path), doraise=True)
+        except Exception as exc:  # pragma: no cover
+            compile_failures.append(f"{path.relative_to(root)}: {exc}")
+    if compile_failures:
+        errors.extend(compile_failures)
+    checks["python_compile"] = {"passed": not compile_failures, "count": len(py_files), "failures": compile_failures}
+
+    scipy_ok = importlib.util.find_spec("scipy") is not None
+    if scipy_ok:
+        try:
+            from scipy.optimize import milp  # noqa: F401
+        except Exception:
+            scipy_ok = False
+    if not scipy_ok:
+        errors.append("scipy.optimize.milp unavailable")
+    checks["scipy_milp"] = {"passed": scipy_ok}
+
+    test_result = None
+    if run_tests and (root / "tests" / "test_core.py").exists():
+        proc = subprocess.run(
+            [sys.executable, "-m", "unittest", "tests.test_core"],
+            cwd=str(root), text=True, capture_output=True,
+        )
+        combined = proc.stdout + "\n" + proc.stderr
+        match = re.search(r"Ran\s+(\d+)\s+tests?", combined)
+        runtime_count = int(match.group(1)) if match else None
+        passed = proc.returncode == 0 and runtime_count == EXPECTED_TEST_COUNT
+        test_result = {
+            "passed": passed,
+            "returncode": proc.returncode,
+            "runtime_test_count": runtime_count,
+            "expected_test_count": EXPECTED_TEST_COUNT,
+            "stdout_tail": proc.stdout[-2000:],
+            "stderr_tail": proc.stderr[-4000:],
+        }
+        if not passed:
+            errors.append(
+                f"test suite failed or count != {EXPECTED_TEST_COUNT} (ran {runtime_count})"
+            )
+    checks["tests"] = test_result
+
+    return {
+        "project_version": PROJECT_VERSION,
+        "layout_version": LAYOUT_VERSION,
+        "audit_version": VERSION,
+        "passed": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "checks": checks,
+        "summary": "Audit passed" if not errors else "Audit failed",
+    }
+
+
+def terse_output(result: Dict[str, Any]) -> str:
+    if result["passed"]:
+        modules = sum(1 for k in EXPECTED_VERSION_TEXT if k.endswith(".py"))
+        test_check = result["checks"].get("tests") or {}
+        test_count = test_check.get("runtime_test_count", "?")
+        return f"PASS  {result['project_version']}  {modules} modules  {test_count} tests"
+    return "FAIL  " + ";  ".join(result["errors"])
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="MLB DFS engine audit (package layout)")
+    parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1]))
+    parser.add_argument("--run-tests", action="store_true", help="run the full suite and verify the count")
+    parser.add_argument("--terse", action="store_true", help="one-line PASS/FAIL summary")
+    parser.add_argument("--output", help="write full JSON result to this path")
+    args = parser.parse_args()
+
+    result = run_audit(Path(args.root), run_tests=args.run_tests)
+
+    if args.terse:
+        print(terse_output(result))
+        raise SystemExit(0 if result["passed"] else 1)
+
+    text = json.dumps(result, indent=2, sort_keys=True)
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+    print(text)
+    raise SystemExit(0 if result["passed"] else 1)
+
+
+if __name__ == "__main__":
+    main()

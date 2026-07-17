@@ -1,0 +1,1218 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.3-review",
+ "coverage": "full",
+ "contest_id": "191823035",
+ "slate_date": "2026-06-29",
+ "meta": {
+  "entries_total": 29,
+  "entries_complete_lineups": 29,
+  "winning_points": 154.7,
+  "winning_entry_id": "5178336996",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 27,
+  "entries_in_duplicated_lineups": 4,
+  "share_duplicated_pct": 13.8,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 25,
+   "2": 2
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2000,
+  "at_cap_entries": 14,
+  "at_cap_share_pct": 48.3,
+  "salary_left_histogram": {
+   "<= 0": 7,
+   "701-1500": 3,
+   "101-300": 4,
+   "301-700": 8,
+   "1-100": 7
+  },
+  "max_stack_histogram": {
+   "3": 9,
+   "4": 16,
+   "5": 4
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Braxton Ashcraft",
+     "Sean Burke"
+    ],
+    "count": 10,
+    "field_share_pct": 34.5
+   },
+   {
+    "pair": [
+     "Aaron Nola",
+     "Sean Burke"
+    ],
+    "count": 6,
+    "field_share_pct": 20.7
+   },
+   {
+    "pair": [
+     "Aaron Nola",
+     "Shane Baz"
+    ],
+    "count": 4,
+    "field_share_pct": 13.8
+   },
+   {
+    "pair": [
+     "Aaron Nola",
+     "Braxton Ashcraft"
+    ],
+    "count": 4,
+    "field_share_pct": 13.8
+   },
+   {
+    "pair": [
+     "Braxton Ashcraft",
+     "Shane Baz"
+    ],
+    "count": 3,
+    "field_share_pct": 10.3
+   },
+   {
+    "pair": [
+     "Sean Burke",
+     "Shane Baz"
+    ],
+    "count": 2,
+    "field_share_pct": 6.9
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Konnor Griffin",
+    "pct_drafted": 68.97
+   },
+   {
+    "player": "Miguel Vargas",
+    "pct_drafted": 65.52
+   },
+   {
+    "player": "Sean Burke",
+    "pct_drafted": 62.07
+   },
+   {
+    "player": "Braxton Ashcraft",
+    "pct_drafted": 58.62
+   },
+   {
+    "player": "Kyle Teel",
+    "pct_drafted": 55.17
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true
+ },
+ "entries": [
+  {
+   "entry_id": "5178336996",
+   "username": "Silverbxxck",
+   "points": 154.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "endy rodriguez",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "miguel vargas",
+    "ryan ohearn",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178461749",
+   "username": "Jbucna",
+   "points": 143.7,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 47.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "braxton ashcraft",
+    "bryan reynolds",
+    "chase meidroth",
+    "colson montgomery",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "ryan ohearn",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178454588",
+   "username": "JJWADDELL",
+   "points": 138.55,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Aaron Nola",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 42.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "brandon marsh",
+    "bryson stott",
+    "colson montgomery",
+    "endy rodriguez",
+    "konnor griffin",
+    "miguel vargas",
+    "ryan ohearn",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178480966",
+   "username": "RaymondAnthonyPablo",
+   "points": 134.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "braxton ashcraft",
+    "bryan reynolds",
+    "chase meidroth",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "pete alonso",
+    "ryan ohearn",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178381926",
+   "username": "grok",
+   "points": 132.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Sean Burke",
+    "Shane Baz"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 41.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "chase meidroth",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle schwarber",
+    "kyle teel",
+    "ryan ohearn",
+    "sean burke",
+    "shane baz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178437820",
+   "username": "bleeski",
+   "points": 132.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 51.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "ryan ohearn",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178505858",
+   "username": "gustavo0413",
+   "points": 132.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 51.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "ryan ohearn",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178505939",
+   "username": "rcollins587",
+   "points": 124.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "braxton ashcraft",
+    "bryce harper",
+    "colson montgomery",
+    "esmerlyn valdez",
+    "jackson holliday",
+    "kyle schwarber",
+    "kyle teel",
+    "miguel vargas",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178448414",
+   "username": "jklodawizard",
+   "points": 123.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Shane Baz"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 44.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "braxton ashcraft",
+    "bryson stott",
+    "colson montgomery",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "sam antonacci",
+    "shane baz",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178374037",
+   "username": "Primetime2194",
+   "points": 116.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Aaron Nola",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 47.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "bryce harper",
+    "bryson stott",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle schwarber",
+    "kyle teel",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178271566",
+   "username": "wcmart",
+   "points": 115.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "braxton ashcraft",
+    "bryson stott",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "nick gonzales",
+    "sam antonacci",
+    "sean burke",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178467794",
+   "username": "ninefive",
+   "points": 112.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Shane Baz"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "braden montgomery",
+    "brandon lowe",
+    "braxton ashcraft",
+    "bryce harper",
+    "endy rodriguez",
+    "jared triolo",
+    "kyle schwarber",
+    "shane baz",
+    "tyler callihan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178380292",
+   "username": "apenn21",
+   "points": 110.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Aaron Nola",
+    "Shane Baz"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "alec bohm",
+    "brandon lowe",
+    "brandon marsh",
+    "bryce harper",
+    "dylan beavers",
+    "esmerlyn valdez",
+    "gunnar henderson",
+    "kyle teel",
+    "shane baz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178412205",
+   "username": "rictaji",
+   "points": 108.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Aaron Nola",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "bryce harper",
+    "chase meidroth",
+    "justin crawford",
+    "kyle schwarber",
+    "kyle teel",
+    "miguel vargas",
+    "sean burke",
+    "trea turner",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178351136",
+   "username": "SinCitySlumdweller",
+   "points": 106.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 47.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "braxton ashcraft",
+    "bryan reynolds",
+    "colson montgomery",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke",
+    "tyler callihan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178462331",
+   "username": "earlbobby",
+   "points": 105.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon lowe",
+    "braxton ashcraft",
+    "bryan reynolds",
+    "colson montgomery",
+    "konnor griffin",
+    "kyle teel",
+    "miguel vargas",
+    "randal grichuk",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178504218",
+   "username": "NJ-Ram",
+   "points": 104.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 32.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "brandon marsh",
+    "braxton ashcraft",
+    "bryson stott",
+    "j t realmuto",
+    "konnor griffin",
+    "kyle schwarber",
+    "pete alonso",
+    "sean burke",
+    "tyler callihan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178432528",
+   "username": "thesnod",
+   "points": 104.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Aaron Nola",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 33.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "braden montgomery",
+    "bryce harper",
+    "chase meidroth",
+    "j t realmuto",
+    "kyle schwarber",
+    "miguel vargas",
+    "sean burke",
+    "trea turner",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178437822",
+   "username": "callahanm328",
+   "points": 103.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Aaron Nola",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 44.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "bryce harper",
+    "chase meidroth",
+    "konnor griffin",
+    "kyle schwarber",
+    "kyle teel",
+    "miguel vargas",
+    "ryan ohearn",
+    "sean burke",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178365351",
+   "username": "DanDePo",
+   "points": 101.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Aaron Nola",
+    "Shane Baz"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "adley rutschman",
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "colton cowser",
+    "shane baz",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178496653",
+   "username": "SupernintendoBraun",
+   "points": 100.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Braxton Ashcraft",
+    "Shane Baz"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 33.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "braden montgomery",
+    "brandon lowe",
+    "braxton ashcraft",
+    "esmerlyn valdez",
+    "konnor griffin",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "shane baz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178504299",
+   "username": "deets27",
+   "points": 98.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Sean Burke",
+    "Shane Baz"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 31.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "bryce harper",
+    "chase meidroth",
+    "colson montgomery",
+    "colton cowser",
+    "kyle schwarber",
+    "samuel basallo",
+    "sean burke",
+    "shane baz",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178347925",
+   "username": "Skralph",
+   "points": 90.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Aaron Nola",
+    "Shane Baz"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "adley rutschman",
+    "alec bohm",
+    "bryce harper",
+    "chase meidroth",
+    "jake mangum",
+    "konnor griffin",
+    "kyle schwarber",
+    "sam antonacci",
+    "shane baz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178258391",
+   "username": "Mulligan4J",
+   "points": 84.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Aaron Nola",
+    "Shane Baz"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "andrew benintendi",
+    "brandon marsh",
+    "bryan reynolds",
+    "colson montgomery",
+    "gunnar henderson",
+    "jackson holliday",
+    "pete alonso",
+    "samuel basallo",
+    "shane baz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178262070",
+   "username": "nickenyon6",
+   "points": 77.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Aaron Nola",
+    "Braxton Ashcraft"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 43.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "adley rutschman",
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "konnor griffin",
+    "miguel vargas",
+    "randal grichuk",
+    "sam antonacci",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178442488",
+   "username": "griffalicious24",
+   "points": 77.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Aaron Nola",
+    "Braxton Ashcraft"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 43.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "adley rutschman",
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "konnor griffin",
+    "miguel vargas",
+    "randal grichuk",
+    "sam antonacci",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178342845",
+   "username": "dos-perros",
+   "points": 75.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Aaron Nola",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 44.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "alec bohm",
+    "braden montgomery",
+    "brandon lowe",
+    "bryan reynolds",
+    "konnor griffin",
+    "kyle schwarber",
+    "kyle teel",
+    "miguel vargas",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178430477",
+   "username": "CashLineCriminal",
+   "points": 73.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Aaron Nola",
+    "Braxton Ashcraft"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 42.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "adley rutschman",
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "dylan beavers",
+    "konnor griffin",
+    "miguel vargas",
+    "ryan ohearn",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5178456389",
+   "username": "tvielkin",
+   "points": 56.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Aaron Nola",
+    "Braxton Ashcraft"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "aaron nola",
+    "brandon lowe",
+    "braxton ashcraft",
+    "colson montgomery",
+    "colton cowser",
+    "dylan beavers",
+    "gunnar henderson",
+    "kyle teel",
+    "pete alonso",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Konnor Griffin",
+   "player_norm": "konnor griffin",
+   "roster_position": "SS",
+   "pct_drafted": 68.97,
+   "fpts": 15.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "1B",
+   "pct_drafted": 65.52,
+   "fpts": 12.0
+  },
+  {
+   "player": "Sean Burke",
+   "player_norm": "sean burke",
+   "roster_position": "P",
+   "pct_drafted": 62.07,
+   "fpts": 19.8
+  },
+  {
+   "player": "Braxton Ashcraft",
+   "player_norm": "braxton ashcraft",
+   "roster_position": "P",
+   "pct_drafted": 58.62,
+   "fpts": 19.9
+  },
+  {
+   "player": "Kyle Teel",
+   "player_norm": "kyle teel",
+   "roster_position": "C",
+   "pct_drafted": 55.17,
+   "fpts": 5.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "3B",
+   "pct_drafted": 51.72,
+   "fpts": 9.0
+  },
+  {
+   "player": "Aaron Nola",
+   "player_norm": "aaron nola",
+   "roster_position": "P",
+   "pct_drafted": 48.28,
+   "fpts": -0.25
+  },
+  {
+   "player": "Brandon Lowe",
+   "player_norm": "brandon lowe",
+   "roster_position": "2B",
+   "pct_drafted": 44.83,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kyle Schwarber",
+   "player_norm": "kyle schwarber",
+   "roster_position": "OF",
+   "pct_drafted": 41.38,
+   "fpts": 4.0
+  },
+  {
+   "player": "Bryce Harper",
+   "player_norm": "bryce harper",
+   "roster_position": "1B",
+   "pct_drafted": 37.93,
+   "fpts": 18.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 37.93,
+   "fpts": 11.0
+  },
+  {
+   "player": "Esmerlyn Valdez",
+   "player_norm": "esmerlyn valdez",
+   "roster_position": "OF",
+   "pct_drafted": 34.48,
+   "fpts": 27.0
+  },
+  {
+   "player": "Shane Baz",
+   "player_norm": "shane baz",
+   "roster_position": "P",
+   "pct_drafted": 31.03,
+   "fpts": 18.95
+  },
+  {
+   "player": "Ryan O'Hearn",
+   "player_norm": "ryan ohearn",
+   "roster_position": "OF",
+   "pct_drafted": 31.03,
+   "fpts": 12.0
+  },
+  {
+   "player": "Taylor Ward",
+   "player_norm": "taylor ward",
+   "roster_position": "OF",
+   "pct_drafted": 27.59,
+   "fpts": 0.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 27.59,
+   "fpts": 13.0
+  },
+  {
+   "player": "Brandon Marsh",
+   "player_norm": "brandon marsh",
+   "roster_position": "OF",
+   "pct_drafted": 24.14,
+   "fpts": 28.0
+  },
+  {
+   "player": "Bryan Reynolds",
+   "player_norm": "bryan reynolds",
+   "roster_position": "OF",
+   "pct_drafted": 20.69,
+   "fpts": 11.0
+  },
+  {
+   "player": "Bryson Stott",
+   "player_norm": "bryson stott",
+   "roster_position": "2B",
+   "pct_drafted": 20.69,
+   "fpts": 5.0
+  },
+  {
+   "player": "Alec Bohm",
+   "player_norm": "alec bohm",
+   "roster_position": "3B",
+   "pct_drafted": 20.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Braden Montgomery",
+   "player_norm": "braden montgomery",
+   "roster_position": "OF",
+   "pct_drafted": 20.69,
+   "fpts": 7.0
+  },
+  {
+   "player": "Pete Alonso",
+   "player_norm": "pete alonso",
+   "roster_position": "1B",
+   "pct_drafted": 17.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Adley Rutschman",
+   "player_norm": "adley rutschman",
+   "roster_position": "C",
+   "pct_drafted": 17.24,
+   "fpts": 4.0
+  },
+  {
+   "player": "Trea Turner",
+   "player_norm": "trea turner",
+   "roster_position": "SS",
+   "pct_drafted": 10.34,
+   "fpts": 19.0
+  },
+  {
+   "player": "Gunnar Henderson",
+   "player_norm": "gunnar henderson",
+   "roster_position": "SS",
+   "pct_drafted": 10.34,
+   "fpts": 12.0
+  },
+  {
+   "player": "Endy Rodriguez",
+   "player_norm": "endy rodriguez",
+   "roster_position": "C",
+   "pct_drafted": 10.34,
+   "fpts": 27.0
+  },
+  {
+   "player": "Samuel Basallo",
+   "player_norm": "samuel basallo",
+   "roster_position": "C",
+   "pct_drafted": 10.34,
+   "fpts": 3.0
+  },
+  {
+   "player": "Randal Grichuk",
+   "player_norm": "randal grichuk",
+   "roster_position": "OF",
+   "pct_drafted": 10.34,
+   "fpts": 5.0
+  },
+  {
+   "player": "Blaze Alexander",
+   "player_norm": "blaze alexander",
+   "roster_position": "3B",
+   "pct_drafted": 10.34,
+   "fpts": 4.0
+  },
+  {
+   "player": "Colton Cowser",
+   "player_norm": "colton cowser",
+   "roster_position": "OF",
+   "pct_drafted": 10.34,
+   "fpts": 9.0
+  },
+  {
+   "player": "Tyler Callihan",
+   "player_norm": "tyler callihan",
+   "roster_position": "OF",
+   "pct_drafted": 10.34,
+   "fpts": 2.0
+  },
+  {
+   "player": "Tristan Peters",
+   "player_norm": "tristan peters",
+   "roster_position": "OF",
+   "pct_drafted": 10.34,
+   "fpts": 5.0
+  },
+  {
+   "player": "Dylan Beavers",
+   "player_norm": "dylan beavers",
+   "roster_position": "OF",
+   "pct_drafted": 10.34,
+   "fpts": 0.0
+  },
+  {
+   "player": "J.T. Realmuto",
+   "player_norm": "j t realmuto",
+   "roster_position": "C",
+   "pct_drafted": 6.9,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jackson Holliday",
+   "player_norm": "jackson holliday",
+   "roster_position": "2B",
+   "pct_drafted": 6.9,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nick Gonzales",
+   "player_norm": "nick gonzales",
+   "roster_position": "3B",
+   "pct_drafted": 3.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Mangum",
+   "player_norm": "jake mangum",
+   "roster_position": "OF",
+   "pct_drafted": 3.45,
+   "fpts": 7.0
+  },
+  {
+   "player": "Andrew Benintendi",
+   "player_norm": "andrew benintendi",
+   "roster_position": "OF",
+   "pct_drafted": 3.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Justin Crawford",
+   "player_norm": "justin crawford",
+   "roster_position": "OF",
+   "pct_drafted": 3.45,
+   "fpts": 13.0
+  },
+  {
+   "player": "Jared Triolo",
+   "player_norm": "jared triolo",
+   "roster_position": "SS",
+   "pct_drafted": 3.45,
+   "fpts": 14.0
+  }
+ ]
+}

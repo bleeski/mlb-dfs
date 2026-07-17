@@ -1,0 +1,7 @@
+runs/
+outputs/
+data/standings/inbox/
+__pycache__/
+*.pyc
+.env
+.DS_Store

@@ -1,0 +1,31 @@
+Venue,Run_Factor_Raw,HR_Factor_Raw,Run_Factor_Applied,HR_Factor_Applied,Wind_Sensitivity,Last_Updated
+Chase Field,0.980,0.920,0.980,0.940,Roof,2026-07-07
+Truist Park,0.900,0.880,0.940,0.940,Medium,2026-07-07
+Oriole Park at Camden Yards,1.040,0.990,1.040,0.990,Medium,2026-07-07
+Fenway Park,0.960,0.760,0.960,0.940,High,2026-07-07
+Wrigley Field,1.040,1.110,1.040,1.080,High,2026-07-07
+Rate Field,0.960,0.970,0.960,0.970,Medium,2026-07-07
+Great American Ball Park,1.020,1.230,1.020,1.080,High,2026-07-07
+Progressive Field,0.940,0.760,0.940,0.940,Medium,2026-07-07
+Coors Field,1.190,0.990,1.080,0.990,Medium,2026-07-07
+Comerica Park,0.940,0.970,0.940,0.970,Medium,2026-07-07
+Daikin Park,1.020,1.280,1.020,1.080,Roof,2026-07-07
+Kauffman Stadium,1.140,1.020,1.080,1.020,High,2026-07-07
+Angel Stadium,0.860,0.720,0.940,0.940,Medium,2026-07-07
+Dodger Stadium,0.940,1.160,0.940,1.080,Medium,2026-07-07
+loanDepot park,0.900,0.710,0.940,0.940,Roof,2026-07-07
+American Family Field,0.960,0.990,0.960,0.990,Roof,2026-07-07
+Target Field,0.980,0.920,0.980,0.940,Medium,2026-07-07
+Citi Field,0.960,0.900,0.960,0.940,Medium,2026-07-07
+Yankee Stadium,1.060,1.320,1.060,1.080,Medium,2026-07-07
+Sutter Health Park,1.280,1.250,1.080,1.080,High,2026-07-07
+Citizens Bank Park,1.080,1.120,1.080,1.080,Medium,2026-07-07
+PNC Park,1.100,0.940,1.080,0.940,High,2026-07-07
+Petco Park,0.850,0.860,0.940,0.940,High,2026-07-07
+T-Mobile Park,0.880,1.030,0.940,1.030,Roof,2026-07-07
+Oracle Park,0.900,0.740,0.940,0.940,High,2026-07-07
+Busch Stadium,0.920,0.690,0.940,0.940,Medium,2026-07-07
+Tropicana Field,1.020,1.180,1.020,1.080,Roof,2026-07-07
+Globe Life Field,0.880,0.980,0.940,0.980,Roof,2026-07-07
+Rogers Centre,1.000,1.090,1.000,1.080,Roof,2026-07-07
+Nationals Park,1.170,1.290,1.080,1.080,Medium,2026-07-07

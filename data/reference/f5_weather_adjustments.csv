@@ -1,0 +1,16 @@
+Adjustment_Type,Level,Direction,Hitter_Factor,Pitcher_Factor,Game_Exposure_Cap,Exclude_Game,Notes
+wind,8-12,out,1.015,0.985,,false,Use only when park threshold is met
+wind,8-12,in,0.985,1.015,,false,Use only when park threshold is met
+wind,8-12,cross,1.000,1.000,,false,
+wind,13-17,out,1.030,0.970,,false,
+wind,13-17,in,0.970,1.030,,false,
+wind,13-17,cross,1.000,1.000,,false,
+wind,18+,out,1.040,0.960,,false,
+wind,18+,in,0.960,1.040,,false,
+wind,18+,cross,1.000,1.000,,false,
+delay,none,,1.000,1.000,,false,"Delay affects starting pitchers, not hitters"
+delay,low,,1.000,1.000,,false,
+delay,medium,,1.000,0.950,,false,Pitcher-only downgrade
+delay,high,,1.000,0.850,,false,Pitcher-only downgrade and exposure warning
+postponement,medium,,1.000,1.000,0.25,false,Cap total game exposure; explicit warning
+postponement,high,,1.000,1.000,0.00,true,Exclude game or wait for resolution
