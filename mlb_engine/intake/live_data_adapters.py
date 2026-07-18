@@ -67,7 +67,7 @@ THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
 
 # MLB Stats API abbreviations that differ from DraftKings CSV abbreviations.
-DK_ABBREV_REMAP = {"AZ": "ARI", "ATH": "OAK"}
+DK_ABBREV_REMAP = {"AZ": "ARI"}  # ATH passes through unchanged: DraftKings, the salary CSV, and data/reference all key the Athletics as ATH post-relocation (was OAK)
 
 # the-odds-api returns full team names; DraftKings CSVs use abbreviations.
 MLB_TEAM_NAME_TO_DK = {
@@ -80,8 +80,8 @@ MLB_TEAM_NAME_TO_DK = {
     "los angeles angels": "LAA", "los angeles dodgers": "LAD",
     "miami marlins": "MIA", "milwaukee brewers": "MIL",
     "minnesota twins": "MIN", "new york mets": "NYM",
-    "new york yankees": "NYY", "athletics": "OAK",
-    "oakland athletics": "OAK", "philadelphia phillies": "PHI",
+    "new york yankees": "NYY", "athletics": "ATH",
+    "oakland athletics": "ATH", "philadelphia phillies": "PHI",
     "pittsburgh pirates": "PIT", "san diego padres": "SD",
     "san francisco giants": "SF", "seattle mariners": "SEA",
     "st louis cardinals": "STL", "st. louis cardinals": "STL",
