@@ -1,0 +1,7 @@
+# Normalize text files to LF in the repo and on checkout, so Windows
+# core.autocrlf=true stops re-churning every tracked file as modified.
+* text=auto eol=lf
+
+# Data files: treat as binary so bytes (BOMs, source line endings) are
+# preserved exactly and never show up as line-ending-only diffs.
+*.csv -text
