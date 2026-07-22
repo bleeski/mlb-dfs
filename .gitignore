@@ -9,3 +9,9 @@ __pycache__/
 # transient per-slate working inputs (bundle, salaries, entries); the
 # durable record is data/archive/<date>/, not data/slates/
 data/slates/*/
+
+# stray root-level bundle (belongs in data/slates/<date>/)
+/slate_bundle.json
+
+# ad-hoc session scratch
+_scratch_*/
