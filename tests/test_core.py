@@ -792,6 +792,47 @@ class LiveDataAdapterTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     build_entry_requirements(entries, statuses, NOW)
 
+    def test_normalize_name_folds_diacritics_and_suffixes(self):
+        # Regression for the 2026-07-19 bug: the old regex deleted an accented
+        # character instead of folding it, so "José" and "Jose" normalized
+        # to different keys and a confirmed starter's salary row went unmatched.
+        from mlb_engine.intake.slate_intake_manager import normalize_name
+        self.assertEqual(normalize_name("José Fermín"), normalize_name("Jose Fermin"))
+        self.assertEqual(normalize_name("Nasim Nuñez"), normalize_name("Nasim Nunez"))
+        self.assertEqual(normalize_name("Andrés Chaparro"), normalize_name("Andres Chaparro"))
+        self.assertEqual(normalize_name("Julio Rodríguez Jr."), normalize_name("Julio Rodriguez"))
+        self.assertEqual(normalize_name("O'Hoppe"), normalize_name("O'Hoppe"))  # unchanged/self-consistent
+        self.assertEqual(normalize_name(""), "")
+        self.assertEqual(normalize_name(None), "")
+
+    def test_accented_feed_name_matches_ascii_salary_row(self):
+        # Same bug, exercised through the real matching path: a confirmed-lineup
+        # hitter with an accented name (as the MLB Stats API returns it) must
+        # still resolve against the plain-ASCII DK salary row for that player,
+        # not fall into unmatched_feed_players / uncovered_salary_player_ids.
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            with salary.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["Position", "Name + ID", "Name", "ID", "Roster Position", "Salary", "Game Info", "TeamAbbrev"])
+                writer.writerow(["C", "Jose Fermin (77001)", "Jose Fermin", "77001", "C", "4000",
+                                  "AAA@BBB 06/11/2026 01:00PM ET", "AAA"])
+            feed = {
+                "date": "2026-06-11", "fetched_at": TS,
+                "games": [{
+                    "game_pk": 1, "game_date_utc": TS, "status": "Pre-Game", "venue": "Test Park",
+                    "away": {
+                        "team_abbrev": "AAA", "lineup_status": "confirmed", "probable_pitcher": None,
+                        "lineup": [{"order": 1, "id": 900, "name": "José Fermín", "position": "C", "bat_side": "R"}],
+                    },
+                    "home": {"team_abbrev": "BBB", "lineup_status": "tbd", "probable_pitcher": None, "lineup": []},
+                }],
+            }
+            result = lda.build_status_map_from_lineups_feed(feed, str(salary))
+            self.assertEqual(result["unmatched_feed_players"], [])
+            self.assertIn("77001", result["confirmed_hitter_ids"])
+            self.assertEqual(result["status_by_player_id"]["77001"].status, "Confirmed_Starter")
+
     def test_totals_raw_to_odds_packet(self):
         raw = [{
             "id": "ev1", "commence_time": "2026-06-11T17:05:00Z",
@@ -2253,6 +2294,204 @@ class PctFloorAndClockPipelineTests(unittest.TestCase):
             self.assertTrue(clock["past_deadline"])  # fixture slate date is in the past
             warnings = plan["checkpoint_plan"].get("warnings") or []
             self.assertTrue(any(str(w).startswith("slate_clock:") for w in warnings))
+
+
+class WaterfallCheckpointTests(unittest.TestCase):
+    """v1.10: posture_allocator rendered as a first-class, review-only checkpoint
+    block, plus a DISPLAY-ONLY tier-derived coverage target. Nothing here auto-applies
+    to the certified build; every value stays a deterministic review proxy."""
+
+    @staticmethod
+    def _menu():
+        # contest_ids match the entries fixture; shapes land one A, one F, one V.
+        return [
+            {"contest_id": "900", "name": "MLB WTA Satellite", "entry_fee": 5,
+             "field_size": 30, "paid_places": 1, "my_entries": 1},
+            {"contest_id": "901", "name": "MLB Double Up", "entry_fee": 5,
+             "field_size": 100, "paid_places": 30, "my_entries": 1},
+            {"contest_id": "902", "name": "MLB Small Shootout", "entry_fee": 2,
+             "field_size": 50, "paid_places": 5, "my_entries": 1},
+        ]
+
+    def test_waterfall_block_absent_when_not_supplied(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            proj = projection_frame(ids)
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj,
+                candidates_override=[candidate("A", legal_rosters(ids)[0], 100)],
+                approve=False,
+            )
+            wf = plan["checkpoint_plan"]["waterfall"]
+            self.assertFalse(wf["available"])
+            self.assertIn("posture defaults", wf["note"])
+            self.assertEqual(plan["status"], "plan_pending_approval")
+
+    def test_waterfall_block_present_and_labeled(self):
+        from mlb_engine.allocate import posture_allocator as pa
+        result = pa.allocate(self._menu())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            write_entries(entries, rosters=[None, None, None],
+                          contest_ids=["900", "901", "902"])
+            proj = projection_frame(ids)
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj,
+                candidates_override=[candidate("A", legal_rosters(ids)[0], 100)],
+                waterfall=result, approve=False,
+            )
+            wf = plan["checkpoint_plan"]["waterfall"]
+            self.assertTrue(wf["available"])
+            self.assertEqual({r["tier"] for r in wf["tiers"]}, {"A", "F", "V"})
+            self.assertEqual(set(wf["tier_entry_counts"]), {"A", "F", "V"})
+            # Truthful-labels guard: the block disclaims win-rate/ROI/probability.
+            for banned in ("win rate", "ROI", "probability"):
+                self.assertIn(banned, wf["label"])
+            self.assertIsNotNone(wf["fee_shares"])
+            self.assertIsInstance(wf["coverage_target"], dict)
+            self.assertTrue(wf["coverage_target"]["applies"])
+            # run_slate also surfaces the block at the top level for convenience.
+            self.assertEqual(plan["waterfall"], wf)
+
+    def test_derive_coverage_target_apex_scales_sp_pairs(self):
+        wf = {"rows": [{"contest_id": "900", "tier": "A"}]}
+        reqs = _entry_reqs(16, contest_id="900")
+        cov = epi.derive_coverage_target(wf, reqs, {"available": True, "viable_sp_pairs": 6})
+        self.assertEqual(cov["sp_pair_spread_demand"], 6)   # min(16, 6), floored to min(3, 6)
+        self.assertGreaterEqual(cov["coverage_target"], 6)
+        self.assertEqual(cov["tier_entry_counts"], {"A": 16})
+        self.assertTrue(cov["applies"])
+
+    def test_derive_coverage_target_floor_heavy_is_compact(self):
+        wf = {"rows": [{"contest_id": "900", "tier": "F"}]}
+        reqs = _entry_reqs(20, contest_id="900")
+        cov = epi.derive_coverage_target(wf, reqs, {"available": True, "viable_sp_pairs": 6})
+        # Floor tolerates a shared chalk core, so the bank target stays small (efficiency).
+        self.assertEqual(cov["coverage_target"], 2)
+        self.assertIsNone(cov["sp_pair_spread_demand"])
+
+    def test_derive_coverage_target_none_when_unresolved(self):
+        wf = {"rows": [{"contest_id": "900", "tier": "UNRESOLVED"}]}
+        reqs = _entry_reqs(5, contest_id="900")
+        self.assertIsNone(epi.derive_coverage_target(wf, reqs, None))
+
+    def test_coverage_target_wired_to_bank_matches_checkpoint(self):
+        # Ledger 3.6 wiring test: the tier-derived coverage target shown in the
+        # approve=False checkpoint is exactly the value that reaches
+        # build_diverse_candidate_bank on approve=True. Real path, synthetic fixtures.
+        from unittest import mock
+        from mlb_engine.allocate import posture_allocator as pa
+        result = pa.allocate(self._menu())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            write_entries(entries, rosters=[None, None, None],
+                          contest_ids=["900", "901", "902"])
+            proj = projection_frame(ids)
+
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj,
+                candidates_override=[candidate("A", legal_rosters(ids)[0], 100)],
+                waterfall=result, requested_n=4, approve=False,
+            )
+            cov = plan["checkpoint_plan"]["waterfall"]["coverage_target"]
+            self.assertTrue(cov["applies"])
+            shown = cov["coverage_target"]
+
+            class _Stop(Exception):
+                pass
+
+            captured = {}
+
+            def _spy(*args, **kwargs):
+                captured["kwargs"] = kwargs
+                raise _Stop()
+
+            with mock.patch.object(opt, "build_diverse_candidate_bank", _spy):
+                with self.assertRaises(_Stop):
+                    run_slate(
+                        runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                        projections_override=proj, waterfall=result,
+                        requested_n=4, approve=True,
+                    )
+        self.assertEqual(captured["kwargs"].get("coverage_target"), shown)
+
+
+class ContestLibraryTests(unittest.TestCase):
+    """contest_library: review-only resolver turning reserved contests into a
+    posture_allocator waterfall in trust order (provided > library > name > unresolved).
+    Companion outside the audited engine; nothing auto-applies."""
+
+    ARCH = str(Path(__file__).resolve().parents[1] / "data" / "reference" / "dk_contest_archetypes.csv")
+
+    @staticmethod
+    def _reserved():
+        return [
+            {"contest_id": "900", "name": "MLB $5 Winner Take All", "entry_fee": 5, "my_entries": 2},
+            {"contest_id": "901", "name": "MLB $10 Double Up", "entry_fee": 10, "my_entries": 1},
+            {"contest_id": "902", "name": "MLB $3 Relay Throw", "entry_fee": 3, "my_entries": 4},
+            {"contest_id": "903", "name": "MLB Totally Novel Contest", "entry_fee": 3, "my_entries": 1},
+        ]
+
+    def test_name_archetype_resolution_and_tiers(self):
+        from mlb_engine.field import contest_library as cl
+        menu = {c["contest_id"]: c for c in cl.resolve_menu(self._reserved(), archetypes_path=self.ARCH)}
+        self.assertEqual(menu["900"]["resolution"], "name_archetype")
+        self.assertLessEqual(menu["900"]["breadth"], 0.05)     # WTA -> Apex
+        self.assertGreaterEqual(menu["901"]["breadth"], 0.20)  # Double Up -> Floor
+        self.assertEqual(menu["903"]["resolution"], "unresolved")
+
+    def test_library_history_beats_name(self):
+        from mlb_engine.field import contest_library as cl
+        reg = cl.empty_registry()
+        cl.record_observation(reg, "MLB Totally Novel Contest", 3,
+                              field_size=200, paid_places=40, date_str="2026-07-18")
+        menu = {c["contest_id"]: c for c in cl.resolve_menu(self._reserved(), reg, archetypes_path=self.ARCH)}
+        self.assertEqual(menu["903"]["resolution"], "library")
+        self.assertEqual(menu["903"]["field_size"], 200)
+        self.assertEqual(menu["903"]["paid_places"], 40)
+
+    def test_provided_beats_everything(self):
+        from mlb_engine.field import contest_library as cl
+        menu = {c["contest_id"]: c for c in cl.resolve_menu(
+            self._reserved(), archetypes_path=self.ARCH,
+            provided_menu=[{"contest_id": "900", "field_size": 50, "paid_places": 1}])}
+        self.assertEqual(menu["900"]["resolution"], "provided")
+        self.assertEqual(menu["900"]["paid_places"], 1)
+
+    def test_build_waterfall_end_to_end_through_run_slate(self):
+        from mlb_engine.field import contest_library as cl
+        reserved = self._reserved()[:3]  # A, F, V, all name-resolved
+        wf = cl.build_waterfall(reserved_contests=reserved, archetypes_path=self.ARCH)
+        self.assertEqual({r["tier"] for r in wf["rows"]}, {"A", "F", "V"})
+        self.assertGreaterEqual(wf["resolution_summary"]["name_archetype"], 3)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            write_entries(entries, rosters=[None, None, None],
+                          contest_ids=["900", "901", "902"])
+            proj = projection_frame(ids)
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj,
+                candidates_override=[candidate("A", legal_rosters(ids)[0], 100)],
+                waterfall=wf, approve=False,
+            )
+            block = plan["checkpoint_plan"]["waterfall"]
+            self.assertTrue(block["available"])
+            self.assertEqual({t["tier"] for t in block["tiers"]}, {"A", "F", "V"})
+            self.assertTrue(all(t["resolution"] == "name_archetype" for t in block["tiers"]))
+            self.assertIsInstance(block["coverage_target"], dict)
 
 
 if __name__ == "__main__":

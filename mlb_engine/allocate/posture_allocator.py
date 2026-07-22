@@ -106,25 +106,41 @@ except Exception:  # pragma: no cover
 
 
 def classify_tier(contest: Dict[str, Any]) -> Dict[str, Any]:
+    """Classify a contest into F/A/V/UNRESOLVED.
+
+    Preferred inputs are exact contest-page counts (field_size, paid_places, seats),
+    which give an exact breadth. When those are absent a caller may supply an inferred
+    ``breadth`` (for example from the contest library's name inference); the tier is
+    then classified from that breadth and the reason is tagged as inferred so the
+    review never mistakes an inferred tier for a confirmed one. Deterministic shape
+    classification, never a probability claim."""
     field = contest.get("field_size")
     paid = contest.get("paid_places")
     seats = contest.get("seats")
-    if not field or paid is None:
+    inferred_breadth = contest.get("breadth")
+    if field and paid is not None:
+        breadth = paid / field
+        exact = True
+    elif inferred_breadth is not None:
+        breadth = float(inferred_breadth)
+        exact = False
+    else:
         return {"tier": "UNRESOLVED", "breadth": None,
-                "reason": "paid_places or field_size missing; capture from the contest page "
-                          "(Cowork archival runbook, job 1) before allocating"}
-    breadth = paid / field
-    if paid == 1:
+                "reason": "paid_places/field_size missing and no inferred breadth; capture from "
+                          "the contest page (Cowork archival runbook, job 1) or seed the contest "
+                          "library before allocating"}
+    tag = "" if exact else " [inferred breadth, not confirmed from the contest page]"
+    if exact and paid == 1:
         return {"tier": "A", "breadth": round(breadth, 4), "reason": "winner-take-all (paid_places == 1)"}
     if seats and seats >= SAT_SEATS_F and breadth >= SAT_F_BREADTH:
         return {"tier": "F", "breadth": round(breadth, 4),
-                "reason": f"multi-seat satellite (seats {seats}, breadth {breadth:.2f}); "
+                "reason": f"multi-seat satellite (seats {seats}, breadth {breadth:.2f}){tag}; "
                           "a won ticket is a realized convertible asset"}
     if breadth >= TIER_F_BREADTH:
-        return {"tier": "F", "breadth": round(breadth, 4), "reason": f"broad payout (breadth {breadth:.2f})"}
+        return {"tier": "F", "breadth": round(breadth, 4), "reason": f"broad payout (breadth {breadth:.2f}){tag}"}
     if breadth <= TIER_A_BREADTH:
-        return {"tier": "A", "breadth": round(breadth, 4), "reason": f"top-heavy payout (breadth {breadth:.2f})"}
-    return {"tier": "V", "breadth": round(breadth, 4), "reason": f"moderate breadth ({breadth:.2f})"}
+        return {"tier": "A", "breadth": round(breadth, 4), "reason": f"top-heavy payout (breadth {breadth:.2f}){tag}"}
+    return {"tier": "V", "breadth": round(breadth, 4), "reason": f"moderate breadth ({breadth:.2f}){tag}"}
 
 
 def resolve_posture(contest: Dict[str, Any], archetypes: Any = None) -> str:
@@ -182,6 +198,8 @@ def allocate(
             "my_entries": my,
             "fee_total": round(fee_total, 2),
             "archetype": ARCHETYPE_BY_TIER.get(cls["tier"], "resolve shape first"),
+            "resolution": c.get("resolution"),
+            "confidence": c.get("confidence"),
         }
         rows.append(row)
         fees_by_tier[cls["tier"]] += fee_total

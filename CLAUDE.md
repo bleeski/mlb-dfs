@@ -65,9 +65,19 @@ immediately with zero diagnostic narration.
 ## Hard guardrails
 - Never log, echo, or write API keys. THE_ODDS_API_KEY stays in the
   environment.
-- Never automate authenticated DraftKings actions. No scripted standings
-  pulls, no scripted uploads, no browser sessions holding Ben's login.
-  Money moves only at Ben's manual upload.
+- DraftKings reads are MANUAL. Claude-in-Chrome is blocked from
+  draftkings.com by platform safety restrictions, and scripted DK access
+  violates DK terms; Claude never attempts to bypass either (no curl, no
+  requests, no alternate fetch). Ben downloads completed-contest standings
+  himself (one click on exportfullstandingscsv/<contest_id> while logged in)
+  and drops them in data/standings/inbox/. Claude automates everything
+  downstream (field_miner, grading, ledger archive) and may emit the exact
+  export URLs from the contest IDs in Ben's files and remind Ben to pull, but
+  never fetches DraftKings itself.
+- The money-and-entry wall is absolute: never automate a DraftKings action
+  that enters a contest or moves money. No lineup uploads, no entry submission
+  or edits, no deposits or withdrawals. Lineups and money move only at Ben's
+  manual action. Never store DK credentials or cookies.
 - Blank reserved entry rows block certification. Never bypass.
 - Ledger edits are in place; the archive is append-only, newest first;
   never drop an invariant section.
@@ -76,9 +86,11 @@ immediately with zero diagnostic narration.
 
 ## Scheduled task sessions
 Each scheduled run is its own session. Read this file and the ledger
-Quick Card first. Stay file-scoped: no browser, no DraftKings, no
-destructive git operations. Commit with a descriptive message when a task
-changes tracked files.
+Quick Card first. Stay file-scoped: no DraftKings fetching (the platform
+blocks it and it is barred anyway), no destructive git operations. A
+scheduled task may process standings CSVs Ben has already dropped in the
+inbox and remind him which contests still need a manual pull. Commit with a
+descriptive message when a task changes tracked files.
 
 ## Post-slate
 For each standings CSV in data/standings/inbox/: run

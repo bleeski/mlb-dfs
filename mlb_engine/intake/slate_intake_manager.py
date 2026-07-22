@@ -1,7 +1,21 @@
 """
-MLB Classic Slate Intake Manager — v1.7
+MLB Classic Slate Intake Manager — v1.8
 Framework patch: MLB Classic v2.16.0 Lean Decision System
-Compiled: 2026-07-08 (v1.7 slate clock)
+Compiled: 2026-07-08 (v1.7 slate clock); 2026-07-19 (v1.8 name-fold fix)
+
+v1.8 fix:
+  - normalize_name() now NFKD-folds diacritics and strips generational suffixes
+    (Jr/Sr/II/III/IV) before the alnum collapse. Previously an accented feed name
+    (MLB Stats API, e.g. "Jose Fermin" with an acute accent on the o and i) failed
+    to match the plain-ASCII DK salary name ("Jose Fermin") because the old regex
+    deleted the accented character instead of folding it, splitting the surname
+    into two dead tokens. The confirmed starter then had no salary match and its
+    row was silently absent from the pool rather than flagged. Every caller shares
+    the fix since they all import this one function: this module's own declared-
+    pitcher and pasted-lineup reconciliation, plus every name-matching call site in
+    live_data_adapters.py. Caught 2026-07-19 on the afternoon 4-game slate build:
+    6 confirmed hitters affected before catch, worked around in-memory for that
+    build, now fixed at the source.
 
 v1.7 additions:
   - slate_clock(): first-lock detection and the T-minus-buffer delivery deadline.
@@ -44,11 +58,12 @@ import csv
 import json
 import os
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-VERSION = "v1.7"
+VERSION = "v1.8"
 DK_ROSTER_SLOTS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
 HITTER_SLOTS = {"C", "1B", "2B", "3B", "SS", "OF"}
 PITCHER_ALIASES = {"P", "SP", "RP"}
@@ -97,11 +112,20 @@ def normalize_player_id(value: Any) -> str:
     return text
 
 
+_NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
+
+
 def normalize_name(value: Any) -> str:
-    text = str(value or "").strip().lower()
+    # NFKD-fold first so an accented letter (feed data, e.g. MLB Stats API)
+    # collapses to its plain-ASCII base instead of being deleted by the alnum
+    # collapse below and matches DK's plain-ASCII salary spelling. See v1.8 note.
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.strip().lower()
     text = re.sub(r"\([^)]*\)", " ", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
-    return " ".join(text.split())
+    toks = [t for t in text.split() if t not in _NAME_SUFFIXES]
+    return " ".join(toks)
 
 
 def _first_existing(header: Sequence[str], candidates: Sequence[str]) -> Optional[str]:

@@ -134,7 +134,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.9"
+VERSION = "v1.10"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -1130,6 +1130,154 @@ def build_checkpoint_plan(
     }
 
 
+# --- v1.10 waterfall (posture_allocator) checkpoint integration --------------
+# The waterfall/tier policy lives in mlb_engine.allocate.posture_allocator, a
+# REVIEW-ONLY companion deliberately OUTSIDE the audited engine (ledger 3.9).
+# run_slate consumes its already-computed result as inert data: it never imports
+# or runs the allocator, and nothing here auto-applies to the certified build.
+# The derived coverage target is a DETERMINISTIC review input that, when a waterfall
+# is supplied, drives build_diverse_candidate_bank's coverage_target on approve=True
+# (the auto-bank path); with no waterfall the bank call is unchanged. None of these
+# values is a win-rate, cash-rate, ROI, or probability claim, and nothing auto-applies
+# without the operator approving the checkpoint that displays it.
+
+_WATERFALL_LABEL = (
+    "bankroll policy priors and deterministic shape classification; "
+    "not win rate, cash rate, ROI, or probability; review-only, nothing auto-applies"
+)
+
+
+def _tier_entry_counts(
+    waterfall: Mapping[str, Any],
+    entry_requirements: Sequence[Mapping[str, Any]],
+) -> Dict[str, int]:
+    """Entries per tier, joining allocator rows (contest_id -> tier) to reserved entries."""
+    tier_by_contest = {
+        str(r.get("contest_id")): str(r.get("tier"))
+        for r in (waterfall.get("rows") or [])
+        if r.get("contest_id")
+    }
+    counts: Dict[str, int] = {}
+    for req in entry_requirements:
+        tier = tier_by_contest.get(str(req.get("contest_id") or ""))
+        if tier is None:
+            continue
+        counts[tier] = counts.get(tier, 0) + 1
+    return counts
+
+
+def derive_coverage_target(
+    waterfall: Mapping[str, Any],
+    entry_requirements: Sequence[Mapping[str, Any]],
+    feasibility_inputs: Optional[Mapping[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Map the tiers present + entry counts + slate SP-pair capacity to a single
+    candidate-bank coverage target and SP-pair-spread demand.
+
+    Tier A wants a distinct decorrelated lineup per entry with SP-pair spread scaled
+    to entries (ledger 3.5); Tier F tolerates a shared chalk core (a primary plus one
+    variant); Tier V takes distinct near-best lineups under the concentration rule.
+    One slate builds one bank, so the effective target is the demand summed across
+    resolved tiers, floored to the Tier A SP-pair spread.
+
+    Deterministic review input shown in the approve=False checkpoint; on approve=True
+    with a waterfall supplied it drives build_diverse_candidate_bank's coverage_target
+    (auto-bank path). Never a probability claim. Returns None when no tier can be
+    resolved (no menu, or every matched contest is UNRESOLVED)."""
+    counts = _tier_entry_counts(waterfall, entry_requirements)
+    a = counts.get("A", 0)
+    f = counts.get("F", 0)
+    v = counts.get("V", 0)
+    if a + f + v <= 0:
+        return None
+    viable_pairs = None
+    if feasibility_inputs and feasibility_inputs.get("available"):
+        viable_pairs = feasibility_inputs.get("viable_sp_pairs")
+
+    notes: list[str] = []
+    sp_pair_spread_demand: Optional[int] = None
+    a_distinct = a
+    if a:
+        if viable_pairs:
+            sp_pair_spread_demand = max(min(a, int(viable_pairs)), min(3, int(viable_pairs)))
+        else:
+            sp_pair_spread_demand = max(a, 3)
+        a_distinct = max(a, sp_pair_spread_demand)
+        notes.append(
+            f"Tier A ({a} entries): {a_distinct} distinct decorrelated lineups spanning "
+            f"{sp_pair_spread_demand} SP pairs (ledger 3.5); structural duplication screen "
+            f"(exact-set dedup + SP breadth) on every candidate")
+    f_distinct = min(f, 2) if f else 0
+    if f:
+        notes.append(
+            f"Tier F ({f} entries): {f_distinct} top-script highest-median core(s); shared "
+            f"chalk core tolerated, no forced SP-pair spread")
+    v_distinct = v
+    if v:
+        notes.append(
+            f"Tier V ({v} entries): up to {v_distinct} distinct near-best lineups under the "
+            f"concentration rule")
+
+    coverage_target = max(a_distinct + f_distinct + v_distinct, sp_pair_spread_demand or 0, 1)
+    return {
+        "coverage_target": int(coverage_target),
+        "sp_pair_spread_demand": sp_pair_spread_demand,
+        "tier_entry_counts": dict(counts),
+        "resolved_entry_count": a + f + v,
+        "total_entry_count": len(list(entry_requirements)),
+        "viable_sp_pairs": (int(viable_pairs) if viable_pairs is not None else None),
+        "applies": True,
+        "notes": notes,
+        "label": "deterministic review input; drives candidate-bank coverage_target on "
+                 "approve=True (auto-bank path), shown here for review before it applies",
+    }
+
+
+def build_waterfall_block(
+    waterfall: Optional[Mapping[str, Any]],
+    entry_requirements: Sequence[Mapping[str, Any]],
+    feasibility_inputs: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Render posture_allocator output as a first-class checkpoint block plus a
+    display-only coverage target. Review proxy; nothing auto-applies."""
+    if not waterfall:
+        return {
+            "available": False,
+            "label": _WATERFALL_LABEL,
+            "note": "no waterfall/contest menu supplied; tier policy unavailable, "
+                    "checkpoint uses posture defaults. Supply a contest menu (paid_places "
+                    "and field_size per contest) to enable tier policy.",
+        }
+    counts = _tier_entry_counts(waterfall, entry_requirements)
+    unresolved = counts.get("UNRESOLVED", 0)
+    coverage = derive_coverage_target(waterfall, entry_requirements, feasibility_inputs)
+    return {
+        "available": True,
+        "label": waterfall.get("label") or _WATERFALL_LABEL,
+        "allocator_version": waterfall.get("version"),
+        "tiers": [
+            {
+                "contest_id": r.get("contest_id"), "name": r.get("name"),
+                "tier": r.get("tier"), "breadth": r.get("breadth"),
+                "posture": r.get("posture"), "my_entries": r.get("my_entries"),
+                "tier_reason": r.get("tier_reason"),
+                "resolution": r.get("resolution"), "confidence": r.get("confidence"),
+            }
+            for r in (waterfall.get("rows") or [])
+        ],
+        "tier_entry_counts": dict(counts),
+        "unresolved_entries": unresolved,
+        "fees_by_tier": waterfall.get("fees_by_tier"),
+        "fee_shares": waterfall.get("fee_shares"),
+        "policy": waterfall.get("policy"),
+        "policy_checks": list(waterfall.get("policy_checks") or []),
+        "family_notes": list(waterfall.get("family_notes") or []),
+        "warnings": list(waterfall.get("warnings") or []),
+        "coverage_target": coverage,
+        "contest_postures_suggested": waterfall.get("contest_postures"),
+    }
+
+
 def _merged_controls_for_build(
     posture_by_contest: Mapping[str, Mapping[str, Any]],
     override: Optional[Mapping[str, Any]],
@@ -1868,6 +2016,7 @@ def run_slate(
     salary_csv: str | Path,
     entries_csv: str | Path,
     contest_postures: Optional[Mapping[str, Any]] = None,
+    waterfall: Optional[Mapping[str, Any]] = None,
     projection_rows: Any = None,
     projection_mode: str = "emergency_proxy",
     projections_override: Any = None,
@@ -1906,6 +2055,14 @@ def run_slate(
 
     STRATEGY_DEFAULTS feeding the checkpoint and controls are principled priors,
     not calibrated values, and are never to be read as win rates or ROI.
+
+    ``waterfall`` is the optional, already-computed result of
+    ``mlb_engine.allocate.posture_allocator.allocate`` (a review-only companion
+    OUTSIDE the audited engine, ledger 3.9). When supplied it is rendered as a
+    first-class checkpoint block with a derived candidate-bank coverage target
+    that, on approve=True, drives build_diverse_candidate_bank (auto-bank path).
+    It is inert data: run_slate never imports or runs the allocator, and the
+    coverage target only applies through the checkpoint the operator approves.
     """
     from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
     from mlb_engine.optimize.optimizer_v3 import (
@@ -2033,6 +2190,21 @@ def run_slate(
         existing = list(checkpoint.get("warnings") or [])
         checkpoint["warnings"] = existing + [f"feasibility: {b}" for b in binding]
 
+    # v1.10 waterfall tier policy as a first-class checkpoint block. Review-only:
+    # the supplied ``waterfall`` is inert data from the posture_allocator companion
+    # (never imported here). The derived coverage target is shown here and, on
+    # approve=True with a waterfall supplied, drives build_diverse_candidate_bank
+    # (below). Uses the feasibility inputs computed above for viable SP-pair capacity.
+    checkpoint["waterfall"] = build_waterfall_block(
+        waterfall, entry_requirements, feasibility_inputs
+    )
+    wf_block = checkpoint["waterfall"]
+    if wf_block.get("available"):
+        wf_flags = list(wf_block.get("policy_checks") or []) + list(wf_block.get("warnings") or [])
+        if wf_flags:
+            existing = list(checkpoint.get("warnings") or [])
+            checkpoint["warnings"] = existing + [f"waterfall: {w}" for w in wf_flags]
+
     # v1.9 slate clock: first lock and the T-minus-5 delivery deadline, visible
     # at every checkpoint so the session budgets from the deadline instead of
     # discovering it. Deterministic bookkeeping, never a guarantee.
@@ -2077,6 +2249,7 @@ def run_slate(
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],
         "slate_clock": clock,
+        "waterfall": checkpoint.get("waterfall"),
         "caller_asserted_gates": caller_asserted,
         "strategy_defaults_are_priors": True,
         "projected_order": projected_order,
@@ -2102,15 +2275,26 @@ def run_slate(
         dominant_shape = max(shape_counts, key=shape_counts.get) if shape_counts else "large_field_gpp"
         mode = "wta" if dominant_shape in ("large_wta", "single_entry_gpp") else "gpp"
         n = int(requested_n or max(len(entry_requirements), 1))
+        # v1.10: when a waterfall is supplied, the tier-derived coverage target from the
+        # checkpoint (exactly the value displayed for review) drives the bank's
+        # coverage_target on this auto-bank path. With no waterfall it stays None and the
+        # call is byte-identical to pre-v1.10. Deterministic review input, never a claim.
+        wf_block = checkpoint.get("waterfall") or {}
+        wf_cov = wf_block.get("coverage_target") if wf_block.get("available") else None
+        wf_coverage_target = (
+            int(wf_cov["coverage_target"]) if wf_cov and wf_cov.get("coverage_target") else None
+        )
         bank = build_diverse_candidate_bank(
             projections, requested_n=n, mode=mode, target="ceiling",
             contest_shapes=sorted(shape_counts) or None,
             max_sp_pair_repetition=controls.get("max_sp_pair_repetition"),
+            coverage_target=wf_coverage_target,
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
         bank_diag = {
             "source": "build_diverse_candidate_bank", "mode": mode, "requested_n": n,
             "candidate_count": len(candidates),
+            "waterfall_coverage_target": wf_coverage_target,
             "contest_shape_profile": bank.get("contest_shape_profile"),
             "diversity_augmentation": bank.get("diversity_augmentation"),
         }
