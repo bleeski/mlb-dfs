@@ -1,0 +1,295 @@
+{
+ "contests": {
+  "mlb $1 triple up [top 9 win $3] (late night)|na": {
+   "entry_fee": null,
+   "field_size": 31,
+   "history": [
+    {
+     "date": "2026-07-18",
+     "field_size": 31,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 31,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 31,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-07-18",
+   "name": "MLB $1 Triple Up [Top 9 Win $3] (Late Night)",
+   "observations": 3
+  },
+  "mlb $1 triple up [top 9 win $3] (turbo)|na": {
+   "entry_fee": null,
+   "field_size": 31,
+   "history": [
+    {
+     "date": "2026-07-18",
+     "field_size": 31,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 31,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 31,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-07-18",
+   "name": "MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
+   "observations": 3
+  },
+  "mlb satellite to $15 relay throw (early)|na": {
+   "entry_fee": null,
+   "field_size": 150,
+   "history": [
+    {
+     "date": "2026-06-20",
+     "field_size": 150,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 150,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 150,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-20",
+   "name": "MLB Satellite to $15 Relay Throw (Early)",
+   "observations": 3
+  },
+  "mlb satellite to $15 relay throw|na": {
+   "entry_fee": null,
+   "field_size": 177,
+   "history": [
+    {
+     "date": "2026-06-19",
+     "field_size": 177,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-19",
+     "field_size": 177,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-19",
+     "field_size": 177,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-19",
+   "name": "MLB Satellite to $15 Relay Throw",
+   "observations": 3
+  },
+  "mlb satellite to $2 mlb pocket cup mega qualifier (afternoon)|na": {
+   "entry_fee": null,
+   "field_size": 193,
+   "history": [
+    {
+     "date": "2026-06-20",
+     "field_size": 193,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 193,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 193,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-20",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Afternoon)",
+   "observations": 3
+  },
+  "mlb satellite to $2 mlb pocket cup mega qualifier (turbo)|na": {
+   "entry_fee": null,
+   "field_size": 210,
+   "history": [
+    {
+     "date": "2026-07-18",
+     "field_size": 203,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 210,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 203,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 210,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 203,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-07-18",
+     "field_size": 210,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-07-18",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo)",
+   "observations": 6
+  },
+  "mlb satellite to $5m fbwc $13 qualifier (early)|na": {
+   "entry_fee": null,
+   "field_size": 110,
+   "history": [
+    {
+     "date": "2026-06-20",
+     "field_size": 110,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 110,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 110,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-20",
+   "name": "MLB Satellite to $5M FBWC $13 Qualifier (Early)",
+   "observations": 3
+  },
+  "mlb satellite to midseason best ball $5 knuckleball (afternoon)|na": {
+   "entry_fee": null,
+   "field_size": 23,
+   "history": [
+    {
+     "date": "2026-06-20",
+     "field_size": 23,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 23,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 23,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-20",
+   "name": "MLB Satellite to Midseason Best Ball $5 Knuckleball (Afternoon)",
+   "observations": 3
+  },
+  "mlb satellite to nfl best ball $25 millionaire (early)|na": {
+   "entry_fee": null,
+   "field_size": 242,
+   "history": [
+    {
+     "date": "2026-06-20",
+     "field_size": 242,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 242,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-20",
+     "field_size": 242,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-20",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Early)",
+   "observations": 3
+  },
+  "mlb satellite to nfl best ball $25 millionaire|na": {
+   "entry_fee": null,
+   "field_size": 297,
+   "history": [
+    {
+     "date": "2026-06-19",
+     "field_size": 297,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-19",
+     "field_size": 297,
+     "paid_places": null,
+     "seats": null
+    },
+    {
+     "date": "2026-06-19",
+     "field_size": 297,
+     "paid_places": null,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-06-19",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire",
+   "observations": 3
+  }
+ },
+ "label": "observed contest history and name-inferred payout shape; observed values are observed history and inferred values are labeled priors; never win rate, cash rate, ROI, or probability; review-only, nothing auto-applies",
+ "updated": "2026-07-19",
+ "version": "0.1-review"
+}
