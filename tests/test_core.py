@@ -40,6 +40,8 @@ from mlb_engine.projections.projection_builder import (
 from mlb_engine.intake.slate_intake_manager import material_weather_adjustments, validate_slate_context_packet
 from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv, slate_clock
 from mlb_engine.intake.live_data_adapters import build_status_map_from_lineups_feed
+from mlb_engine.optimize import bank_cache
+from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS, _candidate_ordered_roster
 
 NOW = datetime(2026, 6, 11, 17, 0, tzinfo=timezone.utc)
 TS = NOW.isoformat()
@@ -2494,6 +2496,91 @@ class ContestLibraryTests(unittest.TestCase):
             self.assertEqual({t["tier"] for t in block["tiers"]}, {"A", "F", "V"})
             self.assertTrue(all(t["resolution"] == "name_archetype" for t in block["tiers"]))
             self.assertIsInstance(block["coverage_target"], dict)
+
+
+class BankCacheTests(unittest.TestCase):
+    """A resumable bank exists because an unbounded build inside a bounded
+    execution environment is killed with no output and no diagnostic."""
+
+    def _roster(self, n=10, swap=False):
+        ids = [f"p{i}" for i in range(n)]
+        if swap:  # same ten players, OF1 and OF2 exchanged
+            ids[7], ids[8] = ids[8], ids[7]
+        return ids
+
+    def test_dedupe_keys_on_ordered_roster_not_player_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            self.assertTrue(cache.add(self._roster(), 100.0))
+            # Identical player set, different slot order: a genuinely different
+            # candidate for late swap, which pins players to exact DK slots.
+            self.assertTrue(cache.add(self._roster(swap=True), 99.0))
+            self.assertEqual(len(cache), 2)
+            # An exact repeat is still rejected.
+            self.assertFalse(cache.add(self._roster(), 100.0))
+            self.assertEqual(len(cache), 2)
+
+    def test_round_trips_and_resumes_from_disk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache = bank_cache.BankCache(path)
+            cache.add(self._roster(), 100.0, job="j1")
+            cache.attempted.add("j1")
+            cache.attempted.add("j2-failed")
+            cache.save()
+
+            resumed = bank_cache.BankCache(path)
+            self.assertEqual(len(resumed), 1)
+            # Failed jobs are remembered too, so a resumed slice does not re-pay
+            # for combinations already known to be infeasible.
+            self.assertEqual(resumed.attempted, {"j1", "j2-failed"})
+            self.assertFalse(resumed.add(self._roster(), 100.0))
+
+    def test_as_candidates_matches_allocator_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            cache.add(self._roster(), 100.0)
+            cand = cache.as_candidates()[0]
+            self.assertEqual(len(cand["roster_slot_ids"]), len(ENTRY_ROSTER_SLOTS))
+            self.assertEqual(_candidate_ordered_roster(cand), tuple(self._roster()))
+
+    def test_ordered_roster_fills_dk_slots_in_order(self):
+        lineup = pd.DataFrame([
+            {"Player_ID": "sp1", "Assigned_Position": "P"},
+            {"Player_ID": "sp2", "Assigned_Position": "P"},
+            {"Player_ID": "c1", "Assigned_Position": "C"},
+            {"Player_ID": "b1", "Assigned_Position": "1B"},
+            {"Player_ID": "b2", "Assigned_Position": "2B"},
+            {"Player_ID": "b3", "Assigned_Position": "3B"},
+            {"Player_ID": "ss1", "Assigned_Position": "SS"},
+            {"Player_ID": "of1", "Assigned_Position": "OF"},
+            {"Player_ID": "of2", "Assigned_Position": "OF"},
+            {"Player_ID": "of3", "Assigned_Position": "OF"},
+        ])
+        self.assertEqual(
+            bank_cache.ordered_roster(lineup),
+            ("sp1", "sp2", "c1", "b1", "b2", "b3", "ss1", "of1", "of2", "of3"),
+        )
+        self.assertIsNone(bank_cache.ordered_roster(lineup.head(9)))
+
+
+class SolveBudgetTests(unittest.TestCase):
+    """Default None must leave the prior unbounded behavior byte-identical."""
+
+    def test_budget_absent_builds_everything(self):
+        ids = write_salary(Path(tempfile.mkdtemp()) / "s.csv")
+        result = opt.build_multi_lineup(projection_frame(ids), n_lineups=2, mode="wta")
+        self.assertEqual(len(result["lineups"]), 2)
+        self.assertIsNone(result["budget"]["time_budget_s"])
+        self.assertFalse(result["budget"]["exhausted"])
+
+    def test_zero_budget_returns_partial_with_diagnostic(self):
+        ids = write_salary(Path(tempfile.mkdtemp()) / "s.csv")
+        result = opt.build_multi_lineup(
+            projection_frame(ids), n_lineups=2, mode="wta", time_budget_s=0.0)
+        self.assertTrue(result["budget"]["exhausted"])
+        self.assertEqual(result["budget"]["lineups_built"], 0)
+        self.assertEqual(result["budget"]["lineups_requested"], 2)
 
 
 class TeamAbbrevNormalizationTests(unittest.TestCase):

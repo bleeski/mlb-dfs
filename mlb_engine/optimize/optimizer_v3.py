@@ -113,6 +113,8 @@ v3.1 fixes preserved (carried forward from v3.2.1 bundle).
 v2 fixes preserved.
 """
 
+import time as _time
+
 import pandas as pd
 from collections import Counter
 from math import ceil
@@ -1717,9 +1719,20 @@ def build_multi_lineup(
     max_sp_pair_repetition=None,
     sp_pair_coverage_plan=None,
     enforce_wta_stack_core_uniqueness=True,
+    time_budget_s=None,
     **single_lineup_kwargs
 ):
     """Multi-lineup wrapper with v3.4 DU enforcement and v3.7 anchor caps.
+
+    v3.19 ``time_budget_s`` bounds the wall-clock spent generating lineups.
+    Default None preserves prior behavior exactly (unbounded). When set, the
+    per-lineup loop stops before starting a lineup it cannot afford and returns
+    what it has under ``budget``, so a caller running inside a hard execution
+    ceiling gets a short bank plus a diagnostic instead of being killed with no
+    output. Cost grows superlinearly in n_lineups because each lineup carries
+    overlap constraints against all priors (measured on a 159-row pool: n=5
+    3.2s, n=8 7.6s, n=10 12.2s), so an unbounded call is not safe to assume
+    finishes inside a fixed budget.
 
     Per Framework v2.7: post-solve DU validation with deterministic
     penalty rotation; threshold-only relaxation; B1 round-3 fix
@@ -1807,7 +1820,28 @@ def build_multi_lineup(
     sp_usage = Counter()
     sp_pair_usage = Counter()
 
+    budget_started = _time.monotonic()
+    budget_s = None if time_budget_s is None else float(time_budget_s)
+    budget_report = {
+        'time_budget_s': budget_s,
+        'exhausted': False,
+        'lineups_requested': int(n_lineups),
+        'lineups_built': 0,
+        'elapsed_s': 0.0,
+    }
+    per_lineup_cost = None
+
     for i in range(n_lineups):
+        if budget_s is not None:
+            elapsed = _time.monotonic() - budget_started
+            # Stop before starting a lineup the budget cannot cover. Each lineup
+            # costs at least as much as the running average because overlap
+            # constraints accumulate, so the average is a floor, not an estimate.
+            projected = elapsed + (per_lineup_cost or 0.0)
+            if elapsed >= budget_s or (per_lineup_cost is not None and projected > budget_s):
+                budget_report['exhausted'] = True
+                break
+        lineup_started = _time.monotonic()
         accepted = None  # A1 round-2 fix
         relaxation_idx = -1
 
@@ -1999,6 +2033,8 @@ def build_multi_lineup(
                 if accepted['relaxation_idx'] >= 0:
                     record['du_relaxation_idx'] = accepted['relaxation_idx']
             lineups.append(record)
+            cost = _time.monotonic() - lineup_started
+            per_lineup_cost = cost if per_lineup_cost is None else max(per_lineup_cost, cost)
             prior_lineup_ids.append(accepted['lineup_df']['Player_ID'].tolist())
 
             accepted_sp_ids = _get_ordered_sp_ids(accepted['lineup_df'])
@@ -2084,6 +2120,9 @@ def build_multi_lineup(
 
     sp_pair_coverage_validation = validate_sp_pair_coverage(lineups, coverage_plan)
 
+    budget_report['lineups_built'] = len(lineups)
+    budget_report['elapsed_s'] = round(_time.monotonic() - budget_started, 3)
+
     return {
         'lineups': lineups,
         'failed_indices': failed_indices,
@@ -2093,6 +2132,7 @@ def build_multi_lineup(
         'anchor_validation': anchor_validation,
         'sp_pair_coverage_plan': coverage_plan,
         'sp_pair_coverage_validation': sp_pair_coverage_validation,
+        'budget': budget_report,
     }
 
 # ============================================================================
@@ -2907,6 +2947,7 @@ def build_candidate_lineup_bank(
     contest_shape=None,
     contest_shapes=None,
     bank_constraint_scope='selection',
+    time_budget_s=None,
     **single_lineup_kwargs
 ):
     """Generate and score a candidate bank through the certified MILP path.
@@ -2938,6 +2979,7 @@ def build_candidate_lineup_bank(
         max_sp_pair_repetition=bank_pair_cap,
         sp_pair_coverage_plan=sp_pair_coverage_plan,
         enforce_wta_stack_core_uniqueness=(scope == 'bank'),
+        time_budget_s=time_budget_s,
         **single_lineup_kwargs,
     )
 
@@ -3054,6 +3096,7 @@ def build_diverse_candidate_bank(
     target='ceiling',
     coverage_target=None,
     max_sp_pair_repetition=None,
+    time_budget_s=None,
     **bank_kwargs
 ):
     """Coverage-guaranteed wrapper over build_candidate_lineup_bank (v3.18).
@@ -3073,10 +3116,19 @@ def build_diverse_candidate_bank(
     diverse enough to be feasible. Deterministic review input, never a win-rate, ROI,
     or probability claim.
     """
+    _budget_started = _time.monotonic()
+    _budget_s = None if time_budget_s is None else float(time_budget_s)
+
+    def _budget_left():
+        if _budget_s is None:
+            return None
+        return _budget_s - (_time.monotonic() - _budget_started)
+
     bank = build_candidate_lineup_bank(
         projections_df, requested_n=requested_n,
         candidate_bank_size=candidate_bank_size, mode=mode, target=target,
-        max_sp_pair_repetition=max_sp_pair_repetition, **bank_kwargs,
+        max_sp_pair_repetition=max_sp_pair_repetition,
+        time_budget_s=_budget_s, **bank_kwargs,
     )
 
     slate_metadata = bank_kwargs.get('slate_metadata')
@@ -3105,6 +3157,9 @@ def build_diverse_candidate_bank(
         'stackable_team_count': len(stack_teams),
         'target_size': target_size,
         'distinct_sp_pairs': None,
+        'time_budget_s': _budget_s,
+        'budget_exhausted': False,
+        'base_bank_budget': (bank.get('budget') or {}),
         'note': '',
     }
 
@@ -3157,6 +3212,13 @@ def build_diverse_candidate_bank(
 
     attempts = {'n': 0}
     max_attempts = target_size * 4 + 60
+    # Worst observed single augmentation solve, used as the reserve so the loop
+    # stops before starting a solve it cannot finish rather than being killed.
+    aug_cost = {'max': 0.0}
+
+    def _budget_exhausted():
+        left = _budget_left()
+        return left is not None and left <= aug_cost['max']
 
     def _try_accept(pair, team):
         nonlocal next_candidate_id
@@ -3164,10 +3226,13 @@ def build_diverse_candidate_bank(
         kwargs = dict(single_lineup_kwargs)
         kwargs['locks'] = list(set(kwargs.get('locks') or []) | set(pair))
         kwargs['stack_constraints'] = {'team': team, 'min_size': 4, 'max_size': 5}
+        _attempt_started = _time.monotonic()
         try:
             ldf, obj = build_single_lineup(projections_df, target=target, **kwargs)
         except Exception:
             return False
+        finally:
+            aug_cost['max'] = max(aug_cost['max'], _time.monotonic() - _attempt_started)
         if ldf is None:
             return False
         ids = frozenset(_lineup_player_ids(ldf))
@@ -3214,7 +3279,7 @@ def build_diverse_candidate_bank(
 
     # Phase 1 (breadth): ensure every viable SP pair has at least one lineup.
     for p_idx, pair in enumerate(viable_pairs):
-        if attempts['n'] >= max_attempts:
+        if attempts['n'] >= max_attempts or _budget_exhausted():
             break
         if pair_counts.get(tuple(sorted(pair, key=str)), 0) >= 1:
             continue
@@ -3231,7 +3296,8 @@ def build_diverse_candidate_bank(
     # Phase 2 (depth): cycle (pair, rotating stack) until target size or exhausted.
     round_idx = 1
     max_rounds = len(stack_teams) + 2
-    while len(existing) < target_size and round_idx <= max_rounds and attempts['n'] < max_attempts:
+    while (len(existing) < target_size and round_idx <= max_rounds
+           and attempts['n'] < max_attempts and not _budget_exhausted()):
         progress = False
         for p_idx, pair in enumerate(viable_pairs):
             if len(existing) >= target_size or attempts['n'] >= max_attempts:
@@ -3262,6 +3328,8 @@ def build_diverse_candidate_bank(
         pass
 
     augmentation['appended'] = len(scored) - base_count
+    augmentation['budget_exhausted'] = bool(_budget_exhausted())
+    augmentation['elapsed_s'] = round(_time.monotonic() - _budget_started, 3)
     augmentation['final_candidate_count'] = len(scored)
     augmentation['distinct_sp_pairs'] = len([k for k, v in pair_counts.items() if v > 0])
     augmentation['attempts'] = attempts['n']
