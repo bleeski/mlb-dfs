@@ -1,0 +1,349 @@
+{
+  "slate_date": "2026-07-19",
+  "snapshots": [
+    {
+      "fetched_at": "2026-07-19T14:12:03.204452+00:00",
+      "pull_label": "am",
+      "source": "the-odds-api v4 totals, DK+FD (raw), via tools/fetch_slate_bundle.py (mlb-morning-prestage)",
+      "note": "Posted prices only; not a projection, edge, or probability claim.",
+      "games": [
+        {
+          "game_pk": 822786,
+          "away_team": "CWS",
+          "home_team": "TOR",
+          "game_time_et": "12:15 PM",
+          "commence_time_utc": "2026-07-19T16:15:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.0,
+            "over_price": -114,
+            "under_price": -105
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.5,
+            "over_price": 102,
+            "under_price": -124
+          },
+          "book_disagreement": true,
+          "point_diff_dk_minus_fd": -0.5
+        },
+        {
+          "game_pk": 823523,
+          "away_team": "LAD",
+          "home_team": "NYY",
+          "game_time_et": "12:35 PM",
+          "commence_time_utc": "2026-07-19T16:35:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.0,
+            "over_price": -103,
+            "under_price": -117
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.0,
+            "over_price": 100,
+            "under_price": -122
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 823521,
+          "away_team": "LAD",
+          "home_team": "NYY",
+          "game_time_et": "7:20 PM",
+          "commence_time_utc": "2026-07-19T23:20:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.0,
+            "over_price": -103,
+            "under_price": -117
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.0,
+            "over_price": 100,
+            "under_price": -122
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824739,
+          "away_team": "TB",
+          "home_team": "BOS",
+          "game_time_et": "1:35 PM",
+          "commence_time_utc": "2026-07-19T17:35:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.0,
+            "over_price": -114,
+            "under_price": -105
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.0,
+            "over_price": -110,
+            "under_price": -110
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 823439,
+          "away_team": "NYM",
+          "home_team": "PHI",
+          "game_time_et": "1:35 PM",
+          "commence_time_utc": "2026-07-19T17:35:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.5,
+            "over_price": -119,
+            "under_price": -101
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.5,
+            "over_price": -122,
+            "under_price": 100
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824897,
+          "away_team": "TEX",
+          "home_team": "ATL",
+          "game_time_et": "1:35 PM",
+          "commence_time_utc": "2026-07-19T17:35:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.5,
+            "over_price": -121,
+            "under_price": 100
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.5,
+            "over_price": -120,
+            "under_price": -102
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824411,
+          "away_team": "PIT",
+          "home_team": "CLE",
+          "game_time_et": "1:40 PM",
+          "commence_time_utc": "2026-07-19T17:40:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 7.0,
+            "over_price": -117,
+            "under_price": -103
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 7.0,
+            "over_price": -115,
+            "under_price": -105
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824168,
+          "away_team": "BAL",
+          "home_team": "HOU",
+          "game_time_et": "2:10 PM",
+          "commence_time_utc": "2026-07-19T18:10:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.5,
+            "over_price": -105,
+            "under_price": -114
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.5,
+            "over_price": -105,
+            "under_price": -115
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824086,
+          "away_team": "SD",
+          "home_team": "KC",
+          "game_time_et": "2:10 PM",
+          "commence_time_utc": "2026-07-19T18:10:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 10.0,
+            "over_price": -111,
+            "under_price": -109
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 10.0,
+            "over_price": -120,
+            "under_price": -102
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 823764,
+          "away_team": "MIA",
+          "home_team": "MIL",
+          "game_time_et": "2:10 PM",
+          "commence_time_utc": "2026-07-19T18:10:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 8.0,
+            "over_price": -110,
+            "under_price": -109
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 8.0,
+            "over_price": -115,
+            "under_price": -105
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824653,
+          "away_team": "MIN",
+          "home_team": "CHC",
+          "game_time_et": "2:20 PM",
+          "commence_time_utc": "2026-07-19T18:20:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 7.5,
+            "over_price": -109,
+            "under_price": -111
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 7.5,
+            "over_price": -114,
+            "under_price": -106
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824330,
+          "away_team": "CIN",
+          "home_team": "COL",
+          "game_time_et": "3:10 PM",
+          "commence_time_utc": "2026-07-19T19:10:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 11.0,
+            "over_price": -112,
+            "under_price": -108
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 11.0,
+            "over_price": -110,
+            "under_price": -110
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824978,
+          "away_team": "WSH",
+          "home_team": "ATH",
+          "game_time_et": "4:05 PM",
+          "commence_time_utc": "2026-07-19T20:05:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 10.5,
+            "over_price": -113,
+            "under_price": -107
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 10.5,
+            "over_price": -112,
+            "under_price": -108
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 824007,
+          "away_team": "DET",
+          "home_team": "LAA",
+          "game_time_et": "4:07 PM",
+          "commence_time_utc": "2026-07-19T20:07:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 9.5,
+            "over_price": 100,
+            "under_price": -120
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 9.5,
+            "over_price": 102,
+            "under_price": -124
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 823113,
+          "away_team": "SF",
+          "home_team": "SEA",
+          "game_time_et": "4:10 PM",
+          "commence_time_utc": "2026-07-19T20:10:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 7.0,
+            "over_price": -126,
+            "under_price": 104
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 7.0,
+            "over_price": -122,
+            "under_price": 100
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        },
+        {
+          "game_pk": 825057,
+          "away_team": "STL",
+          "home_team": "AZ",
+          "game_time_et": "4:10 PM",
+          "commence_time_utc": "2026-07-19T20:10:00Z",
+          "draftkings": {
+            "last_update": "2026-07-19T14:11:19Z",
+            "point": 9.0,
+            "over_price": -102,
+            "under_price": -119
+          },
+          "fanduel": {
+            "last_update": "2026-07-19T14:11:58Z",
+            "point": 9.0,
+            "over_price": -108,
+            "under_price": -112
+          },
+          "book_disagreement": false,
+          "point_diff_dk_minus_fd": 0.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,787 @@
+{
+  "slate_date": "2026-07-19",
+  "entries": [
+    {
+      "captured_at": "2026-07-19T14:12:03.204452+00:00",
+      "source": "MLB Stats API via tools/fetch_slate_bundle.py (mlb-morning-prestage)",
+      "games": [
+        {
+          "game_pk": 822786,
+          "venue": "Rogers Centre",
+          "game_time_et": "12:15 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "CWS",
+            "record": "51-46",
+            "probable_pitcher": {
+              "id": 680732,
+              "name": "Sean Burke",
+              "hand": null
+            },
+            "lineup_status": "confirmed",
+            "lineup": [
+              {
+                "order": 1,
+                "id": 803011,
+                "name": "Sam Antonacci",
+                "position": "2B",
+                "bat_side": "L"
+              },
+              {
+                "order": 2,
+                "id": 808959,
+                "name": "Munetaka Murakami",
+                "position": "1B",
+                "bat_side": "L"
+              },
+              {
+                "order": 3,
+                "id": 678246,
+                "name": "Miguel Vargas",
+                "position": "3B",
+                "bat_side": "R"
+              },
+              {
+                "order": 4,
+                "id": 695657,
+                "name": "Colson Montgomery",
+                "position": "SS",
+                "bat_side": "L"
+              },
+              {
+                "order": 5,
+                "id": 643217,
+                "name": "Andrew Benintendi",
+                "position": "DH",
+                "bat_side": "L"
+              },
+              {
+                "order": 6,
+                "id": 695731,
+                "name": "Braden Montgomery",
+                "position": "RF",
+                "bat_side": "S"
+              },
+              {
+                "order": 7,
+                "id": 545341,
+                "name": "Randal Grichuk",
+                "position": "LF",
+                "bat_side": "R"
+              },
+              {
+                "order": 8,
+                "id": 671976,
+                "name": "Tristan Peters",
+                "position": "CF",
+                "bat_side": "L"
+              },
+              {
+                "order": 9,
+                "id": 691011,
+                "name": "Drew Romo",
+                "position": "C",
+                "bat_side": "S"
+              }
+            ]
+          },
+          "home": {
+            "team_abbrev": "TOR",
+            "record": "46-52",
+            "probable_pitcher": {
+              "id": 702056,
+              "name": "Trey Yesavage",
+              "hand": null
+            },
+            "lineup_status": "confirmed",
+            "lineup": [
+              {
+                "order": 1,
+                "id": 676391,
+                "name": "Ernie Clement",
+                "position": "2B",
+                "bat_side": "R"
+              },
+              {
+                "order": 2,
+                "id": 664770,
+                "name": "Nathan Lukes",
+                "position": "RF",
+                "bat_side": "L"
+              },
+              {
+                "order": 3,
+                "id": 665489,
+                "name": "Vladimir Guerrero Jr.",
+                "position": "DH",
+                "bat_side": "R"
+              },
+              {
+                "order": 4,
+                "id": 672960,
+                "name": "Kazuma Okamoto",
+                "position": "3B",
+                "bat_side": "R"
+              },
+              {
+                "order": 5,
+                "id": 662139,
+                "name": "Daulton Varsho",
+                "position": "CF",
+                "bat_side": "L"
+              },
+              {
+                "order": 6,
+                "id": 815873,
+                "name": "Sean Keys",
+                "position": "1B",
+                "bat_side": "L"
+              },
+              {
+                "order": 7,
+                "id": 678218,
+                "name": "Brandon Valenzuela",
+                "position": "C",
+                "bat_side": "S"
+              },
+              {
+                "order": 8,
+                "id": 665926,
+                "name": "Andr\u00e9s Gim\u00e9nez",
+                "position": "SS",
+                "bat_side": "L"
+              },
+              {
+                "order": 9,
+                "id": 682729,
+                "name": "Jonatan Clase",
+                "position": "LF",
+                "bat_side": "S"
+              }
+            ]
+          }
+        },
+        {
+          "game_pk": 823523,
+          "venue": "Yankee Stadium",
+          "game_time_et": "12:35 PM",
+          "doubleheader": "S",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "LAD",
+            "record": "62-36",
+            "probable_pitcher": {
+              "id": 808967,
+              "name": "Yoshinobu Yamamoto",
+              "hand": null
+            },
+            "lineup_status": "confirmed",
+            "lineup": [
+              {
+                "order": 1,
+                "id": 660271,
+                "name": "Shohei Ohtani",
+                "position": "DH",
+                "bat_side": "L"
+              },
+              {
+                "order": 2,
+                "id": 681624,
+                "name": "Andy Pages",
+                "position": "CF",
+                "bat_side": "R"
+              },
+              {
+                "order": 3,
+                "id": 518692,
+                "name": "Freddie Freeman",
+                "position": "1B",
+                "bat_side": "L"
+              },
+              {
+                "order": 4,
+                "id": 605141,
+                "name": "Mookie Betts",
+                "position": "SS",
+                "bat_side": "R"
+              },
+              {
+                "order": 5,
+                "id": 571970,
+                "name": "Max Muncy",
+                "position": "3B",
+                "bat_side": "L"
+              },
+              {
+                "order": 6,
+                "id": 663656,
+                "name": "Kyle Tucker",
+                "position": "RF",
+                "bat_side": "L"
+              },
+              {
+                "order": 7,
+                "id": 606192,
+                "name": "Teoscar Hern\u00e1ndez",
+                "position": "LF",
+                "bat_side": "R"
+              },
+              {
+                "order": 8,
+                "id": 687221,
+                "name": "Dalton Rushing",
+                "position": "C",
+                "bat_side": "L"
+              },
+              {
+                "order": 9,
+                "id": 669242,
+                "name": "Tommy Edman",
+                "position": "2B",
+                "bat_side": "S"
+              }
+            ]
+          },
+          "home": {
+            "team_abbrev": "NYY",
+            "record": "54-43",
+            "probable_pitcher": {
+              "id": 693645,
+              "name": "Cam Schlittler",
+              "hand": null
+            },
+            "lineup_status": "confirmed",
+            "lineup": [
+              {
+                "order": 1,
+                "id": 663757,
+                "name": "Trent Grisham",
+                "position": "CF",
+                "bat_side": "L"
+              },
+              {
+                "order": 2,
+                "id": 700250,
+                "name": "Ben Rice",
+                "position": "1B",
+                "bat_side": "L"
+              },
+              {
+                "order": 3,
+                "id": 691176,
+                "name": "Jasson Dom\u00ednguez",
+                "position": "DH",
+                "bat_side": "S"
+              },
+              {
+                "order": 4,
+                "id": 641355,
+                "name": "Cody Bellinger",
+                "position": "LF",
+                "bat_side": "L"
+              },
+              {
+                "order": 5,
+                "id": 680474,
+                "name": "Max Schuemann",
+                "position": "RF",
+                "bat_side": "R"
+              },
+              {
+                "order": 6,
+                "id": 665862,
+                "name": "Jazz Chisholm Jr.",
+                "position": "2B",
+                "bat_side": "L"
+              },
+              {
+                "order": 7,
+                "id": 683011,
+                "name": "Anthony Volpe",
+                "position": "SS",
+                "bat_side": "R"
+              },
+              {
+                "order": 8,
+                "id": 641857,
+                "name": "Ryan McMahon",
+                "position": "3B",
+                "bat_side": "L"
+              },
+              {
+                "order": 9,
+                "id": 645305,
+                "name": "Ali S\u00e1nchez",
+                "position": "C",
+                "bat_side": "R"
+              }
+            ]
+          }
+        },
+        {
+          "game_pk": 823521,
+          "venue": "Yankee Stadium",
+          "game_time_et": "7:20 PM",
+          "doubleheader": "S",
+          "game_number": 2,
+          "away": {
+            "team_abbrev": "LAD",
+            "record": "62-36",
+            "probable_pitcher": null,
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "NYY",
+            "record": "54-43",
+            "probable_pitcher": null,
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824739,
+          "venue": "Fenway Park",
+          "game_time_et": "1:35 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "TB",
+            "record": "56-41",
+            "probable_pitcher": {
+              "id": 663556,
+              "name": "Shane McClanahan",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "BOS",
+            "record": "49-48",
+            "probable_pitcher": {
+              "id": 543243,
+              "name": "Sonny Gray",
+              "hand": null
+            },
+            "lineup_status": "confirmed",
+            "lineup": [
+              {
+                "order": 1,
+                "id": 663330,
+                "name": "Jahmai Jones",
+                "position": "DH",
+                "bat_side": "R"
+              },
+              {
+                "order": 2,
+                "id": 678882,
+                "name": "Ceddanne Rafaela",
+                "position": "CF",
+                "bat_side": "R"
+              },
+              {
+                "order": 3,
+                "id": 677800,
+                "name": "Wilyer Abreu",
+                "position": "RF",
+                "bat_side": "L"
+              },
+              {
+                "order": 4,
+                "id": 575929,
+                "name": "Willson Contreras",
+                "position": "1B",
+                "bat_side": "R"
+              },
+              {
+                "order": 5,
+                "id": 702332,
+                "name": "Caleb Durbin",
+                "position": "3B",
+                "bat_side": "R"
+              },
+              {
+                "order": 6,
+                "id": 663853,
+                "name": "Romy Gonzalez",
+                "position": "2B",
+                "bat_side": "R"
+              },
+              {
+                "order": 7,
+                "id": 655316,
+                "name": "Andruw Monasterio",
+                "position": "SS",
+                "bat_side": "R"
+              },
+              {
+                "order": 8,
+                "id": 680776,
+                "name": "Jarren Duran",
+                "position": "LF",
+                "bat_side": "L"
+              },
+              {
+                "order": 9,
+                "id": 657136,
+                "name": "Connor Wong",
+                "position": "C",
+                "bat_side": "R"
+              }
+            ]
+          }
+        },
+        {
+          "game_pk": 823439,
+          "venue": "Citizens Bank Park",
+          "game_time_et": "1:35 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "NYM",
+            "record": "41-58",
+            "probable_pitcher": {
+              "id": 690997,
+              "name": "Nolan McLean",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "PHI",
+            "record": "55-44",
+            "probable_pitcher": {
+              "id": 660604,
+              "name": "Alan Rangel",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824897,
+          "venue": "Truist Park",
+          "game_time_et": "1:35 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "TEX",
+            "record": "50-48",
+            "probable_pitcher": {
+              "id": 543135,
+              "name": "Nathan Eovaldi",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "ATL",
+            "record": "56-41",
+            "probable_pitcher": {
+              "id": 656550,
+              "name": "Grant Holmes",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824411,
+          "venue": "Progressive Field",
+          "game_time_et": "1:40 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "PIT",
+            "record": "51-48",
+            "probable_pitcher": {
+              "id": 694973,
+              "name": "Paul Skenes",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "CLE",
+            "record": "52-47",
+            "probable_pitcher": {
+              "id": 676282,
+              "name": "Joey Cantillo",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824168,
+          "venue": "Daikin Park",
+          "game_time_et": "2:10 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "BAL",
+            "record": "48-51",
+            "probable_pitcher": {
+              "id": 687064,
+              "name": "Brandon Young",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "HOU",
+            "record": "47-53",
+            "probable_pitcher": {
+              "id": 686613,
+              "name": "Hunter Brown",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824086,
+          "venue": "Kauffman Stadium",
+          "game_time_et": "2:10 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "SD",
+            "record": "48-50",
+            "probable_pitcher": {
+              "id": 608566,
+              "name": "Germ\u00e1n M\u00e1rquez",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "KC",
+            "record": "40-59",
+            "probable_pitcher": {
+              "id": 702070,
+              "name": "Noah Cameron",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 823764,
+          "venue": "American Family Field",
+          "game_time_et": "2:10 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "MIA",
+            "record": "52-47",
+            "probable_pitcher": {
+              "id": 691587,
+              "name": "Eury P\u00e9rez",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "MIL",
+            "record": "61-37",
+            "probable_pitcher": {
+              "id": 688107,
+              "name": "Robert Gasser",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824653,
+          "venue": "Wrigley Field",
+          "game_time_et": "2:20 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "MIN",
+            "record": "49-50",
+            "probable_pitcher": {
+              "id": 805673,
+              "name": "Zebby Matthews",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "CHC",
+            "record": "55-43",
+            "probable_pitcher": {
+              "id": 684007,
+              "name": "Shota Imanaga",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824330,
+          "venue": "Coors Field",
+          "game_time_et": "3:10 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "CIN",
+            "record": "44-53",
+            "probable_pitcher": {
+              "id": 668881,
+              "name": "Hunter Greene",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "COL",
+            "record": "40-60",
+            "probable_pitcher": {
+              "id": 663372,
+              "name": "Ryan Feltner",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824978,
+          "venue": "Sutter Health Park",
+          "game_time_et": "4:05 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "WSH",
+            "record": "49-50",
+            "probable_pitcher": {
+              "id": 656492,
+              "name": "Foster Griffin",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "ATH",
+            "record": "42-56",
+            "probable_pitcher": {
+              "id": 682052,
+              "name": "Jacob Lopez",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 824007,
+          "venue": "Angel Stadium",
+          "game_time_et": "4:07 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "DET",
+            "record": "46-52",
+            "probable_pitcher": {
+              "id": 663554,
+              "name": "Casey Mize",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "LAA",
+            "record": "38-61",
+            "probable_pitcher": {
+              "id": 696270,
+              "name": "Ryan Johnson",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 823113,
+          "venue": "T-Mobile Park",
+          "game_time_et": "4:10 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "SF",
+            "record": "42-56",
+            "probable_pitcher": {
+              "id": 592662,
+              "name": "Robbie Ray",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "SEA",
+            "record": "49-50",
+            "probable_pitcher": {
+              "id": 669302,
+              "name": "Logan Gilbert",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        },
+        {
+          "game_pk": 825057,
+          "venue": "Chase Field",
+          "game_time_et": "4:10 PM",
+          "doubleheader": "N",
+          "game_number": 1,
+          "away": {
+            "team_abbrev": "STL",
+            "record": "51-46",
+            "probable_pitcher": {
+              "id": 669467,
+              "name": "Andre Pallante",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          },
+          "home": {
+            "team_abbrev": "AZ",
+            "record": "50-48",
+            "probable_pitcher": {
+              "id": 593958,
+              "name": "Eduardo Rodriguez",
+              "hand": null
+            },
+            "lineup_status": "tbd",
+            "lineup": []
+          }
+        }
+      ]
+    }
+  ]
+}
