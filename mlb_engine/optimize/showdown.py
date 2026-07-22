@@ -47,11 +47,30 @@ def _digits(cell: Any) -> str:
 # --------------------------------------------------------------------------- #
 # Intake: melt the Showdown salary CSV to player grain with role-specific id/salary
 # --------------------------------------------------------------------------- #
-def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True) -> pd.DataFrame:
+def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
+                             starters_only: bool = True) -> pd.DataFrame:
     """Melt a DK Showdown salary export (two rows per player, CPT and UTIL) to one
     row per player carrying CPT_ID/CPT_Salary, UTIL_ID/UTIL_Salary, team, opponent,
-    game, and Base (AvgPointsPerGame, a labeled proxy). Players missing either role
-    row, or flagged out (Status IL/O/OUT) when ``exclude_out``, are dropped."""
+    game, Base (AvgPointsPerGame, a labeled proxy), and the declared Starting value.
+
+    Players missing either role row, or flagged out (Status IL/O/OUT) when
+    ``exclude_out``, are dropped.
+
+    ``starters_only`` restricts the pool to the players who can actually take the
+    field, which is the same contract Classic enforces through
+    ``live_data_adapters.build_slate_pool``. DraftKings publishes this in the salary
+    file's ``Starting`` column: ``SP``/``P`` marks the declared starting pitcher and
+    ``1``-``9`` marks a posted batting order slot. Without the filter the solver
+    happily captains a reliever who will not pitch and rosters bench bats, because
+    AvgPointsPerGame does not know who is playing. On the MIN@CHC fixture the
+    unfiltered pool put a non-starting arm in every lineup while the file plainly
+    declared someone else.
+
+    The filter applies only when the file actually carries the information. Before
+    lineups post, ``Starting`` is empty for everyone, so the pool falls back to all
+    healthy players and stamps ``Pool_Basis='all_healthy'``. Read that column before
+    treating a build as starter-restricted.
+    """
     by_key: Dict[tuple, Dict[str, Any]] = {}
     with Path(path).open(newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
@@ -71,12 +90,15 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True) -> pd.D
             opponent = home if team == away else away
             base = _num(r.get("AvgPointsPerGame") or r.get("Avg Points Per Game")) or 0.0
             key = (name, team)
+            starting = str(r.get("Starting") or "").strip().upper()
             rec = by_key.setdefault(key, {
                 "Player_Key": f"{name}|{team}", "Name": name, "Team": team,
                 "Opponent": opponent, "Position": str(r.get("Position") or "").strip(),
-                "Game_ID": matchup, "Base": base,
+                "Game_ID": matchup, "Base": base, "Starting": starting,
                 "CPT_ID": None, "CPT_Salary": None, "UTIL_ID": None, "UTIL_Salary": None,
             })
+            if starting and not rec.get("Starting"):
+                rec["Starting"] = starting
             if role == "CPT":
                 rec["CPT_ID"], rec["CPT_Salary"] = pid, salary
             else:
@@ -85,6 +107,25 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True) -> pd.D
                 rec["Base"] = base
     rows = [r for r in by_key.values()
             if r["CPT_ID"] and r["UTIL_ID"] and r["CPT_Salary"] and r["UTIL_Salary"]]
+
+    def _is_declared(rec: Mapping[str, Any]) -> bool:
+        value = str(rec.get("Starting") or "").strip().upper()
+        return value in ("SP", "P") or value.isdigit()
+
+    declared = [r for r in rows if _is_declared(r)]
+    basis = "all_healthy"
+    if starters_only and declared:
+        # Only restrict when the file has actually posted something. A slate where
+        # nothing has posted yet leaves Starting blank for everyone, and filtering
+        # to an empty pool would be worse than not filtering at all.
+        rows = declared
+        basis = "declared_starters"
+    for rec in rows:
+        rec["Pool_Basis"] = basis
+        value = str(rec.get("Starting") or "").strip().upper()
+        rec["Batting_Order"] = int(value) if value.isdigit() else None
+        rec["Is_Declared_Starter"] = value in ("SP", "P")
+
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.sort_values("Player_Key").reset_index(drop=True)

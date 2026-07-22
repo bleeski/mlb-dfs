@@ -1,0 +1,26 @@
+{
+  "skill_name": "generate-lineups",
+  "evals": [
+    {
+      "id": 0,
+      "name": "classic-eight-game-slate",
+      "prompt": "Here are my DraftKings files for today's early MLB slate. Generate lineups for all my entries.",
+      "expected_output": "A certified DKEntries CSV in outputs/<date>/ with every reserved entry filled, all three gates passing, plus a short brief covering gates, slate clock, pool and stacks.",
+      "files": ["inputs/DKSalaries_classic.csv", "inputs/DKEntries_classic.csv"]
+    },
+    {
+      "id": 1,
+      "name": "showdown-single-game",
+      "prompt": "Build my lineups for this MIN/CHC showdown, I've got the salary and entries files here.",
+      "expected_output": "A filled Showdown DKEntries CSV (CPT + 5 UTIL per entry) with the DK template preserved, reported as review-grade rather than certified because showdown.py is v0.1-review.",
+      "files": ["inputs/DKSalaries_showdown_MIN_CHC.csv", "inputs/DKEntries_showdown_MIN_CHC.csv"]
+    },
+    {
+      "id": 2,
+      "name": "classic-under-deadline",
+      "prompt": "First pitch is in about 20 minutes and I haven't built anything yet. Salary and entries CSVs are attached, I need something I can upload.",
+      "expected_output": "A certified file produced quickly, skipping optional steps, with the delivery deadline surfaced and no player pool trimming used to save time.",
+      "files": ["inputs/DKSalaries_classic.csv", "inputs/DKEntries_classic.csv"]
+    }
+  ]
+}

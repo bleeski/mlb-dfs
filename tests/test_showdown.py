@@ -91,11 +91,50 @@ class ShowdownSolverTests(unittest.TestCase):
         self.assertEqual(set(lu["teams"]), {"AA", "BB"})
 
     def test_melt_real_pool(self):
-        df = sd.melt_showdown_salary_csv(SAL)
+        df = sd.melt_showdown_salary_csv(SAL, starters_only=False)
         self.assertGreaterEqual(len(df), 40)
         self.assertEqual(set(df.Team.unique()), {"MIN", "CHC"})
         self.assertTrue((df["CPT_ID"] != df["UTIL_ID"]).all())
         self.assertTrue((df["CPT_Salary"] >= df["UTIL_Salary"]).all())
+
+    def test_melt_restricts_to_declared_starters(self):
+        """AvgPointsPerGame does not know who is playing, so an unrestricted pool
+        captains relievers and rosters bench bats. DK publishes the answer in the
+        salary file's Starting column and the pool has to honor it."""
+        full = sd.melt_showdown_salary_csv(SAL, starters_only=False)
+        pool = sd.melt_showdown_salary_csv(SAL)
+        self.assertLess(len(pool), len(full))
+        self.assertEqual(pool["Pool_Basis"].iloc[0], "declared_starters")
+        # Two declared starting pitchers, nine posted hitters per side.
+        self.assertEqual(int(pool["Is_Declared_Starter"].sum()), 2)
+        self.assertEqual(int(pool["Batting_Order"].notna().sum()), 18)
+        self.assertEqual(set(pool.Team.unique()), {"MIN", "CHC"})
+        starters = set(pool.loc[pool["Is_Declared_Starter"], "Name"])
+        self.assertEqual(starters, {"Taj Bradley", "Matthew Boyd"})
+        # A rostered arm who is not starting must not survive the filter.
+        self.assertIn("Joe Ryan", set(full["Name"]))
+        self.assertNotIn("Joe Ryan", set(pool["Name"]))
+
+    def test_melt_falls_back_when_nothing_posted(self):
+        """Before lineups post, Starting is blank for everyone. Filtering then would
+        empty the pool, so the basis is reported instead of silently restricting."""
+        import csv as _csv
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(SAL)
+            dest = Path(tmp) / "blank_starting.csv"
+            with src.open(encoding="utf-8-sig", newline="") as fh:
+                rows = list(_csv.reader(fh))
+            head, body = rows[0], rows[1:]
+            col = head.index("Starting")
+            for row in body:
+                if len(row) > col:
+                    row[col] = ""
+            with dest.open("w", encoding="utf-8", newline="") as fh:
+                w = _csv.writer(fh); w.writerow(head); w.writerows(body)
+            pool = sd.melt_showdown_salary_csv(dest)
+            self.assertGreaterEqual(len(pool), 40)
+            self.assertEqual(pool["Pool_Basis"].iloc[0], "all_healthy")
 
     def test_build_and_certify_real(self):
         df = sd.melt_showdown_salary_csv(SAL)
