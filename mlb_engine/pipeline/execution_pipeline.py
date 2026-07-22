@@ -2041,6 +2041,7 @@ def run_slate(
     scanner_flagged_games: Optional[Sequence[str]] = None,
     source_metadata: Optional[Mapping[str, Any]] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    bank_time_budget_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -2289,6 +2290,7 @@ def run_slate(
             contest_shapes=sorted(shape_counts) or None,
             max_sp_pair_repetition=controls.get("max_sp_pair_repetition"),
             coverage_target=wf_coverage_target,
+            time_budget_s=bank_time_budget_s,
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
         bank_diag = {

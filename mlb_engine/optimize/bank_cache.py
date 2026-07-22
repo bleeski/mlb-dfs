@@ -216,17 +216,21 @@ def extend_bank(
     else:
         pair_space = list(itertools.combinations(sp_ids, 2))
 
-    jobs: List[Tuple[Tuple[str, str], str]] = []
-    for a, b in pair_space:
-        if game_of.get(a) == game_of.get(b):
-            continue  # two starters in the same game cannot both be right
-        for team in teams:
-            jobs.append(((a, b), team))
-    # Best pitchers first, then rotate stacks, so a truncated slice still covers
-    # the strongest breadth rather than an arbitrary corner of the space.
+    usable_pairs = [
+        (a, b) for a, b in pair_space if game_of.get(a) != game_of.get(b)
+    ]  # two starters in the same game cannot both be right
+    # Breadth before depth: give every SP pair one lineup before any pair gets a
+    # second. Portfolio controls cap SP-pair repetition (often at 1), so a bank
+    # that deepens one pair at a time can hold hundreds of candidates and still
+    # leave the selection MILP infeasible for want of distinct pairs. Rotating the
+    # stack team alongside keeps team diversity climbing at the same rate.
     rank = {pid: i for i, pid in enumerate(sp_ids)}
-    jobs.sort(key=lambda j: (rank.get(j[0][0], 999) + rank.get(j[0][1], 999),
-                             teams.index(j[1])))
+    usable_pairs.sort(key=lambda p: rank.get(p[0], 999) + rank.get(p[1], 999))
+    jobs: List[Tuple[Tuple[str, str], str]] = []
+    if teams:
+        for round_idx in range(len(teams)):
+            for pair_idx, pair in enumerate(usable_pairs):
+                jobs.append((pair, teams[(pair_idx + round_idx) % len(teams)]))
 
     built = 0
     attempted_now = 0
