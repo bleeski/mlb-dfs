@@ -177,6 +177,21 @@ def extend_bank(
     lock_sig = _lock_signature(locked_slot_assignments)
     excl = [str(x) for x in (excludes or [])]
 
+    # A DK Classic roster has 8 hitter slots. When a late-swap entry pins enough of
+    # them, a 4-5 man stack no longer fits in what is left and every solve is
+    # infeasible no matter how long the budget runs. Relax the stack demand to the
+    # room actually available rather than burning the slice on impossible jobs.
+    pinned_hitter_slots = sum(
+        1 for slot in (locked_slot_assignments or {})
+        if slot in ENTRY_ROSTER_SLOTS and not slot.startswith("P")
+    )
+    free_hitter_slots = 8 - pinned_hitter_slots
+    stack_relaxed_to = None
+    if free_hitter_slots < stack_min:
+        stack_relaxed_to = max(0, free_hitter_slots)
+        stack_min = stack_relaxed_to
+        stack_max = max(stack_max, stack_min)
+
     pitchers = projections_df[projections_df["Position"] == "P"]
     if "Ceiling" in pitchers.columns:
         pitchers = pitchers.sort_values("Ceiling", ascending=False)
@@ -185,8 +200,24 @@ def extend_bank(
     hitters = projections_df[projections_df["Position"] != "P"]
     teams = sorted({str(t) for t in hitters["Team"]})
 
+    # A pinned pitcher slot makes every SP pair that excludes it infeasible, so
+    # enumerating them burns the budget on guaranteed failures. Constrain the pair
+    # space to the pins up front. Same for a pinned hitter's team: a 4-5 stack of a
+    # different team can still be legal, so teams are left alone.
+    pinned_sps = {
+        str(pid) for slot, pid in (locked_slot_assignments or {}).items()
+        if slot in ("P1", "P2")
+    }
+    if len(pinned_sps) >= 2:
+        pair_space = [tuple(sorted(pinned_sps))[:2]]
+    elif len(pinned_sps) == 1:
+        pinned = next(iter(pinned_sps))
+        pair_space = [(pinned, other) for other in sp_ids if other != pinned]
+    else:
+        pair_space = list(itertools.combinations(sp_ids, 2))
+
     jobs: List[Tuple[Tuple[str, str], str]] = []
-    for a, b in itertools.combinations(sp_ids, 2):
+    for a, b in pair_space:
         if game_of.get(a) == game_of.get(b):
             continue  # two starters in the same game cannot both be right
         for team in teams:
@@ -194,7 +225,8 @@ def extend_bank(
     # Best pitchers first, then rotate stacks, so a truncated slice still covers
     # the strongest breadth rather than an arbitrary corner of the space.
     rank = {pid: i for i, pid in enumerate(sp_ids)}
-    jobs.sort(key=lambda j: (rank[j[0][0]] + rank[j[0][1]], teams.index(j[1])))
+    jobs.sort(key=lambda j: (rank.get(j[0][0], 999) + rank.get(j[0][1], 999),
+                             teams.index(j[1])))
 
     built = 0
     attempted_now = 0
@@ -220,7 +252,8 @@ def extend_bank(
                 locks=list(pair),
                 locked_slot_assignments=dict(locked_slot_assignments or {}) or None,
                 excludes=excl or None,
-                stack_constraints={"team": team, "min_size": stack_min, "max_size": stack_max},
+                stack_constraints=({"team": team, "min_size": stack_min,
+                                    "max_size": stack_max} if stack_min >= 2 else None),
             )
         except Exception:  # noqa: BLE001 - an infeasible combination is data, not an error
             worst = max(worst, time.monotonic() - attempt_started)
@@ -244,17 +277,24 @@ def extend_bank(
             built += 1
 
     cache.save()
+    # Count only jobs for this lock signature. cache.attempted spans every
+    # signature the cache has seen, so a global count reads as more jobs done
+    # than the current list contains.
+    suffix = f"|{lock_sig}"
+    done_here = sum(1 for key in cache.attempted if key.endswith(suffix))
     return {
         "version": VERSION,
         "built_this_slice": built,
         "attempted_this_slice": attempted_now,
         "total_candidates": len(cache),
         "jobs_total": len(jobs),
-        "jobs_attempted": len(cache.attempted),
+        "jobs_attempted": done_here,
         "job_list_exhausted": exhausted,
         "elapsed_s": round(time.monotonic() - started, 3),
         "time_budget_s": float(time_budget_s),
         "lock_signature": lock_sig,
+        "free_hitter_slots": free_hitter_slots,
+        "stack_min_relaxed_to": stack_relaxed_to,
         "note": "deterministic candidate generation through the certified MILP path; "
                 "never an ROI, win-rate, or probability claim",
     }
