@@ -58,9 +58,27 @@ DEFAULT_RHP_START_WEIGHT = 0.72
 STALE_DAYS_WARN = 10
 
 
+# The reference platoon file, refreshed manually from FanGraphs RosterResource.
+# build_slate_pool loads this by default so TBD teams get a projected order
+# instead of being dropped from the slate.
+DEFAULT_PLATOON_REFERENCE = Path("data/reference/fangraphs_platoon_lineups.json")
+
+
 # --------------------------------------------------------------------------- #
 # Loading and opponent-hand resolution
 # --------------------------------------------------------------------------- #
+def _dk_abbrev(value: Any) -> str:
+    """Normalize any source's team code to the DraftKings code.
+
+    FanGraphs ships WSN/TBR/CHW/KCR/SDP/SFG and the MLB Stats API ships AZ. An
+    un-normalized code matches no salary row and fills zero hitters without
+    raising, so every team code entering this module goes through here.
+    """
+    from mlb_engine.intake.live_data_adapters import to_dk_abbrev
+
+    return to_dk_abbrev(str(value or "").strip().upper())
+
+
 def load_platoon_lineups(path: str | Path) -> Dict[str, Any]:
     """Read the FanGraphs platoon-lineups JSON from disk."""
     with open(path, encoding="utf-8") as f:
@@ -77,8 +95,8 @@ def extract_opp_throws_from_lineups(lineups_json: Mapping[str, Any]) -> Dict[str
     out: Dict[str, str] = {}
     for g in lineups_json.get("games") or []:
         away, home = g.get("away") or {}, g.get("home") or {}
-        a_team = str(away.get("team_abbrev") or "").strip().upper()
-        h_team = str(home.get("team_abbrev") or "").strip().upper()
+        a_team = _dk_abbrev(away.get("team_abbrev"))
+        h_team = _dk_abbrev(home.get("team_abbrev"))
         a_hand = (away.get("probable_pitcher") or {}).get("hand")
         h_hand = (home.get("probable_pitcher") or {}).get("hand")
         if a_team and h_hand in ("R", "L"):
@@ -148,10 +166,11 @@ def build_projected_order(
     unmatched: List[dict] = []
     stale: List[dict] = []
     hand_assumed: List[str] = []
-    want = {t.strip().upper() for t in only_teams} if only_teams else None
+    want = {_dk_abbrev(t) for t in only_teams} if only_teams else None
+    opp_throws_by_team = {_dk_abbrev(k): v for k, v in (opp_throws_by_team or {}).items()}
 
     for team_entry in platoon.get("teams") or []:
-        team = str(team_entry.get("abbrev") or "").strip().upper()
+        team = _dk_abbrev(team_entry.get("abbrev"))
         if want is not None and team not in want:
             continue
         opp_hand = opp_throws_by_team.get(team)
@@ -170,6 +189,17 @@ def build_projected_order(
             else:
                 unmatched.append({"player": row.get("player"), "team": team,
                                   "reason": "no salary match" if not pid_list else "ambiguous salary match"})
+
+    # A requested team the file covers but that filled nothing is a crosswalk
+    # failure (team code or name normalization), not thin data. It used to read as
+    # success because the caller only saw a per-team hitter count.
+    covered = {_dk_abbrev(t.get("abbrev")) for t in platoon.get("teams") or []}
+    filled: Dict[str, int] = {}
+    for m in matched:
+        filled[m["team"]] = filled.get(m["team"], 0) + 1
+    zero_fill = sorted(t for t in (want or covered) if t in covered and not filled.get(t))
+    missing_from_file = sorted(t for t in (want or set()) if t not in covered)
+
     report = {
         "version": VERSION,
         "collected_date": collected,
@@ -177,6 +207,9 @@ def build_projected_order(
         "n_unmatched": len(unmatched),
         "matched": matched,
         "unmatched": unmatched,
+        "filled_by_team": dict(sorted(filled.items())),
+        "zero_fill_teams": zero_fill,
+        "teams_missing_from_file": missing_from_file,
         "stale_teams": stale,
         "hand_assumed_teams": hand_assumed,
         "note": "Projected order, not confirmed. Do NOT pass these teams as "
@@ -280,11 +313,12 @@ def mispricing_screen(
     itself and is never an ROI, edge, win-rate, or probability claim.
     """
     name_idx = _salary_name_index(salary_csv) if salary_csv else None
-    want = {t.strip().upper() for t in only_teams} if only_teams else None
+    want = {_dk_abbrev(t) for t in only_teams} if only_teams else None
+    opp_throws_by_team = {_dk_abbrev(k): v for k, v in (opp_throws_by_team or {}).items()}
     ext = {str(k): float(v) for k, v in (typical_order_map or {}).items()}
     out: List[Dict[str, Any]] = []
     for team_entry in platoon.get("teams") or []:
-        team = str(team_entry.get("abbrev") or "").strip().upper()
+        team = _dk_abbrev(team_entry.get("abbrev"))
         if want is not None and team not in want:
             continue
         opp_hand = opp_throws_by_team.get(team) or default_hand

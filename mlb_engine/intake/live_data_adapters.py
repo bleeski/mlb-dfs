@@ -67,7 +67,19 @@ THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
 
 # MLB Stats API abbreviations that differ from DraftKings CSV abbreviations.
-DK_ABBREV_REMAP = {"AZ": "ARI"}  # ATH passes through unchanged: DraftKings, the salary CSV, and data/reference all key the Athletics as ATH post-relocation (was OAK)
+# One canonical map to DraftKings team codes. Three vocabularies reach this
+# engine: the MLB Stats API (AZ), FanGraphs RosterResource (WSN/TBR/CHW/KCR/SDP/
+# SFG), and DraftKings itself. A code that fails to normalize does not raise --
+# it silently matches nothing, which is how WSH once filled 0 of 9 hitters and
+# reported success. Every ingest boundary routes through to_dk_abbrev().
+# ATH passes through unchanged: DraftKings, the salary CSV, and data/reference all
+# key the Athletics as ATH post-relocation (was OAK).
+DK_ABBREV_REMAP = {
+    # MLB Stats API
+    "AZ": "ARI",
+    # FanGraphs RosterResource
+    "WSN": "WSH", "TBR": "TB", "CHW": "CWS", "KCR": "KC", "SDP": "SD", "SFG": "SF",
+}
 
 # the-odds-api returns full team names; DraftKings CSVs use abbreviations.
 MLB_TEAM_NAME_TO_DK = {
@@ -553,16 +565,45 @@ def build_slate_pool(
     tbd_teams = [t for t in slate_teams if t not in confirmed_teams and t not in excluded_teams]
     platoon_order: Dict[str, int] = {}
     platoon_report: Optional[Dict[str, Any]] = None
-    if tbd_teams and platoon_json is not None:
+    platoon_source: Optional[str] = None
+    if tbd_teams:
         try:
             from mlb_engine.intake.platoon_order_adapter import (
-                build_projected_order, extract_opp_throws_from_lineups,
+                DEFAULT_PLATOON_REFERENCE, build_projected_order,
+                extract_opp_throws_from_lineups, load_platoon_lineups,
             )
-            opp_throws = extract_opp_throws_from_lineups(lineups_feed)
-            platoon_order, platoon_report = build_projected_order(
-                platoon_json, salary_csv, opp_throws, only_teams=list(tbd_teams),
-            )
-            platoon_order = {str(k): int(v) for k, v in platoon_order.items()}
+            resolved = platoon_json
+            if resolved is None:
+                # A TBD team with no projected order falls back to top-9 by
+                # AvgPointsPerGame, which is a worse prior than the reference
+                # platoon file and silently discards the batting order. Load the
+                # reference by default so TBD games stay in the pool with a real
+                # projected order instead of being guessed at or dropped.
+                ref = DEFAULT_PLATOON_REFERENCE
+                if not ref.is_absolute():
+                    ref = Path(__file__).resolve().parents[2] / ref
+                if ref.exists():
+                    resolved = load_platoon_lineups(ref)
+                    platoon_source = str(ref)
+                else:
+                    warnings.append(
+                        f"no platoon reference at {ref}; TBD teams fall back to "
+                        "top-9 AvgPointsPerGame. Refresh it from FanGraphs "
+                        "RosterResource to restore projected orders."
+                    )
+            else:
+                platoon_source = "caller_supplied"
+            if resolved is not None:
+                opp_throws = extract_opp_throws_from_lineups(lineups_feed)
+                platoon_order, platoon_report = build_projected_order(
+                    resolved, salary_csv, opp_throws, only_teams=list(tbd_teams),
+                )
+                platoon_order = {str(k): int(v) for k, v in platoon_order.items()}
+                for team in (platoon_report or {}).get("zero_fill_teams") or []:
+                    warnings.append(
+                        f"{team}: covered by the platoon file but filled 0 hitters; "
+                        "team-code or name crosswalk failure, not thin data"
+                    )
         except Exception as exc:  # defensive: pool must degrade, not die
             warnings.append(f"platoon projected order unavailable: {exc}")
             platoon_order = {}
@@ -685,6 +726,7 @@ def build_slate_pool(
         "pitcher_roles": pitcher_roles,
         "platoon_order_by_player_id": platoon_order,
         "platoon_report": platoon_report,
+        "platoon_source": platoon_source,
         "team_by_player_id": team_by_player_id,
         "opposing_probables": extract_opposing_probables(lineups_feed),
         "batter_hands": extract_batter_hands(lineups_feed, salary_map),

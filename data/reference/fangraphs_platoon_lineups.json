@@ -1,0 +1,3619 @@
+{
+  "source": "FanGraphs RosterResource - Platoon Lineups",
+  "url_pattern": "https://www.fangraphs.com/roster-resource/platoon-lineups/{slug}",
+  "stat_set": "Projected",
+  "view_mode": "Both (Packed)",
+  "lineup_label": "Go-To Starting Lineup",
+  "collected_date": "2026-06-30",
+  "description": "Projected batting order (slots 1-9) vs RHP and vs LHP for all 30 MLB teams. Bench and IL players are excluded. 'page_updated' is the per-team 'Updated' timestamp shown on the FanGraphs page (these lineups refresh periodically, not daily).",
+  "fields": {
+    "slot": "batting order position, 1-9",
+    "position": "projected defensive position (DH included)",
+    "player": "player name",
+    "bats": "handedness: L=left, R=right, S=switch"
+  },
+  "team_count": 30,
+  "teams": [
+    {
+      "team": "New York Yankees",
+      "slug": "yankees",
+      "abbrev": "NYY",
+      "league": "AL",
+      "division": "East",
+      "page_updated": "2026-06-07",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Trent Grisham",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Ben Rice",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Paul Goldschmidt",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "LF",
+          "player": "Cody Bellinger",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "2B",
+          "player": "Jazz Chisholm Jr.",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Spencer Jones",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "SS",
+          "player": "José Caballero",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Ryan McMahon",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "J.C. Escarra",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "1B",
+          "player": "Paul Goldschmidt",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Ben Rice",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "Cody Bellinger",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Amed Rosario",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "CF",
+          "player": "Trent Grisham",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "SS",
+          "player": "Anthony Volpe",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Jazz Chisholm Jr.",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "José Caballero",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Ali Sánchez",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Boston Red Sox",
+      "slug": "red-sox",
+      "abbrev": "BOS",
+      "league": "AL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Masataka Yoshida",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Ceddanne Rafaela",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Wilyer Abreu",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Willson Contreras",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Jarren Duran",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "3B",
+          "player": "Caleb Durbin",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Anthony Seigler",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Carlos Narváez",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Tsung-Che Cheng",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Nate Eaton",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Ceddanne Rafaela",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Wilyer Abreu",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Willson Contreras",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Romy Gonzalez",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "3B",
+          "player": "Caleb Durbin",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Anthony Seigler",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Andruw Monasterio",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Carlos Narváez",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Toronto Blue Jays",
+      "slug": "blue-jays",
+      "abbrev": "TOR",
+      "league": "AL",
+      "division": "East",
+      "page_updated": "2026-05-14",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "George Springer",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Yohendrick Piñango",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Vladimir Guerrero Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Kazuma Okamoto",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "CF",
+          "player": "Daulton Varsho",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Jesús Sánchez",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Ernie Clement",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Andrés Giménez",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Brandon Valenzuela",
+          "bats": "S"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "George Springer",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "RF",
+          "player": "Myles Straw",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Vladimir Guerrero Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Kazuma Okamoto",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "2B",
+          "player": "Lenyn Sosa",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "SS",
+          "player": "Ernie Clement",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Daulton Varsho",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "LF",
+          "player": "Davis Schneider",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Brandon Valenzuela",
+          "bats": "S"
+        }
+      ]
+    },
+    {
+      "team": "Baltimore Orioles",
+      "slug": "orioles",
+      "abbrev": "BAL",
+      "league": "AL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Gunnar Henderson",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Taylor Ward",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Adley Rutschman",
+          "bats": "S"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Pete Alonso",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Samuel Basallo",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Dylan Beavers",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Colton Cowser",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Blaze Alexander",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Jackson Holliday",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Taylor Ward",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Gunnar Henderson",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Adley Rutschman",
+          "bats": "S"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Pete Alonso",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "3B",
+          "player": "Coby Mayo",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Tyler O'Neill",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "DH",
+          "player": "Samuel Basallo",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Blaze Alexander",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Leody Taveras",
+          "bats": "S"
+        }
+      ]
+    },
+    {
+      "team": "Tampa Bay Rays",
+      "slug": "rays",
+      "abbrev": "TBR",
+      "league": "AL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Yandy Díaz",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "1B",
+          "player": "Jonathan Aranda",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Junior Caminero",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Victor Mesa Jr.",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Chandler Simpson",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "Cedric Mullins",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "SS",
+          "player": "Taylor Walls",
+          "bats": "S"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Richie Palacios",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Hunter Feduccia",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Yandy Díaz",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Jonny DeLuca",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Junior Caminero",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Ryan Vilade",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Jonathan Aranda",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "2B",
+          "player": "Ben Williamson",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "SS",
+          "player": "Taylor Walls",
+          "bats": "S"
+        },
+        {
+          "slot": 8,
+          "position": "LF",
+          "player": "Chandler Simpson",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Nick Fortes",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Chicago White Sox",
+      "slug": "white-sox",
+      "abbrev": "CHW",
+      "league": "AL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Sam Antonacci",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "3B",
+          "player": "Miguel Vargas",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Kyle Teel",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Andrew Benintendi",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "SS",
+          "player": "Colson Montgomery",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Braden Montgomery",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Tristan Peters",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Chase Meidroth",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "1B",
+          "player": "Jacob Gonzalez",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "1B",
+          "player": "Miguel Vargas",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Randal Grichuk",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "2B",
+          "player": "Chase Meidroth",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Colson Montgomery",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "CF",
+          "player": "Junior Perez",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Braden Montgomery",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "SS",
+          "player": "Luisangel Acuña",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "LF",
+          "player": "Sam Antonacci",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Drew Romo",
+          "bats": "S"
+        }
+      ]
+    },
+    {
+      "team": "Detroit Tigers",
+      "slug": "tigers",
+      "abbrev": "DET",
+      "league": "AL",
+      "division": "Central",
+      "page_updated": "2026-06-05",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Gleyber Torres",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Kevin McGonigle",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Dillon Dingler",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Kerry Carpenter",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Riley Greene",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "1B",
+          "player": "Spencer Torkelson",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "DH",
+          "player": "Colt Keith",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "Wenceel Pérez",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "3B",
+          "player": "Zach McKinstry",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Gleyber Torres",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "3B",
+          "player": "Kevin McGonigle",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "CF",
+          "player": "Matt Vierling",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "C",
+          "player": "Dillon Dingler",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Riley Greene",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Jahmai Jones",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "1B",
+          "player": "Spencer Torkelson",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "Wenceel Pérez",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Zack Short",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Kansas City Royals",
+      "slug": "royals",
+      "abbrev": "KCR",
+      "league": "AL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Carter Jensen",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Bobby Witt Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Jac Caglianone",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "CF",
+          "player": "Lane Thomas",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "2B",
+          "player": "Michael Massey",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "C",
+          "player": "Salvador Perez",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "RF",
+          "player": "John Rave",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Nick Loftin",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "LF",
+          "player": "Isaac Collins",
+          "bats": "S"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Lane Thomas",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Bobby Witt Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Jac Caglianone",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Salvador Perez",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "C",
+          "player": "Carter Jensen",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Starling Marte",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Nick Loftin",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "LF",
+          "player": "Isaac Collins",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Michael Massey",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "Minnesota Twins",
+      "slug": "twins",
+      "abbrev": "MIN",
+      "league": "AL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Trevor Larnach",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Byron Buxton",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "2B",
+          "player": "Kody Clemens",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Josh Bell",
+          "bats": "S"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Royce Lewis",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "C",
+          "player": "Victor Caratini",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Brooks Lee",
+          "bats": "S"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Tristan Gray",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "RF",
+          "player": "Luke Keaschall",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Austin Martin",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Byron Buxton",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "DH",
+          "player": "Josh Bell",
+          "bats": "S"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Royce Lewis",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "3B",
+          "player": "Brooks Lee",
+          "bats": "S"
+        },
+        {
+          "slot": 6,
+          "position": "C",
+          "player": "Victor Caratini",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Luke Keaschall",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Ryan Kreidler",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "RF",
+          "player": "Kyler Fedko",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Cleveland Guardians",
+      "slug": "guardians",
+      "abbrev": "CLE",
+      "league": "AL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Steven Kwan",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Travis Bazzana",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Chase DeLauter",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Kyle Manzardo",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Kahlil Watson",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "SS",
+          "player": "Brayan Rocchio",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "DH",
+          "player": "Cooper Ingle",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Gabriel Arias",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Patrick Bailey",
+          "bats": "S"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Travis Bazzana",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Brayan Rocchio",
+          "bats": "S"
+        },
+        {
+          "slot": 3,
+          "position": "DH",
+          "player": "Chase DeLauter",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Rhys Hoskins",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Kahlil Watson",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "David Fry",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Steven Kwan",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Gabriel Arias",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Austin Hedges",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Houston Astros",
+      "slug": "astros",
+      "abbrev": "HOU",
+      "league": "AL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Jeremy Peña",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Yordan Alvarez",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Isaac Paredes",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Christian Walker",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "2B",
+          "player": "Jose Altuve",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "Taylor Trammell",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Yainer Diaz",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "Cam Smith",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "LF",
+          "player": "Joey Loperfido",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Jeremy Peña",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Yordan Alvarez",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Isaac Paredes",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "2B",
+          "player": "Jose Altuve",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Christian Walker",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Cam Smith",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Yainer Diaz",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "Jake Meyers",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "LF",
+          "player": "Brice Matthews",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Texas Rangers",
+      "slug": "rangers",
+      "abbrev": "TEX",
+      "league": "AL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Joc Pederson",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "3B",
+          "player": "Josh Jung",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "SS",
+          "player": "Corey Seager",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Brandon Nimmo",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Jake Burger",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "2B",
+          "player": "Ezequiel Duran",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Evan Carter",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Kyle Higashioka",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "LF",
+          "player": "Alejandro Osuna",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "RF",
+          "player": "Brandon Nimmo",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Corey Seager",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Josh Jung",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Jake Burger",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Justin Foscue",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "2B",
+          "player": "Ezequiel Duran",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Kyle Higashioka",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "LF",
+          "player": "Alejandro Osuna",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Cameron Cauley",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Seattle Mariners",
+      "slug": "mariners",
+      "abbrev": "SEA",
+      "league": "AL",
+      "division": "West",
+      "page_updated": "2026-06-05",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "J.P. Crawford",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Julio Rodríguez",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Josh Naylor",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "LF",
+          "player": "Randy Arozarena",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Luke Raley",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "2B",
+          "player": "Cole Young",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "DH",
+          "player": "Dominic Canzone",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Jhonny Pereda",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "3B",
+          "player": "Colt Emerson",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "J.P. Crawford",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Julio Rodríguez",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "Randy Arozarena",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Josh Naylor",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Rob Refsnyder",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Victor Robles",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Cole Young",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Jhonny Pereda",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "3B",
+          "player": "Colt Emerson",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "Athletics",
+      "slug": "athletics",
+      "abbrev": "ATH",
+      "league": "AL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Henry Bolte",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "1B",
+          "player": "Nick Kurtz",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Shea Langeliers",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Lawrence Butler",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Jonah Heim",
+          "bats": "S"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Carlos Cortes",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Max Muncy",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Jeff McNeil",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Alika Williams",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Henry Bolte",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "C",
+          "player": "Shea Langeliers",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Nick Kurtz",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Jonah Heim",
+          "bats": "S"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Colby Thomas",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Lawrence Butler",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Max Muncy",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Alika Williams",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Joshua Kuroda-Grauer",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Los Angeles Angels",
+      "slug": "angels",
+      "abbrev": "LAA",
+      "league": "AL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Zach Neto",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "3B",
+          "player": "Denzer Guzman",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Nolan Schanuel",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Jorge Soler",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Wade Meckler",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Jo Adell",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Donovan Walton",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Logan O'Hoppe",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Josh Lowe",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Zach Neto",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Jorge Soler",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Jo Adell",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Vaughn Grissom",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "2B",
+          "player": "Oswald Peraza",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "3B",
+          "player": "Denzer Guzman",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Logan O'Hoppe",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "Jose Siri",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "LF",
+          "player": "Wade Meckler",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "New York Mets",
+      "slug": "mets",
+      "abbrev": "NYM",
+      "league": "NL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "RF",
+          "player": "Carson Benge",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Juan Soto",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Bo Bichette",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "SS",
+          "player": "Francisco Lindor",
+          "bats": "S"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Jared Young",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "A.J. Ewing",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "DH",
+          "player": "Mark Vientos",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Brett Baty",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Francisco Alvarez",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "RF",
+          "player": "Carson Benge",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Juan Soto",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Bo Bichette",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "SS",
+          "player": "Francisco Lindor",
+          "bats": "S"
+        },
+        {
+          "slot": 5,
+          "position": "C",
+          "player": "Francisco Alvarez",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "1B",
+          "player": "Mark Vientos",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "A.J. Ewing",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "LF",
+          "player": "Tyrone Taylor",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Brett Baty",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "Philadelphia Phillies",
+      "slug": "phillies",
+      "abbrev": "PHI",
+      "league": "NL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Trea Turner",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Kyle Schwarber",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Bryce Harper",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "LF",
+          "player": "Brandon Marsh",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "3B",
+          "player": "Alec Bohm",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "2B",
+          "player": "Bryson Stott",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "J.T. Realmuto",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "Gabriel Rincones Jr.",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Justin Crawford",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Trea Turner",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Kyle Schwarber",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Bryce Harper",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Alec Bohm",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Brandon Marsh",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "C",
+          "player": "J.T. Realmuto",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "2B",
+          "player": "Bryson Stott",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "Derek Hill",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "LF",
+          "player": "Edmundo Sosa",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Atlanta Braves",
+      "slug": "braves",
+      "abbrev": "ATL",
+      "league": "NL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Michael Harris II",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Ozzie Albies",
+          "bats": "S"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Matt Olson",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "C",
+          "player": "Drake Baldwin",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Dominic Smith",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Mauricio Dubón",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Austin Riley",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "Mike Yastrzemski",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Ha-Seong Kim",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Mauricio Dubón",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Michael Harris II",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "2B",
+          "player": "Ozzie Albies",
+          "bats": "S"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Matt Olson",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Drake Baldwin",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "3B",
+          "player": "Austin Riley",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Joey Bart",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "Eli White",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Ha-Seong Kim",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Washington Nationals",
+      "slug": "nationals",
+      "abbrev": "WSN",
+      "league": "NL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "James Wood",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "1B",
+          "player": "Luis García Jr.",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Curtis Mead",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "SS",
+          "player": "CJ Abrams",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Dylan Crews",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Daylen Lile",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Jacob Young",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Keibert Ruiz",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Nasim Nuñez",
+          "bats": "S"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "James Wood",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "1B",
+          "player": "Andrés Chaparro",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Curtis Mead",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "SS",
+          "player": "CJ Abrams",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Dylan Crews",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Daylen Lile",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Jacob Young",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Nasim Nuñez",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Keibert Ruiz",
+          "bats": "S"
+        }
+      ]
+    },
+    {
+      "team": "Miami Marlins",
+      "slug": "marlins",
+      "abbrev": "MIA",
+      "league": "NL",
+      "division": "East",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Jakob Marsee",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Otto Lopez",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Kyle Stowers",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "2B",
+          "player": "Xavier Edwards",
+          "bats": "S"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Heriberto Hernández",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Griffin Conine",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "DH",
+          "player": "Owen Caissie",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Joe Mack",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "3B",
+          "player": "Graham Pauley",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Otto Lopez",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Xavier Edwards",
+          "bats": "S"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "Esteury Ruiz",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Heriberto Hernández",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Kyle Stowers",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Leo Jiménez",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Jakob Marsee",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Javier Sanoja",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Joe Mack",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "Chicago Cubs",
+      "slug": "cubs",
+      "abbrev": "CHC",
+      "league": "NL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Pete Crow-Armstrong",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "3B",
+          "player": "Alex Bregman",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Michael Busch",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Seiya Suzuki",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Ian Happ",
+          "bats": "S"
+        },
+        {
+          "slot": 6,
+          "position": "2B",
+          "player": "Nico Hoerner",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "RF",
+          "player": "Michael Conforto",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Carson Kelly",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Dansby Swanson",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "CF",
+          "player": "Pete Crow-Armstrong",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Nico Hoerner",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Seiya Suzuki",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Alex Bregman",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Michael Busch",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Ian Happ",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Carson Kelly",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "DH",
+          "player": "Pedro Ramírez",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Dansby Swanson",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "St. Louis Cardinals",
+      "slug": "cardinals",
+      "abbrev": "STL",
+      "league": "NL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "JJ Wetherholt",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Iván Herrera",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Alec Burleson",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "RF",
+          "player": "Jordan Walker",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "LF",
+          "player": "Lars Nootbaar",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "SS",
+          "player": "Masyn Winn",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Jimmy Crooks",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Blaze Jordan",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Nathan Church",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "JJ Wetherholt",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "DH",
+          "player": "Iván Herrera",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Jordan Walker",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "LF",
+          "player": "Nelson Velázquez",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Alec Burleson",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "SS",
+          "player": "Masyn Winn",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "José Fermín",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "3B",
+          "player": "Blaze Jordan",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Pedro Pagés",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Milwaukee Brewers",
+      "slug": "brewers",
+      "abbrev": "MIL",
+      "league": "NL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Christian Yelich",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Jackson Chourio",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "2B",
+          "player": "Brice Turang",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "C",
+          "player": "William Contreras",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Jake Bauers",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "Garrett Mitchell",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "RF",
+          "player": "Sal Frelick",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Cooper Pratt",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "3B",
+          "player": "David Hamilton",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Jackson Chourio",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "C",
+          "player": "William Contreras",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "2B",
+          "player": "Brice Turang",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Andrew Vaughn",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Gary Sánchez",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "Blake Perkins",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "RF",
+          "player": "Sal Frelick",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Cooper Pratt",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "3B",
+          "player": "Joey Ortiz",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Cincinnati Reds",
+      "slug": "reds",
+      "abbrev": "CIN",
+      "league": "NL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Elly De La Cruz",
+          "bats": "S"
+        },
+        {
+          "slot": 2,
+          "position": "1B",
+          "player": "Sal Stewart",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "JJ Bleday",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Eugenio Suárez",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Nathaniel Lowe",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Spencer Steer",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "C",
+          "player": "Tyler Stephenson",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "TJ Friedl",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Matt McLain",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Elly De La Cruz",
+          "bats": "S"
+        },
+        {
+          "slot": 2,
+          "position": "3B",
+          "player": "Sal Stewart",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Spencer Steer",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "LF",
+          "player": "JJ Bleday",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "CF",
+          "player": "Dane Myers",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Eugenio Suárez",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "RF",
+          "player": "Noelvi Marte",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Tyler Stephenson",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Matt McLain",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Pittsburgh Pirates",
+      "slug": "pirates",
+      "abbrev": "PIT",
+      "league": "NL",
+      "division": "Central",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Konnor Griffin",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Brandon Lowe",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "Bryan Reynolds",
+          "bats": "S"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Ryan O'Hearn",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Esmerlyn Valdez",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "C",
+          "player": "Endy Rodríguez",
+          "bats": "S"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Nick Gonzales",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "DH",
+          "player": "Tyler Callihan",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Jake Mangum",
+          "bats": "S"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "SS",
+          "player": "Konnor Griffin",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Brandon Lowe",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "Bryan Reynolds",
+          "bats": "S"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Marcell Ozuna",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Ryan O'Hearn",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Esmerlyn Valdez",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Jared Triolo",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "Jake Mangum",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Henry Davis",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Los Angeles Dodgers",
+      "slug": "dodgers",
+      "abbrev": "LAD",
+      "league": "NL",
+      "division": "West",
+      "page_updated": "2026-06-14",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Shohei Ohtani",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Andy Pages",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Freddie Freeman",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "SS",
+          "player": "Mookie Betts",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "3B",
+          "player": "Max Muncy",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "RF",
+          "player": "Kyle Tucker",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "LF",
+          "player": "Ryan Ward",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Dalton Rushing",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Alex Freeland",
+          "bats": "S"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "DH",
+          "player": "Shohei Ohtani",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "CF",
+          "player": "Andy Pages",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "1B",
+          "player": "Freddie Freeman",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "SS",
+          "player": "Mookie Betts",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "RF",
+          "player": "Kyle Tucker",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Alex Call",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Max Muncy",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Miguel Rojas",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Dalton Rushing",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "San Diego Padres",
+      "slug": "padres",
+      "abbrev": "SDP",
+      "league": "NL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "RF",
+          "player": "Fernando Tatis Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Samad Taylor",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "CF",
+          "player": "Jackson Merrill",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "3B",
+          "player": "Manny Machado",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Gavin Sheets",
+          "bats": "L"
+        },
+        {
+          "slot": 6,
+          "position": "SS",
+          "player": "Xander Bogaerts",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "1B",
+          "player": "Ty France",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "2B",
+          "player": "Jake Cronenworth",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Freddy Fermin",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "RF",
+          "player": "Fernando Tatis Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Samad Taylor",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "3B",
+          "player": "Manny Machado",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "DH",
+          "player": "Miguel Andujar",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "1B",
+          "player": "Ty France",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "Jackson Merrill",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "SS",
+          "player": "Xander Bogaerts",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "C",
+          "player": "Freddy Fermin",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Jake Cronenworth",
+          "bats": "L"
+        }
+      ]
+    },
+    {
+      "team": "San Francisco Giants",
+      "slug": "giants",
+      "abbrev": "SFG",
+      "league": "NL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Luis Arraez",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "LF",
+          "player": "Casey Schmitt",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "CF",
+          "player": "Jung Hoo Lee",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Rafael Devers",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "SS",
+          "player": "Willy Adames",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Bryce Eldridge",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Matt Chapman",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "RF",
+          "player": "Heliot Ramos",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Drew Cavanaugh",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "3B",
+          "player": "Matt Chapman",
+          "bats": "R"
+        },
+        {
+          "slot": 2,
+          "position": "2B",
+          "player": "Luis Arraez",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "LF",
+          "player": "Casey Schmitt",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "Rafael Devers",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "SS",
+          "player": "Willy Adames",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Heliot Ramos",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "RF",
+          "player": "Victor Bericoto",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "CF",
+          "player": "Jung Hoo Lee",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "C",
+          "player": "Eric Haase",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Arizona Diamondbacks",
+      "slug": "diamondbacks",
+      "abbrev": "ARI",
+      "league": "NL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Ketel Marte",
+          "bats": "S"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Geraldo Perdomo",
+          "bats": "S"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Corbin Carroll",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "C",
+          "player": "Gabriel Moreno",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "DH",
+          "player": "Lourdes Gurriel Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "LF",
+          "player": "Max Kepler",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "3B",
+          "player": "Nolan Arenado",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "1B",
+          "player": "Pavin Smith",
+          "bats": "L"
+        },
+        {
+          "slot": 9,
+          "position": "CF",
+          "player": "Tommy Troy",
+          "bats": "R"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Ketel Marte",
+          "bats": "S"
+        },
+        {
+          "slot": 2,
+          "position": "SS",
+          "player": "Geraldo Perdomo",
+          "bats": "S"
+        },
+        {
+          "slot": 3,
+          "position": "RF",
+          "player": "Corbin Carroll",
+          "bats": "L"
+        },
+        {
+          "slot": 4,
+          "position": "C",
+          "player": "Gabriel Moreno",
+          "bats": "R"
+        },
+        {
+          "slot": 5,
+          "position": "3B",
+          "player": "Nolan Arenado",
+          "bats": "R"
+        },
+        {
+          "slot": 6,
+          "position": "CF",
+          "player": "Tommy Troy",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "LF",
+          "player": "Lourdes Gurriel Jr.",
+          "bats": "R"
+        },
+        {
+          "slot": 8,
+          "position": "1B",
+          "player": "Ildemaro Vargas",
+          "bats": "S"
+        },
+        {
+          "slot": 9,
+          "position": "DH",
+          "player": "LuJames Groover",
+          "bats": "R"
+        }
+      ]
+    },
+    {
+      "team": "Colorado Rockies",
+      "slug": "rockies",
+      "abbrev": "COL",
+      "league": "NL",
+      "division": "West",
+      "page_updated": "2026-06-30",
+      "vs_RHP": [
+        {
+          "slot": 1,
+          "position": "LF",
+          "player": "Jake McCarthy",
+          "bats": "L"
+        },
+        {
+          "slot": 2,
+          "position": "RF",
+          "player": "Mickey Moniak",
+          "bats": "L"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Hunter Goodman",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "TJ Rumfield",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "3B",
+          "player": "Willi Castro",
+          "bats": "S"
+        },
+        {
+          "slot": 6,
+          "position": "DH",
+          "player": "Troy Johnston",
+          "bats": "L"
+        },
+        {
+          "slot": 7,
+          "position": "CF",
+          "player": "Cole Carrigg",
+          "bats": "S"
+        },
+        {
+          "slot": 8,
+          "position": "SS",
+          "player": "Ezequiel Tovar",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "2B",
+          "player": "Edouard Julien",
+          "bats": "L"
+        }
+      ],
+      "vs_LHP": [
+        {
+          "slot": 1,
+          "position": "2B",
+          "player": "Willi Castro",
+          "bats": "S"
+        },
+        {
+          "slot": 2,
+          "position": "RF",
+          "player": "Tyler Freeman",
+          "bats": "R"
+        },
+        {
+          "slot": 3,
+          "position": "C",
+          "player": "Hunter Goodman",
+          "bats": "R"
+        },
+        {
+          "slot": 4,
+          "position": "1B",
+          "player": "TJ Rumfield",
+          "bats": "L"
+        },
+        {
+          "slot": 5,
+          "position": "CF",
+          "player": "Cole Carrigg",
+          "bats": "S"
+        },
+        {
+          "slot": 6,
+          "position": "3B",
+          "player": "Kyle Karros",
+          "bats": "R"
+        },
+        {
+          "slot": 7,
+          "position": "LF",
+          "player": "Jake McCarthy",
+          "bats": "L"
+        },
+        {
+          "slot": 8,
+          "position": "DH",
+          "player": "Braxton Fulford",
+          "bats": "R"
+        },
+        {
+          "slot": 9,
+          "position": "SS",
+          "player": "Ezequiel Tovar",
+          "bats": "R"
+        }
+      ]
+    }
+  ],
+  "failures": []
+}

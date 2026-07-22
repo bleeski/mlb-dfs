@@ -2496,6 +2496,76 @@ class ContestLibraryTests(unittest.TestCase):
             self.assertIsInstance(block["coverage_target"], dict)
 
 
+class TeamAbbrevNormalizationTests(unittest.TestCase):
+    """Three vocabularies reach this engine: MLB Stats API (AZ), FanGraphs
+    RosterResource (WSN/TBR/CHW/KCR/SDP/SFG), and DraftKings. An un-normalized
+    code raises nothing -- it matches no salary row and fills zero hitters while
+    reporting success, which is how WSH once filled 0 of 9."""
+
+    def _salary(self, path: Path, team: str):
+        header = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+                  "Salary", "Game Info", "TeamAbbrev"]
+        game = f"{team}@ZZZ 06/11/2026 01:00PM ET"
+        rows = [[p, f"{n} (2000{i})", n, f"2000{i}", p, "3000", game, team]
+                for i, (p, n) in enumerate([
+                    ("C", "Bat One"), ("1B", "Bat Two"), ("2B", "Bat Three")])]
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh); w.writerow(header); w.writerows(rows)
+
+    def _platoon(self, abbrev: str):
+        return {"collected_date": "2026-06-11", "teams": [{
+            "team": "Washington Nationals", "abbrev": abbrev, "page_updated": "2026-06-11",
+            "vs_RHP": [{"slot": 1, "position": "C", "player": "Bat One", "bats": "R"},
+                       {"slot": 2, "position": "1B", "player": "Bat Two", "bats": "L"},
+                       {"slot": 3, "position": "2B", "player": "Bat Three", "bats": "R"}],
+            "vs_LHP": [{"slot": 1, "position": "1B", "player": "Bat Two", "bats": "L"},
+                       {"slot": 2, "position": "C", "player": "Bat One", "bats": "R"},
+                       {"slot": 3, "position": "2B", "player": "Bat Three", "bats": "R"}]}]}
+
+    def test_fangraphs_abbrev_resolves_to_dk_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            self._salary(salary, "WSH")
+            order, report = poa.build_projected_order(
+                self._platoon("WSN"), str(salary), {"WSH": "R"}, only_teams=["WSH"])
+            self.assertEqual(len(order), 3)
+            self.assertEqual(report["filled_by_team"], {"WSH": 3})
+            self.assertEqual(report["zero_fill_teams"], [])
+
+    def test_az_resolves_to_ari_for_opponent_handedness(self):
+        feed = {"games": [{
+            "game_pk": 1, "game_date_utc": "2026-06-11T17:00:00Z",
+            "away": {"team_abbrev": "ATH", "lineup": [],
+                     "probable_pitcher": {"id": 1, "name": "Lefty", "hand": "L"}},
+            "home": {"team_abbrev": "AZ", "lineup": [],
+                     "probable_pitcher": {"id": 2, "name": "Righty", "hand": "R"}}}]}
+        out = poa.extract_opp_throws_from_lineups(feed)
+        self.assertNotIn("AZ", out)
+        self.assertEqual(out["ARI"], "L")   # Arizona faces the away lefty
+        self.assertEqual(out["ATH"], "R")
+
+    def test_zero_fill_is_reported_not_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            self._salary(salary, "WSH")
+            # Names that match nothing in the salary file: covered but unfillable.
+            broken = self._platoon("WSN")
+            for view in ("vs_RHP", "vs_LHP"):
+                for row in broken["teams"][0][view]:
+                    row["player"] = "Nobody " + row["player"]
+            _order, report = poa.build_projected_order(
+                broken, str(salary), {"WSH": "R"}, only_teams=["WSH"])
+            self.assertEqual(report["zero_fill_teams"], ["WSH"])
+
+    def test_requested_team_absent_from_file_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            self._salary(salary, "WSH")
+            _order, report = poa.build_projected_order(
+                self._platoon("WSN"), str(salary), {"COL": "R"}, only_teams=["COL"])
+            self.assertEqual(report["teams_missing_from_file"], ["COL"])
+
+
 class DoubleheaderLegTests(unittest.TestCase):
     """A feed keyed by matchup alone collapses both legs of a doubleheader onto one
     key. Last-write-wins then adopts the night game's lock time for a matinee
