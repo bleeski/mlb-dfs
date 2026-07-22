@@ -1,0 +1,1302 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.4-review",
+ "coverage": "full",
+ "contest_id": "192464820",
+ "slate_date": "2026-07-19",
+ "meta": {
+  "entries_total": 31,
+  "entries_complete_lineups": 31,
+  "winning_points": 183.6,
+  "winning_entry_id": "5193191404",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 30,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 6.5,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 29,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2000,
+  "at_cap_entries": 30,
+  "at_cap_share_pct": 96.8,
+  "salary_left_histogram": {
+   "<= 0": 29,
+   "1-100": 1,
+   "> 1500": 1
+  },
+  "max_stack_histogram": {
+   "3": 10,
+   "4": 10,
+   "5": 11
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Grayson Rodriguez",
+     "Tarik Skubal"
+    ],
+    "count": 13,
+    "field_share_pct": 41.9
+   },
+   {
+    "pair": [
+     "Tarik Skubal",
+     "Zack Littell"
+    ],
+    "count": 9,
+    "field_share_pct": 29.0
+   },
+   {
+    "pair": [
+     "J.T. Ginn",
+     "Tarik Skubal"
+    ],
+    "count": 8,
+    "field_share_pct": 25.8
+   },
+   {
+    "pair": [
+     "Grayson Rodriguez",
+     "Zack Littell"
+    ],
+    "count": 1,
+    "field_share_pct": 3.2
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Tarik Skubal",
+    "pct_drafted": 96.77
+   },
+   {
+    "player": "James Wood",
+    "pct_drafted": 67.74
+   },
+   {
+    "player": "Keibert Ruiz",
+    "pct_drafted": 51.61
+   },
+   {
+    "player": "Tyler Soderstrom",
+    "pct_drafted": 51.61
+   },
+   {
+    "player": "Riley Greene",
+    "pct_drafted": 48.39
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [
+   "jose fermin"
+  ],
+  "ownership_recompute_max_diff_pts": 22.58,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 310,
+  "roster_slots_expected": 310,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 977.4,
+  "dk_table_deficit_pts": 22.6,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 22.6 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "entry_id": "5193191404",
+   "username": "vectra568",
+   "points": 183.6,
+   "salary_used": 50800,
+   "salary_left": -800,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.77,
+   "n_cheap": 0,
+   "players_norm": [
+    "j t ginn",
+    "jacob wilson",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "riley greene",
+    "shea langeliers",
+    "spencer torkelson",
+    "tarik skubal",
+    "tyler soderstrom",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193213753",
+   "username": "KnogKnebronson",
+   "points": 171.6,
+   "salary_used": 50500,
+   "salary_left": -500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 40.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "carlos cortes",
+    "j t ginn",
+    "jacob wilson",
+    "jonah heim",
+    "keibert ruiz",
+    "kevin mcgonigle",
+    "nasim nunez",
+    "riley greene",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193215270",
+   "username": "lpapesh",
+   "points": 165.75,
+   "salary_used": 50500,
+   "salary_left": -500,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "donovan walton",
+    "grayson rodriguez",
+    "jacob wilson",
+    "james wood",
+    "lawrence butler",
+    "shea langeliers",
+    "spencer torkelson",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193162615",
+   "username": "Brandt622",
+   "points": 162.6,
+   "salary_used": 50500,
+   "salary_left": -500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "j t ginn",
+    "jacob wilson",
+    "jeff mcneil",
+    "jonah heim",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "riley greene",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193200733",
+   "username": "choproom",
+   "points": 147.6,
+   "salary_used": 50600,
+   "salary_left": -600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "j t ginn",
+    "james wood",
+    "jonah heim",
+    "joshua kuroda grauer",
+    "riley greene",
+    "tarik skubal",
+    "tyler soderstrom",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193212173",
+   "username": "Vanilla_Gorilla25",
+   "points": 145.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "j t ginn",
+    "jonah heim",
+    "jorge soler",
+    "kevin mcgonigle",
+    "nasim nunez",
+    "riley greene",
+    "spencer torkelson",
+    "tarik skubal",
+    "tyler soderstrom",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193187287",
+   "username": "jklodawizard",
+   "points": 138.6,
+   "salary_used": 51200,
+   "salary_left": -1200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 40.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "j t ginn",
+    "james wood",
+    "joshua kuroda grauer",
+    "nasim nunez",
+    "riley greene",
+    "shea langeliers",
+    "spencer torkelson",
+    "tarik skubal",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193165465",
+   "username": "Emac",
+   "points": 134.45,
+   "salary_used": 51600,
+   "salary_left": -1600,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 45.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "colt keith",
+    "james wood",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "riley greene",
+    "spencer torkelson",
+    "tarik skubal",
+    "tyler soderstrom",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193196602",
+   "username": "crowbar99",
+   "points": 123.6,
+   "salary_used": 50600,
+   "salary_left": -600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "j t ginn",
+    "james wood",
+    "jeff mcneil",
+    "jorbit vivas",
+    "jose siri",
+    "keibert ruiz",
+    "luis garcia",
+    "tarik skubal",
+    "tyler soderstrom",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193174906",
+   "username": "nickenyon6",
+   "points": 120.75,
+   "salary_used": 51500,
+   "salary_left": -1500,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "daylen lile",
+    "grayson rodriguez",
+    "james wood",
+    "jose tena",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "spencer torkelson",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193204416",
+   "username": "griffalicious24",
+   "points": 120.75,
+   "salary_used": 51500,
+   "salary_left": -1500,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "daylen lile",
+    "grayson rodriguez",
+    "james wood",
+    "jose tena",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "spencer torkelson",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193170867",
+   "username": "joephoto",
+   "points": 114.75,
+   "salary_used": 51300,
+   "salary_left": -1300,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 48.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "grayson rodriguez",
+    "jacob wilson",
+    "james wood",
+    "jose tena",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "luis garcia",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193222740",
+   "username": "BigNats13",
+   "points": 114.45,
+   "salary_used": 50500,
+   "salary_left": -500,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 47.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "jacob wilson",
+    "jose tena",
+    "keibert ruiz",
+    "kevin mcgonigle",
+    "luis garcia",
+    "riley greene",
+    "tarik skubal",
+    "tyler soderstrom",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193203592",
+   "username": "jean_bordeaux",
+   "points": 103.75,
+   "salary_used": 50700,
+   "salary_left": -700,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "grayson rodriguez",
+    "james outman",
+    "jose siri",
+    "joshua kuroda grauer",
+    "kevin mcgonigle",
+    "luis garcia",
+    "shea langeliers",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193164346",
+   "username": "apenn21",
+   "points": 103.45,
+   "salary_used": 51300,
+   "salary_left": -1300,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 44.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "james wood",
+    "jose tena",
+    "kevin mcgonigle",
+    "riley greene",
+    "shea langeliers",
+    "spencer torkelson",
+    "tarik skubal",
+    "vaughn grissom",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193209239",
+   "username": "jjax04",
+   "points": 100.45,
+   "salary_used": 51100,
+   "salary_left": -1100,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 44.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "jacob wilson",
+    "james wood",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "kevin mcgonigle",
+    "luis garcia",
+    "matt vierling",
+    "tarik skubal",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193193215",
+   "username": "brennan_rooks",
+   "points": 99.6,
+   "salary_used": 50700,
+   "salary_left": -700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 36.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "j t ginn",
+    "james wood",
+    "jorge soler",
+    "kevin mcgonigle",
+    "logan ohoppe",
+    "nolan schanuel",
+    "riley greene",
+    "tarik skubal",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193226933",
+   "username": "philipsellers92",
+   "points": 98.75,
+   "salary_used": 51200,
+   "salary_left": -1200,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "daylen lile",
+    "grayson rodriguez",
+    "james wood",
+    "jonah heim",
+    "jorbit vivas",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193216970",
+   "username": "humpalmd",
+   "points": 97.75,
+   "salary_used": 50800,
+   "salary_left": -800,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "denzer guzman",
+    "grayson rodriguez",
+    "jacob wilson",
+    "james wood",
+    "jose tena",
+    "keibert ruiz",
+    "luis garcia",
+    "matt vierling",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193226858",
+   "username": "NickiFoy",
+   "points": 96.75,
+   "salary_used": 50500,
+   "salary_left": -500,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "grayson rodriguez",
+    "jeff mcneil",
+    "jonah heim",
+    "jorbit vivas",
+    "lawrence butler",
+    "luis garcia",
+    "mike trout",
+    "tarik skubal",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193202687",
+   "username": "Harpua99",
+   "points": 95.45,
+   "salary_used": 51100,
+   "salary_left": -1100,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 36.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "james wood",
+    "jonah heim",
+    "jorge soler",
+    "joshua kuroda grauer",
+    "mike trout",
+    "spencer torkelson",
+    "tarik skubal",
+    "vaughn grissom",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193168923",
+   "username": "bleeski",
+   "points": 93.75,
+   "salary_used": 51000,
+   "salary_left": -1000,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "carlos cortes",
+    "cj abrams",
+    "daylen lile",
+    "grayson rodriguez",
+    "james wood",
+    "jonah heim",
+    "jose tena",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193222314",
+   "username": "lukecappo",
+   "points": 78.45,
+   "salary_used": 51300,
+   "salary_left": -1300,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "james wood",
+    "jose tena",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "kevin mcgonigle",
+    "luis garcia",
+    "riley greene",
+    "tarik skubal",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193228782",
+   "username": "jpeters6",
+   "points": 76.75,
+   "salary_used": 50600,
+   "salary_left": -600,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "dylan crews",
+    "grayson rodriguez",
+    "jorbit vivas",
+    "kevin mcgonigle",
+    "luis garcia",
+    "nasim nunez",
+    "riley greene",
+    "shea langeliers",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193151839",
+   "username": "SupernintendoBraun",
+   "points": 72.75,
+   "salary_used": 50900,
+   "salary_left": -900,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 41.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "grayson rodriguez",
+    "james wood",
+    "keibert ruiz",
+    "kevin mcgonigle",
+    "mike trout",
+    "nasim nunez",
+    "nolan schanuel",
+    "riley greene",
+    "tarik skubal",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193186929",
+   "username": "hammerjr",
+   "points": 71.75,
+   "salary_used": 50600,
+   "salary_left": -600,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 35.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "grayson rodriguez",
+    "james outman",
+    "kevin mcgonigle",
+    "lawrence butler",
+    "luis garcia",
+    "matt vierling",
+    "nasim nunez",
+    "shea langeliers",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193191390",
+   "username": "jericho911",
+   "points": 68.45,
+   "salary_used": 51200,
+   "salary_left": -1200,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 37.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "james wood",
+    "joshua kuroda grauer",
+    "keibert ruiz",
+    "matt vierling",
+    "mike trout",
+    "nolan schanuel",
+    "tarik skubal",
+    "vaughn grissom",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193228974",
+   "username": "sima0038",
+   "points": 68.45,
+   "salary_used": 51100,
+   "salary_left": -1100,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "james outman",
+    "james wood",
+    "jonah heim",
+    "jose tena",
+    "keibert ruiz",
+    "kevin mcgonigle",
+    "riley greene",
+    "tarik skubal",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193175914",
+   "username": "sirleged7777",
+   "points": 64.45,
+   "salary_used": 51400,
+   "salary_left": -1400,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 43.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "daylen lile",
+    "james wood",
+    "jose tena",
+    "joshua kuroda grauer",
+    "logan ohoppe",
+    "luis garcia",
+    "riley greene",
+    "tarik skubal",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193212196",
+   "username": "bigwillyxl",
+   "points": 51.75,
+   "salary_used": 50700,
+   "salary_left": -700,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "grayson rodriguez",
+    "james wood",
+    "jo adell",
+    "keibert ruiz",
+    "luis garcia",
+    "nasim nunez",
+    "tarik skubal",
+    "vaughn grissom",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5193153859",
+   "username": "nauldyboy",
+   "points": 24.7,
+   "salary_used": 46200,
+   "salary_left": 3800,
+   "sp_pair": [
+    "Grayson Rodriguez",
+    "Zack Littell"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "daylen lile",
+    "grayson rodriguez",
+    "jo adell",
+    "jose tena",
+    "luis garcia",
+    "mike trout",
+    "shea langeliers",
+    "vaughn grissom",
+    "zach neto",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Tarik Skubal",
+   "player_norm": "tarik skubal",
+   "roster_position": "P",
+   "pct_drafted": 96.77,
+   "fpts": 34.75
+  },
+  {
+   "player": "James Wood",
+   "player_norm": "james wood",
+   "roster_position": "OF",
+   "pct_drafted": 67.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Keibert Ruiz",
+   "player_norm": "keibert ruiz",
+   "roster_position": "C",
+   "pct_drafted": 51.61,
+   "fpts": 10.0
+  },
+  {
+   "player": "Tyler Soderstrom",
+   "player_norm": "tyler soderstrom",
+   "roster_position": "OF",
+   "pct_drafted": 51.61,
+   "fpts": 25.0
+  },
+  {
+   "player": "Riley Greene",
+   "player_norm": "riley greene",
+   "roster_position": "OF",
+   "pct_drafted": 48.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Grayson Rodriguez",
+   "player_norm": "grayson rodriguez",
+   "roster_position": "P",
+   "pct_drafted": 45.16,
+   "fpts": -3.0
+  },
+  {
+   "player": "Daylen Lile",
+   "player_norm": "daylen lile",
+   "roster_position": "OF",
+   "pct_drafted": 45.16,
+   "fpts": 5.0
+  },
+  {
+   "player": "Luis Garcia Jr.",
+   "player_norm": "luis garcia",
+   "roster_position": "1B",
+   "pct_drafted": 41.94,
+   "fpts": 0.0
+  },
+  {
+   "player": "CJ Abrams",
+   "player_norm": "cj abrams",
+   "roster_position": "SS",
+   "pct_drafted": 41.94,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "3B",
+   "pct_drafted": 35.48,
+   "fpts": 12.0
+  },
+  {
+   "player": "Jose Tena",
+   "player_norm": "jose tena",
+   "roster_position": "2B",
+   "pct_drafted": 35.48,
+   "fpts": 2.0
+  },
+  {
+   "player": "Zack Littell",
+   "player_norm": "zack littell",
+   "roster_position": "P",
+   "pct_drafted": 32.26,
+   "fpts": -2.3
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 29.03,
+   "fpts": 32.0
+  },
+  {
+   "player": "Shea Langeliers",
+   "player_norm": "shea langeliers",
+   "roster_position": "C",
+   "pct_drafted": 25.81,
+   "fpts": 15.0
+  },
+  {
+   "player": "J.T. Ginn",
+   "player_norm": "j t ginn",
+   "roster_position": "P",
+   "pct_drafted": 25.81,
+   "fpts": 29.85
+  },
+  {
+   "player": "Jacob Wilson",
+   "player_norm": "jacob wilson",
+   "roster_position": "SS",
+   "pct_drafted": 25.81,
+   "fpts": 26.0
+  },
+  {
+   "player": "Joshua Kuroda-Grauer",
+   "player_norm": "joshua kuroda grauer",
+   "roster_position": "2B",
+   "pct_drafted": 22.58,
+   "fpts": 15.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "1B",
+   "pct_drafted": 19.35,
+   "fpts": 5.0
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "OF",
+   "pct_drafted": 16.13,
+   "fpts": 5.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "3B",
+   "pct_drafted": 16.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "2B",
+   "pct_drafted": 16.13,
+   "fpts": 2.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "SS",
+   "pct_drafted": 12.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Matt Vierling",
+   "player_norm": "matt vierling",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jorbit Vivas",
+   "player_norm": "jorbit vivas",
+   "roster_position": "3B",
+   "pct_drafted": 12.9,
+   "fpts": 7.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "2B",
+   "pct_drafted": 9.68,
+   "fpts": 7.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "1B",
+   "pct_drafted": 9.68,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jeff McNeil",
+   "player_norm": "jeff mcneil",
+   "roster_position": "2B",
+   "pct_drafted": 9.68,
+   "fpts": 17.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "SS",
+   "pct_drafted": 9.68,
+   "fpts": 12.0
+  },
+  {
+   "player": "Colt Keith",
+   "player_norm": "colt keith",
+   "roster_position": "3B",
+   "pct_drafted": 9.68,
+   "fpts": 18.0
+  },
+  {
+   "player": "Lawrence Butler",
+   "player_norm": "lawrence butler",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 6.0
+  },
+  {
+   "player": "James Outman",
+   "player_norm": "james outman",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jorge Soler",
+   "player_norm": "jorge soler",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "C",
+   "pct_drafted": 9.68,
+   "fpts": 5.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "SS",
+   "pct_drafted": 6.45,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jo Adell",
+   "player_norm": "jo adell",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kerry Carpenter",
+   "player_norm": "kerry carpenter",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 6.45,
+   "fpts": 11.0
+  },
+  {
+   "player": "Carlos Cortes",
+   "player_norm": "carlos cortes",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 25.0
+  },
+  {
+   "player": "Logan O'Hoppe",
+   "player_norm": "logan ohoppe",
+   "roster_position": "C",
+   "pct_drafted": 6.45,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jose Siri",
+   "player_norm": "jose siri",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 3.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "SS",
+   "pct_drafted": 3.23,
+   "fpts": 7.0
+  },
+  {
+   "player": "Donovan Walton",
+   "player_norm": "donovan walton",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 12.0
+  },
+  {
+   "player": "Denzer Guzman",
+   "player_norm": "denzer guzman",
+   "roster_position": "3B",
+   "pct_drafted": 3.23,
+   "fpts": 3.0
+  },
+  {
+   "player": "Dylan Crews",
+   "player_norm": "dylan crews",
+   "roster_position": "OF",
+   "pct_drafted": 3.23,
+   "fpts": 2.0
+  }
+ ]
+}

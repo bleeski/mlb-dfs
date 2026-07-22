@@ -519,6 +519,99 @@ table omits, with drafted-position splits carried in a dedicated
 
 === ARCHIVE (append-only; full decompositions, newest first) ===
 
+**Session note (2026-07-22, mlb-standings-archive scheduled task):** A-002
+through A-005 below were mined this session. `field_miner` v0.4 splits the
+ownership recompute self-check into a hard structural gate
+(`parse_structural_ok`, blocks archiving on failure) and an advisory DK-table
+agreement check (`dk_table_agrees`, the 1.5-pt band) — see the module
+docstring's "v0.4 verification split." Ledger invariant 3.7 still reads the
+1.5-pt band as a hard "the parse is wrong, fix before archiving" gate. All 12
+mining runs this session (11 contests plus one re-run) passed the structural
+gate; 7 missed the 1.5-pt advisory band, in every case attributed by
+`verification_note` to DK's own `%Drafted` table omitting multi-position rows,
+not a parse defect. Archived all of them on the structural gate rather than
+blocking on the advisory band. Flagging the invariant-text/code drift for
+Ben to reconcile 3.7's wording rather than resolving it unilaterally.
+
+## A-002 — 2026-07-19 — 1 contest, afternoon4 sub-slate
+
+Archived 2026-07-22 via the standings-archive scheduled task. Contest 192464820
+was pulled from the inbox alongside a same-day-looking 2026-07-18 batch by
+contest-ID proximity; that grouping was wrong. Resolved to 2026-07-19 (the
+afternoon4 4-game sub-slate: DET@LAA, SF@SEA, STL@AZ, WSH@ATH) by a 100.0%
+salary join against `data/slates/2026-07-19-afternoon4/DKSalaries.csv` (a 0.0%
+join against the main 2026-07-19 slate and against every 2026-07-18 candidate
+tested — see A-003). Salary CSV archived alongside as
+`DKSalaries_2026-07-19-afternoon4.csv`. Full coverage. A stale
+`data/archive/2026-07-18/mined_192464820.json` from the initial misdated run
+could not be deleted (workspace files are delete-protected without manual
+approval) and has been overwritten with a superseded marker pointing here; safe
+for Ben to remove by hand. Entry fee, payout structure, paid places, cash line,
+and Ben's own Entry IDs: not in the export, not backfilled this run.
+
+#### Full-field decomposition — contest 192464820 (field_miner 0.4-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 31 (31 complete lineups); winning score 183.6; multi-entry contest: False.
+- Duplication: 30 distinct lineups; 6.5% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 29, 2: 1}.
+- Salary usage: 96.8% of entries within $100 of the cap. Salary-left bins: {'<= 0': 29, '1-100': 1, '> 1500': 1}.
+- Max-stack histogram: {3: 10, 4: 10, 5: 11}.
+- SP-pair field share (top): Grayson Rodriguez/Tarik Skubal 41.9%, Tarik Skubal/Zack Littell 29.0%, J.T. Ginn/Tarik Skubal 25.8%, Grayson Rodriguez/Zack Littell 3.2%.
+- Chalk (top-5 %Drafted): Tarik Skubal 96.77%, James Wood 67.74%, Keibert Ruiz 51.61%, Tyler Soderstrom 51.61%, Riley Greene 48.39%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 22.58 pts; parse OK; DK %Drafted table short 22.6 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+### Gaps to backfill for A-002
+
+- Entry fee, payout structure, paid places, cash line, seats, Ben's own Entry IDs: not captured.
+- Ownership recompute misses the 1.5-pt advisory band by 22.6 pts, the largest in this batch. Structural check passed; DK's own table is short, not our parse; still worth a manual glance given the size of the gap.
+
+---
+
+## A-003 — 2026-07-18 — 3 contests, one slate
+
+Archived 2026-07-22. Slate date inferred, not confirmed: contest-standings zip
+export timestamps for 192413146/192413147 read 2026-07-18 22:31 (server-side
+export time). 192444379 has no zip but shares the same top SP names (Matthew
+Boyd / Taj Bradley / Davis Martin) and opponent-registry cross-reference as the
+other two. No salary CSV or DKEntries file for 2026-07-18 exists anywhere in
+this repo, so all three ran `standings_only` (duplication, chalk, SP pairs,
+ownership recompute, and the opponent registry populated; salary usage and
+stack tables unavailable). Entry fee, payout structure, paid places, and cash
+line: not in the export, not backfilled.
+
+#### Full-field decomposition — contest 192413146 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 203 (203 complete lineups); winning score 144.6; multi-entry contest: True.
+- Duplication: 181 distinct lineups; 15.8% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 171, 2: 6, 3: 2, 7: 2}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Matthew Boyd/Shane Bieber 20.2%, Matthew Boyd/Taj Bradley 19.2%, Davis Martin/Taj Bradley 17.7%, Davis Martin/Matthew Boyd 10.8%.
+- Chalk (top-5 %Drafted): Matthew Boyd 54.68%, Taj Bradley 52.71%, Elly De La Cruz 50.25%, Ernie Clement 43.84%, JJ Bleday 42.86%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 192413147 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 210 (208 complete lineups); winning score 142.25; multi-entry contest: True.
+- Duplication: 187 distinct lineups; 14.4% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 178, 2: 5, 3: 2, 7: 2}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Davis Martin/Taj Bradley 19.2%, Matthew Boyd/Shane Bieber 16.3%, Matthew Boyd/Taj Bradley 16.3%, Davis Martin/Matthew Boyd 11.5%.
+- Chalk (top-5 %Drafted): Taj Bradley 50.48%, Matthew Boyd 48.57%, Elly De La Cruz 42.38%, JJ Bleday 42.38%, Ernie Clement 42.38%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 192444379 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 31 (31 complete lineups); winning score 140.6; multi-entry contest: False.
+- Duplication: 31 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 31}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Matthew Boyd/Taj Bradley 32.3%, Davis Martin/Taj Bradley 29.0%, Matthew Boyd/Shane Bieber 12.9%, Davis Martin/Rhett Lowder 9.7%.
+- Chalk (top-5 %Drafted): Taj Bradley 70.97%, Elly De La Cruz 54.84%, Matthew Boyd 51.61%, Ernie Clement 48.39%, Davis Martin 45.16%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+
+### Gaps to backfill for A-003
+
+- Slate date: inferred from zip export timestamp and registry cross-reference, not confirmed via a salary file. Re-run at full coverage and confirm if a 2026-07-18 DKSalaries or DKEntries file ever surfaces.
+- Entry fee, payout structure, paid places, cash line, seats, Ben's own Entry IDs: not captured.
+
+---
+
 ## A-001 — 2026-06-29 — 3 contests, one slate
 
 Uploaded 2026-06-30; slate date confirmed 2026-06-29 on 2026-07-04 via the
@@ -715,3 +808,104 @@ anchor the conditioning argument.
   tolerance). The mining surfaced the (player, roster position) grain of the
   standings player table (now an invariant in 3.1) and corrected three players'
   ownership in the table above.
+
+---
+
+## A-004 — 2026-06-20 — 5 contests, one slate
+
+Archived 2026-07-22. Slate date inferred, not confirmed: zip export timestamps
+for 191506958/191507209/191507213/191507220 read 2026-06-21 00:03 (server-side
+export time). 191506960 has no zip but shares the same dominant chalk SP (Chris
+Sale, 40-59% owned in every contest of this group, absent from A-005 below) and
+opponent-registry cross-reference. Corroborating signal, not proof: a web check
+found Chris Sale placed on the 15-day injured list on 2026-06-21 with a
+fractured rib, consistent with a start the evening before. No salary CSV or
+DKEntries file for 2026-06-20 exists anywhere in this repo, so all five ran
+`standings_only`. Entry fee, payout structure, paid places, and cash line: not
+in the export, not backfilled.
+
+#### Full-field decomposition — contest 191506958 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 193 (188 complete lineups); winning score 149.55; multi-entry contest: True.
+- Duplication: 164 distinct lineups; 19.1% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 152, 2: 8, 3: 1, 4: 1, 6: 1, 7: 1}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Chris Sale/Max Meyer 20.7%, Chris Sale/MacKenzie Gore 10.1%, Kyle Harrison/Max Meyer 9.6%, Chris Sale/Ian Seymour 8.5%.
+- Chalk (top-5 %Drafted): Chris Sale 54.92%, Max Meyer 40.41%, Wyatt Langford 37.82%, Ezequiel Duran 35.23%, Fernando Tatis Jr. 28.5%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 191506960 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 23 (23 complete lineups); winning score 154.0; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Kyle Harrison/Max Meyer 21.7%, Chris Sale/MacKenzie Gore 17.4%, Chris Sale/Max Meyer 13.0%, Chris Sale/Ian Seymour 13.0%.
+- Chalk (top-5 %Drafted): Chris Sale 52.17%, Kyle Stowers 47.83%, Max Meyer 43.48%, Jonathan Aranda 34.78%, Kyle Harrison 34.78%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 191507209 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 150 (150 complete lineups); winning score 157.9; multi-entry contest: True.
+- Duplication: 150 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 150}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Chris Sale/Will Warren 19.3%, Chris Sale/MacKenzie Gore 13.3%, Chris Sale/Max Meyer 10.0%, Kyle Harrison/Max Meyer 6.0%.
+- Chalk (top-5 %Drafted): Chris Sale 58.67%, Paul Goldschmidt 34.0%, Jose Caballero 32.0%, Will Warren 31.33%, Amed Rosario 30.67%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 11.34 pts; parse OK; DK %Drafted table short 24.6 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 191507213 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 242 (242 complete lineups); winning score 155.0; multi-entry contest: True.
+- Duplication: 242 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 242}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Chris Sale/Max Meyer 14.5%, Chris Sale/MacKenzie Gore 10.3%, Chris Sale/Will Warren 9.5%, Max Meyer/Will Warren 7.4%.
+- Chalk (top-5 %Drafted): Chris Sale 49.17%, Max Meyer 39.67%, Will Warren 28.93%, Seiya Suzuki 28.1%, Nico Hoerner 26.45%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 9.51 pts; parse OK; DK %Drafted table short 9.5 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 191507220 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 110 (110 complete lineups); winning score 155.25; multi-entry contest: True.
+- Duplication: 110 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 110}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Chris Sale/Will Warren 20.0%, Chris Sale/MacKenzie Gore 15.5%, Chris Sale/Max Meyer 10.9%, MacKenzie Gore/Max Meyer 7.3%.
+- Chalk (top-5 %Drafted): Chris Sale 56.36%, MacKenzie Gore 37.27%, Will Warren 36.36%, Max Meyer 27.27%, Pete Crow-Armstrong 22.73%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 3.63 pts; parse OK; DK %Drafted table short 3.5 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+### Gaps to backfill for A-004
+
+- Slate date: inferred, not confirmed via a salary file.
+- 191507209 and 191507213 miss the 1.5-pt ownership-recompute advisory band (11.34 and 9.51 pts respectively); DK-table-short, structural check passed (see the session note above the archive).
+- Entry fee, payout structure, paid places, cash line, seats, Ben's own Entry IDs: not captured.
+
+---
+
+## A-005 — 2026-06-19 — 2 contests, one slate
+
+Archived 2026-07-22. Slate date inferred, not confirmed: zip export timestamps
+for both contests read 2026-06-20 05:35 (server-side export time, consistent
+with a slate the previous evening). Both share the same dominant chalk SP
+(Jacob Misiorowski, 55%+ owned in both, absent from A-004 above). No salary CSV
+or DKEntries file for 2026-06-19 exists anywhere in this repo, so both ran
+`standings_only`. Entry fee, payout structure, paid places, and cash line: not
+in the export, not backfilled.
+
+#### Full-field decomposition — contest 191488360 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 177 (177 complete lineups); winning score 179.0; multi-entry contest: True.
+- Duplication: 176 distinct lineups; 1.1% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 175, 2: 1}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Cam Schlittler/Jacob Misiorowski 15.3%, Jacob Misiorowski/Jacob deGrom 12.4%, Jacob Misiorowski/Ranger Suarez 6.8%, Jacob Misiorowski/Roki Sasaki 4.5%.
+- Chalk (top-5 %Drafted): Jacob Misiorowski 55.37%, Cam Schlittler 30.51%, Jacob deGrom 28.25%, Jo Adell 21.47%, Marcell Ozuna 20.34%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 3.96 pts; parse OK; DK %Drafted table short 6.8 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 191488366 (field_miner 0.4-review; coverage standings_only; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 297 (297 complete lineups); winning score 189.4; multi-entry contest: True.
+- Duplication: 297 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 297}.
+- Salary-usage and stack tables unavailable at this coverage tier (no salary file); re-run at full coverage if the slate salary CSV or the slate's DKEntries upload file (which embeds the salary block) surfaces.
+- SP-pair field share (top): Jacob Misiorowski/Jacob deGrom 12.8%, Cam Schlittler/Jacob Misiorowski 12.1%, Jacob Misiorowski/Ranger Suarez 6.4%, Jacob deGrom/Ranger Suarez 5.4%.
+- Chalk (top-5 %Drafted): Jacob Misiorowski 55.56%, Jacob deGrom 31.31%, Cam Schlittler 27.95%, Jo Adell 21.21%, Logan O'Hoppe 18.86%.
+- Diagnostics: salary join n/a (standings_only); ownership recompute max diff 2.02 pts; parse OK; DK %Drafted table short 3.4 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+### Gaps to backfill for A-005
+
+- Slate date: inferred, not confirmed via a salary file.
+- Entry fee, payout structure, paid places, cash line, seats, Ben's own Entry IDs: not captured.

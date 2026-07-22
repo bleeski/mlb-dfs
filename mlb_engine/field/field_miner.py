@@ -77,7 +77,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-VERSION = "0.3-review"
+VERSION = "0.4-review"
 SALARY_CAP = 50000
 ROSTER_SLOTS = ("P", "C", "1B", "2B", "3B", "SS", "OF")
 EXPECTED_SLOT_COUNTS = {"P": 2, "C": 1, "1B": 1, "2B": 1, "3B": 1, "SS": 1, "OF": 3}
@@ -381,6 +381,42 @@ def mine_contest(
         own_recompute_max_diff, own_denominator = min(candidates)
     else:
         own_recompute_max_diff, own_denominator = None, None
+
+    # v0.4 verification split. Two distinct questions were previously conflated:
+    #   (a) is OUR parse structurally sound? Hard gate; a real parse bug blocks
+    #       archiving (this is what caught the v0.3 position-grain error).
+    #   (b) does DK's %Drafted table agree with it? Advisory only. DraftKings
+    #       omits position rows for some multi-position players, so their table
+    #       can sum short of the structural total while our parse is exact. In
+    #       that case the lineup-derived recompute is the authoritative ownership.
+    roster_size = sum(EXPECTED_SLOT_COUNTS.values())
+    intra_entry_dupes = [
+        e["entry_id"] for e in complete
+        if len(e["players_norm"]) != len(set(e["players_norm"]))
+    ]
+    observed_slots = sum(roster_counts.values())
+    expected_slots = roster_size * n_complete
+    parse_structural_ok = (not intra_entry_dupes) and (observed_slots == expected_slots)
+    denom_used = n_all if own_denominator == "all_entries" else n_complete
+    recomputed_total_pct = round(100.0 * observed_slots / denom_used, 1) if denom_used else None
+    dk_total_pct = round(sum(own.values()), 1) if own else None
+    dk_deficit_pts = (round(recomputed_total_pct - dk_total_pct, 1)
+                      if (recomputed_total_pct is not None and dk_total_pct is not None) else None)
+    dk_table_agrees = (own_recompute_max_diff is not None and own_recompute_max_diff <= 1.5)
+    if not parse_structural_ok:
+        verification_note = ("PARSE FAILURE: structural check failed "
+                             f"(slots {observed_slots} vs expected {expected_slots}, "
+                             f"{len(intra_entry_dupes)} entries with a duplicated player). "
+                             "Do not archive anything downstream of this parse.")
+    elif dk_table_agrees:
+        verification_note = "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+    else:
+        verification_note = (
+            f"parse structurally sound (every complete entry carries {roster_size} distinct "
+            f"players); DK's %Drafted table sums {dk_deficit_pts} pts short, which is DK "
+            "omitting position rows for multi-position players. Lineup-derived ownership is "
+            "authoritative for this contest.")
+
     joined = [e for e in complete if not e["unmatched"]]
     join_rate = round(100.0 * len(joined) / n_complete, 1) if (has_salary and n_complete) else None
 
@@ -424,7 +460,16 @@ def mine_contest(
             "salary_name_collisions": smap.get("__collisions__", {}).get("names", []),
             "ownership_recompute_max_diff_pts": own_recompute_max_diff,
             "ownership_recompute_denominator": own_denominator,
-            "ownership_recompute_ok": (own_recompute_max_diff is not None and own_recompute_max_diff <= 1.5),
+            "ownership_recompute_ok": dk_table_agrees,
+            "parse_structural_ok": parse_structural_ok,
+            "intra_entry_duplicate_entry_ids": intra_entry_dupes[:5],
+            "roster_slots_observed": observed_slots,
+            "roster_slots_expected": expected_slots,
+            "recomputed_total_pct": recomputed_total_pct,
+            "dk_table_total_pct": dk_total_pct,
+            "dk_table_deficit_pts": dk_deficit_pts,
+            "dk_table_agrees": dk_table_agrees,
+            "verification_note": verification_note,
         },
         "entries": [
             {k: e[k] for k in (
@@ -599,9 +644,15 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
             f"{t['player']} {t['pct_drafted']}%" for t in c["top_owned"]) + ".")
     join_txt = (f"salary join {g['salary_join_rate_pct']}% of complete entries fully joined; "
                 if g["salary_join_rate_pct"] is not None else "salary join n/a (standings_only); ")
+    parse_txt = "parse OK" if g.get("parse_structural_ok", True) else "PARSE FAILED"
+    if g.get("dk_table_agrees", g.get("ownership_recompute_ok")):
+        dk_txt = "DK %Drafted agrees"
+    else:
+        dk_txt = (f"DK %Drafted table short {g.get('dk_table_deficit_pts')} pts "
+                  "(DK omits multi-position rows; lineup-derived ownership used)")
     lines.append(f"- Diagnostics: {join_txt}"
-                 f"ownership recompute max diff {g['ownership_recompute_max_diff_pts']} pts "
-                 f"({'OK' if g['ownership_recompute_ok'] else 'CHECK PARSE'}).")
+                 f"ownership recompute max diff {g['ownership_recompute_max_diff_pts']} pts; "
+                 f"{parse_txt}; {dk_txt}.")
     return "\n".join(lines)
 
 

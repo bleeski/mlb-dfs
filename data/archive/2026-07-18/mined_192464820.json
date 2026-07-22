@@ -1,0 +1,7 @@
+{
+ "_SUPERSEDED": true,
+ "_reason": "Initial run misdated this contest as 2026-07-18 by ID-proximity/registry inference. Verified 2026-07-22 via 100.0% salary join against data/slates/2026-07-19-afternoon4/DKSalaries.csv (a 0.0% join against every 2026-07-18 slate candidate); the true slate_date is 2026-07-19 (afternoon4 sub-slate). The correct mined output is data/archive/2026-07-19/mined_192464820.json. This file could not be deleted (workspace files are delete-protected without manual approval); left in place with this marker so nothing downstream reads it as valid. Safe for Ben to delete by hand.",
+ "correct_file": "data/archive/2026-07-19/mined_192464820.json",
+ "correct_slate_date": "2026-07-19",
+ "contest_id": "192464820"
+}

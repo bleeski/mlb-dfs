@@ -1,0 +1,1441 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.4-review",
+ "coverage": "standings_only",
+ "contest_id": "192444379",
+ "slate_date": "2026-07-18",
+ "meta": {
+  "entries_total": 31,
+  "entries_complete_lineups": 31,
+  "winning_points": 140.6,
+  "winning_entry_id": "5192702978",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 31,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 31
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": null,
+  "at_cap_entries": null,
+  "at_cap_share_pct": null,
+  "salary_left_histogram": {},
+  "max_stack_histogram": {},
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Matthew Boyd",
+     "Taj Bradley"
+    ],
+    "count": 10,
+    "field_share_pct": 32.3
+   },
+   {
+    "pair": [
+     "Davis Martin",
+     "Taj Bradley"
+    ],
+    "count": 9,
+    "field_share_pct": 29.0
+   },
+   {
+    "pair": [
+     "Matthew Boyd",
+     "Shane Bieber"
+    ],
+    "count": 4,
+    "field_share_pct": 12.9
+   },
+   {
+    "pair": [
+     "Davis Martin",
+     "Rhett Lowder"
+    ],
+    "count": 3,
+    "field_share_pct": 9.7
+   },
+   {
+    "pair": [
+     "Davis Martin",
+     "Matthew Boyd"
+    ],
+    "count": 2,
+    "field_share_pct": 6.5
+   },
+   {
+    "pair": [
+     "Shane Bieber",
+     "Taj Bradley"
+    ],
+    "count": 2,
+    "field_share_pct": 6.5
+   },
+   {
+    "pair": [
+     "Taj Bradley",
+     "Tomoyuki Sugano"
+    ],
+    "count": 1,
+    "field_share_pct": 3.2
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Taj Bradley",
+    "pct_drafted": 70.97
+   },
+   {
+    "player": "Elly De La Cruz",
+    "pct_drafted": 54.84
+   },
+   {
+    "player": "Matthew Boyd",
+    "pct_drafted": 51.61
+   },
+   {
+    "player": "Ernie Clement",
+    "pct_drafted": 48.39
+   },
+   {
+    "player": "Davis Martin",
+    "pct_drafted": 45.16
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": null,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 310,
+  "roster_slots_expected": 310,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "entry_id": "5192702978",
+   "username": "sethrollins12",
+   "points": 140.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Shane Bieber"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 33.55,
+   "n_cheap": null,
+   "players_norm": [
+    "elly de la cruz",
+    "ernie clement",
+    "eugenio suarez",
+    "jake mccarthy",
+    "jj bleday",
+    "jose trevino",
+    "matthew boyd",
+    "michael busch",
+    "noelvi marte",
+    "shane bieber"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192792515",
+   "username": "nauldyboy",
+   "points": 140.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Shane Bieber"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 27.74,
+   "n_cheap": null,
+   "players_norm": [
+    "elly de la cruz",
+    "jake mccarthy",
+    "jonatan clase",
+    "jose trevino",
+    "matthew boyd",
+    "noelvi marte",
+    "pedro ramirez",
+    "sal stewart",
+    "shane bieber",
+    "spencer steer"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192793860",
+   "username": "rmknks",
+   "points": 110.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 29.68,
+   "n_cheap": null,
+   "players_norm": [
+    "brett sullivan",
+    "cole carrigg",
+    "dane myers",
+    "edwin arroyo",
+    "elly de la cruz",
+    "matthew boyd",
+    "noelvi marte",
+    "sal stewart",
+    "taj bradley",
+    "tj rumfield"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192681304",
+   "username": "juliom328",
+   "points": 108.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Shane Bieber"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 32.58,
+   "n_cheap": null,
+   "players_norm": [
+    "elly de la cruz",
+    "ernie clement",
+    "eugenio suarez",
+    "jake mccarthy",
+    "jj bleday",
+    "kyle teel",
+    "matthew boyd",
+    "nathan lukes",
+    "shane bieber",
+    "tj rumfield"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192683544",
+   "username": "tripp01",
+   "points": 106.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 28.06,
+   "n_cheap": null,
+   "players_norm": [
+    "chase meidroth",
+    "dansby swanson",
+    "jake mccarthy",
+    "jj bleday",
+    "jose trevino",
+    "kazuma okamoto",
+    "matthew boyd",
+    "nathan lukes",
+    "spencer steer",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192650135",
+   "username": "Mulligan4J",
+   "points": 105.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 24.19,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "alex bregman",
+    "cole carrigg",
+    "dansby swanson",
+    "davis martin",
+    "edouard julien",
+    "ian happ",
+    "jake mccarthy",
+    "taj bradley",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192670634",
+   "username": "nickenyon6",
+   "points": 98.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 34.19,
+   "n_cheap": null,
+   "players_norm": [
+    "brett sullivan",
+    "edwin arroyo",
+    "elly de la cruz",
+    "eugenio suarez",
+    "george springer",
+    "jj bleday",
+    "matthew boyd",
+    "noelvi marte",
+    "taj bradley",
+    "tj rumfield"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192770176",
+   "username": "roryjr82",
+   "points": 93.25,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Matthew Boyd"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 29.03,
+   "n_cheap": null,
+   "players_norm": [
+    "davis martin",
+    "elly de la cruz",
+    "ernie clement",
+    "george springer",
+    "kyle teel",
+    "matthew boyd",
+    "michael busch",
+    "pedro ramirez",
+    "sam antonacci",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192782057",
+   "username": "Paulo21613",
+   "points": 91.9,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Taj Bradley",
+    "Tomoyuki Sugano"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 27.1,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "cole carrigg",
+    "ernie clement",
+    "jake mccarthy",
+    "mickey moniak",
+    "miguel vargas",
+    "munetaka murakami",
+    "taj bradley",
+    "tomoyuki sugano",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192645374",
+   "username": "apenn21",
+   "points": 91.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Shane Bieber"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 33.55,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "elly de la cruz",
+    "ernie clement",
+    "george springer",
+    "jake mccarthy",
+    "jj bleday",
+    "kazuma okamoto",
+    "matthew boyd",
+    "shane bieber",
+    "spencer steer"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192706677",
+   "username": "WHITGAR",
+   "points": 89.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 27.42,
+   "n_cheap": null,
+   "players_norm": [
+    "austin martin",
+    "braden montgomery",
+    "davis martin",
+    "edouard julien",
+    "elly de la cruz",
+    "jose trevino",
+    "miguel vargas",
+    "munetaka murakami",
+    "ryan kreidler",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192795032",
+   "username": "Jbucna",
+   "points": 85.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 32.58,
+   "n_cheap": null,
+   "players_norm": [
+    "dane myers",
+    "davis martin",
+    "elly de la cruz",
+    "eugenio suarez",
+    "jose trevino",
+    "josh bell",
+    "noelvi marte",
+    "sam antonacci",
+    "taj bradley",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192803005",
+   "username": "heat00veride",
+   "points": 85.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 25.16,
+   "n_cheap": null,
+   "players_norm": [
+    "austin martin",
+    "brett sullivan",
+    "colson montgomery",
+    "davis martin",
+    "eugenio suarez",
+    "luke keaschall",
+    "mickey moniak",
+    "taj bradley",
+    "tj rumfield",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192663771",
+   "username": "SlobberKnockers1",
+   "points": 81.75,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Shane Bieber",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 31.94,
+   "n_cheap": null,
+   "players_norm": [
+    "elly de la cruz",
+    "ernie clement",
+    "george springer",
+    "jake mccarthy",
+    "josh bell",
+    "luke keaschall",
+    "miguel vargas",
+    "shane bieber",
+    "taj bradley",
+    "victor caratini"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192648027",
+   "username": "bleeski",
+   "points": 81.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 28.39,
+   "n_cheap": null,
+   "players_norm": [
+    "cole carrigg",
+    "davis martin",
+    "edouard julien",
+    "jake mccarthy",
+    "jj bleday",
+    "josh bell",
+    "ryan kreidler",
+    "sal stewart",
+    "taj bradley",
+    "victor caratini"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192702878",
+   "username": "TexasHeat12",
+   "points": 80.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 33.87,
+   "n_cheap": null,
+   "players_norm": [
+    "chase meidroth",
+    "elly de la cruz",
+    "eugenio suarez",
+    "jj bleday",
+    "jonatan clase",
+    "jose trevino",
+    "matthew boyd",
+    "nathan lukes",
+    "spencer steer",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192729412",
+   "username": "Letspickemright",
+   "points": 79.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 31.94,
+   "n_cheap": null,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "davis martin",
+    "ernie clement",
+    "jj bleday",
+    "jose trevino",
+    "mickey moniak",
+    "ryan kreidler",
+    "spencer steer",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192652729",
+   "username": "winboy27",
+   "points": 78.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 34.19,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "cole carrigg",
+    "elly de la cruz",
+    "ernie clement",
+    "george springer",
+    "josh bell",
+    "matthew boyd",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192690769",
+   "username": "Harpua99",
+   "points": 77.75,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Shane Bieber",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 28.71,
+   "n_cheap": null,
+   "players_norm": [
+    "ernie clement",
+    "eugenio suarez",
+    "jake mccarthy",
+    "luke keaschall",
+    "ryan jeffers",
+    "ryan kreidler",
+    "seiya suzuki",
+    "shane bieber",
+    "spencer steer",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192671297",
+   "username": "macyfan",
+   "points": 66.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 35.16,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "cole carrigg",
+    "dane myers",
+    "edwin arroyo",
+    "elly de la cruz",
+    "eugenio suarez",
+    "george springer",
+    "matthew boyd",
+    "sal stewart",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192727597",
+   "username": "Boudin71",
+   "points": 66.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 36.77,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "chase meidroth",
+    "ernie clement",
+    "eugenio suarez",
+    "jake mccarthy",
+    "matthew boyd",
+    "munetaka murakami",
+    "sam antonacci",
+    "spencer steer",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192780065",
+   "username": "ConnorClark11",
+   "points": 64.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 26.45,
+   "n_cheap": null,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "davis martin",
+    "ernie clement",
+    "josh bell",
+    "kody clemens",
+    "ryan jeffers",
+    "sam antonacci",
+    "taj bradley",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192684086",
+   "username": "jc000000",
+   "points": 55.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 30.97,
+   "n_cheap": null,
+   "players_norm": [
+    "colson montgomery",
+    "ernie clement",
+    "george springer",
+    "jj bleday",
+    "jonatan clase",
+    "matthew boyd",
+    "sal stewart",
+    "taj bradley",
+    "victor caratini",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192791815",
+   "username": "hicks357",
+   "points": 55.25,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Matthew Boyd"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 23.55,
+   "n_cheap": null,
+   "players_norm": [
+    "alex bregman",
+    "colson montgomery",
+    "dane myers",
+    "daulton varsho",
+    "davis martin",
+    "ernie clement",
+    "matthew boyd",
+    "miguel vargas",
+    "pete crow armstrong",
+    "victor caratini"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192747555",
+   "username": "MichaelBayneTech",
+   "points": 54.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 27.1,
+   "n_cheap": null,
+   "players_norm": [
+    "andres gimenez",
+    "andrew benintendi",
+    "chase meidroth",
+    "davis martin",
+    "eugenio suarez",
+    "kyle teel",
+    "sam antonacci",
+    "spencer steer",
+    "taj bradley",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192746070",
+   "username": "srqdave",
+   "points": 54.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 36.13,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "austin martin",
+    "elly de la cruz",
+    "ernie clement",
+    "eugenio suarez",
+    "george springer",
+    "ian happ",
+    "matthew boyd",
+    "munetaka murakami",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192716571",
+   "username": "Skralph",
+   "points": 53.35,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Matthew Boyd",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 35.48,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "edwin arroyo",
+    "elly de la cruz",
+    "eugenio suarez",
+    "matthew boyd",
+    "nathan lukes",
+    "noelvi marte",
+    "sal stewart",
+    "sam antonacci",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192650383",
+   "username": "colemandizzy",
+   "points": 49.4,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Taj Bradley"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 30.0,
+   "n_cheap": null,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "davis martin",
+    "edwin arroyo",
+    "elly de la cruz",
+    "kyle teel",
+    "munetaka murakami",
+    "ryan kreidler",
+    "sam antonacci",
+    "taj bradley"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192740404",
+   "username": "MO-TRUBBLE",
+   "points": 45.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Rhett Lowder"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 23.23,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "andrew benintendi",
+    "colson montgomery",
+    "davis martin",
+    "jj bleday",
+    "miguel vargas",
+    "munetaka murakami",
+    "nico hoerner",
+    "rhett lowder",
+    "spencer steer"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192703062",
+   "username": "cr323",
+   "points": 30.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Rhett Lowder"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 23.55,
+   "n_cheap": null,
+   "players_norm": [
+    "alejandro kirk",
+    "colson montgomery",
+    "davis martin",
+    "ernie clement",
+    "josh bell",
+    "luke keaschall",
+    "mickey moniak",
+    "miguel vargas",
+    "pete crow armstrong",
+    "rhett lowder"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "entry_id": "5192721657",
+   "username": "BigRedMachine1975",
+   "points": 28.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Davis Martin",
+    "Rhett Lowder"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 27.42,
+   "n_cheap": null,
+   "players_norm": [
+    "andrew benintendi",
+    "davis martin",
+    "edwin arroyo",
+    "elly de la cruz",
+    "eugenio suarez",
+    "kyle teel",
+    "noelvi marte",
+    "rhett lowder",
+    "sal stewart",
+    "sam antonacci"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Taj Bradley",
+   "player_norm": "taj bradley",
+   "roster_position": "P",
+   "pct_drafted": 70.97,
+   "fpts": 7.25
+  },
+  {
+   "player": "Elly De La Cruz",
+   "player_norm": "elly de la cruz",
+   "roster_position": "SS",
+   "pct_drafted": 54.84,
+   "fpts": 8.0
+  },
+  {
+   "player": "Matthew Boyd",
+   "player_norm": "matthew boyd",
+   "roster_position": "P",
+   "pct_drafted": 51.61,
+   "fpts": 21.1
+  },
+  {
+   "player": "Davis Martin",
+   "player_norm": "davis martin",
+   "roster_position": "P",
+   "pct_drafted": 45.16,
+   "fpts": 17.15
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "2B",
+   "pct_drafted": 41.94,
+   "fpts": 0.0
+  },
+  {
+   "player": "Eugenio Suarez",
+   "player_norm": "eugenio suarez",
+   "roster_position": "3B",
+   "pct_drafted": 41.94,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "OF",
+   "pct_drafted": 35.48,
+   "fpts": 21.0
+  },
+  {
+   "player": "JJ Bleday",
+   "player_norm": "jj bleday",
+   "roster_position": "OF",
+   "pct_drafted": 32.26,
+   "fpts": 3.0
+  },
+  {
+   "player": "Alejandro Kirk",
+   "player_norm": "alejandro kirk",
+   "roster_position": "C",
+   "pct_drafted": 32.26,
+   "fpts": 2.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "OF",
+   "pct_drafted": 25.81,
+   "fpts": 5.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 25.81,
+   "fpts": 0.0
+  },
+  {
+   "player": "Noelvi Marte",
+   "player_norm": "noelvi marte",
+   "roster_position": "OF",
+   "pct_drafted": 22.58,
+   "fpts": 12.0
+  },
+  {
+   "player": "Jose Trevino",
+   "player_norm": "jose trevino",
+   "roster_position": "C",
+   "pct_drafted": 22.58,
+   "fpts": 31.0
+  },
+  {
+   "player": "Shane Bieber",
+   "player_norm": "shane bieber",
+   "roster_position": "P",
+   "pct_drafted": 19.35,
+   "fpts": 26.5
+  },
+  {
+   "player": "Spencer Steer",
+   "player_norm": "spencer steer",
+   "roster_position": "1B",
+   "pct_drafted": 19.35,
+   "fpts": 5.0
+  },
+  {
+   "player": "Cole Carrigg",
+   "player_norm": "cole carrigg",
+   "roster_position": "OF",
+   "pct_drafted": 19.35,
+   "fpts": 18.0
+  },
+  {
+   "player": "Josh Bell",
+   "player_norm": "josh bell",
+   "roster_position": "1B",
+   "pct_drafted": 19.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "1B",
+   "pct_drafted": 19.35,
+   "fpts": 7.0
+  },
+  {
+   "player": "Edwin Arroyo",
+   "player_norm": "edwin arroyo",
+   "roster_position": "2B",
+   "pct_drafted": 19.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Kyle Teel",
+   "player_norm": "kyle teel",
+   "roster_position": "C",
+   "pct_drafted": 16.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "3B",
+   "pct_drafted": 16.13,
+   "fpts": 5.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 16.13,
+   "fpts": 2.0
+  },
+  {
+   "player": "Andrew Benintendi",
+   "player_norm": "andrew benintendi",
+   "roster_position": "OF",
+   "pct_drafted": 16.13,
+   "fpts": 2.0
+  },
+  {
+   "player": "Sal Stewart",
+   "player_norm": "sal stewart",
+   "roster_position": "3B",
+   "pct_drafted": 12.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Victor Caratini",
+   "player_norm": "victor caratini",
+   "roster_position": "C",
+   "pct_drafted": 12.9,
+   "fpts": 3.0
+  },
+  {
+   "player": "Luke Keaschall",
+   "player_norm": "luke keaschall",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 3.0
+  },
+  {
+   "player": "TJ Rumfield",
+   "player_norm": "tj rumfield",
+   "roster_position": "1B",
+   "pct_drafted": 12.9,
+   "fpts": 29.0
+  },
+  {
+   "player": "Dane Myers",
+   "player_norm": "dane myers",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nathan Lukes",
+   "player_norm": "nathan lukes",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 12.9,
+   "fpts": 3.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 12.0
+  },
+  {
+   "player": "Edouard Julien",
+   "player_norm": "edouard julien",
+   "roster_position": "2B",
+   "pct_drafted": 9.68,
+   "fpts": 9.0
+  },
+  {
+   "player": "Ryan Kreidler",
+   "player_norm": "ryan kreidler",
+   "roster_position": "SS",
+   "pct_drafted": 9.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Vladimir Guerrero Jr.",
+   "player_norm": "vladimir guerrero",
+   "roster_position": "1B",
+   "pct_drafted": 9.68,
+   "fpts": 12.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "3B",
+   "pct_drafted": 9.68,
+   "fpts": 2.0
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brett Sullivan",
+   "player_norm": "brett sullivan",
+   "roster_position": "C",
+   "pct_drafted": 9.68,
+   "fpts": 10.0
+  },
+  {
+   "player": "Sal Stewart",
+   "player_norm": "sal stewart",
+   "roster_position": "1B",
+   "pct_drafted": 9.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jonatan Clase",
+   "player_norm": "jonatan clase",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 2.0
+  },
+  {
+   "player": "Rhett Lowder",
+   "player_norm": "rhett lowder",
+   "roster_position": "P",
+   "pct_drafted": 9.68,
+   "fpts": -13.35
+  },
+  {
+   "player": "Austin Martin",
+   "player_norm": "austin martin",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Spencer Steer",
+   "player_norm": "spencer steer",
+   "roster_position": "OF",
+   "pct_drafted": 9.68,
+   "fpts": 5.0
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "3B",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 4.0
+  },
+  {
+   "player": "Dansby Swanson",
+   "player_norm": "dansby swanson",
+   "roster_position": "SS",
+   "pct_drafted": 6.45,
+   "fpts": 15.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "3B",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Braden Montgomery",
+   "player_norm": "braden montgomery",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ryan Kreidler",
+   "player_norm": "ryan kreidler",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "3B",
+   "pct_drafted": 6.45,
+   "fpts": 14.0
+  },
+  {
+   "player": "Ryan Jeffers",
+   "player_norm": "ryan jeffers",
+   "roster_position": "C",
+   "pct_drafted": 6.45,
+   "fpts": 5.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 10.0
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "1B",
+   "pct_drafted": 6.45,
+   "fpts": 18.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "SS",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "2B",
+   "pct_drafted": 6.45,
+   "fpts": 5.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 16.0
+  },
+  {
+   "player": "Andres Gimenez",
+   "player_norm": "andres gimenez",
+   "roster_position": "SS",
+   "pct_drafted": 3.23,
+   "fpts": 8.0
+  },
+  {
+   "player": "Kody Clemens",
+   "player_norm": "kody clemens",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 28.0
+  },
+  {
+   "player": "Tristan Peters",
+   "player_norm": "tristan peters",
+   "roster_position": "OF",
+   "pct_drafted": 3.23,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tomoyuki Sugano",
+   "player_norm": "tomoyuki sugano",
+   "roster_position": "P",
+   "pct_drafted": 3.23,
+   "fpts": 14.65
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "SS",
+   "pct_drafted": 3.23,
+   "fpts": 5.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "1B",
+   "pct_drafted": 3.23,
+   "fpts": 5.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "OF",
+   "pct_drafted": 3.23,
+   "fpts": 5.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 14.0
+  }
+ ]
+}
