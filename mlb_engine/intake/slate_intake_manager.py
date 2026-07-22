@@ -63,7 +63,7 @@ from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-VERSION = "v1.8"
+VERSION = "v1.9"
 DK_ROSTER_SLOTS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
 HITTER_SLOTS = {"C", "1B", "2B", "3B", "SS", "OF"}
 PITCHER_ALIASES = {"P", "SP", "RP"}

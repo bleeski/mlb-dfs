@@ -134,7 +134,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.10"
+VERSION = "v1.11"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -2341,4 +2341,39 @@ def run_slate(
         "strategy_defaults_are_priors": True,
         "light_satellite": bool(light_satellite),
     })
+    result["delivered_path"] = mirror_to_outputs(result, salary_csv)
     return result
+
+
+def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[str]:
+    """Copy a promoted export to outputs/<date>/ and return the path.
+
+    CLAUDE.md states deliverables land in outputs/<date>/ with exact paths, but the
+    engine only ever wrote runs/<run_id>/final/, so every slate ended with a manual
+    copy. The run directory stays immutable and stays the source for the
+    post-export gate re-read; this is a mirror, never the certified artifact.
+    """
+    output_path = result.get("output_path")
+    if not output_path or not result.get("passed"):
+        return None
+    try:
+        from mlb_engine.intake.slate_intake_manager import (
+            parse_dk_salary_csv, parse_game_info_datetime,
+        )
+
+        slate_date = None
+        for sp in parse_dk_salary_csv(str(salary_csv)):
+            parsed = parse_game_info_datetime(sp.game_info)
+            if parsed is not None:
+                slate_date = parsed.date().isoformat()
+                break
+        if slate_date is None:
+            return None
+        source = Path(output_path)
+        dest_dir = Path(__file__).resolve().parents[2] / "outputs" / slate_date
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / source.name
+        dest.write_bytes(source.read_bytes())
+        return str(dest)
+    except Exception:  # noqa: BLE001 - a mirror must never fail a certified build
+        return None

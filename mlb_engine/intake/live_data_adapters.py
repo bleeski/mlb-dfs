@@ -61,7 +61,7 @@ from mlb_engine.swap.late_swap_manager import (
 )
 from mlb_engine.intake.slate_intake_manager import normalize_name
 
-VERSION = "v1.2"
+VERSION = "v1.3"
 
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"

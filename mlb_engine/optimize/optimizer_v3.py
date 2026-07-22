@@ -127,7 +127,7 @@ except Exception as exc:  # pragma: no cover - environment-dependent
     SCIPY_AVAILABLE = False
     SCIPY_IMPORT_ERROR = str(exc)
 
-OPTIMIZER_VERSION = 'v3.18'
+OPTIMIZER_VERSION = 'v3.19'
 LAST_SOLVER_BACKEND = None
 LAST_SOLVER_STATUS = None
 

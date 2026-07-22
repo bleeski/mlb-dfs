@@ -1,6 +1,6 @@
 """platoon_order_adapter.py
 
-MLB Classic v2.22.0. VERSION = "v1.0".
+MLB Classic v2.22.0. VERSION = "v1.1" (v1.1: DK team-code normalization).
 
 Turns the FanGraphs RosterResource "Platoon Lineups" JSON into two upstream,
 opt-in capabilities. Both run before execution_pipeline.run_slate and neither
@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 from mlb_engine.projections.xwoba_base_correction import _norm_name
 from mlb_engine.projections.projection_builder import batting_order_factor
 
-VERSION = "v1.0"
+VERSION = "v1.1"
 
 # League-average share of games started by a RHP vs LHP. A labeled prior, not a
 # calibrated value; override per slate with a better split if you have one.

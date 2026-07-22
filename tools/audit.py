@@ -22,22 +22,23 @@ from typing import Any, Dict, List
 VERSION = "v3.0"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
-EXPECTED_TEST_COUNT = 131
+EXPECTED_TEST_COUNT = 144
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
-    "mlb_engine/optimize/optimizer_v3.py": "OPTIMIZER_VERSION = 'v3.18'",
+    "mlb_engine/optimize/optimizer_v3.py": "OPTIMIZER_VERSION = 'v3.19'",
     "mlb_engine/allocate/contest_allocator.py": 'VERSION = "v1.10"',
-    "mlb_engine/intake/slate_intake_manager.py": 'VERSION = "v1.8"',
+    "mlb_engine/intake/slate_intake_manager.py": 'VERSION = "v1.9"',
     "mlb_engine/entries/dk_entries_manager.py": 'VERSION = "v1.6"',
     "mlb_engine/swap/late_swap_manager.py": 'VERSION = "v1.3"',
     "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.3"',
-    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.10"',
+    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.11"',
     "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.4"',
     "mlb_engine/projections/xwoba_base_correction.py": 'VERSION = "v1.2"',
-    "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.2"',
+    "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.3"',
     "mlb_engine/optimize/tail_candidate_scanner.py": 'VERSION = "v1.0"',
-    "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.0"',
+    "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.1"',
+    "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.0"',
 }
 
 CSV_REQUIRED = {
@@ -66,10 +67,54 @@ def csv_header(path: Path) -> List[str]:
         return next(csv.reader(handle), [])
 
 
+def check_dependencies(root: Path) -> Dict[str, Any]:
+    """Import every requirement before anything else runs.
+
+    A missing solver is not a slow build, it is no build. On 2026-07-22 scipy was
+    absent in a fresh environment and surfaced at T-35 on a live slate as a bare
+    'scipy.optimize.milp unavailable', with the install competing for the same
+    minutes as the build. Checking first turns that into a one-line fix.
+    """
+    import importlib
+
+    req = root / "requirements.txt"
+    wanted = []
+    if req.exists():
+        for line in req.read_text(encoding="utf-8").splitlines():
+            name = line.strip().split("==")[0].split(">=")[0].split("<")[0].strip()
+            if name and not name.startswith("#"):
+                wanted.append(name)
+    missing = []
+    for name in wanted:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            missing.append(name)
+    milp_ok = True
+    try:
+        from scipy.optimize import milp  # noqa: F401
+    except Exception:  # noqa: BLE001
+        milp_ok = False
+    return {
+        "required": wanted,
+        "missing": missing,
+        "scipy_milp_available": milp_ok,
+        "passed": not missing and milp_ok,
+        "remedy": ("pip install -r requirements.txt --break-system-packages"
+                   if missing or not milp_ok else None),
+    }
+
+
 def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     errors: List[str] = []
     warnings: List[str] = []
     checks: Dict[str, Any] = {}
+
+    deps = check_dependencies(root)
+    checks["dependencies"] = deps
+    if not deps["passed"]:
+        detail = f"missing {deps['missing']}" if deps["missing"] else "scipy.optimize.milp unavailable"
+        errors.append(f"dependencies: {detail}; run: {deps['remedy']}")
 
     missing = [rel for rel in EXPECTED_VERSION_TEXT if not (root / rel).exists()]
     missing += [rel for rel in CSV_REQUIRED if not (root / rel).exists()]

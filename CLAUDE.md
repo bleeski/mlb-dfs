@@ -35,17 +35,33 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  12 modules  119 tests`. The quick form of the suite
-   alone is `python -m unittest tests.test_core`.
-3. Read the ledger Quick Card: ledger/MLB_Classic_Calibration_Ledger.md
+   `PASS  v2.26.0  13 modules  144 tests`. The quick form of the suite
+   alone is `python -m unittest tests.test_core`. The audit checks
+   dependencies first and names the install command, because a missing
+   solver is not a slow build, it is no build.
+3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
+   before any build. It times one lineup and a short multi-lineup run on
+   the real pool and says whether the bank fits the execution budget. Exit
+   3 means it does not: pass `time_budget_s` and accept a partial bank, or
+   build across slices with `mlb_engine.optimize.bank_cache`. Never trim
+   the player pool to fit a compute limit. An infrastructure limit may
+   reduce search effort; it may never reduce the legal player set, because
+   that is a strategy change and it is invisible in the certified output.
+4. Read the ledger Quick Card: ledger/MLB_Classic_Calibration_Ledger.md
    section 0 plus section headers only. The full read is post-slate work.
 Never repair audit or test infrastructure during a live slate. If version
 or inventory checks fail while the test suite passes in full, proceed with
 the build and flag the failure for post-slate repair.
 
 ## Per-slate loop
-Inputs live in data/slates/<date>/: slate_bundle.json, the platoon JSON,
-the DKSalaries CSV, and the DKEntries reserved-entries CSV.
+Inputs live in data/slates/<date>/: slate_bundle.json, the lineups feed,
+the DKSalaries CSV, and the DKEntries reserved-entries CSV. The platoon
+fallback is no longer a per-slate drop: build_slate_pool loads
+data/reference/fangraphs_platoon_lineups.json by default, so a TBD team
+keeps a projected batting order instead of being guessed at by top-9
+AvgPointsPerGame or dropped from the slate. Refresh that reference from
+FanGraphs RosterResource periodically; the pool report names any team the
+file covers but cannot fill, and flags stale per-team pages.
 1. live_data_adapters.build_slate_pool(salary_csv, lineups_feed,
    platoon_json, declared_pitchers) is the required intake front door.
    Hitters: the confirmed nine per posted lineup plus the platoon-projected
@@ -54,10 +70,15 @@ the DKSalaries CSV, and the DKEntries reserved-entries CSV.
 2. run_slate(approve=False). Review the checkpoint: slate clock, pool
    report, postures, stack plan, caps, feasibility, and a single Blockers
    line where every blocker maps to an engine action.
-3. run_slate(approve=True). The certified DKEntries file and build report
-   go to outputs/<date>/.
+3. run_slate(approve=True). The certified artifact is
+   runs/<run_id>/final/DKEntries.csv and stays immutable; the engine
+   mirrors it to outputs/<date>/ and returns that as `delivered_path`.
 4. Ben uploads to DraftKings by hand. Refinements after delivery go
    through run_late_swap with authorized_entry_ids, never a rebuild.
+   `python tools/late_swap.py --date <date> --parent-entries <csv>` wraps
+   that path, including the excluded-new-teams rule (a locked game admits
+   no new players) and the pinned-slot candidate generation it requires.
+   Verify any file before upload with `python tools/verify_export.py`.
 T-schedule: at T-20 skip optional steps. At T-10 approve on posture
 defaults and auto-floors. At T-5 present the best certified file
 immediately with zero diagnostic narration.
