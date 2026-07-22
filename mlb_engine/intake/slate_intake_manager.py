@@ -1527,6 +1527,48 @@ def slate_clock(
         }
 
     first_gid, first_dt = min(locks.items(), key=lambda kv: kv[1])
+
+    # Cross-check the feed-derived clock against the salary file. The salary CSV is
+    # authoritative for which games are on the slate, so when a feed map disagrees
+    # about the first lock the salary file wins and the disagreement is surfaced.
+    # A feed keyed by matchup alone reports a doubleheader's night game for a
+    # matinee draftgroup, which moves the deadline the wrong way by hours.
+    cross_check: Optional[Dict[str, Any]] = None
+    if source == "lock_time_map":
+        plist = list(players) if players is not None else (
+            parse_dk_salary_csv(str(salary_csv)) if salary_csv else []
+        )
+        salary_locks: Dict[str, datetime] = {}
+        for sp in plist:
+            dt = parse_game_info_datetime(sp.game_info)
+            if dt is None:
+                continue
+            gid = str(sp.game_id or sp.game_info)
+            if gid not in salary_locks or dt < salary_locks[gid]:
+                salary_locks[gid] = dt
+        if salary_locks:
+            sal_gid, sal_dt = min(salary_locks.items(), key=lambda kv: kv[1])
+            if sal_dt.tzinfo is None:
+                sal_dt = sal_dt.replace(tzinfo=timezone.utc)
+            drift = (first_dt - sal_dt).total_seconds() / 60.0
+            agrees = abs(drift) <= 5.0 and sal_gid == first_gid
+            cross_check = {
+                "checked": True,
+                "agrees": bool(agrees),
+                "salary_first_lock_game_id": sal_gid,
+                "salary_first_lock_utc": sal_dt.astimezone(timezone.utc).isoformat(),
+                "feed_first_lock_game_id": first_gid,
+                "drift_minutes": round(drift, 1),
+            }
+            if not agrees:
+                cross_check["note"] = (
+                    "feed lock map disagrees with the authoritative salary file; "
+                    "salary file used. Check for a doubleheader leg collision."
+                )
+                first_gid, first_dt = sal_gid, sal_dt
+                locks = dict(salary_locks)
+                source = "salary_game_info_after_cross_check"
+
     deadline = first_dt - timedelta(minutes=int(buffer_minutes))
     minutes_to_lock = (first_dt - now_dt).total_seconds() / 60.0
     minutes_to_deadline = (deadline - now_dt).total_seconds() / 60.0
@@ -1541,6 +1583,7 @@ def slate_clock(
         "minutes_to_lock": round(minutes_to_lock, 1),
         "minutes_to_deadline": round(minutes_to_deadline, 1),
         "past_deadline": minutes_to_deadline < 0,
+        "salary_cross_check": cross_check,
         "lock_time_by_game_id": {
             gid: dt.astimezone(timezone.utc).isoformat() for gid, dt in sorted(locks.items())
         },

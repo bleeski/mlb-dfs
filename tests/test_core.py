@@ -38,6 +38,8 @@ from mlb_engine.projections.projection_builder import (
     load_savant_expected_stats, refresh_confirmed_lineups,
 )
 from mlb_engine.intake.slate_intake_manager import material_weather_adjustments, validate_slate_context_packet
+from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv, slate_clock
+from mlb_engine.intake.live_data_adapters import build_status_map_from_lineups_feed
 
 NOW = datetime(2026, 6, 11, 17, 0, tzinfo=timezone.utc)
 TS = NOW.isoformat()
@@ -2492,6 +2494,65 @@ class ContestLibraryTests(unittest.TestCase):
             self.assertEqual({t["tier"] for t in block["tiers"]}, {"A", "F", "V"})
             self.assertTrue(all(t["resolution"] == "name_archetype" for t in block["tiers"]))
             self.assertIsInstance(block["coverage_target"], dict)
+
+
+class DoubleheaderLegTests(unittest.TestCase):
+    """A feed keyed by matchup alone collapses both legs of a doubleheader onto one
+    key. Last-write-wins then adopts the night game's lock time for a matinee
+    draftgroup, moving the delivery deadline hours the wrong way. Leg selection is
+    resolved against the salary file, which is authoritative for the slate."""
+
+    def _feed(self):
+        def side(team, status="tbd"):
+            return {"team_abbrev": team, "lineup_status": status, "lineup": [],
+                    "probable_pitcher": {"id": 1, "name": "Pitcher A", "hand": "R"}}
+        return {"date": "2026-06-11", "games": [
+            {"game_pk": 1, "game_date_utc": "2026-06-11T17:00:00Z", "status": "Scheduled",
+             "away": side("AAA"), "home": side("BBB")},
+            {"game_pk": 2, "game_date_utc": "2026-06-11T23:05:00Z", "status": "Scheduled",
+             "away": side("AAA"), "home": side("BBB")},
+            {"game_pk": 3, "game_date_utc": "2026-06-11T17:00:00Z", "status": "Scheduled",
+             "away": side("CCC"), "home": side("DDD")},
+        ]}
+
+    def test_night_leg_dropped_and_matinee_lock_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            write_salary(salary)
+            status = build_status_map_from_lineups_feed(self._feed(), str(salary))
+            self.assertEqual(
+                status["lock_time_by_game_id"]["AAA@BBB"], "2026-06-11T17:00:00+00:00"
+            )
+            dropped = status["doubleheader_legs_dropped"]
+            self.assertEqual([d["game_pk"] for d in dropped], [2])
+
+    def test_clock_prefers_salary_file_when_feed_disagrees(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            write_salary(salary)
+            players = parse_dk_salary_csv(str(salary))
+            # A feed map that kept the night leg: 6 hours late on the first lock.
+            bad = {"AAA@BBB": "2026-06-11T23:05:00+00:00",
+                   "CCC@DDD": "2026-06-11T17:00:00+00:00"}
+            clock = slate_clock(players=players, lock_time_by_game_id=bad,
+                                now=datetime(2026, 6, 11, 14, 0, tzinfo=timezone.utc))
+            check = clock["salary_cross_check"]
+            self.assertTrue(check["checked"])
+            self.assertFalse(check["agrees"])
+            self.assertEqual(clock["first_lock_utc"], "2026-06-11T17:00:00+00:00")
+            self.assertEqual(clock["source"], "salary_game_info_after_cross_check")
+
+    def test_agreeing_feed_leaves_clock_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            write_salary(salary)
+            players = parse_dk_salary_csv(str(salary))
+            good = {"AAA@BBB": "2026-06-11T17:00:00+00:00",
+                    "CCC@DDD": "2026-06-11T17:00:00+00:00"}
+            clock = slate_clock(players=players, lock_time_by_game_id=good,
+                                now=datetime(2026, 6, 11, 14, 0, tzinfo=timezone.utc))
+            self.assertTrue(clock["salary_cross_check"]["agrees"])
+            self.assertEqual(clock["source"], "lock_time_map")
 
 
 if __name__ == "__main__":

@@ -144,6 +144,104 @@ def _parse_utc(value: str) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def _salary_game_times(players: Mapping[str, Any]) -> Dict[str, datetime]:
+    """DK game_id -> earliest UTC start parsed from the salary Game Info column.
+
+    The salary CSV is authoritative for which leg of a doubleheader is on the
+    slate. DK ships one leg per draftgroup, so the earliest parseable start for
+    a matchup is that leg.
+    """
+    from mlb_engine.intake.slate_intake_manager import parse_game_info_datetime
+
+    out: Dict[str, datetime] = {}
+    for record in players.values():
+        gid = str(_record_get(record, "game_id") or "").strip().upper()
+        info = _record_get(record, "game_info")
+        if not gid or not info:
+            continue
+        parsed = parse_game_info_datetime(info)
+        if parsed is None:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        if gid not in out or parsed < out[gid]:
+            out[gid] = parsed
+    return out
+
+
+def _select_slate_legs(
+    games: Sequence[Mapping[str, Any]],
+    salary_game_times: Mapping[str, datetime],
+    tolerance_minutes: int = 10,
+) -> Tuple[List[Mapping[str, Any]], List[Dict[str, Any]]]:
+    """Keep exactly the doubleheader leg that is on the DK slate.
+
+    A feed keyed only by ``AWAY@HOME`` collapses both legs of a doubleheader onto
+    one key, and a naive last-write-wins loop silently adopts the night game's
+    lock time for a matinee draftgroup. That is a missed-lock bug, not a cosmetic
+    one, so leg selection is resolved against the salary file rather than by
+    iteration order. Legs whose start disagrees with the salary file by more than
+    ``tolerance_minutes`` are dropped and reported.
+
+    When the salary file has no time for a matchup the earliest leg is kept, which
+    is first-wins rather than last-wins and matches DK's one-leg-per-draftgroup
+    behavior.
+    """
+    by_key: Dict[str, List[Mapping[str, Any]]] = {}
+    for game_entry in games:
+        away = to_dk_abbrev((game_entry.get("away") or {}).get("team_abbrev"))
+        home = to_dk_abbrev((game_entry.get("home") or {}).get("team_abbrev"))
+        if not away or not home:
+            continue
+        by_key.setdefault(f"{away}@{home}", []).append(game_entry)
+
+    kept: List[Mapping[str, Any]] = []
+    dropped: List[Dict[str, Any]] = []
+    for game_id, legs in by_key.items():
+        if len(legs) == 1:
+            kept.append(legs[0])
+            continue
+        target = salary_game_times.get(game_id)
+
+        def _start(entry: Mapping[str, Any]) -> Optional[datetime]:
+            try:
+                return _parse_utc(entry.get("game_date_utc"))
+            except (TypeError, ValueError):
+                return None
+
+        dated = [(entry, _start(entry)) for entry in legs]
+        dated = [(entry, start) for entry, start in dated if start is not None]
+        if not dated:
+            kept.append(legs[0])
+            continue
+        if target is None:
+            chosen, _ = min(dated, key=lambda pair: pair[1])
+            reason = "no salary start time; kept earliest leg"
+        else:
+            chosen, delta = min(
+                ((entry, abs((start - target).total_seconds()) / 60.0) for entry, start in dated),
+                key=lambda pair: pair[1],
+            )
+            if delta > tolerance_minutes:
+                reason = (
+                    f"no leg within {tolerance_minutes}m of the salary start "
+                    f"{target.isoformat()}; kept closest ({delta:.0f}m off)"
+                )
+            else:
+                reason = f"matched salary start {target.isoformat()}"
+        kept.append(chosen)
+        for entry, start in dated:
+            if entry is chosen:
+                continue
+            dropped.append({
+                "game_id": game_id,
+                "game_pk": entry.get("game_pk"),
+                "start_utc": start.isoformat(),
+                "reason": reason,
+            })
+    return kept, dropped
+
+
 # ---------------------------------------------------------------------------
 # MLB Stats API lineups feed -> late-swap and confirmation contracts
 # ---------------------------------------------------------------------------
@@ -176,7 +274,9 @@ def build_status_map_from_lineups_feed(
         key = (normalize_name(_record_get(record, "name")), str(_record_get(record, "team")).strip().upper())
         salary_by_name_team.setdefault(key, []).append(str(pid))
 
-    games: List[Mapping[str, Any]] = list(feed.get("games") or [])
+    games, doubleheader_legs_dropped = _select_slate_legs(
+        list(feed.get("games") or []), _salary_game_times(players)
+    )
     lock_time_by_game_id: Dict[str, datetime] = {}
     game_meta: Dict[str, Dict[str, Any]] = {}
     excluded_game_ids: List[str] = []
@@ -275,6 +375,7 @@ def build_status_map_from_lineups_feed(
         "game_meta": game_meta,
         "unmatched_feed_players": unmatched,
         "uncovered_salary_player_ids": sorted(uncovered),
+        "doubleheader_legs_dropped": doubleheader_legs_dropped,
         "feed_date": feed.get("date"),
         "feed_fetched_at": feed.get("fetched_at"),
     }
