@@ -151,6 +151,67 @@ def fetch_lineups(date: str, dest: Path) -> dict:
     return feed
 
 
+def resolve_platoon_json(args):
+    """RotoWire projected orders overlaid on the FanGraphs reference, for TBD teams.
+
+    The MLB Stats API (and mlb.com, which renders it) only shows a lineup once the
+    team officially posts it; until then the team reads TBD. RotoWire publishes a
+    beat-projected order for those teams and refreshes it through the day. This
+    fetches RotoWire and merges it over the manually-refreshed FanGraphs platoon
+    reference, so a TBD team gets the freshest projected order available: RotoWire
+    where it covers the team, FanGraphs otherwise, and top-9 AvgPointsPerGame only
+    when neither does.
+
+    The merged dict is handed to build_slate_pool as platoon_json, so
+    build_projected_order applies it strictly to TBD teams (only_teams) and always
+    as a projected order, never a confirmed one. A confirmed lineup posted later
+    still supersedes it. Any failure returns None, which restores the engine's
+    default FanGraphs-only behavior. RotoWire is a public HTTP page; this never
+    touches DraftKings.
+    """
+    if not getattr(args, "rotowire", True):
+        return None
+    today = dt.date.today().isoformat()
+    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+    rw_when = "today" if args.date == today else "tomorrow" if args.date == tomorrow else None
+    if rw_when is None:
+        # RotoWire only serves today and tomorrow; a backfill keeps the default.
+        return None
+    try:
+        from tools.fetch_rotowire_lineups import fetch_rotowire_platoon
+        from mlb_engine.intake.live_data_adapters import to_dk_abbrev
+        from mlb_engine.intake.platoon_order_adapter import (
+            DEFAULT_PLATOON_REFERENCE, load_platoon_lineups,
+        )
+        rw = fetch_rotowire_platoon(rw_when, collected_date=args.date)
+        # Key on the DK code, not the raw abbrev: FanGraphs ships TBR/SDP/SFG where
+        # RotoWire ships TB/SD/SF, so a raw-code merge would leave two entries for
+        # one club and let a stale FanGraphs-only hitter survive next to RotoWire's
+        # nine. Normalizing both sides lets RotoWire replace FanGraphs outright.
+        by_team: dict = {}
+        ref = DEFAULT_PLATOON_REFERENCE
+        if not ref.is_absolute():
+            ref = REPO / ref
+        if ref.exists():
+            for t in load_platoon_lineups(ref).get("teams") or []:
+                by_team[to_dk_abbrev(t.get("abbrev", ""))] = t
+        rw_n = 0
+        for t in rw.get("teams") or []:
+            by_team[to_dk_abbrev(t.get("abbrev", ""))] = t  # RotoWire wins
+            rw_n += 1
+        print(f"rotowire: merged {rw_n} projected lineups over the FanGraphs "
+              "reference", file=sys.stderr)
+        return {
+            "source": "merged: RotoWire (fresh) over FanGraphs reference",
+            "collected_date": args.date,
+            "teams": list(by_team.values()),
+        }
+    except Exception as exc:  # never let a fallback source break the build
+        print(f"rotowire fetch unavailable ({exc}); using FanGraphs reference only",
+              file=sys.stderr)
+        return None
+
+
 # --------------------------------------------------------------------------- #
 # Shared verification. The upload file is the only thing that matters, so check
 # it directly rather than trusting the build report.
@@ -199,7 +260,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         _assemble_projection_frame, run_slate,
     )
 
-    pool = build_slate_pool(str(salary), feed)
+    pool = build_slate_pool(str(salary), feed, platoon_json=resolve_platoon_json(args))
     report = pool["pool_report"]
     clock = pool.get("clock") or {}
     kwargs = pool["run_slate_kwargs"]
@@ -466,6 +527,10 @@ def main() -> int:
     ap.add_argument("--lineups", help="mlb-lineups feed JSON; fetched if omitted")
     ap.add_argument("--odds", help="mlb-game-odds JSON, used for the brief only")
     ap.add_argument("--date", help="slate date; derived from the salary file if omitted")
+    ap.add_argument("--no-rotowire", dest="rotowire", action="store_false",
+                    help="skip the RotoWire projected-lineup fallback for TBD teams "
+                         "and use only the FanGraphs reference")
+    ap.set_defaults(rotowire=True)
     ap.add_argument("--entries-count", dest="entries", type=int,
                     help="override the reserved-entry count")
     ap.add_argument("--max-seconds", type=float, default=35.0,
