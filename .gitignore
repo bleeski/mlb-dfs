@@ -15,3 +15,6 @@ data/slates/*/
 
 # ad-hoc session scratch
 _scratch_*/
+
+# generate-lineups iteration scratch (build scripts, review HTML)
+skills/generate-lineups-workspace/
