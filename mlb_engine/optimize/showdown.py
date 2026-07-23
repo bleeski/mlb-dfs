@@ -18,6 +18,7 @@ solver, so test_golden_replay is unaffected.
 from __future__ import annotations
 
 import csv
+import math
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
@@ -27,7 +28,14 @@ import pandas as pd
 
 from mlb_engine.optimize.roster_contracts import SHOWDOWN, RosterContract
 
-VERSION = "0.1-review"
+VERSION = "0.2-review"
+
+# A pure points-max solve always wants the single highest-Base player at CPT
+# (1.5x multiplier beats any UTIL contribution), so an unbounded bank converges
+# every lineup on the same captain. Observed 24/24 on the 2026-07-23 SD@ATL
+# slate (Chris Sale, Base 22.35 against a next-best of ~15) before this cap
+# existed. Default caps any single captain to just over a third of the bank.
+DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.35
 
 _DIGITS = re.compile(r"\d+")
 
@@ -110,7 +118,11 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
 
     def _is_declared(rec: Mapping[str, Any]) -> bool:
         value = str(rec.get("Starting") or "").strip().upper()
-        return value in ("SP", "P") or value.isdigit()
+        # PO (probable/projected opener) and PLR (piggyback/long reliever) are
+        # DraftKings' own bullpen-game tags alongside SP/P; a bullpen-game slate
+        # (opener + bulk arm) must keep both declared pitchers in the pool or the
+        # entire team's pitching option silently vanishes from the build.
+        return value in ("SP", "P", "PO", "PLR") or value.isdigit()
 
     declared = [r for r in rows if _is_declared(r)]
     basis = "all_healthy"
@@ -124,7 +136,7 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         rec["Pool_Basis"] = basis
         value = str(rec.get("Starting") or "").strip().upper()
         rec["Batting_Order"] = int(value) if value.isdigit() else None
-        rec["Is_Declared_Starter"] = value in ("SP", "P")
+        rec["Is_Declared_Starter"] = value in ("SP", "P", "PO", "PLR")
 
     df = pd.DataFrame(rows)
     if not df.empty:
@@ -141,6 +153,7 @@ def build_showdown_lineup(
     locks: Optional[Sequence[str]] = None,
     excludes: Optional[Sequence[str]] = None,
     cpt_lock: Optional[str] = None,
+    cpt_excludes: Optional[Sequence[str]] = None,
     forbidden_sets: Optional[Sequence[Sequence[str]]] = None,
     time_limit: int = 20,
 ) -> Optional[Dict[str, Any]]:
@@ -199,6 +212,9 @@ def build_showdown_lineup(
             add({cpt(i): 1.0, util(i): 1.0}, 1.0, np.inf)
     if cpt_lock and cpt_lock in key_row:                       # lock captain
         add({cpt(keys.index(cpt_lock)): 1.0}, 1.0, 1.0)
+    for ck in (cpt_excludes or []):                            # exposure cap: still
+        if ck in key_row:                                      # eligible at UTIL,
+            add({cpt(keys.index(ck)): 1.0}, 0.0, 0.0)           # just not as CPT
     for fs in (forbidden_sets or []):                          # forbid an exact 6-set
         idxs = [keys.index(k) for k in fs if k in key_row]
         if len(idxs) == contract.roster_size:
@@ -254,17 +270,51 @@ def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract) -> Dict[str, Any]:
 
 
 def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHOWDOWN,
+                        max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
+                        diagnostics: Optional[Dict[str, Any]] = None,
                         **kwargs) -> List[Dict[str, Any]]:
     """Up to ``n`` distinct legal lineups, each differing from the prior ones by at
-    least one player (exact-set forbidding). Descending projected points."""
+    least one player (exact-set forbidding), with no single captain filling more
+    than ``max_cpt_exposure_pct`` of the bank. Pass ``max_cpt_exposure_pct=None``
+    to disable the cap (e.g. a caller doing its own explicit cpt_lock rotation).
+
+    Once a captain reaches its share of ``n`` it is excluded from the CPT role
+    for the rest of the build -- it can still be rostered at UTIL, just not
+    captained again. If that exclusion makes a slot infeasible (a thin pool with
+    few legal captains), the cap relaxes for that one slot rather than shrinking
+    the bank: an exposure cap is a diversity control, and a diversity control may
+    never reduce the legal player set below what is needed to fill the entries
+    already in front of it. ``diagnostics``, if passed a dict, is filled in place
+    with ``cap_count``, ``captain_exposure`` (player_key -> count), and
+    ``relaxed_slots`` so a caller can report or flag when the cap didn't hold.
+    """
     bank: List[Dict[str, Any]] = []
     forbidden: List[List[str]] = []
-    for _ in range(max(1, int(n))):
-        lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden, **kwargs)
+    cpt_counts: Dict[str, int] = {}
+    n_target = max(1, int(n))
+    # floor, not ceil/round: this is an upper bound, so rounding must never let
+    # the allowed count push the realized exposure pct above the requested cap.
+    cap = max(1, math.floor(max_cpt_exposure_pct * n_target)) if max_cpt_exposure_pct else None
+    relaxed_slots = 0
+    for _ in range(n_target):
+        cpt_excludes = [k for k, c in cpt_counts.items() if cap is not None and c >= cap] or None
+        lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                   cpt_excludes=cpt_excludes, **kwargs)
+        if lu is None and cpt_excludes:
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden, **kwargs)
+            if lu is not None:
+                relaxed_slots += 1
         if lu is None:
             break
         bank.append(lu)
         forbidden.append(lu["player_keys"])
+        cpt_key = lu["captain"]["player_key"]
+        cpt_counts[cpt_key] = cpt_counts.get(cpt_key, 0) + 1
+    if diagnostics is not None:
+        diagnostics["max_cpt_exposure_pct"] = max_cpt_exposure_pct
+        diagnostics["cap_count"] = cap
+        diagnostics["captain_exposure"] = dict(cpt_counts)
+        diagnostics["relaxed_slots"] = relaxed_slots
     return bank
 
 

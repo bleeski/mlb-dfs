@@ -34,6 +34,8 @@ Everything here is a deterministic review input. Nothing is an ROI, win-rate, ca
 """
 from __future__ import annotations
 
+import csv
+import hashlib
 import itertools
 import json
 import time
@@ -44,6 +46,34 @@ from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import build_single_lineup
 
 VERSION = "v1.0"
+
+
+def pool_signature(salary_csv: str | Path, length: int = 10) -> str:
+    """Short deterministic signature of a DK salary file's player-ID pool.
+
+    The resumable bank cache used to be keyed on date alone
+    (``bank_cache_<date>.json``). Two DK exports that share a calendar date but
+    cover different games -- a day slate built earlier and a night slate built
+    later, or two different satellite draftgroups -- have almost entirely
+    different Player_ID sets. A date-only key let the second build silently
+    reuse the first build's cache and certify against IDs that do not exist in
+    its own salary file, which surfaces as "invalid Player_ID(s)" at export
+    verification, well after the wasted solve time.
+
+    Folding this signature into the cache filename means an unrelated pool
+    gets its own file and simply never collides, rather than corrupting the
+    next build's. It is a filesystem-hygiene fix, not a strategy change: it
+    does not alter what candidates are generated or which players are legal,
+    only which cache file two different pools land in.
+    """
+    ids: List[str] = []
+    with open(salary_csv, encoding="utf-8-sig", newline="") as fh:
+        for row in csv.DictReader(fh):
+            pid = str(row.get("ID") or "").strip()
+            if pid:
+                ids.append(pid)
+    digest = hashlib.sha256(",".join(sorted(ids)).encode("utf-8")).hexdigest()
+    return digest[:length]
 
 # Slot buckets in DK order. ENTRY_ROSTER_SLOTS is ('P1','P2','C',...,'OF3'); the
 # optimizer stamps Assigned_Position with the bare DK position token.

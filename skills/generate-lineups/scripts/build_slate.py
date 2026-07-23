@@ -255,7 +255,7 @@ def verify_classic(salary_csv: Path, entries_csv: Path) -> dict:
 def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 feed: dict, deadline: float) -> tuple[int, dict]:
     from mlb_engine.intake.live_data_adapters import build_slate_pool
-    from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+    from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
     from mlb_engine.pipeline.execution_pipeline import (
         _assemble_projection_frame, run_slate,
     )
@@ -298,7 +298,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     projected_direct = (single_s * bank_size * (1 + (growth - 1) / 2)
                         + cross_pairs * single_s)
 
-    bank_path = REPO / "runs" / f"bank_cache_{args.date}.json"
+    bank_path = REPO / "runs" / f"bank_cache_{args.date}_{pool_signature(salary)}.json"
     strategy = "direct"
     bank_report = None
     candidates = None
@@ -332,12 +332,31 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # strategy; this makes a wrong estimate degrade to a smaller bank instead
         # of a killed process that leaves nothing behind.
         bank_time_budget_s=max(deadline - time.monotonic() - 6.0, 5.0),
+        portfolio_controls_override=args.controls_override,
         **slate_kwargs,
     )
 
     if not result.get("passed"):
-        print(json.dumps({"status": "not_certified",
-                          "errors": result.get("errors")}, indent=1))
+        # A failed joint allocation is frequently a small-slate control
+        # infeasibility, not a real "no legal lineup" wall: too few games means
+        # too few distinct SP pairs and team stacks to keep every portfolio
+        # control (max_shared_players, exposure caps) satisfied at once for a
+        # large requested_n. The engine already computes the exact structural
+        # floor and a remedy per failing check (see feasibility.checks); surface
+        # it here so the fix is "rerun with --controls-override" instead of a
+        # from-scratch debugging session.
+        feas = result.get("feasibility") or {}
+        payload = {"status": "not_certified", "errors": result.get("errors")}
+        if not feas.get("passed", True):
+            payload["feasibility"] = feas
+            payload["hint"] = (
+                "one or more portfolio controls are structurally infeasible for "
+                "this pool/entry count (see feasibility.checks[].remedy). Rerun "
+                "with --controls-override '{\"max_shared_players\": <n>, ...}' "
+                "set to at least the named floors. This raises diversity caps to "
+                "match the slate, not a strategy or player-pool change."
+            )
+        print(json.dumps(payload, indent=1))
         return 3, {}
 
     delivered = result.get("delivered_path") or result.get("output_path")
@@ -374,6 +393,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         },
         "exposure": exposure,
         "verification": checks,
+        "controls_override_applied": args.controls_override,
     }
     return (0 if checks["passed"] else 3), brief
 
@@ -397,7 +417,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         print(json.dumps({"status": "no_blank_reserved_entries"}, indent=1))
         return 4, {}
 
-    bank = sd.build_showdown_bank(df, n=n_entries)
+    cpt_cap = (args.controls_override or {}).get("max_cpt_exposure_pct",
+                                                  sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
+    cpt_diagnostics: dict = {}
+    bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
+                                  diagnostics=cpt_diagnostics)
     if len(bank) < n_entries:
         print(json.dumps({"status": "bank_short",
                           "built": len(bank), "needed": n_entries}, indent=1))
@@ -420,9 +444,18 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments)
     template = sd.verify_template_preserved(str(entries), str(dest))
 
+    cap_count = cpt_diagnostics.get("cap_count")
+    captain_counts = cpt_diagnostics.get("captain_exposure") or {}
+    captain_exposure = {
+        key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
+        for key, count in sorted(captain_counts.items(), key=lambda kv: -kv[1])
+    }
+    relaxed_slots = cpt_diagnostics.get("relaxed_slots") or 0
+
     brief = {
-        # Showdown ships as v0.1-review and Phase 3 is not complete, so this path
-        # is labeled review-grade. It is not the Classic certification contract.
+        # Showdown ships as v0.2-review (cpt exposure cap added 2026-07-23) and
+        # Phase 3 is not complete, so this path is labeled review-grade. It is
+        # not the Classic certification contract.
         "status": "review_grade_build",
         "contest_type": "showdown",
         "date": args.date,
@@ -445,10 +478,21 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "template_preserved": template.get("passed"),
             "write_report": write_report,
         },
-        "caution": ("showdown.py is v0.1-review and Phase 3 is not complete. "
-                    "Per-lineup checks and template preservation passed, but this "
-                    "is not the Classic three-gate certification. Review before "
-                    "uploading."),
+        "captain_exposure": {
+            "cap_pct": cpt_diagnostics.get("max_cpt_exposure_pct"),
+            "cap_count": cap_count,
+            "by_player": captain_exposure,
+            "relaxed_slots": relaxed_slots,
+        },
+        "caution": ("showdown.py is v0.2-review and Phase 3 is not complete. "
+                    "Per-lineup checks, template preservation, and the captain "
+                    "exposure cap passed, but this is not the Classic three-gate "
+                    "certification. Review before uploading."
+                    + (f" NOTE: the {cap_count}-lineup captain cap relaxed on "
+                       f"{relaxed_slots} slot(s) because the pool couldn't "
+                       "support it without truncating the bank -- check "
+                       "captain_exposure.by_player before uploading."
+                       if relaxed_slots else "")),
     }
     return (0 if template.get("passed") else 3), brief
 
@@ -537,6 +581,15 @@ def main() -> int:
                     help="wall clock this invocation may use before saving and "
                          "asking to be rerun")
     ap.add_argument("--brief", help="write the brief JSON here")
+    ap.add_argument("--controls-override", dest="controls_override", type=json.loads,
+                    default=None,
+                    help="JSON dict of portfolio_controls_override, e.g. "
+                         "'{\"max_shared_players\": 8}'. Use when a build fails "
+                         "with a feasibility hint naming a control floor; this "
+                         "raises diversity caps, it never changes the player pool. "
+                         "Showdown reads \"max_cpt_exposure_pct\" from the same "
+                         "dict (default 0.35) to cap how much of the bank a "
+                         "single captain can fill; pass null to disable it.")
     args = ap.parse_args()
 
     started = time.monotonic()
@@ -552,8 +605,17 @@ def main() -> int:
 
     slate_dir = REPO / "data" / "slates" / args.date
     slate_dir.mkdir(parents=True, exist_ok=True)
-    staged_salary = _stage(salary, slate_dir / "DKSalaries.csv")
-    staged_entries = _stage(entries, slate_dir / "DKEntries.csv")
+    # Classic and Showdown builds for the same date used to stage to the same
+    # DKSalaries.csv/DKEntries.csv filenames, so a Showdown build for a date
+    # already carrying a Classic build (or vice versa) silently overwrote the
+    # other's staged inputs mid-run (hit 2026-07-23: a Showdown SD@ATL stage
+    # clobbered an in-flight Classic build's salary/entries CSVs). Classic
+    # keeps the bare filenames CLAUDE.md documents and that late_swap.py /
+    # solver_probe.py already default to; Showdown gets distinct filenames so
+    # the two contest types can never collide on the same date again.
+    suffix = "_showdown" if contest == "showdown" else ""
+    staged_salary = _stage(salary, slate_dir / f"DKSalaries{suffix}.csv")
+    staged_entries = _stage(entries, slate_dir / f"DKEntries{suffix}.csv")
 
     if contest == "showdown":
         code, brief = run_showdown(args, slate_dir, staged_salary, staged_entries)

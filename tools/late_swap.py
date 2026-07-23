@@ -34,7 +34,7 @@ if str(REPO) not in sys.path:
 from mlb_engine.intake.live_data_adapters import (  # noqa: E402
     build_slate_pool, build_status_map_from_lineups_feed,
 )
-from mlb_engine.optimize.bank_cache import BankCache, extend_bank  # noqa: E402
+from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, run_late_swap,
 )
@@ -76,6 +76,16 @@ def main() -> int:
                                         "default authorizes every reserved entry")
     ap.add_argument("--dry-run", action="store_true",
                     help="report requirements and candidate coverage, do not swap")
+    ap.add_argument("--controls-override", dest="controls_override", type=json.loads,
+                    default=None,
+                    help="JSON dict merged over the default PORTFOLIO_CONTROLS. A "
+                         "swap is certified against the WHOLE delivered portfolio, "
+                         "not just the authorized entries, so if the parent build "
+                         "used looser controls (e.g. build_slate.py's own "
+                         "--controls-override on a small slate) the untouched "
+                         "entries can violate this script's stricter defaults "
+                         "before the swap even runs. Pass the same values the "
+                         "parent build used.")
     args = ap.parse_args()
 
     slate = REPO / "data" / "slates" / args.date
@@ -114,7 +124,7 @@ def main() -> int:
         missing_status_policy="treat_as_locked",
     )
 
-    cache_path = REPO / "runs" / f"bank_cache_{args.date}.json"
+    cache_path = REPO / "runs" / f"bank_cache_{args.date}_{pool_signature(salary)}.json"
     cache = BankCache(cache_path)
 
     # A general bank covers entries with no locked slots. Entries that already hold
@@ -155,6 +165,10 @@ def main() -> int:
                           "candidates": len(candidates)}, indent=1))
         return 0
 
+    controls = dict(PORTFOLIO_CONTROLS)
+    if args.controls_override:
+        controls.update(args.controls_override)
+
     result = run_late_swap(
         runs_root=str(REPO / "runs"),
         current_entries_csv=args.parent_entries,
@@ -169,7 +183,7 @@ def main() -> int:
         starter_player_ids=status["starter_player_ids"],
         authorized_entry_ids=authorized,
         workflow_gates=dict(WORKFLOW_GATES),
-        portfolio_controls=dict(PORTFOLIO_CONTROLS),
+        portfolio_controls=controls,
     )
 
     if not result.get("passed"):
