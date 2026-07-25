@@ -2654,6 +2654,71 @@ class FieldMinerContractTests(unittest.TestCase):
             self.assertEqual(result["contest_type"], "classic")
             self.assertEqual(result["meta"]["roster_size"], 10)
 
+    def _salary_csv(self, tmp, showdown: bool):
+        """A DK salary CSV. Showdown lists every player twice, CPT at 1.5x."""
+        path = Path(tmp) / "sal.csv"
+        names = ["Aaron Judge", "Juan Soto", "Gerrit Cole", "Anthony Volpe",
+                 "Cody Bellinger", "Jose Ramirez"]
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["Position", "Name + ID", "Name", "ID",
+                             "Roster Position", "Salary", "Game Info",
+                             "TeamAbbrev", "AvgPointsPerGame"])
+            for i, name in enumerate(names):
+                base = 8000 + i * 100
+                if showdown:
+                    writer.writerow(["OF", f"{name} ({i})", name, i, "CPT",
+                                     int(base * 1.5), "A@B", "AAA", 9.0])
+                    writer.writerow(["OF", f"{name} ({i})", name, i, "UTIL",
+                                     base, "A@B", "AAA", 9.0])
+                else:
+                    writer.writerow(["OF", f"{name} ({i})", name, i, "OF",
+                                     base, "A@B", "AAA", 9.0])
+        return path
+
+    def test_showdown_salary_map_keeps_cpt_and_util_prices_apart(self):
+        """DK ships each Showdown player twice; collapsing them by name charged
+        captain prices for all six slots and inflated every entry by ~36%."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            smap = fm.load_salary_map(str(self._salary_csv(tmp, showdown=True)))
+            self.assertEqual(smap["__contest_type__"]["value"], "showdown")
+            self.assertEqual(smap["__collisions__"]["names"], [])
+            self.assertEqual(smap["aaron judge|CPT"]["salary"], 12000)
+            self.assertEqual(smap["aaron judge|UTIL"]["salary"], 8000)
+            # The flat key must be the base price, never the captain price.
+            self.assertEqual(smap["aaron judge"]["salary"], 8000)
+
+    def test_showdown_entry_is_charged_one_captain_and_five_util(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            smap = fm.load_salary_map(str(self._salary_csv(tmp, showdown=True)))
+            standings = self._standings(tmp, [self.SHOWDOWN] * 3)
+            result = fm.mine_contest(standings, smap, contest_id="1")
+            # CPT Judge at 12000 plus the other five at base.
+            expected = 12000 + sum(8000 + i * 100 for i in range(1, 6))
+            self.assertEqual(result["entries"][0]["salary_used"], expected)
+            self.assertTrue(result["diagnostics"]["parse_structural_ok"])
+
+    def test_classic_salary_map_is_unchanged(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            smap = fm.load_salary_map(str(self._salary_csv(tmp, showdown=False)))
+            self.assertEqual(smap["__contest_type__"]["value"], "classic")
+            self.assertEqual(smap["aaron judge"]["salary"], 8000)
+            self.assertNotIn("aaron judge|OF", smap)
+
+    def test_wrong_contest_type_salary_file_fails_the_gate(self):
+        """Joining across contest types matches on name and misprices silently."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            smap = fm.load_salary_map(str(self._salary_csv(tmp, showdown=False)))
+            standings = self._standings(tmp, [self.SHOWDOWN] * 3)
+            result = fm.mine_contest(standings, smap, contest_id="1")
+            self.assertFalse(result["diagnostics"]["parse_structural_ok"])
+            self.assertIn("WRONG SALARY FILE",
+                          result["diagnostics"]["verification_note"])
+
     def test_showdown_field_carries_its_own_roster_size(self):
         """Showdown must never be scored against the Classic contract."""
         from mlb_engine.field import field_miner as fm

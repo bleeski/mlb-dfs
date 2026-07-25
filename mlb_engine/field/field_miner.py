@@ -264,8 +264,25 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
+    """Load a DK salary CSV into {normalized name: record}.
+
+    Showdown needs a second key. DK ships each Showdown player TWICE, once as
+    CPT at 1.5x and once as UTIL at base, so a name-keyed map has a collision on
+    literally every player. The pre-v0.5 collision rule kept the higher salary,
+    which is always the captain row, and a six-man lineup that cost $82,100
+    joined at $111,900 because five of its six slots were charged captain
+    prices. Every salary-derived table downstream was wrong by that much.
+
+    So for a Showdown file the map carries both layers: the flat name key holds
+    the UTIL (base) record, which is what the cheap-count and SP-pair lookups
+    want, and ``"<name>|<slot>"`` holds the exact per-slot price for the entry
+    salary math. Classic files are unchanged and keep only the flat key, because
+    Classic Roster Position is a multi-position token like "OF/1B" and keying on
+    it would break the join it is supposed to fix.
+    """
     out: Dict[str, Dict[str, Any]] = {}
     collisions: List[str] = []
+    rows: List[Dict[str, Any]] = []
     with open(path, "r", encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         fields = {(f or "").strip().lower(): f for f in (reader.fieldnames or [])}
@@ -273,6 +290,7 @@ def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
         sal_f = fields.get("salary")
         team_f = fields.get("teamabbrev") or fields.get("team")
         id_f = fields.get("id")
+        slot_f = fields.get("roster position")
         if not (name_f and sal_f):
             raise ValueError("salary CSV missing Name/Salary columns")
         for row in reader:
@@ -283,19 +301,36 @@ def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
                 sal = int(float(row.get(sal_f, 0) or 0))
             except ValueError:
                 continue
-            rec = {
-                "name": row.get(name_f, "").strip(),
-                "salary": sal,
-                "team": (row.get(team_f, "") or "").strip() if team_f else "",
-                "player_id": (row.get(id_f, "") or "").strip() if id_f else "",
-            }
-            if nm in out:
-                collisions.append(nm)
-                if sal > out[nm]["salary"]:
-                    out[nm] = rec  # keep higher salary on collision, mirrored from the crosswalk
-            else:
+            rows.append({
+                "norm": nm,
+                "slot": (row.get(slot_f, "") or "").strip().upper() if slot_f else "",
+                "rec": {
+                    "name": row.get(name_f, "").strip(),
+                    "salary": sal,
+                    "team": (row.get(team_f, "") or "").strip() if team_f else "",
+                    "player_id": (row.get(id_f, "") or "").strip() if id_f else "",
+                },
+            })
+
+    slots_seen = {r["slot"] for r in rows}
+    is_showdown = bool({"CPT", "UTIL"} & slots_seen) and "UTIL" in slots_seen
+    for r in rows:
+        nm, slot, rec = r["norm"], r["slot"], r["rec"]
+        if is_showdown:
+            out[f"{nm}|{slot}"] = rec
+            # Base layer is the UTIL price, never the captain price.
+            if slot == "UTIL" or nm not in out:
                 out[nm] = rec
+            continue
+        if nm in out:
+            collisions.append(nm)
+            if rec["salary"] > out[nm]["salary"]:
+                out[nm] = rec  # keep higher salary on collision, mirrored from the crosswalk
+        else:
+            out[nm] = rec
+
     out["__collisions__"] = {"names": sorted(set(collisions))}  # type: ignore[assignment]
+    out["__contest_type__"] = {"value": "showdown" if is_showdown else "classic"}  # type: ignore[assignment]
     return out
 
 
@@ -353,7 +388,15 @@ def mine_contest(
 
     has_salary = salary_map is not None
     smap = salary_map or {}
-    salaries = sorted(v["salary"] for k, v in smap.items() if not k.startswith("__"))
+    # A salary file for the wrong contest type joins by name and produces
+    # plausible-looking nonsense rather than an error, which is the same
+    # fail-open class as the structural gate. Catch it before any table is
+    # built, because "certified but wrong" is the expensive outcome here.
+    salary_contest_type = str(
+        (smap.get("__contest_type__") or {}).get("value") or "classic").lower()
+    contest_type_mismatch = has_salary and salary_contest_type != contest_type
+    salaries = sorted(v["salary"] for k, v in smap.items()
+                      if not k.startswith("__") and "|" not in k)
     if cheap_threshold is None and salaries:
         cheap_threshold = salaries[max(0, int(0.10 * (len(salaries) - 1)))]
     cheap_threshold = int(cheap_threshold or 0) if has_salary else None
@@ -366,7 +409,10 @@ def mine_contest(
         missing = []
         for slot, name in e["lineup"]:
             nm = normalize_name(name)
-            rec = smap.get(nm)
+            # Showdown prices the same player differently by slot, so the slot
+            # key wins when the salary file carries one. Classic has no slot
+            # layer and falls straight through to the name key.
+            rec = smap.get(f"{nm}|{slot}") or smap.get(nm)
             if slot == "P":
                 # The slot token identifies the SP pair; the salary join only
                 # canonicalizes the name, so the pair survives a missing join.
@@ -473,6 +519,7 @@ def mine_contest(
         and (observed_slots == expected_slots)
         and not parsed_nothing
         and not mostly_unparsed
+        and not contest_type_mismatch
     )
     denom_used = n_all if own_denominator == "all_entries" else n_complete
     recomputed_total_pct = round(100.0 * observed_slots / denom_used, 1) if denom_used else None
@@ -480,7 +527,14 @@ def mine_contest(
     dk_deficit_pts = (round(recomputed_total_pct - dk_total_pct, 1)
                       if (recomputed_total_pct is not None and dk_total_pct is not None) else None)
     dk_table_agrees = (own_recompute_max_diff is not None and own_recompute_max_diff <= 1.5)
-    if parsed_nothing:
+    if contest_type_mismatch:
+        verification_note = (
+            f"WRONG SALARY FILE: the standings export is {contest_type} but the "
+            f"salary CSV is {salary_contest_type}. Joining across contest types "
+            "matches on name and silently misprices every entry. Supply the "
+            f"{contest_type} salary file for this slate, or omit --salary to mine "
+            "the standings_only tier. Do not archive anything downstream of this.")
+    elif parsed_nothing:
         verification_note = (
             f"PARSE FAILURE: none of the {n_all} entry rows parsed into a complete "
             f"{roster_size}-player lineup. The lineup strings do not match the "
