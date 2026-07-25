@@ -22,7 +22,7 @@ from typing import Any, Dict, List
 VERSION = "v3.0"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
-EXPECTED_TEST_COUNT = 171  # 167 + 4 added 2026-07-25 (salary auto-resolution)
+EXPECTED_TEST_COUNT = 180  # 171 + 9 added 2026-07-25 (I-2 F1 from Vegas totals)
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -33,9 +33,9 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/swap/late_swap_manager.py": 'VERSION = "v1.3"',
     "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.3"',
     "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.11"',
-    "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.4"',
+    "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.5"',
     "mlb_engine/projections/xwoba_base_correction.py": 'VERSION = "v1.2"',
-    "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.3"',
+    "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.4"',
     "mlb_engine/optimize/tail_candidate_scanner.py": 'VERSION = "v1.0"',
     "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.1"',
     "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.0"',

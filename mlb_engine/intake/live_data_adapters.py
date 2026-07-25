@@ -61,7 +61,7 @@ from mlb_engine.swap.late_swap_manager import (
 )
 from mlb_engine.intake.slate_intake_manager import normalize_name
 
-VERSION = "v1.3"
+VERSION = "v1.4"
 
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
@@ -862,10 +862,36 @@ def parse_the_odds_api_totals(raw: Sequence[Mapping[str, Any]], fetched_at: Opti
                     if point is not None:
                         books[key] = float(point)
                         break
+        # Moneylines ride along when the response carries the h2h market. They
+        # are what splits a game total into per-team implied totals, which is
+        # the whole input to F1. Absent, F1 falls back to an even split, which
+        # still prices the game environment and simply does not pick a side.
+        moneyline_books: Dict[str, Dict[str, float]] = {"away": {}, "home": {}}
+        for bookmaker in event.get("bookmakers") or []:
+            key = str(bookmaker.get("key") or "").lower()
+            for market in bookmaker.get("markets") or []:
+                if str(market.get("key")) != "h2h":
+                    continue
+                for outcome in market.get("outcomes") or []:
+                    side = team_name_to_dk_abbrev(outcome.get("name"))
+                    price = outcome.get("price")
+                    if price is None or side is None:
+                        continue
+                    if side == away:
+                        moneyline_books["away"][key] = float(price)
+                    elif side == home:
+                        moneyline_books["home"][key] = float(price)
+        moneyline: Dict[str, float] = {}
+        for side_key, team_code in (("away", away), ("home", home)):
+            prices = moneyline_books[side_key]
+            if prices:
+                moneyline[team_code] = float(statistics.median(sorted(prices.values())))
+
         if not books:
             continue
         stamp = fetched_at or latest_update or datetime.now(timezone.utc).isoformat()
         odds_by_game_id[game_id] = {
+            "moneyline": moneyline,
             "total": float(statistics.median(sorted(books.values()))),
             "source": "the-odds-api:" + ",".join(sorted(books)),
             "fetched_at": stamp,

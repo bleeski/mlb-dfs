@@ -17,7 +17,11 @@ Sources (all free tiers):
      tail_candidate_scanner lineups_json).
   2. the-odds-api.com v4 — DK+FD full-game totals, emitted as the RAW events
      payload so live_data_adapters.parse_the_odds_api_totals consumes it
-     unchanged. Costs ~3 credits per pull on the 500/month free plan. The API
+     unchanged. Markets are totals AND h2h: the moneyline is what splits a
+     game total into per-team implied totals, and without it F1 can price the
+     game environment but cannot pick a side. Costs credits per market per
+     region, so roughly double a totals-only pull, on the 500/month free
+     plan. The API
      key is read from the THE_ODDS_API_KEY environment variable, is never
      printed, and is scrubbed from any error text. Skipped with a warning when
      the variable is unset.
@@ -229,7 +233,7 @@ def fetch_odds_raw(date: str, warnings: List[str]) -> Optional[List[Dict[str, An
     end_dt = datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)
     end = f"{end_dt.strftime('%Y-%m-%d')}T09:59:00Z"
     params = urllib.parse.urlencode({
-        "apiKey": api_key, "regions": "us", "markets": "totals",
+        "apiKey": api_key, "regions": "us", "markets": "totals,h2h",
         "bookmakers": "draftkings,fanduel", "oddsFormat": "american",
         "commenceTimeFrom": start, "commenceTimeTo": end,
     })

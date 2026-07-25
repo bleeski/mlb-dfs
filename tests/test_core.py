@@ -2580,6 +2580,130 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         self.assertIn("99", captured["ids"])   # the probable was requested too
 
 
+class F1GameEnvironmentTests(unittest.TestCase):
+    """I-2: Vegas totals were fetched and discarded, so F1 was 1.0 for everyone.
+
+    The engine priced an 11.5-total Coors game and a 7-total pitcher's park
+    identically. The acceptance criterion from the 07-19 review is the first
+    test here: a high-total game's hitters must carry a higher F1 than a
+    low-total game's.
+    """
+
+    @staticmethod
+    def _pb():
+        from mlb_engine.projections import projection_builder as pb
+        return pb
+
+    def test_high_total_game_outranks_low_total_game(self):
+        pb = self._pb()
+        odds = {"COL@LAD": {"total": 11.5}, "SEA@SF": {"total": 7.0}}
+        teams = {"h_col": "COL", "h_lad": "LAD", "h_sea": "SEA", "h_sf": "SF"}
+        f1, report = pb.build_f1_factors(odds, teams)
+        self.assertGreater(f1["h_col"], f1["h_sea"])
+        self.assertGreater(f1["h_lad"], f1["h_sf"])
+        self.assertEqual(report["games_priced"], 2)
+        self.assertEqual(report["non_neutral_f1"], 4)
+
+    def test_factors_stay_inside_the_clip(self):
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 20.0}, "CCC@DDD": {"total": 2.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"}
+        f1, _ = pb.build_f1_factors(odds, teams)
+        low, high = pb.F1_HITTER_CLIP
+        for value in f1.values():
+            self.assertGreaterEqual(value, low)
+            self.assertLessEqual(value, high)
+
+    def test_moneyline_splits_the_total_toward_the_favorite(self):
+        pb = self._pb()
+        away, home = pb.implied_team_totals(8.5, away_price=200, home_price=-240)
+        self.assertGreater(home, away)
+        self.assertAlmostEqual(away + home, 8.5, places=6)
+        # Without a moneyline the split is even rather than invented.
+        self.assertEqual(pb.implied_team_totals(8.5), (4.25, 4.25))
+
+    def test_pitchers_stay_neutral_in_v1(self):
+        """The opposing-team total already feeds a pitcher's matchup elsewhere;
+        applying it here too would double count it."""
+        pb = self._pb()
+        odds = {"COL@LAD": {"total": 12.0}, "SEA@SF": {"total": 6.5}}
+        # Both games on the slate, so there is a real spread to normalize
+        # against; a single-team slate is its own mean and correctly yields 1.0.
+        teams = {"h": "COL", "h2": "SEA", "p": "COL"}
+        f1, _ = pb.build_f1_factors(odds, teams, pitcher_ids=["p"])
+        self.assertEqual(f1["p"], 1.0)
+        self.assertNotEqual(f1["h"], 1.0)
+        self.assertGreater(f1["h"], f1["h2"])
+
+    def test_mean_is_taken_over_slate_teams_not_every_priced_game(self):
+        """The odds feed covers the whole day; a draftgroup covers part of it.
+        Normalizing against games nobody on the slate competes with shifts the
+        whole slate and wastes the clip range."""
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 8.0}, "CCC@DDD": {"total": 8.0},
+                "EEE@FFF": {"total": 14.0}}   # not on the slate
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"}
+        _, report = pb.build_f1_factors(odds, teams)
+        self.assertEqual(report["mean_basis"], "slate_teams")
+        self.assertEqual(report["mean_basis_team_count"], 4)
+        self.assertAlmostEqual(report["league_mean_implied_total"], 4.0)
+
+    def test_teams_without_a_game_line_stay_neutral(self):
+        pb = self._pb()
+        f1, report = pb.build_f1_factors(
+            {"AAA@BBB": {"total": 9.0}}, {"a": "AAA", "z": "ZZZ"})
+        self.assertEqual(f1["z"], 1.0)
+        self.assertIn("ZZZ", report["teams_without_odds"])
+
+    def test_no_odds_yields_an_empty_map_and_says_so(self):
+        pb = self._pb()
+        f1, report = pb.build_f1_factors({}, {"a": "AAA"})
+        self.assertEqual(f1, {})
+        self.assertIn("skipped", report)
+        self.assertEqual(report["non_neutral_f1"], 0)
+
+    def test_f1_map_reaches_the_projection_frame(self):
+        """The whole point of I-2: the factor has to arrive in the frame the
+        optimizer ranks on, not just exist in a helper."""
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            with salary.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Position", "Name + ID", "Name", "ID",
+                                 "Roster Position", "Salary", "Game Info",
+                                 "TeamAbbrev", "AvgPointsPerGame"])
+                writer.writerow(["OF", "A (1)", "A", "1", "OF", 4000,
+                                 "COL@LAD 07/25/2026 07:05PM ET", "COL", 9.0])
+            rows = [{"Player_ID": "1", "AvgPointsPerGame": 9.0}]
+            frame, enrichment = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None,
+                f1_by_player_id={"1": 1.12},
+            )
+            self.assertEqual(enrichment["f1"]["applied_count"], 1)
+            self.assertAlmostEqual(float(frame.loc[0, "F1"]), 1.12)
+            self.assertIn("f1_environment", str(frame.loc[0, "Notes"]))
+
+    def test_explicit_f1_always_wins_over_the_prior(self):
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            with salary.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Position", "Name + ID", "Name", "ID",
+                                 "Roster Position", "Salary", "Game Info",
+                                 "TeamAbbrev", "AvgPointsPerGame"])
+                writer.writerow(["OF", "A (1)", "A", "1", "OF", 4000,
+                                 "COL@LAD 07/25/2026 07:05PM ET", "COL", 9.0])
+            rows = [{"Player_ID": "1", "AvgPointsPerGame": 9.0, "F1": 1.30}]
+            frame, enrichment = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None,
+                f1_by_player_id={"1": 1.12},
+            )
+            self.assertEqual(enrichment["f1"]["applied_count"], 0)
+            self.assertAlmostEqual(float(frame.loc[0, "F1"]), 1.30)
+
+
 class FieldMinerContractTests(unittest.TestCase):
     """field_miner v0.5: the structural gate must be able to fail.
 

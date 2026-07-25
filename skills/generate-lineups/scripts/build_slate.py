@@ -457,6 +457,88 @@ def resolve_reference_data(args) -> dict:
     }
 
 
+def load_odds_packet(args) -> tuple[dict, dict]:
+    """Return ({game_id: odds entry}, note) for the slate, or ({}, note).
+
+    Accepts an --odds file in either shape the project produces: a raw
+    the-odds-api events list, an mlb-game-odds payload wrapping one, or a
+    slate_bundle carrying ``odds_raw_totals``. Falls back to fetching when
+    THE_ODDS_API_KEY is set. The key is read from the environment, never
+    printed, and scrubbed from any error text.
+    """
+    import os
+
+    from mlb_engine.intake.live_data_adapters import parse_the_odds_api_totals
+
+    raw = None
+    source = None
+    path = getattr(args, "odds", None)
+    if path and Path(path).exists():
+        try:
+            payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        except Exception as exc:
+            return {}, {"source": str(path), "warning": f"unreadable odds file: {exc}"}
+        if isinstance(payload, list):
+            raw = payload
+        elif isinstance(payload, dict):
+            for key in ("odds_raw_totals", "raw", "events", "odds"):
+                if isinstance(payload.get(key), list):
+                    raw = payload[key]
+                    break
+        source = str(path)
+        if raw is None:
+            return {}, {"source": source,
+                        "warning": "odds file carried no recognizable events list"}
+
+    if raw is None:
+        key = os.environ.get("THE_ODDS_API_KEY")
+        if not key:
+            return {}, {"source": None,
+                        "warning": "no --odds file and THE_ODDS_API_KEY unset; "
+                                   "F1 stays neutral for this build"}
+        import urllib.parse
+        query = urllib.parse.urlencode({
+            "apiKey": key, "regions": "us", "markets": "totals,h2h",
+            "oddsFormat": "american",
+        })
+        url = ("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?" + query)
+        try:
+            with urllib.request.urlopen(url, timeout=20) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+        except Exception as exc:
+            # Never let the key reach a log line or the brief.
+            scrubbed = str(exc).replace(key, "<redacted>")
+            return {}, {"source": "the-odds-api",
+                        "warning": f"odds fetch failed ({scrubbed}); F1 stays neutral"}
+        source = "the-odds-api"
+
+    parsed = parse_the_odds_api_totals(raw)
+    odds = parsed.get("odds_by_game_id") or {}
+    with_ml = sum(1 for v in odds.values() if (v or {}).get("moneyline"))
+    return odds, {"source": source, "games": len(odds), "games_with_moneyline": with_ml}
+
+
+def build_f1_map(pool: dict, odds_by_game_id: dict) -> tuple[dict, dict]:
+    """Return ({Player_ID: F1}, report) from the slate's posted game lines.
+
+    Game environment is the strongest exogenous signal in MLB DFS and the market
+    prices it for free. Pitchers are held at 1.0 in v1 so the opposing-team
+    total is not counted twice. Labeled prior, never a run projection.
+    """
+    from mlb_engine.projections.projection_builder import build_f1_factors
+
+    team_by_player_id = dict(pool.get("team_by_player_id") or {})
+    pitcher_ids = list((pool.get("pitcher_roles") or {}).keys())
+    # Pitchers are absent from team_by_player_id (it is hitters only), so add
+    # them explicitly to keep the F1 map total and its report honest.
+    salary_team = pool.get("team_by_player_id") or {}
+    for pid in pitcher_ids:
+        team_by_player_id.setdefault(str(pid), salary_team.get(str(pid), ""))
+    if not odds_by_game_id:
+        return {}, {"skipped": "no odds packet available", "non_neutral_f1": 0}
+    return build_f1_factors(odds_by_game_id, team_by_player_id, pitcher_ids=pitcher_ids)
+
+
 def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
     """Return ({Player_ID: F4}, report) for the pool's hitters, or ({}, report).
 
@@ -498,7 +580,8 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
 
 
 def summarize_enrichment(reference_status: dict, enrichment: dict,
-                         f4_report: dict, degraded_reason) -> dict:
+                         f4_report: dict, degraded_reason,
+                         f1_report: dict | None = None) -> dict:
     """Condense the enrichment record into the block the brief carries.
 
     The one question this has to answer at a glance is whether this build had
@@ -511,6 +594,7 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
     ceiling = enrichment.get("ceiling") or {}
     pitcher_ceiling = enrichment.get("pitcher_ceiling") or {}
     non_neutral_f4 = int(f4_report.get("non_neutral_f4") or 0)
+    f1_report = f1_report or {}
 
     counts = {
         "xwoba_non_neutral": int(xwoba.get("non_neutral_applied") or 0),
@@ -522,7 +606,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f4_non_neutral": non_neutral_f4,
         "f4_hitters_scored": int(f4_report.get("hitters_scored") or 0),
         "f4_platoon_applied": int(f4_report.get("platoon_component_applied") or 0),
-        "f1_non_neutral": 0,
+        "f1_non_neutral": int(f1_report.get("non_neutral_f1") or 0),
+        "f1_games_priced": int(f1_report.get("games_priced") or 0),
         "f5_non_neutral": 0,
     }
     warnings = list(reference_status.get("warnings") or [])
@@ -530,6 +615,20 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
     for key in ("warning", "skipped"):
         if f4_report.get(key):
             warnings.append(f"f4: {f4_report[key]}")
+        if f1_report.get(key):
+            warnings.append(f"f1: {f1_report[key]}")
+    if (f1_report.get("odds") or {}).get("warning"):
+        warnings.append(f"f1: {f1_report['odds']['warning']}")
+    no_ml = f1_report.get("games_without_moneyline") or []
+    if no_ml:
+        warnings.append(
+            "f1: no moneyline for " + ", ".join(no_ml)
+            + "; those totals split evenly rather than by side")
+    teams_no_odds = f1_report.get("teams_without_odds") or []
+    if teams_no_odds:
+        warnings.append(
+            "f1: no game line for " + ", ".join(teams_no_odds)
+            + "; those hitters stay neutral")
     teams_without = f4_report.get("teams_without_opposing_probable") or []
     if teams_without:
         warnings.append(
@@ -540,7 +639,7 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
 
     signal = any(counts[k] for k in (
         "xwoba_non_neutral", "hitter_ceiling_differentiated",
-        "pitcher_ceiling_differentiated", "f4_non_neutral"))
+        "pitcher_ceiling_differentiated", "f4_non_neutral", "f1_non_neutral"))
     return {
         "signal_applied": bool(signal),
         "degraded": bool(degraded_reason),
@@ -548,12 +647,17 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "reference_data": reference_status,
         "counts": counts,
         "f4_league_mean_est_woba": f4_report.get("league_mean_est_woba"),
+        "f1_odds": f1_report.get("odds"),
+        "f1_league_mean_implied_total": f1_report.get("league_mean_implied_total"),
+        "f1_implied_total_by_team": f1_report.get("implied_total_by_team"),
         "warnings": warnings,
         "note": "Enrichment counts are deterministic labeled priors applied to the "
                 "projection frame: xwOBA Base correction, xISO hitter ceilings, "
-                "K-rate pitcher ceilings, and the F4 opposing-SP/platoon matchup "
-                "factor. Never ROI, win rate, or a probability claim. F1 (Vegas "
-                "totals) and F5 (weather) are not wired yet and report 0.",
+                "K-rate pitcher ceilings, the F4 opposing-SP/platoon matchup "
+                "factor, and F1 from Vegas implied team totals. Implied totals "
+                "are derived from the posted total and moneyline, not published "
+                "by the book. Never ROI, win rate, or a probability claim. F5 "
+                "(weather) is not wired yet and reports 0.",
     }
 
 
@@ -580,6 +684,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     if f4_report.get("warning"):
         print(f"enrichment warning: {f4_report['warning']}", file=sys.stderr)
 
+    odds_by_game_id, odds_note = load_odds_packet(args)
+    if odds_note.get("warning"):
+        print(f"odds: {odds_note['warning']}", file=sys.stderr)
+    f1_by_player_id, f1_report = build_f1_map(pool, odds_by_game_id)
+    f1_report["odds"] = odds_note
+    if f1_report.get("warning"):
+        print(f"enrichment warning: {f1_report['warning']}", file=sys.stderr)
+
     # Assemble the frame WITH the enrichments. This frame is not just the timing
     # probe: on the sliced-bank path it is the frame every cached candidate is
     # built from, so enriching it here is what puts the signal in the portfolio.
@@ -588,6 +700,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         savant_pitching_csv=reference["savant_pitching"],
         fangraphs_pitching_csv=reference["fangraphs_pitching"],
         f4_by_player_id=f4_by_player_id or None,
+        f1_by_player_id=f1_by_player_id or None,
     )
     degraded_reason = None
     try:
@@ -597,6 +710,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             None,
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
             f4_by_player_id=enrich_kwargs["f4_by_player_id"],
+            f1_by_player_id=enrich_kwargs["f1_by_player_id"],
             fangraphs_pitching_csv=enrich_kwargs["fangraphs_pitching_csv"],
         )
     except ValueError as exc:
@@ -609,8 +723,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         print(f"ENRICHMENT FAILED, building unenriched: {degraded_reason}",
               file=sys.stderr)
         enrich_kwargs = dict(savant_batting_csv=None, savant_pitching_csv=None,
-                             fangraphs_pitching_csv=None, f4_by_player_id=None)
+                             fangraphs_pitching_csv=None, f4_by_player_id=None,
+                             f1_by_player_id=None)
         f4_by_player_id = {}
+        f1_by_player_id = {}
         projections, enrichment = _assemble_projection_frame(
             str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
@@ -744,7 +860,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "verification": checks,
         "controls_override_applied": args.controls_override,
         "enrichment": summarize_enrichment(
-            reference["status"], enrichment, f4_report, degraded_reason),
+            reference["status"], enrichment, f4_report, degraded_reason, f1_report),
     }
     return (0 if checks["passed"] else 3), brief
 
@@ -920,7 +1036,11 @@ def main() -> int:
     ap.add_argument("--salary", required=True)
     ap.add_argument("--entries", dest="entries_csv", required=True)
     ap.add_argument("--lineups", help="mlb-lineups feed JSON; fetched if omitted")
-    ap.add_argument("--odds", help="mlb-game-odds JSON, used for the brief only")
+    ap.add_argument("--odds",
+                    help="game-odds JSON (raw the-odds-api events, an "
+                         "mlb-game-odds payload, or a slate_bundle). Feeds the "
+                         "F1 game-environment prior. When omitted, totals are "
+                         "fetched if THE_ODDS_API_KEY is set, else F1 stays 1.0.")
     ap.add_argument("--date", help="slate date; derived from the salary file if omitted")
     ap.add_argument("--no-rotowire", dest="rotowire", action="store_false",
                     help="skip the RotoWire projected-lineup fallback for TBD teams "

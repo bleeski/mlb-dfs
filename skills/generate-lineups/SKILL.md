@@ -74,17 +74,17 @@ before lock, run them first and pass the results in:
 - **mlb-lineups** for confirmed lineups, batting order, and pitcher handedness.
   Save the JSON and pass `--lineups <path>`.
 - **mlb-game-odds** for moneylines, run lines, and totals. Save it and pass
-  `--odds <path>`. Odds still do not reach the projections: F1 is 1.0 for every
-  player until the Vegas-totals factor is wired (open item I-2). For now they
-  give you the game environment to describe in the brief. Do not tell Ben the
-  build priced a Coors game differently, because it did not.
+  `--odds <path>`. Odds now DO change the build: they are the input to F1, the
+  game-environment factor. When `--odds` is omitted the script fetches totals
+  and moneylines itself if `THE_ODDS_API_KEY` is set, and leaves F1 at 1.0 for
+  everyone if it is not.
 
 ### Projection enrichment (this is what makes the build more than APPG)
 
-The build applies four deterministic priors: the xwOBA Base correction, xISO
-hitter ceilings, K-rate pitcher ceilings, and the F4 opposing-SP-quality and
-platoon matchup factor. They read three files in `data/reference/`. Refresh them
-when the brief says they are stale:
+The build applies five deterministic priors: the xwOBA Base correction, xISO
+hitter ceilings, K-rate pitcher ceilings, the F4 opposing-SP-quality and platoon
+matchup factor, and F1 from Vegas implied team totals. Four of them read files in
+`data/reference/`. Refresh those when the brief says they are stale:
 
 ```bash
 python tools/refresh_reference_data.py     # pulls Savant, reports all three
@@ -97,8 +97,15 @@ Read `enrichment.signal_applied` in the brief before you present anything. False
 means this build ranked players on `AvgPointsPerGame x batting-order factor` and
 nothing else, which is a materially weaker portfolio, and Ben should be told
 plainly rather than handed a certified file that looks identical to a good one.
-`enrichment.counts` says which factors moved players and by how many; F1 and F5
-report 0 because they are not wired yet.
+`enrichment.counts` says which factors moved players and by how many. F5
+(weather) still reports 0 because it is not wired yet.
+
+On F1 specifically: the books post a game total but not per-team totals, so the
+split is DERIVED from the total and the moneyline. Say "implied team total"
+rather than implying DraftKings published it. Hitter F1 is the team's implied
+total over the slate's mean, clipped to 0.85-1.15; pitcher F1 stays 1.0 in v1 so
+the opposing-team total is not counted twice. `enrichment.f1_implied_total_by_team`
+carries the numbers if Ben asks which games the build liked.
 
 Fresher lineups matter most. A team that has posted since the last pull moves from
 a projected batting order to a confirmed one, which is strictly better information.
@@ -339,7 +346,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 171 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 180 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

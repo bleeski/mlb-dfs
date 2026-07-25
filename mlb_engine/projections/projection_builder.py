@@ -42,7 +42,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
-VERSION = "v1.4"
+VERSION = "v1.5"
 MODES = {"provider_projection", "emergency_proxy"}
 FACTOR_COLUMNS = ("F1", "F2", "F3", "F4", "F5")
 CORE_COLUMNS = (
@@ -501,6 +501,196 @@ def build_k_rate_ceiling_multipliers(
 # if a better split exists. Applied BEFORE F1/F5 it does not double count the
 # implied total or the park. Pitcher F4 remains 1.0 in this version. All
 # outputs are deterministic review inputs, never ROI or win-rate claims.
+
+# ---------------------------------------------------------------------------
+# F1: game environment from Vegas implied team totals (v1.8)
+# ---------------------------------------------------------------------------
+# Game environment is the strongest exogenous signal in MLB DFS and the market
+# prices it for free. Until this landed, F1 was 1.0 for every player on every
+# slate: the engine priced an 11.5-total Coors game and a 7-total pitcher's park
+# identically, while the odds were fetched and discarded.
+#
+# Everything here is a deterministic labeled prior derived from posted prices.
+# It is not a projection of runs, not an edge, and not a probability claim.
+
+# The books post a game total but not per-team totals, so the split has to be
+# derived. Expected margin scales with how lopsided the moneyline is; this maps
+# the devigged win-probability gap onto runs. At 2.4, a -150 favorite (p≈0.60,
+# gap 0.20) takes about half a run of the total, which is where books' own
+# team totals sit. Deliberately conservative: understating the split costs a
+# little signal, overstating it invents some.
+F1_MARGIN_RUNS_PER_PROB_GAP = 2.4
+F1_HITTER_CLIP = (0.85, 1.15)
+# Pitcher F1 stays 1.0 in v1. The opposing-team total is already the input to a
+# pitcher's matchup elsewhere, and applying it here too would double count it.
+F1_PITCHER_NEUTRAL = 1.0
+
+
+def devig_two_way(price_a: Optional[float], price_b: Optional[float]) -> Optional[Tuple[float, float]]:
+    """Return (p_a, p_b) with the vig removed, or None if either price is absent.
+
+    American prices carry an overround; normalizing the two implied
+    probabilities to sum to 1 is the standard proportional devig.
+    """
+    if price_a is None or price_b is None:
+        return None
+    try:
+        raw_a = _american_to_prob(float(price_a))
+        raw_b = _american_to_prob(float(price_b))
+    except (TypeError, ValueError):
+        return None
+    total = raw_a + raw_b
+    if total <= 0:
+        return None
+    return raw_a / total, raw_b / total
+
+
+def _american_to_prob(price: float) -> float:
+    price = float(price)
+    if price < 0:
+        return (-price) / ((-price) + 100.0)
+    return 100.0 / (price + 100.0)
+
+
+def implied_team_totals(
+    total: Optional[float],
+    away_price: Optional[float] = None,
+    home_price: Optional[float] = None,
+    margin_per_gap: float = F1_MARGIN_RUNS_PER_PROB_GAP,
+) -> Optional[Tuple[float, float]]:
+    """Split a game total into (away_total, home_total).
+
+    With both moneylines, the total splits around the devigged win-probability
+    gap. Without them the split is even, which is honest rather than clever: an
+    even split says "this game is a run environment and we do not know which
+    side is favored", and that is exactly what the data supports.
+    """
+    if total is None:
+        return None
+    try:
+        total = float(total)
+    except (TypeError, ValueError):
+        return None
+    if total <= 0:
+        return None
+    probs = devig_two_way(away_price, home_price)
+    if probs is None:
+        return total / 2.0, total / 2.0
+    p_away, p_home = probs
+    margin = margin_per_gap * (p_home - p_away)  # positive when home is favored
+    return (total - margin) / 2.0, (total + margin) / 2.0
+
+
+def build_f1_factors(
+    odds_by_game_id: Mapping[str, Mapping[str, Any]],
+    team_by_player_id: Mapping[str, str],
+    pitcher_ids: Optional[Iterable[str]] = None,
+    clip: Tuple[float, float] = F1_HITTER_CLIP,
+) -> Tuple[Dict[str, float], Dict[str, Any]]:
+    """Return ({Player_ID: F1}, report) from posted game totals and moneylines.
+
+    ``odds_by_game_id`` is keyed ``AWAY@HOME`` in DK abbreviations, the shape
+    ``live_data_adapters.parse_the_odds_api_totals`` already emits, optionally
+    carrying a ``moneyline`` dict of the same two team codes to American prices.
+    The team-to-game mapping is read off the keys, so no second input can drift
+    from the first.
+
+    Hitter F1 is the team's implied total over the SLATE's mean implied total,
+    clipped. The slate mean rather than a season constant, because the optimizer
+    only ever ranks players against others on the same slate: on a uniformly
+    high-total night nobody deserves a uniform boost, but the best game on that
+    night still deserves the edge over the worst.
+
+    Every emitted F1 is a labeled deterministic prior, never a run projection,
+    an edge, or a probability claim.
+    """
+    totals_by_team: Dict[str, float] = {}
+    games_used: Dict[str, Any] = {}
+    games_without_moneyline: List[str] = []
+    for game_id, entry in (odds_by_game_id or {}).items():
+        if "@" not in str(game_id):
+            continue
+        away, home = str(game_id).split("@", 1)
+        away, home = away.strip().upper(), home.strip().upper()
+        moneyline = (entry or {}).get("moneyline") or {}
+        split = implied_team_totals(
+            (entry or {}).get("total"),
+            moneyline.get(away), moneyline.get(home),
+        )
+        if split is None:
+            continue
+        if not moneyline.get(away) or not moneyline.get(home):
+            games_without_moneyline.append(str(game_id))
+        totals_by_team[away], totals_by_team[home] = split
+        games_used[str(game_id)] = {
+            "total": (entry or {}).get("total"),
+            "implied": {away: round(split[0], 2), home: round(split[1], 2)},
+            "source": (entry or {}).get("source"),
+        }
+
+    report: Dict[str, Any] = {
+        "games_priced": len(games_used),
+        "games_without_moneyline": sorted(games_without_moneyline),
+        "games": games_used,
+        "note": (
+            "Deterministic F1 prior: implied team total over the slate mean, "
+            "clipped. Implied totals are derived from the posted game total and "
+            "moneyline, not published by the book. Labeled prior, never a run "
+            "projection, ROI, win rate, or probability claim. Pitcher F1 stays "
+            "1.0 in v1 so the opposing-team total is not double counted."
+        ),
+    }
+    if not totals_by_team:
+        report["skipped"] = "no game carried a usable total"
+        report["league_mean_implied_total"] = None
+        report["non_neutral_f1"] = 0
+        report["hitters_scored"] = 0
+        return {}, report
+
+    # Normalize against the teams actually ON this slate, not every game the
+    # odds feed happened to price. The feed covers the whole day while a
+    # draftgroup covers part of it, so averaging all of it shifts an entire
+    # slate up or down against a baseline no player on it competes with. A
+    # uniform shift changes no rankings but does waste the clip range: on
+    # 2026-07-22 a 3-game draftgroup sat entirely under the all-games mean and
+    # every team landed below 1.0, compressing the spread toward the low clip
+    # instead of centering it. Falls back to all priced teams when the pool
+    # supplies none of them.
+    pool_teams = {str(t).strip().upper() for t in (team_by_player_id or {}).values()}
+    slate_totals = {k: v for k, v in totals_by_team.items() if k in pool_teams}
+    basis = slate_totals or totals_by_team
+    league_mean = sum(basis.values()) / len(basis)
+    report["mean_basis"] = "slate_teams" if slate_totals else "all_priced_teams"
+    report["mean_basis_team_count"] = len(basis)
+    report["league_mean_implied_total"] = round(league_mean, 3)
+    report["implied_total_by_team"] = {k: round(v, 2) for k, v in sorted(totals_by_team.items())}
+
+    low, high = clip
+    pitchers = {str(p) for p in (pitcher_ids or [])}
+    f1_by_player: Dict[str, float] = {}
+    teams_without_odds: set = set()
+    for pid, team in (team_by_player_id or {}).items():
+        pid = str(pid)
+        if pid in pitchers:
+            f1_by_player[pid] = F1_PITCHER_NEUTRAL
+            continue
+        team_total = totals_by_team.get(str(team).strip().upper())
+        if team_total is None or league_mean <= 0:
+            teams_without_odds.add(str(team).strip().upper())
+            f1_by_player[pid] = 1.0
+            continue
+        f1_by_player[pid] = float(min(high, max(low, team_total / league_mean)))
+
+    report["hitters_scored"] = len(f1_by_player) - len(pitchers & set(f1_by_player))
+    report["teams_without_odds"] = sorted(teams_without_odds)
+    report["non_neutral_f1"] = sum(
+        1 for v in f1_by_player.values() if abs(float(v) - 1.0) > 1e-9)
+    if f1_by_player and report["non_neutral_f1"] == 0:
+        report["warning"] = (
+            f"F1 computed for {len(f1_by_player)} players but every value is "
+            "neutral 1.0; no team's implied total differed from the slate mean")
+    return f1_by_player, report
+
 
 F4_PLATOON_PRIOR: Dict[Tuple[str, str], float] = {
     ("L", "R"): 1.04, ("L", "L"): 0.94,
