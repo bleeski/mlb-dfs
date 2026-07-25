@@ -7,12 +7,27 @@ exist yet; regenerate it by rerunning that scan until it does.
 
 Pull each while logged in to DraftKings, **check the file size is non-zero**, and
 drop it in `data/standings/inbox/`. A zero-byte export is a failed pull, not a
-pulled file. Showdown contests archive separately from Classic and never pool
-with them.
+pulled file.
+
+The inbox is flat. Classic and Showdown comingle freely: the miner reads the
+contest type off the lineup cells and resolves the right salary file itself
+(`--auto-salary`), declining to the standings_only tier rather than joining the
+wrong slate. Showdown still archives separately from Classic in the ledger and
+never pools with it; that separation is carried in the emitted block, not in the
+folder layout.
+
+**Update 2026-07-25:** tranche 1 came back populated, so aging is confirmed and
+tranches 2 and 3 are worth pulling. Tranche 1 and the Classic half of tranche 2
+are already archived as A-006 and A-007; what remains below is the Showdown half
+of tranche 2 plus everything from tranche 3 down.
 
 ---
 
-## Tranche 1 — the aging test (pull these first, alone)
+## Tranche 1 — DONE (archived as A-006)
+
+Pulled 2026-07-25, all four populated, mined and archived. Aging confirmed.
+
+## ~~Tranche 1 — the aging test~~ (kept for the record)
 
 2026-07-24 night slate, 16 entries. If these come back populated, the export ages
 out and the rule is a same-night pull. If they come back empty, the export path
@@ -27,9 +42,9 @@ https://www.draftkings.com/contest/exportfullstandingscsv/192667458
 https://www.draftkings.com/contest/exportfullstandingscsv/192658268
 ```
 
-## Tranche 2 — rest of 2026-07-24 (pull if tranche 1 worked)
+## Tranche 2 — Classic half DONE (archived as A-007); Showdown still open
 
-Main slate, 9 entries:
+Main slate, 9 entries. ARCHIVED, do not re-pull:
 
 ```
 https://www.draftkings.com/contest/exportfullstandingscsv/192701222
@@ -40,7 +55,7 @@ https://www.draftkings.com/contest/exportfullstandingscsv/192709106
 https://www.draftkings.com/contest/exportfullstandingscsv/192712196
 ```
 
-Showdown, 15 entries:
+Showdown, 15 entries. STILL TO PULL:
 
 ```
 https://www.draftkings.com/contest/exportfullstandingscsv/192657334
