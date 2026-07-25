@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  13 modules  149 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  13 modules  157 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw).
@@ -518,6 +518,34 @@ table omits, with drafted-position splits carried in a dedicated
 ---
 
 === ARCHIVE (append-only; full decompositions, newest first) ===
+
+**Evidence loss (2026-07-25, recorded so no future session proposes a re-pull):**
+Five standings exports are unrecoverable and their slates will never enter the
+archive: contests **191489664, 191513240, 191520890, 191521489, 191542451**. All
+five landed in `data/standings/inbox/` at zero bytes on 2026-07-19. Ben re-pulled
+them two different ways on 2026-07-24 and both attempts returned zero bytes
+again. The working theory is that DK's `exportfullstandingscsv/<id>` endpoint
+ages out and stops serving a populated file some days after a contest settles;
+the files sat for five days before anyone noticed they were empty. The five
+zero-byte files were deleted from the inbox on 2026-07-25 with this note as their
+only record.
+
+Two consequences, both standing:
+
+1. **The pull window is same-night or next-morning.** Treat a standings export as
+   perishable. Pull it the night the contest settles, or the following morning at
+   the latest, and check the file size before walking away. A zero-byte export is
+   a failed pull, not a pulled file.
+2. **The archive stays at 5 slates (A-001..A-005) against the 8-15 gate in
+   section 5.** These five would have taken it to 10. The ownership-model
+   dependency is therefore further out than the raw contest count suggested, and
+   the next five settled slates all have to land cleanly.
+
+Aging is a theory, not a finding. The test that would confirm it is the four
+2026-07-24 night contests (**192657350, 192657349, 192667458, 192658268**), still
+unpulled as of this note. If those come back populated, age is confirmed and rule
+1 above is the fix. If they come back empty too, the export path itself is broken
+and the failure is not about timing at all. Record the result here either way.
 
 **Session note (2026-07-22, mlb-standings-archive scheduled task):** A-002
 through A-005 below were mined this session. `field_miner` v0.4 splits the
