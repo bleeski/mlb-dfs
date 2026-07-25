@@ -2719,6 +2719,85 @@ class FieldMinerContractTests(unittest.TestCase):
             self.assertIn("WRONG SALARY FILE",
                           result["diagnostics"]["verification_note"])
 
+    def _slate_salary(self, path, teams, extra_names=()):
+        """A Classic salary file covering the given teams, 10 players each."""
+        with Path(path).open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["Position", "Name + ID", "Name", "ID",
+                             "Roster Position", "Salary", "Game Info",
+                             "TeamAbbrev", "AvgPointsPerGame"])
+            pid = 0
+            for team in teams:
+                for j in range(10):
+                    pid += 1
+                    writer.writerow(["OF", f"{team}{j} ({pid})", f"{team} Player{j}",
+                                     pid, "OF", 4000, "A@B", team, 8.0])
+            for name in extra_names:
+                pid += 1
+                writer.writerow(["OF", f"{name} ({pid})", name, pid, "OF",
+                                 4000, "A@B", "ZZZ", 8.0])
+        return str(path)
+
+    def _lineup_from(self, teams):
+        slots = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        names = [f"{teams[i % len(teams)]} Player{i}" for i in range(10)]
+        return " ".join(f"{s} {n}" for s, n in zip(slots, names))
+
+    def test_auto_salary_rejects_a_superset_draftgroup(self):
+        """The real 2026-07-24 case: the night slate's games sat inside the main
+        slate's, so a night contest joined 100% against both files."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            night_teams = ["AAA", "BBB", "CCC", "DDD"]
+            night = self._slate_salary(Path(tmp) / "DKSalaries_night.csv", night_teams)
+            main = self._slate_salary(Path(tmp) / "DKSalaries_main.csv",
+                                      night_teams + ["EEE", "FFF", "GGG", "HHH"])
+            standings = self._standings(tmp, [self._lineup_from(night_teams)] * 5)
+            resolved = fm.resolve_salary_file(standings, [main, night])
+            self.assertEqual(resolved["path"], night, resolved["reason"])
+            by_path = {s["path"]: s for s in resolved["scored"]}
+            # Both price every player; only team coverage separates them.
+            self.assertEqual(by_path[main]["join_rate"], 1.0)
+            self.assertEqual(by_path[night]["join_rate"], 1.0)
+            self.assertLess(by_path[main]["team_coverage"],
+                            by_path[night]["team_coverage"])
+
+    def test_auto_salary_treats_identical_copies_as_one_answer(self):
+        """The same slate is on disk as a staged copy, a run input, and an
+        archived copy. That is not a decision to escalate."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            teams = ["AAA", "BBB", "CCC", "DDD"]
+            a = self._slate_salary(Path(tmp) / "DKSalaries.csv", teams)
+            b = self._slate_salary(Path(tmp) / "DKSalaries_archived.csv", teams)
+            standings = self._standings(tmp, [self._lineup_from(teams)] * 5)
+            resolved = fm.resolve_salary_file(standings, [a, b])
+            self.assertIn(resolved["path"], (a, b))
+            self.assertNotIn("ambiguous", resolved["reason"])
+
+    def test_auto_salary_declines_when_two_real_slates_tie(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            teams = ["AAA", "BBB", "CCC", "DDD"]
+            a = self._slate_salary(Path(tmp) / "DKSalaries_a.csv", teams)
+            b = self._slate_salary(Path(tmp) / "DKSalaries_b.csv", teams,
+                                   extra_names=("Someone Else",))
+            standings = self._standings(tmp, [self._lineup_from(teams)] * 5)
+            resolved = fm.resolve_salary_file(standings, [a, b])
+            self.assertIsNone(resolved["path"])
+            self.assertIn("ambiguous", resolved["reason"])
+
+    def test_auto_salary_declines_rather_than_joining_a_foreign_slate(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            other = self._slate_salary(Path(tmp) / "DKSalaries_other.csv",
+                                       ["XXX", "YYY"])
+            standings = self._standings(
+                tmp, [self._lineup_from(["AAA", "BBB", "CCC", "DDD"])] * 5)
+            resolved = fm.resolve_salary_file(standings, [other])
+            self.assertIsNone(resolved["path"])
+            self.assertIn("standings_only", resolved["reason"])
+
     def test_showdown_field_carries_its_own_roster_size(self):
         """Showdown must never be scored against the Classic contract."""
         from mlb_engine.field import field_miner as fm

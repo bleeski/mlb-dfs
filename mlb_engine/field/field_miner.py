@@ -75,6 +75,7 @@ import sys
 import tempfile
 import unicodedata
 from collections import Counter, defaultdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 VERSION = "0.5-review"
@@ -332,6 +333,149 @@ def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
     out["__collisions__"] = {"names": sorted(set(collisions))}  # type: ignore[assignment]
     out["__contest_type__"] = {"value": "showdown" if is_showdown else "classic"}  # type: ignore[assignment]
     return out
+
+
+# ---------------------------------------------------------------------------
+# Salary-file resolution
+# ---------------------------------------------------------------------------
+
+# Below this share of joined player references the candidate is not this
+# contest's slate. Real files join at 100%; a wrong-draftgroup file from the
+# same date still joins on the players the two slates share, which is exactly
+# why "some join rate" is not evidence and a threshold is needed.
+MIN_AUTO_JOIN_RATE = 0.95
+# A winner must also beat the runner-up by this much, so two plausible files are
+# reported as ambiguous rather than silently resolved by a rounding difference.
+MIN_AUTO_JOIN_MARGIN = 0.02
+# A correct salary file has its teams drafted almost exhaustively by the field.
+# A superset file (a larger draftgroup on the same date that contains this one)
+# joins just as well but leaves whole teams untouched. Not 1.0, because a small
+# field can legitimately ignore one bad team.
+MIN_AUTO_TEAM_COVERAGE = 0.80
+
+
+def score_salary_candidate(standings: Dict[str, Any],
+                           salary_path: str) -> Dict[str, Any]:
+    """Score one candidate salary file against one contest's standings.
+
+    Returns contest-type agreement and the share of player references in
+    complete lineups that the file can price. No mining, no tables; this is
+    cheap enough to run across every candidate on disk.
+    """
+    result: Dict[str, Any] = {"path": str(salary_path), "usable": False,
+                              "join_rate": 0.0, "contest_type_matches": False,
+                              "error": None}
+    try:
+        smap = load_salary_map(str(salary_path))
+    except Exception as exc:
+        result["error"] = str(exc)
+        return result
+    standings_type = str(standings.get("contest_type") or "classic").lower()
+    salary_type = str((smap.get("__contest_type__") or {}).get("value") or "classic").lower()
+    result["salary_contest_type"] = salary_type
+    result["contest_type_matches"] = salary_type == standings_type
+    if not result["contest_type_matches"]:
+        return result
+    seen = matched = 0
+    drafted_teams: set = set()
+    for entry in standings.get("entries") or []:
+        if not entry.get("lineup_complete"):
+            continue
+        for slot, name in entry["lineup"]:
+            nm = normalize_name(name)
+            seen += 1
+            rec = smap.get(f"{nm}|{slot}") or smap.get(nm)
+            if rec:
+                matched += 1
+                if rec.get("team"):
+                    drafted_teams.add(rec["team"])
+    result["join_rate"] = round(matched / seen, 4) if seen else 0.0
+    result["references"] = seen
+
+    # Join rate alone cannot tell a correct file from a SUPERSET of it. On
+    # 2026-07-24 the night slate's four games were all inside the main slate's
+    # ten, so a night contest joined 100% against both files. The asymmetry that
+    # does discriminate: a field drafting from the whole draftgroup touches
+    # nearly every team in its own salary file, and only a fraction of the teams
+    # in a larger one. The reverse direction needs no help, because a main-slate
+    # contest cannot join at all against a file missing six of its games.
+    salary_teams = {v["team"] for k, v in smap.items()
+                    if not k.startswith("__") and v.get("team")}
+    result["salary_teams"] = len(salary_teams)
+    # The same slate is routinely on disk several times: the staged copy, the
+    # promoted run's inputs, the archived copy. Those are not competing answers,
+    # so identify a candidate by what it CONTAINS rather than where it lives.
+    result["signature"] = hash(frozenset(
+        (k, v["salary"]) for k, v in smap.items() if not k.startswith("__")))
+    result["drafted_teams"] = len(drafted_teams)
+    result["team_coverage"] = (round(len(drafted_teams) / len(salary_teams), 4)
+                               if salary_teams else 0.0)
+    result["usable"] = (result["join_rate"] >= MIN_AUTO_JOIN_RATE
+                        and result["team_coverage"] >= MIN_AUTO_TEAM_COVERAGE)
+    return result
+
+
+def resolve_salary_file(standings: Dict[str, Any],
+                        candidates: Sequence[str]) -> Dict[str, Any]:
+    """Pick the salary file that actually belongs to this contest, or refuse.
+
+    Contest type is read off the standings, so the only open question is WHICH
+    slate's salary file this is. On 2026-07-24 a single date carried three
+    draftgroups plus a Showdown, and the ten Classic exports needed two
+    different salary files; matching them by hand is the last step in the
+    archival loop where a human can pick the wrong file and get plausible
+    numbers instead of an error.
+
+    Returns ``{"path": str|None, "reason": str, "scored": [...]}``. A None path
+    means mine the standings_only tier: ownership, duplication, chalk, and SP
+    pairs all survive without salary, and that is strictly better than joining
+    against the wrong slate.
+    """
+    scored = sorted(
+        (score_salary_candidate(standings, path) for path in candidates),
+        key=lambda s: (-s["join_rate"], -s.get("team_coverage", 0.0), s["path"]),
+    )
+    usable = [s for s in scored if s["usable"]]
+    if not usable:
+        best = scored[0] if scored else None
+        detail = (f"best candidate {Path(best['path']).name} joined "
+                  f"{best['join_rate']:.0%} with "
+                  f"{best.get('team_coverage', 0.0):.0%} team coverage"
+                  if best else "no candidates supplied")
+        return {"path": None, "scored": scored,
+                "reason": (f"no salary file joined at least {MIN_AUTO_JOIN_RATE:.0%} "
+                           f"({detail}); mine the standings_only tier or supply "
+                           "--salary explicitly")}
+    if len(usable) > 1 and (usable[0]["join_rate"] - usable[1]["join_rate"]) < MIN_AUTO_JOIN_MARGIN:
+        # Two files price this contest equally well. Usually they are the same
+        # slate on disk in two places, which is not a decision at all. Only a
+        # genuine difference in the player universe is ambiguous, and guessing
+        # there is how evidence gets silently mislabeled.
+        tied = [u for u in usable
+                if usable[0]["join_rate"] - u["join_rate"] < MIN_AUTO_JOIN_MARGIN]
+        if len({u["signature"] for u in tied}) > 1:
+            names = sorted({Path(u["path"]).name for u in tied})
+            return {"path": None, "scored": scored,
+                    "reason": (f"ambiguous: {', '.join(names)} differ in content but "
+                               f"both join at {usable[0]['join_rate']:.0%}; supply "
+                               "--salary explicitly")}
+    return {"path": usable[0]["path"], "scored": scored,
+            "reason": f"joined {usable[0]['join_rate']:.0%} of player references"}
+
+
+def default_salary_candidates(root: Path) -> List[str]:
+    """Every salary CSV the repo has on disk, newest first.
+
+    Promoted run inputs are the authoritative copies because they are what the
+    build actually used; staged slate files and archived copies fill the gaps.
+    """
+    root = Path(root)
+    seen: List[Path] = []
+    for pattern in ("runs/*/inputs/DKSalaries*.csv",
+                    "data/slates/*/DKSalaries*.csv",
+                    "data/archive/*/DKSalaries*.csv"):
+        seen.extend(root.glob(pattern))
+    return [str(p) for p in sorted(set(seen), key=lambda p: -p.stat().st_mtime)]
 
 
 # ---------------------------------------------------------------------------
@@ -943,6 +1087,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--standings")
     ap.add_argument("--salary", help="slate salary CSV; omit to run the standings_only degraded tier")
+    ap.add_argument("--auto-salary", action="store_true",
+                    help="pick the salary CSV by scoring candidates against this "
+                         "contest's lineups; declines to standings_only rather "
+                         "than joining against the wrong slate")
+    ap.add_argument("--salary-dir",
+                    help="restrict --auto-salary to DKSalaries*.csv in this "
+                         "directory (default: every salary CSV in the repo)")
     ap.add_argument("--contest-id", default="")
     ap.add_argument("--slate-date", default="")
     ap.add_argument("--registry")
@@ -955,8 +1106,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.standings:
         ap.error("--standings is required (or --selftest)")
     st = parse_standings_export(args.standings)
-    if args.salary:
-        smap: Optional[Dict[str, Dict[str, Any]]] = load_salary_map(args.salary)
+    salary_path = args.salary
+    if not salary_path and args.auto_salary:
+        root = Path(__file__).resolve().parents[2]
+        candidates = ([str(p) for p in sorted(Path(args.salary_dir).glob("DKSalaries*.csv"))]
+                      if args.salary_dir else default_salary_candidates(root))
+        resolved = resolve_salary_file(st, candidates)
+        salary_path = resolved["path"]
+        if salary_path:
+            print(f"salary auto-resolved: {Path(salary_path).name} "
+                  f"({resolved['reason']})")
+        else:
+            print(f"NOTICE: salary auto-resolution declined: {resolved['reason']}")
+    if salary_path:
+        smap: Optional[Dict[str, Dict[str, Any]]] = load_salary_map(salary_path)
     else:
         smap = None
         print("NOTICE: no --salary supplied; running the standings_only degraded tier "

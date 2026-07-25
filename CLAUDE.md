@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  13 modules  167 tests`. The quick form of the suite
+   `PASS  v2.26.0  13 modules  171 tests`. The quick form of the suite
    alone is `python -m unittest tests.test_core`. The audit checks
    dependencies first and names the install command, because a missing
    solver is not a slow build, it is no build.
@@ -114,14 +114,31 @@ inbox and remind him which contests still need a manual pull. Commit with a
 descriptive message when a task changes tracked files.
 
 ## Post-slate
+The inbox is FLAT. Do not sort it into per-contest-type folders: the miner
+reads Classic vs Showdown off the lineup cells, and a folder is a second
+copy of that fact that can disagree with the first.
+
 For each standings CSV in data/standings/inbox/: run
-`python -m mlb_engine.field.field_miner` with --registry and --emit-ledger, run the
-verification checklist (utf-8-sig read, salary join rate investigated,
-ownership recompute within 1.5 points of %Drafted, duplication table
-present, contest JSON complete), append the emitted block to the ledger
-archive, update the registry, move files to data/archive/<date>/, commit.
-Ownership and outcome counts are conditioned on contest archetype and
-field size, never pooled across them.
+`python -m mlb_engine.field.field_miner` with --auto-salary, --registry and
+--emit-ledger, run the verification checklist (utf-8-sig read, salary join
+rate investigated, ownership recompute within 1.5 points of %Drafted,
+duplication table present, contest JSON complete), append the emitted block
+to the ledger archive, update the registry, move files to
+data/archive/<date>/, commit. Ownership and outcome counts are conditioned
+on contest archetype and field size, never pooled across them.
+
+--auto-salary scores every salary CSV on disk against the contest's own
+lineups and picks the one that fits, or declines to the standings_only tier
+rather than joining the wrong slate. Join rate alone is not enough: one date
+carries several draftgroups and a small one can sit entirely inside a larger
+one, so the resolver also requires the field to have drafted nearly every
+team in the candidate file. Identical copies of one slate are one answer;
+two files that differ in content and fit equally well are reported as
+ambiguous and need an explicit --salary.
+
+The structural gate is hard and fail-closed: a zero parse, an unparsed share
+over 20%, or a standings/salary contest-type mismatch all block archiving.
+Never archive downstream of a PARSE FAILURE or WRONG SALARY FILE note.
 
 ## Showdown (active after Phase 3)
 Roster contracts live in mlb_engine/optimize/roster_contracts.py. Classic
