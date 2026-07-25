@@ -2225,6 +2225,165 @@ class BuildSlatePoolTests(unittest.TestCase):
             self.assertTrue(any("postponed" in w for w in report["warnings"]))
             self.assertEqual(report["blockers"], [])
 
+    def test_pool_ignores_feed_teams_outside_the_draftgroup(self):
+        """The feed covers the whole day; the salary file defines the slate.
+
+        Regression for 2026-07-24, when a 15-game feed against a 4-game
+        draftgroup produced 22 "0/9 salary hitters" warnings about teams that
+        could never have been in the pool, burying the real ones.
+        """
+        feed = pool_lineups_feed()
+        extra = dict(feed["games"][0])
+        extra["game_pk"] = 3
+        extra["away"] = {"team_abbrev": "T7", "lineup_status": "confirmed",
+                         "probable_pitcher": {"name": "T7 Ace", "hand": "R", "id": 600007},
+                         "lineup": [{"name": f"T7 Hitter{i+1}", "order": i + 1}
+                                    for i in range(9)]}
+        extra["home"] = {"team_abbrev": "T8", "lineup_status": "confirmed",
+                         "probable_pitcher": {"name": "T8 Ace", "hand": "R", "id": 600008},
+                         "lineup": [{"name": f"T8 Hitter{i+1}", "order": i + 1}
+                                    for i in range(9)]}
+        feed["games"] = feed["games"] + [extra]
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, feed=feed)["pool_report"]
+            noise = [w for w in report["warnings"] if "T7" in w or "T8" in w]
+            self.assertEqual(noise, [])
+            self.assertNotIn("T7", report["teams"])
+            self.assertNotIn("T8", report["teams"])
+            self.assertEqual(report["blockers"], [])
+
+    def test_pool_confirmed_team_crosswalk_failure_is_blocker(self):
+        """A posted lineup that matches almost no salary rows is a join failure.
+
+        Building anyway substitutes a projected or APPG order while the real
+        lineup sits unused, and the certified file cannot show that happened.
+        """
+        ghosted = pool_lineups_feed()
+        ghosted["games"][0]["away"]["lineup"] = [
+            {"name": f"T1 Ghost{i+1}", "order": i + 1} for i in range(9)]
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, feed=ghosted)["pool_report"]
+            self.assertTrue(any("T1" in b and "crosswalk" in b
+                                for b in report["blockers"]), report["blockers"])
+
+        # Boundary: 5 of 9 matched is thin data, not a join failure. Warning only.
+        partial = pool_lineups_feed()
+        for i in range(4):
+            partial["games"][0]["away"]["lineup"][i]["name"] = f"T1 Ghost{i+1}"
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, feed=partial)["pool_report"]
+            self.assertTrue(any("T1: confirmed lineup matched 5/9" in w
+                                for w in report["warnings"]), report["warnings"])
+            self.assertFalse(any("T1" in b for b in report["blockers"]))
+
+    def test_pool_blocks_when_feed_does_not_cover_the_draftgroup(self):
+        """Keyed on game coverage, never on how many lineups have posted.
+
+        An early build legitimately has zero confirmed teams and must not be
+        blocked for it; a feed missing the slate's games entirely is a different
+        thing and means the wrong feed was passed.
+        """
+        half = pool_lineups_feed()
+        half["games"] = half["games"][:1]          # slate has T3@T4, feed does not
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, feed=half)["pool_report"]
+            self.assertTrue(any("does not match this draftgroup" in b
+                                for b in report["blockers"]), report["blockers"])
+
+        # One missing team out of four is a warning, not a blocker.
+        mostly = pool_lineups_feed()
+        mostly["games"][1]["home"]["team_abbrev"] = "T9"
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, feed=mostly)["pool_report"]
+            self.assertFalse(any("does not match this draftgroup" in b
+                                 for b in report["blockers"]), report["blockers"])
+            self.assertTrue(any("absent from the lineups feed" in w and "T4" in w
+                                for w in report["warnings"]), report["warnings"])
+
+        # Nothing posted yet: all teams tbd, feed still covers the games.
+        unposted = pool_lineups_feed()
+        for game in unposted["games"]:
+            for team_side in ("away", "home"):
+                game[team_side]["lineup_status"] = "tbd"
+                game[team_side]["lineup"] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, feed=unposted)["pool_report"]
+            self.assertFalse(any("does not match this draftgroup" in b
+                                 for b in report["blockers"]), report["blockers"])
+
+
+class BuildSlateScriptTests(unittest.TestCase):
+    """Covers the two pure helpers in the generate-lineups build script.
+
+    The script is the production front door but had no test harness; its
+    top-level imports are stdlib only, so it loads without the engine.
+    """
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_feed_age_minutes_reads_fetched_at(self):
+        import datetime as dt
+        mod = self._module()
+        self.assertIsNone(mod.feed_age_minutes({}))
+        self.assertIsNone(mod.feed_age_minutes({"fetched_at": "not a time"}))
+        recent = (dt.datetime.now(dt.timezone.utc)
+                  - dt.timedelta(minutes=30)).isoformat().replace("+00:00", "Z")
+        self.assertAlmostEqual(mod.feed_age_minutes({"fetched_at": recent}), 30.0, delta=1.0)
+
+    def test_verify_classic_enforces_dk_team_and_game_rules(self):
+        mod = self._module()
+        header = ["Position", "Name + ID", "Name", "ID", "Roster Position", "Salary",
+                  "Game Info", "AvgPointsPerGame", "TeamAbbrev"]
+        slots = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+
+        def write(tmp, teams, games):
+            salary = Path(tmp) / "s.csv"
+            with salary.open("w", newline="") as fh:
+                w = csv.writer(fh)
+                w.writerow(header)
+                for i, slot in enumerate(slots):
+                    w.writerow([slot, f"P{i} ({i})", f"P{i}", i, slot, 4000,
+                                f"{games[i]} 07/10/2026 07:05PM ET", 8.0, teams[i]])
+            entries = Path(tmp) / "e.csv"
+            with entries.open("w", newline="") as fh:
+                w = csv.writer(fh)
+                w.writerow(["Entry ID", "Contest Name", "Contest ID", "Entry Fee"] + slots)
+                w.writerow(["1", "c", "2", "$1"] + [str(i) for i in range(10)])
+            return salary, entries
+
+        # Six hitters from one team: over the DK cap of five.
+        stacked = ["A", "B"] + ["H"] * 6 + ["Z", "Z"]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = write(tmp, stacked, ["A@B"] * 2 + ["H@Z"] * 8)
+            result = mod.verify_classic(salary, entries)
+            self.assertFalse(result["passed"])
+            self.assertTrue(any("more than 5 hitters" in f for f in result["failures"]),
+                            result["failures"])
+
+        # Every player from a single game: DK requires at least two.
+        with tempfile.TemporaryDirectory() as tmp:
+            teams = ["A", "B", "A", "B", "A", "B", "A", "B", "A", "B"]
+            salary, entries = write(tmp, teams, ["A@B"] * 10)
+            result = mod.verify_classic(salary, entries)
+            self.assertTrue(any("DK requires 2" in f for f in result["failures"]),
+                            result["failures"])
+
+        # A legal lineup across two games passes both new checks.
+        with tempfile.TemporaryDirectory() as tmp:
+            teams = ["A", "C", "A", "A", "A", "A", "C", "C", "C", "C"]
+            salary, entries = write(tmp, teams, ["A@B"] * 6 + ["C@D"] * 4)
+            result = mod.verify_classic(salary, entries)
+            self.assertEqual([f for f in result["failures"]
+                              if "hitters" in f or "game(s)" in f], [])
+
 
 class PctFloorAndClockPipelineTests(unittest.TestCase):
     def test_slate_feasibility_emits_pct_floors(self):
