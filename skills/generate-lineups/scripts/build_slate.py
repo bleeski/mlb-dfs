@@ -179,6 +179,44 @@ def preserve_prior_slate(paths, tag: str) -> list:
     return moved
 
 
+def fetch_handedness(player_ids) -> dict:
+    """Map MLBAM id -> {"bat": code, "pitch": code} for the supplied players.
+
+    The schedule hydrate returns lineup players and probable pitchers as id +
+    fullName only, with no handedness on either. That left ``bat_side`` absent on
+    every hitter and ``hand`` None on every probable, so BOTH inputs to the F4
+    platoon prior were missing and the component was structurally dead no matter
+    how well the rest of the enrichment was wired. One batched /people call
+    supplies both. Failure is non-fatal: F4's team-level opposing-SP quality
+    component still applies and only the platoon multiplier goes neutral.
+    """
+    ids = sorted({str(p) for p in player_ids if p})
+    if not ids:
+        return {}
+    out: dict = {}
+    base = "https://statsapi.mlb.com/api/v1"
+    for start in range(0, len(ids), 250):  # keep the query string sane
+        chunk = ",".join(ids[start:start + 250])
+        url = (f"{base}/people?personIds={chunk}"
+               "&fields=people,id,batSide,pitchHand,code")
+        try:
+            with urllib.request.urlopen(url, timeout=20) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:
+            print(f"handedness hydrate failed ({exc}); F4 platoon component will "
+                  "be neutral for this build", file=sys.stderr)
+            continue
+        for person in payload.get("people") or []:
+            entry = {}
+            for key, field in (("bat", "batSide"), ("pitch", "pitchHand")):
+                code = str(((person.get(field) or {}).get("code") or "")).strip().upper()
+                if code in ("L", "R", "S"):
+                    entry[key] = code
+            if entry:
+                out[str(person.get("id"))] = entry
+    return out
+
+
 def fetch_lineups(date: str, dest: Path) -> dict:
     """Minimal MLB Stats API pull, used only when no feed was supplied.
 
@@ -221,6 +259,29 @@ def fetch_lineups(date: str, dest: Path) -> dict:
                 "away": side("away", "awayPlayers"),
                 "home": side("home", "homePlayers"),
             })
+
+    # Attach handedness so extract_batter_hands and extract_opposing_probables
+    # have something to read. Both are inputs to the F4 platoon prior.
+    wanted = []
+    for game_entry in games:
+        for team_side in (game_entry["away"], game_entry["home"]):
+            wanted += [h.get("id") for h in team_side["lineup"]]
+            probable = team_side.get("probable_pitcher") or {}
+            if probable.get("id"):
+                wanted.append(probable["id"])
+    hand_by_id = fetch_handedness(wanted)
+    for game_entry in games:
+        for team_side in (game_entry["away"], game_entry["home"]):
+            for hitter in team_side["lineup"]:
+                code = (hand_by_id.get(str(hitter.get("id"))) or {}).get("bat")
+                if code:
+                    hitter["bat_side"] = code
+            probable = team_side.get("probable_pitcher") or {}
+            if probable and not probable.get("hand"):
+                code = (hand_by_id.get(str(probable.get("id"))) or {}).get("pitch")
+                if code:
+                    probable["hand"] = code
+
     feed = {"date": date, "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "games": games}
     dest.write_text(json.dumps(feed), encoding="utf-8")
@@ -338,6 +399,165 @@ def verify_classic(salary_csv: Path, entries_csv: Path) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Projection enrichment. Everything below exists because a build that skips it
+# certifies exactly as cleanly as one that does not: with no reference data the
+# engine ranks players on AvgPointsPerGame times a batting-order factor and
+# nothing else, and no gate anywhere in the pipeline can tell the difference.
+# The enrichments themselves already exist and are tested; the only thing that
+# was ever missing on this path was the wiring.
+# --------------------------------------------------------------------------- #
+def resolve_reference_data(args) -> dict:
+    """Locate the enrichment inputs and report how fresh they are.
+
+    Returns a dict with the three CSV paths (None when absent or when
+    enrichment is disabled) plus the status block that rides into the brief.
+    Missing or stale files never block a build: degraded signal beats no
+    lineups at T-10. They are loud instead, in the brief and on stderr.
+    """
+    status: dict = {"enabled": bool(getattr(args, "enrichment", True))}
+    if not status["enabled"]:
+        status["note"] = ("enrichment disabled with --no-enrichment; this build "
+                          "ranks on AvgPointsPerGame x batting-order factor only")
+        print(f"enrichment: {status['note']}", file=sys.stderr)
+        return {"savant_batting": None, "savant_pitching": None,
+                "fangraphs_pitching": None, "status": status}
+
+    try:
+        from tools.refresh_reference_data import reference_status
+        report = reference_status(
+            Path(getattr(args, "reference_dir", None) or (REPO / "data" / "reference")),
+            max_age_days=getattr(args, "reference_max_age_days", 14.0),
+        )
+    except Exception as exc:  # a reporting failure must never kill a build
+        status["note"] = f"reference-data status unavailable ({exc}); enrichment OFF"
+        print(f"enrichment: {status['note']}", file=sys.stderr)
+        return {"savant_batting": None, "savant_pitching": None,
+                "fangraphs_pitching": None, "status": status}
+
+    files = report["files"]
+    status.update({
+        "files": {name: {"age_days": info["age_days"], "stale": info["stale"],
+                         "exists": info["exists"]}
+                  for name, info in files.items()},
+        "warnings": list(report["warnings"]),
+        "any_stale": report["any_stale"],
+    })
+    for warning in status["warnings"]:
+        print(f"enrichment warning: {warning}", file=sys.stderr)
+
+    def usable(name: str):
+        info = files.get(name) or {}
+        return info["path"] if info.get("exists") else None
+
+    return {
+        "savant_batting": usable("expected_stats_batting.csv"),
+        "savant_pitching": usable("expected_stats_pitching.csv"),
+        "fangraphs_pitching": usable("fangraphs_season_pitching.csv"),
+        "status": status,
+    }
+
+
+def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
+    """Return ({Player_ID: F4}, report) for the pool's hitters, or ({}, report).
+
+    F4 is the deterministic matchup prior: opposing-SP xwOBA-against quality
+    times a platoon hand factor, PA-shrunk and clipped. The SP-quality component
+    applies team-wide even when batter hands are missing, so a TBD lineup still
+    receives it. It is a labeled prior, never a win-rate or probability claim.
+    """
+    from mlb_engine.projections.projection_builder import (
+        compute_f4_factors, load_savant_expected_stats,
+    )
+
+    team_by_player_id = pool.get("team_by_player_id") or {}
+    opposing = pool.get("opposing_probables") or {}
+    if not team_by_player_id:
+        return {}, {"skipped": "no hitters in the pool"}
+
+    table = None
+    if savant_pitching_csv:
+        try:
+            table = load_savant_expected_stats(savant_pitching_csv)
+        except Exception as exc:
+            return {}, {"skipped": f"savant pitching table unreadable: {exc}"}
+
+    f4, report = compute_f4_factors(
+        team_by_player_id, opposing, table, pool.get("batter_hands") or {},
+    )
+    non_neutral = sum(1 for v in f4.values() if abs(float(v) - 1.0) > 1e-9)
+    report["non_neutral_f4"] = non_neutral
+    if f4 and non_neutral == 0:
+        # Not fatal, but it means every hitter got the neutral factor, which is
+        # indistinguishable from not computing F4 at all. Say so.
+        report["warning"] = (
+            "F4 computed for "
+            f"{len(f4)} hitters but every value is neutral 1.0; the opposing-SP "
+            "quality and platoon components both found nothing to apply"
+        )
+    return f4, report
+
+
+def summarize_enrichment(reference_status: dict, enrichment: dict,
+                         f4_report: dict, degraded_reason) -> dict:
+    """Condense the enrichment record into the block the brief carries.
+
+    The one question this has to answer at a glance is whether this build had
+    signal or was APPG in a ceiling costume. ``signal_applied`` is that answer:
+    it is True only when at least one factor moved at least one player off
+    neutral.
+    """
+    enrichment = enrichment or {}
+    xwoba = enrichment.get("xwoba") or {}
+    ceiling = enrichment.get("ceiling") or {}
+    pitcher_ceiling = enrichment.get("pitcher_ceiling") or {}
+    non_neutral_f4 = int(f4_report.get("non_neutral_f4") or 0)
+
+    counts = {
+        "xwoba_non_neutral": int(xwoba.get("non_neutral_applied") or 0),
+        "xwoba_match_rate": xwoba.get("match_rate"),
+        "hitter_ceiling_differentiated": int(ceiling.get("differentiated_rows") or 0),
+        "pitcher_ceiling_differentiated": int(
+            pitcher_ceiling.get("differentiated_rows")
+            or pitcher_ceiling.get("matched") or 0),
+        "f4_non_neutral": non_neutral_f4,
+        "f4_hitters_scored": int(f4_report.get("hitters_scored") or 0),
+        "f4_platoon_applied": int(f4_report.get("platoon_component_applied") or 0),
+        "f1_non_neutral": 0,
+        "f5_non_neutral": 0,
+    }
+    warnings = list(reference_status.get("warnings") or [])
+    warnings += list(enrichment.get("warnings") or [])
+    for key in ("warning", "skipped"):
+        if f4_report.get(key):
+            warnings.append(f"f4: {f4_report[key]}")
+    teams_without = f4_report.get("teams_without_opposing_probable") or []
+    if teams_without:
+        warnings.append(
+            "f4: no opposing probable for " + ", ".join(sorted(teams_without))
+            + "; those hitters stay neutral")
+    if degraded_reason:
+        warnings.append(f"DEGRADED to unenriched build: {degraded_reason}")
+
+    signal = any(counts[k] for k in (
+        "xwoba_non_neutral", "hitter_ceiling_differentiated",
+        "pitcher_ceiling_differentiated", "f4_non_neutral"))
+    return {
+        "signal_applied": bool(signal),
+        "degraded": bool(degraded_reason),
+        "degraded_reason": degraded_reason,
+        "reference_data": reference_status,
+        "counts": counts,
+        "f4_league_mean_est_woba": f4_report.get("league_mean_est_woba"),
+        "warnings": warnings,
+        "note": "Enrichment counts are deterministic labeled priors applied to the "
+                "projection frame: xwOBA Base correction, xISO hitter ceilings, "
+                "K-rate pitcher ceilings, and the F4 opposing-SP/platoon matchup "
+                "factor. Never ROI, win rate, or a probability claim. F1 (Vegas "
+                "totals) and F5 (weather) are not wired yet and report 0.",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Classic
 # --------------------------------------------------------------------------- #
 def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
@@ -354,10 +574,47 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     kwargs = pool["run_slate_kwargs"]
 
     n_entries = args.entries or count_reserved(entries)
-    projections, _ = _assemble_projection_frame(
-        str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
-        projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
+
+    reference = resolve_reference_data(args)
+    f4_by_player_id, f4_report = build_f4_map(pool, reference["savant_pitching"])
+    if f4_report.get("warning"):
+        print(f"enrichment warning: {f4_report['warning']}", file=sys.stderr)
+
+    # Assemble the frame WITH the enrichments. This frame is not just the timing
+    # probe: on the sliced-bank path it is the frame every cached candidate is
+    # built from, so enriching it here is what puts the signal in the portfolio.
+    enrich_kwargs = dict(
+        savant_batting_csv=reference["savant_batting"],
+        savant_pitching_csv=reference["savant_pitching"],
+        fangraphs_pitching_csv=reference["fangraphs_pitching"],
+        f4_by_player_id=f4_by_player_id or None,
     )
+    degraded_reason = None
+    try:
+        projections, enrichment = _assemble_projection_frame(
+            str(salary), kwargs["projection_rows"], "emergency_proxy",
+            enrich_kwargs["savant_batting_csv"], enrich_kwargs["savant_pitching_csv"],
+            None,
+            projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
+            f4_by_player_id=enrich_kwargs["f4_by_player_id"],
+            fangraphs_pitching_csv=enrich_kwargs["fangraphs_pitching_csv"],
+        )
+    except ValueError as exc:
+        # The engine's zero-match guards raise rather than build a silent no-op.
+        # That is the right call at the library layer and the wrong outcome at
+        # T-10, so degrade to the unenriched frame and make the reason impossible
+        # to miss. A shipped build on bare APPG that SAYS it is on bare APPG is
+        # honest; a killed slate is not a better answer.
+        degraded_reason = str(exc)
+        print(f"ENRICHMENT FAILED, building unenriched: {degraded_reason}",
+              file=sys.stderr)
+        enrich_kwargs = dict(savant_batting_csv=None, savant_pitching_csv=None,
+                             fangraphs_pitching_csv=None, f4_by_player_id=None)
+        f4_by_player_id = {}
+        projections, enrichment = _assemble_projection_frame(
+            str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
+            projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
+        )
 
     # Decide the strategy from a measurement, never from a guess. The rule that
     # matters: an infrastructure limit may reduce search effort, never the legal
@@ -416,6 +673,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         salary_csv=str(salary), entries_csv=str(entries),
         approve=True, requested_n=n_entries,
         candidates_override=candidates,
+        # Same enrichment inputs the probe frame used. run_slate reassembles the
+        # frame internally, so passing anything less here would build the bank on
+        # enriched projections and then certify against unenriched ones.
+        **enrich_kwargs,
         # Always bounded, even on the direct path. The estimate above decides
         # strategy; this makes a wrong estimate degrade to a smaller bank instead
         # of a killed process that leaves nothing behind.
@@ -482,6 +743,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "exposure": exposure,
         "verification": checks,
         "controls_override_applied": args.controls_override,
+        "enrichment": summarize_enrichment(
+            reference["status"], enrichment, f4_report, degraded_reason),
     }
     return (0 if checks["passed"] else 3), brief
 
@@ -678,6 +941,19 @@ def main() -> int:
                          "Showdown reads \"max_cpt_exposure_pct\" from the same "
                          "dict (default 0.35) to cap how much of the bank a "
                          "single captain can fill; pass null to disable it.")
+    ap.add_argument("--reference-dir", default=None,
+                    help="directory holding the projection enrichment inputs "
+                         "(default data/reference/)")
+    ap.add_argument("--reference-max-age-days", type=float, default=14.0,
+                    help="warn in the brief when an enrichment input is older "
+                         "than this (default 14). Stale inputs are still used; "
+                         "they are reported, not blocked.")
+    ap.add_argument("--no-enrichment", dest="enrichment", action="store_false",
+                    help="build on AvgPointsPerGame x batting-order factor only, "
+                         "skipping the xwOBA correction, xISO and K-rate ceilings, "
+                         "and the F4 matchup factor. For reproducing an old build; "
+                         "not for live slates.")
+    ap.set_defaults(enrichment=True)
     ap.add_argument("--feed-max-age-minutes", type=float, default=90.0,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "

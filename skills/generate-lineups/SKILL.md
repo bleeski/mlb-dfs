@@ -74,9 +74,31 @@ before lock, run them first and pass the results in:
 - **mlb-lineups** for confirmed lineups, batting order, and pitcher handedness.
   Save the JSON and pass `--lineups <path>`.
 - **mlb-game-odds** for moneylines, run lines, and totals. Save it and pass
-  `--odds <path>`. Odds do not change the build; they give you the game
-  environment to describe in the brief, which is what makes the brief worth
-  reading.
+  `--odds <path>`. Odds still do not reach the projections: F1 is 1.0 for every
+  player until the Vegas-totals factor is wired (open item I-2). For now they
+  give you the game environment to describe in the brief. Do not tell Ben the
+  build priced a Coors game differently, because it did not.
+
+### Projection enrichment (this is what makes the build more than APPG)
+
+The build applies four deterministic priors: the xwOBA Base correction, xISO
+hitter ceilings, K-rate pitcher ceilings, and the F4 opposing-SP-quality and
+platoon matchup factor. They read three files in `data/reference/`. Refresh them
+when the brief says they are stale:
+
+```bash
+python tools/refresh_reference_data.py     # pulls Savant, reports all three
+```
+
+Savant is fetched over HTTP. FanGraphs stays manual by decision; the tool prints
+the export URL and reports the file's age rather than fetching it.
+
+Read `enrichment.signal_applied` in the brief before you present anything. False
+means this build ranked players on `AvgPointsPerGame x batting-order factor` and
+nothing else, which is a materially weaker portfolio, and Ben should be told
+plainly rather than handed a certified file that looks identical to a good one.
+`enrichment.counts` says which factors moved players and by how many; F1 and F5
+report 0 because they are not wired yet.
 
 Fresher lineups matter most. A team that has posted since the last pull moves from
 a projected batting order to a confirmed one, which is strictly better information.
@@ -301,7 +323,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 149 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 157 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

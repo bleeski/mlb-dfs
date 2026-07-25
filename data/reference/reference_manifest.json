@@ -1,0 +1,16 @@
+{
+ "files": {
+  "expected_stats_batting.csv": {
+   "fetched_at": "2026-07-25T17:21:09.388161+00:00",
+   "rows": 602,
+   "source": "baseballsavant expected_statistics batter 2026 min=1"
+  },
+  "expected_stats_pitching.csv": {
+   "fetched_at": "2026-07-25T17:21:09.693608+00:00",
+   "rows": 757,
+   "source": "baseballsavant expected_statistics pitcher 2026 min=1"
+  }
+ },
+ "manifest_version": "1.0.0",
+ "note": "Fetched-date stamps for the projection enrichment inputs. Written by tools/refresh_reference_data.py; read by the build to decide whether the enrichment inputs are fresh enough to trust. Files with no entry here fall back to filesystem mtime, which is a floor on their true age."
+}

@@ -2385,6 +2385,201 @@ class BuildSlateScriptTests(unittest.TestCase):
                               if "hitters" in f or "game(s)" in f], [])
 
 
+class BuildSlateEnrichmentWiringTests(unittest.TestCase):
+    """The I-1 gap: enrichment that exists, is tested, and reaches no build.
+
+    Distinct from ProjectionEnrichmentWiringTests above, which covers the engine
+    layer. These cover the SCRIPT layer, which is where the gap actually was.
+
+    Production builds ranked players on AvgPointsPerGame times a batting-order
+    factor because the script that builds slates never passed the Savant CSVs,
+    the FanGraphs CSV, or an F4 map to the engine. Nothing downstream could
+    detect that, because a certified file built on bare APPG is indistinguishable
+    at certification time from one built on real signal. These tests drive the
+    script path specifically, so the wiring cannot silently come undone again.
+    """
+
+    @staticmethod
+    def _module():
+        return BuildSlateScriptTests._module()
+
+    @staticmethod
+    def _args(**overrides):
+        import types
+        base = dict(enrichment=True, reference_dir=None, reference_max_age_days=14.0)
+        base.update(overrides)
+        return types.SimpleNamespace(**base)
+
+    def _reference_dir(self, tmp, ages=None, missing=()):
+        """A reference directory whose files carry controlled fetch stamps."""
+        import datetime as dt
+        root = Path(tmp) / "reference"
+        root.mkdir(parents=True, exist_ok=True)
+        names = ["expected_stats_batting.csv", "expected_stats_pitching.csv",
+                 "fangraphs_season_pitching.csv"]
+        files = {}
+        now = dt.datetime.now(dt.timezone.utc)
+        for name in names:
+            if name in missing:
+                continue
+            (root / name).write_text("placeholder\n", encoding="utf-8")
+            age = (ages or {}).get(name, 0.0)
+            files[name] = {"fetched_at": (now - dt.timedelta(days=age)).isoformat()}
+        (root / "reference_manifest.json").write_text(
+            json.dumps({"files": files}), encoding="utf-8")
+        return root
+
+    def test_resolve_reference_data_reports_ages_and_returns_paths(self):
+        mod = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._reference_dir(tmp)
+            ref = mod.resolve_reference_data(self._args(reference_dir=str(root)))
+            self.assertTrue(ref["savant_batting"])
+            self.assertTrue(ref["savant_pitching"])
+            self.assertTrue(ref["fangraphs_pitching"])
+            self.assertTrue(ref["status"]["enabled"])
+            self.assertFalse(ref["status"]["any_stale"])
+            self.assertEqual(ref["status"]["warnings"], [])
+
+    def test_stale_and_missing_reference_data_warn_without_blocking(self):
+        """Degraded signal beats no lineups at T-10, but it is never silent."""
+        mod = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._reference_dir(
+                tmp, ages={"expected_stats_batting.csv": 40.0},
+                missing=("fangraphs_season_pitching.csv",))
+            ref = mod.resolve_reference_data(self._args(reference_dir=str(root)))
+            self.assertTrue(ref["savant_batting"])          # stale is still used
+            self.assertIsNone(ref["fangraphs_pitching"])    # missing is not
+            self.assertTrue(ref["status"]["any_stale"])
+            joined = " ".join(ref["status"]["warnings"])
+            self.assertIn("expected_stats_batting.csv", joined)
+            self.assertIn("fangraphs_season_pitching.csv", joined)
+
+    def test_no_enrichment_flag_returns_no_paths(self):
+        mod = self._module()
+        ref = mod.resolve_reference_data(self._args(enrichment=False))
+        self.assertFalse(ref["status"]["enabled"])
+        self.assertIsNone(ref["savant_batting"])
+        self.assertIsNone(ref["savant_pitching"])
+        self.assertIsNone(ref["fangraphs_pitching"])
+
+    def test_build_f4_map_applies_sp_quality_and_platoon(self):
+        """A tough opposing SP must discount hitters relative to a soft one."""
+        mod = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            pitching = Path(tmp) / "pitching.csv"
+            # est_woba against: 0.360 is hittable, 0.260 is not. Both well over
+            # the PA-shrinkage threshold so neither is pulled back to neutral.
+            pitching.write_text(
+                "player_id,pa,woba,est_woba\n"
+                "1001,600,0.360,0.360\n"
+                "1002,600,0.260,0.260\n",
+                encoding="utf-8")
+            pool = {
+                "team_by_player_id": {"h1": "AAA", "h2": "BBB"},
+                "opposing_probables": {
+                    "AAA": {"id": "1001", "name": "Soft Tosser", "hand": "R"},
+                    "BBB": {"id": "1002", "name": "Ace", "hand": "R"},
+                },
+                "batter_hands": {"h1": "L", "h2": "L"},
+            }
+            f4, report = mod.build_f4_map(pool, str(pitching))
+            self.assertGreater(f4["h1"], f4["h2"])
+            self.assertEqual(report["hitters_scored"], 2)
+            self.assertEqual(report["non_neutral_f4"], 2)
+            # Both hitters are L vs R, so the platoon component must be live.
+            self.assertEqual(report["platoon_component_applied"], 2)
+
+    def test_build_f4_map_stays_neutral_without_an_opposing_probable(self):
+        mod = self._module()
+        f4, report = mod.build_f4_map(
+            {"team_by_player_id": {"h1": "AAA"}, "opposing_probables": {},
+             "batter_hands": {}}, None)
+        self.assertEqual(f4, {"h1": 1.0})
+        self.assertIn("AAA", report["teams_without_opposing_probable"])
+        self.assertIn("neutral", report["warning"])
+
+    def test_summarize_enrichment_answers_whether_the_build_had_signal(self):
+        mod = self._module()
+        bare = mod.summarize_enrichment({"enabled": True}, {}, {}, None)
+        self.assertFalse(bare["signal_applied"])
+        self.assertEqual(bare["counts"]["f4_non_neutral"], 0)
+
+        enriched = mod.summarize_enrichment(
+            {"enabled": True, "warnings": []},
+            {"xwoba": {"non_neutral_applied": 40, "match_rate": 0.9},
+             "ceiling": {"differentiated_rows": 38},
+             "pitcher_ceiling": {"differentiated_rows": 6},
+             "warnings": []},
+            {"hitters_scored": 40, "non_neutral_f4": 40,
+             "platoon_component_applied": 40},
+            None,
+        )
+        self.assertTrue(enriched["signal_applied"])
+        self.assertEqual(enriched["counts"]["xwoba_non_neutral"], 40)
+        self.assertEqual(enriched["counts"]["f4_platoon_applied"], 40)
+        # F1 and F5 are not wired yet; they must report zero, never absent.
+        self.assertEqual(enriched["counts"]["f1_non_neutral"], 0)
+        self.assertEqual(enriched["counts"]["f5_non_neutral"], 0)
+
+    def test_summarize_enrichment_surfaces_a_degraded_build(self):
+        mod = self._module()
+        summary = mod.summarize_enrichment(
+            {"enabled": True}, {}, {}, "xwOBA wiring failure: matched 0 of 60")
+        self.assertTrue(summary["degraded"])
+        self.assertFalse(summary["signal_applied"])
+        self.assertTrue(any("DEGRADED" in w for w in summary["warnings"]))
+
+    def test_fetch_lineups_feed_shape_carries_handedness_fields(self):
+        """extract_batter_hands and extract_opposing_probables both read fields
+        the schedule hydrate does not return, so the fetcher must fill them."""
+        mod = self._module()
+        captured = {}
+
+        def fake_handedness(ids):
+            captured["ids"] = sorted(str(i) for i in ids)
+            return {"11": {"bat": "L"}, "12": {"bat": "R"},
+                    "99": {"pitch": "L"}}
+
+        raw = {"dates": [{"games": [{
+            "gamePk": 5, "gameDate": "2026-07-25T23:05:00Z",
+            "status": {"detailedState": "Scheduled"},
+            "teams": {
+                "away": {"team": {"abbreviation": "AAA"},
+                         "probablePitcher": {"id": 99, "fullName": "Arm"}},
+                "home": {"team": {"abbreviation": "BBB"}},
+            },
+            "lineups": {"awayPlayers": [{"id": 11, "fullName": "One"},
+                                        {"id": 12, "fullName": "Two"}]},
+        }]}]}
+
+        class FakeResponse:
+            def read(self_inner):
+                return json.dumps(raw).encode("utf-8")
+
+            def __enter__(self_inner):
+                return self_inner
+
+            def __exit__(self_inner, *exc):
+                return False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            original_open, original_hand = mod.urllib.request.urlopen, mod.fetch_handedness
+            mod.urllib.request.urlopen = lambda *a, **k: FakeResponse()
+            mod.fetch_handedness = fake_handedness
+            try:
+                feed = mod.fetch_lineups("2026-07-25", Path(tmp) / "feed.json")
+            finally:
+                mod.urllib.request.urlopen = original_open
+                mod.fetch_handedness = original_hand
+
+        away = feed["games"][0]["away"]
+        self.assertEqual([h.get("bat_side") for h in away["lineup"]], ["L", "R"])
+        self.assertEqual(away["probable_pitcher"]["hand"], "L")
+        self.assertIn("99", captured["ids"])   # the probable was requested too
+
+
 class PctFloorAndClockPipelineTests(unittest.TestCase):
     def test_slate_feasibility_emits_pct_floors(self):
         frame = diverse_projection_frame()

@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  13 modules  149 tests`. The quick form of the suite
+   `PASS  v2.26.0  13 modules  157 tests`. The quick form of the suite
    alone is `python -m unittest tests.test_core`. The audit checks
    dependencies first and names the install command, because a missing
    solver is not a slow build, it is no build.
