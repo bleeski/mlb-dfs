@@ -2704,6 +2704,73 @@ class F1GameEnvironmentTests(unittest.TestCase):
             self.assertAlmostEqual(float(frame.loc[0, "F1"]), 1.30)
 
 
+class F5ParkWeatherWiringTests(unittest.TestCase):
+    """F5 closes E-1. Park factors were computable all along and reached nothing.
+
+    F5 is the one enrichment with a human step that cannot be automated: a
+    retractable roof's open/closed state is in no forecast, and a closed roof
+    cancels the wind adjustment entirely, so a wrong guess moves every hitter in
+    that game the wrong way.
+    """
+
+    def _frame_with_f5(self, f5_map):
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            with salary.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Position", "Name + ID", "Name", "ID",
+                                 "Roster Position", "Salary", "Game Info",
+                                 "TeamAbbrev", "AvgPointsPerGame"])
+                writer.writerow(["OF", "A (1)", "A", "1", "OF", 4000,
+                                 "COL@LAD 07/25/2026 07:05PM ET", "COL", 9.0])
+            rows = [{"Player_ID": "1", "AvgPointsPerGame": 9.0}]
+            return epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None,
+                f5_by_player_id=f5_map)
+
+    def test_f5_map_reaches_the_projection_frame(self):
+        frame, enrichment = self._frame_with_f5({"1": 1.06})
+        self.assertEqual(enrichment["f5"]["applied_count"], 1)
+        self.assertAlmostEqual(float(frame.loc[0, "F5"]), 1.06)
+        self.assertIn("f5_park_weather", str(frame.loc[0, "Notes"]))
+
+    def test_no_f5_map_leaves_the_neutral_default(self):
+        frame, enrichment = self._frame_with_f5(None)
+        self.assertEqual(enrichment["f5"]["applied_count"], 0)
+        self.assertAlmostEqual(float(frame.loc[0, "F5"]), 1.0)
+
+    def test_closed_roof_cancels_wind_but_keeps_the_park_factor(self):
+        from mlb_engine.intake.slate_intake_manager import compute_f5_factor
+        park = {"Test Park": {"run_factor_applied": 1.06, "hr_factor_applied": 1.10}}
+        adjustments = [{"adjustment_type": "wind", "level": "13-17", "direction": "out",
+                        "hitter_factor": 1.03, "pitcher_factor": 0.97,
+                        "game_exposure_cap": None, "exclude_game": False}]
+        weather = {"wind_status": "out", "wind_speed_mph": 15.0,
+                   "delay_risk": "none", "postponement_risk": "none"}
+        open_roof = compute_f5_factor("Test Park", weather, park, adjustments,
+                                      wind_threshold_mph=10.0, roof_closed=False)
+        closed = compute_f5_factor("Test Park", weather, park, adjustments,
+                                   wind_threshold_mph=10.0, roof_closed=True)
+        self.assertGreater(open_roof["hitter_f5"], closed["hitter_f5"])
+        # Closed still carries the park factor; only wind is cancelled.
+        self.assertAlmostEqual(closed["hitter_f5"], 1.06)
+        self.assertIsNone(closed["components"]["wind_row"])
+
+    def test_wind_below_the_venue_threshold_does_not_apply(self):
+        from mlb_engine.intake.slate_intake_manager import compute_f5_factor
+        park = {"Test Park": {"run_factor_applied": 1.0, "hr_factor_applied": 1.0}}
+        adjustments = [{"adjustment_type": "wind", "level": "8-12", "direction": "out",
+                        "hitter_factor": 1.015, "pitcher_factor": 0.985,
+                        "game_exposure_cap": None, "exclude_game": False}]
+        weather = {"wind_status": "out", "wind_speed_mph": 9.0,
+                   "delay_risk": "none", "postponement_risk": "none"}
+        result = compute_f5_factor("Test Park", weather, park, adjustments,
+                                   wind_threshold_mph=13.0)
+        self.assertAlmostEqual(result["hitter_f5"], 1.0)
+        self.assertIsNone(result["components"]["wind_row"])
+
+
 class FieldMinerContractTests(unittest.TestCase):
     """field_miner v0.5: the structural gate must be able to fail.
 

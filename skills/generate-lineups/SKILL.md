@@ -81,10 +81,10 @@ before lock, run them first and pass the results in:
 
 ### Projection enrichment (this is what makes the build more than APPG)
 
-The build applies five deterministic priors: the xwOBA Base correction, xISO
+The build applies six deterministic priors: the xwOBA Base correction, xISO
 hitter ceilings, K-rate pitcher ceilings, the F4 opposing-SP-quality and platoon
-matchup factor, and F1 from Vegas implied team totals. Four of them read files in
-`data/reference/`. Refresh those when the brief says they are stale:
+matchup factor, F1 from Vegas implied team totals, and F5 park and weather. Most
+read files in `data/reference/`. Refresh those when the brief says they are stale:
 
 ```bash
 python tools/refresh_reference_data.py     # pulls Savant, reports all three
@@ -97,8 +97,9 @@ Read `enrichment.signal_applied` in the brief before you present anything. False
 means this build ranked players on `AvgPointsPerGame x batting-order factor` and
 nothing else, which is a materially weaker portfolio, and Ben should be told
 plainly rather than handed a certified file that looks identical to a good one.
-`enrichment.counts` says which factors moved players and by how many. F5
-(weather) still reports 0 because it is not wired yet.
+`enrichment.counts` says which factors moved players and by how many. Every
+factor is wired now; a 0 means that factor found nothing to apply on this slate,
+which is a fact about the slate rather than a gap in the build.
 
 On F1 specifically: the books post a game total but not per-team totals, so the
 split is DERIVED from the total and the moneyline. Say "implied team total"
@@ -106,6 +107,18 @@ rather than implying DraftKings published it. Hitter F1 is the team's implied
 total over the slate's mean, clipped to 0.85-1.15; pitcher F1 stays 1.0 in v1 so
 the opposing-team total is not counted twice. `enrichment.f1_implied_total_by_team`
 carries the numbers if Ben asks which games the build liked.
+
+On F5: park factors apply from `data/reference/` with no forecast at all, which
+is most of the signal, since Coors is Coors in any weather. Wind needs a
+`--bundle` (from `tools/fetch_slate_bundle.py`) and applies only when the roof is
+open, the direction is out or in, and the speed clears the venue threshold.
+
+**The retractable-roof rule is manual and stays manual.** A roof's open/closed
+state appears in no forecast, and a closed roof cancels the wind adjustment
+entirely, so guessing wrong moves every hitter in that game the wrong way. Those
+venues take the park factor only and are listed in
+`enrichment.f5_retractable_unresolved` plus a stderr line. Surface them to Ben
+when the game matters to the slate; never resolve one yourself.
 
 Fresher lineups matter most. A team that has posted since the last pull moves from
 a projected batting order to a confirmed one, which is strictly better information.
@@ -346,7 +359,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 180 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 184 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

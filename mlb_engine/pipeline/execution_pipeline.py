@@ -1535,6 +1535,7 @@ def _assemble_projection_frame(
     projected_order_by_player_id: Optional[Mapping[str, int]] = None,
     f4_by_player_id: Optional[Mapping[str, float]] = None,
     f1_by_player_id: Optional[Mapping[str, float]] = None,
+    f5_by_player_id: Optional[Mapping[str, float]] = None,
     apply_value_sanity_guard: bool = True,
     fangraphs_pitching_csv: Optional[str | Path] = None,
 ) -> "tuple[pd.DataFrame, Dict[str, Any]]":
@@ -1599,6 +1600,7 @@ def _assemble_projection_frame(
     projected_order = {str(k): int(v) for k, v in (projected_order_by_player_id or {}).items()}
     f4_map = {str(k): float(v) for k, v in (f4_by_player_id or {}).items()}
     f1_map = {str(k): float(v) for k, v in (f1_by_player_id or {}).items()}
+    f5_map = {str(k): float(v) for k, v in (f5_by_player_id or {}).items()}
 
     players = {str(p.player_id): p for p in parse_dk_salary_csv(str(salary_csv))}
     rows = list(projection_rows or [])
@@ -1613,6 +1615,9 @@ def _assemble_projection_frame(
         "f1": {"requested": len(f1_map), "applied_count": 0, "applied_player_ids": [],
                "note": "deterministic F1 game-environment prior applied to rows "
                        "lacking an explicit F1" if f1_map else "no F1 map supplied"},
+        "f5": {"requested": len(f5_map), "applied_count": 0, "applied_player_ids": [],
+               "note": "deterministic F5 park/weather prior applied to rows "
+                       "lacking an explicit F5" if f5_map else "no F5 map supplied"},
         "warnings": [],
     }
 
@@ -1638,6 +1643,11 @@ def _assemble_projection_frame(
             enrichment["f1"]["applied_count"] += 1
             enrichment["f1"]["applied_player_ids"].append(pid)
             notes = (notes + f"; f1_environment: deterministic prior {f1_map[pid]:.3f}").lstrip("; ")
+        if (r.get("F5") in (None, "")) and pid in f5_map:
+            r["F5"] = f5_map[pid]
+            enrichment["f5"]["applied_count"] += 1
+            enrichment["f5"]["applied_player_ids"].append(pid)
+            notes = (notes + f"; f5_park_weather: deterministic prior {f5_map[pid]:.3f}").lstrip("; ")
         for fcol in ("F1", "F2", "F3", "F4", "F5"):
             if fcol not in r or r.get(fcol) in (None, ""):
                 r[fcol] = 1.0
@@ -2040,6 +2050,7 @@ def run_slate(
     platoon_order_by_player_id: Optional[Mapping[str, int]] = None,
     f4_by_player_id: Optional[Mapping[str, float]] = None,
     f1_by_player_id: Optional[Mapping[str, float]] = None,
+    f5_by_player_id: Optional[Mapping[str, float]] = None,
     apply_value_sanity_guard: bool = True,
     confirmed_hitter_ids: Optional[Iterable[str]] = None,
     confirmed_teams: Optional[Iterable[str]] = None,
@@ -2095,7 +2106,7 @@ def run_slate(
             projections["Ownership_Tier"] = "Mid"
         projection_enrichment: Dict[str, Any] = {
             "xwoba": None, "ceiling": None, "value_guard": None, "f4": None,
-            "f1": None, "pitcher_ceiling": None,
+            "f1": None, "f5": None, "pitcher_ceiling": None,
             "warnings": [],
             "note": "projections_override path; assembly enrichments (xwOBA, ceiling, "
                     "pitcher ceiling, value guard, F4 map) are not applied to a "
@@ -2108,6 +2119,7 @@ def run_slate(
             projected_order_by_player_id=platoon_order_by_player_id,
             f4_by_player_id=f4_by_player_id,
             f1_by_player_id=f1_by_player_id,
+            f5_by_player_id=f5_by_player_id,
             apply_value_sanity_guard=apply_value_sanity_guard,
             fangraphs_pitching_csv=fangraphs_pitching_csv,
         )

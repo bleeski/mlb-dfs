@@ -539,6 +539,130 @@ def build_f1_map(pool: dict, odds_by_game_id: dict) -> tuple[dict, dict]:
     return build_f1_factors(odds_by_game_id, team_by_player_id, pitcher_ids=pitcher_ids)
 
 
+def build_f5_map(pool: dict, args) -> tuple[dict, dict]:
+    """Return ({Player_ID: F5}, report) from park factors and tonight's weather.
+
+    F5 is the only enrichment with a HUMAN step that cannot be automated away.
+    A retractable roof's open/closed state is not in any forecast, and guessing
+    it is worse than leaving it neutral: a closed roof cancels the wind
+    adjustment entirely, so a wrong guess moves every hitter in that game the
+    wrong way. Unresolved retractables therefore take the park factor only, and
+    the game is named in a checkpoint warning for Ben to resolve by hand.
+
+    Park factors apply on their own even with no forecast at all, which is most
+    of the available signal: Coors is Coors in any weather.
+    """
+    from mlb_engine.intake.slate_intake_manager import (
+        compute_f5_factor, load_f5_park_factors, load_f5_weather_adjustments,
+    )
+    from mlb_engine.optimize.optimizer_v3 import wind_bearing_to_f5_label
+
+    report: dict = {"games_scored": 0, "retractable_unresolved": [],
+                    "venues_without_park_factor": [], "non_neutral_f5": 0}
+
+    bundle_path = getattr(args, "bundle", None)
+    weather_by_venue: dict = {}
+    if bundle_path and Path(bundle_path).exists():
+        try:
+            bundle = json.loads(Path(bundle_path).read_text(encoding="utf-8"))
+            weather_by_venue = bundle.get("weather") or {}
+            report["weather_source"] = str(bundle_path)
+        except Exception as exc:
+            report["warning"] = f"bundle unreadable ({exc}); park factors only"
+    else:
+        report["weather_source"] = None
+
+    try:
+        park_factors = load_f5_park_factors(str(REPO / "data/reference/f5_park_factors.csv"))
+        adjustments = load_f5_weather_adjustments(
+            str(REPO / "data/reference/f5_weather_adjustments.csv"))
+        venue_rows = {}
+        with (REPO / "data/reference/team_to_venue.csv").open(encoding="utf-8-sig",
+                                                             newline="") as fh:
+            for row in csv.DictReader(fh):
+                venue_rows[str(row.get("Home_Team", "")).strip().upper()] = row
+    except Exception as exc:
+        report["skipped"] = f"F5 reference data unreadable: {exc}"
+        return {}, report
+
+    # Game_ID is AWAY@HOME, so the home team names the venue.
+    team_by_player_id = dict(pool.get("team_by_player_id") or {})
+    pitcher_roles = pool.get("pitcher_roles") or {}
+    home_by_team: dict = {}
+    for row in (pool.get("projection_rows") or []):
+        game_id = str(row.get("Game_ID") or "")
+        if "@" in game_id:
+            home_by_team[str(row.get("Team") or "").strip().upper()] = \
+                game_id.split("@", 1)[1].strip().upper()
+        if str(row.get("Player_ID")) in pitcher_roles:
+            team_by_player_id.setdefault(str(row.get("Player_ID")),
+                                         str(row.get("Team") or ""))
+
+    f5_by_team: dict = {}
+    for team in sorted({str(t).strip().upper() for t in team_by_player_id.values() if t}):
+        home = home_by_team.get(team)
+        venue_row = venue_rows.get(home or "")
+        if not venue_row:
+            continue
+        venue = str(venue_row.get("Venue", "")).strip()
+        if venue not in park_factors:
+            report["venues_without_park_factor"].append(venue or home or team)
+        roof_type = str(venue_row.get("Roof_Type", "")).strip().lower()
+        forecast = (weather_by_venue.get(venue) or {})
+        hours = forecast.get("hourly_window") or []
+        mid = hours[len(hours) // 2] if hours else {}
+
+        roof_closed = roof_type == "dome"
+        if roof_type == "retractable" and venue not in report["retractable_unresolved"]:
+            # Never guessed. Neutral wind plus the park factor is the honest read.
+            report["retractable_unresolved"].append(venue)
+
+        wind_status = "cross"
+        if hours and roof_type == "outdoor":
+            wind_status = wind_bearing_to_f5_label(
+                mid.get("wind_direction_deg"),
+                venue_row.get("CF_Azimuth_Degrees"))
+        weather = {
+            "wind_status": wind_status,
+            "wind_speed_mph": mid.get("wind_speed_mph"),
+            "delay_risk": "none",
+            "postponement_risk": "none",
+        }
+        threshold = venue_row.get("Wind_Min_Speed_MPH")
+        try:
+            threshold = float(threshold) if threshold not in (None, "") else None
+        except (TypeError, ValueError):
+            threshold = None
+        result = compute_f5_factor(venue, weather, park_factors, adjustments,
+                                   wind_threshold_mph=threshold,
+                                   roof_closed=roof_closed or roof_type == "retractable")
+        f5_by_team[team] = result
+        report["games_scored"] += 1
+
+    f5_by_player: dict = {}
+    for pid, team in team_by_player_id.items():
+        result = f5_by_team.get(str(team).strip().upper())
+        if not result:
+            f5_by_player[str(pid)] = 1.0
+            continue
+        f5_by_player[str(pid)] = float(
+            result["pitcher_f5"] if str(pid) in pitcher_roles else result["hitter_f5"])
+
+    report["non_neutral_f5"] = sum(
+        1 for v in f5_by_player.values() if abs(float(v) - 1.0) > 1e-9)
+    report["f5_by_team"] = {
+        t: {"venue": r["components"]["venue"],
+            "hitter_f5": r["hitter_f5"], "pitcher_f5": r["pitcher_f5"],
+            "wind": r["components"].get("wind_row")}
+        for t, r in sorted(f5_by_team.items())}
+    report["note"] = (
+        "Deterministic F5 prior: park run factor times a wind adjustment that "
+        "applies only when the roof is open, direction is out/in, and speed "
+        "meets the venue threshold. Retractable roofs are never guessed. "
+        "Labeled prior, never a run projection or probability claim.")
+    return f5_by_player, report
+
+
 def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
     """Return ({Player_ID: F4}, report) for the pool's hitters, or ({}, report).
 
@@ -581,7 +705,8 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
 
 def summarize_enrichment(reference_status: dict, enrichment: dict,
                          f4_report: dict, degraded_reason,
-                         f1_report: dict | None = None) -> dict:
+                         f1_report: dict | None = None,
+                         f5_report: dict | None = None) -> dict:
     """Condense the enrichment record into the block the brief carries.
 
     The one question this has to answer at a glance is whether this build had
@@ -595,6 +720,7 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
     pitcher_ceiling = enrichment.get("pitcher_ceiling") or {}
     non_neutral_f4 = int(f4_report.get("non_neutral_f4") or 0)
     f1_report = f1_report or {}
+    f5_report = f5_report or {}
 
     counts = {
         "xwoba_non_neutral": int(xwoba.get("non_neutral_applied") or 0),
@@ -608,7 +734,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f4_platoon_applied": int(f4_report.get("platoon_component_applied") or 0),
         "f1_non_neutral": int(f1_report.get("non_neutral_f1") or 0),
         "f1_games_priced": int(f1_report.get("games_priced") or 0),
-        "f5_non_neutral": 0,
+        "f5_non_neutral": int(f5_report.get("non_neutral_f5") or 0),
+        "f5_games_scored": int(f5_report.get("games_scored") or 0),
     }
     warnings = list(reference_status.get("warnings") or [])
     warnings += list(enrichment.get("warnings") or [])
@@ -617,6 +744,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
             warnings.append(f"f4: {f4_report[key]}")
         if f1_report.get(key):
             warnings.append(f"f1: {f1_report[key]}")
+        if f5_report.get(key):
+            warnings.append(f"f5: {f5_report[key]}")
     if (f1_report.get("odds") or {}).get("warning"):
         warnings.append(f"f1: {f1_report['odds']['warning']}")
     no_ml = f1_report.get("games_without_moneyline") or []
@@ -639,7 +768,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
 
     signal = any(counts[k] for k in (
         "xwoba_non_neutral", "hitter_ceiling_differentiated",
-        "pitcher_ceiling_differentiated", "f4_non_neutral", "f1_non_neutral"))
+        "pitcher_ceiling_differentiated", "f4_non_neutral", "f1_non_neutral",
+        "f5_non_neutral"))
     return {
         "signal_applied": bool(signal),
         "degraded": bool(degraded_reason),
@@ -650,6 +780,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f1_odds": f1_report.get("odds"),
         "f1_league_mean_implied_total": f1_report.get("league_mean_implied_total"),
         "f1_implied_total_by_team": f1_report.get("implied_total_by_team"),
+        "f5_by_team": f5_report.get("f5_by_team"),
+        "f5_retractable_unresolved": f5_report.get("retractable_unresolved") or [],
         "warnings": warnings,
         "note": "Enrichment counts are deterministic labeled priors applied to the "
                 "projection frame: xwOBA Base correction, xISO hitter ceilings, "
@@ -692,6 +824,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     if f1_report.get("warning"):
         print(f"enrichment warning: {f1_report['warning']}", file=sys.stderr)
 
+    f5_by_player_id, f5_report = build_f5_map(pool, args)
+    for venue in f5_report.get("retractable_unresolved") or []:
+        print(f"F5 ROOF: {venue} is retractable and its open/closed state is "
+              "unresolved; wind is NOT applied there. Confirm by hand if it "
+              "matters to this slate.", file=sys.stderr)
+
     # Assemble the frame WITH the enrichments. This frame is not just the timing
     # probe: on the sliced-bank path it is the frame every cached candidate is
     # built from, so enriching it here is what puts the signal in the portfolio.
@@ -701,6 +839,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         fangraphs_pitching_csv=reference["fangraphs_pitching"],
         f4_by_player_id=f4_by_player_id or None,
         f1_by_player_id=f1_by_player_id or None,
+        f5_by_player_id=f5_by_player_id or None,
     )
     degraded_reason = None
     try:
@@ -711,6 +850,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
             f4_by_player_id=enrich_kwargs["f4_by_player_id"],
             f1_by_player_id=enrich_kwargs["f1_by_player_id"],
+            f5_by_player_id=enrich_kwargs["f5_by_player_id"],
             fangraphs_pitching_csv=enrich_kwargs["fangraphs_pitching_csv"],
         )
     except ValueError as exc:
@@ -724,9 +864,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
               file=sys.stderr)
         enrich_kwargs = dict(savant_batting_csv=None, savant_pitching_csv=None,
                              fangraphs_pitching_csv=None, f4_by_player_id=None,
-                             f1_by_player_id=None)
+                             f1_by_player_id=None, f5_by_player_id=None)
         f4_by_player_id = {}
         f1_by_player_id = {}
+        f5_by_player_id = {}
         projections, enrichment = _assemble_projection_frame(
             str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
@@ -860,7 +1001,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "verification": checks,
         "controls_override_applied": args.controls_override,
         "enrichment": summarize_enrichment(
-            reference["status"], enrichment, f4_report, degraded_reason, f1_report),
+            reference["status"], enrichment, f4_report, degraded_reason,
+            f1_report, f5_report),
     }
     return (0 if checks["passed"] else 3), brief
 
@@ -1061,6 +1203,10 @@ def main() -> int:
                          "Showdown reads \"max_cpt_exposure_pct\" from the same "
                          "dict (default 0.35) to cap how much of the bank a "
                          "single captain can fill; pass null to disable it.")
+    ap.add_argument("--bundle",
+                    help="slate_bundle.json from tools/fetch_slate_bundle.py. "
+                         "Supplies the per-venue forecast for F5. Park factors "
+                         "apply without it; wind does not.")
     ap.add_argument("--reference-dir", default=None,
                     help="directory holding the projection enrichment inputs "
                          "(default data/reference/)")
