@@ -68,6 +68,8 @@ if str(REPO) not in sys.path:
 
 SALARY_CAP = 50000
 CLASSIC_SLOTS = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF")
+MAX_HITTERS_PER_TEAM = 5
+MIN_GAMES_PER_LINEUP = 2
 
 
 # --------------------------------------------------------------------------- #
@@ -101,6 +103,80 @@ def slate_date_from_salary(salary_csv: Path) -> str:
         if parsed is not None:
             return parsed.date().isoformat()
     return dt.date.today().isoformat()
+
+
+def feed_age_minutes(feed: dict) -> float | None:
+    """Minutes since the feed was fetched, or None when it does not say.
+
+    The feed has always carried `fetched_at` and nothing ever read it, so a
+    morning file on disk beat a fresh fetch silently.
+    """
+    stamp = (feed or {}).get("fetched_at")
+    if not stamp:
+        return None
+    try:
+        when = dt.datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=dt.timezone.utc)
+    delta = dt.datetime.now(dt.timezone.utc) - when
+    return round(delta.total_seconds() / 60.0, 1)
+
+
+def slate_signature(salary_csv: Path) -> dict:
+    """Identify the draftgroup, not just the date.
+
+    DK runs more than one Classic draftgroup on most dates: a main slate and a
+    night slate, sometimes an early one. Keying staged inputs and delivered
+    artifacts by date alone means the second build of the day overwrites the
+    first one's staged CSVs and its delivered DKEntries.csv. On 2026-07-24 a
+    night-slate build destroyed a certified main-slate file that survived only
+    because it had been copied aside by hand.
+
+    Returns the game set and a short human-readable tag (first lock in ET plus
+    game count, e.g. "1905_10g"), so a caller can both name a slate and tell two
+    slates apart without trusting filenames.
+    """
+    from mlb_engine.intake.slate_intake_manager import (
+        parse_dk_salary_csv, parse_game_info_datetime,
+    )
+    games, starts = set(), []
+    for sp in parse_dk_salary_csv(str(salary_csv)):
+        info = getattr(sp, "game_info", "") or ""
+        gid = str(getattr(sp, "game_id", "") or info.split(" ", 1)[0] or "").strip()
+        if gid:
+            games.add(gid)
+        parsed = parse_game_info_datetime(info)
+        if parsed is not None:
+            starts.append(parsed)
+    first = min(starts) if starts else None
+    tag = f"{first.strftime('%H%M')}_{len(games)}g" if first else f"{len(games)}g"
+    return {"games": frozenset(games), "tag": tag,
+            "first_lock": first.isoformat() if first else None}
+
+
+def preserve_prior_slate(paths, tag: str) -> list:
+    """Move artifacts from a different draftgroup aside instead of overwriting.
+
+    Silent overwriting is the failure; a renamed file that is still on disk is
+    recoverable, and the rename is printed so it is never a surprise.
+    """
+    moved = []
+    for path in paths:
+        path = Path(path)
+        if not path.exists():
+            continue
+        dest = path.with_name(f"{path.stem}_{tag}{path.suffix}")
+        n = 1
+        while dest.exists():
+            dest = path.with_name(f"{path.stem}_{tag}_{n}{path.suffix}")
+            n += 1
+        path.rename(dest)
+        moved.append(str(dest))
+        print(f"preserved prior slate artifact: {path.name} -> {dest.name}",
+              file=sys.stderr)
+    return moved
 
 
 def fetch_lineups(date: str, dest: Path) -> dict:
@@ -244,6 +320,18 @@ def verify_classic(salary_csv: Path, entries_csv: Path) -> dict:
             teams = {}
             for p in players[2:]:
                 teams[p["TeamAbbrev"]] = teams.get(p["TeamAbbrev"], 0) + 1
+            # DK Classic legality, checked here because this is the last
+            # independent look at the file before Ben uploads it: at most 5
+            # hitters from one team, and players from at least 2 games.
+            over = [f"{t} {n}" for t, n in teams.items() if n > MAX_HITTERS_PER_TEAM]
+            if over:
+                failures.append(f"{eid}: more than {MAX_HITTERS_PER_TEAM} hitters "
+                                f"from one team ({', '.join(sorted(over))})")
+            games = {str(p.get("Game Info", "")).split(" ", 1)[0] for p in players}
+            games.discard("")
+            if len(games) < MIN_GAMES_PER_LINEUP:
+                failures.append(f"{eid}: players from {len(games)} game(s), "
+                                f"DK requires {MIN_GAMES_PER_LINEUP}")
             top = sorted(teams.items(), key=lambda kv: -kv[1])[:2]
             lineups.append({"entry_id": eid, "salary": total, "stack": top})
     return {"passed": not failures, "failures": failures, "lineups": lineups}
@@ -590,6 +678,11 @@ def main() -> int:
                          "Showdown reads \"max_cpt_exposure_pct\" from the same "
                          "dict (default 0.35) to cap how much of the bank a "
                          "single captain can fill; pass null to disable it.")
+    ap.add_argument("--feed-max-age-minutes", type=float, default=90.0,
+                    help="refetch a disk-cached lineups feed older than this "
+                         "(default 90). Lineups confirm through the afternoon, so "
+                         "a stale feed downgrades confirmed teams to projected "
+                         "orders while better information exists.")
     args = ap.parse_args()
 
     started = time.monotonic()
@@ -614,9 +707,29 @@ def main() -> int:
     # solver_probe.py already default to; Showdown gets distinct filenames so
     # the two contest types can never collide on the same date again.
     suffix = "_showdown" if contest == "showdown" else ""
+    # The contest-type suffix separates Classic from Showdown but not one Classic
+    # draftgroup from another on the same date. Compare game sets and move the
+    # prior draftgroup's staged inputs, brief, and delivered file aside rather
+    # than overwriting them.
+    signature = slate_signature(salary)
+    prior_salary = slate_dir / f"DKSalaries{suffix}.csv"
+    out_dir = REPO / "outputs" / args.date
+    if prior_salary.exists():
+        prior_sig = slate_signature(prior_salary)
+        if prior_sig["games"] and prior_sig["games"] != signature["games"]:
+            print(f"different draftgroup for {args.date}: staged "
+                  f"{prior_sig['tag']}, incoming {signature['tag']}", file=sys.stderr)
+            preserve_prior_slate(
+                [prior_salary,
+                 slate_dir / f"DKEntries{suffix}.csv",
+                 out_dir / f"DKEntries{suffix}.csv",
+                 out_dir / f"build_brief{suffix}.json"],
+                prior_sig["tag"],
+            )
     staged_salary = _stage(salary, slate_dir / f"DKSalaries{suffix}.csv")
     staged_entries = _stage(entries, slate_dir / f"DKEntries{suffix}.csv")
 
+    feed_note = None
     if contest == "showdown":
         code, brief = run_showdown(args, slate_dir, staged_salary, staged_entries)
     else:
@@ -624,10 +737,27 @@ def main() -> int:
         if args.lineups:
             feed = json.loads(Path(args.lineups).read_text(encoding="utf-8"))
             (slate_dir / "lineups_feed.json").write_text(json.dumps(feed), encoding="utf-8")
+            feed_note = {"source": str(args.lineups), "age_minutes": feed_age_minutes(feed)}
         elif feed_path.exists():
+            # Lineups confirm continuously through the afternoon, so a feed left on
+            # disk from the morning quietly downgrades confirmed teams to projected
+            # orders at exactly the moment better information exists. Age it.
             feed = json.loads(feed_path.read_text(encoding="utf-8"))
+            age = feed_age_minutes(feed)
+            if age is None or age > args.feed_max_age_minutes:
+                try:
+                    feed = fetch_lineups(args.date, feed_path)
+                    feed_note = {"source": "refetched", "replaced_age_minutes": age}
+                except Exception as exc:  # network failure must not kill the build
+                    feed_note = {"source": str(feed_path), "age_minutes": age,
+                                 "warning": f"stale feed reused; refetch failed: {exc}"}
+                    print(feed_note["warning"], file=sys.stderr)
+            else:
+                feed_note = {"source": str(feed_path), "age_minutes": age}
         else:
             feed = fetch_lineups(args.date, feed_path)
+            feed_note = {"source": "fetched", "age_minutes": 0.0}
+        print(f"lineups feed: {json.dumps(feed_note)}", file=sys.stderr)
         code, brief = run_classic(args, slate_dir, staged_salary, staged_entries,
                                   feed, deadline)
 
@@ -637,10 +767,19 @@ def main() -> int:
         brief["elapsed_s"] = round(time.monotonic() - started, 1)
         brief["labels"] = ("deterministic review proxies and labeled priors only; "
                            "never ROI, win rate, cash rate, or probability")
+        brief["slate"] = {"tag": signature["tag"], "games": len(signature["games"]),
+                          "first_lock_local": signature["first_lock"]}
+        if feed_note is not None:
+            brief["lineups_feed"] = feed_note
         out = Path(args.brief) if args.brief else (
-            REPO / "outputs" / args.date / "build_brief.json")
+            REPO / "outputs" / args.date / f"build_brief{suffix}.json")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(brief, indent=1), encoding="utf-8")
+        # A second, slate-tagged copy so evidence survives a same-date rebuild even
+        # when the prior-slate preserve step did not run (same draftgroup, rerun).
+        if not args.brief:
+            out.with_name(f"build_brief{suffix}_{signature['tag']}.json").write_text(
+                json.dumps(brief, indent=1), encoding="utf-8")
         print(json.dumps(brief, indent=1))
     return code
 

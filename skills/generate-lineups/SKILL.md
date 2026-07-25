@@ -61,6 +61,10 @@ again, it resumes), `3` built but did not certify, `4` inputs missing.
 An exit of `10` is normal on a big slate, not a failure. The bank persists between
 runs. Just run it again.
 
+Inside Cowork's bash sandbox this command usually will not fit in one call. Read
+"Running inside the Cowork sandbox" below before you start, and confirm the salary
+file is the slate Ben meant.
+
 ### Better data when there is time
 
 The script fetches probable pitchers and batting orders itself if it has to, but
@@ -77,14 +81,95 @@ before lock, run them first and pass the results in:
 Fresher lineups matter most. A team that has posted since the last pull moves from
 a projected batting order to a confirmed one, which is strictly better information.
 
+## Running inside the Cowork sandbox
+
+Cowork's bash gives you one 45-second window per call, and that window includes
+container startup, so a `timeout 40` wrapper gets killed before its trailing
+`echo` ever runs. Budget the inner timeout at 25 to 33 seconds. Importing
+`mlb_engine.optimize.optimizer_v3` off the mounted filesystem costs about 15
+seconds by itself. That leaves roughly 15 to 20 seconds of real work per call,
+and you cannot escape it by backgrounding, because processes do not survive
+between calls.
+
+**Put exactly one expensive thing in each call.** The default path does two
+network fetches inside the build: the MLB Stats API lineups pull, which alone has
+a 25-second timeout, and the RotoWire merge. Either can consume the whole
+remaining budget. Do the fetch in its own call instead, with a short standalone
+`urllib` script that hits
+
+```
+https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=<date>&hydrate=lineups,probablePitcher,team
+```
+
+shapes the response into the same structure `fetch_lineups` produces, and writes
+it into the slate directory. That call is cheap because it imports nothing from
+the engine. Then build:
+
+```bash
+timeout 33 python -u <repo>/skills/generate-lineups/scripts/build_slate.py \
+  --salary <DKSalaries.csv> --entries <DKEntries.csv> \
+  --lineups <the feed you just wrote> --no-rotowire --max-seconds 14 \
+  > outputs/<date>/_build.log 2>&1
+```
+
+On 2026-07-24 that took a 16-entry Classic build to 10.8 seconds elapsed and it
+certified on the first attempt, after three runs with in-build fetching had been
+killed at the wall.
+
+**Diagnostics, which matter more than they sound.** Always run `python -u` and
+redirect the log inside the repo. `/tmp` is not shared between calls, and
+buffered stdout vanishes when the call is killed; on 2026-07-24 fourteen minutes
+went to a build whose real error, a missing scipy, sat unread in a log that no
+longer existed. Never check liveness with `pgrep -f build_slate.py`, because the
+pattern matches the checking command's own command line and reports RUNNING
+forever. And note that a repo-wide `grep -rn` on this mount can return empty
+without erroring, which reads exactly like "no matches"; scope greps to specific
+files before concluding a symbol is absent.
+
+**Check dependencies before any build, including inside T-20.** A fresh sandbox
+has no scipy, and a `pip install` does not persist across sessions. The probe
+costs two seconds, and a missing solver is not a slow build, it is no build.
+
+If the build still will not fit, use the exit-10 resume and run the identical
+command again. The bank persists between invocations, so each call adds a slice.
+Shrink the bank, never the pool.
+
+## Confirm which slate you were handed
+
+Before staging, print the salary file's game list, game count, and first lock from
+the `Game Info` column, and the entries file's contest IDs. Compare them against
+the games Ben named. Two traps, both seen on 2026-07-24:
+
+- A re-uploaded file can land under a hashed filename while the generic
+  `DKSalaries.csv` still resolves to the earlier upload. Run `ls -la` on the
+  uploads directory and read mtimes; be suspicious whenever a generic name and a
+  hashed variant coexist.
+- If the entries file's contest IDs match a build already delivered this session,
+  treat it as a stale upload until proven otherwise, not a new slate.
+
+A stale-but-valid salary file is still a valid salary file, so the build succeeds,
+certifies, and reports clean gates for the wrong slate. Nothing downstream can
+catch this. State the slate identity out loud before you solve.
+
+Related: DK often runs more than one Classic draftgroup on a date (a main slate
+and a Night slate). Staging and delivery are keyed by date today, so the second
+build overwrites the first one's staged inputs and its delivered
+`outputs/<date>/DKEntries.csv`. Copy any delivered file aside before building a
+second draftgroup for the same date.
+
 ## Reporting back
 
 Lead with the file and whether it is certified. Then a short brief, roughly:
 
 - **Gates**: all three pass, or exactly which failed
 - **Time**: minutes to the T-5 delivery deadline, and whether the slate clock
-  agreed with the salary file (`salary_cross_check`). A disagreement means a
-  doubleheader leg collision; say so, because it moves the deadline by hours.
+  agreed with the salary file (`salary_cross_check`). On disagreement the salary
+  file wins and the clock is rewritten, which is the correct behavior. Read the
+  `note` and `drift_minutes` before explaining it: a doubleheader leg collision is
+  one cause, but a partial-day draftgroup is another and is benign, because the
+  lineups feed covers the whole day so its earliest lock is an earlier game than
+  the draftgroup's. Do not report the doubleheader reading as the diagnosis
+  without checking which one you have.
 - **Pool**: teams kept, how many are on confirmed lineups versus projected platoon
   orders, and any team the platoon file covers but could not fill
 - **Portfolio**: primary stacks and their exposure, the SP pairs used
@@ -196,7 +281,10 @@ python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 144 test
 The audit checks dependencies first and names the install command if something is
 missing, because a missing solver is not a slow build, it is no build.
 
-Skip this under deadline pressure. Inside T-20, go straight to the build.
+Skip the test suite under deadline pressure. Inside T-20, go straight to the
+build. The dependency check is the one part that is never skipped: it takes two
+seconds, and a fresh sandbox with no scipy produces no build at all, which costs
+far more than the check.
 
 ## Verifying a file you did not just build
 

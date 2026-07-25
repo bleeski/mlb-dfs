@@ -621,11 +621,48 @@ def build_slate_pool(
             row["F2"] = batting_order_factor(int(slot))
             row["Notes"] = "confirmed_order: F2 from posted batting order"
         keep[str(pid)] = row
-    for team in sorted(confirmed_teams - excluded_teams):
+    # The lineups feed covers the whole day; the salary file defines the
+    # draftgroup. A team the feed confirms but the salary file does not carry is
+    # not on this slate, so it is silent rather than a warning. Reporting it buried
+    # real intake failures under noise: on 2026-07-24 the feed held 15 games and
+    # the night draftgroup held 4, producing 22 "0/9" lines about teams that could
+    # never have been in the pool.
+    slate_team_set = set(slate_teams)
+    for team in sorted((confirmed_teams & slate_team_set) - excluded_teams):
         n = sum(1 for r in keep.values() if r["Team"] == team)
         teams_report[team] = {"status": "confirmed", "hitters": n}
-        if n != 9:
-            warnings.append(f"{team}: confirmed lineup matched {n}/9 salary hitters")
+        if n == 9:
+            continue
+        detail = f"{team}: confirmed lineup matched {n}/9 salary hitters"
+        if n < 5:
+            # A posted lineup that crosswalks to almost nothing is a name/team
+            # join failure, not thin data. Building anyway silently substitutes a
+            # projected or APPG order while real information sits unused.
+            blockers.append(detail + "; crosswalk failure, real lineup went unused")
+        else:
+            warnings.append(detail)
+
+    # Feed/draftgroup alignment. Keyed on whether the feed contains the slate's
+    # games at all, never on how many lineups have posted, because an early build
+    # legitimately has zero confirmed teams and must not be blocked for it.
+    feed_teams = {
+        side
+        for gid in (status.get("lock_time_by_game_id") or {})
+        for side in str(gid).split("@")
+    }
+    if feed_teams:
+        eligible = slate_team_set - excluded_teams
+        missing = sorted(eligible - feed_teams)
+        if missing and len(missing) * 2 >= len(eligible):
+            blockers.append(
+                f"lineups feed covers {len(eligible) - len(missing)}/{len(eligible)} "
+                "slate teams; it does not match this draftgroup. Refetch and pass "
+                "--lineups before trusting this pool."
+            )
+        elif missing:
+            warnings.append(
+                "slate teams absent from the lineups feed: " + ", ".join(missing)
+            )
 
     # TBD teams: platoon projected nine, APPG fallback when platoon cannot fill.
     platoon_by_team: Dict[str, List[str]] = {}
