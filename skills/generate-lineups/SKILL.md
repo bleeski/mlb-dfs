@@ -128,7 +128,23 @@ https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=<date>&hydrate=lineups,p
 
 shapes the response into the same structure `fetch_lineups` produces, and writes
 it into the slate directory. That call is cheap because it imports nothing from
-the engine. Then build:
+the engine.
+
+**The hydrate does not return handedness.** The schedule response gives lineup
+players and probable pitchers as id plus name, with neither `batSide` nor
+`pitchHand`. Both are inputs to the F4 platoon prior, so a hand-shaped feed that
+omits them silently zeroes that component. `fetch_lineups` fills them with one
+batched call; a hand-rolled pre-fetch must do the same:
+
+```
+https://statsapi.mlb.com/api/v1/people?personIds=<ids>&fields=people,id,batSide,pitchHand,code
+```
+
+Write `bat_side` onto each lineup hitter and `hand` onto each probable pitcher.
+Check `enrichment.counts.f4_platoon_applied` in the brief afterward; a zero there
+on a slate with confirmed lineups means the feed was missing handedness.
+
+Then build:
 
 ```bash
 timeout 33 python -u <repo>/skills/generate-lineups/scripts/build_slate.py \
@@ -323,7 +339,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 157 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 163 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

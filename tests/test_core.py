@@ -2580,6 +2580,91 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         self.assertIn("99", captured["ids"])   # the probable was requested too
 
 
+class FieldMinerContractTests(unittest.TestCase):
+    """field_miner v0.5: the structural gate must be able to fail.
+
+    Before v0.5 the gate was `observed_slots == expected_slots`. On a file where
+    nothing parsed, both sides were 0, so a total parse failure certified itself
+    as structurally sound and emitted an empty archive block. A Showdown export
+    did exactly that, because CPT/UTIL are not Classic slot tokens.
+    """
+
+    HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup",
+              "", "Player", "Roster Position", "%Drafted", "FPTS"]
+    CLASSIC = ("P Gerrit Cole P Tarik Skubal C Cal Raleigh 1B Matt Olson "
+               "2B Ketel Marte 3B Jose Ramirez SS Bobby Witt Jr. OF Aaron Judge "
+               "OF Juan Soto OF Kyle Tucker")
+    SHOWDOWN = ("CPT Aaron Judge UTIL Juan Soto UTIL Gerrit Cole UTIL Anthony Volpe "
+                "UTIL Cody Bellinger UTIL Jose Ramirez")
+
+    def _standings(self, tmp, lineups):
+        path = Path(tmp) / "contest-standings-1.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.HEADER)
+            for i, lineup in enumerate(lineups):
+                writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0", "120.5",
+                                 lineup, "", "Aaron Judge", "OF", "41.2%", "18.5"])
+        from mlb_engine.field import field_miner as fm
+        return fm.parse_standings_export(str(path))
+
+    def test_detects_and_parses_showdown_lineups(self):
+        from mlb_engine.field import field_miner as fm
+        self.assertEqual(fm.detect_contest_type([self.SHOWDOWN]), "showdown")
+        self.assertEqual(fm.detect_contest_type([self.CLASSIC]), "classic")
+        self.assertEqual(fm.detect_contest_type([]), "classic")
+        players, complete = fm.parse_lineup_string(self.SHOWDOWN, "showdown")
+        self.assertTrue(complete)
+        self.assertEqual(len(players), 6)
+        self.assertEqual(players[0], ("CPT", "Aaron Judge"))
+
+    def test_showdown_under_the_classic_contract_yields_nothing(self):
+        """Disjoint token vocabularies, so a mismatch is empty, never wrong."""
+        from mlb_engine.field import field_miner as fm
+        players, complete = fm.parse_lineup_string(self.SHOWDOWN, "classic")
+        self.assertEqual(players, [])
+        self.assertFalse(complete)
+
+    def test_zero_parse_fails_the_structural_gate(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            standings = self._standings(tmp, ["FLEX Aaron Judge FLEX Juan Soto"] * 3)
+            result = fm.mine_contest(standings, None, contest_id="1")
+            diagnostics = result["diagnostics"]
+            self.assertFalse(diagnostics["parse_structural_ok"])
+            self.assertIn("PARSE FAILURE", diagnostics["verification_note"])
+            self.assertEqual(result["meta"]["entries_complete_lineups"], 0)
+
+    def test_mostly_unparsed_fails_the_structural_gate(self):
+        """A few withdrawn entries are normal; most of the field is not."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            standings = self._standings(tmp, [self.CLASSIC] + [""] * 4)
+            result = fm.mine_contest(standings, None, contest_id="1")
+            self.assertFalse(result["diagnostics"]["parse_structural_ok"])
+            self.assertIn("PARSE FAILURE",
+                          result["diagnostics"]["verification_note"])
+
+    def test_clean_classic_field_still_passes(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            standings = self._standings(tmp, [self.CLASSIC] * 5)
+            result = fm.mine_contest(standings, None, contest_id="1")
+            self.assertTrue(result["diagnostics"]["parse_structural_ok"])
+            self.assertEqual(result["contest_type"], "classic")
+            self.assertEqual(result["meta"]["roster_size"], 10)
+
+    def test_showdown_field_carries_its_own_roster_size(self):
+        """Showdown must never be scored against the Classic contract."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            standings = self._standings(tmp, [self.SHOWDOWN] * 5)
+            result = fm.mine_contest(standings, None, contest_id="1")
+            self.assertEqual(result["contest_type"], "showdown")
+            self.assertEqual(result["meta"]["roster_size"], 6)
+            self.assertTrue(result["diagnostics"]["parse_structural_ok"])
+
+
 class PctFloorAndClockPipelineTests(unittest.TestCase):
     def test_slate_feasibility_emits_pct_floors(self):
         frame = diverse_projection_frame()

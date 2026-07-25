@@ -22,7 +22,7 @@ from typing import Any, Dict, List
 VERSION = "v3.0"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
-EXPECTED_TEST_COUNT = 157  # 149 + 8 added 2026-07-25 (I-1 projection enrichment wiring)
+EXPECTED_TEST_COUNT = 163  # 157 + 6 added 2026-07-25 (field_miner v0.5 gate + Showdown contract)
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",

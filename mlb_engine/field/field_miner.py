@@ -77,10 +77,29 @@ import unicodedata
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-VERSION = "0.4-review"
+VERSION = "0.5-review"
 SALARY_CAP = 50000
 ROSTER_SLOTS = ("P", "C", "1B", "2B", "3B", "SS", "OF")
 EXPECTED_SLOT_COUNTS = {"P": 2, "C": 1, "1B": 1, "2B": 1, "3B": 1, "SS": 1, "OF": 3}
+
+# Showdown is a second roster contract on the same export format, not a second
+# format. One captain at 1.5x plus five UTIL, all from one game. Before v0.5 this
+# module knew only the Classic slot tokens, so every Showdown lineup parsed to
+# zero players and the structural gate — which compared two numbers that were
+# both zero — called the result sound. Showdown archetypes never pool with
+# Classic in the ledger or the ownership work, so the contest type is carried
+# through the emitted block rather than inferred again downstream.
+SHOWDOWN_SLOTS = ("CPT", "UTIL")
+SHOWDOWN_EXPECTED_SLOT_COUNTS = {"CPT": 1, "UTIL": 5}
+ROSTER_CONTRACTS = {
+    "classic": {"slots": ROSTER_SLOTS, "expected": EXPECTED_SLOT_COUNTS},
+    "showdown": {"slots": SHOWDOWN_SLOTS, "expected": SHOWDOWN_EXPECTED_SLOT_COUNTS},
+}
+
+# Withdrawn and zeroed entries legitimately fail to parse, but only a few per
+# contest. Past this share the likelier explanation is that the roster contract
+# is wrong, and archiving would record a field that was never read.
+MAX_UNPARSED_ENTRY_SHARE = 0.20
 AT_CAP_SALARY_LEFT = 100          # policy constant: "at the cap" band, dollars left
 SALARY_LEFT_BINS = (0, 100, 300, 700, 1500)  # bin edges for the salary-left histogram
 _SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
@@ -110,19 +129,49 @@ def normalize_name(name: str) -> str:
 # Standings export parsing (positional, utf-8-sig; ledger invariant 3.1)
 # ---------------------------------------------------------------------------
 
-def parse_lineup_string(lineup: str) -> Tuple[List[Tuple[str, str]], bool]:
+def detect_contest_type(lineups: Sequence[str]) -> str:
+    """Return 'showdown' or 'classic' from the lineup cells themselves.
+
+    The export format is identical between the two; only the slot tokens differ,
+    and they are disjoint, so counting which vocabulary appears is decisive. Ties
+    and empty input fall back to Classic, which is the overwhelmingly common case
+    and the assumption every caller made implicitly before v0.5.
+    """
+    classic_hits = showdown_hits = 0
+    for lineup in lineups:
+        for token in str(lineup or "").split():
+            if token in SHOWDOWN_SLOTS:
+                showdown_hits += 1
+            elif token in ROSTER_SLOTS:
+                classic_hits += 1
+    return "showdown" if showdown_hits > classic_hits else "classic"
+
+
+def parse_lineup_string(lineup: str,
+                        contest_type: str = "classic") -> Tuple[List[Tuple[str, str]], bool]:
     """Parse a DK Lineup cell into [(slot, name), ...].
 
-    Returns (players, is_complete). A complete MLB Classic lineup has the
-    slot multiset 2P/1C/1B/2B/3B/SS/3OF. Empty or partial strings (zeroed or
-    withdrawn entries) return ([], False) or a partial list flagged False.
+    Returns (players, is_complete). A complete Classic lineup has the slot
+    multiset 2P/1C/1B/2B/3B/SS/3OF; a complete Showdown lineup is 1CPT/5UTIL.
+    Empty or partial strings (zeroed or withdrawn entries) return ([], False) or
+    a partial list flagged False.
+
+    ``contest_type`` selects the roster contract. Parsing a Showdown cell under
+    the Classic contract yields ([], False) rather than a wrong answer, because
+    the token vocabularies are disjoint — which is safe on its own but was NOT
+    safe in aggregate until the structural gate learned to fail on an empty
+    parse.
     """
+    contract = ROSTER_CONTRACTS.get(str(contest_type or "classic").lower(),
+                                    ROSTER_CONTRACTS["classic"])
+    slots, expected = contract["slots"], contract["expected"]
+    size = sum(expected.values())
     toks = str(lineup or "").split()
     out: List[Tuple[str, str]] = []
     slot: Optional[str] = None
     buf: List[str] = []
     for t in toks:
-        if t in ROSTER_SLOTS:
+        if t in slots:
             if slot is not None and buf:
                 out.append((slot, " ".join(buf)))
             slot, buf = t, []
@@ -131,7 +180,8 @@ def parse_lineup_string(lineup: str) -> Tuple[List[Tuple[str, str]], bool]:
     if slot is not None and buf:
         out.append((slot, " ".join(buf)))
     counts = Counter(s for s, _ in out)
-    complete = (len(out) == 10 and all(counts.get(k, 0) == v for k, v in EXPECTED_SLOT_COUNTS.items()))
+    complete = (len(out) == size
+                and all(counts.get(k, 0) == v for k, v in expected.items()))
     return out, complete
 
 
@@ -161,6 +211,13 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
             "Rank,EntryId,EntryName,TimeRemaining,Points,Lineup,,Player,"
             "Roster Position,%Drafted,FPTS (see ledger 3.1)"
         )
+    # Decide the roster contract before parsing anything. The export format is
+    # identical for Classic and Showdown and only the slot tokens differ, so the
+    # file answers this itself and nobody has to pass a flag that can be wrong.
+    contest_type = detect_contest_type(
+        (list(raw) + [""] * (11 - len(raw)))[5]
+        for raw in rows[1:] if len(raw) > 1 and str(raw[1]).strip()
+    )
     for raw in rows[1:]:
         row = list(raw) + [""] * (11 - len(raw))
         # Left block: an entry row has a non-empty EntryId.
@@ -169,7 +226,7 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
             m = _ENTRYNAME_SEQ.match(name_raw)
             username = m.group("user").strip() if m else name_raw
             declared = int(m.group("n")) if m else 1
-            lineup, complete = parse_lineup_string(row[5])
+            lineup, complete = parse_lineup_string(row[5], contest_type)
             try:
                 points = float(row[4]) if str(row[4]).strip() else None
             except ValueError:
@@ -198,7 +255,8 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
                 "pct_drafted": _parse_pct(row[9]),
                 "fpts": fpts,
             })
-    return {"entries": entries, "player_table": players, "path": path}
+    return {"entries": entries, "player_table": players, "path": path,
+            "contest_type": contest_type}
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +334,8 @@ def mine_contest(
     """
     entries = standings["entries"]
     ptable = standings["player_table"]
+    contest_type = str(standings.get("contest_type") or "classic").lower()
+    contract = ROSTER_CONTRACTS.get(contest_type, ROSTER_CONTRACTS["classic"])
     # DK's player table is grained per (player, roster position): a
     # multi-position player appears once per drafted slot and the rows SUM to
     # his total field share. Aggregate to player grain here; the raw split is
@@ -389,21 +449,52 @@ def mine_contest(
     #       omits position rows for some multi-position players, so their table
     #       can sum short of the structural total while our parse is exact. In
     #       that case the lineup-derived recompute is the authoritative ownership.
-    roster_size = sum(EXPECTED_SLOT_COUNTS.values())
+    roster_size = sum(contract["expected"].values())
     intra_entry_dupes = [
         e["entry_id"] for e in complete
         if len(e["players_norm"]) != len(set(e["players_norm"]))
     ]
     observed_slots = sum(roster_counts.values())
     expected_slots = roster_size * n_complete
-    parse_structural_ok = (not intra_entry_dupes) and (observed_slots == expected_slots)
+    # v0.5: the slot-count equality alone is fail-open. When NOTHING parses,
+    # n_complete is 0, both sides are 0, and a total parse failure certified
+    # itself as "structurally sound" while emitting an empty archive block. That
+    # is exactly what a Showdown export did before this module knew the Showdown
+    # contract: CPT/UTIL are not Classic slot tokens, so every row parsed to zero
+    # players and the gate waved it through. A gate that cannot fail on an empty
+    # parse is not a gate. Two additions: some entries must parse, and the share
+    # that did not must stay small.
+    unparsed = n_all - n_complete
+    unparsed_share = (unparsed / n_all) if n_all else 0.0
+    parsed_nothing = n_all > 0 and n_complete == 0
+    mostly_unparsed = n_all > 0 and unparsed_share > MAX_UNPARSED_ENTRY_SHARE
+    parse_structural_ok = (
+        (not intra_entry_dupes)
+        and (observed_slots == expected_slots)
+        and not parsed_nothing
+        and not mostly_unparsed
+    )
     denom_used = n_all if own_denominator == "all_entries" else n_complete
     recomputed_total_pct = round(100.0 * observed_slots / denom_used, 1) if denom_used else None
     dk_total_pct = round(sum(own.values()), 1) if own else None
     dk_deficit_pts = (round(recomputed_total_pct - dk_total_pct, 1)
                       if (recomputed_total_pct is not None and dk_total_pct is not None) else None)
     dk_table_agrees = (own_recompute_max_diff is not None and own_recompute_max_diff <= 1.5)
-    if not parse_structural_ok:
+    if parsed_nothing:
+        verification_note = (
+            f"PARSE FAILURE: none of the {n_all} entry rows parsed into a complete "
+            f"{roster_size}-player lineup. The lineup strings do not match the "
+            f"{contest_type} roster contract this run assumed. If the Lineup cells "
+            "read 'CPT ... UTIL ...' this is a Showdown export; mine it as Showdown. "
+            "Do not archive anything downstream of this parse.")
+    elif mostly_unparsed:
+        verification_note = (
+            f"PARSE FAILURE: {unparsed} of {n_all} entry rows ({unparsed_share:.0%}) "
+            f"did not parse into a complete {roster_size}-player lineup, above the "
+            f"{MAX_UNPARSED_ENTRY_SHARE:.0%} tolerance. Withdrawn and zeroed entries "
+            "are expected at low rates; this is too many to be that. "
+            "Do not archive anything downstream of this parse.")
+    elif not parse_structural_ok:
         verification_note = ("PARSE FAILURE: structural check failed "
                              f"(slots {observed_slots} vs expected {expected_slots}, "
                              f"{len(intra_entry_dupes)} entries with a duplicated player). "
@@ -426,9 +517,14 @@ def mine_contest(
         "coverage": "full" if has_salary else "standings_only",
         "contest_id": contest_id,
         "slate_date": slate_date,
+        # Carried explicitly so nothing downstream has to re-infer it. Showdown
+        # archetypes never pool with Classic in the ledger or the ownership work.
+        "contest_type": contest_type,
         "meta": {
             "entries_total": n_all,
             "entries_complete_lineups": n_complete,
+            "roster_size": roster_size,
+            "entries_unparsed": unparsed,
             "winning_points": winner["points"] if winner else None,
             "winning_entry_id": winner["entry_id"] if winner else None,
             "multi_entry_flag": any(e["declared_max_entries"] > 1 for e in entries),

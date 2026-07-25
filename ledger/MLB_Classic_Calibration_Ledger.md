@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  13 modules  157 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  13 modules  163 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw).
@@ -518,6 +518,152 @@ table omits, with drafted-position splits carried in a dedicated
 ---
 
 === ARCHIVE (append-only; full decompositions, newest first) ===
+
+**Aging test RESOLVED (2026-07-25):** the four 2026-07-24 night contests came
+back fully populated on a next-day pull, one day after the same endpoint returned
+zero bytes for the 07-19 contests on their third attempt. Age is the mechanism.
+Standing rule: pull standings the night a contest settles or the next morning,
+and check the file is non-zero before walking away. A zero-byte export is a
+failed pull, not a pulled file.
+
+Two archive entries below, kept separate because they are different draftgroups
+on the same date and pooling them would blur two different fields.
+
+## A-006 — 2026-07-24 — 4 contests, night slate (4 games: ATH@MIN, CIN@STL, LAA@SF, SEA@TEX)
+
+Salary basis: runs/20260724T233609Z_8f32ac45/inputs/DKSalaries.csv (16 entries
+delivered). All four passed the field_miner v0.5 structural gate at 100% salary
+join. Contests 192657349, 192657350, 192658268, 192667458.
+
+
+#### Full-field decomposition — contest 192657349 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 237 (228 complete lineups); winning score 118.9; multi-entry contest: True.
+- Duplication: 216 distinct lineups; 8.3% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 209, 2: 6, 7: 1}.
+- Salary usage: 55.7% of entries within $100 of the cap. Salary-left bins: {'1-100': 63, '> 1500': 18, '301-700': 26, '<= 0': 64, '701-1500': 22, '101-300': 35}.
+- Max-stack histogram: {2: 26, 3: 55, 4: 71, 5: 76}.
+- SP-pair field share (top): Dustin May/MacKenzie Gore 16.7%, Logan Webb/MacKenzie Gore 16.2%, Bryce Miller/Logan Webb 11.8%, Bryce Miller/Dustin May 11.0%.
+- Chalk (top-5 %Drafted): Logan Webb 45.15%, MacKenzie Gore 43.46%, Byron Buxton 42.62%, Dustin May 38.4%, Bryce Miller 34.6%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.42 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 192657350 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 237 (237 complete lineups); winning score 139.75; multi-entry contest: True.
+- Duplication: 214 distinct lineups; 13.1% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 206, 2: 4, 4: 1, 5: 1, 7: 2}.
+- Salary usage: 51.9% of entries within $100 of the cap. Salary-left bins: {'101-300': 53, '1-100': 67, '> 1500': 21, '<= 0': 56, '701-1500': 16, '301-700': 24}.
+- Max-stack histogram: {1: 2, 2: 31, 3: 67, 4: 69, 5: 68}.
+- SP-pair field share (top): Logan Webb/MacKenzie Gore 16.9%, Dustin May/MacKenzie Gore 11.0%, Bryce Miller/Logan Webb 11.0%, Bryce Miller/Dustin May 10.1%.
+- Chalk (top-5 %Drafted): Logan Webb 46.41%, MacKenzie Gore 45.15%, Byron Buxton 39.66%, Dustin May 35.86%, Bryce Miller 35.86%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.42 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 192658268 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 3567 (3454 complete lineups); winning score 145.95; multi-entry contest: True.
+- Duplication: 3105 distinct lineups; 15.7% of entries sat in a duplicated lineup; max copies 16; the winning lineup had 1 copy. Copies histogram: {1: 2911, 2: 137, 3: 25, 4: 12, 5: 7, 6: 4, 7: 3, 9: 1, 10: 3, 11: 1, 16: 1}.
+- Salary usage: 43.7% of entries within $100 of the cap. Salary-left bins: {'301-700': 630, '<= 0': 869, '1-100': 639, '> 1500': 200, '701-1500': 356, '101-300': 760}.
+- Max-stack histogram: {1: 3, 2: 409, 3: 789, 4: 761, 5: 1492}.
+- SP-pair field share (top): Logan Webb/MacKenzie Gore 18.0%, Dustin May/MacKenzie Gore 14.5%, Bryce Miller/Logan Webb 13.5%, Dustin May/Logan Webb 10.2%.
+- Chalk (top-5 %Drafted): Logan Webb 47.27%, MacKenzie Gore 45.84%, Bryce Miller 37.01%, Dustin May 36.05%, Byron Buxton 34.65%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+
+#### Full-field decomposition — contest 192667458 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 59 (58 complete lineups); winning score 110.8; multi-entry contest: False.
+- Duplication: 57 distinct lineups; 3.4% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 56, 2: 1}.
+- Salary usage: 60.3% of entries within $100 of the cap. Salary-left bins: {'301-700': 8, '<= 0': 16, '1-100': 19, '701-1500': 4, '> 1500': 4, '101-300': 7}.
+- Max-stack histogram: {2: 6, 3: 16, 4: 13, 5: 23}.
+- SP-pair field share (top): Dustin May/Logan Webb 20.7%, Bryce Miller/Logan Webb 20.7%, Logan Webb/MacKenzie Gore 17.2%, MacKenzie Gore/Zebby Matthews 12.1%.
+- Chalk (top-5 %Drafted): Logan Webb 64.41%, Byron Buxton 40.68%, MacKenzie Gore 40.68%, Jacob Wilson 37.29%, Bryce Miller 35.59%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 3.39 pts; parse OK; DK %Drafted table short 5.3 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+### Gaps to backfill for A-006
+
+Entry fee, payout structure, and cash line for all four contests (the export
+omits the archetype trio). Ben's own entries are identifiable from the promoted
+run's assignments but are not yet recorded; that is E-3 and remains unbuilt.
+
+## A-007 — 2026-07-24 — 6 contests, main slate (10 games)
+
+Salary basis: runs/20260724T224327Z_e80d2ada/inputs/DKSalaries.csv (9 entries
+delivered). All six passed the structural gate at 100% salary join. Contests
+192701222, 192701224, 192701225, 192705822, 192709106, 192712196.
+
+
+#### Full-field decomposition — contest 192701222 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 59 (59 complete lineups); winning score 123.6; multi-entry contest: False.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 52.5% of entries within $100 of the cap. Salary-left bins: {'301-700': 9, '<= 0': 18, '1-100': 13, '101-300': 13, '> 1500': 3, '701-1500': 3}.
+- Max-stack histogram: {1: 1, 2: 11, 3: 10, 4: 8, 5: 29}.
+- SP-pair field share (top): MacKenzie Gore/Roki Sasaki 6.8%, Dustin May/MacKenzie Gore 6.8%, Bryce Miller/Dustin May 5.1%, Logan Webb/Shane McClanahan 5.1%.
+- Chalk (top-5 %Drafted): MacKenzie Gore 30.51%, Logan Webb 28.81%, Dustin May 27.12%, Royce Lewis 23.72%, Shane McClanahan 20.34%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 5.09 pts; parse OK; DK %Drafted table short 10.6 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 192701224 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 59 (59 complete lineups); winning score 129.45; multi-entry contest: False.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 45.8% of entries within $100 of the cap. Salary-left bins: {'<= 0': 17, '101-300': 19, '> 1500': 2, '301-700': 10, '1-100': 10, '701-1500': 1}.
+- Max-stack histogram: {1: 1, 2: 11, 3: 10, 4: 8, 5: 29}.
+- SP-pair field share (top): Dustin May/Logan Webb 10.2%, Logan Webb/MacKenzie Gore 8.5%, Dustin May/MacKenzie Gore 8.5%, Logan Webb/Shane McClanahan 5.1%.
+- Chalk (top-5 %Drafted): Logan Webb 45.76%, Dustin May 30.51%, Byron Buxton 28.81%, Royce Lewis 27.11%, MacKenzie Gore 23.73%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 3.39 pts; parse OK; DK %Drafted table short 3.8 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 192701225 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 59 (59 complete lineups); winning score 132.8; multi-entry contest: False.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 57.6% of entries within $100 of the cap. Salary-left bins: {'301-700': 10, '1-100': 15, '<= 0': 19, '701-1500': 2, '> 1500': 2, '101-300': 11}.
+- Max-stack histogram: {1: 1, 2: 7, 3: 10, 4: 11, 5: 30}.
+- SP-pair field share (top): Dustin May/MacKenzie Gore 10.2%, Logan Webb/MacKenzie Gore 10.2%, Dustin May/Logan Webb 6.8%, Shane McClanahan/Trey Yesavage 6.8%.
+- Chalk (top-5 %Drafted): Logan Webb 37.29%, MacKenzie Gore 32.2%, Shane McClanahan 28.81%, Dustin May 27.12%, Byron Buxton 23.73%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 3.39 pts; parse OK; DK %Drafted table short 7.2 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 192705822 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 118 (118 complete lineups); winning score 126.75; multi-entry contest: True.
+- Duplication: 118 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 118}.
+- Salary usage: 66.1% of entries within $100 of the cap. Salary-left bins: {'<= 0': 51, '101-300': 20, '1-100': 27, '701-1500': 5, '301-700': 13, '> 1500': 2}.
+- Max-stack histogram: {1: 3, 2: 22, 3: 18, 4: 24, 5: 51}.
+- SP-pair field share (top): Dustin May/MacKenzie Gore 11.9%, Dustin May/Logan Webb 5.9%, Logan Webb/Shane McClanahan 5.9%, Bryce Miller/Logan Webb 5.1%.
+- Chalk (top-5 %Drafted): Logan Webb 38.98%, MacKenzie Gore 31.36%, Dustin May 28.81%, Byron Buxton 22.03%, Jake Cronenworth 22.03%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 2.54 pts; parse OK; DK %Drafted table short 4.4 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 192709106 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 59 (59 complete lineups); winning score 117.25; multi-entry contest: True.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 52.5% of entries within $100 of the cap. Salary-left bins: {'701-1500': 3, '1-100': 15, '<= 0': 16, '101-300': 17, '301-700': 7, '> 1500': 1}.
+- Max-stack histogram: {1: 1, 2: 7, 3: 6, 4: 14, 5: 31}.
+- SP-pair field share (top): Dustin May/MacKenzie Gore 13.6%, Dustin May/Trevor Rogers 8.5%, Bryce Miller/Logan Webb 8.5%, Logan Webb/MacKenzie Gore 8.5%.
+- Chalk (top-5 %Drafted): Logan Webb 42.37%, Dustin May 33.9%, MacKenzie Gore 30.51%, Byron Buxton 27.12%, Bryce Miller 25.42%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 6.78 pts; parse OK; DK %Drafted table short 8.9 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+#### Full-field decomposition — contest 192712196 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Entries 237 (237 complete lineups); winning score 133.0; multi-entry contest: False.
+- Duplication: 235 distinct lineups; 1.7% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 233, 2: 2}.
+- Salary usage: 67.9% of entries within $100 of the cap. Salary-left bins: {'1-100': 71, '<= 0': 90, '101-300': 47, '701-1500': 10, '301-700': 17, '> 1500': 2}.
+- Max-stack histogram: {1: 12, 2: 70, 3: 37, 4: 46, 5: 72}.
+- SP-pair field share (top): Logan Webb/MacKenzie Gore 9.3%, Dustin May/Logan Webb 8.4%, Dustin May/MacKenzie Gore 7.2%, Logan Webb/Trevor Rogers 3.4%.
+- Chalk (top-5 %Drafted): Logan Webb 37.55%, Byron Buxton 32.07%, Royce Lewis 27.84%, MacKenzie Gore 25.74%, Dustin May 24.05%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 2.11 pts; parse OK; DK %Drafted table short 3.5 pts (DK omits multi-position rows; lineup-derived ownership used).
+
+### Gaps to backfill for A-007
+
+Same trio gap as A-006. Note that all six missed the 1.5-point DK-table advisory
+band (max diff 2.1 to 6.8 pts) while passing the structural gate at a 100% join
+rate, which is the multi-position-row pattern first recorded on 2026-07-22.
+
+### Archive count after this session
+
+12 contests across 7 slate-entries (A-001..A-007). The ownership-model gate in
+section 5 counts SLATES, not contests: this session took the archive from 5
+slates to 7. Both of tonight's entries are Classic. The three 07-24 and four
+07-23 Showdown contests are pullable but were deliberately held back until
+field_miner v0.5 (this session) taught the miner the Showdown roster contract;
+they are now minable and remain uncaptured.
+
 
 **Evidence loss (2026-07-25, recorded so no future session proposes a re-pull):**
 Five standings exports are unrecoverable and their slates will never enter the
