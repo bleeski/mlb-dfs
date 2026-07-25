@@ -119,12 +119,19 @@ On 2026-07-24 that took a 16-entry Classic build to 10.8 seconds elapsed and it
 certified on the first attempt, after three runs with in-build fetching had been
 killed at the wall.
 
-**The sandbox degrades over a long session.** Late on 2026-07-24 a single engine
-module import stopped fitting in 40 seconds and `git status` hung indefinitely,
-in the same session where the whole build had run in 33 seconds an hour earlier.
-When that happens, stop trying: the work belongs on Ben's machine, where the same
-suite runs in under a second. Hand him PowerShell commands and say plainly what
-is unverified.
+**The mount stalls intermittently, and it recovers.** Late on 2026-07-24 a single
+engine module import stopped fitting in 40 seconds and `git status` hung
+indefinitely; roughly half an hour later, with nothing changed, the same import
+took 0.2 seconds, `git status` returned in 2.4 seconds, and the suite ran in
+0.028 seconds. This is a transient I/O stall on the host-backed mount, most
+likely antivirus or file-sync contention on the repo path, not progressive decay.
+
+So do not conclude the environment is broken from one observation. Pause, retry
+once, and only then decide. On 2026-07-24 I declared the test suite unrunnable and
+handed it to Ben when it would have run fine twenty minutes later. Keep per-call
+work bounded so a stall costs one call instead of a build, and if a stall persists
+across retries during a live slate, deliver from what is already certified rather
+than waiting it out.
 
 **Diagnostics, which matter more than they sound.** Always run `python -u` and
 redirect the log inside the repo. `/tmp` is not shared between calls, and
