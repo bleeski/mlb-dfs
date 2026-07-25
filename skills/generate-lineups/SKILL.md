@@ -80,6 +80,9 @@ before lock, run them first and pass the results in:
 
 Fresher lineups matter most. A team that has posted since the last pull moves from
 a projected batting order to a confirmed one, which is strictly better information.
+The script now ages a disk-cached feed itself: anything older than
+`--feed-max-age-minutes` (default 90) is refetched, and the brief records which
+feed was used and how old it was.
 
 ## Running inside the Cowork sandbox
 
@@ -116,19 +119,30 @@ On 2026-07-24 that took a 16-entry Classic build to 10.8 seconds elapsed and it
 certified on the first attempt, after three runs with in-build fetching had been
 killed at the wall.
 
+**The sandbox degrades over a long session.** Late on 2026-07-24 a single engine
+module import stopped fitting in 40 seconds and `git status` hung indefinitely,
+in the same session where the whole build had run in 33 seconds an hour earlier.
+When that happens, stop trying: the work belongs on Ben's machine, where the same
+suite runs in under a second. Hand him PowerShell commands and say plainly what
+is unverified.
+
 **Diagnostics, which matter more than they sound.** Always run `python -u` and
 redirect the log inside the repo. `/tmp` is not shared between calls, and
 buffered stdout vanishes when the call is killed; on 2026-07-24 fourteen minutes
 went to a build whose real error, a missing scipy, sat unread in a log that no
 longer existed. Never check liveness with `pgrep -f build_slate.py`, because the
 pattern matches the checking command's own command line and reports RUNNING
-forever. And note that a repo-wide `grep -rn` on this mount can return empty
-without erroring, which reads exactly like "no matches"; scope greps to specific
-files before concluding a symbol is absent.
+forever. The same self-match trap applies to `ps | grep`. And note that a
+repo-wide `grep -rn` on this mount can return empty without erroring, which reads
+exactly like "no matches"; scope greps to specific files before concluding a
+symbol is absent. When you pipe a command into `head`, `$?` is head's exit code,
+not the command's; capture to a file and check the real status.
 
 **Check dependencies before any build, including inside T-20.** A fresh sandbox
 has no scipy, and a `pip install` does not persist across sessions. The probe
 costs two seconds, and a missing solver is not a slow build, it is no build.
+`tools/wheel_fetch.py` fetches wheels resumably into a persistent mount directory
+when a single call cannot finish the download.
 
 If the build still will not fit, use the exit-10 resume and run the identical
 command again. The bank persists between invocations, so each call adds a slice.
@@ -151,11 +165,11 @@ A stale-but-valid salary file is still a valid salary file, so the build succeed
 certifies, and reports clean gates for the wrong slate. Nothing downstream can
 catch this. State the slate identity out loud before you solve.
 
-Related: DK often runs more than one Classic draftgroup on a date (a main slate
-and a Night slate). Staging and delivery are keyed by date today, so the second
-build overwrites the first one's staged inputs and its delivered
-`outputs/<date>/DKEntries.csv`. Copy any delivered file aside before building a
-second draftgroup for the same date.
+DK often runs more than one Classic draftgroup on a date (a main slate and a night
+slate). `build_slate.py` now compares game sets and moves a prior draftgroup's
+staged inputs, brief, and delivered file aside rather than overwriting them, and
+the brief carries a `slate` block with a tag like `2005_4g`. Read that tag back to
+Ben so he can confirm which draftgroup he is entering.
 
 ## Reporting back
 
@@ -176,6 +190,11 @@ Lead with the file and whether it is certified. Then a short brief, roughly:
 - **Environment**: if odds were pulled, the totals that shaped the stacks
 - **Anything odd**: stale platoon pages, teams with 8 of 9 hitters matched,
   warnings from the pool report
+
+Pool warnings are now scoped to the draftgroup, so a team named in them is a team
+on this slate. A team matching fewer than 5 of 9 salary hitters is a blocker, not
+a warning, because that is a name-crosswalk failure and building anyway
+substitutes a projected order while the real lineup sits unused.
 
 Keep it to a handful of lines. Ben can open the JSON if he wants the rest. Do not
 narrate the steps you took; he watched them happen.
@@ -279,7 +298,10 @@ python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 149 test
 ```
 
 The audit checks dependencies first and names the install command if something is
-missing, because a missing solver is not a slow build, it is no build.
+missing, because a missing solver is not a slow build, it is no build. It also
+pins the test count, so adding tests requires bumping `EXPECTED_TEST_COUNT` and
+the three docs that quote the expected line (CLAUDE.md, the ledger Quick Card,
+and this file). A count mismatch is the pin working, not a broken suite.
 
 Skip the test suite under deadline pressure. Inside T-20, go straight to the
 build. The dependency check is the one part that is never skipped: it takes two
@@ -295,7 +317,15 @@ python <repo>/tools/verify_export.py --salary <DKSalaries.csv> --entries <file.c
 
 Checks blanks, duplicates, the salary cap, slot eligibility, and, against a
 parent, that locked slots held and no new player came from a locked game. Exit 3
-on any failure.
+on any failure. The script's own `verify_classic` additionally enforces the DK
+rules of at most 5 hitters from one team and players from at least 2 games.
+
+## Commands for Ben
+
+Ben runs Windows PowerShell 5.1, not bash. `&&` is a parse error there. Give him
+one command per line, Windows paths with backslashes, and always start with
+`cd C:\Users\benja\Documents\Claude\mlb-dfs`, because he will not necessarily be
+in the repo.
 
 ## The engine, briefly
 
