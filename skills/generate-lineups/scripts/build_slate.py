@@ -928,6 +928,31 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     postures = parse_postures_arg(getattr(args, "postures", None))
     if postures:
         slate_kwargs["contest_postures"] = postures
+
+    # The pool report is the evidence behind the lineup gate. Without it run_slate
+    # can only say "some players carry a batting order", which is not the same
+    # claim.
+    slate_kwargs["source_metadata"] = {
+        **dict(slate_kwargs.get("source_metadata") or {}),
+        "pool_report": pool.get("pool_report"),
+    }
+
+    # F4 gates that this build genuinely cannot evidence, assumed explicitly and
+    # printed. A build given no odds map is a different state from a build whose
+    # odds matched nothing; only the first is assumable, and the assumption is
+    # recorded in diagnostics rather than papered over with a default of True.
+    assumed: list[str] = []
+    if not f1_by_player_id:
+        assumed.append("odds_gate_passed")
+    if not f5_by_player_id:
+        assumed.append("weather_gate_passed")
+    assumed += [g for g in parse_assume_gates_arg(getattr(args, "assume_gates", None))
+                if g not in assumed]
+    for gate in assumed:
+        print(f"gate assumed (not checked): {gate}", file=sys.stderr)
+    if assumed:
+        slate_kwargs["assume_gates"] = assumed
+
     result = run_slate(
         runs_root=str(REPO / "runs"),
         salary_csv=str(salary), entries_csv=str(entries),
@@ -1352,6 +1377,26 @@ def parse_postures_arg(value: str | None) -> dict[str, str]:
     return out
 
 
+ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
+                   "lineup_gate_passed", "pitcher_audit_gate_passed",
+                   "weather_gate_passed", "odds_gate_passed")
+
+
+def parse_assume_gates_arg(value: str | None) -> list[str]:
+    if not value:
+        return []
+    out = []
+    for name in str(value).split(","):
+        name = name.strip()
+        if not name:
+            continue
+        if name not in ASSUMABLE_GATES:
+            raise SystemExit(f"--assume-gates: unknown gate {name!r}; valid: "
+                             + ", ".join(ASSUMABLE_GATES))
+        out.append(name)
+    return out
+
+
 BARE_STAGED_NAMES = {"DKSalaries.csv", "DKEntries.csv"}
 
 
@@ -1431,6 +1476,12 @@ def main() -> int:
                     help="wall clock this invocation may use before saving and "
                          "asking to be rerun")
     ap.add_argument("--brief", help="write the brief JSON here")
+    ap.add_argument("--assume-gates", dest="assume_gates", default=None,
+                    help="comma-separated pre-export gates to certify without "
+                         "checking, for the T-5 fast path. Each one is recorded "
+                         "verbatim in diagnostics.json, so the artifact states "
+                         "which checks were skipped instead of implying they ran. "
+                         "Valid: " + ", ".join(ASSUMABLE_GATES))
     ap.add_argument("--postures", default=None,
                     help="comma-separated <contest_id_or_name>=<posture> pairs, e.g. "
                          "'192707612=wta_satellite,192707473=cash'. Postures: cash, "

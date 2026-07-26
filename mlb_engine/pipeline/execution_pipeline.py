@@ -364,6 +364,13 @@ def execute_portfolio(
         "diagnostic_source_file": str(final_export.relative_to(run_dir)),
         "diagnostic_source_sha256": final_hash,
         "assignment_sha256": assignment_record["sha256"],
+        # F4: what the pre-export gates were built from, recorded in the immutable
+        # run record. "Upload-ready" is defined as all three gates passing, so the
+        # artifact has to say which of its inputs were checked, which were
+        # asserted by the caller, and which were assumed without checking.
+        "workflow_gate_evidence": dict((metadata or {}).get("workflow_gate_evidence") or {}),
+        "assumed_gates": list((metadata or {}).get("assumed_gates") or []),
+        "caller_asserted_gates": list((metadata or {}).get("caller_asserted_gates") or []),
         **certification,
     }
     diagnostic_path = run_dir / "final" / "diagnostics.json"
@@ -698,6 +705,123 @@ def _resolve_contest_postures(
             "competing_patterns": list(inferred.get("competing_patterns") or []),
         }
     return resolved
+
+
+PRE_EXPORT_GATE_NAMES = (
+    "salary_gate_passed", "entry_grid_gate_passed", "lineup_gate_passed",
+    "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
+)
+
+
+def _applied(block: Any) -> Optional[bool]:
+    """True when an enrichment map reached rows, False when it reached none.
+
+    None when no map was requested at all: a build that was never given odds is
+    a different state from a build given odds that matched nothing, and only the
+    second is a failure.
+    """
+    if not isinstance(block, Mapping):
+        return None
+    requested = int(block.get("requested") or 0)
+    if requested <= 0:
+        return None
+    return int(block.get("applied_count") or 0) > 0
+
+
+def _derive_workflow_gates(
+    *,
+    schema: Mapping[str, Any],
+    entry_requirements: Sequence[Mapping[str, Any]],
+    posture_by_contest: Mapping[str, Mapping[str, Any]],
+    projected_order: Mapping[str, Any],
+    pitcher_roles: Optional[Mapping[str, str]],
+    projection_enrichment: Mapping[str, Any],
+    pool_report: Optional[Mapping[str, Any]] = None,
+) -> Tuple[Dict[str, Optional[bool]], Dict[str, str]]:
+    """Derive the six pre-export gates from evidence already on hand.
+
+    A gate is True only when something checkable says so, False when something
+    checkable says otherwise, and None when nothing does. None is not a pass:
+    ``validate_upload_ready_gates`` reports it as a missing gate and blocks. The
+    caller can assume any of them explicitly via ``assume_gates``, which is
+    recorded, and that is the only way one of these reaches True unchecked.
+    """
+    gates: Dict[str, Optional[bool]] = {}
+    why: Dict[str, str] = {}
+
+    gates["salary_gate_passed"] = bool(schema.get("passed"))
+    why["salary_gate_passed"] = f"salary CSV schema validation: {schema.get('summary')}"
+
+    reserved = list(entry_requirements or [])
+    grid_ok = bool(reserved) and all(
+        str(r.get("contest_id") or "").strip() for r in reserved
+    )
+    gates["entry_grid_gate_passed"] = grid_ok
+    why["entry_grid_gate_passed"] = (
+        f"{len(reserved)} reserved entries parsed across "
+        f"{len(posture_by_contest)} contests, every row carrying a contest id"
+        if grid_ok else
+        f"{len(reserved)} reserved entries parsed; the grid is empty or a row "
+        f"carries no contest id"
+    )
+
+    report = dict(pool_report or {})
+    if report:
+        thin = sorted(
+            team for team, rec in (report.get("teams") or {}).items()
+            if str(rec.get("status")) not in ("excluded_postponed", "excluded_no_order_data")
+            and int(rec.get("hitters") or 0) < 9
+        )
+        gates["lineup_gate_passed"] = not report.get("blockers") and not thin
+        why["lineup_gate_passed"] = (
+            f"pool report: {len(report.get('blockers') or [])} blockers, "
+            f"{len(thin)} team(s) under nine hitters"
+            + (f" ({', '.join(thin)})" if thin else "")
+        )
+    elif projected_order:
+        gates["lineup_gate_passed"] = True
+        why["lineup_gate_passed"] = (
+            f"{len(projected_order)} players carry a batting order; no pool "
+            f"report was supplied, so team completeness is unverified"
+        )
+    else:
+        gates["lineup_gate_passed"] = None
+        why["lineup_gate_passed"] = (
+            "no pool report and no batting orders; nothing states that the "
+            "lineups behind this build were reviewed"
+        )
+
+    roles = dict(pitcher_roles or {})
+    if roles:
+        bad = sorted(pid for pid, role in roles.items()
+                     if str(role) not in ALLOWED_PITCHER_ROLES_FOR_GATE)
+        gates["pitcher_audit_gate_passed"] = not bad
+        why["pitcher_audit_gate_passed"] = (
+            f"{len(roles)} declared arms, all in the allowed role set"
+            if not bad else f"arms with a role outside the allowed set: {bad}"
+        )
+    else:
+        gates["pitcher_audit_gate_passed"] = None
+        why["pitcher_audit_gate_passed"] = (
+            "no pitcher_roles supplied; nothing states which arms were audited")
+
+    enrichment = dict(projection_enrichment or {})
+    gates["weather_gate_passed"] = _applied(enrichment.get("f5"))
+    why["weather_gate_passed"] = _enrichment_note("F5 park/weather", enrichment.get("f5"))
+    gates["odds_gate_passed"] = _applied(enrichment.get("f1"))
+    why["odds_gate_passed"] = _enrichment_note("F1 implied team total", enrichment.get("f1"))
+    return gates, why
+
+
+ALLOWED_PITCHER_ROLES_FOR_GATE = frozenset(
+    {"verified_starter", "declared_probable_sp", "viable_bulk_or_alt_sp"})
+
+
+def _enrichment_note(label: str, block: Any) -> str:
+    if not isinstance(block, Mapping) or int(block.get("requested") or 0) <= 0:
+        return f"{label}: no map supplied for this build"
+    return (f"{label}: {block.get('applied_count')} of {block.get('requested')} "
+            f"requested rows enriched")
 
 
 def unresolved_contest_blockers(resolved: Mapping[str, Mapping[str, Any]]) -> List[str]:
@@ -2095,6 +2219,7 @@ def run_slate(
     excluded_player_ids: Optional[Iterable[str]] = None,
     portfolio_controls_override: Optional[Mapping[str, Any]] = None,
     workflow_gates: Optional[Mapping[str, Any]] = None,
+    assume_gates: Optional[Sequence[str]] = None,
     requested_n: Optional[int] = None,
     archetypes_path: Optional[str] = None,
     approve: bool = False,
@@ -2295,15 +2420,43 @@ def run_slate(
             )
         checkpoint["warnings"] = clock_warnings
 
+    # F4: six of the eight pre-export gates used to default to True with a static
+    # "caller_asserted" label, and no production caller ever supplied
+    # ``workflow_gates``. validate_upload_ready_gates only fails a gate that is
+    # present-and-falsy or absent, so the axis always passed and ``workflow_valid``
+    # was computed from constants. "Upload-ready" is defined as all three gates
+    # passing; if six inputs to that definition are literals, the label carries no
+    # information, which is how a 23-team 0/9 build read certified on 07-22.
+    #
+    # Each of the six is now derived from work this function has already done, or
+    # left None. None means missing, and missing blocks.
+    derived_gates, gate_evidence = _derive_workflow_gates(
+        schema=schema,
+        entry_requirements=entry_requirements,
+        posture_by_contest=posture_by_contest,
+        projected_order=projected_order,
+        pitcher_roles=pitcher_roles,
+        projection_enrichment=projection_enrichment,
+        pool_report=(source_metadata or {}).get("pool_report"),
+    )
     gate_defaults = {
-        "salary_gate_passed": True, "entry_grid_gate_passed": True,
-        "lineup_gate_passed": True, "pitcher_audit_gate_passed": True,
-        "weather_gate_passed": True, "odds_gate_passed": True,
+        **derived_gates,
         "projection_schema_gate_passed": bool(schema.get("passed")),
         "optimizer_gate_passed": bool(preflight.get("optimizer_certifiable")),
     }
-    caller_asserted = sorted(set(gate_defaults) - {"projection_schema_gate_passed", "optimizer_gate_passed"})
-    gates = {**gate_defaults, **dict(workflow_gates or {})}
+    supplied = dict(workflow_gates or {})
+    # The T-5 fast path. An assumed gate certifies, and the assumption is written
+    # verbatim into the artifact, so the file states which checks were skipped
+    # rather than implying they ran.
+    assumed = sorted({str(x) for x in (assume_gates or [])} & set(derived_gates))
+    gates = {**gate_defaults, **supplied}
+    for name in assumed:
+        if gates.get(name) is None:
+            gates[name] = True
+    gates = {k: v for k, v in gates.items() if v is not None}
+    # Only the gates a caller actually supplied are caller-asserted. The label
+    # used to name six gates nobody had asserted.
+    caller_asserted = sorted(set(supplied) & set(PRE_EXPORT_GATE_NAMES))
 
     base_payload = {
         "checkpoint_plan": checkpoint,
@@ -2317,6 +2470,8 @@ def run_slate(
         "slate_clock": clock,
         "waterfall": checkpoint.get("waterfall"),
         "caller_asserted_gates": caller_asserted,
+        "workflow_gate_evidence": gate_evidence,
+        "assumed_gates": assumed,
         "contest_identity_blockers": contest_identity_blockers,
         "strategy_defaults_are_priors": True,
         "projected_order": projected_order,
@@ -2395,7 +2550,11 @@ def run_slate(
         portfolio_controls=controls,
         confirmed_hitter_ids=confirmed_hitter_ids, confirmed_teams=confirmed_teams,
         pitcher_roles=pitcher_roles, excluded_player_ids=excluded_player_ids,
-        metadata={**(metadata or {}), "front_door": "run_slate", "front_door_version": VERSION},
+        metadata={**(metadata or {}), "front_door": "run_slate",
+                  "front_door_version": VERSION,
+                  "workflow_gate_evidence": gate_evidence,
+                  "assumed_gates": assumed,
+                  "caller_asserted_gates": caller_asserted},
         compute_bank_coverage=not light_satellite,
     )
     result.update({
@@ -2414,6 +2573,8 @@ def run_slate(
         "projected_order": projected_order,
         "projection_enrichment": projection_enrichment,
         "caller_asserted_gates": caller_asserted,
+        "workflow_gate_evidence": gate_evidence,
+        "assumed_gates": assumed,
         "contest_identity_blockers": contest_identity_blockers,
         "strategy_defaults_are_priors": True,
         "light_satellite": bool(light_satellite),

@@ -41,12 +41,20 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
+# F4: these were eight hardcoded True values on the path that runs closest to
+# lock with the least verification. A swap does not re-derive weather, odds, or a
+# pitcher audit, and it has no business claiming it did. What it can state is
+# what it actually checks: the salary file parsed, the entry grid parsed, and the
+# parent's posted lineups were read. The rest are declared assumptions, and
+# ``assumed_gates`` in the artifact names them.
 WORKFLOW_GATES = {
-    "salary_gate_passed": True, "entry_grid_gate_passed": True,
-    "lineup_gate_passed": True, "pitcher_audit_gate_passed": True,
-    "weather_gate_passed": True, "odds_gate_passed": True,
     "projection_schema_gate_passed": True, "optimizer_gate_passed": True,
 }
+# Named here rather than derived so the list is reviewable in one place. A swap
+# that wants a real weather gate has to be given a weather map.
+LATE_SWAP_ASSUMED_GATES = [
+    "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
+]
 PORTFOLIO_CONTROLS = {
     "max_player_exposure_pct": 0.6, "max_pitcher_exposure_pct": 0.7,
     "max_primary_stack_exposure_pct": 0.6, "max_sp_pair_repetition": 1,
@@ -194,9 +202,17 @@ def main() -> int:
         confirmed_teams=status["confirmed_teams"],
         starter_player_ids=status["starter_player_ids"],
         authorized_entry_ids=authorized,
-        workflow_gates=dict(WORKFLOW_GATES),
+        workflow_gates={**WORKFLOW_GATES, **{g: True for g in LATE_SWAP_ASSUMED_GATES},
+                        # Derived, not assumed: all three parsed above or this
+                        # script would already have exited.
+                        "salary_gate_passed": True,
+                        "entry_grid_gate_passed": True,
+                        "lineup_gate_passed": bool(status.get("confirmed_teams")),
+                        },
         portfolio_controls=controls,
     )
+    print("gates assumed by late swap (not checked): "
+          + ", ".join(LATE_SWAP_ASSUMED_GATES), file=sys.stderr)
 
     if not result.get("passed"):
         print("late swap did not pass:", file=sys.stderr)

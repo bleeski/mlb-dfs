@@ -1078,6 +1078,11 @@ class RunSlateFrontDoorTests(unittest.TestCase):
             # no expensive build happened
             self.assertFalse((root / "runs").exists())
 
+    # The six gates this fixture cannot evidence: it supplies no odds map, no
+    # weather map, and no pitcher_roles. Before F4 they defaulted to True and the
+    # certification read clean; now they are absent, and absent blocks.
+    UNEVIDENCED = ["odds_gate_passed", "weather_gate_passed", "pitcher_audit_gate_passed"]
+
     def test_approved_promotes_with_overrides(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1086,6 +1091,7 @@ class RunSlateFrontDoorTests(unittest.TestCase):
                 runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
                 projections_override=proj, candidates_override=cands,
                 portfolio_controls_override=self.LOOSE, approve=True,
+                assume_gates=self.UNEVIDENCED,
             )
             self.assertTrue(built["passed"], built.get("errors"))
             self.assertTrue(built["approved"])
@@ -1093,6 +1099,28 @@ class RunSlateFrontDoorTests(unittest.TestCase):
             self.assertTrue(built["allocation_certified"])
             self.assertTrue(Path(built["output_path"]).exists())
             self.assertEqual(built["candidate_bank"]["source"], "candidates_override")
+            # the artifact states which checks were skipped rather than implying
+            # they ran
+            self.assertEqual(sorted(built["assumed_gates"]), sorted(self.UNEVIDENCED))
+
+    def test_unevidenced_gates_block_and_are_named(self):
+        """F4: six gates used to be hardcoded True, so workflow_valid was a constant."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, entries, cands, proj = self._inputs(root)
+            built = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj, candidates_override=cands,
+                portfolio_controls_override=self.LOOSE, approve=True,
+            )
+            self.assertFalse(built["passed"])
+            errors = " ".join(built.get("errors") or [])
+            for gate in self.UNEVIDENCED:
+                self.assertIn(gate, errors)
+            # and every gate says why it reads the way it does
+            evidence = built["workflow_gate_evidence"]
+            self.assertIn("salary CSV schema validation", evidence["salary_gate_passed"])
+            self.assertIn("no map supplied", evidence["odds_gate_passed"])
 
     def test_blocks_on_bad_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
