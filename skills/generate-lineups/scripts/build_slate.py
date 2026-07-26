@@ -800,12 +800,38 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
     if degraded_reason:
         warnings.append(f"DEGRADED to unenriched build: {degraded_reason}")
 
+    # Derived from what the engine actually applied per row, not from the size of
+    # the input maps. A stale-ID map is requested-but-unapplied, and the brief
+    # used to report that as enrichment; an honest-looking enrichment block that
+    # misreports is worse than none.
+    engine_applied = {
+        key: int((enrichment.get(key) or {}).get("applied_count") or 0)
+        for key in ("f1", "f4", "f5")
+        if isinstance(enrichment.get(key), dict)
+    }
+    counts.update({f"{k}_engine_applied": v for k, v in engine_applied.items()})
+    requested_but_unapplied = sorted(
+        key for key in ("f1", "f4", "f5")
+        if isinstance(enrichment.get(key), dict)
+        and int((enrichment[key] or {}).get("requested") or 0) > 0
+        and int((enrichment[key] or {}).get("applied_count") or 0) == 0
+    )
+    for key in requested_but_unapplied:
+        warnings.append(
+            f"{key}: a map was supplied but reached zero rows; the ids in it do "
+            f"not match this slate's pool. That factor is OFF for this build.")
     signal = any(counts[k] for k in (
         "xwoba_non_neutral", "hitter_ceiling_differentiated",
         "pitcher_ceiling_differentiated", "f4_non_neutral", "f1_non_neutral",
-        "f5_non_neutral"))
+        "f5_non_neutral")) and not (
+        # If every factor that was requested applied to nothing, and nothing else
+        # differentiated a row, there is no signal to claim.
+        requested_but_unapplied and not counts["xwoba_non_neutral"]
+        and not counts["hitter_ceiling_differentiated"]
+        and not counts["pitcher_ceiling_differentiated"])
     return {
         "signal_applied": bool(signal),
+        "requested_but_unapplied": requested_but_unapplied,
         "degraded": bool(degraded_reason),
         "degraded_reason": degraded_reason,
         "reference_data": reference_status,
@@ -820,10 +846,12 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "note": "Enrichment counts are deterministic labeled priors applied to the "
                 "projection frame: xwOBA Base correction, xISO hitter ceilings, "
                 "K-rate pitcher ceilings, the F4 opposing-SP/platoon matchup "
-                "factor, and F1 from Vegas implied team totals. Implied totals "
-                "are derived from the posted total and moneyline, not published "
-                "by the book. Never ROI, win rate, or a probability claim. F5 "
-                "(weather) is not wired yet and reports 0.",
+                "factor, F1 from Vegas implied team totals, and F5 park/weather. "
+                "Implied totals are derived from the posted total and moneyline, "
+                "not published by the book. signal_applied and the *_engine_applied "
+                "counts come from the engine's per-row application, not from the "
+                "size of the input maps. Never ROI, win rate, or a probability "
+                "claim.",
     }
 
 
@@ -842,6 +870,47 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     report = pool["pool_report"]
     clock = pool.get("clock") or {}
     kwargs = pool["run_slate_kwargs"]
+
+    # F8: the intake blockers landed, and then were read once, to be printed into
+    # the brief. Nothing exited on them, so the 2026-07-22 failure (23 teams
+    # matched 0/9, headline read certified) replayed with prettier logging.
+    #
+    # Tiering per the anti-paralysis doctrine: a blocker that says the pool is
+    # structurally wrong for this slate is HARD, because a build on it is not a
+    # worse build, it is a build of something else. A blocker about the freshness
+    # of a reference file is SOFT: it degrades the build, it does not invalidate
+    # it, and stopping the slate over it is the failure mode the doctrine exists
+    # to prevent.
+    blockers = list(report.get("blockers") or [])
+    soft = [b for b in blockers if SOFT_POOL_BLOCKER_RE.search(b)]
+    hard = [b for b in blockers if b not in soft]
+    for b in soft:
+        print(f"pool (soft): {b}", file=sys.stderr)
+    if hard and not args.ignore_pool_blockers:
+        for b in hard:
+            print(f"POOL BLOCKER: {b}", file=sys.stderr)
+        print(json.dumps({
+            "status": "pool_blocked",
+            "blockers": hard,
+            "soft_blockers": soft,
+            "note": "the pool this build would use is structurally wrong for this "
+                    "slate; building on it produces a certified file for a "
+                    "different slate than the one being entered. Fix the input, "
+                    "or pass --ignore-pool-blockers to build anyway and have the "
+                    "override recorded in the brief.",
+        }, indent=1))
+        return 3, {}
+    if hard:
+        for b in hard:
+            print(f"POOL BLOCKER OVERRIDDEN by --ignore-pool-blockers: {b}",
+                  file=sys.stderr)
+
+    # A salary/feed clock disagreement means two sources describe different
+    # slates, so say which one this build adopted rather than picking silently.
+    if report.get("salary_cross_check") is False:
+        print(f"clock: salary file says {clock.get('first_lock_local')}, the "
+              f"lineups feed says {clock.get('feed_first_lock_local')}; adopted "
+              f"{clock.get('source', 'salary')}", file=sys.stderr)
 
     n_entries = args.entries or count_reserved(entries)
 
@@ -1059,6 +1128,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "delivered_sha256": manifest_sha256(delivered),
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
+        "pool_blockers_overridden": hard if (hard and args.ignore_pool_blockers) else [],
+        "pool_blockers_soft": soft,
         "run_id": result.get("run_id"),
         "gates": {
             "workflow_valid": result.get("workflow_valid"),
@@ -1453,6 +1524,14 @@ def parse_postures_arg(value: str | None) -> dict[str, str]:
     return out
 
 
+import re as _re
+
+# SOFT pool blockers: they degrade the build and print, they do not stop it.
+# Everything else from build_slate_pool is HARD. Keeping the soft list explicit
+# and short means a new blocker is hard by default, which is the safe direction.
+SOFT_POOL_BLOCKER_RE = _re.compile(
+    r"(stale|days old|refresh|reference file|platoon file is)", _re.IGNORECASE)
+
 ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
                    "weather_gate_passed", "odds_gate_passed")
@@ -1552,6 +1631,10 @@ def main() -> int:
                     help="wall clock this invocation may use before saving and "
                          "asking to be rerun")
     ap.add_argument("--brief", help="write the brief JSON here")
+    ap.add_argument("--ignore-pool-blockers", action="store_true",
+                    help="build despite a HARD pool blocker. The override is "
+                         "printed and recorded in the brief. Reach for this only "
+                         "when you have read the blocker and know it is wrong.")
     ap.add_argument("--assume-gates", dest="assume_gates", default=None,
                     help="comma-separated pre-export gates to certify without "
                          "checking, for the T-5 fast path. Each one is recorded "
