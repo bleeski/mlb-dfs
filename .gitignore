@@ -18,3 +18,6 @@ _scratch_*/
 
 # generate-lineups iteration scratch (build scripts, review HTML)
 skills/generate-lineups-workspace/
+
+# stray loose feed/bundle files at the slates root (per-slate dirs are ignored above)
+data/slates/_*.json
