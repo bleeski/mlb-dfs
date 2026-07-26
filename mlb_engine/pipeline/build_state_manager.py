@@ -231,6 +231,13 @@ def verify_run_bundle(run_dir: str | Path) -> Dict[str, Any]:
         source_rel = diagnostic.get("diagnostic_source_file")
         source_hash = diagnostic.get("diagnostic_source_sha256")
         if not source_rel or not source_hash:
+            # A blocked run has no export, so it has nothing to bind a hash to.
+            # Reporting that as a verification failure made every correctly
+            # blocked run read as tampered, which is the opposite of what the
+            # check is for.
+            if diagnostic.get("hash_binding_applicable") is False or \
+                    diagnostic.get("status") == "blocked":
+                continue
             errors.append("diagnostics missing export hash binding")
             continue
         source_path = run_path / source_rel

@@ -197,9 +197,47 @@ def _bank_coverage(projections: Any, candidates: Sequence[Dict[str, Any]]) -> Di
         return {"passed": None, "note": f"bank coverage diagnostic unavailable: {exc}"}
 
 
+def _json_safe(value: Any) -> Any:
+    """Drop anything that will not serialise, keeping the rest.
+
+    bank_diag carries DataFrames under 'lineups'. The counts and validations
+    beside them are the reviewable part and must reach disk; a single
+    unserialisable key must not take the whole record with it.
+    """
+    if isinstance(value, Mapping):
+        return {
+            ("|".join(sorted(str(x) for x in k))
+             if isinstance(k, (tuple, frozenset, set)) else str(k)): _json_safe(v)
+            for k, v in value.items() if k != "lineups"
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, (set, frozenset)):
+        return sorted(str(v) for v in value)
+    return str(value)
+
+
 def _blocked_result(run: Dict[str, Any], errors: Sequence[str], diagnostics: Dict[str, Any]) -> Dict[str, Any]:
     run_dir = Path(run["run_dir"])
     diagnostic_path = run_dir / "final" / "diagnostics.json"
+    # Blocked-run diagnostics used to omit status, blockers and errors, and to
+    # carry empty hash-binding fields, so verify_run_bundle reported a false
+    # "missing export hash binding" on a run that had been correctly blocked. A
+    # correctly blocked run is not a tampered one, and the record has to say
+    # which it is.
+    diagnostics = {
+        **diagnostics,
+        "status": "blocked",
+        "pipeline_version": VERSION,
+        "errors": list(errors),
+        "blockers": list(errors),
+        "export_declared": False,
+        "hash_binding_applicable": False,
+        "hash_binding_note": "no export was declared for this run; hash binding "
+                             "does not apply and its absence is not a defect",
+    }
     _write_json(diagnostic_path, diagnostics)
     register_artifact(run_dir, diagnostic_path, "diagnostics")
     update_run_certification(
@@ -235,6 +273,11 @@ def execute_portfolio(
     metadata: Optional[Dict[str, Any]] = None,
     additional_input_paths: Optional[Sequence[str | Path]] = None,
     compute_bank_coverage: bool = True,
+    # F11. Explicit rather than smuggled through ``metadata``: metadata goes into
+    # the run manifest, and these carry frozenset-keyed pair counts that a
+    # manifest cannot serialise. They belong in diagnostics.json only.
+    bank_diagnostics: Optional[Mapping[str, Any]] = None,
+    bank_warnings: Optional[Sequence[str]] = None,
 ) -> Dict[str, Any]:
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
@@ -371,6 +414,17 @@ def execute_portfolio(
         "workflow_gate_evidence": dict((metadata or {}).get("workflow_gate_evidence") or {}),
         "assumed_gates": list((metadata or {}).get("assumed_gates") or []),
         "caller_asserted_gates": list((metadata or {}).get("caller_asserted_gates") or []),
+        # F11: what the build actually did. build_multi_lineup returns relaxation
+        # counts, DU and anchor validation, and failed_indices; none of it was
+        # written down, so the immutable run record could not answer "what did the
+        # engine give up to produce this file". Relaxations are exactly the facts
+        # post-slate review needs, and a portfolio is clean when they are zero,
+        # not when the gates pass.
+        "bank_diagnostics": _json_safe(bank_diagnostics),
+        "warnings": list(bank_warnings or []),
+        "status": "certified" if certification.get("workflow_valid") else "blocked",
+        "export_declared": True,
+        "hash_binding_applicable": True,
         **certification,
     }
     diagnostic_path = run_dir / "final" / "diagnostics.json"
@@ -2258,6 +2312,13 @@ def run_slate(
         runtime_preflight, validate_projection_schema,
     )
 
+    # Pulled out of ``metadata`` before it reaches create_run: metadata is
+    # serialised into the run manifest, and these carry pair counts keyed on
+    # frozensets that json cannot encode as keys.
+    metadata = dict(metadata or {})
+    caller_bank_diagnostics = metadata.pop("bank_diagnostics", None)
+    caller_bank_warnings = metadata.pop("bank_warnings", None)
+
     entry_rows = parse_dk_entry_rows(str(entries_csv))
     reserved = [r for r in entry_rows]
     posture_by_contest = _resolve_contest_postures(reserved, contest_postures, archetypes_path)
@@ -2528,6 +2589,14 @@ def run_slate(
             "waterfall_coverage_target": wf_coverage_target,
             "contest_shape_profile": bank.get("contest_shape_profile"),
             "diversity_augmentation": bank.get("diversity_augmentation"),
+            # F11: the facts post-slate review needs, carried from the solver
+            # rather than discarded at this boundary.
+            "relaxations": bank.get("relaxations"),
+            "failed_indices": list(bank.get("failed_indices") or []),
+            "du_validation": bank.get("du_validation"),
+            "anchor_validation": bank.get("anchor_validation"),
+            "sp_pair_coverage_validation": bank.get("sp_pair_coverage_validation"),
+            "budget": bank.get("budget"),
         }
 
     if apply_script_routing and fill_depth_plan is not None:
@@ -2554,7 +2623,20 @@ def run_slate(
                   "front_door_version": VERSION,
                   "workflow_gate_evidence": gate_evidence,
                   "assumed_gates": assumed,
-                  "caller_asserted_gates": caller_asserted},
+                  "caller_asserted_gates": caller_asserted,
+                  },
+        # When candidates were handed in, run_slate did not build the bank and
+        # has nothing to say about how they were produced. The caller does, so
+        # the caller's record wins rather than being overwritten with the word
+        # "candidates_override".
+        bank_diagnostics={
+            **dict(caller_bank_diagnostics or {}),
+            **{k: v for k, v in (bank_diag or {}).items()
+               if candidates_override is None or k == "candidate_count"},
+        },
+        bank_warnings=(
+            list(caller_bank_warnings or [])
+            + list(((bank_diag or {}).get("relaxations") or {}).get("warnings") or [])),
         compute_bank_coverage=not light_satellite,
     )
     result.update({

@@ -607,5 +607,92 @@ class PromotedPointerPortabilityTests(unittest.TestCase):
             self.assertIsNone(get_latest_promoted_run(runs))
 
 
+class DiagnosticsHonestyTests(unittest.TestCase):
+    """F11: the run record is the project's memory of what was shipped and why."""
+
+    def test_coverage_target_does_not_shrink_to_the_lineups_built(self):
+        from mlb_engine.optimize.optimizer_v3 import validate_sp_pair_coverage
+
+        plan = {"policy": "weighted_soft", "target_unique_pairs": 8,
+                "required_pairs": [], "coverage_preference": "spread"}
+        # Three lineups against an eight-pair target. soft_pass used to be
+        # len(observed) >= min(target, len(lineups)), so a truncated portfolio
+        # always met its own target while the summary printed the unshrunk one.
+        records = [
+            {"lineup": None, "sp_ids": [f"p{i}", f"q{i}"]} for i in range(3)
+        ]
+        result = validate_sp_pair_coverage(records, plan)
+        self.assertEqual(result["target_unique_pairs"], 8)
+        self.assertTrue(result["truncated_portfolio"])
+        self.assertFalse(result["soft_target_met"])
+        self.assertFalse(result["pass"])
+        self.assertIn("unreachable by construction", result["summary"])
+
+    def test_augmentation_note_reports_a_no_op_as_a_no_op(self):
+        """The note asserted forced coverage even when nothing was appended."""
+        import re as _re
+
+        from mlb_engine.optimize import optimizer_v3
+
+        source = Path(optimizer_v3.__file__).read_text(encoding="utf-8")
+        # The unconditional claim is gone, and the no-op branch says so plainly.
+        self.assertNotIn(
+            'f"forced coverage across {n_pairs} viable SP pairs and "', source)
+        self.assertIn("coverage augmentation appended nothing", source)
+        self.assertIn("was NOT forced", source)
+        self.assertTrue(_re.search(r"if augmentation\['appended'\] <= 0", source))
+
+    def test_blocked_run_verifies_instead_of_reading_as_tampered(self):
+        from mlb_engine.pipeline.build_state_manager import (
+            create_run, register_artifact, update_run_certification,
+            verify_run_bundle,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run = create_run(Path(tmp) / "runs", "initial_build")
+            run_dir = Path(run["run_dir"])
+            diagnostics = run_dir / "final" / "diagnostics.json"
+            diagnostics.parent.mkdir(parents=True, exist_ok=True)
+            diagnostics.write_text(json.dumps({
+                "run_id": run["run_id"],
+                "status": "blocked",
+                "errors": ["pool blocker: ATL matched 0/9"],
+                "blockers": ["pool blocker: ATL matched 0/9"],
+                "export_declared": False,
+                "hash_binding_applicable": False,
+            }), encoding="utf-8")
+            register_artifact(run_dir, diagnostics, "diagnostics")
+            update_run_certification(
+                run_dir,
+                {"workflow_valid": False, "selection_certified": False,
+                 "allocation_certified": False},
+                errors=["pool blocker: ATL matched 0/9"], warnings=[],
+                status="blocked")
+            result = verify_run_bundle(run_dir)
+            self.assertTrue(result["passed"], result["errors"])
+            self.assertNotIn("diagnostics missing export hash binding",
+                             " ".join(result["errors"]))
+
+    def test_a_real_export_still_requires_its_hash_binding(self):
+        """The exemption must not become a way to skip the check that matters."""
+        from mlb_engine.pipeline.build_state_manager import (
+            create_run, register_artifact, verify_run_bundle,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run = create_run(Path(tmp) / "runs", "initial_build")
+            run_dir = Path(run["run_dir"])
+            diagnostics = run_dir / "final" / "diagnostics.json"
+            diagnostics.parent.mkdir(parents=True, exist_ok=True)
+            diagnostics.write_text(json.dumps({
+                "run_id": run["run_id"], "status": "certified",
+                "export_declared": True, "hash_binding_applicable": True,
+            }), encoding="utf-8")
+            register_artifact(run_dir, diagnostics, "diagnostics")
+            result = verify_run_bundle(run_dir)
+            self.assertFalse(result["passed"])
+            self.assertIn("missing export hash binding", " ".join(result["errors"]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

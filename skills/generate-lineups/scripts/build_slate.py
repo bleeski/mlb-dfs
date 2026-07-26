@@ -1077,6 +1077,30 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "pool_report": pool.get("pool_report"),
     }
 
+    # On the sliced path run_slate never builds the bank, so it has nothing to
+    # record about how the candidates were produced and diagnostics.json would
+    # say only "candidates_override". The cache's own report is the equivalent
+    # evidence and belongs in the immutable run record for the same reason
+    # (F11): the run record is this project's memory of what was shipped.
+    if bank_report is not None:
+        slate_kwargs["metadata"] = {
+            **dict(slate_kwargs.get("metadata") or {}),
+            "bank_diagnostics": {"source": "bank_cache", "strategy": strategy,
+                                 **{k: v for k, v in bank_report.items()
+                                    if k != "candidates"}},
+            "bank_warnings": [
+                w for w in [
+                    (f"{bank_report.get('jobs_failed')} cache jobs failed"
+                     if bank_report.get("jobs_failed") else None),
+                    ("the job list was not exhausted; this bank is a slice, not "
+                     "the full search" if not bank_report.get("job_list_exhausted")
+                     else None),
+                    (f"budget exhausted after {bank_report.get('elapsed_s')}s"
+                     if bank_report.get("budget_exhausted") else None),
+                ] if w
+            ],
+        }
+
     # F4 gates that this build genuinely cannot evidence, assumed explicitly and
     # printed. A build given no odds map is a different state from a build whose
     # odds matched nothing; only the first is assumable, and the assumption is
@@ -1771,8 +1795,35 @@ def main() -> int:
         feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
         if args.lineups:
             feed = json.loads(Path(args.lineups).read_text(encoding="utf-8"))
-            (slate_dir / "lineups_feed.json").write_text(json.dumps(feed), encoding="utf-8")
-            feed_note = {"source": str(args.lineups), "age_minutes": feed_age_minutes(feed)}
+            # A supplied feed overwrote the staged one unconditionally, so a feed
+            # for the wrong day or a hand-edited one destroyed the good copy and
+            # left nothing to fall back to. The staged feed is the durable input;
+            # it is replaced only by a feed that covers this draftgroup.
+            staged_feed = slate_dir / "lineups_feed.json"
+            feed_teams = {
+                str((game.get(side) or {}).get("team_abbrev") or "").upper()
+                for game in (feed.get("games") or []) for side in ("away", "home")
+            }
+            from mlb_engine.intake.slate_intake_manager import (
+                parse_dk_salary_csv as _parse_salary,
+            )
+            slate_teams = {sp.team.upper() for sp in _parse_salary(str(salary))
+                           if sp.team}
+            covered = len(slate_teams & feed_teams)
+            if slate_teams and covered * 2 < len(slate_teams):
+                print(json.dumps({
+                    "status": "supplied_feed_rejected",
+                    "feed": str(args.lineups),
+                    "slate_teams": sorted(slate_teams),
+                    "covered": covered,
+                    "note": "the supplied feed covers under half this draftgroup's "
+                            "teams, so it is a feed for a different slate. The "
+                            "staged feed was NOT overwritten.",
+                }, indent=1))
+                return 3, {}
+            staged_feed.write_text(json.dumps(feed), encoding="utf-8")
+            feed_note = {"source": str(args.lineups), "age_minutes": feed_age_minutes(feed),
+                         "draftgroup_coverage": f"{covered}/{len(slate_teams)}"}
         elif feed_path.exists():
             # Lineups confirm continuously through the afternoon, so a feed left on
             # disk from the morning quietly downgrades confirmed teams to projected

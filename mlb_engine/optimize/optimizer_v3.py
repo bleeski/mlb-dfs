@@ -1292,7 +1292,13 @@ def validate_sp_pair_coverage(lineup_records, coverage_plan=None):
     target_unique = int(coverage_plan.get('target_unique_pairs') or 0)
     policy = coverage_plan.get('policy', 'disabled')
     hard_pass = len(missing) == 0
-    soft_pass = len(observed) >= min(target_unique, len(lineup_records or []))
+    # The target does not move. It used to shrink to min(target, lineups built),
+    # so a truncated portfolio always met its own coverage target while the
+    # summary went on printing the unshrunk number. A gate whose note moves its
+    # own goalposts makes every automated check on `pass` useless.
+    n_built = len(lineup_records or [])
+    truncated_portfolio = bool(target_unique and n_built < target_unique)
+    soft_pass = len(observed) >= target_unique
     passed = hard_pass if required_pairs else soft_pass
     observed_dict = {tuple(sorted(pair, key=str)): count for pair, count in observed.items()}
     summary = (
@@ -1303,6 +1309,9 @@ def validate_sp_pair_coverage(lineup_records, coverage_plan=None):
         summary += f'; missing {len(missing)} required pair(s)'
     if not required_pairs and not soft_pass:
         summary += '; soft unique-pair target missed'
+    if truncated_portfolio:
+        summary += (f'; only {n_built} lineups were built against a {target_unique} '
+                    f'pair target, so the target was unreachable by construction')
     return {
         'pass': bool(passed),
         'policy': policy,
@@ -1312,6 +1321,8 @@ def validate_sp_pair_coverage(lineup_records, coverage_plan=None):
         'missing_required_pairs': missing,
         'covered_required_pairs': covered,
         'target_unique_pairs': target_unique,
+        'lineups_built': n_built,
+        'truncated_portfolio': truncated_portfolio,
         'soft_target_met': bool(soft_pass),
         'observed_unique_pair_count': len(observed),
         'observed_pair_counts': observed_dict,
@@ -2169,6 +2180,44 @@ def build_multi_lineup(
     budget_report['lineups_built'] = len(lineups)
     budget_report['elapsed_s'] = round(_time.monotonic() - budget_started, 3)
 
+    # A portfolio is not clean because the gates passed; it is clean when the
+    # relaxation counts are zero. These were computed per lineup and then lived
+    # only inside individual records, so the run record could not answer "what
+    # did the engine give up to produce this", which is exactly the fact
+    # post-slate review needs.
+    relaxations = {
+        'overlap_relaxed_lineups': sum(1 for r in lineups if 'relaxed_overlap' in r),
+        'du_relaxed_lineups': sum(1 for r in lineups if 'du_relaxation_idx' in r),
+        'du_retry_lineups': sum(1 for r in lineups if r.get('du_retry_count')),
+        'du_relaxation_high_water': du_relaxation_high_water,
+        'coverage_cap_notes': list(coverage_cap_notes),
+        'failed_lineup_count': len(failed_indices),
+        'requested': int(n_lineups),
+        'built': len(lineups),
+    }
+    relaxations['clean'] = not (
+        relaxations['overlap_relaxed_lineups']
+        or relaxations['du_relaxed_lineups']
+        or relaxations['coverage_cap_notes']
+        or relaxations['failed_lineup_count']
+    )
+    warnings = []
+    if relaxations['overlap_relaxed_lineups']:
+        warnings.append(
+            f"overlap cap relaxed on {relaxations['overlap_relaxed_lineups']} of "
+            f"{len(lineups)} lineups")
+    if relaxations['du_relaxed_lineups']:
+        warnings.append(
+            f"DU thresholds relaxed on {relaxations['du_relaxed_lineups']} lineups "
+            f"(high water step {du_relaxation_high_water})")
+    for note in coverage_cap_notes:
+        warnings.append(f"coverage cap: {note}")
+    if failed_indices:
+        warnings.append(
+            f"{len(failed_indices)} of {n_lineups} requested lineups were not built "
+            f"(indices {failed_indices[:10]})")
+    relaxations['warnings'] = warnings
+
     return {
         'lineups': lineups,
         'failed_indices': failed_indices,
@@ -2179,6 +2228,7 @@ def build_multi_lineup(
         'sp_pair_coverage_plan': coverage_plan,
         'sp_pair_coverage_validation': sp_pair_coverage_validation,
         'budget': budget_report,
+        'relaxations': relaxations,
     }
 
 # ============================================================================
@@ -3381,10 +3431,28 @@ def build_diverse_candidate_bank(
     augmentation['final_candidate_count'] = len(scored)
     augmentation['distinct_sp_pairs'] = len([k for k, v in pair_counts.items() if v > 0])
     augmentation['attempts'] = attempts['n']
-    augmentation['note'] = (
-        f"forced coverage across {n_pairs} viable SP pairs and "
-        f"{len(stack_teams)} stackable teams"
-    )
+    # Built from observed state. The note used to assert "forced coverage across
+    # N pairs" unconditionally, including when budget exhaustion no-opped both
+    # phases and the pass appended nothing at all, so the run record claimed work
+    # that never happened.
+    if augmentation['appended'] <= 0:
+        reason = ("the compute budget was exhausted before it ran"
+                  if augmentation['budget_exhausted']
+                  else "no candidate it produced improved coverage")
+        augmentation['note'] = (
+            f"coverage augmentation appended nothing: {reason}. The bank covers "
+            f"{augmentation['distinct_sp_pairs']} of {n_pairs} viable SP pairs; "
+            f"coverage across the remaining pairs was NOT forced."
+        )
+    else:
+        augmentation['note'] = (
+            f"appended {augmentation['appended']} candidates over "
+            f"{attempts['n']} attempts, forcing coverage toward {n_pairs} viable "
+            f"SP pairs and {len(stack_teams)} stackable teams; the bank now "
+            f"covers {augmentation['distinct_sp_pairs']} pairs"
+            + (". The compute budget was exhausted before the pass completed."
+               if augmentation['budget_exhausted'] else ".")
+        )
     bank['diversity_augmentation'] = augmentation
     return bank
 
