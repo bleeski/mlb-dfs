@@ -8,6 +8,20 @@ Priorities: **P0** corrupts what gets uploaded or lets an invalid file certify. 
 
 ---
 
+## Landed 2026-07-26 (Stage 0, Stage 1, Stage 2, plus F14)
+
+**Stage 2 LANDED.** F9, F10, F11, F12, G4. **F14 LANDED**, pulled forward from Stage 3 because it broke a real build during Stage 1 and its failure mode is invisible in the output.
+
+Open after this: F13 (timeout semantics), F15 (payload seams), F16 (late-swap identity), F17 (intake trust), F18 (factor ownership), F19 (determinism pin), F20 (caps, deferred by decision), F21 (Excluded coercion), F3b/F3c, the F23 remainder, and Section 2 beyond G1 and G4.
+
+**G7 is now decidable.** `tools/net_to_date.py` reads `ledger/own_results.json`, which the miner fills as contests are archived. It starts empty by design: the record written while verifying G4 used the top three finishers rather than Ben's entries and was deleted rather than left in the ledger as fiction. The number arrives from the next archived slate onward, and the runbook now says to capture fee and winnings on the day, because DK exports age out.
+
+Three defects the new tooling found on its own while Stage 2 landed:
+
+- `preserve_prior_slate` took its tag from whatever salary file was staged at the moment of the rename rather than from the file being renamed, so the certified 10-game Classic export had been filed as `DKEntries_1915_1g.csv`, borrowing a one-game Showdown slate's tag, with one brief written under two names.
+- Passing `--lineups` overwrote the staged feed unconditionally. A feed for the wrong day destroyed the good copy and left nothing to fall back to. It happened during this session.
+- `data/slates/2026-07-25/` held the Showdown pair at the bare Classic names, live, exactly as the review described. The staging guard now refuses it and the files are back under honest names.
+
 ## Landed 2026-07-26 (Stage 0 + Stage 1)
 
 **G1 LANDED** `tools/preflight_upload.py`. **F1 LANDED**. **F2 LANDED**. **F3a LANDED** (F3b shape enum and F3c ticket_line scoring still open). **F4 LANDED**. **F5 LANDED**. **F6 LANDED** as decided: the three holes are closed and CLAUDE.md records Showdown as review-grade with the cost stated; full gate integration stays open backlog. **F7 LANDED**. **F8 LANDED**. **F23 partial**: the untracked Showdown modules are committed and the stray feed files are ignored; the rest of the hygiene batch is open.
