@@ -541,5 +541,71 @@ class RegistryAccumulationTests(unittest.TestCase):
         self.assertEqual(resolved.name, "field_opponent_registry.json")
 
 
+class PromotedPointerPortabilityTests(unittest.TestCase):
+    """F12: the pointer raised across sessions and late swap died at entry."""
+
+    def _fake_run(self, runs_root: Path, run_id: str) -> Path:
+        from mlb_engine.pipeline.build_state_manager import (
+            MANIFEST_NAME, sha256_file,
+        )
+        run_dir = runs_root / run_id
+        (run_dir / "final").mkdir(parents=True)
+        (run_dir / MANIFEST_NAME).write_text(
+            json.dumps({"run_id": run_id, "status": "promoted"}), encoding="utf-8")
+        (runs_root / "latest_valid_run.json").write_text(json.dumps({
+            "run_id": run_id,
+            "run_dir_rel": run_id,
+            # An absolute path under a mount that does not exist in this process,
+            # which is the shape every pointer written in a prior Cowork session
+            # has.
+            "run_dir": f"/sessions/dead-session-mount/mnt/mlb-dfs/runs/{run_id}",
+            "manifest_sha256": sha256_file(run_dir / MANIFEST_NAME),
+            "promoted_utc": "2026-07-25T21:24:40+00:00",
+        }), encoding="utf-8")
+        return run_dir
+
+    def test_pointer_written_under_one_mount_resolves_under_another(self):
+        from mlb_engine.pipeline.build_state_manager import get_latest_promoted_run
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"
+            runs.mkdir()
+            run_dir = self._fake_run(runs, "20260725T212439Z_c2111186")
+            resolved = get_latest_promoted_run(runs)
+            self.assertIsNotNone(resolved)
+            self.assertEqual(Path(resolved["run_dir"]).resolve(), run_dir.resolve())
+
+    def test_old_shape_pointer_without_run_dir_rel_still_resolves(self):
+        """The pointers already on disk predate run_dir_rel; run_id must carry them."""
+        from mlb_engine.pipeline.build_state_manager import get_latest_promoted_run
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"
+            runs.mkdir()
+            run_dir = self._fake_run(runs, "20260725T212439Z_c2111186")
+            pointer = runs / "latest_valid_run.json"
+            data = json.loads(pointer.read_text(encoding="utf-8"))
+            del data["run_dir_rel"]
+            pointer.write_text(json.dumps(data), encoding="utf-8")
+            resolved = get_latest_promoted_run(runs)
+            self.assertIsNotNone(resolved)
+            self.assertEqual(Path(resolved["run_dir"]).resolve(), run_dir.resolve())
+
+    def test_a_genuinely_missing_run_returns_none_rather_than_raising(self):
+        from mlb_engine.pipeline.build_state_manager import get_latest_promoted_run
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"
+            runs.mkdir()
+            (runs / "latest_valid_run.json").write_text(json.dumps({
+                "run_id": "nope", "run_dir": "/sessions/dead/mnt/runs/nope",
+                "manifest_sha256": "x", "promoted_utc": "2026-07-25T00:00:00+00:00",
+            }), encoding="utf-8")
+            self.assertIsNone(get_latest_promoted_run(runs))
+            # and a corrupt pointer is None, not a traceback
+            (runs / "latest_valid_run.json").write_text("{not json", encoding="utf-8")
+            self.assertIsNone(get_latest_promoted_run(runs))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

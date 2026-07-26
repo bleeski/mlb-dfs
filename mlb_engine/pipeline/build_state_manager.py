@@ -282,6 +282,13 @@ def promote_run(
     pointer = Path(latest_pointer_path) if latest_pointer_path else run_path.parent / LATEST_POINTER
     _atomic_write_json(pointer, {
         "run_id": manifest["run_id"],
+        # Relative to the pointer's own directory, which is runs_root. A pointer
+        # that only knows an absolute path from a dead session mount is a pointer
+        # to nothing; this one resolves under any mount, and run_id resolves it
+        # even if the file is moved.
+        "run_dir_rel": run_path.resolve().name,
+        "runs_root_rel": str(pointer.parent.resolve().name),
+        # Kept for readers written against the old shape. Never resolved first.
         "run_dir": str(run_path.resolve()),
         "manifest_sha256": sha256_file(run_path / MANIFEST_NAME),
         "promoted_utc": manifest["promoted_utc"],
@@ -289,18 +296,58 @@ def promote_run(
     return {"passed": True, "errors": [], "run_id": manifest["run_id"], "run_dir": str(run_path)}
 
 
+def _resolve_pointer_run_dir(runs_root: Path, data: Dict[str, Any]) -> Optional[Path]:
+    """Locate the promoted run from the pointer, run_id first.
+
+    ``run_dir`` is an absolute path recorded by the session that promoted the
+    run. Every Cowork session gets a new mount, so in any later session that
+    path is not merely absent, it belongs to a directory tree the process cannot
+    stat: the bare ``.exists()`` raised PermissionError rather than returning
+    False, and ``tools/late_swap.py`` died at entry. The deadline-critical tool
+    must not depend on the birth session's filesystem.
+
+    ``runs_root`` plus ``run_id`` is the same run under whatever mount is
+    current, so it is tried first and the recorded path is only a fallback.
+    """
+    candidates = []
+    relative = str(data.get("run_dir_rel") or "").strip()
+    if relative:
+        candidates.append(runs_root / relative)
+    run_id = str(data.get("run_id") or "").strip()
+    if run_id:
+        candidates.append(runs_root / run_id)
+    recorded = str(data.get("run_dir") or "").strip()
+    if recorded:
+        candidates.append(Path(recorded))
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                return candidate
+        except OSError:
+            # A dead session mount. Not an error, just not this one.
+            continue
+    return None
+
+
 def get_latest_promoted_run(runs_root: str | Path) -> Optional[Dict[str, Any]]:
-    pointer = Path(runs_root) / LATEST_POINTER
-    if not pointer.exists():
+    runs_root = Path(runs_root)
+    pointer = runs_root / LATEST_POINTER
+    try:
+        if not pointer.exists():
+            return None
+        data = json.loads(pointer.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return None
-    data = json.loads(pointer.read_text(encoding="utf-8"))
-    run_dir = Path(data.get("run_dir", ""))
-    if not run_dir.exists():
+    run_dir = _resolve_pointer_run_dir(runs_root, data)
+    if run_dir is None:
         return None
-    manifest = _load_manifest(run_dir)
-    if manifest.get("status") != "promoted":
-        return None
-    if sha256_file(run_dir / MANIFEST_NAME) != data.get("manifest_sha256"):
+    try:
+        manifest = _load_manifest(run_dir)
+        if manifest.get("status") != "promoted":
+            return None
+        if sha256_file(run_dir / MANIFEST_NAME) != data.get("manifest_sha256"):
+            return None
+    except (OSError, ValueError):
         return None
     return {"run_dir": str(run_dir), "manifest": manifest, "pointer": data}
 
