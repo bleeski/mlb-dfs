@@ -8,6 +8,22 @@ Priorities: **P0** corrupts what gets uploaded or lets an invalid file certify. 
 
 ---
 
+## Landed 2026-07-26 (Stage 0 + Stage 1)
+
+**G1 LANDED** `tools/preflight_upload.py`. **F1 LANDED**. **F2 LANDED**. **F3a LANDED** (F3b shape enum and F3c ticket_line scoring still open). **F4 LANDED**. **F5 LANDED**. **F6 LANDED** as decided: the three holes are closed and CLAUDE.md records Showdown as review-grade with the cost stated; full gate integration stays open backlog. **F7 LANDED**. **F8 LANDED**. **F23 partial**: the untracked Showdown modules are committed and the stray feed files are ignored; the rest of the hygiene batch is open.
+
+Two decisions taken on the record. **F20 deferred**: the caps divergence is real and unchanged, but a cap change alters lineup construction and does not belong bundled into an integrity fix; it needs its own dated ledger decision. **F6** resolved as above.
+
+Three findings the new tools reproduced independently while landing this work, which should be read as confirming the review rather than as new items:
+
+- The first rebuild of the 07-25 four-game slate failed on a pitcher with no role, served from a bank cache built before the F1 filter existed. That is **F13/F14**'s job-key defect (`_job_key` omits any projections signature) reproducing live, and it argues for moving F14 up.
+- The golden replay had been silently broken by F4 and nothing caught it, because `tools/audit.py` gated `test_core` only. That is **F22** demonstrated, and the audit now gates four suites.
+- `outputs/2026-07-25/DKEntries_showdown_theses.csv` shows 0% embedded-pool overlap against all seven salary files on disk. That is the hand-typed-roster defect named in **F23**, confirmed.
+
+Nothing in Cluster B, Cluster C, or Section 2 beyond G1 is implemented. The backlog below stands as written for everything not marked LANDED above.
+
+---
+
 ## The governing frame
 
 Three facts govern everything below, in order.
