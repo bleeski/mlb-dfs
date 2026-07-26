@@ -38,6 +38,7 @@ import csv
 import hashlib
 import itertools
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -128,22 +129,59 @@ class BankCache:
         self.candidates: List[Dict[str, Any]] = []
         self.attempted: set[str] = set()
         self._seen: set[Tuple[str, ...]] = set()
+        self.corrupt_on_load = False
         if self.path.exists():
             self._load()
 
     def _load(self) -> None:
-        payload = json.loads(self.path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            # A cache killed mid-save is unreadable, and an unreadable cache
+            # used to be a fatal error on every later run for the same slate:
+            # the file is derived data and rebuilding it costs a slice, so
+            # discard and start over rather than block the build.
+            self.corrupt_on_load = True
+            self.candidates, self.attempted, self._seen = [], set(), set()
+            return
         self.candidates = list(payload.get("candidates") or [])
         self.attempted = set(payload.get("attempted") or [])
         self._seen = {tuple(c["roster"]) for c in self.candidates}
 
+    def drop_stale_jobs(self, conditions_sig: str) -> int:
+        """Forget candidates and attempts built under different conditions.
+
+        A job key ends with the conditions signature. Anything carrying a
+        different one was solved against a different exclude set, different
+        stack bounds, or different projections, and serving it now is serving
+        an answer to a question nobody asked. Returns how many were dropped.
+        """
+        if not conditions_sig:
+            return 0
+        suffix = f"|{conditions_sig}"
+        stale_attempts = {k for k in self.attempted if not k.endswith(suffix)}
+        stale_candidates = [
+            c for c in self.candidates
+            if c.get("job") and not str(c["job"]).endswith(suffix)
+        ]
+        if not stale_attempts and not stale_candidates:
+            return 0
+        self.attempted -= stale_attempts
+        keep = [c for c in self.candidates if c not in stale_candidates]
+        self.candidates = keep
+        self._seen = {tuple(c["roster"]) for c in keep}
+        return len(stale_attempts) + len(stale_candidates)
+
     def save(self) -> None:
+        """tmp + os.replace: a kill mid-save used to poison the file permanently."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({
+        tmp = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps({
             "version": VERSION,
             "candidates": self.candidates,
             "attempted": sorted(self.attempted),
         }, indent=1), encoding="utf-8")
+        os.replace(tmp, self.path)
 
     def add(self, roster: Sequence[str], objective: float, job: str = "") -> bool:
         """Store a candidate. Dedupes on the ordered roster, never the player set."""
@@ -221,8 +259,51 @@ class BankCache:
         return len(self.candidates)
 
 
-def _job_key(pair: Sequence[str], team: str, lock_sig: str = "") -> str:
-    return "|".join(["+".join(sorted(str(p) for p in pair)), str(team), lock_sig])
+def _job_key(pair: Sequence[str], team: str, lock_sig: str = "",
+             conditions_sig: str = "") -> str:
+    """Identify a solve by everything that changes its answer.
+
+    The key was (pair, team, lock signature) only. It omitted excludes, the
+    stack bounds, and any signature of the projections, so two solves that
+    would produce different lineups shared a key: a late-swap slice served
+    pre-exclusion candidates, and an enriched rerun served the unenriched
+    answers from before enrichment landed. That is not a stale cache in the
+    ordinary sense, it is the cache answering a question it was never asked.
+
+    It is not hypothetical. On 2026-07-26 a rebuild after the DK Status filter
+    landed failed certification on a pitcher with no role, served from a cache
+    built before the filter existed.
+    """
+    return "|".join([
+        "+".join(sorted(str(p) for p in pair)), str(team), lock_sig, conditions_sig,
+    ])
+
+
+def conditions_signature(
+    projections_df,
+    excludes: Optional[Sequence[str]] = None,
+    stack_min: Optional[int] = None,
+    stack_max: Optional[int] = None,
+) -> str:
+    """A short digest of everything outside (pair, team, locks) that moves a solve.
+
+    Covers the excluded set, the stack bounds, and the projection values the
+    objective is built from. Hashing the values rather than the row count
+    matters: an enrichment pass changes Ceiling without changing the pool.
+    """
+    digest = hashlib.sha256()
+    digest.update(b"v2")
+    digest.update(("|".join(sorted(str(x) for x in (excludes or []))) + "\n").encode())
+    digest.update(f"{stack_min}:{stack_max}\n".encode())
+    for column in ("Player_ID", "Ceiling", "Floor", "Base", "Salary", "Excluded"):
+        if column not in getattr(projections_df, "columns", []):
+            continue
+        try:
+            values = projections_df.sort_values("Player_ID")[column].tolist()
+        except Exception:  # noqa: BLE001 - a signature must not kill a build
+            values = list(projections_df[column])
+        digest.update((column + ":" + ",".join(f"{v}" for v in values) + "\n").encode())
+    return digest.hexdigest()[:16]
 
 
 def _lock_signature(locked_slot_assignments: Optional[Mapping[str, str]]) -> str:
@@ -253,6 +334,7 @@ def extend_bank(
     started = time.monotonic()
     lock_sig = _lock_signature(locked_slot_assignments)
     excl = [str(x) for x in (excludes or [])]
+    conditions_sig = ""  # computed below, once the stack bounds are settled
 
     # A DK Classic roster has 8 hitter slots. When a late-swap entry pins enough of
     # them, a 4-5 man stack no longer fits in what is left and every solve is
@@ -268,6 +350,11 @@ def extend_bank(
         stack_relaxed_to = max(0, free_hitter_slots)
         stack_min = stack_relaxed_to
         stack_max = max(stack_max, stack_min)
+
+    # Everything outside (pair, team, locks) that changes a solve's answer, fixed
+    # now that the stack bounds are settled and used as part of every job key.
+    conditions_sig = conditions_signature(projections_df, excl, stack_min, stack_max)
+    superseded = cache.drop_stale_jobs(conditions_sig)
 
     pitchers = projections_df[projections_df["Position"] == "P"]
     if "Ceiling" in pitchers.columns:
@@ -293,16 +380,51 @@ def extend_bank(
     else:
         pair_space = list(itertools.combinations(sp_ids, 2))
 
-    usable_pairs = [
-        (a, b) for a, b in pair_space if game_of.get(a) != game_of.get(b)
-    ]  # two starters in the same game cannot both be right
+    # Two starters in the same game cannot both be right. An unknown game is not
+    # the same game: str(nan) == str(nan), so two pitchers whose Game_ID did not
+    # parse compared equal and the pair was discarded, which is the opposite of
+    # the optimizer's own documented guard (it keeps the pair and reports it).
+    # Silently dropping pairs shrinks the legal search on a data condition.
+    def _known(gid: Any) -> bool:
+        text = str(gid).strip().lower()
+        return bool(text) and text not in ("nan", "none", "nat", "<na>")
+
+    usable_pairs = []
+    unknown_game_pairs = 0
+    for a, b in pair_space:
+        ga, gb = game_of.get(a), game_of.get(b)
+        if not _known(ga) or not _known(gb):
+            unknown_game_pairs += 1
+            usable_pairs.append((a, b))
+            continue
+        if ga != gb:
+            usable_pairs.append((a, b))
     # Breadth before depth: give every SP pair one lineup before any pair gets a
     # second. Portfolio controls cap SP-pair repetition (often at 1), so a bank
     # that deepens one pair at a time can hold hundreds of candidates and still
     # leave the selection MILP infeasible for want of distinct pairs. Rotating the
     # stack team alongside keeps team diversity climbing at the same rate.
+    # Ordered by combined ceiling, with an ID tiebreak for determinism. Rank-sum
+    # treats the gap between the best and second-best arm as identical to the gap
+    # between the twentieth and twenty-first, which it is not: on a budgeted
+    # slice the ordering decides which pairs get solved at all.
+    ceiling_of: Dict[str, float] = {}
+    if "Ceiling" in getattr(pitchers, "columns", []):
+        for row in pitchers.itertuples():
+            try:
+                ceiling_of[str(row.Player_ID)] = float(row.Ceiling)
+            except (TypeError, ValueError):
+                continue
     rank = {pid: i for i, pid in enumerate(sp_ids)}
-    usable_pairs.sort(key=lambda p: rank.get(p[0], 999) + rank.get(p[1], 999))
+
+    def _pair_order(pair: Tuple[str, str]):
+        a, b = pair
+        if ceiling_of:
+            combined = ceiling_of.get(a, 0.0) + ceiling_of.get(b, 0.0)
+            return (-combined, a, b)
+        return (rank.get(a, 999) + rank.get(b, 999), a, b)
+
+    usable_pairs.sort(key=_pair_order)
     jobs: List[Tuple[Tuple[str, str], str]] = []
     if teams:
         for round_idx in range(len(teams)):
@@ -321,10 +443,9 @@ def extend_bank(
         if remaining <= worst:
             exhausted = False
             break
-        key = _job_key(pair, team, lock_sig)
+        key = _job_key(pair, team, lock_sig, conditions_sig)
         if key in cache.attempted:
             continue
-        cache.attempted.add(key)
         attempted_now += 1
         attempt_started = time.monotonic()
         try:
@@ -338,8 +459,17 @@ def extend_bank(
             )
         except Exception:  # noqa: BLE001 - an infeasible combination is data, not an error
             worst = max(worst, time.monotonic() - attempt_started)
+            # A proven-infeasible combination will be infeasible again under the
+            # same conditions, so it is recorded and never retried.
+            cache.attempted.add(key)
             continue
         worst = max(worst, time.monotonic() - attempt_started)
+        # Recorded only after the solve returned. Keys used to enter `attempted`
+        # BEFORE the solve and persist, so a job that hit the time limit was
+        # marked done forever and never retried on a later slice: the sliced path
+        # is the big-slate path, and this quietly dropped exactly the jobs a
+        # second slice exists to finish.
+        cache.attempted.add(key)
         roster = ordered_roster(lineup_df)
         if roster is None:
             continue
@@ -358,10 +488,10 @@ def extend_bank(
             built += 1
 
     cache.save()
-    # Count only jobs for this lock signature. cache.attempted spans every
-    # signature the cache has seen, so a global count reads as more jobs done
-    # than the current list contains.
-    suffix = f"|{lock_sig}"
+    # Count only jobs for this lock signature AND these conditions. Both are
+    # suffixes of the key; a global count reads as more jobs done than the
+    # current list contains.
+    suffix = f"|{lock_sig}|{conditions_sig}"
     done_here = sum(1 for key in cache.attempted if key.endswith(suffix))
     return {
         "version": VERSION,
@@ -374,6 +504,13 @@ def extend_bank(
         "elapsed_s": round(time.monotonic() - started, 3),
         "time_budget_s": float(time_budget_s),
         "lock_signature": lock_sig,
+        "conditions_signature": conditions_sig,
+        # Named so a reviewer can see the cache decided some of its stored work
+        # no longer answers this build's question, rather than wondering why the
+        # candidate count fell.
+        "superseded_jobs_dropped": superseded,
+        "cache_was_corrupt_on_load": bool(getattr(cache, "corrupt_on_load", False)),
+        "unknown_game_pairs_kept": unknown_game_pairs,
         "free_hitter_slots": free_hitter_slots,
         "stack_min_relaxed_to": stack_relaxed_to,
         "note": "deterministic candidate generation through the certified MILP path; "

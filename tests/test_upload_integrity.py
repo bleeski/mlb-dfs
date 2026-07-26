@@ -694,5 +694,79 @@ class DiagnosticsHonestyTests(unittest.TestCase):
             self.assertIn("missing export hash binding", " ".join(result["errors"]))
 
 
+class BankCacheCorrectnessTests(unittest.TestCase):
+    """F14: the cache served answers to questions nobody asked."""
+
+    def _frame(self):
+        import pandas as pd
+        return pd.DataFrame({
+            "Player_ID": ["1", "2", "3"],
+            "Ceiling": [10.0, 20.0, 30.0],
+            "Salary": [4000, 5000, 6000],
+            "Excluded": [False, False, False],
+        })
+
+    def test_conditions_signature_moves_with_every_input_that_moves_a_solve(self):
+        from mlb_engine.optimize.bank_cache import conditions_signature
+
+        frame = self._frame()
+        base = conditions_signature(frame, [], 4, 5)
+        self.assertEqual(base, conditions_signature(frame, [], 4, 5))
+        self.assertNotEqual(base, conditions_signature(frame, ["2"], 4, 5),
+                            "an exclude must change the signature")
+        self.assertNotEqual(base, conditions_signature(frame, [], 3, 5),
+                            "a stack bound must change the signature")
+        enriched = frame.copy()
+        enriched.loc[0, "Ceiling"] = 11.5
+        self.assertNotEqual(base, conditions_signature(enriched, [], 4, 5),
+                            "an enrichment pass must change the signature")
+
+    def test_stale_jobs_are_dropped_when_conditions_change(self):
+        from mlb_engine.optimize.bank_cache import BankCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = BankCache(Path(tmp) / "bank.json")
+            cache.attempted = {"a+b|TEAM||OLDSIG", "c+d|TEAM||NEWSIG"}
+            cache.candidates = [
+                {"roster": [str(i) for i in range(10)], "objective": 1.0,
+                 "job": "a+b|TEAM||OLDSIG"},
+                {"roster": [str(i) for i in range(10, 20)], "objective": 2.0,
+                 "job": "c+d|TEAM||NEWSIG"},
+            ]
+            cache._seen = {tuple(c["roster"]) for c in cache.candidates}
+            dropped = cache.drop_stale_jobs("NEWSIG")
+            self.assertEqual(dropped, 2)
+            self.assertEqual(cache.attempted, {"c+d|TEAM||NEWSIG"})
+            self.assertEqual(len(cache.candidates), 1)
+            self.assertEqual(cache.candidates[0]["job"], "c+d|TEAM||NEWSIG")
+            # idempotent: running it again changes nothing
+            self.assertEqual(cache.drop_stale_jobs("NEWSIG"), 0)
+
+    def test_corrupt_cache_rebuilds_instead_of_blocking_the_build(self):
+        from mlb_engine.optimize.bank_cache import BankCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            path.write_text('{"candidates": [{"roster": ["a"', encoding="utf-8")
+            cache = BankCache(path)
+            self.assertTrue(cache.corrupt_on_load)
+            self.assertEqual(cache.candidates, [])
+            self.assertEqual(cache.attempted, set())
+
+    def test_save_is_atomic(self):
+        from mlb_engine.optimize.bank_cache import BankCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache = BankCache(path)
+            cache.add([str(i) for i in range(10)], 1.0, job="j")
+            cache.save()
+            self.assertTrue(path.exists())
+            # no tmp files left behind
+            self.assertEqual(
+                [p.name for p in Path(tmp).iterdir() if p.name != "bank.json"], [])
+            self.assertEqual(len(BankCache(path).candidates), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
