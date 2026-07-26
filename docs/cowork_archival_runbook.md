@@ -97,6 +97,18 @@ Per contest:
    you are running inside a sandbox with a call timeout; it exits 10 with
    progress kept and finishes across several runs.
 
+   **Capture the money at mining time, not later.** Add `--entry-fee <fee>` and
+   `--winnings <won>` for the contests Ben entered. Entry IDs are harvested from
+   `outputs/<slate_date>/upload_manifest.json` automatically; `--my-entry-ids`
+   overrides that. This writes a self-vs-field block into the ledger entry and
+   appends the contest to `ledger/own_results.json`, which
+   `python tools/net_to_date.py` turns into one cumulative table.
+
+   Do this on the day. DK exports age out and five contests are already
+   unrecoverable; anything not captured at mining time is captured never. The
+   number this produces is the input to the open stakes decision, and that
+   decision cannot be made without it.
+
 6. Paste the emitted block into the ledger archive under the slate's `A-NNN`
    entry, newest first. Reconcile the living sections the same session: if the
    slate contradicts a provisional rule, adjust the rule's grade and note the

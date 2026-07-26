@@ -768,5 +768,94 @@ class BankCacheCorrectnessTests(unittest.TestCase):
             self.assertEqual(len(BankCache(path).candidates), 1)
 
 
+class OwnResultsTests(unittest.TestCase):
+    """G4: the rank column was parsed and discarded, so 'are we winning' was unanswerable."""
+
+    def _mined(self):
+        return {
+            "contest_id": "C1", "slate_date": "2026-07-24",
+            "meta": {"entries_total": 100, "winning_points": 150.0},
+            "entries": [
+                {"rank": "1", "entry_id": "E1", "points": 150.0,
+                 "players_norm": ("a", "b")},
+                {"rank": "4", "entry_id": "E2", "points": 140.0,
+                 "players_norm": ("c", "d")},
+                {"rank": "51", "entry_id": "E3", "points": 100.0,
+                 "players_norm": ("c", "d")},
+                {"rank": "90", "entry_id": "E9", "points": 50.0,
+                 "players_norm": ("e", "f")},
+            ],
+        }
+
+    def test_finish_percentiles_and_duplication_against_the_field(self):
+        from mlb_engine.field.field_miner import summarize_own_entries
+
+        summary = summarize_own_entries(self._mined(), ["E2", "E3"],
+                                        entry_fee=0.25, winnings=1.50)
+        self.assertEqual(summary["matched"], 2)
+        self.assertEqual(summary["best_rank"], 4)
+        self.assertEqual(summary["worst_rank"], 51)
+        self.assertEqual(summary["field_size"], 100)
+        self.assertAlmostEqual(summary["best_finish_percentile"], 97.0, places=1)
+        self.assertEqual(summary["best_points"], 140.0)
+        self.assertEqual(summary["winning_points"], 150.0)
+        # E2 and E3 are the same lineup, so both are duplicated by the field
+        self.assertEqual(summary["own_lineups_duplicated_by_field"], 2)
+        self.assertEqual(summary["max_copies_of_an_own_lineup"], 2)
+        self.assertAlmostEqual(summary["fees_total"], 0.50)
+        self.assertAlmostEqual(summary["net"], 1.00)
+        self.assertIn("never a graded prediction", summary["labels"])
+
+    def test_no_money_supplied_means_no_net_rather_than_a_guess(self):
+        from mlb_engine.field.field_miner import summarize_own_entries
+
+        summary = summarize_own_entries(self._mined(), ["E2"])
+        self.assertIsNone(summary["net"])
+        self.assertIsNone(summary["fees_total"])
+        self.assertEqual(summary["matched"], 1)
+
+    def test_unmatched_entry_ids_say_so_instead_of_reporting_zero(self):
+        from mlb_engine.field.field_miner import summarize_own_entries
+
+        summary = summarize_own_entries(self._mined(), ["NOPE"])
+        self.assertEqual(summary["matched"], 0)
+        self.assertIn("check the contest id", summary["note"])
+
+    def test_rank_survives_the_entries_projection(self):
+        """It was parsed off the standings and then dropped at the projection."""
+        from mlb_engine.field.field_miner import mine_contest, parse_standings_export
+
+        archived = sorted((REPO / "data" / "archive").rglob("contest-standings-*.csv"))
+        if not archived:
+            self.skipTest("no archived standings on disk")
+        standings = parse_standings_export(str(archived[0]))
+        # standings_only tier: no salary map needed, so this stays fast.
+        mined = mine_contest(standings, None, contest_id="T1")
+        entries = mined["entries"]
+        self.assertTrue(entries, "fixture standings produced no complete entries")
+        self.assertIn("rank", entries[0])
+        self.assertTrue(any(str(e["rank"]).strip().isdigit() for e in entries))
+
+    def test_net_to_date_is_keyed_on_contest_id(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        from net_to_date import append_record, load_records
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "own.json"
+            append_record({"contest_id": "C1", "slate_date": "2026-07-24",
+                           "net": 0.75, "fees_total": 0.75, "winnings_total": 1.5,
+                           "matched": 3}, path)
+            append_record({"contest_id": "C2", "slate_date": "2026-07-25",
+                           "net": -0.25, "fees_total": 0.25, "winnings_total": 0.0,
+                           "matched": 1}, path)
+            append_record({"contest_id": "C1", "slate_date": "2026-07-24",
+                           "net": 1.10, "fees_total": 0.75, "winnings_total": 1.85,
+                           "matched": 3}, path)
+            records = load_records(path)
+            self.assertEqual(len(records), 2)
+            self.assertEqual({r["contest_id"]: r["net"] for r in records},
+                             {"C1": 1.10, "C2": -0.25})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -794,7 +794,11 @@ def mine_contest(
         },
         "entries": [
             {k: e[k] for k in (
-                "entry_id", "username", "points", "salary_used", "salary_left",
+                # ``rank`` was parsed and then dropped here, so the project could
+                # not answer "where did my entries finish" and therefore could not
+                # answer "are we winning" (G4). It is the cheapest column in the
+                # file and it was the only one thrown away.
+                "rank", "entry_id", "username", "points", "salary_used", "salary_left",
                 "sp_pair", "max_stack", "stack_pattern", "chalk_score", "n_cheap",
                 "players_norm", "lineup_complete",
             )} for e in entries if e["lineup_complete"]
@@ -882,6 +886,110 @@ def score_duplication_risk(
 # ---------------------------------------------------------------------------
 # Opponent-recurrence registry (EntryName usernames across archived contests)
 # ---------------------------------------------------------------------------
+
+def harvest_own_entry_ids(slate_date: str, contest_id: str = "") -> List[str]:
+    """Ben's Entry IDs for a contest, read from that date's upload manifest.
+
+    The manifest records every delivered file and the contests it covered, so
+    the delivered file itself is the record of which Entry IDs were entered
+    where. Asking the operator to retype them at archival time is how this step
+    gets skipped.
+    """
+    root = Path(__file__).resolve().parents[2]
+    manifest_path = root / "outputs" / str(slate_date) / "upload_manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+
+    wanted = str(contest_id or "").strip()
+    out: List[str] = []
+    for record in manifest.get("deliveries", []):
+        if record.get("status") == "superseded":
+            continue
+        if wanted and wanted not in {str(c) for c in (record.get("contest_ids") or [])}:
+            continue
+        delivered = root / str(record.get("delivered_file") or "")
+        if not delivered.exists():
+            continue
+        try:
+            rows = parse_dk_entry_rows(delivered)
+        except (OSError, ValueError):
+            continue
+        out.extend(r.entry_id for r in rows
+                   if not wanted or r.contest_id == wanted)
+    return sorted(set(out))
+
+
+def summarize_own_entries(
+    mined: Mapping[str, Any],
+    my_entry_ids: Sequence[str],
+    entry_fee: Optional[float] = None,
+    winnings: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Where Ben's own entries finished, against the field he was in.
+
+    G4: ``parse_standings_export`` read the rank column and the entries
+    projection dropped it, ``grade_against_actuals`` had never run, and no
+    archived contest carried a fee. The project could not answer "are we
+    winning", which makes the stakes decision undecidable for want of a number.
+
+    Everything here is an observed outcome read off a completed contest. It is
+    not a graded prediction, an ROI model, a win rate, or a probability claim,
+    and it says nothing about whether any of it was skill.
+    """
+    wanted = {str(x).strip() for x in (my_entry_ids or []) if str(x).strip()}
+    all_entries = list(mined.get("entries") or [])
+    field_size = int((mined.get("meta") or {}).get("entries_total") or len(all_entries))
+    mine = [e for e in all_entries if str(e.get("entry_id")) in wanted]
+    if not mine:
+        return {"matched": 0, "requested": len(wanted), "field_size": field_size,
+                "note": "none of the supplied entry ids appear in this contest's "
+                        "standings; check the contest id"}
+
+    def _rank(entry) -> Optional[int]:
+        try:
+            return int(str(entry.get("rank")).strip())
+        except (TypeError, ValueError):
+            return None
+
+    ranks = [r for r in (_rank(e) for e in mine) if r is not None]
+    points = [e["points"] for e in mine if e.get("points") is not None]
+    # Duplication against the field, which is the number that matters in a
+    # satellite: clearing the cut line undbuplicated is the whole game.
+    groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
+    for entry in all_entries:
+        groups[tuple(entry["players_norm"])].append(str(entry.get("entry_id")))
+    dup_counts = []
+    for entry in mine:
+        copies = len(groups.get(tuple(entry["players_norm"]), []))
+        dup_counts.append(copies)
+    fees = (float(entry_fee) * len(mine)) if entry_fee is not None else None
+    return {
+        "matched": len(mine),
+        "requested": len(wanted),
+        "field_size": field_size,
+        "best_rank": min(ranks) if ranks else None,
+        "worst_rank": max(ranks) if ranks else None,
+        "best_finish_percentile": (round(100.0 * (1 - (min(ranks) - 1) / field_size), 2)
+                                   if ranks and field_size else None),
+        "median_finish_percentile": (
+            round(100.0 * (1 - (statistics.median(ranks) - 1) / field_size), 2)
+            if ranks and field_size else None),
+        "best_points": max(points) if points else None,
+        "winning_points": (mined.get("meta") or {}).get("winning_points"),
+        "own_lineups_duplicated_by_field": sum(1 for c in dup_counts if c > 1),
+        "max_copies_of_an_own_lineup": max(dup_counts) if dup_counts else None,
+        "entry_fee": entry_fee,
+        "fees_total": fees,
+        "winnings_total": winnings,
+        "net": (round(float(winnings) - fees, 2)
+                if winnings is not None and fees is not None else None),
+        "labels": "observed outcomes from a completed contest; never a graded "
+                  "prediction, ROI model, win rate, or probability claim",
+    }
+
 
 DEFAULT_REGISTRY_PATH = "data/reference/field_opponent_registry.json"
 
@@ -1054,6 +1162,23 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
     if salary_tables_valid and c["sp_pair_top"]:
         top = ", ".join(f"{'/'.join(x['pair'])} {x['field_share_pct']}%" for x in c["sp_pair_top"][:4])
         lines.append(f"- SP-pair field share (top): {top}.")
+    own = mined.get("own_results")
+    if own and own.get("matched"):
+        net = (f"; fees ${own['fees_total']:.2f}, winnings ${own['winnings_total']:.2f}, "
+               f"net ${own['net']:.2f}"
+               if own.get("net") is not None else
+               "; fees and winnings not supplied, so no net line for this contest")
+        lines.append(
+            f"- **Self vs field**: {own['matched']} own entries; best rank "
+            f"{own['best_rank']}/{own['field_size']} "
+            f"({own['best_finish_percentile']}th pct), median "
+            f"{own['median_finish_percentile']}th pct; best {own['best_points']} pts "
+            f"against a winning {own['winning_points']}; "
+            f"{own['own_lineups_duplicated_by_field']} own lineup(s) duplicated by "
+            f"the field (max {own['max_copies_of_an_own_lineup']} copies){net}. "
+            f"Observed outcomes, never a graded prediction.")
+    elif own:
+        lines.append(f"- Self vs field: {own.get('note')}")
     if c["top_owned"]:
         lines.append("- Chalk (top-5 %Drafted): " + ", ".join(
             f"{t['player']} {t['pct_drafted']}%" for t in c["top_owned"]) + ".")
@@ -1220,6 +1345,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--registry")
     ap.add_argument("--emit-ledger", action="store_true")
     ap.add_argument("--json", dest="json_out")
+    ap.add_argument("--my-entry-ids",
+                    help="comma-separated Entry IDs of Ben's own entries. Omit and "
+                         "they are harvested from outputs/<slate-date>/"
+                         "upload_manifest.json, which records what was actually "
+                         "delivered to each contest.")
+    ap.add_argument("--entry-fee", type=float,
+                    help="fee per entry for this contest, for the net line")
+    ap.add_argument("--winnings", type=float,
+                    help="total winnings for Ben's entries in this contest")
     ap.add_argument("--force", action="store_true",
                     help="archive despite a failed structural parse check. The "
                          "override is recorded verbatim as line 2 of the emitted "
@@ -1288,6 +1422,49 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "warning": "this contest was archived downstream of a structural parse "
                        "failure by explicit operator override",
         }
+
+    # G4: own results. Evidence decays, and DK exports age out; five contests are
+    # already unrecoverable. Capturing this at mining time is the only chance.
+    own_ids = [x.strip() for x in (args.my_entry_ids or "").split(",") if x.strip()]
+    if not own_ids and args.slate_date:
+        own_ids = harvest_own_entry_ids(args.slate_date, args.contest_id)
+        if own_ids:
+            print(f"own entries: {len(own_ids)} harvested from the upload manifest")
+    if own_ids:
+        mined["own_results"] = summarize_own_entries(
+            mined, own_ids, entry_fee=args.entry_fee, winnings=args.winnings)
+        summary = mined["own_results"]
+        if summary.get("matched"):
+            print(f"own results: {summary['matched']}/{summary['requested']} entries "
+                  f"matched; best rank {summary['best_rank']} of "
+                  f"{summary['field_size']} "
+                  f"({summary['best_finish_percentile']}th pct); "
+                  f"{summary['own_lineups_duplicated_by_field']} own lineup(s) "
+                  f"duplicated by the field")
+        else:
+            print(f"own results: {summary.get('note')}")
+        if summary.get("matched"):
+            # Persisted per contest so net-to-date is a lookup, not a rebuild.
+            # DK exports age out; five contests are already unrecoverable, and
+            # anything not captured at mining time is captured never.
+            try:
+                sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+                from net_to_date import append_record
+
+                append_record({
+                    "contest_id": args.contest_id or mined.get("contest_id"),
+                    "slate_date": args.slate_date or mined.get("slate_date"),
+                    "contest_name": (mined.get("meta") or {}).get("contest_name"),
+                    **{k: summary.get(k) for k in (
+                        "matched", "field_size", "best_rank", "best_finish_percentile",
+                        "median_finish_percentile", "best_points", "winning_points",
+                        "own_lineups_duplicated_by_field", "entry_fee",
+                        "fees_total", "winnings_total", "net")},
+                })
+                print("own results appended to ledger/own_results.json "
+                      "(python tools/net_to_date.py for the cumulative table)")
+            except Exception as exc:  # noqa: BLE001 - bookkeeping never blocks
+                print(f"own results not persisted: {exc}")
 
     if args.registry:
         update_registry(args.registry, mined)
