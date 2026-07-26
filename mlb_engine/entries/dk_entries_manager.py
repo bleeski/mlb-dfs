@@ -364,7 +364,49 @@ DEFAULT_ARCHETYPES = [
 ]
 
 
+DEFAULT_ARCHETYPES_CSV = "data/reference/dk_contest_archetypes.csv"
+
+# Type precedence, applied before pattern length. Longest-pattern-wins misroutes
+# real DK names because the generic family words are longer than the words that
+# actually decide the objective: "Satellite to $2 MLB Pocket Cup MEGA Qualifier"
+# resolved on "Pocket Cup", and "Single Entry Satellite" resolved on "Single
+# Entry". A satellite pays a ticket for clearing a cut line and a Double Up pays
+# flat; those are different objectives, and neither is a generic GPP. When a name
+# says it is one of them, it is.
+ARCHETYPE_TYPE_PRECEDENCE = {
+    "satellite": 100,
+    "cash": 90,
+    "wta": 80,
+    "se_gpp": 50,
+    "portfolio_gpp": 20,
+    "unknown": 0,
+}
+
+
+def find_archetypes_csv() -> Optional[str]:
+    """Locate the curated reference CSV without depending on the caller's cwd.
+
+    The 22-row curated file was dead on the production path: build_slate.py
+    passed no ``archetypes_path``, so identity came from the six-pattern
+    DEFAULT_ARCHETYPES, which carries no cash entry at all. Resolve it the way
+    posture_allocator already does, module-relative first so a scheduled task
+    running from anywhere still finds it.
+    """
+    candidates = [
+        Path(__file__).resolve().parents[2] / DEFAULT_ARCHETYPES_CSV,
+        Path.cwd() / DEFAULT_ARCHETYPES_CSV,
+        Path.cwd() / "dk_contest_archetypes.csv",
+        Path(__file__).resolve().parent / "dk_contest_archetypes.csv",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def load_archetypes(path: Optional[str] = None) -> List[ContestArchetype]:
+    if not path:
+        path = find_archetypes_csv()
     if not path or not Path(path).exists():
         return list(DEFAULT_ARCHETYPES)
     output: List[ContestArchetype] = []
@@ -388,11 +430,29 @@ def infer_ticket_value_from_title(contest_name: str) -> Optional[float]:
 
 
 def infer_contest_archetype(contest_name: str, entry_fee: Optional[float] = None, archetypes: Optional[Sequence[ContestArchetype]] = None) -> Dict[str, Any]:
+    """Resolve a contest name to an archetype by type precedence, then length.
+
+    Inference is a labelled prior, never a fact about the contest. The ledger
+    Quick Card's standing instruction is to supply the real posture rather than
+    trust this; ``run_slate(contest_postures=...)`` and ``build_slate.py
+    --postures`` are how to obey it, and both override everything here.
+    """
     name = str(contest_name or "")
-    matches = [a for a in (archetypes or DEFAULT_ARCHETYPES) if a.pattern.lower() in name.lower()]
-    selected = max(matches, key=lambda a: len(a.pattern), default=None)
+    pool = list(archetypes) if archetypes else list(DEFAULT_ARCHETYPES)
+    matches = [a for a in pool if a.pattern.lower().strip() and a.pattern.lower() in name.lower()]
+    selected = max(
+        matches,
+        # Type precedence first; then an archetype that pins max entries beats
+        # one that does not, because "$0.25 Knuckleball [150-Max]" matches both
+        # and only the 150-Max row carries the field structure that decides the
+        # posture; then longest pattern, then the name for a stable tiebreak.
+        key=lambda a: (ARCHETYPE_TYPE_PRECEDENCE.get(str(a.inferred_type).lower(), 0),
+                       1 if a.inferred_max_entries is not None else 0,
+                       len(a.pattern), a.pattern),
+        default=None,
+    )
     if selected is None:
-        return {"inferred_type": "unknown", "inferred_max_entries": None, "payout_shape_default": "unknown", "confidence": CONFIDENCE_UNKNOWN, "decision_critical_gaps": ["contest_type"]}
+        return {"inferred_type": "unknown", "inferred_max_entries": None, "payout_shape_default": "unknown", "confidence": CONFIDENCE_UNKNOWN, "decision_critical_gaps": ["contest_type"], "matched_pattern": None, "competing_patterns": []}
     gaps: List[str] = []
     if selected.inferred_type == "satellite":
         gaps = ["ticket_count", "ticket_value"]
@@ -403,6 +463,12 @@ def infer_contest_archetype(contest_name: str, entry_fee: Optional[float] = None
         "confidence": selected.confidence,
         "inferred_buy_in": selected.inferred_buy_in if selected.inferred_buy_in is not None else entry_fee,
         "decision_critical_gaps": gaps,
+        "matched_pattern": selected.pattern,
+        # Named so the checkpoint can show what else the title matched. A contest
+        # whose name matches three families is exactly where the inference is
+        # least trustworthy, and that has to be visible rather than resolved
+        # silently.
+        "competing_patterns": sorted(a.pattern for a in matches if a is not selected),
     }
 
 

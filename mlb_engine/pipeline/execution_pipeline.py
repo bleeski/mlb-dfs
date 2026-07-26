@@ -667,24 +667,59 @@ def _resolve_contest_postures(
         if isinstance(override, str):
             posture = override
             inferred = {"inferred_type": override, "payout_shape_default": None, "inferred_max_entries": None}
+            source = "operator_supplied"
         elif isinstance(override, Mapping):
             inferred = dict(override)
             posture = str(inferred.get("posture") or normalize_posture(
                 inferred.get("inferred_type"), inferred.get("payout_shape_default"),
                 inferred.get("inferred_max_entries"),
             ))
+            source = "operator_supplied"
         else:
             inferred = infer_contest_archetype(cname, fee, archetypes)
             posture = normalize_posture(
                 inferred.get("inferred_type"), inferred.get("payout_shape_default"),
                 inferred.get("inferred_max_entries"),
             )
+            source = ("name_inference"
+                      if inferred.get("inferred_type") not in (None, "", "unknown")
+                      else "unresolved")
         shape = str(inferred.get("contest_shape") or _posture_to_shape(posture))
         resolved[cid] = {
             "contest_id": cid, "contest_name": cname, "posture": posture,
             "contest_shape": shape, "inferred": inferred,
+            # Where this posture came from. The build is entitled to route a
+            # contest on a labelled prior; it is not entitled to route one
+            # silently, and the difference between "the operator said cash" and
+            # "the name matched nothing so it fell through to large_gpp" is the
+            # whole of F3.
+            "posture_source": source,
+            "matched_pattern": inferred.get("matched_pattern"),
+            "competing_patterns": list(inferred.get("competing_patterns") or []),
         }
     return resolved
+
+
+def unresolved_contest_blockers(resolved: Mapping[str, Mapping[str, Any]]) -> List[str]:
+    """One blocker per reserved contest whose identity nothing established.
+
+    ``normalize_posture`` ends in an unconditional ``return "large_gpp"``, so an
+    unrecognised name does not fail, it becomes a large-field GPP build. On a
+    portfolio that is almost entirely satellites and qualifiers that is the
+    wrong objective, applied invisibly. Route it or name it.
+    """
+    out: List[str] = []
+    for cid, rec in sorted(resolved.items()):
+        if rec.get("posture_source") != "unresolved":
+            continue
+        out.append(
+            f"contest {cid} '{rec.get('contest_name')}' matched no archetype; "
+            f"it would build as {rec.get('posture')} by fallback, not by "
+            f"identification. Supply the real posture via contest_postures "
+            f"(build_slate.py --postures {cid}=<posture>) or add the pattern to "
+            f"data/reference/dk_contest_archetypes.csv."
+        )
+    return out
 
 
 def _posture_to_shape(posture: str) -> str:
@@ -2101,6 +2136,7 @@ def run_slate(
     entry_rows = parse_dk_entry_rows(str(entries_csv))
     reserved = [r for r in entry_rows]
     posture_by_contest = _resolve_contest_postures(reserved, contest_postures, archetypes_path)
+    contest_identity_blockers = unresolved_contest_blockers(posture_by_contest)
 
     if projections_override is not None:
         projections = projections_override.copy() if hasattr(projections_override, "copy") else projections_override
@@ -2281,6 +2317,7 @@ def run_slate(
         "slate_clock": clock,
         "waterfall": checkpoint.get("waterfall"),
         "caller_asserted_gates": caller_asserted,
+        "contest_identity_blockers": contest_identity_blockers,
         "strategy_defaults_are_priors": True,
         "projected_order": projected_order,
         "projection_enrichment": projection_enrichment,
@@ -2290,6 +2327,14 @@ def run_slate(
     if not schema.get("passed"):
         return {"passed": False, "status": "blocked", "approved": bool(approve),
                 "errors": [f"projection schema failed: {schema}"], **base_payload}
+
+    # Wrong-contest identity is a HARD gate: it is decidable from disk in under a
+    # second, it changes the objective the whole portfolio is built to, and it is
+    # invisible in the certified output. It has no override, because the fix is a
+    # single flag on the same command and takes less time than an override would.
+    if approve and contest_identity_blockers:
+        return {"passed": False, "status": "blocked", "approved": True,
+                "errors": contest_identity_blockers, **base_payload}
 
     if not approve:
         return {"passed": True, "status": "plan_pending_approval", "approved": False,
@@ -2369,6 +2414,7 @@ def run_slate(
         "projected_order": projected_order,
         "projection_enrichment": projection_enrichment,
         "caller_asserted_gates": caller_asserted,
+        "contest_identity_blockers": contest_identity_blockers,
         "strategy_defaults_are_priors": True,
         "light_satellite": bool(light_satellite),
     })

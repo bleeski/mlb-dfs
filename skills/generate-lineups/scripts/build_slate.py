@@ -925,6 +925,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             return 10, {}
 
     slate_kwargs = dict(kwargs)
+    postures = parse_postures_arg(getattr(args, "postures", None))
+    if postures:
+        slate_kwargs["contest_postures"] = postures
     result = run_slate(
         runs_root=str(REPO / "runs"),
         salary_csv=str(salary), entries_csv=str(entries),
@@ -942,7 +945,23 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         **slate_kwargs,
     )
 
+    # Contest identity, one line per contest, with where it came from. The
+    # objective the portfolio is built to is the single most consequential
+    # inference in the build and it used to be invisible.
+    for cid, info in sorted((result.get("posture_by_contest") or {}).items()):
+        src = info.get("posture_source") or "name_inference"
+        extra = ""
+        if info.get("matched_pattern"):
+            extra = f" [matched '{info['matched_pattern']}'"
+            if info.get("competing_patterns"):
+                extra += f", also matched {info['competing_patterns']}"
+            extra += "]"
+        print(f"contest {cid} {info.get('posture')} ({src}){extra}: "
+              f"{info.get('contest_name')}", file=sys.stderr)
+
     if not result.get("passed"):
+        for blocker in result.get("contest_identity_blockers") or []:
+            print(f"contest identity: {blocker}", file=sys.stderr)
         # A failed joint allocation is frequently a small-slate control
         # infeasibility, not a real "no legal lineup" wall: too few games means
         # too few distinct SP pairs and team stacks to keep every portfolio
@@ -1304,6 +1323,35 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     }
 
 
+VALID_POSTURES = ("cash", "wta_satellite", "single_entry", "small_gpp",
+                  "large_gpp", "mme")
+
+
+def parse_postures_arg(value: str | None) -> dict[str, str]:
+    """'<id_or_name>=<posture>,...' -> {key: posture}, validated eagerly.
+
+    A typo here would silently fall through name inference to large_gpp, which is
+    the exact failure the flag exists to close, so an unknown posture is an error
+    at parse time rather than a value nothing reads.
+    """
+    if not value:
+        return {}
+    out: dict[str, str] = {}
+    for item in str(value).split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise SystemExit(f"--postures entry {item!r} is not <contest>=<posture>")
+        key, posture = (x.strip() for x in item.split("=", 1))
+        if posture not in VALID_POSTURES:
+            raise SystemExit(
+                f"--postures: unknown posture {posture!r}; valid: "
+                + ", ".join(VALID_POSTURES))
+        out[key] = posture
+    return out
+
+
 BARE_STAGED_NAMES = {"DKSalaries.csv", "DKEntries.csv"}
 
 
@@ -1383,6 +1431,15 @@ def main() -> int:
                     help="wall clock this invocation may use before saving and "
                          "asking to be rerun")
     ap.add_argument("--brief", help="write the brief JSON here")
+    ap.add_argument("--postures", default=None,
+                    help="comma-separated <contest_id_or_name>=<posture> pairs, e.g. "
+                         "'192707612=wta_satellite,192707473=cash'. Postures: cash, "
+                         "wta_satellite, single_entry, small_gpp, large_gpp, mme. "
+                         "These override name inference entirely. The ledger Quick "
+                         "Card's standing instruction is to never trust the "
+                         "inference; this flag is how to obey it. A contest whose "
+                         "name matches no archetype blocks the build until it is "
+                         "named here or added to the archetypes CSV.")
     ap.add_argument("--controls-override", dest="controls_override", type=json.loads,
                     default=None,
                     help="JSON dict of portfolio_controls_override, e.g. "
