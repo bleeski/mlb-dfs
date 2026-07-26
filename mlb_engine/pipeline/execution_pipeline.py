@@ -2580,6 +2580,15 @@ def run_slate(
         "light_satellite": bool(light_satellite),
     })
     result["delivered_path"] = mirror_to_outputs(result, salary_csv)
+    # Repo-relative alongside the absolute path: every recorded delivered_path in
+    # outputs/2026-07-25/ pointed at a session mount that no longer exists.
+    if result.get("delivered_path"):
+        try:
+            from mlb_engine.entries.upload_manifest import repo_relative, sha256_file
+            result["delivered_path_repo"] = repo_relative(result["delivered_path"])
+            result["delivered_sha256"] = sha256_file(result["delivered_path"])
+        except Exception:  # noqa: BLE001
+            pass
     return result
 
 
@@ -2610,8 +2619,67 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         source = Path(output_path)
         dest_dir = Path(__file__).resolve().parents[2] / "outputs" / slate_date
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / source.name
+        # The delivered name carries the slate tag. DK runs several draftgroups on
+        # most dates and this mirror wrote one name per contest type, so the
+        # second build of the day silently replaced the first one's delivered
+        # file while both briefs went on citing the same path.
+        tag = _slate_tag(salary_csv)
+        stem = source.stem
+        dest = dest_dir / (f"{stem}_{tag}{source.suffix}" if tag and not stem.endswith(tag)
+                           else source.name)
         dest.write_bytes(source.read_bytes())
+        _record_upload_manifest(slate_date, dest, result, tag)
         return str(dest)
     except Exception:  # noqa: BLE001 - a mirror must never fail a certified build
         return None
+
+
+def _slate_tag(salary_csv: Any) -> str:
+    """'1605_4g': first lock in ET plus game count. Identifies the draftgroup."""
+    try:
+        from mlb_engine.intake.slate_intake_manager import (
+            parse_dk_salary_csv, parse_game_info_datetime,
+        )
+        games, starts = set(), []
+        for sp in parse_dk_salary_csv(str(salary_csv)):
+            info = getattr(sp, "game_info", "") or ""
+            gid = str(getattr(sp, "game_id", "") or info.split(" ", 1)[0] or "").strip()
+            if gid:
+                games.add(gid)
+            parsed = parse_game_info_datetime(info)
+            if parsed is not None:
+                starts.append(parsed)
+        if not starts or not games:
+            return ""
+        return f"{min(starts).strftime('%H%M')}_{len(games)}g"
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _record_upload_manifest(slate_date: str, dest: Path, result: Mapping[str, Any],
+                            tag: str) -> None:
+    """One manifest record per delivery, so T-5 never has to guess which file."""
+    try:
+        from mlb_engine.entries.upload_manifest import record_delivery
+
+        contests = (result.get("posture_by_contest") or {})
+        # Counted off the delivered file, not off an upstream plan: the count
+        # preflight cross-checks has to be a fact about these bytes, because
+        # catching a truncated write is exactly what it is for.
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        entries_in_file = len(parse_dk_entry_rows(dest))
+        record_delivery(
+            date=slate_date,
+            delivered_file=dest,
+            contest_type="classic",
+            slate_tag=tag,
+            contest_ids=sorted(contests),
+            contest_names=sorted(
+                str(v.get("contest_name") or "") for v in contests.values()),
+            entries=entries_in_file,
+            run_id=result.get("run_id"),
+            status="delivered",
+            certification="certified" if result.get("workflow_valid") else "not_certified",
+        )
+    except Exception:  # noqa: BLE001 - bookkeeping must never fail a certified build
+        pass

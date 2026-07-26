@@ -706,8 +706,18 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     check_status(entries, salary, rep)
     details = check_legality(contest, slots, entries, salary, rep)
 
-    if args.manifest:
-        check_manifest(entries_path, entries, Path(args.manifest), rep)
+    manifest = Path(args.manifest) if args.manifest else None
+    if manifest is None:
+        # The manifest sits next to the delivered file. Finding it without being
+        # told is the difference between a cross-check that runs at T-5 and one
+        # that runs when the operator remembers a flag.
+        sibling = entries_path.resolve().parent / "upload_manifest.json"
+        if sibling.exists():
+            manifest = sibling
+            rep.info["manifest_source"] = "found next to the entries file"
+    if manifest is not None:
+        rep.info["manifest_file"] = str(manifest)
+        check_manifest(entries_path, entries, manifest, rep)
     if args.parent:
         check_parent(entries, Path(args.parent), rep)
     if args.feed:

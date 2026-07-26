@@ -124,6 +124,20 @@ def feed_age_minutes(feed: dict) -> float | None:
     return round(delta.total_seconds() / 60.0, 1)
 
 
+def manifest_repo_relative(path) -> str | None:
+    if not path:
+        return None
+    from mlb_engine.entries.upload_manifest import repo_relative
+    return repo_relative(path)
+
+
+def manifest_sha256(path) -> str | None:
+    if not path or not Path(path).exists():
+        return None
+    from mlb_engine.entries.upload_manifest import sha256_file
+    return sha256_file(path)
+
+
 def slate_tag_suffix(salary_csv: Path) -> str:
     """'_1610_1g' for the delivered filename, so same-date builds cannot collide.
 
@@ -182,6 +196,12 @@ def preserve_prior_slate(paths, tag: str) -> list:
         if not path.exists():
             continue
         dest = path.with_name(f"{path.stem}_{tag}{path.suffix}")
+        if dest.exists() and dest.read_bytes() == path.read_bytes():
+            # The tag-copy already exists with identical content, which is what
+            # happens when the delivery path also writes the tagged name. Minting
+            # a _1 here produced three duplicate briefs in outputs/2026-07-25/ and
+            # made the directory unreadable.
+            continue
         n = 1
         while dest.exists():
             dest = path.with_name(f"{path.stem}_{tag}_{n}{path.suffix}")
@@ -1032,6 +1052,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "date": args.date,
         "entries": n_entries,
         "delivered_path": delivered,
+        # Repo-relative and hashed. Every delivered_path recorded on 2026-07-25
+        # was absolute against a session mount that no longer exists, and no
+        # brief stated which bytes it was describing.
+        "delivered_path_repo": manifest_repo_relative(delivered),
+        "delivered_sha256": manifest_sha256(delivered),
+        "upload_manifest": manifest_repo_relative(
+            REPO / "outputs" / args.date / "upload_manifest.json"),
         "run_id": result.get("run_id"),
         "gates": {
             "workflow_valid": result.get("workflow_valid"),
@@ -1238,6 +1265,20 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         print(json.dumps({"status": "showdown_export_failed",
                           "errors": write_report.get("errors")}, indent=1))
         return 3, {}
+    try:
+        from mlb_engine.entries.upload_manifest import record_delivery
+        record_delivery(
+            date=args.date, delivered_file=dest, contest_type="showdown",
+            slate_tag=slate_tag_suffix(salary).lstrip("_"),
+            contest_ids=sorted({r["contest_id"] for r in rows}),
+            contest_names=sorted({r.get("contest_name", "") for r in rows}),
+            entries=len(assignments), run_id=None, status="delivered",
+            certification="review_grade",
+            notes="Showdown ships review-grade; it does not pass the three "
+                  "certification gates. See CLAUDE.md.",
+        )
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a build
+        print(f"upload manifest not recorded: {exc}", file=sys.stderr)
     template = sd.verify_template_preserved(str(entries), str(dest))
 
     if use_ladder:
@@ -1268,6 +1309,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "date": args.date,
         "entries": n_entries,
         "delivered_path": str(dest),
+        "delivered_path_repo": manifest_repo_relative(dest),
+        "delivered_sha256": manifest_sha256(dest),
+        "upload_manifest": manifest_repo_relative(
+            REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
         "pool": {
             "players": int(len(df)),
