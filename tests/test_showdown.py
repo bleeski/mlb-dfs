@@ -165,12 +165,66 @@ class ShowdownExportTests(unittest.TestCase):
         eid = blanks[0]["entry_id"]
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "candidate.csv"
-            res = sd.write_showdown_entries(ENT, out, [{"entry_id": eid, "roster_ids": lu["roster_ids"]}])
+            # Deliberately partial: this test is about the round trip, not the
+            # delivery gate, so it opts out of the all-rows-filled requirement.
+            res = sd.write_showdown_entries(
+                ENT, out, [{"entry_id": eid, "roster_ids": lu["roster_ids"]}],
+                require_all_filled=False)
             self.assertTrue(res["passed"], res["errors"])
             self.assertTrue(sd.verify_template_preserved(ENT, out)["passed"])
             reparsed = {r["entry_id"]: r for r in sd.read_showdown_reserved_rows(out)["reserved"]}
             self.assertEqual(reparsed[eid]["cells"], lu["roster_ids"])
             self.assertFalse(reparsed[eid]["is_blank"])
+
+    def test_blank_reserved_rows_block_the_write(self):
+        """F6(c): a short bank used to leave trailing reserved rows blank and ship."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        lu = sd.build_showdown_lineup(df)
+        parsed = sd.read_showdown_reserved_rows(ENT)
+        blanks = [r for r in parsed["reserved"] if r["is_blank"]]
+        self.assertGreater(len(blanks), 1, "fixture needs more than one blank row")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "candidate.csv"
+            res = sd.write_showdown_entries(
+                ENT, out, [{"entry_id": blanks[0]["entry_id"],
+                            "roster_ids": lu["roster_ids"]}])
+            self.assertFalse(res["passed"])
+            self.assertIn("would ship blank", " ".join(res["errors"]))
+            self.assertIsNone(res["candidate_path"])
+            # and nothing was left at the delivered name
+            self.assertFalse(out.exists())
+
+    def test_single_team_pool_is_refused_at_the_melt(self):
+        """F6(a): the both-teams check used to read its teams out of the pool."""
+        import csv as _csv
+        with open(SAL, newline="", encoding="utf-8-sig") as fh:
+            rows = list(_csv.DictReader(fh))
+        keep_team = rows[0]["TeamAbbrev"]
+        with tempfile.TemporaryDirectory() as tmp:
+            one = Path(tmp) / "one_team.csv"
+            with one.open("w", newline="", encoding="utf-8") as fh:
+                writer = _csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows([r for r in rows if r["TeamAbbrev"] == keep_team])
+            with self.assertRaises(ValueError) as ctx:
+                sd.melt_showdown_salary_csv(str(one))
+            self.assertIn("single-team pool", str(ctx.exception))
+
+    def test_certify_recomputes_salary_and_rejects_a_missing_key(self):
+        """F6(b): lineup.get('salary', 0) skipped the cap check when absent."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        lu = dict(sd.build_showdown_lineup(df))
+        self.assertTrue(sd.certify_showdown(lu, df)["passed"])
+        checks = sd.certify_showdown(lu, df)["checks"]
+        self.assertAlmostEqual(float(checks["recomputed_salary"]),
+                               float(lu["salary"]), delta=1.0)
+        self.assertEqual(len(checks["required_teams"]), 2)
+        no_key = {k: v for k, v in lu.items() if k != "salary"}
+        result = sd.certify_showdown(no_key, df)
+        self.assertFalse(result["passed"])
+        self.assertIn("no salary key", " ".join(result["errors"]))
+        lying = {**lu, "salary": 1.0}
+        self.assertFalse(sd.certify_showdown(lying, df)["passed"])
 
     def test_completed_rows_are_immutable(self):
         # Self-contained template: one blank reservation and one already-submitted row.

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import csv
 import math
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
@@ -151,6 +152,24 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.sort_values("Player_Key").reset_index(drop=True)
+    # A Showdown contest is one game. A pool covering one side cannot produce a
+    # legal lineup, and worse, it used to certify one: the both-teams check read
+    # its required teams out of this frame, so a single-team pool made the rule
+    # vacuously true. Refuse here, where the cause is visible, rather than at the
+    # gate, where it is not.
+    teams = {str(t).strip().upper() for t in df["Team"].dropna().unique()} if not df.empty else set()
+    if df.empty:
+        raise ValueError(
+            f"{path} melted to an empty Showdown pool; no player carries both a "
+            f"CPT and a UTIL salary row")
+    if len(teams) < 2:
+        raise ValueError(
+            f"{path} melted to a single-team pool ({sorted(teams)}, basis="
+            f"{basis}). A DK Showdown pool must carry both sides of the matchup; "
+            f"a one-team pool produces lineups DK rejects and defeats the "
+            f"both-teams certification. Check the Status and Starting columns for "
+            f"the missing side."
+        )
     return df
 
 
@@ -387,14 +406,55 @@ def certify_showdown(lineup: Mapping[str, Any], df: pd.DataFrame,
     keys = [p["player_key"] for p in players]
     if len(set(keys)) != len(keys):
         errors.append("a player fills more than one roster slot")
-    if lineup.get("salary", 0) > contract.salary_cap:
-        errors.append(f"salary {lineup.get('salary')} exceeds cap {contract.salary_cap}")
-    slate_teams = set(df["Team"].unique()) if not df.empty else set()
-    for team in slate_teams:
+    by_key = {r["Player_Key"]: r for _, r in df.iterrows()} if not df.empty else {}
+
+    # (b) Recompute the salary from the role columns rather than trust the key.
+    # ``lineup.get("salary", 0)`` skipped the cap check entirely when the key was
+    # absent, and the 1.5x captain price was never checked against anything. DK
+    # prices the CPT row itself, so a wrong captain price is a real over-cap
+    # lineup that reads clean.
+    recomputed: Optional[float] = 0.0
+    for p in players:
+        src = by_key.get(p["player_key"])
+        if src is None:
+            recomputed = None
+            break
+        col = "CPT_Salary" if p["role"] == "CPT" else "UTIL_Salary"
+        value = src.get(col) if hasattr(src, "get") else None
+        if value is None or (isinstance(value, float) and value != value):
+            recomputed = None
+            break
+        recomputed += float(value)
+    if recomputed is None:
+        errors.append("salary not recomputable from the pool's role columns; "
+                      "the cap check cannot be performed on this lineup")
+    else:
+        if recomputed > contract.salary_cap:
+            errors.append(f"recomputed salary {recomputed:.0f} exceeds cap "
+                          f"{contract.salary_cap}")
+        stated = lineup.get("salary")
+        if stated is None:
+            errors.append("lineup carries no salary key; nothing stated a total to check")
+        elif abs(float(stated) - recomputed) > 1.0:
+            errors.append(f"stated salary {stated} disagrees with the recomputed "
+                          f"{recomputed:.0f} from the role columns")
+
+    # (a) Required teams come from the matchup, not from the pool handed in.
+    # Deriving them from ``df`` made the check circular: a single-team pool, which
+    # ``melt_showdown_salary_csv(starters_only=True)`` can produce, certified a
+    # six-man one-team lineup that DK rejects outright.
+    required = required_teams_from_pool(df)
+    if len(required) < 2:
+        errors.append(
+            f"pool covers {len(required)} team(s) {sorted(required)}; a DK Showdown "
+            f"contest is one game and its pool must carry both sides. Certifying "
+            f"against a single-team pool proves nothing about team representation."
+        )
+    for team in sorted(required):
         if contract.min_players_per_team > 0 and sum(1 for p in players if p["team"] == team) < contract.min_players_per_team:
             errors.append(f"team {team} under-represented (need >= {contract.min_players_per_team})")
+
     # role-correct draftable ids
-    by_key = {r["Player_Key"]: r for _, r in df.iterrows()} if not df.empty else {}
     for p in players:
         src = by_key.get(p["player_key"])
         if src is None:
@@ -405,7 +465,29 @@ def certify_showdown(lineup: Mapping[str, Any], df: pd.DataFrame,
             errors.append(f"{p['player_key']} {p['role']} uses id {p['draftable_id']}, expected {want}")
     return {"passed": not errors, "errors": errors,
             "checks": {"roster_size": len(players), "salary": lineup.get("salary"),
+                       "recomputed_salary": recomputed,
+                       "required_teams": sorted(required),
                        "teams": lineup.get("teams")}}
+
+
+def required_teams_from_pool(df: pd.DataFrame) -> set:
+    """Both sides of the matchup, read from Game_ID rather than from who is in df.
+
+    ``Game_ID`` is the 'AWAY@HOME' token off DK's Game Info column, so it names
+    both teams even when the pool only carries one of them. That is the whole
+    point: a starters-only or hand-filtered pool must not be able to redefine
+    what "both teams" means.
+    """
+    teams: set = set()
+    if df is None or df.empty:
+        return teams
+    for gid in df["Game_ID"].dropna().unique() if "Game_ID" in df.columns else []:
+        token = str(gid).strip().upper()
+        if "@" in token:
+            teams.update(t for t in token.split("@") if t)
+    if not teams:
+        teams = {str(t).strip().upper() for t in df["Team"].dropna().unique()}
+    return teams
 
 
 # --------------------------------------------------------------------------- #
@@ -438,9 +520,16 @@ def read_showdown_reserved_rows(path: str | Path, contract: RosterContract = SHO
 
 def write_showdown_entries(template_path: str | Path, candidate_path: str | Path,
                            assignments: Sequence[Mapping[str, Any]],
-                           contract: RosterContract = SHOWDOWN) -> Dict[str, Any]:
+                           contract: RosterContract = SHOWDOWN,
+                           require_all_filled: bool = True) -> Dict[str, Any]:
     """Fill blank reserved rows with roster_ids ([CPT_ID, 5x UTIL_ID]); preserve every
-    other cell. Never overwrites the template."""
+    other cell. Never overwrites the template.
+
+    ``require_all_filled`` defaults True: a file that leaves a reserved row blank
+    is not a deliverable, and the delivery path must not be able to produce one
+    by accident. Pass False only when deliberately writing a partial file, and
+    then do not upload it.
+    """
     source, target = Path(template_path).resolve(), Path(candidate_path).resolve()
     if source == target:
         raise ValueError("candidate_path must differ from template_path")
@@ -469,12 +558,57 @@ def write_showdown_entries(template_path: str | Path, candidate_path: str | Path
         raw[start:end] = ids
         used.add(eid)
         logs.append({"entry_id": eid, "contest_id": r["contest_id"], "roster_ids": ids})
+    # (c) Every reserved row must end filled. A blank reserved row is the exact
+    # class the Classic gate exists to block, and this path shipped them: the
+    # caller zips assignments against a possibly-shorter bank, so a short bank
+    # left trailing rows empty and the file went out anyway.
+    unfilled = sorted(r["entry_id"] for r in parsed["reserved"]
+                      if r["entry_id"] not in used and not r["is_complete"])
+    if unfilled and require_all_filled:
+        errors.append(
+            f"{len(unfilled)} reserved row(s) would ship blank: "
+            f"{', '.join(unfilled[:10])}. A blank reserved row blocks "
+            f"certification; build more lineups or reduce the entry count."
+        )
     if errors:
         return {"passed": False, "errors": errors, "candidate_path": None, "assignment_log": logs}
+
+    # Write to a name nobody would upload, re-read it, and only then move it into
+    # place. The old path opened the delivered name with "w" and never re-read
+    # it, so an interrupted write left a truncated file sitting at the canonical
+    # upload path with no indication anything had gone wrong.
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w", newline="", encoding="utf-8") as fh:
+    staging = target.with_name(f"DO_NOT_UPLOAD_{target.name}")
+    with staging.open("w", newline="", encoding="utf-8") as fh:
         csv.writer(fh).writerows(rows)
-    return {"passed": True, "errors": [], "candidate_path": str(target), "assignment_log": logs}
+    try:
+        written = read_showdown_reserved_rows(staging, contract)
+        blank_after = sorted(r["entry_id"] for r in written["reserved"] if r["is_blank"])
+        short = sorted(r["entry_id"] for r in written["reserved"]
+                       if not r["is_blank"] and not r["is_complete"])
+        readback: List[str] = []
+        if blank_after and require_all_filled:
+            readback.append(f"blank reserved rows in the written file: {blank_after[:10]}")
+        if short:
+            readback.append(f"partially filled rows in the written file: {short[:10]}")
+        written_by_entry = {r["entry_id"]: r["cells"] for r in written["reserved"]}
+        for log in logs:
+            if written_by_entry.get(log["entry_id"]) != log["roster_ids"]:
+                readback.append(
+                    f"{log['entry_id']}: the written row does not match the "
+                    f"assignment it was built from")
+        if readback:
+            return {"passed": False, "errors": readback, "candidate_path": None,
+                    "assignment_log": logs}
+    except (OSError, ValueError) as exc:
+        return {"passed": False,
+                "errors": [f"written file did not read back as a valid "
+                           f"{contract.name} export: {exc}"],
+                "candidate_path": None, "assignment_log": logs}
+    os.replace(staging, target)
+    return {"passed": True, "errors": [], "candidate_path": str(target),
+            "assignment_log": logs,
+            "reserved_rows": len(parsed["reserved"]), "rows_filled": len(used)}
 
 
 def verify_template_preserved(source_path: str | Path, candidate_path: str | Path,

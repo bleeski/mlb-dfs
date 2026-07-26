@@ -140,6 +140,27 @@ The structural gate is hard and fail-closed: a zero parse, an unparsed share
 over 20%, or a standings/salary contest-type mismatch all block archiving.
 Never archive downstream of a PARSE FAILURE or WRONG SALARY FILE note.
 
+## Showdown certification status (decided 2026-07-26)
+
+Showdown ships **review-grade**, not certified. It does not pass through
+workflow_valid / selection_certified / allocation_certified; `run_slate` is
+the Classic front door and Showdown does not enter it. Say "review-grade
+build", never "upload-ready", for any Showdown deliverable.
+
+What that costs, stated so it is not rediscovered: no workflow gate axis, no
+allocation certification, no immutable run directory, no export hash binding,
+and no `latest_valid_run` promotion, so `run_late_swap` cannot refine a
+Showdown delivery. What it does have, as of the F6 fixes: both-teams derived
+from the matchup rather than from the pool handed in, a melt that refuses a
+single-team pool, salary recomputed from the CPT/UTIL role columns instead of
+trusted, an atomic write through `DO_NOT_UPLOAD_*` that re-reads and
+re-verifies before `os.replace`, and a hard refusal to leave any reserved row
+blank. Run `python tools/preflight_upload.py --entries <file> --salary <file>`
+on every Showdown deliverable; that is the gate for this path.
+
+Bringing Showdown under the three gates is open backlog, not a decision left
+implicit.
+
 ## Showdown (active after Phase 3)
 Roster contracts live in mlb_engine/optimize/roster_contracts.py. Classic
 and Showdown are two contracts on one solver. Showdown archetypes never

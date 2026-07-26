@@ -124,6 +124,20 @@ def feed_age_minutes(feed: dict) -> float | None:
     return round(delta.total_seconds() / 60.0, 1)
 
 
+def slate_tag_suffix(salary_csv: Path) -> str:
+    """'_1610_1g' for the delivered filename, so same-date builds cannot collide.
+
+    Three Showdown slates on 2026-07-25 each recorded a delivered_path of
+    .../DKEntries_showdown.csv, so two briefs ended up citing a file holding
+    another slate's lineups. The delivered name always carries the slate tag.
+    """
+    try:
+        tag = str(slate_signature(Path(salary_csv)).get("tag") or "").strip()
+    except Exception:
+        tag = ""
+    return f"_{tag}" if tag else ""
+
+
 def slate_signature(salary_csv: Path) -> dict:
     """Identify the draftgroup, not just the date.
 
@@ -1199,14 +1213,31 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                           "errors": [c.get("errors") for c in failed]}, indent=1))
         return 3, {}
 
+    # zip() silently truncates to the shorter side, so a bank short of the
+    # reserved-row count left the remainder blank and shipped. Say so instead.
+    if len(bank) < len(rows):
+        print(json.dumps({
+            "status": "bank_short_of_reserved_rows",
+            "reserved_blank_rows": len(rows),
+            "lineups_built": len(bank),
+            "shortfall": len(rows) - len(bank),
+            "note": "a blank reserved row blocks certification; lower --entries-count "
+                    "to the number built, or rerun to deepen the bank",
+        }, indent=1))
+        return 3, {}
+
     out_dir = REPO / "outputs" / args.date
     out_dir.mkdir(parents=True, exist_ok=True)
-    dest = out_dir / "DKEntries_showdown.csv"
+    dest = out_dir / f"DKEntries_showdown{slate_tag_suffix(salary)}.csv"
     assignments = [
         {"entry_id": row["entry_id"], "roster_ids": list(lineup["roster_ids"])}
         for row, lineup in zip(rows, bank)
     ]
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments)
+    if not write_report.get("passed"):
+        print(json.dumps({"status": "showdown_export_failed",
+                          "errors": write_report.get("errors")}, indent=1))
+        return 3, {}
     template = sd.verify_template_preserved(str(entries), str(dest))
 
     if use_ladder:
