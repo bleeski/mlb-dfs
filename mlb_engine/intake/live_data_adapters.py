@@ -484,6 +484,12 @@ def _pool_row(sp: Any, batting_order: Optional[int] = None) -> Dict[str, Any]:
         "Game_ID": sp.game_id or sp.game_info,
         "AvgPointsPerGame": appg,
         "Excluded": False,
+        # Carried so every downstream consumer, including the checkpoint and the
+        # export validators, can re-derive availability without re-reading the
+        # salary CSV. Rows reaching here are already status-filtered, so a
+        # non-empty value is a watch tier, never an out tier.
+        "DK_Status": str(getattr(sp, "status", "") or ""),
+        "DK_Starting": str(getattr(sp, "starting", "") or ""),
     }
     if batting_order is not None:
         row["Batting_Order"] = int(batting_order)
@@ -531,10 +537,41 @@ def build_slate_pool(
     intake bookkeeping; it moves no projection and is never a win-rate, ROI, or
     probability claim.
     """
-    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv, slate_clock
+    from mlb_engine.intake.slate_intake_manager import (
+        parse_dk_salary_csv, salary_status_tier, slate_clock,
+    )
     from mlb_engine.projections.projection_builder import batting_order_factor
 
-    players = parse_dk_salary_csv(str(salary_csv))
+    all_players = parse_dk_salary_csv(str(salary_csv))
+
+    # F1: DK's own Status column, read before anything selects a player.
+    #
+    # This has to happen here, ahead of the confirmed/platoon/APPG branches
+    # rather than inside any of them, because the failure it closes is that the
+    # APPG fallback sorts by AvgPointsPerGame and a shelved star has the highest
+    # APPG on his team. The platoon path had the same hole from the other
+    # direction: it kept whatever it matched. Both are exactly the early-build
+    # path the fallback exists to serve.
+    #
+    # Shelved players are dropped from the legal pool. This is not the forbidden
+    # compute-limited pool reduction: it removes players who cannot take the
+    # field, which is a fact in the authoritative file, not a search-effort
+    # trade. Day-to-day players stay eligible and warn.
+    status_out_rows: List[Dict[str, str]] = []
+    status_watch_ids: set[str] = set()
+    players = []
+    for p in all_players:
+        tier = salary_status_tier(p.status)
+        if tier == "out":
+            status_out_rows.append(
+                {"player_id": p.player_id, "name": p.name, "team": p.team,
+                 "status": p.status}
+            )
+            continue
+        if tier == "watch":
+            status_watch_ids.add(p.player_id)
+        players.append(p)
+
     by_id = {p.player_id: p for p in players}
     salary_map = {p.player_id: p for p in players}
     status = build_status_map_from_lineups_feed(lineups_feed, salary_map)
@@ -561,6 +598,22 @@ def build_slate_pool(
     warnings: List[str] = []
     blockers: List[str] = []
     teams_report: Dict[str, Dict[str, Any]] = {}
+
+    # One line per shelved player, naming player and team. A count alone is not
+    # reviewable: the operator has to be able to see that the name he expected to
+    # be in the pool is the name that was dropped, and why.
+    for rec in sorted(status_out_rows, key=lambda r: (r["team"], r["name"])):
+        warnings.append(
+            f"{rec['team']} {rec['name']} ({rec['player_id']}): DK Status "
+            f"{rec['status']}; dropped from the pool before selection"
+        )
+    for pid in sorted(status_watch_ids):
+        sp = by_id.get(pid)
+        if sp is not None:
+            warnings.append(
+                f"{sp.team} {sp.name} ({pid}): DK Status {sp.status}; eligible, "
+                f"watch for a late scratch"
+            )
 
     tbd_teams = [t for t in slate_teams if t not in confirmed_teams and t not in excluded_teams]
     platoon_order: Dict[str, int] = {}
@@ -705,6 +758,40 @@ def build_slate_pool(
         teams_report[team] = {"status": "excluded_postponed", "hitters": 0}
         warnings.append(f"{team}: game {team_game.get(team)} postponed/cancelled/suspended; team excluded")
 
+    # DK's Starting column is the authoritative confirmed order, in the
+    # authoritative file, and only Showdown ever read it. Use it as a check on
+    # the feed crosswalk rather than as a second source of truth: a team DK
+    # marks with nine batting slots while the feed matched almost nothing is a
+    # proven name/team join failure, not thin data.
+    starting_by_team: Dict[str, int] = {}
+    for p in players:
+        if p.team and str(p.starting).isdigit() and 1 <= int(p.starting) <= 9:
+            starting_by_team[p.team] = starting_by_team.get(p.team, 0) + 1
+    for team, dk_slots in sorted(starting_by_team.items()):
+        if team in excluded_teams or dk_slots < 9:
+            continue
+        matched = sum(1 for r in keep.values() if r["Team"] == team)
+        if matched < 5:
+            blockers.append(
+                f"{team}: DK marks 9 confirmed batting slots in the salary file "
+                f"but the pool holds {matched}; crosswalk failure, the "
+                f"authoritative order went unused"
+            )
+
+    # A team that cannot field nine hitters after exclusions cannot be stacked
+    # and should not be silently half-present in the pool.
+    for team, rec in sorted(teams_report.items()):
+        if rec.get("status") in ("excluded_postponed", "excluded_no_order_data"):
+            continue
+        if int(rec.get("hitters") or 0) < 9:
+            dropped_here = [r for r in status_out_rows if r["team"] == team]
+            if dropped_here:
+                blockers.append(
+                    f"{team}: {rec.get('hitters')}/9 hitters after dropping "
+                    + ", ".join(f"{r['name']} ({r['status']})" for r in dropped_here)
+                    + "; the team cannot fill a stack"
+                )
+
     # Pitchers: probables plus explicit declarations. Nothing else exists.
     pitcher_roles: Dict[str, str] = {}
     for pid in probable_ids:
@@ -770,9 +857,16 @@ def build_slate_pool(
         "clock": clock,
         "lock_time_by_game_id": status.get("lock_time_by_game_id"),
         "pool_report": {
-            "salary_rows_total": len(players),
+            "salary_rows_total": len(all_players),
             "kept": len(rows),
-            "dropped": len(players) - len(rows),
+            "dropped": len(all_players) - len(rows),
+            "status_dropped": status_out_rows,
+            "status_watch": [
+                {"player_id": pid, "name": by_id[pid].name, "team": by_id[pid].team,
+                 "status": by_id[pid].status}
+                for pid in sorted(status_watch_ids)
+                if pid in by_id and pid in keep
+            ],
             "hitters_kept": len(team_by_player_id),
             "pitchers_kept": len(pitcher_roles),
             "teams": teams_report,

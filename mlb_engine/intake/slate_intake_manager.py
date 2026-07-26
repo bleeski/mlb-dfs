@@ -86,6 +86,13 @@ class SalaryPlayer:
     opponent: str = ""
     game_id: str = ""
     raw: Dict[str, Any] = field(default_factory=dict)
+    # DK ships availability in the salary file itself and the Classic path never
+    # read it: an IL bat that survives the platoon or APPG fallback is a dead
+    # roster slot, 10% of a Classic entry lost before first pitch. Both columns
+    # are promoted to first-class fields so no consumer has to know they live in
+    # ``raw``, and so the value carries onto the projection row.
+    status: str = ""      # "", IL, O, OUT, NA, DTD ...
+    starting: str = ""    # confirmed batting slot 1-9, or SP/PO for arms
 
 
 @dataclass(frozen=True)
@@ -232,8 +239,30 @@ def parse_dk_salary_csv(path: str) -> List[SalaryPlayer]:
         salary = parse_money(row.get("Salary", ""))
         game_info = str(row.get(game_col, "") or "").strip() if game_col else ""
         opp, game_id = infer_opponent_and_game_id(team, game_info)
-        players.append(SalaryPlayer(pid, name, team, positions, salary, game_info, opp, game_id, dict(row)))
+        players.append(SalaryPlayer(
+            pid, name, team, positions, salary, game_info, opp, game_id, dict(row),
+            status=str(row.get("Status", "") or "").strip().upper(),
+            starting=str(row.get("Starting", "") or "").strip().upper(),
+        ))
     return players
+
+
+# DK's availability vocabulary. OUT statuses are shelved and must never occupy a
+# roster slot. DTD is playable-but-risky: it warns, and escalates to a blocker
+# only inside a chosen primary stack, because hard-blocking every DTD bat would
+# routinely strip legal players out of a legal pool.
+SALARY_STATUS_OUT = frozenset({"IL", "O", "OUT", "NA", "IL10", "IL15", "IL60", "PUP", "SUSP"})
+SALARY_STATUS_WATCH = frozenset({"DTD", "GTD", "Q"})
+
+
+def salary_status_tier(status: Any) -> str:
+    """'out' | 'watch' | 'clean' for a DK Status cell."""
+    value = str(status or "").strip().upper()
+    if value in SALARY_STATUS_OUT:
+        return "out"
+    if value in SALARY_STATUS_WATCH:
+        return "watch"
+    return "clean"
 
 
 def _extract_game_date(game_info: str) -> str:

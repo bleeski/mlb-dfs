@@ -34,6 +34,7 @@ if str(REPO) not in sys.path:
 from mlb_engine.intake.live_data_adapters import (  # noqa: E402
     build_slate_pool, build_status_map_from_lineups_feed,
 )
+from mlb_engine.entries.dk_entries_manager import assert_contest_geometry  # noqa: E402
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, run_late_swap,
@@ -95,6 +96,17 @@ def main() -> int:
         if not path.exists():
             print(f"missing input: {path}", file=sys.stderr)
             return 4
+
+    # This is the tool that runs closest to lock and the one most likely to hit
+    # a clobbered staged name. data/slates/<date>/ is keyed on date alone, so a
+    # Showdown build for the same date can leave six-slot files at the bare
+    # Classic names this script defaults to. Read the geometry before reading
+    # anything else, and refuse rather than parse a Showdown file at row[4:14].
+    try:
+        assert_contest_geometry(salary, Path(args.parent_entries), declared="CLASSIC")
+    except ValueError as exc:
+        print(f"contest geometry: {exc}", file=sys.stderr)
+        return 3
 
     feed = json.loads(feed_path.read_text(encoding="utf-8"))
     status = build_status_map_from_lineups_feed(feed, str(salary))

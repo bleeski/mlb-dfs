@@ -1304,14 +1304,42 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     }
 
 
+BARE_STAGED_NAMES = {"DKSalaries.csv", "DKEntries.csv"}
+
+
 def _stage(source: Path, dest: Path) -> Path:
     """Copy an uploaded file into the slate directory, writably.
 
     Uploads arrive on a read-only mount, so a plain copy inherits mode 500 and the
     next slate cannot overwrite it. Replace rather than write in place.
+
+    The bare ``DKSalaries.csv`` / ``DKEntries.csv`` names are what
+    ``tools/late_swap.py`` and ``tools/solver_probe.py`` read by default, and
+    ``data/slates/<date>/`` is keyed on date alone. Staging Showdown data at
+    those names points the deadline-critical tools at a six-slot file they will
+    read as ten-slot. It happened on 2026-07-25: the staged Classic pair went
+    md5-identical to its ``_showdown`` twins. Showdown always stages under a
+    suffixed name.
     """
     if source.resolve() == dest.resolve():
         return dest
+    if dest.name in BARE_STAGED_NAMES:
+        with source.open(encoding="utf-8-sig", newline="") as fh:
+            reader = csv.reader(fh)
+            header = next(reader, [])
+            first = next(reader, [])
+        looks_showdown = (
+            "CPT" in [str(c).strip().upper() for c in header]
+            or any(str(c).strip().upper() in ("CPT", "UTIL") for c in first[:6])
+        )
+        if looks_showdown:
+            raise ValueError(
+                f"refusing to stage Showdown data at the bare Classic name "
+                f"{dest.name}: {source} carries CPT/UTIL geometry. "
+                f"tools/late_swap.py and tools/solver_probe.py default to this "
+                f"name and would read it at Classic width. Stage Showdown under "
+                f"a suffixed name."
+            )
     if dest.exists():
         try:
             dest.unlink()

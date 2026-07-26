@@ -17,7 +17,10 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from mlb_engine.intake.slate_intake_manager import SalaryPlayer, parse_dk_salary_csv
+from mlb_engine.intake.slate_intake_manager import (
+    SalaryPlayer, parse_dk_salary_csv, salary_status_tier,
+)
+from mlb_engine.optimize.roster_contracts import CLASSIC, SHOWDOWN
 
 VERSION = "v1.6"
 ENTRY_ID_COL = 0
@@ -29,6 +32,10 @@ ROSTER_END_COL_EXCLUSIVE = 14
 ROSTER_SLOTS = ["P1", "P2", "C", "1B", "2B", "3B", "SS", "OF1", "OF2", "OF3"]
 ROSTER_POSITIONS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
 ALLOWED_PITCHER_ROLES = {"verified_starter", "declared_probable_sp", "viable_bulk_or_alt_sp"}
+# Measured signal strength of the embedded-pool check: near-total overlap for the
+# right salary/entries pairing, near-zero for a wrong-day pairing. There is no
+# middle ground to tune, so the threshold only has to be well clear of both.
+EMBEDDED_POOL_MIN_OVERLAP = 0.95
 
 PRE_EXPORT_GATES = (
     "salary_gate_passed",
@@ -209,18 +216,83 @@ def read_csv_rows(path: str | Path) -> Tuple[List[str], List[List[str]]]:
     return rows[0], rows[1:]
 
 
+def detect_entries_geometry(header: Sequence[str]) -> Tuple[str, Tuple[str, ...]]:
+    """Read the roster contract off the DKEntries header. Raise, never assume.
+
+    Columns 0-3 are identical in both geometries, so validating only those
+    accepted a Showdown file at Classic width: the parser then read four columns
+    past the end of the roster, pulled DK's Instructions text and embedded-pool
+    IDs into roster cells, and every blank reserved row read as filled. The slot
+    labels that distinguish the two contracts are in the header; read them.
+    """
+    labels = [str(x).strip().upper() for x in header[ROSTER_START_COL:]]
+    for name, contract in (("CLASSIC", CLASSIC), ("SHOWDOWN", SHOWDOWN)):
+        slots = tuple(s.upper() for s in contract.slots)
+        if labels[:len(slots)] == list(slots):
+            return name, contract.slots
+    found = ",".join(labels[:12]) or "<empty>"
+    raise ValueError(
+        "DKEntries roster window matches no roster contract; expected "
+        f"'{','.join(CLASSIC.slots)}' (Classic) or '{','.join(SHOWDOWN.slots)}' "
+        f"(Showdown) at column {ROSTER_START_COL}, found '{found}'"
+    )
+
+
+def detect_salary_contract(path: str | Path) -> str:
+    """'CLASSIC' or 'SHOWDOWN', read off the salary file's Roster Position values."""
+    with Path(path).open(newline="", encoding="utf-8-sig") as handle:
+        for row in csv.DictReader(handle):
+            roles = {r.strip().upper()
+                     for r in str(row.get("Roster Position") or "").split("/")}
+            if roles & {"CPT", "UTIL"}:
+                return "SHOWDOWN"
+            break
+    return "CLASSIC"
+
+
+def assert_contest_geometry(
+    salary_csv: str | Path,
+    entries_csv: str | Path,
+    declared: Optional[str] = None,
+) -> str:
+    """Agreement between the salary file, the entries file, and the caller.
+
+    Every consumer that opens a slate directory runs this. ``data/slates/<date>/``
+    is shared and date-only-keyed, so a Showdown build for the same date
+    overwrites the Classic staged names; the files themselves are the only
+    reliable statement of which contract they carry, and they must agree with
+    each other and with whatever the caller thinks it is building.
+    """
+    from_salary = detect_salary_contract(salary_csv)
+    from_entries, _ = detect_entries_geometry(read_csv_rows(entries_csv)[0])
+    if from_salary != from_entries:
+        raise ValueError(
+            f"contest-type mismatch: {salary_csv} is {from_salary} but "
+            f"{entries_csv} is {from_entries}. These two files are not the same "
+            f"contest; one of them is a stale staged copy."
+        )
+    if declared and str(declared).strip().upper() != from_entries:
+        raise ValueError(
+            f"declared contest type {str(declared).strip().upper()} but the files "
+            f"on disk are {from_entries}"
+        )
+    return from_entries
+
+
 def parse_dk_entry_rows(path: str | Path) -> List[DKEntryRow]:
     """Parse reserved rows positionally; never use ``DictReader`` for rosters."""
     header, data = read_csv_rows(path)
     if not header or [x.strip() for x in header[:4]] != ["Entry ID", "Contest Name", "Contest ID", "Entry Fee"]:
         raise ValueError("DKEntries header must start with Entry ID, Contest Name, Contest ID, Entry Fee")
+    _, slots = detect_entries_geometry(header)
+    roster_end = ROSTER_START_COL + len(slots)
     output: List[DKEntryRow] = []
     for offset, row in enumerate(data, start=2):
         entry_id = _safe_get(row, ENTRY_ID_COL)
         contest_id = _safe_get(row, CONTEST_ID_COL)
         if not entry_id or not contest_id or not re.fullmatch(r"\d+", entry_id) or not re.fullmatch(r"\d+", contest_id):
             continue
-        cells = tuple(normalize_player_id(_safe_get(row, i)) for i in range(ROSTER_START_COL, ROSTER_END_COL_EXCLUSIVE))
+        cells = tuple(normalize_player_id(_safe_get(row, i)) for i in range(ROSTER_START_COL, roster_end))
         ids = tuple(pid for pid in cells if pid)
         output.append(DKEntryRow(
             row_index=offset,
@@ -236,8 +308,15 @@ def parse_dk_entry_rows(path: str | Path) -> List[DKEntryRow]:
 
 
 def detect_player_pool_start(header: Sequence[str]) -> Optional[int]:
+    """Locate DK's embedded player pool, to the right of the entry columns.
+
+    The bound used to be the Classic roster end, which put it past the end of a
+    Showdown row and made the embedded pool unreachable on exactly the files
+    where a wrong-slate pairing is easiest to make. The pool starts to the right
+    of the roster window whatever the contract, so bound it on the start column.
+    """
     for i, value in enumerate(header):
-        if str(value).strip().lower() == "position" and i >= ROSTER_END_COL_EXCLUSIVE:
+        if str(value).strip().lower() == "position" and i > ROSTER_START_COL:
             return i
     return None
 
@@ -393,11 +472,24 @@ def write_candidate_from_template(
     candidate_path: str | Path,
     preserve_completed: bool = True,
 ) -> Dict[str, Any]:
-    """Write a candidate without overwriting the source template."""
+    """Write a candidate without overwriting the source template.
+
+    The roster window comes from the template's own header. Padding every row
+    to the Classic width on a Showdown template overwrote DK's Instructions
+    column, and the preservation check then exempted the same columns it had
+    just destroyed, so the damage passed.
+    """
     source = Path(template_path).resolve()
     target = Path(candidate_path).resolve()
     if source == target:
         raise ValueError("candidate_path must differ from template_path")
+    contract_name, slots = detect_entries_geometry(read_csv_rows(source)[0])
+    if contract_name != "CLASSIC":
+        raise ValueError(
+            f"write_candidate_from_template builds ten-slot Classic rows; this "
+            f"template is {contract_name} ({len(slots)} slots). Showdown exports "
+            f"go through mlb_engine.optimize.showdown.write_showdown_entries."
+        )
     with source.open(newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.reader(handle))
     parsed = parse_dk_entry_rows(source)
@@ -453,17 +545,22 @@ def validate_template_preservation(source_path: str | Path, candidate_path: str 
     if len(source_rows) != len(candidate_rows):
         errors.append("row count changed")
         return {"passed": False, "errors": errors}
+    # The exempt window is the source template's real roster window, not the
+    # Classic constant. Exempting columns the file does not use for rosters is
+    # how a destroyed Instructions column passed this check.
+    _, slots = detect_entries_geometry(source_rows[0] if source_rows else [])
+    roster_end = ROSTER_START_COL + len(slots)
     source_entries = {r.row_index: r for r in parse_dk_entry_rows(source_path)}
     for i, (source, candidate) in enumerate(zip(source_rows, candidate_rows), start=1):
         width = max(len(source), len(candidate))
         s = source + [""] * (width - len(source))
         c = candidate + [""] * (width - len(candidate))
-        for col in list(range(0, ROSTER_START_COL)) + list(range(ROSTER_END_COL_EXCLUSIVE, width)):
+        for col in list(range(0, ROSTER_START_COL)) + list(range(roster_end, width)):
             if s[col] != c[col]:
                 errors.append(f"non-roster cell changed at row {i}, column {col + 1}")
         source_entry = source_entries.get(i)
         if source_entry and source_entry.is_complete and source_entry.entry_id not in mutable:
-            if s[ROSTER_START_COL:ROSTER_END_COL_EXCLUSIVE] != c[ROSTER_START_COL:ROSTER_END_COL_EXCLUSIVE]:
+            if s[ROSTER_START_COL:roster_end] != c[ROSTER_START_COL:roster_end]:
                 errors.append(f"completed Entry ID {source_entry.entry_id} changed")
     return {"passed": not errors, "errors": errors, "summary": "Template preserved" if not errors else "Template preservation failed"}
 
@@ -548,6 +645,7 @@ def validate_dk_entries_file(
     listed (TBD lineups) pass. When None, the legacy global-set check applies.
     """
     entries = parse_dk_entry_rows(path)
+    contract_name, _slots = detect_entries_geometry(read_csv_rows(path)[0])
     controls = dict(portfolio_controls or {})
     players: Dict[str, SalaryPlayer] = {}
     if salary_csv_path:
@@ -565,6 +663,34 @@ def validate_dk_entries_file(
     legal_rosters: List[Tuple[DKEntryRow, Tuple[str, ...]]] = []
     by_contest_sig: Dict[str, Counter] = defaultdict(Counter)
 
+    if contract_name != "CLASSIC":
+        errors.append(
+            f"this validator enforces the Classic contract; the entries file is "
+            f"{contract_name}. A Showdown file validated as Classic passes on "
+            f"columns it never used."
+        )
+
+    # DK's own fingerprint of the draftgroup, sitting unread in the entries file.
+    # ``allowed_ids`` comes from the same salary CSV that built the lineups, so a
+    # wrong-slate build validates against itself; the embedded pool is the only
+    # independent statement of which draftgroup this entries file belongs to.
+    pool_overlap: Optional[float] = None
+    embedded_pool = parse_embedded_player_pool(path)
+    if embedded_pool and allowed_ids:
+        pool_overlap = len(set(embedded_pool) & allowed_ids) / len(embedded_pool)
+        if pool_overlap < EMBEDDED_POOL_MIN_OVERLAP:
+            errors.append(
+                f"entries file's embedded player pool overlaps the salary file at "
+                f"{pool_overlap:.1%} ({len(set(embedded_pool) & allowed_ids)}/"
+                f"{len(embedded_pool)}); below {EMBEDDED_POOL_MIN_OVERLAP:.0%} means "
+                f"these are different draftgroups"
+            )
+    elif allowed_ids:
+        warnings.append(
+            "entries file carries no parseable embedded player pool; the "
+            "independent same-draftgroup check is unavailable for this file"
+        )
+
     for entry in entries:
         if not entry.is_complete:
             blank_entries.append(entry.entry_id)
@@ -581,6 +707,17 @@ def validate_dk_entries_file(
             continue
         if excluded.intersection(roster):
             errors.append(f"Entry ID {entry.entry_id}: excluded player rostered")
+        # F1 recheck, read straight off the salary CSV. The intake filter is the
+        # primary defence; this one exists so the export gate does not depend on
+        # intake having run, which is the case for any hand-built or ad-hoc file.
+        shelved = [
+            f"{players[pid].name} ({players[pid].status})"
+            for pid in roster
+            if pid in players and salary_status_tier(players[pid].status) == "out"
+        ]
+        if shelved:
+            errors.append(
+                f"Entry ID {entry.entry_id}: shelved player rostered {shelved}")
         for slot, required_pos, pid in zip(ROSTER_SLOTS, ROSTER_POSITIONS, roster):
             player = players.get(pid)
             if player and required_pos not in player.positions:
@@ -681,6 +818,9 @@ def validate_dk_entries_file(
         "warnings": warnings,
         "entry_count": len(entries),
         "complete_entry_count": total,
+        "contract": contract_name,
+        "embedded_pool_size": len(embedded_pool),
+        "embedded_pool_overlap": None if pool_overlap is None else round(pool_overlap, 4),
         "blank_entries": blank_entries,
         "invalid_ids": invalid_ids,
         "duplicate_same_contest": duplicate_same_contest,

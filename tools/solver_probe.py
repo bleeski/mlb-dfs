@@ -51,6 +51,17 @@ def _resolve_inputs(args) -> tuple[Path, Path]:
     slate = REPO / "data" / "slates" / args.date
     salary = Path(args.salary) if args.salary else slate / "DKSalaries.csv"
     feed = Path(args.lineups) if args.lineups else slate / "lineups_feed.json"
+    # The default name is date-keyed and shared, so it can hold a Showdown file
+    # left by another build for the same date. This probe reports whether the
+    # bank fits the execution budget; timing a six-slot pool as a ten-slot one
+    # answers a question nobody asked.
+    from mlb_engine.entries.dk_entries_manager import detect_salary_contract
+    contract = detect_salary_contract(salary)
+    if contract != "CLASSIC":
+        raise SystemExit(
+            f"{salary} carries {contract} geometry; solver_probe times the Classic "
+            f"solver. Pass --salary with the Classic file for this date."
+        )
     return salary, feed
 
 
