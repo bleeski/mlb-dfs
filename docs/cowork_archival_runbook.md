@@ -70,14 +70,32 @@ Per contest:
 5. Run the miner from the project working copy:
 
    ```
-   python field_miner.py \
-     --standings archive/<slate_date>/standings_<contest_id>.csv \
-     --salary archive/<slate_date>/DKSalaries_<slate_date>.csv \
+   python -m mlb_engine.field.field_miner \
+     --standings data/standings/inbox/contest-standings-<contest_id>.csv \
+     --auto-salary \
      --contest-id <contest_id> --slate-date <slate_date> \
-     --registry field_opponent_registry.json \
-     --json archive/<slate_date>/mined_<contest_id>.json \
+     --json data/archive/<slate_date>/mined_<contest_id>.json \
      --emit-ledger
    ```
+
+   Do not pass `--registry`. It defaults to
+   `data/reference/field_opponent_registry.json`, which is the one registry.
+   Passing a bare relative path is what forked it into two diverging copies in
+   the first place, and the runbook telling you to do that is what kept it
+   forked. Accumulation is now idempotent per contest, so re-running a mine
+   changes nothing.
+
+   The structural gate is fail-closed and blocks: exit 4 wrong salary file,
+   5 zero entries parsed, 6 unparsed share over tolerance, 3 other structural
+   failure. Nothing is written on a block, so there is nothing to undo. `--force`
+   archives anyway and records the override as line 2 of the emitted block.
+   Never use it to make a red run look green; use it only when you have read the
+   note and know the check is wrong.
+
+   To rebuild the registry from scratch (it is derived data, and the archive is
+   the source): `python tools/rebuild_registry.py`. Add `--max-seconds 35` if
+   you are running inside a sandbox with a call timeout; it exits 10 with
+   progress kept and finishes across several runs.
 
 6. Paste the emitted block into the ledger archive under the slate's `A-NNN`
    entry, newest first. Reconcile the living sections the same session: if the

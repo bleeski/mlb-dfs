@@ -415,5 +415,131 @@ class UploadManifestTests(unittest.TestCase):
                 um.REPO_ROOT = original_root
 
 
+class FieldMinerGateTests(unittest.TestCase):
+    """F9: the structural gate computed, then archived anyway."""
+
+    def _mined(self, structural_ok, **flags):
+        return {
+            "contest_id": "C1", "slate_date": "2026-07-25", "coverage": "full",
+            "entries": [], "meta": {"winning_entry_id": "E1"},
+            "diagnostics": {"parse_structural_ok": structural_ok,
+                            "verification_note": "PARSE FAILURE: test fixture",
+                            **flags},
+        }
+
+    def test_exit_codes_are_pinned_per_failure_mode(self):
+        from mlb_engine.field import field_miner as fm
+
+        self.assertEqual(fm.structural_exit_code({"contest_type_mismatch": True}),
+                         fm.EXIT_WRONG_SALARY_FILE)
+        self.assertEqual(fm.structural_exit_code({"parsed_nothing": True}),
+                         fm.EXIT_PARSED_NOTHING)
+        self.assertEqual(fm.structural_exit_code({"mostly_unparsed": True}),
+                         fm.EXIT_MOSTLY_UNPARSED)
+        self.assertEqual(fm.structural_exit_code({}), fm.EXIT_STRUCTURAL_OTHER)
+        # the four codes are distinct, or a caller cannot tell them apart
+        codes = {fm.EXIT_WRONG_SALARY_FILE, fm.EXIT_PARSED_NOTHING,
+                 fm.EXIT_MOSTLY_UNPARSED, fm.EXIT_STRUCTURAL_OTHER}
+        self.assertEqual(len(codes), 4)
+        self.assertNotIn(fm.EXIT_OK, codes)
+
+    def test_verification_note_is_line_one_of_every_block(self):
+        from mlb_engine.field.field_miner import emit_ledger_block
+
+        mined = self._mined(True)
+        mined["diagnostics"]["verification_note"] = "parse structurally sound"
+        mined.update({
+            "duplication": {"distinct_lineups": 1, "share_duplicated_pct": 0.0,
+                            "max_copies": 1, "winner_copies": 1, "copies_histogram": {}},
+            "construction": {"at_cap_share_pct": None, "salary_left_histogram": {},
+                             "max_stack_histogram": {}, "sp_pair_top": [], "top_owned": []},
+            "meta": {"entries_total": 1, "entries_complete_lineups": 1,
+                     "winning_points": 1.0, "multi_entry_flag": False},
+        })
+        mined["diagnostics"].update({
+            "salary_join_rate_pct": None, "ownership_recompute_ok": True,
+            "ownership_recompute_max_diff_pts": 0.0, "recomputed_total_pct": 100.0,
+            "dk_table_total_pct": 100.0, "dk_table_deficit_pts": 0.0,
+            "roster_slots_observed": 10, "roster_slots_expected": 10,
+            "intra_entry_duplicate_entry_ids": [], "entries_unparsed": 0,
+            "ownership_recompute_denominator": "all_entries"})
+        body = emit_ledger_block(mined)
+        first_bullet = next(l for l in body.splitlines() if l.startswith("- "))
+        self.assertIn("Verification:", first_bullet)
+
+    def test_forced_override_is_visible_in_the_block(self):
+        from mlb_engine.field.field_miner import emit_ledger_block
+
+        mined = self._mined(False, contest_type_mismatch=True)
+        mined.update({
+            "duplication": {"distinct_lineups": 1, "share_duplicated_pct": 0.0,
+                            "max_copies": 1, "winner_copies": 1, "copies_histogram": {}},
+            "construction": {"at_cap_share_pct": 50.0, "salary_left_histogram": {"a": 1},
+                             "max_stack_histogram": {"4": 1},
+                             "sp_pair_top": [{"pair": ("a", "b"), "field_share_pct": 10}],
+                             "top_owned": []},
+            "meta": {"entries_total": 1, "entries_complete_lineups": 1,
+                     "winning_points": 1.0, "multi_entry_flag": False},
+            "forced_override": {"warning": "archived under override",
+                                "exit_code_suppressed": 4,
+                                "verification_note": "WRONG SALARY FILE"},
+        })
+        mined["diagnostics"].update({
+            "salary_join_rate_pct": 0.0, "ownership_recompute_ok": False,
+            "ownership_recompute_max_diff_pts": 99.0, "recomputed_total_pct": 100.0,
+            "dk_table_total_pct": 1.0, "dk_table_deficit_pts": 99.0,
+            "roster_slots_observed": 10, "roster_slots_expected": 10,
+            "intra_entry_duplicate_entry_ids": [], "entries_unparsed": 0,
+            "ownership_recompute_denominator": "all_entries"})
+        body = emit_ledger_block(mined)
+        self.assertIn("ARCHIVED UNDER OVERRIDE", body)
+        # and the salary-derived tables are withheld rather than printed wrong
+        self.assertIn("unavailable", body)
+        self.assertNotIn("Max-stack histogram", body)
+        self.assertNotIn("SP-pair field share", body)
+
+
+class RegistryAccumulationTests(unittest.TestCase):
+    """F10: re-mining used to inflate every aggregate silently."""
+
+    def _mined(self, contest_id, usernames):
+        return {
+            "contest_id": contest_id, "slate_date": "2026-07-25",
+            "meta": {"winning_entry_id": "E1"},
+            "entries": [
+                {"entry_id": f"E{i}", "username": name, "salary_used": 49000,
+                 "max_stack": 4, "chalk_score": 1.0, "players_norm": [f"p{i}"]}
+                for i, name in enumerate(usernames)
+            ],
+        }
+
+    def test_remining_a_contest_is_a_no_op(self):
+        from mlb_engine.field.field_miner import update_registry
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "reg.json")
+            first = update_registry(path, self._mined("C1", ["alice", "bob"]))
+            self.assertEqual(first["users"]["alice"]["entries"], 1)
+            before = Path(path).read_text(encoding="utf-8")
+
+            update_registry(path, self._mined("C1", ["alice", "bob"]))
+            update_registry(path, self._mined("C1", ["alice", "bob"]))
+            self.assertEqual(Path(path).read_text(encoding="utf-8"), before)
+
+            # a genuinely new contest still accumulates
+            after = update_registry(path, self._mined("C2", ["alice"]))
+            self.assertEqual(after["users"]["alice"]["entries"], 2)
+            self.assertEqual(after["users"]["bob"]["entries"], 1)
+            self.assertEqual(after["contests_mined"], ["C1", "C2"])
+
+    def test_default_path_is_module_relative_and_single(self):
+        from mlb_engine.field.field_miner import default_registry_path
+
+        resolved = Path(default_registry_path())
+        self.assertTrue(resolved.is_absolute())
+        self.assertEqual(resolved.parent.name, "reference")
+        self.assertEqual(resolved.name, "field_opponent_registry.json")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -264,8 +264,18 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
 # Salary join (authoritative for salary and team; ledger invariant 3.1)
 # ---------------------------------------------------------------------------
 
+_SALARY_MAP_CACHE: Dict[Tuple[str, int, int], Dict[str, Dict[str, Any]]] = {}
+
+
 def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
-    """Load a DK salary CSV into {normalized name: record}.
+    """Load a DK salary CSV into {normalized name: record}, memoized on mtime+size.
+
+    ``resolve_salary_file`` scores every candidate on disk against one contest,
+    and the archival loop runs it once per contest. With 102 candidates that is
+    102 CSV parses per contest and roughly ten seconds each, which put a full
+    registry rebuild over three minutes for twenty-one contests. The cache key
+    is (path, mtime_ns, size), so a file edited between calls is reloaded and a
+    stale map is never served.
 
     Showdown needs a second key. DK ships each Showdown player TWICE, once as
     CPT at 1.5x and once as UTIL at base, so a name-keyed map has a collision on
@@ -281,6 +291,15 @@ def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
     Classic Roster Position is a multi-position token like "OF/1B" and keying on
     it would break the join it is supposed to fix.
     """
+    try:
+        stat = os.stat(path)
+        cache_key: Optional[Tuple[str, int, int]] = (
+            str(path), stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        cache_key = None
+    if cache_key is not None and cache_key in _SALARY_MAP_CACHE:
+        return _SALARY_MAP_CACHE[cache_key]
+
     out: Dict[str, Dict[str, Any]] = {}
     collisions: List[str] = []
     rows: List[Dict[str, Any]] = []
@@ -332,6 +351,8 @@ def load_salary_map(path: str) -> Dict[str, Dict[str, Any]]:
 
     out["__collisions__"] = {"names": sorted(set(collisions))}  # type: ignore[assignment]
     out["__contest_type__"] = {"value": "showdown" if is_showdown else "classic"}  # type: ignore[assignment]
+    if cache_key is not None:
+        _SALARY_MAP_CACHE[cache_key] = out
     return out
 
 
@@ -756,6 +777,12 @@ def mine_contest(
             "ownership_recompute_denominator": own_denominator,
             "ownership_recompute_ok": dk_table_agrees,
             "parse_structural_ok": parse_structural_ok,
+            # The individual reasons, so the caller can pin an exit code per
+            # failure mode instead of re-deriving it from the note text.
+            "parsed_nothing": parsed_nothing,
+            "mostly_unparsed": mostly_unparsed,
+            "contest_type_mismatch": contest_type_mismatch,
+            "entries_unparsed_share": round(unparsed_share, 4),
             "intra_entry_duplicate_entry_ids": intra_entry_dupes[:5],
             "roster_slots_observed": observed_slots,
             "roster_slots_expected": expected_slots,
@@ -856,7 +883,31 @@ def score_duplication_risk(
 # Opponent-recurrence registry (EntryName usernames across archived contests)
 # ---------------------------------------------------------------------------
 
-def update_registry(registry_path: str, mined: Dict[str, Any]) -> Dict[str, Any]:
+DEFAULT_REGISTRY_PATH = "data/reference/field_opponent_registry.json"
+
+
+def default_registry_path() -> str:
+    """The one registry path, resolved module-relative.
+
+    ``--registry`` was a bare cwd-relative argument with no default, so the
+    registry forked: ledger/field_opponent_registry.json held 534 users and
+    data/reference/ held 1986, 230 of them shared and disagreeing, with neither
+    a superset of the other. Two authorities for one fact is this project's
+    named no-op failure class.
+    """
+    return str(Path(__file__).resolve().parents[2] / DEFAULT_REGISTRY_PATH)
+
+
+def update_registry(registry_path: Optional[str], mined: Dict[str, Any]) -> Dict[str, Any]:
+    """Accumulate one contest into the opponent registry, idempotently.
+
+    Accumulation had no dedupe at all, so re-mining a contest, which the
+    post-slate runbook invites whenever a mine is re-run, inflated every
+    aggregate silently. A contest is mined as a whole, so contest id is the
+    right dedupe grain: if a user already carries this contest, their totals
+    already include it and this pass adds nothing.
+    """
+    registry_path = registry_path or default_registry_path()
     reg: Dict[str, Any] = {}
     if os.path.exists(registry_path):
         with open(registry_path, "r", encoding="utf-8") as fh:
@@ -865,6 +916,14 @@ def update_registry(registry_path: str, mined: Dict[str, Any]) -> Dict[str, Any]
                              "record-only, never a prediction")
     users = reg.setdefault("users", {})
     cid = mined["contest_id"] or mined.get("meta", {}).get("winning_entry_id", "unknown")
+    mined_contests = reg.setdefault("contests_mined", [])
+    if cid in mined_contests:
+        # Already folded in. Recompute the derived averages and return, so a
+        # re-mine is a genuine no-op rather than a quiet double count.
+        _finalize_registry_averages(users)
+        _write_registry(registry_path, reg)
+        return reg
+    mined_contests.append(cid)
     dup_ids = set()
     # Recompute duplicated entry ids from players_norm groups.
     groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
@@ -893,19 +952,58 @@ def update_registry(registry_path: str, mined: Dict[str, Any]) -> Dict[str, Any]
         if e["entry_id"] in dup_ids:
             u["dup_entries"] += 1
         u["last_seen"] = mined["slate_date"] or cid
+    if mined.get("forced_override"):
+        reg.setdefault("forced_contests", []).append({
+            "contest_id": cid,
+            "note": mined["forced_override"]["verification_note"],
+        })
+    _finalize_registry_averages(users)
+    _write_registry(registry_path, reg)
+    return reg
+
+
+def _finalize_registry_averages(users: Dict[str, Any]) -> None:
     for u in users.values():
         u["avg_salary_used"] = round(u["sum_salary_used"] / u["n_salary"], 0) if u["n_salary"] else None
         n_stack = u.get("n_stack", 0)
         u["avg_max_stack"] = round(u["sum_max_stack"] / n_stack, 2) if n_stack else None
         u["avg_chalk_score"] = round(u["sum_chalk"] / u["n_chalk"], 2) if u["n_chalk"] else None
-    with open(registry_path, "w", encoding="utf-8") as fh:
+
+
+def _write_registry(registry_path: str, reg: Dict[str, Any]) -> None:
+    """tmp + os.replace. A kill mid-write used to leave a truncated registry."""
+    target = Path(registry_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(f".{target.name}.{os.getpid()}.tmp")
+    with tmp.open("w", encoding="utf-8") as fh:
         json.dump(reg, fh, indent=1, sort_keys=True)
-    return reg
+    os.replace(tmp, target)
 
 
 # ---------------------------------------------------------------------------
 # Ledger archive block emitter
 # ---------------------------------------------------------------------------
+
+# Pinned exit codes, one per structural failure mode. They are distinct so a
+# scheduled task can tell "this is the wrong file" from "this file is unreadable"
+# without parsing prose, and so the runbook can name a fix per code.
+EXIT_OK = 0
+EXIT_WRONG_SALARY_FILE = 4      # standings and salary are different contest types
+EXIT_PARSED_NOTHING = 5         # zero entry rows produced a complete lineup
+EXIT_MOSTLY_UNPARSED = 6        # unparsed share above the tolerance
+EXIT_STRUCTURAL_OTHER = 3       # slot-count or intra-entry duplicate failure
+
+
+def structural_exit_code(diagnostics: Mapping[str, Any]) -> int:
+    """Map a failed structural gate to its pinned exit code."""
+    if diagnostics.get("contest_type_mismatch"):
+        return EXIT_WRONG_SALARY_FILE
+    if diagnostics.get("parsed_nothing"):
+        return EXIT_PARSED_NOTHING
+    if diagnostics.get("mostly_unparsed"):
+        return EXIT_MOSTLY_UNPARSED
+    return EXIT_STRUCTURAL_OTHER
+
 
 def emit_ledger_block(mined: Dict[str, Any]) -> str:
     m, d, c, g = mined["meta"], mined["duplication"], mined["construction"], mined["diagnostics"]
@@ -914,6 +1012,18 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
     lines.append(f"#### Full-field decomposition — contest {mined['contest_id'] or 'UNKNOWN'} "
                  f"(field_miner {VERSION}; coverage {cov}; {REVIEW_LABEL})")
     lines.append("")
+    # The verification note is line 1 of the block, always. It used to be
+    # computed, used to pick a string, and then omitted from the emitted block,
+    # so a block tagged "coverage full" could sit in the archive with a
+    # fabricated stack histogram and nothing in the archive saying so. A reader
+    # of the ledger must not have to go back to the run to learn this.
+    lines.append(f"- Verification: {g.get('verification_note') or 'no note recorded'}")
+    override = mined.get("forced_override")
+    if override:
+        lines.append(f"- **ARCHIVED UNDER OVERRIDE**: {override['warning']}. "
+                     f"Suppressed exit code {override['exit_code_suppressed']}. "
+                     f"Treat every number below as unverified.")
+    lines.append("")
     lines.append(f"- Entries {m['entries_total']} ({m['entries_complete_lineups']} complete lineups); "
                  f"winning score {m['winning_points']}; multi-entry contest: {m['multi_entry_flag']}.")
     lines.append(f"- Duplication: {d['distinct_lineups']} distinct lineups; "
@@ -921,16 +1031,27 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
                  f"max copies {d['max_copies']}; the winning lineup had {d['winner_copies']} cop"
                  f"{'y' if d['winner_copies'] == 1 else 'ies'}. "
                  f"Copies histogram: {d['copies_histogram']}.")
-    if c["at_cap_share_pct"] is not None:
+    # Every table below this line is a salary join. On a contest-type mismatch
+    # the join matched on name across two different contests, so the numbers are
+    # not merely uncertain, they are wrong. Report them unavailable rather than
+    # print a plausible-looking histogram nobody can later distinguish from a
+    # real one.
+    salary_tables_valid = not g.get("contest_type_mismatch")
+    if not salary_tables_valid:
+        lines.append("- Salary usage, stack histogram and SP-pair tables: **unavailable**. "
+                     "The salary file resolved to a different contest type, so the "
+                     "join matched on name across contests and every salary-derived "
+                     "number would be wrong.")
+    if salary_tables_valid and c["at_cap_share_pct"] is not None:
         lines.append(f"- Salary usage: {c['at_cap_share_pct']}% of entries within "
                      f"${AT_CAP_SALARY_LEFT} of the cap. Salary-left bins: {c['salary_left_histogram']}.")
-    if c["max_stack_histogram"]:
+    if salary_tables_valid and c["max_stack_histogram"]:
         lines.append(f"- Max-stack histogram: {c['max_stack_histogram']}.")
     if cov == "standings_only":
         lines.append("- Salary-usage and stack tables unavailable at this coverage tier "
                      "(no salary file); re-run at full coverage if the slate salary CSV or the "
                      "slate's DKEntries upload file (which embeds the salary block) surfaces.")
-    if c["sp_pair_top"]:
+    if salary_tables_valid and c["sp_pair_top"]:
         top = ", ".join(f"{'/'.join(x['pair'])} {x['field_share_pct']}%" for x in c["sp_pair_top"][:4])
         lines.append(f"- SP-pair field share (top): {top}.")
     if c["top_owned"]:
@@ -1099,6 +1220,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--registry")
     ap.add_argument("--emit-ledger", action="store_true")
     ap.add_argument("--json", dest="json_out")
+    ap.add_argument("--force", action="store_true",
+                    help="archive despite a failed structural parse check. The "
+                         "override is recorded verbatim as line 2 of the emitted "
+                         "ledger block and in the registry entry, so a forced "
+                         "archive is never indistinguishable from a clean one. "
+                         "Exit codes when not forced: "
+                         f"{EXIT_WRONG_SALARY_FILE} wrong salary file, "
+                         f"{EXIT_PARSED_NOTHING} zero entries parsed, "
+                         f"{EXIT_MOSTLY_UNPARSED} unparsed share over tolerance, "
+                         f"{EXIT_STRUCTURAL_OTHER} other structural failure.")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
@@ -1125,6 +1256,39 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("NOTICE: no --salary supplied; running the standings_only degraded tier "
               "(duplication, chalk, SP pairs, registry; no salary or stack tables)")
     mined = mine_contest(st, smap, contest_id=args.contest_id, slate_date=args.slate_date)
+
+    # F9: the structural gate is computed and then, until now, ignored. main()
+    # called update_registry, emit_ledger_block and returned 0 with no branch on
+    # parse_structural_ok; the only use of the flag selected a note string that
+    # emit_ledger_block then omitted. A wrong-salary mine produced join 0.0%,
+    # "PARSE FAILED" in diagnostics, exit 0, a written registry, and a block
+    # tagged "coverage full" with a fabricated stack histogram.
+    #
+    # This matters more than the exit code suggests. The archive is the training
+    # data for the ownership model, which is the project's single gating
+    # dependency, and the scheduled task mines unattended. One bad mine poisons
+    # ownership rows, duplication tables and the registry in one clean-looking
+    # run, and nothing downstream can tell which rows came from it.
+    diagnostics = mined.get("diagnostics") or {}
+    if not diagnostics.get("parse_structural_ok", True):
+        note = diagnostics.get("verification_note") or "structural parse check failed"
+        code = structural_exit_code(diagnostics)
+        print()
+        print(f"BLOCKED (exit {code}): {note}")
+        if not args.force:
+            print("Nothing was written: no registry update, no ledger block, no JSON. "
+                  "Fix the input and re-run, or pass --force to record the override "
+                  "verbatim in the emitted block.")
+            return code
+        print("--force supplied: writing anyway. The override is recorded verbatim "
+              "in the emitted block and in the registry entry.")
+        mined["forced_override"] = {
+            "verification_note": note,
+            "exit_code_suppressed": code,
+            "warning": "this contest was archived downstream of a structural parse "
+                       "failure by explicit operator override",
+        }
+
     if args.registry:
         update_registry(args.registry, mined)
         print(f"registry updated: {args.registry}")

@@ -330,10 +330,17 @@ Order of calibratability, therefore:
   winner copies and share-duplicated per contest; prize share divides by copies,
   so duplication belongs in every post-mortem readout. Labels: observed field
   behavior and deterministic descriptive statistics, never a probability.
-- **The opponent registry** (`field_opponent_registry.json`, untracked) accumulates
-  EntryName usernames across contests: entries, average salary used, average max
-  stack, average chalk score, duplicated-entry count. Small recurring fields have
-  regulars. Record-only; never a prediction.
+- **The opponent registry** (`data/reference/field_opponent_registry.json`)
+  accumulates EntryName usernames across contests: entries, average salary used,
+  average max stack, average chalk score, duplicated-entry count. Small recurring
+  fields have regulars. Record-only; never a prediction. As of 2026-07-26 there
+  is exactly one registry at exactly that path; `--registry` defaults to it and
+  should not be passed. It had forked into a second copy under `ledger/` (534
+  users against 1986, 230 shared users disagreeing, neither a superset) because
+  the flag took a bare cwd-relative path. Accumulation is idempotent per contest,
+  so a re-mine is a genuine no-op rather than a silent double count, and the file
+  is derived data: `python tools/rebuild_registry.py` reconstructs it from
+  `data/archive/**/contest-standings-*.csv` deterministically.
 - **Standings-only degraded tier (added 2026-07-04).** When the slate salary CSV is
   unrecoverable, run the miner without it. Duplication tables, winner copies,
   chalk scores, SP-pair concentration (the slot tokens identify pitchers), the
