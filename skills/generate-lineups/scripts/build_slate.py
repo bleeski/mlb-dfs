@@ -913,7 +913,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             time_budget_s=max(remaining - 8.0, 5.0),
             max_candidates=max(n_entries * 12, 60),
         )
-        candidates = cache.as_candidates()
+        candidates = cache.as_candidates(projections, requested_n=n_entries)
         if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:
             print(json.dumps({
                 "status": "partial",
@@ -1010,8 +1010,81 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
 # --------------------------------------------------------------------------- #
 # Showdown
 # --------------------------------------------------------------------------- #
+def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
+    """Return (bat_side, pitcher_hand_by_team, note) for a Showdown pool.
+
+    The platoon component of the Base prior needs a hitter's side and the
+    OPPOSING declared starter's hand. Neither is in the DK salary file, so this
+    reads the lineups feed. Missing handedness is not fatal: the prior falls
+    back to a flat 1.00 and the affected teams are named in the brief, which is
+    the honest outcome. Silently flattening it is not, because the prior_note
+    still claims a platoon factor was applied.
+    """
+    note: dict = {"source": None, "hitters_with_side": 0, "teams_with_hand": 0}
+    feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
+    feed = None
+    if feed_path.exists():
+        try:
+            feed = json.loads(feed_path.read_text(encoding="utf-8"))
+            note["source"] = str(feed_path)
+            note["age_minutes"] = feed_age_minutes(feed)
+        except Exception as exc:
+            note["warning"] = f"unreadable lineups feed: {exc}"
+    if feed is None:
+        try:
+            feed = fetch_lineups(args.date, slate_dir / "lineups_feed.json")
+            note["source"] = "fetched"
+        except Exception as exc:
+            note["warning"] = f"lineups feed unavailable ({exc}); platoon stays flat"
+            return {}, {}, note
+
+    teams = set(df["Team"].unique()) if len(df) else set()
+    bat_side: dict = {}
+    hand: dict = {}
+    for game in (feed.get("games") or []):
+        for side in ("away", "home"):
+            block = game.get(side) or {}
+            # fetch_lineups writes team_abbrev; the other two are accepted so a
+            # hand-rolled pre-fetch feed (the Cowork sandbox path) also works.
+            abbrev = (block.get("team_abbrev") or block.get("team")
+                      or block.get("abbrev"))
+            for hitter in (block.get("lineup") or []):
+                if hitter.get("bat_side") and hitter.get("name"):
+                    bat_side[str(hitter["name"])] = str(hitter["bat_side"])
+            pitcher = block.get("probable_pitcher") or block.get("probable") or {}
+            if abbrev and pitcher.get("hand"):
+                hand[str(abbrev)] = str(pitcher["hand"])
+    note["hitters_with_side"] = sum(1 for n in bat_side if n in set(df["Name"]))
+    note["teams_with_hand"] = len([t for t in hand if t in teams])
+    # pitcher_hand is keyed by the team a hitter FACES, so invert: a hitter on
+    # LAD is graded against the NYM starter's hand.
+    facing = {}
+    for _, row in df.iterrows():
+        opp = str(row["Opponent"])
+        if opp in hand:
+            facing[opp] = hand[opp]
+    return bat_side, facing, note
+
+
+def showdown_moneyline(args, df) -> tuple[dict, dict]:
+    """Return ({team: american odds}, note) for the single Showdown game."""
+    try:
+        odds, note = load_odds_packet(args)
+    except Exception as exc:
+        return {}, {"warning": f"odds unavailable ({exc}); entries split evenly"}
+    teams = sorted(df["Team"].unique()) if len(df) else []
+    for entry in (odds or {}).values():
+        ml = (entry or {}).get("moneyline") or {}
+        if all(t in ml for t in teams) and teams:
+            return {t: float(ml[t]) for t in teams}, dict(note, matched=True)
+    return {}, dict(note or {}, matched=False,
+                    warning="no moneyline matched this game's teams; entries "
+                            "split evenly between the two sides")
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
+    from mlb_engine.optimize import showdown_theses as st
 
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv, slate_clock
 
@@ -1026,17 +1099,56 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         print(json.dumps({"status": "no_blank_reserved_entries"}, indent=1))
         return 4, {}
 
-    cpt_cap = (args.controls_override or {}).get("max_cpt_exposure_pct",
-                                                  sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
-    cpt_diagnostics: dict = {}
-    bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
-                                  diagnostics=cpt_diagnostics)
-    if len(bank) < n_entries:
-        print(json.dumps({"status": "bank_short",
-                          "built": len(bank), "needed": n_entries}, indent=1))
-        return 3, {}
+    overrides = args.controls_override or {}
+    cpt_cap = overrides.get("max_cpt_exposure_pct", sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
+    share_cap = overrides.get("max_shared_players", sd.DEFAULT_MAX_SHARED_PLAYERS)
 
-    certs = [sd.certify_showdown(lineup, df) for lineup in bank[:n_entries]]
+    # Handedness and the moneyline are what make the ladder more than a relabeled
+    # points-max bank, so gather them before deciding the path. Both are
+    # best-effort: a Showdown build must not fail because an odds endpoint is
+    # down, it must say the input was missing and build anyway.
+    bat_side, pitcher_hand, feed_note = showdown_handedness(args, slate_dir, df)
+    moneyline, odds_note = showdown_moneyline(args, df)
+
+    basis = str(df["Pool_Basis"].iloc[0]) if len(df) else "empty"
+    posted = int(df["Batting_Order"].notna().sum()) if len(df) else 0
+    # The ladder is conditioned on batting order and declared starters. With
+    # nothing posted there is no order to condition on, so the templates would be
+    # labels over a pool the engine cannot actually distinguish. Fall back rather
+    # than ship a thesis name that means nothing.
+    use_ladder = (basis == "declared_starters" and posted >= 2 * 9)
+
+    ladder_meta: dict = {}
+    solve_diag: dict = {}
+    cpt_diagnostics: dict = {}
+    report: dict = {}
+
+    if use_ladder:
+        priced = st.apply_base_prior(df, bat_side=bat_side, pitcher_hand=pitcher_hand)
+        ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
+                                             max_cpt_exposure_pct=cpt_cap)
+        theses = ladder_meta["theses"]
+        solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
+                                 diagnostics=solve_diag)
+        if any(lu is None for lu in solved):
+            print(json.dumps({"status": "ladder_infeasible",
+                              "unsolved": [t["name"] for t, lu in zip(theses, solved)
+                                           if lu is None]}, indent=1))
+            return 3, {}
+        bank = list(solved)
+        report = st.portfolio_report(priced, theses, solved)
+        certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
+    else:
+        bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
+                                      max_shared_players=share_cap,
+                                      diagnostics=cpt_diagnostics)
+        if len(bank) < n_entries:
+            print(json.dumps({"status": "bank_short",
+                              "built": len(bank), "needed": n_entries}, indent=1))
+            return 3, {}
+        bank = bank[:n_entries]
+        certs = [sd.certify_showdown(lineup, df) for lineup in bank]
+
     failed = [c for c in certs if not c.get("passed")]
     if failed:
         print(json.dumps({"status": "not_certified",
@@ -1048,18 +1160,29 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     dest = out_dir / "DKEntries_showdown.csv"
     assignments = [
         {"entry_id": row["entry_id"], "roster_ids": list(lineup["roster_ids"])}
-        for row, lineup in zip(rows, bank[:n_entries])
+        for row, lineup in zip(rows, bank)
     ]
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments)
     template = sd.verify_template_preserved(str(entries), str(dest))
 
-    cap_count = cpt_diagnostics.get("cap_count")
-    captain_counts = cpt_diagnostics.get("captain_exposure") or {}
+    if use_ladder:
+        cap_count = ladder_meta.get("captain_cap_count")
+        captain_counts = report.get("captain_exposure") or {}
+        relaxed_slots = ((ladder_meta.get("captain_cap_relaxed") or 0)
+                         + (solve_diag.get("captain_lock_relaxed") or 0))
+        overlap_relaxed = solve_diag.get("overlap_relaxed") or 0
+        max_overlap = report.get("max_pairwise_overlap")
+    else:
+        cap_count = cpt_diagnostics.get("cap_count")
+        captain_counts = cpt_diagnostics.get("captain_exposure") or {}
+        relaxed_slots = cpt_diagnostics.get("relaxed_slots") or 0
+        overlap_relaxed = cpt_diagnostics.get("overlap_relaxed_slots") or 0
+        max_overlap = None
     captain_exposure = {
         key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
         for key, count in sorted(captain_counts.items(), key=lambda kv: -kv[1])
     }
-    relaxed_slots = cpt_diagnostics.get("relaxed_slots") or 0
+    realized_cpt_pct = max((v["pct"] for v in captain_exposure.values()), default=0.0)
 
     brief = {
         # Showdown ships as v0.2-review (cpt exposure cap added 2026-07-23) and
@@ -1088,20 +1211,58 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "write_report": write_report,
         },
         "captain_exposure": {
-            "cap_pct": cpt_diagnostics.get("max_cpt_exposure_pct"),
+            "cap_pct": cpt_cap,
             "cap_count": cap_count,
+            "realized_max_pct": realized_cpt_pct,
             "by_player": captain_exposure,
             "relaxed_slots": relaxed_slots,
         },
-        "caution": ("showdown.py is v0.2-review and Phase 3 is not complete. "
-                    "Per-lineup checks, template preservation, and the captain "
-                    "exposure cap passed, but this is not the Classic three-gate "
-                    "certification. Review before uploading."
+        "diversity": {
+            "max_shared_players": share_cap,
+            "max_pairwise_overlap": max_overlap,
+            "overlap_relaxed_slots": overlap_relaxed,
+            "all_unique_rosters": report.get("all_unique_rosters") if use_ladder else None,
+        },
+        "construction": ({
+            "mode": "thesis_ladder",
+            "module_version": st.VERSION,
+            "win_share_basis": ladder_meta.get("win_share_basis"),
+            "favorite": (ladder_meta.get("shape") or {}).get("favorite"),
+            "win_share": (ladder_meta.get("shape") or {}).get("win_share"),
+            "allocation": ladder_meta.get("allocation"),
+            "bullpen_teams": (ladder_meta.get("shape") or {}).get("bullpen_teams"),
+            "platoon_unresolved_teams": list(
+                (priced.attrs.get("platoon_unresolved_teams") or [])),
+            "handedness": feed_note,
+            "odds": odds_note,
+            "lineups": report.get("lineups"),
+            "player_exposure": report.get("player_exposure"),
+        } if use_ladder else {
+            "mode": "points_max_bank",
+            "reason": (f"pool basis is {basis!r} with {posted} posted hitters; the "
+                       "thesis ladder needs both posted batting orders to "
+                       "condition on, so it was not used"),
+        }),
+        "caution": (f"showdown.py is v{sd.VERSION} and Phase 3 is not complete. "
+                    "Per-lineup checks, template preservation, the captain "
+                    "exposure cap, and the roster-overlap bound passed, but this "
+                    "is not the Classic three-gate certification. Review before "
+                    "uploading."
                     + (f" NOTE: the {cap_count}-lineup captain cap relaxed on "
                        f"{relaxed_slots} slot(s) because the pool couldn't "
-                       "support it without truncating the bank -- check "
+                       "support it without leaving a reserved row blank -- check "
                        "captain_exposure.by_player before uploading."
-                       if relaxed_slots else "")),
+                       if relaxed_slots else "")
+                    + (f" NOTE: the {share_cap}-player overlap bound relaxed on "
+                       f"{overlap_relaxed} slot(s); those lineups are still "
+                       "distinct but share more than {share_cap} players with an "
+                       "earlier one."
+                       if overlap_relaxed else "")
+                    + (" NOTE: no moneyline was available, so entries were split "
+                       "evenly between the two sides rather than weighted to the "
+                       "market."
+                       if use_ladder and ladder_meta.get("win_share_basis")
+                       == "even_split_no_market_input" else "")),
     }
     return (0 if template.get("passed") else 3), brief
 

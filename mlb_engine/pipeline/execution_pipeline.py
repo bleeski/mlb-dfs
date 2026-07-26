@@ -1367,7 +1367,9 @@ def _slate_feasibility(
         sps = _eligible_sp_ids_for_anchor_caps(projections, excludes=list(excluded_player_ids or []))
         n_sps = len({str(s) for s in sps})
         info["viable_sp_count"] = n_sps
-        n_pairs = len(enumerate_sp_pairs(sps))
+        # Cross-game only: two opposing starters are anti-correlated, so
+        # counting them as capacity understates the true repetition floor.
+        n_pairs = len(enumerate_sp_pairs(sps, projections))
         info["viable_sp_pairs"] = n_pairs
         n_stackable = len(_stackable_teams_by_strength(projections))
         info["stackable_team_count"] = n_stackable

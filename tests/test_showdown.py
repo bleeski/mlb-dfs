@@ -7,6 +7,8 @@ from the Classic solver, so test_golden_replay is unaffected.
 """
 from __future__ import annotations
 
+import collections
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from mlb_engine.optimize import showdown as sd
+from mlb_engine.optimize import showdown_theses as st
 from mlb_engine.optimize.roster_contracts import CLASSIC, SHOWDOWN, get_contract
 from mlb_engine.entries.dk_entries_manager import ROSTER_SLOTS
 
@@ -186,6 +189,158 @@ class ShowdownExportTests(unittest.TestCase):
             reparsed = {r["entry_id"]: r for r in sd.read_showdown_reserved_rows(out)["reserved"]}
             self.assertEqual(reparsed["111"]["cells"], ["7", "8", "9", "10", "11", "12"])
             self.assertTrue(reparsed["222"]["is_complete"])
+
+
+# --------------------------------------------------------------------------- #
+# Portfolio diversity: overlap bound and captain cap
+# --------------------------------------------------------------------------- #
+def _max_pairwise_overlap(bank):
+    sets = [set(l["player_keys"]) for l in bank]
+    return max((len(a & b) for i, a in enumerate(sets) for b in sets[i + 1:]),
+               default=0)
+
+
+class ShowdownDiversityTests(unittest.TestCase):
+    def test_defaults_are_a_third_and_four_shared(self):
+        # 0.33 not 0.35: cap_count is a floor(), and 0.35 * 20 = 7, which is a
+        # realized 35%. The standing instruction is "never more than a third".
+        self.assertEqual(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT, 0.33)
+        self.assertEqual(sd.DEFAULT_MAX_SHARED_PLAYERS, 4)
+        self.assertEqual(math.floor(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT * 20), 6)
+
+    def test_bank_respects_the_overlap_bound(self):
+        df = sd.melt_showdown_salary_csv(SAL)
+        bank = sd.build_showdown_bank(df, 12, time_limit=6)
+        self.assertEqual(len(bank), 12)
+        self.assertLessEqual(_max_pairwise_overlap(bank), 4)
+
+    def test_exact_set_forbidding_permits_five_shared_and_the_bound_does_not(self):
+        """The reason the bound exists: a one-player swap passes exact-set."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        loose = sd.build_showdown_bank(df, 6, max_shared_players=None, time_limit=6)
+        tight = sd.build_showdown_bank(df, 6, max_shared_players=4, time_limit=6)
+        self.assertEqual(_max_pairwise_overlap(loose), 5)
+        self.assertLessEqual(_max_pairwise_overlap(tight), 4)
+
+    def test_overlap_counts_the_player_not_the_role(self):
+        """Promoting a UTIL to CPT is not a differentiated lineup."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        first = sd.build_showdown_lineup(df, time_limit=6)
+        self.assertIsNotNone(first)
+        keys = list(first["player_keys"])
+        again = sd.build_showdown_lineup(df, forbidden_sets=[keys],
+                                         max_shared_players=5, time_limit=6)
+        self.assertIsNotNone(again)
+        # 5 shared is allowed; all 6 in any role arrangement is not.
+        self.assertLessEqual(len(set(again["player_keys"]) & set(keys)), 5)
+
+    def test_captain_cap_holds_at_a_third_of_the_bank(self):
+        df = sd.melt_showdown_salary_csv(SAL)
+        diag = {}
+        bank = sd.build_showdown_bank(df, 18, diagnostics=diag, time_limit=6)
+        self.assertEqual(len(bank), 18)
+        counts = collections.Counter(l["captain"]["player_key"] for l in bank)
+        self.assertLessEqual(max(counts.values()) / len(bank), 1.0 / 3.0)
+        self.assertEqual(diag["relaxed_slots"], 0)
+
+    def test_cap_relaxes_rather_than_returning_a_short_bank(self):
+        """A short bank leaves a blank reserved row, and a blank row blocks
+        certification. Relaxing a diversity control is the lesser failure."""
+        df = _synth()                       # 7 players, almost no legal variety
+        diag = {}
+        bank = sd.build_showdown_bank(df, 6, diagnostics=diag, time_limit=4)
+        self.assertGreater(len(bank), 0)
+        self.assertIn("overlap_relaxed_slots", diag)
+        self.assertIn("relaxed_slots", diag)
+
+
+# --------------------------------------------------------------------------- #
+# Thesis ladder
+# --------------------------------------------------------------------------- #
+class ShowdownThesisLadderTests(unittest.TestCase):
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+
+    def test_platoon_applies_against_right_handed_starters(self):
+        """Regression: an earlier prior only modeled LHP starters, so a slate
+        with two RHP starters got a flat 1.00 while prior_note still claimed a
+        platoon factor. A same-handed bat must be marked down, not ignored."""
+        raw = sd.melt_showdown_salary_csv(SAL)
+        hitters = raw[raw["Batting_Order"].notna()]
+        name = str(hitters.iloc[0]["Name"])
+        opp = str(hitters.iloc[0]["Opponent"])
+        righty = st.apply_base_prior(raw, bat_side={name: "R"},
+                                     pitcher_hand={opp: "R"})
+        lefty = st.apply_base_prior(raw, bat_side={name: "L"},
+                                    pitcher_hand={opp: "R"})
+        r = float(righty.loc[righty["Name"] == name, "Base"].iloc[0])
+        l = float(lefty.loc[lefty["Name"] == name, "Base"].iloc[0])
+        self.assertLess(r, l)               # RHB vs RHP is the penalty side
+
+    def test_unresolved_platoon_teams_are_reported_not_silently_flattened(self):
+        raw = sd.melt_showdown_salary_csv(SAL)
+        out = st.apply_base_prior(raw, bat_side={}, pitcher_hand={})
+        self.assertEqual(set(out.attrs["platoon_unresolved_teams"]), {"MIN", "CHC"})
+
+    def test_ladder_spans_game_states_and_holds_the_captain_cap(self):
+        ladder = st.build_thesis_ladder(self.df, 18, moneyline={"MIN": -150, "CHC": 130})
+        self.assertEqual(len(ladder["theses"]), 18)
+        self.assertGreaterEqual(len(ladder["allocation"]), 8)
+        self.assertEqual(ladder["win_share_basis"], "moneyline_no_vig")
+        counts = collections.Counter(t["cpt"] for t in ladder["theses"])
+        self.assertLessEqual(max(counts.values()) / 18, 1.0 / 3.0)
+
+    def test_ladder_solves_unique_rosters_under_both_bounds(self):
+        ladder = st.build_thesis_ladder(self.df, 18, moneyline={"MIN": -150, "CHC": 130})
+        lineups = st.solve_ladder(self.df, ladder["theses"], time_limit=5)
+        self.assertTrue(all(l is not None for l in lineups))
+        report = st.portfolio_report(self.df, ladder["theses"], lineups)
+        self.assertTrue(report["all_unique_rosters"])
+        self.assertLessEqual(report["max_pairwise_overlap"], 4)
+        self.assertLessEqual(report["max_captain_exposure_pct"], 100.0 / 3.0)
+        self.assertTrue(all(r["lineup_certified"] for r in report["lineups"]))
+
+    def test_ladder_scales_below_and_above_the_template_count(self):
+        for n in (1, 3, 25):
+            ladder = st.build_thesis_ladder(self.df, n)
+            self.assertEqual(len(ladder["theses"]), n, f"n={n}")
+            self.assertTrue(all(t["name"] for t in ladder["theses"]), f"n={n}")
+
+    def test_repeated_templates_get_distinct_thesis_names(self):
+        """Two rows sharing a thesis name read as a duplicate when they are not."""
+        ladder = st.build_thesis_ladder(self.df, 25)
+        names = [t["name"] for t in ladder["theses"]]
+        self.assertEqual(len(set(names)), len(names))
+
+    def test_no_market_input_splits_evenly_and_says_so(self):
+        ladder = st.build_thesis_ladder(self.df, 10)
+        self.assertEqual(ladder["win_share_basis"], "even_split_no_market_input")
+        self.assertEqual(set(ladder["shape"]["win_share"].values()), {0.5})
+
+    def test_ace_loses_pairs_the_ace_with_the_bats_facing_him(self):
+        """The one shape a points-max solve never builds on its own."""
+        ladder = st.build_thesis_ladder(self.df, 18, moneyline={"MIN": -150, "CHC": 130})
+        thesis = next(t for t in ladder["theses"] if t["template"] == "ace_loses")
+        lineups = st.solve_ladder(self.df, [thesis], time_limit=5)
+        self.assertIsNotNone(lineups[0])
+        teams = collections.Counter(
+            self.df.set_index("Player_Key").loc[k, "Team"]
+            for k in lineups[0]["player_keys"])
+        ace_team = self.df.set_index("Player_Key").loc[thesis["cpt"], "Team"]
+        # The ace's own side contributes the ace and little else.
+        self.assertLessEqual(teams[ace_team], 2)
+
+    def test_bullpen_template_appears_only_without_a_declared_starter(self):
+        both = st.describe_slate(self.df)
+        self.assertEqual(both["bullpen_teams"], [])
+        ladder = st.build_thesis_ladder(self.df, 18)
+        self.assertNotIn("bullpen_game", ladder["allocation"])
+
+        no_sp = self.df[~((self.df["Team"] == "CHC")
+                          & (self.df["Batting_Order"].isna()))].reset_index(drop=True)
+        self.assertEqual(st.describe_slate(no_sp)["bullpen_teams"], ["CHC"])
+        self.assertIn("bullpen_game", st.build_thesis_ladder(no_sp, 18)["allocation"])
 
 
 if __name__ == "__main__":

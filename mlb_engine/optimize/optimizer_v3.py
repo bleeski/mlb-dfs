@@ -1055,13 +1055,59 @@ def resolve_viable_sp_pool(
     }
 
 
-def enumerate_sp_pairs(sp_ids):
-    """Return deterministic sorted 2-combinations of SP IDs."""
+def enumerate_sp_pairs(sp_ids, projections_df=None, cross_game_only=True,
+                       rank_by_ceiling=True):
+    """Return deterministic 2-combinations of SP IDs, strongest first.
+
+    Two corrections over the naive enumeration, both of which cost real slates:
+
+    ``cross_game_only`` drops pairs of opposing starters. On a 14-game slate
+    roughly 14 of the enumerated pairs are the two sides of one game, which are
+    anti-correlated at the win and quality-start level. Phase 1 of the bank spent
+    budgeted solves manufacturing lineups around those pairs, and
+    ``_slate_feasibility`` counted them as capacity, which understates the true
+    repetition floor on thin slates. ``bank_cache.extend_bank`` already excluded
+    them; this makes the two subsystems agree. Pass False to enumerate every
+    combination, which the pair-grid planner may legitimately want.
+
+    ``rank_by_ceiling`` orders pairs by combined pitcher Ceiling descending when
+    a projections frame is supplied. Coverage loops stop on budget exhaustion, so
+    the order decides what gets covered: the previous sort was on Player_ID as a
+    STRING, meaning a big-slate bank under the sandbox ceiling covered an
+    alphabetical prefix and could never reach the two best arms' pairings.
+    Truncation should degrade from the weak end. Ties and unranked pitchers fall
+    back to the id sort, so the result stays deterministic either way.
+    """
     ids = sorted(set(sp_ids or []), key=str)
+
+    game_of = {}
+    ceiling_of = {}
+    if projections_df is not None and hasattr(projections_df, "itertuples"):
+        for row in projections_df.itertuples():
+            pid = str(getattr(row, "Player_ID", ""))
+            game_of[pid] = str(getattr(row, "Game_ID", ""))
+            try:
+                ceiling_of[pid] = float(getattr(row, "Ceiling", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                ceiling_of[pid] = 0.0
+
     pairs = []
     for i, a in enumerate(ids):
         for b in ids[i + 1:]:
+            if cross_game_only and game_of:
+                game_a, game_b = game_of.get(str(a)), game_of.get(str(b))
+                # Only drop when BOTH games are known and equal. An unknown game
+                # is not evidence of a same-game pair, and silently dropping it
+                # would shrink the legal pair set on incomplete data.
+                if game_a and game_b and game_a == game_b:
+                    continue
             pairs.append((a, b))
+
+    if rank_by_ceiling and ceiling_of:
+        pairs.sort(key=lambda pr: (
+            -(ceiling_of.get(str(pr[0]), 0.0) + ceiling_of.get(str(pr[1]), 0.0)),
+            str(pr[0]), str(pr[1]),
+        ))
     return pairs
 
 
@@ -3141,7 +3187,9 @@ def build_diverse_candidate_bank(
     eligible_sps = _eligible_sp_ids_for_anchor_caps(
         projections_df, excludes=single_lineup_kwargs.get('excludes')
     )
-    viable_pairs = enumerate_sp_pairs(eligible_sps)
+    # Cross-game only and ceiling-ranked: Phase 1 below stops on budget
+    # exhaustion, so this order decides which pairings a truncated bank covers.
+    viable_pairs = enumerate_sp_pairs(eligible_sps, projections_df)
     stack_teams = _stackable_teams_by_strength(projections_df)
 
     base_count = len(bank.get('candidate_lineups') or [])

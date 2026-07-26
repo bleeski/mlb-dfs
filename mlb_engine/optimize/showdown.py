@@ -28,14 +28,24 @@ import pandas as pd
 
 from mlb_engine.optimize.roster_contracts import SHOWDOWN, RosterContract
 
-VERSION = "0.2-review"
+VERSION = "0.3-review"
 
 # A pure points-max solve always wants the single highest-Base player at CPT
 # (1.5x multiplier beats any UTIL contribution), so an unbounded bank converges
 # every lineup on the same captain. Observed 24/24 on the 2026-07-23 SD@ATL
 # slate (Chris Sale, Base 22.35 against a next-best of ~15) before this cap
-# existed. Default caps any single captain to just over a third of the bank.
-DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.35
+# existed. Default caps any single captain to a third of the bank.
+#
+# 0.33 rather than 0.35 because the cap count is a floor() of pct * n, so 0.35
+# rounds UP to a breach at some entry counts: at n=20 it permits 7 captains,
+# which is 35% realized. 0.33 permits 6, which is 30%. Set 2026-07-25 when the
+# standing instruction became "never more than a third".
+DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.33
+
+# Two lineups that share five of six players are one lineup with a swapped punt
+# bat. Exact-set forbidding calls that unique; this does not. Roster size minus
+# two, so at least a third of every roster differs from every other roster.
+DEFAULT_MAX_SHARED_PLAYERS = 4
 
 _DIGITS = re.compile(r"\d+")
 
@@ -155,10 +165,20 @@ def build_showdown_lineup(
     cpt_lock: Optional[str] = None,
     cpt_excludes: Optional[Sequence[str]] = None,
     forbidden_sets: Optional[Sequence[Sequence[str]]] = None,
+    max_shared_players: Optional[int] = None,
     time_limit: int = 20,
 ) -> Optional[Dict[str, Any]]:
     """Solve one legal Showdown lineup maximizing projected points (CPT at 1.5x).
-    Returns None if infeasible. Deterministic scipy.milp; a review proxy."""
+    Returns None if infeasible. Deterministic scipy.milp; a review proxy.
+
+    ``forbidden_sets`` are prior lineups this solve must differ from. With
+    ``max_shared_players`` left None each prior set is forbidden as an exact
+    6-set, so a one-player change counts as different. Set it to an integer and
+    the bound tightens to "share at most this many players with any prior
+    lineup", which is what stops a portfolio of near-duplicates that differ only
+    by a punt bat. Overlap counts the PLAYER, not the role: moving someone from
+    UTIL to CPT is not a differentiated lineup, and pretending otherwise is how
+    a portfolio looks diverse in a report and is not diverse on the board."""
     from scipy.optimize import Bounds, LinearConstraint, milp
     from scipy.sparse import coo_matrix
 
@@ -215,11 +235,23 @@ def build_showdown_lineup(
     for ck in (cpt_excludes or []):                            # exposure cap: still
         if ck in key_row:                                      # eligible at UTIL,
             add({cpt(keys.index(ck)): 1.0}, 0.0, 0.0)           # just not as CPT
-    for fs in (forbidden_sets or []):                          # forbid an exact 6-set
+    # Prior lineups. Default is exact-set forbidding; max_shared_players turns it
+    # into an overlap bound. A partial set (some members excluded from this solve)
+    # is still a valid overlap bound, so unlike the exact-set form it is not
+    # skipped -- an excluded player cannot be shared anyway.
+    share_ub = (min(int(max_shared_players), contract.roster_size - 1)
+                if max_shared_players is not None else None)
+    for fs in (forbidden_sets or []):
         idxs = [keys.index(k) for k in fs if k in key_row]
-        if len(idxs) == contract.roster_size:
+        if not idxs:
+            continue
+        if share_ub is None:
+            if len(idxs) == contract.roster_size:                  # forbid exact 6-set
+                add({**{cpt(i): 1.0 for i in idxs}, **{util(i): 1.0 for i in idxs}},
+                    -np.inf, float(contract.roster_size - 1))
+        else:                                                      # overlap bound
             add({**{cpt(i): 1.0 for i in idxs}, **{util(i): 1.0 for i in idxs}},
-                -np.inf, float(contract.roster_size - 1))
+                -np.inf, float(share_ub))
 
     ri, ci, dv = [], [], []
     for rnum, coefs in enumerate(rows):
@@ -271,12 +303,21 @@ def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract) -> Dict[str, Any]:
 
 def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHOWDOWN,
                         max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
+                        max_shared_players: Optional[int] = DEFAULT_MAX_SHARED_PLAYERS,
                         diagnostics: Optional[Dict[str, Any]] = None,
                         **kwargs) -> List[Dict[str, Any]]:
-    """Up to ``n`` distinct legal lineups, each differing from the prior ones by at
-    least one player (exact-set forbidding), with no single captain filling more
-    than ``max_cpt_exposure_pct`` of the bank. Pass ``max_cpt_exposure_pct=None``
-    to disable the cap (e.g. a caller doing its own explicit cpt_lock rotation).
+    """Up to ``n`` distinct legal lineups sharing at most ``max_shared_players``
+    with any prior lineup, with no single captain filling more than
+    ``max_cpt_exposure_pct`` of the bank. Pass ``max_cpt_exposure_pct=None``
+    to disable the cap (e.g. a caller doing its own explicit cpt_lock rotation),
+    or ``max_shared_players=None`` to fall back to exact-set forbidding.
+
+    Both controls relax the same way and for the same reason. The overlap bound
+    tightens as the bank grows and a thin pool will eventually make it
+    infeasible; when that happens the slot re-solves without it rather than
+    returning a short bank, and the relaxation is counted in ``diagnostics``.
+    A short bank leaves a blank reserved row, and a blank row blocks
+    certification, so silently shrinking is the one outcome not on offer.
 
     Once a captain reaches its share of ``n`` it is excluded from the CPT role
     for the rest of the build -- it can still be rostered at UTIL, just not
@@ -296,10 +337,20 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
     # the allowed count push the realized exposure pct above the requested cap.
     cap = max(1, math.floor(max_cpt_exposure_pct * n_target)) if max_cpt_exposure_pct else None
     relaxed_slots = 0
+    overlap_relaxed_slots = 0
     for _ in range(n_target):
         cpt_excludes = [k for k, c in cpt_counts.items() if cap is not None and c >= cap] or None
         lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                   cpt_excludes=cpt_excludes, **kwargs)
+                                   cpt_excludes=cpt_excludes,
+                                   max_shared_players=max_shared_players, **kwargs)
+        # Relax the overlap bound before the captain cap. Captain concentration
+        # is the failure this module was built to prevent, so it is the last
+        # control to give way.
+        if lu is None and max_shared_players is not None:
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       cpt_excludes=cpt_excludes, **kwargs)
+            if lu is not None:
+                overlap_relaxed_slots += 1
         if lu is None and cpt_excludes:
             lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden, **kwargs)
             if lu is not None:
@@ -315,6 +366,8 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         diagnostics["cap_count"] = cap
         diagnostics["captain_exposure"] = dict(cpt_counts)
         diagnostics["relaxed_slots"] = relaxed_slots
+        diagnostics["max_shared_players"] = max_shared_players
+        diagnostics["overlap_relaxed_slots"] = overlap_relaxed_slots
     return bank
 
 

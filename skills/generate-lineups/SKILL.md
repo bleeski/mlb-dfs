@@ -39,6 +39,27 @@ the certified output, so nobody reviewing the file can see it happened.
 eligibility. Never correct it against real-world rosters. If the salary file and a
 data feed disagree, the salary file wins.
 
+## Preflight: one call, always, even inside T-20
+
+A fresh sandbox has no scipy, and `scipy.optimize.milp` is the only solver the
+optimizer will use. Without it there is no build at all, so this is not a slow
+start you can skip under deadline pressure. It is measured at about 9 seconds,
+which fits one call with room to spare, and skipping it costs a whole build.
+
+Resolve the repo first. The mount directory name changes between sessions, so
+never hardcode the path you saw last time:
+
+```bash
+REPO=$(ls -d /sessions/*/mnt/mlb-dfs | head -1)
+cd "$REPO" && pip install -r requirements.txt --break-system-packages -q
+python -c "from scipy.optimize import milp; print('milp OK')"
+```
+
+If that last line does not print `milp OK`, stop and say so rather than starting
+a build that cannot finish. `tools/wheel_fetch.py` is the fallback for when a
+single call genuinely cannot finish the download, which the 9-second measurement
+says is not the normal case; reach for it only after a plain install has failed.
+
 ## The fast path
 
 Almost every request is this one command:
@@ -203,11 +224,9 @@ exactly like "no matches"; scope greps to specific files before concluding a
 symbol is absent. When you pipe a command into `head`, `$?` is head's exit code,
 not the command's; capture to a file and check the real status.
 
-**Check dependencies before any build, including inside T-20.** A fresh sandbox
-has no scipy, and a `pip install` does not persist across sessions. The probe
-costs two seconds, and a missing solver is not a slow build, it is no build.
-`tools/wheel_fetch.py` fetches wheels resumably into a persistent mount directory
-when a single call cannot finish the download.
+**Dependencies do not persist across sessions.** The preflight at the top of this
+file is the whole answer, and it is never the step you skip to save time. A
+sandbox that looks identical to yesterday's still has no scipy today.
 
 If the build still will not fit, use the exit-10 resume and run the identical
 command again. The bank persists between invocations, so each call adds a slice.
@@ -293,7 +312,7 @@ Classic lists `P/C/1B/...` and `P,P,C,1B,2B,3B,SS,OF,OF,OF`.
 
 **Classic** is the production path with the full three-gate certification.
 
-**Showdown** is real but it is `v0.1-review`, and Phase 3 is not complete in the
+**Showdown** is real but it is `v0.3-review`, and Phase 3 is not complete in the
 implementation guide. The script runs per-lineup certification and verifies the
 DK template was preserved, and it labels the result `review_grade_build` rather
 than certified. Pass that label through to Ben honestly. Do not describe a
@@ -308,6 +327,50 @@ nothing had posted yet, so the pool is everyone and the lineups are built on
 AvgPointsPerGame alone, which does not know who is playing. Say which one you got,
 because a Showdown build off an unposted slate is a much weaker object than one
 built after lineups drop.
+
+### The thesis ladder is the default Showdown construction
+
+A Showdown slate is one game, so a points-max solve has exactly one answer and a
+portfolio built from it is that answer with punt bats rotated.
+`mlb_engine/optimize/showdown_theses.py` instead conditions each entry on a game
+state: `LAD win big`, `NYM win close`, `pitchers duel`, `both offenses explode`,
+`ace dominates and takes the loss`, and so on. Every template is a roster SHAPE,
+not a captain preference; two templates that produce the same shape are one
+template.
+
+`run_showdown` routes through it automatically whenever `pool.basis` is
+`declared_starters` and both orders are posted. With nothing posted there is no
+batting order to condition on, so it falls back to `build_showdown_bank` and the
+brief says so in `construction.mode` and `construction.reason`. Read that field
+before describing the build: `thesis_ladder` and `points_max_bank` are different
+objects and only one of them is what Ben asked for.
+
+Entries are allocated across game states by the vig-free moneyline when odds are
+available. `construction.win_share_basis` says which input was used. On
+`even_split_no_market_input` the two sides got equal weight because no moneyline
+matched, which is a real weakness on a lopsided game and belongs in your report.
+
+**Two portfolio controls, both enforced in the solver, both reported:**
+
+- `max_shared_players` (default 4 of 6). No two lineups may share more than four
+  players. Overlap counts the PLAYER, not the role, because promoting a UTIL to
+  CPT is not a differentiated lineup. Exact-set forbidding, the old default,
+  called a one-player swap unique.
+- `max_cpt_exposure_pct` (default 0.33). The count is a `floor()`, which is why
+  the default is 0.33 and not 0.35: at 20 entries 0.35 permits seven captains,
+  a realized 35%.
+
+Both relax rather than truncate, and in a fixed order: the overlap bound gives
+way first, then the captain lock, then the thesis. A short bank leaves a blank
+reserved row and a blank row blocks certification, so silently shrinking is the
+one outcome not on offer. Every relaxation is counted in `diversity` and
+`captain_exposure` and repeated in `caution`. Read those before reporting the
+portfolio as clean. Override either through `--controls-override`.
+
+Both defaults live in `mlb_engine/optimize/showdown.py`. The Showdown suite is
+`tests/test_showdown.py`, which `tools/audit.py` does NOT run: the audit gate
+counts `tests.test_core` only. Run `python -m unittest tests.test_showdown`
+yourself after touching anything in this section.
 
 ## Late swap
 
@@ -359,7 +422,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 184 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 13 modules, 189 tests
 ```
 
 The audit checks dependencies first and names the install command if something is
@@ -369,9 +432,8 @@ the three docs that quote the expected line (CLAUDE.md, the ledger Quick Card,
 and this file). A count mismatch is the pin working, not a broken suite.
 
 Skip the test suite under deadline pressure. Inside T-20, go straight to the
-build. The dependency check is the one part that is never skipped: it takes two
-seconds, and a fresh sandbox with no scipy produces no build at all, which costs
-far more than the check.
+build. The preflight is the one part that is never skipped: it costs about 9
+seconds, and a fresh sandbox with no scipy produces no build at all.
 
 ## Verifying a file you did not just build
 

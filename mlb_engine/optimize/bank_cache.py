@@ -1,6 +1,6 @@
 """bank_cache.py
 
-MLB Classic v2.27.0. VERSION = "v1.0".
+MLB Classic v2.27.0. VERSION = "v1.1".
 
 A resumable candidate bank. The generator runs under a wall-clock budget, writes
 what it produced to disk, and picks up where it left off on the next call. Nothing
@@ -45,7 +45,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import build_single_lineup
 
-VERSION = "v1.0"
+VERSION = "v1.1"
 
 
 def pool_signature(salary_csv: str | Path, length: int = 10) -> str:
@@ -156,18 +156,65 @@ class BankCache:
         )
         return True
 
-    def as_candidates(self) -> List[Dict[str, Any]]:
-        """Shape the allocator and run_late_swap consume."""
+    def as_candidates(self, projections_df=None, requested_n: int = 1) -> List[Dict[str, Any]]:
+        """Shape the allocator and run_late_swap consume.
+
+        Supply ``projections_df`` to attach contest-shape scoring. Without it
+        the payload carries roster and objective only, and
+        ``contest_allocator._candidate_shape_score`` falls back to raw objective:
+        no stack-correlation bonus, no batting-order-cluster bonus, no
+        salary-uniqueness or field-pressure adjustment, and floor_sum reads 0.0
+        so the cash branch cannot distinguish a high-floor lineup from any
+        other. That fallback was silently in force on every big slate, because
+        big slates are exactly when build_slate.py chooses the sliced path, and
+        big slates are exactly when shape scoring matters most.
+
+        One score call per candidate is enough. The allocator's per-shape math
+        derives from contest_fit_score, floor_sum, and the right-tail counts, so
+        scoring each shape separately would multiply the cost for no additional
+        information.
+        """
         out = []
+        scorer = None
+        by_id = None
+        if projections_df is not None and hasattr(projections_df, "columns"):
+            from mlb_engine.optimize.optimizer_v3 import score_lineup_candidate
+            scorer = score_lineup_candidate
+            frame = projections_df.copy()
+            frame["__pid__"] = frame["Player_ID"].astype(str)
+            by_id = frame.set_index("__pid__", drop=False)
+
         for i, entry in enumerate(self.candidates):
             cid = f"bank{i}"
-            out.append({
+            payload: Dict[str, Any] = {
                 "lineup_id": cid,
                 "candidate_id": cid,
                 "roster_slot_ids": list(entry["roster"]),
                 "player_ids": list(entry["roster"]),
                 "objective": float(entry["objective"]),
-            })
+            }
+            if scorer is not None:
+                try:
+                    ids = [str(p) for p in entry["roster"]]
+                    lineup_df = by_id.loc[[p for p in ids if p in by_id.index]]
+                    if len(lineup_df) == len(ids):
+                        score = scorer(lineup_df, projections_df, mode="wta",
+                                       candidate_id=cid, requested_n=requested_n)
+                        payload["contest_fit"] = {
+                            "contest_fit_score": score.get("contest_fit_score"),
+                            "floor_sum": score.get("floor_sum"),
+                            "ceiling_sum": score.get("ceiling_sum"),
+                            "right_tail_volatility_counts":
+                                score.get("right_tail_volatility_counts") or {},
+                        }
+                        payload["contest_fit_score"] = score.get("contest_fit_score")
+                        payload["floor_sum"] = score.get("floor_sum")
+                except Exception:
+                    # A scoring failure must degrade to the unscored payload,
+                    # never lose the candidate: a short bank leaves a blank
+                    # reserved row and a blank row blocks certification.
+                    pass
+            out.append(payload)
         return out
 
     def __len__(self) -> int:

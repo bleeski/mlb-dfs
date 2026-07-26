@@ -22,7 +22,7 @@ from typing import Any, Dict, List
 VERSION = "v3.0"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
-EXPECTED_TEST_COUNT = 184  # 180 + 4 added 2026-07-25 (F5 park/weather wiring)
+EXPECTED_TEST_COUNT = 189  # 184 + 5 added 2026-07-25 (bank consolidation I-4, I-6, I-7)
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -38,7 +38,7 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.4"',
     "mlb_engine/optimize/tail_candidate_scanner.py": 'VERSION = "v1.0"',
     "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.1"',
-    "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.0"',
+    "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.1"',
 }
 
 CSV_REQUIRED = {

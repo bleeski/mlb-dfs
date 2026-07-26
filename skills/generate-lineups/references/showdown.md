@@ -4,9 +4,18 @@ Read this only when the Showdown path misbehaves or Ben asks about its internals
 The normal route is `scripts/build_slate.py`, which detects Showdown and handles
 all of it.
 
+**Construction changed 2026-07-25.** `run_showdown` now builds from the game-state
+thesis ladder in `mlb_engine/optimize/showdown_theses.py` whenever the pool basis
+is `declared_starters` with both orders posted. `build_showdown_bank`, documented
+below, is the fallback for an unposted slate. Two portfolio controls are enforced
+in the solver on both paths: `max_shared_players=4` (overlap counts the player,
+not the role) and `max_cpt_exposure_pct=0.33`. They relax before they truncate,
+overlap first and the captain cap last, and every relaxation is counted in the
+brief under `diversity` and `captain_exposure`.
+
 ## Status, stated plainly
 
-`mlb_engine/optimize/showdown.py` is `VERSION = "0.1-review"`, and
+`mlb_engine/optimize/showdown.py` is `VERSION = "0.3-review"`, and
 `docs/2026-07-18_implementation_guide.md` lists Phase 3 (Showdown) as not started.
 The strategic brief recommends the correlation model ahead of it, on the reasoning
 that a new archetype series splits thin ledger data across two contest types and
@@ -44,7 +53,7 @@ df = sd.melt_showdown_salary_csv(salary_csv)      # one row per player-role
 reserved = sd.read_showdown_reserved_rows(entries_csv)
 blank = [r for r in reserved["reserved"] if not r["is_complete"]]
 
-bank = sd.build_showdown_bank(df, n=len(blank))
+bank = sd.build_showdown_bank(df, n=len(blank))   # caps: 0.33 cpt, 4 shared
 certs = [sd.certify_showdown(lineup, df) for lineup in bank]
 
 assignments = [

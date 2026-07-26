@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  13 modules  184 tests`. The quick form of the suite
+   `PASS  v2.26.0  13 modules  189 tests`. The quick form of the suite
    alone is `python -m unittest tests.test_core`. The audit checks
    dependencies first and names the install command, because a missing
    solver is not a slow build, it is no build.
@@ -144,3 +144,23 @@ Never archive downstream of a PARSE FAILURE or WRONG SALARY FILE note.
 Roster contracts live in mlb_engine/optimize/roster_contracts.py. Classic
 and Showdown are two contracts on one solver. Showdown archetypes never
 pool with Classic in the ledger or the ownership work.
+
+Every Showdown portfolio is built from the game-state thesis ladder in
+mlb_engine/optimize/showdown_theses.py, not a points-max bank. One game has
+one points-max answer, so a bank portfolio is that answer with punt bats
+rotated. run_showdown falls back to the bank only when nothing has posted
+and there is no batting order to condition on; the brief says which one it
+used in construction.mode and never leaves it implied.
+
+Two portfolio controls are non-negotiable and enforced in the solver, not in
+review: no two lineups share more than max_shared_players (4 of 6, counting
+the player and not the role), and no captain exceeds max_cpt_exposure_pct
+(0.33, a floor() of pct * n, which is why it is not 0.35). Both relax before
+they truncate, in the order overlap then captain lock then thesis, because a
+short bank leaves a blank reserved row and a blank row blocks certification.
+Every relaxation is counted in the brief. A portfolio is not clean because
+the gates passed; it is clean when the relaxation counts are zero.
+
+tools/audit.py runs tests.test_core only, so the Showdown suite sits outside
+the audit gate. Run python -m unittest tests.test_showdown by hand after
+touching showdown.py or showdown_theses.py.

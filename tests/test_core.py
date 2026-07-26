@@ -2051,8 +2051,12 @@ class FeasibilityAndDiverseBankTests(unittest.TestCase):
             {"900": {"posture": "wta_satellite"}}, _entry_reqs(16), frame, None,
         )
         self.assertTrue(feas["available"])
-        self.assertEqual(feas["viable_sp_pairs"], 6)
-        self.assertEqual(feas["floor_sp_pair_repetition"], 3)  # ceil(16 / 6)
+        # 4 SPs across 2 games is 6 combinations, but 2 of them are the opposing
+        # starters of one game. Those are anti-correlated and were never real
+        # capacity, so counting them understated the repetition floor: the same
+        # 16 entries now correctly floor at 4 per pair instead of 3.
+        self.assertEqual(feas["viable_sp_pairs"], 4)
+        self.assertEqual(feas["floor_sp_pair_repetition"], 4)  # ceil(16 / 4)
         self.assertEqual(feas["max_stack_size"], 5)
         self.assertEqual(feas["floor_shared_players"], 8)  # 5-stack + shared SP pair + 1
 
@@ -2702,6 +2706,75 @@ class F1GameEnvironmentTests(unittest.TestCase):
             )
             self.assertEqual(enrichment["f1"]["applied_count"], 0)
             self.assertAlmostEqual(float(frame.loc[0, "F1"]), 1.30)
+
+
+class BankConsolidationTests(unittest.TestCase):
+    """I-4, I-6, I-7: the bank was building the wrong pairs in the wrong order
+    and handing the allocator candidates it could not score."""
+
+    def test_same_game_sp_pairs_are_not_capacity(self):
+        """Two opposing starters are anti-correlated at the win and
+        quality-start level, so they were never real pair capacity."""
+        from mlb_engine.optimize.optimizer_v3 import enumerate_sp_pairs
+        frame = diverse_projection_frame()
+        sp_ids = [str(p) for p in frame[frame["Position"] == "P"]["Player_ID"]]
+        self.assertEqual(len(enumerate_sp_pairs(sp_ids, cross_game_only=False)), 6)
+        cross = enumerate_sp_pairs(sp_ids, frame)
+        self.assertEqual(len(cross), 4)
+        game_of = {str(r.Player_ID): str(r.Game_ID) for r in frame.itertuples()}
+        for a, b in cross:
+            self.assertNotEqual(game_of[str(a)], game_of[str(b)])
+
+    def test_pairs_are_ordered_by_combined_ceiling(self):
+        """Coverage loops stop on budget exhaustion, so truncation must degrade
+        from the weak end rather than from an alphabetical prefix."""
+        from mlb_engine.optimize.optimizer_v3 import enumerate_sp_pairs
+        frame = diverse_projection_frame()
+        sp_ids = [str(p) for p in frame[frame["Position"] == "P"]["Player_ID"]]
+        pairs = enumerate_sp_pairs(sp_ids, frame)
+        ceiling = {str(r.Player_ID): float(r.Ceiling) for r in frame.itertuples()}
+        totals = [ceiling[str(a)] + ceiling[str(b)] for a, b in pairs]
+        self.assertEqual(totals, sorted(totals, reverse=True))
+
+    def test_unknown_games_do_not_shrink_the_pair_set(self):
+        """An unknown game is not evidence of a same-game pair."""
+        from mlb_engine.optimize.optimizer_v3 import enumerate_sp_pairs
+        self.assertEqual(len(enumerate_sp_pairs(["a", "b", "c"])), 3)
+
+    def test_cached_candidates_carry_shape_scores(self):
+        """Without this the allocator falls back to raw objective on every big
+        slate: no correlation bonus, no floor logic, floor_sum reads 0.0."""
+        from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = BankCache(Path(tmp) / "bank.json")
+            extend_bank(cache, frame, time_budget_s=12.0, max_candidates=6)
+            self.assertTrue(len(cache) >= 2)
+
+            plain = cache.as_candidates()
+            self.assertNotIn("contest_fit", plain[0])
+
+            scored = cache.as_candidates(frame, requested_n=6)
+            self.assertEqual(len(scored), len(plain))
+            for candidate in scored:
+                self.assertIn("contest_fit", candidate)
+                self.assertIsNotNone(candidate["contest_fit"]["contest_fit_score"])
+                self.assertGreater(float(candidate["floor_sum"]), 0.0)
+
+    def test_cash_shape_score_reads_the_floor_once_scored(self):
+        """The cash branch reads floor_sum; unscored candidates made it 0.0 for
+        everyone, so a high-floor lineup was indistinguishable from any other."""
+        from mlb_engine.allocate.contest_allocator import _candidate_shape_score
+        unscored = {"objective": 100.0}
+        high_floor = {"objective": 100.0,
+                      "contest_fit": {"contest_fit_score": 100.0, "floor_sum": 80.0}}
+        low_floor = {"objective": 100.0,
+                     "contest_fit": {"contest_fit_score": 100.0, "floor_sum": 40.0}}
+        self.assertGreater(_candidate_shape_score(high_floor, "cash"),
+                           _candidate_shape_score(low_floor, "cash"))
+        # The unscored fallback cannot tell them apart at all.
+        self.assertEqual(_candidate_shape_score(unscored, "cash"),
+                         _candidate_shape_score(dict(unscored), "cash"))
 
 
 class F5ParkWeatherWiringTests(unittest.TestCase):
