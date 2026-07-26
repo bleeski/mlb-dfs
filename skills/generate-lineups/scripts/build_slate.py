@@ -180,8 +180,41 @@ def slate_signature(salary_csv: Path) -> dict:
             starts.append(parsed)
     first = min(starts) if starts else None
     tag = f"{first.strftime('%H%M')}_{len(games)}g" if first else f"{len(games)}g"
-    return {"games": frozenset(games), "tag": tag,
+    # The contract goes in the tag. A Showdown slate is one game, so its tag
+    # renders as "1915_1g", which is indistinguishable from a one-game Classic
+    # draftgroup. preserve_prior_slate used that tag to rename a Showdown pair
+    # aside on 2026-07-25 and the result read as Classic on disk, which is
+    # exactly the confusion the tag exists to prevent.
+    from mlb_engine.entries.dk_entries_manager import detect_salary_contract
+    contract = detect_salary_contract(salary_csv)
+    if contract == "SHOWDOWN":
+        tag = f"{tag}_sd"
+    return {"games": frozenset(games), "tag": tag, "contract": contract,
             "first_lock": first.isoformat() if first else None}
+
+
+def _self_declared_tag(path: Path) -> str:
+    """A brief names its own slate; a delivered file's sibling brief names its.
+
+    The tag used to come from whatever was staged at the moment of the rename,
+    not from the file being renamed. On 2026-07-25 that filed the certified
+    10-game Classic export away as ``DKEntries_1915_1g.csv``, borrowing the tag
+    of a one-game Showdown slate it had nothing to do with, and wrote the same
+    brief under two names. A file that can state its own slate should be asked.
+    """
+    try:
+        if path.suffix == ".json" and path.name.startswith("build_brief"):
+            return str((json.loads(path.read_text(encoding="utf-8"))
+                        .get("slate") or {}).get("tag") or "")
+        if path.suffix == ".csv" and path.name.startswith("DKEntries"):
+            sibling = path.with_name(
+                path.name.replace("DKEntries", "build_brief").replace(".csv", ".json"))
+            if sibling.exists():
+                return str((json.loads(sibling.read_text(encoding="utf-8"))
+                            .get("slate") or {}).get("tag") or "")
+    except (OSError, ValueError):
+        return ""
+    return ""
 
 
 def preserve_prior_slate(paths, tag: str) -> list:
@@ -195,7 +228,11 @@ def preserve_prior_slate(paths, tag: str) -> list:
         path = Path(path)
         if not path.exists():
             continue
-        dest = path.with_name(f"{path.stem}_{tag}{path.suffix}")
+        own = _self_declared_tag(path)
+        if own and own != tag:
+            print(f"preserve: {path.name} declares slate {own}, not {tag}; "
+                  f"filing it under its own tag", file=sys.stderr)
+        dest = path.with_name(f"{path.stem}_{own or tag}{path.suffix}")
         if dest.exists() and dest.read_bytes() == path.read_bytes():
             # The tag-copy already exists with identical content, which is what
             # happens when the delivery path also writes the tagged name. Minting
