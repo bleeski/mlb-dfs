@@ -22,7 +22,12 @@ from typing import Any, Dict, List
 VERSION = "v3.0"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
-EXPECTED_TEST_COUNT = 189  # 184 + 5 added 2026-07-25 (bank consolidation I-4, I-6, I-7)
+# Every suite the audit gates. test_core alone left the Showdown suite and the
+# golden replay outside the gate, which is how showdown_theses.py stayed
+# untracked while build_slate imported it unconditionally.
+AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
+                  "tests.test_upload_integrity", "tests.test_golden_replay")
+EXPECTED_TEST_COUNT = 244  # core 190 + showdown 30 + upload_integrity 23 + golden 1
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -182,27 +187,39 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     checks["scipy_milp"] = {"passed": scipy_ok}
 
     test_result = None
-    if run_tests and (root / "tests" / "test_core.py").exists():
+    suites = [name for name in AUDITED_SUITES
+              if (root / "tests" / f"{name.split('.')[-1]}.py").exists()]
+    if run_tests and suites:
         proc = subprocess.run(
-            [sys.executable, "-m", "unittest", "tests.test_core"],
+            [sys.executable, "-m", "unittest", *suites],
             cwd=str(root), text=True, capture_output=True,
         )
         combined = proc.stdout + "\n" + proc.stderr
         match = re.search(r"Ran\s+(\d+)\s+tests?", combined)
         runtime_count = int(match.group(1)) if match else None
-        passed = proc.returncode == 0 and runtime_count == EXPECTED_TEST_COUNT
+        suite_ok = proc.returncode == 0
+        count_ok = runtime_count == EXPECTED_TEST_COUNT
         test_result = {
-            "passed": passed,
+            "passed": suite_ok and count_ok,
+            "suite_passed": suite_ok,
+            "count_matches": count_ok,
+            "suites": suites,
             "returncode": proc.returncode,
             "runtime_test_count": runtime_count,
             "expected_test_count": EXPECTED_TEST_COUNT,
             "stdout_tail": proc.stdout[-2000:],
             "stderr_tail": proc.stderr[-4000:],
         }
-        if not passed:
-            errors.append(
-                f"test suite failed or count != {EXPECTED_TEST_COUNT} (ran {runtime_count})"
-            )
+        # Split, because CLAUDE.md tells the operator to proceed on one of these
+        # and not the other: a count mismatch during a live slate is bookkeeping
+        # that has not caught up, and a failing suite is not.
+        if not suite_ok:
+            errors.append(f"test suite FAILED (ran {runtime_count}); do not build")
+        elif not count_ok:
+            warnings.append(
+                f"test count {runtime_count} != pinned {EXPECTED_TEST_COUNT}; the "
+                f"suite passed, so this is a stale pin. Update EXPECTED_TEST_COUNT "
+                f"in tools/audit.py after the slate.")
     checks["tests"] = test_result
 
     return {
@@ -217,12 +234,26 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     }
 
 
-def terse_output(result: Dict[str, Any]) -> str:
+def engine_module_count(root: Path) -> int:
+    """Counted off disk, not off a hand-kept list.
+
+    The pinned "13 modules" was printed against 20 on the filesystem, and the pin
+    was bumped in the same commit that made it necessary, so it only ever
+    confirmed what the last edit had done.
+    """
+    return sum(1 for p in (root / "mlb_engine").rglob("*.py")
+               if p.name != "__init__.py" and "__pycache__" not in p.parts)
+
+
+def terse_output(result: Dict[str, Any], root: Path) -> str:
+    test_check = result["checks"].get("tests") or {}
+    test_count = test_check.get("runtime_test_count", "?")
+    modules = engine_module_count(root)
     if result["passed"]:
-        modules = sum(1 for k in EXPECTED_VERSION_TEXT if k.endswith(".py"))
-        test_check = result["checks"].get("tests") or {}
-        test_count = test_check.get("runtime_test_count", "?")
-        return f"PASS  {result['project_version']}  {modules} modules  {test_count} tests"
+        line = f"PASS  {result['project_version']}  {modules} modules  {test_count} tests"
+        if result.get("warnings"):
+            line += "  [" + "; ".join(result["warnings"][:2]) + "]"
+        return line
     return "FAIL  " + ";  ".join(result["errors"])
 
 
@@ -237,7 +268,7 @@ def main() -> None:
     result = run_audit(Path(args.root), run_tests=args.run_tests)
 
     if args.terse:
-        print(terse_output(result))
+        print(terse_output(result, Path(args.root)))
         raise SystemExit(0 if result["passed"] else 1)
 
     text = json.dumps(result, indent=2, sort_keys=True)

@@ -281,6 +281,13 @@ class GoldenReplayTests(unittest.TestCase):
                 requested_n=REQUESTED_N,
                 portfolio_controls_override=LOOSE_CONTROLS,
                 approve=True,
+                # This replay supplies no odds map, no weather map, and no
+                # pitcher_roles, so those three gates have no evidence behind
+                # them (F4). Assuming them explicitly keeps the replay's subject
+                # the certified byte output rather than the gate axis, and the
+                # assumption is recorded in the run's diagnostics.
+                assume_gates=["odds_gate_passed", "weather_gate_passed",
+                              "pitcher_audit_gate_passed"],
             )
 
             self.assertTrue(result["passed"], result.get("errors"))

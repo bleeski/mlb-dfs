@@ -286,6 +286,30 @@ narrate the steps you took; he watched them happen.
 Then present the delivered file so he can open it, and remind him the upload is
 manual.
 
+## Always run the preflight before presenting a file
+
+Between "build finished" and "Ben uploads," run this on every deliverable,
+Classic and Showdown alike. No exceptions and no exemption at T-5: it imports no
+engine, touches no network, and finishes in under two seconds.
+
+```bash
+python <repo>/tools/preflight_upload.py --entries <delivered file>
+```
+
+`--salary` is optional; without it the tool resolves the promoted run's
+`inputs/DKSalaries.csv` snapshot, which cannot be clobbered by a later same-date
+build the way the staged copy can. It finds `outputs/<date>/upload_manifest.json`
+next to the entries file on its own and cross-checks the sha256, the entry count,
+and the contest IDs.
+
+Report the one-line verdict and nothing more when it passes. When it fails, lead
+with the failure, quote it verbatim, and do not present the file as ready. Exit 0
+clean, 2 hard failure, 3 IO error.
+
+If the clock genuinely beats the fix, `--force` prints the failures and exits 0.
+Use it only when Ben has seen the failure and said to ship anyway, and say in
+your reply that the file was forced past a failing check and which one.
+
 ## When the deadline has already passed
 
 The brief carries `minutes_to_deadline`. A negative value means the first game of
@@ -437,15 +461,23 @@ seconds, and a fresh sandbox with no scipy produces no build at all.
 
 ## Verifying a file you did not just build
 
+For a file with no parent, `preflight_upload.py` above is the whole check. When
+the file refines an earlier one, use:
+
 ```bash
-python <repo>/tools/verify_export.py --salary <DKSalaries.csv> --entries <file.csv> \
-  [--parent <prior file>] [--locked-teams PIT,NYY]
+python <repo>/tools/verify_export.py --entries <file.csv> --parent <prior file> \
+  [--salary <DKSalaries.csv>]
 ```
 
-Checks blanks, duplicates, the salary cap, slot eligibility, and, against a
-parent, that locked slots held and no new player came from a locked game. Exit 3
-on any failure. The script's own `verify_classic` additionally enforces the DK
-rules of at most 5 hitters from one team and players from at least 2 games.
+It runs every preflight rule (blanks, partial rows, duplicate Entry IDs, header
+geometry, DK Status, embedded-pool overlap, cap, slot eligibility, duplicate
+persons, two games, five hitters per team, hitter versus rostered SP, Showdown
+both-teams and recomputed captain price) and adds the swap-specific ones:
+contest-identity diff against the parent, per-entry slot churn, no player
+introduced from a game that has already started, and no replacement of a player
+whose game has started. Locked teams derive from the salary file's Game Info;
+`--locked-teams` overrides that derivation rather than enabling it. Exit 2 on any
+failure.
 
 ## Commands for Ben
 

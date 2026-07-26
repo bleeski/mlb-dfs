@@ -35,8 +35,13 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  13 modules  189 tests`. The quick form of the suite
-   alone is `python -m unittest tests.test_core`. The audit checks
+   `PASS  v2.26.0  21 modules  244 tests`. The module count is derived from
+   the filesystem, so it moves on its own; the test count is a pin. A count
+   mismatch with the suite passing is a WARNING, not a failure, and prints
+   in brackets on the PASS line: proceed and fix the pin after the slate. A
+   failing suite is an error and blocks. The audit gates four suites
+   (test_core, test_showdown, test_upload_integrity, test_golden_replay);
+   the quick form is `python -m unittest tests.test_core`. The audit checks
    dependencies first and names the install command, because a missing
    solver is not a slow build, it is no build.
 3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
@@ -73,12 +78,23 @@ file covers but cannot fill, and flags stale per-team pages.
 3. run_slate(approve=True). The certified artifact is
    runs/<run_id>/final/DKEntries.csv and stays immutable; the engine
    mirrors it to outputs/<date>/ and returns that as `delivered_path`.
-4. Ben uploads to DraftKings by hand. Refinements after delivery go
+4. **Before any upload, run the preflight.** One command, two files, no
+   engine import, no network, under two seconds:
+   `python tools/preflight_upload.py --entries <delivered.csv> --salary <salary.csv>`
+   Omit `--salary` and it resolves the promoted run's `inputs/` snapshot;
+   it finds `upload_manifest.json` next to the entries file on its own.
+   Exit 0 clean, 2 on any hard failure, 3 on an IO error. `--force` prints
+   the failures and exits 0, so this can never be the reason a slate is not
+   entered. This sentence is the pre-upload rule; nothing else is.
+5. Ben uploads to DraftKings by hand. Refinements after delivery go
    through run_late_swap with authorized_entry_ids, never a rebuild.
    `python tools/late_swap.py --date <date> --parent-entries <csv>` wraps
    that path, including the excluded-new-teams rule (a locked game admits
    no new players) and the pinned-slot candidate generation it requires.
-   Verify any file before upload with `python tools/verify_export.py`.
+   `python tools/verify_export.py --entries <new> --parent <delivered>` is
+   the swap-specific check: it runs every preflight rule plus contest-identity
+   diff, slot churn, and the locked-game guard (derived from Game Info, not a
+   flag).
 T-schedule: at T-20 skip optional steps. At T-10 approve on posture
 defaults and auto-floors. At T-5 present the best certified file
 immediately with zero diagnostic narration.
