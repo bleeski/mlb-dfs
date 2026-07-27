@@ -134,7 +134,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.11"
+VERSION = "v1.12"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -1539,6 +1539,47 @@ _STACK_SIZE_BY_PLAN: Dict[str, int] = {
 }
 
 
+def _exclusion_block(
+    projections: Any,
+    excluded_player_ids: Optional[Iterable[str]] = None,
+) -> Dict[str, Any]:
+    """What the exclusion set actually removes from this pool.
+
+    F15: ``excluded_player_ids`` used to reach validation and feasibility but
+    not the bank build. Now that it does, the checkpoint has to show the effect
+    before the solve, because an exclusion is the one input where a typo is
+    silent: a wrong ID excludes nobody, the build proceeds around a player who
+    should be gone, and the export gate finds it with no time to rebuild.
+    """
+    ids = [str(x) for x in (excluded_player_ids or [])]
+    block: Dict[str, Any] = {
+        "requested": ids,
+        "requested_count": len(ids),
+        "matched_player_ids": [],
+        "unmatched_player_ids": [],
+        "blockers": [],
+        "note": "excludes are applied to the bank build and to every solve; "
+                "deterministic bookkeeping, never a claim",
+    }
+    if not ids:
+        return block
+    try:
+        pool = {str(p) for p in projections["Player_ID"]}
+    except Exception:  # noqa: BLE001 - never block the checkpoint on a frame quirk
+        block["note"] = "exclusion effect not computable from this frame"
+        return block
+    matched = [x for x in ids if x in pool]
+    unmatched = [x for x in ids if x not in pool]
+    block["matched_player_ids"] = matched
+    block["unmatched_player_ids"] = unmatched
+    if unmatched:
+        block["blockers"].append(
+            f"{len(unmatched)} excluded player id(s) are absent from the pool "
+            f"({unmatched[:5]}); an exclusion that matches nobody removes nobody"
+        )
+    return block
+
+
 def _slate_feasibility(
     posture_by_contest: Mapping[str, Mapping[str, Any]],
     entry_requirements: Sequence[Mapping[str, Any]],
@@ -2283,6 +2324,7 @@ def run_slate(
     source_metadata: Optional[Mapping[str, Any]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     bank_time_budget_s: Optional[float] = None,
+    solver_time_limit_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -2305,6 +2347,10 @@ def run_slate(
     that, on approve=True, drives build_diverse_candidate_bank (auto-bank path).
     It is inert data: run_slate never imports or runs the allocator, and the
     coverage target only applies through the checkpoint the operator approves.
+
+    ``solver_time_limit_s`` bounds each individual MILP solve (v3.20 / F13).
+    A solve that hits it is recorded as a timeout and never triggers a
+    relaxation ladder, because a compute limit is not a strategy decision.
     """
     from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
     from mlb_engine.optimize.optimizer_v3 import (
@@ -2431,6 +2477,18 @@ def run_slate(
                 "from_merged_default": base, "raised_to": final, "reason": "feasibility floor",
             }
 
+    # F15: the exclusion set now reaches the bank build, so the checkpoint says
+    # so before the build rather than after. An exclusion that names nobody in
+    # the pool is a blocker at approve=False: it means the ID is wrong, and
+    # discovering that at the export gate costs the whole build.
+    exclusion_block = _exclusion_block(projections, excluded_player_ids)
+    checkpoint["exclusions"] = exclusion_block
+    if exclusion_block.get("blockers"):
+        existing = list(checkpoint.get("warnings") or [])
+        checkpoint["warnings"] = existing + [
+            f"exclusions: {b}" for b in exclusion_block["blockers"]
+        ]
+
     feasibility_report = _feasibility_report(feasibility_inputs, controls)
     checkpoint["feasibility"] = {
         **feasibility_report,
@@ -2528,6 +2586,7 @@ def run_slate(
         "merged_controls": controls,
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],
+        "exclusions": exclusion_block,
         "slate_clock": clock,
         "waterfall": checkpoint.get("waterfall"),
         "caller_asserted_gates": caller_asserted,
@@ -2575,17 +2634,38 @@ def run_slate(
         wf_coverage_target = (
             int(wf_cov["coverage_target"]) if wf_cov and wf_cov.get("coverage_target") else None
         )
+        # F15: excluded_player_ids reached validation and the feasibility block
+        # but never the bank build. At T-10 that spends the entire remaining
+        # budget generating lineups around a player who should have been
+        # dropped, and the mistake surfaces only at the export gate with no time
+        # left to rebuild. Excludes go in two ways because the optimizer honors
+        # both and they cover different paths: the ``Excluded`` column is read by
+        # _prepare_single_lineup_df on every solve including the augmentation
+        # pass, and the ``excludes`` kwarg is read by the anchor-cap and
+        # stackable-team helpers that size the bank.
+        bank_excludes = [str(x) for x in (excluded_player_ids or [])]
+        bank_projections = projections
+        if bank_excludes and hasattr(projections, "columns"):
+            bank_projections = projections.copy()
+            if "Excluded" not in bank_projections.columns:
+                bank_projections["Excluded"] = False
+            mask = bank_projections["Player_ID"].astype(str).isin(set(bank_excludes))
+            bank_projections.loc[mask, "Excluded"] = True
         bank = build_diverse_candidate_bank(
-            projections, requested_n=n, mode=mode, target="ceiling",
+            bank_projections, requested_n=n, mode=mode, target="ceiling",
             contest_shapes=sorted(shape_counts) or None,
             max_sp_pair_repetition=controls.get("max_sp_pair_repetition"),
             coverage_target=wf_coverage_target,
             time_budget_s=bank_time_budget_s,
+            solver_time_limit_s=solver_time_limit_s,
+            excludes=bank_excludes or None,
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
         bank_diag = {
             "source": "build_diverse_candidate_bank", "mode": mode, "requested_n": n,
             "candidate_count": len(candidates),
+            "excluded_player_ids_applied": bank_excludes,
+            "solver_report": bank.get("solver_report"),
             "waterfall_coverage_target": wf_coverage_target,
             "contest_shape_profile": bank.get("contest_shape_profile"),
             "diversity_augmentation": bank.get("diversity_augmentation"),
@@ -2647,6 +2727,7 @@ def run_slate(
         "merged_controls": controls,
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],
+        "exclusions": exclusion_block,
         "slate_clock": clock,
         "candidate_bank": bank_diag,
         "bank_player_coverage": bank_player_coverage,

@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  21 modules  244 tests`. The module count is derived from
+   `PASS  v2.26.0  21 modules  285 tests`. The module count is derived from
    the filesystem, so it moves on its own; the test count is a pin. A count
    mismatch with the suite passing is a WARNING, not a failure, and prints
    in brackets on the PASS line: proceed and fix the pin after the slate. A
@@ -115,6 +115,15 @@ immediately with zero diagnostic narration.
   that enters a contest or moves money. No lineup uploads, no entry submission
   or edits, no deposits or withdrawals. Lineups and money move only at Ben's
   manual action. Never store DK credentials or cookies.
+- A solver time limit is never a strategy change. `build_single_lineup` takes
+  `time_limit_s` and fills a caller-supplied `status_out`; a timeout is recorded
+  in `solver_report`, never climbs the overlap ladder, never steps DU
+  relaxation, and never enters `attempted` in the bank cache, so a later slice
+  retries it. A time-limited incumbent is verified against the constraint matrix
+  and then accepted, tagged `optimality='time_limited'`. The allocator says
+  "time limit at gap X" or "proven infeasible: <constraint>", never both at
+  once. Shrinking a per-solve limit to fit a budget is allowed; trimming the
+  legal player set to fit compute is not.
 - Blank reserved entry rows block certification. Never bypass.
 - Ledger edits are in place; the archive is append-only, newest first;
   never drop an invariant section.

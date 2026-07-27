@@ -8,11 +8,71 @@ Priorities: **P0** corrupts what gets uploaded or lets an invalid file certify. 
 
 ---
 
+## Landed 2026-07-26 (Stage 3 start: F13 and F15)
+
+**F13 LANDED. F15 LANDED.** Engine v3.20, allocator v1.11, bank_cache v1.2,
+pipeline v1.12. Suite 285 (core 210), audit pin updated.
+
+F13, what changed. `SOLVER_TIME_LIMIT_S` replaces the hardcoded 30 and threads
+through `run_slate(solver_time_limit_s=)` -> bank -> `build_multi_lineup` ->
+`build_single_lineup(time_limit_s=)`. Every solve fills a caller-owned
+`status_out` dict, so the module global that the next solve overwrote is no
+longer the only record. A time-limited incumbent is verified against the same
+constraint matrix the solver was handed (integrality plus every row within
+bounds) and then accepted, tagged `optimality='time_limited'`; an incumbent that
+fails verification is rejected and counted, because accepting an unverified one
+into a certified export would be worse than the original bug. On a timeout the
+caller does not climb the overlap ladder, does not step DU relaxation, does not
+burn the DU penalty retries, and does not fold the solve's cost into the budget
+reserve. It records the index in `solver_report.timed_out_lineup_indices` and
+moves on. In `bank_cache.extend_bank` a timed-out job no longer enters
+`attempted`, so a second slice retries it. In the allocator the single "infeasible
+or timed out" string is gone: proven infeasible names the arithmetically binding
+control (buckets x cap < entries) or says plainly that the interaction is
+binding, and a time limit reports the gap and points at the clock. A candidate
+prefilter caps K at ~6x entries, keeping forced-coverage candidates and one
+representative per stack and SP pair, because the pairwise block is K-squared and
+that is where the allocator's own time limit came from.
+
+One correction to the review as written. It says the caller "breaks out of the
+outer loop, so one slow solve ends the whole bank". The `failed_indices.append(i);
+break` at optimizer_v3.py:1987 exits the inner `while accepted is None`, not the
+outer `for`, so that specific mechanism was not there. The effect was real by
+another route and is fixed: `per_lineup_cost`, `aug_cost['max']` and
+`extend_bank`'s `worst` are all max-of-observed reserves, so one 30s timeout set
+the reserve to 30s and every later iteration then read as unaffordable. One slow
+solve did end the bank; it ended it through the budget reserve, not through a
+loop break.
+
+F15, what changed. Bank records emit `primary_stack` (and keep `sp_ids`), so the
+primary-stack exposure cap adds real MILP rows instead of dying at the export
+gate. `candidate_primary_stack` maps the DU signature's 'NONE' sentinel to "" at
+the payload boundary and `_candidate_primary_stack` maps it again at the
+allocator boundary, so stackless candidates stop forming a phantom cap bucket.
+`BankCache.as_candidates` takes `contest_shapes` and scores each one in its own
+mode, so a cash entry is no longer ranked on a ceiling-max score with a floor
+weight applied afterwards; `build_slate.py` resolves those shapes from the
+reserved CSV on the sliced path. Scoring failures are counted in
+`cache.last_payload_report` and surfaced as a bank warning rather than swallowed
+by `except: pass`; the candidate still allocates on raw objective, because a
+short bank leaves a blank reserved row. `excluded_new_teams` without
+`player_team_by_id` is now an error, matching the sibling game-cap check.
+`run_slate` passes `excluded_player_ids` into the bank build both ways
+(`Excluded=True` on the frame and the `excludes` kwarg) and the checkpoint
+carries an `exclusions` block that blocks at `approve=False` when an excluded id
+matches nobody in the pool.
+
+Open after this: F16, F17, F18, F19, F20 (deferred by decision), F21, F3b/F3c,
+the F23 remainder, and Section 2 beyond G1 and G4. F21 and F19 remain the
+natural next pair.
+
+---
+
 ## Landed 2026-07-26 (Stage 0, Stage 1, Stage 2, plus F14)
 
 **Stage 2 LANDED.** F9, F10, F11, F12, G4. **F14 LANDED**, pulled forward from Stage 3 because it broke a real build during Stage 1 and its failure mode is invisible in the output.
 
-Open after this: F13 (timeout semantics), F15 (payload seams), F16 (late-swap identity), F17 (intake trust), F18 (factor ownership), F19 (determinism pin), F20 (caps, deferred by decision), F21 (Excluded coercion), F3b/F3c, the F23 remainder, and Section 2 beyond G1 and G4.
+Open after this (superseded by the Stage 3 block above; F13 and F15 are now LANDED): F16 (late-swap identity), F17 (intake trust), F18 (factor ownership), F19 (determinism pin), F20 (caps, deferred by decision), F21 (Excluded coercion), F3b/F3c, the F23 remainder, and Section 2 beyond G1 and G4.
 
 **Recommended next: F13 and F15 together.** Both cost a slate rather than a few points of lineup quality, which is why they lead the rest of Cluster C. F13 is the compute-becomes-strategy inversion CLAUDE.md forbids: a timeout reads as infeasible, the caller climbs the overlap ladder and steps DU relaxation in response, then breaks out of the outer loop, so one slow solve ends the whole bank and surfaces as "no candidates available" pointing at the pool instead of at the clock. F15 carries two seams that convert into blocked runs at the worst moment: `run_slate` forwards `excluded_player_ids` to validation and feasibility but never into the bank build, so at T-10 the whole remaining budget goes into lineups built around a player who should have been dropped; and direct-path candidates return the literal `'NONE'`, which becomes a truthy phantom cap bucket and causes spurious infeasibility. F21 and F19 are the natural follow-on: both are small and both close holes that change the certified output invisibly.
 
@@ -144,7 +204,7 @@ Dropped from RT's own list as below the value line at current stakes: portfolio 
 
 ## Cluster C | Lineup quality (P1; real, but sequenced after integrity at current stakes)
 
-### F13. Solver timeout is read as infeasibility, triggers strategy relaxation, and one slow solve ends the bank (P1, M) | IC B6 + RT N-8d
+### F13. LANDED 2026-07-26. Solver timeout is read as infeasibility, triggers strategy relaxation, and one slow solve ends the bank (P1, M) | IC B6 + RT N-8d
 
 - **What:** `time_limit: 30` is hardcoded with scipy `success=False` on limit-hit even with a feasible incumbent in `result.x`, which is discarded (`optimizer_v3.py:672-684`). The caller cannot distinguish timeout from infeasible: on None it climbs the overlap ladder toward 8-of-10, steps DU relaxation, then `failed_indices.append(i); break` exits the outer loop **[verified]**, ending the whole bank; `LAST_SOLVER_STATUS` is a module global overwritten by later solves. The allocator has the same blindness (single string "infeasible or timed out", `contest_allocator.py:1489-1495`, with K² pairwise constraints and no prefilter feeding it).
 - **Why:** a compute problem becomes a recorded strategy change (the exact inversion CLAUDE.md forbids), surfaces as "no candidates available" pointing at the pool instead of the clock, and makes builds wall-clock dependent against the determinism claim.
@@ -156,7 +216,7 @@ Dropped from RT's own list as below the value line at current stakes: portfolio 
 - **Why:** the sliced path is the big-slate path; these defects waste exactly the budget that is scarce there and can quietly serve candidates built under superseded conditions.
 - **Fix:** fold `(excludes, target, stack_min, stack_max, projections_signature)` into the job key and cache header, refuse mismatched loads; mirror the unknown-game guard and report dropped pairs; record attempts after completed solves or keep a retryable failed set; order by combined ceiling with ID tiebreak; tmp+`os.replace` on save, rebuild on corrupt load; exclude opponents not own-teams at both sites; pass the frame at `:1170`. Done when: an excluded-player slice regenerates affected jobs; a two-slice run retries a timeout; a NaN-game fixture keeps the pair; coverage plan counts cross-game only.
 
-### F15. The bank-to-allocator payload drops the fields the portfolio controls need (P1, S) | RT N-7 + IC B12/B13/B14/B15
+### F15. LANDED 2026-07-26. The bank-to-allocator payload drops the fields the portfolio controls need (P1, S) | RT N-7 + IC B12/B13/B14/B15
 
 - **What:** `as_candidates` omits `primary_stack`/`sp_ids`, so the stack-exposure cap adds zero MILP rows and the run dies later at the export gate; direct-path candidates return the literal `'NONE'` which becomes a truthy phantom cap bucket causing spurious infeasibility (`optimizer_v3.py:751-752` **[verified]**, `contest_allocator.py:1429-1431`); `contest_fit_by_shape` is never populated (single `mode="wta"` score), so cash ranks on inverted weights; scoring failures degrade silently (`except: pass`, no counters); `excluded_new_teams` fails open when `player_team_by_id` is absent while the sibling game-cap check fails closed (`contest_allocator.py:1302-1307` vs `:1436-1444`); and `run_slate` forwards `excluded_player_ids` to validation and feasibility but never into the bank build itself (`execution_pipeline.py:2317-2323` **[verified]**), so at T-10 the entire remaining budget is spent building lineups around a player who should have been dropped, discovered only at the gate.
 - **Why:** these are the seams through which this week's enrichment work fails to reach big-slate portfolios, and two of them convert into blocked runs at the worst moment.
@@ -274,7 +334,7 @@ Each stage is shippable alone; nothing in any stage blocks a build while incompl
 
 **Stage 2, evidence (half a day):** F9 miner fail-closed. F10 registry merge. F11 diagnostics honesty. F12 pointer portability. G4 own results, and persist per-slate ownership predictions from the next slate forward.
 
-**Stage 3, quality (a day):** F13 timeout semantics. F14 cache correctness. F15 payload seams. F16 late-swap identity. F17 intake trust. F18 factor ownership decision + doubleheader odds. F19 determinism pin. F20/F21 doctrine decisions and Excluded coercion.
+**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). F16 late-swap identity. F17 intake trust. F18 factor ownership decision + doubleheader odds. F19 determinism pin. F20/F21 doctrine decisions and Excluded coercion.
 
 **Stage 4, process and leverage (as time allows):** G2 skeptic pass. G3 ownership/dup wiring (after Stage 2, once the archive is trustworthy and at the 8-slate gate). G5 corpus split + ENGINE_STATE. G6 scheduled loops. G8 tier doctrine. F22 tests. F23 remainder. G7 stakes decision, dated, once G4 yields a number.
 

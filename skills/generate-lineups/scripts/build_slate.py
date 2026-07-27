@@ -1053,7 +1053,27 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             time_budget_s=max(remaining - 8.0, 5.0),
             max_candidates=max(n_entries * 12, 60),
         )
-        candidates = cache.as_candidates(projections, requested_n=n_entries)
+        # F15: score each contest shape the reserved CSV actually contains. A
+        # single wta score is a ceiling-max ranking, and the allocator's cash
+        # branch then applies its floor weighting on top of it, so cash entries
+        # ranked on inverted weights. The shapes are known from the entries file,
+        # so there is nothing to guess.
+        try:
+            from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+            from mlb_engine.pipeline.execution_pipeline import _resolve_contest_postures
+            reserved_rows = parse_dk_entry_rows(str(entries))
+            postures = _resolve_contest_postures(
+                reserved_rows, parse_postures_arg(getattr(args, "postures", None)), None)
+            slice_shapes = sorted({
+                (postures.get(str(r.contest_id)) or {}).get(
+                    "contest_shape", "large_field_gpp")
+                for r in reserved_rows
+            })
+        except Exception as exc:  # noqa: BLE001 - shape scoring is a refinement
+            print(f"shape resolution failed, scoring wta only: {exc}", file=sys.stderr)
+            slice_shapes = None
+        candidates = cache.as_candidates(
+            projections, requested_n=n_entries, contest_shapes=slice_shapes)
         if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:
             print(json.dumps({
                 "status": "partial",
@@ -1087,7 +1107,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             **dict(slate_kwargs.get("metadata") or {}),
             "bank_diagnostics": {"source": "bank_cache", "strategy": strategy,
                                  **{k: v for k, v in bank_report.items()
-                                    if k != "candidates"}},
+                                    if k != "candidates"},
+                                 "payload_report": dict(cache.last_payload_report)},
             "bank_warnings": [
                 w for w in [
                     (f"{bank_report.get('jobs_failed')} cache jobs failed"
@@ -1097,6 +1118,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                      else None),
                     (f"budget exhausted after {bank_report.get('elapsed_s')}s"
                      if bank_report.get("budget_exhausted") else None),
+                    # F13/F15: both were previously invisible in the run record.
+                    (f"{bank_report.get('jobs_timed_out')} cache jobs hit the solver "
+                     f"time limit and are retryable on another slice"
+                     if bank_report.get("jobs_timed_out") else None),
+                    (f"{cache.last_payload_report.get('scoring_failed')} candidates "
+                     f"could not be scored and allocate on raw objective"
+                     if cache.last_payload_report.get("scoring_failed") else None),
                 ] if w
             ],
         }

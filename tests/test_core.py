@@ -3587,5 +3587,418 @@ class DoubleheaderLegTests(unittest.TestCase):
             self.assertEqual(clock["source"], "lock_time_map")
 
 
+def _wide_projection_frame(teams=20, hitters_per_team=12) -> pd.DataFrame:
+    """A pool big enough that a 1ms MILP finds no incumbent at all.
+
+    The small fixtures solve in microseconds, so they exercise the accepted
+    time-limited incumbent. This one exercises the other branch: time limit,
+    nothing to accept, and the caller must not read that as an infeasible pool.
+    """
+    names = [f"W{i}" for i in range(1, teams + 1)]
+    game = {t: f"{names[i // 2 * 2]}@{names[i // 2 * 2 + 1]}" for i, t in enumerate(names)}
+    opp = {t: (names[i + 1] if i % 2 == 0 else names[i - 1]) for i, t in enumerate(names)}
+    rows = []
+    pid = 30000
+    for team in names:
+        pid += 1
+        rows.append({
+            "Player_ID": str(pid), "Name": f"P_{team}", "Team": team,
+            "Opponent": opp[team], "Position": "P", "Salary": 9000.0,
+            "Game_ID": game[team], "Floor": 12.0, "Ceiling": 25.0 + pid % 7,
+            "Excluded": False, "Locked": False,
+        })
+    slots = ("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF", "1B", "OF", "2B", "SS")
+    for team in names:
+        for j in range(hitters_per_team):
+            pid += 1
+            rows.append({
+                "Player_ID": str(pid), "Name": f"{team}_{pid}", "Team": team,
+                "Opponent": opp[team], "Position": slots[j % len(slots)],
+                "Salary": 3000.0 + (pid % 9) * 100, "Game_ID": game[team],
+                "Floor": 5.0, "Ceiling": 8.0 + pid % 11, "Excluded": False, "Locked": False,
+            })
+    return pd.DataFrame(rows)
+
+
+class _FakeMilpResult:
+    """A scipy milp result reshaped to report a time limit.
+
+    Timing-based tests are the wrong tool here: a faster machine turns them into
+    skips, and the branch under test is the one that only fires when the clock
+    runs out. Forcing the status makes the assertion deterministic while leaving
+    the incumbent verification to run for real.
+    """
+
+    def __init__(self, x, status=1, message="Time limit reached", mip_gap=0.0125):
+        self.x = x
+        self.status = status
+        self.success = status == 0
+        self.message = message
+        self.mip_gap = mip_gap
+        self.fun = None
+
+
+def _patch_milp(factory):
+    """Context manager swapping scipy.optimize.milp for the duration."""
+    import contextlib
+    import scipy.optimize as sciopt
+
+    @contextlib.contextmanager
+    def _cm():
+        real = sciopt.milp
+
+        def fake(*args, **kwargs):
+            return factory(real, *args, **kwargs)
+
+        sciopt.milp = fake
+        try:
+            yield
+        finally:
+            sciopt.milp = real
+
+    return _cm()
+
+
+class SolverTimeoutSemanticsTests(unittest.TestCase):
+    """F13. A clock is not an infeasible pool and never buys a relaxation."""
+
+    def test_resolve_time_limit_bounds_by_remaining_budget(self):
+        self.assertEqual(opt.resolve_solver_time_limit(), opt.SOLVER_TIME_LIMIT_S)
+        self.assertEqual(opt.resolve_solver_time_limit(12.0), 12.0)
+        # The remaining budget wins when it is tighter. Shrinking search effort
+        # is the permitted response to a tight budget; trimming the pool is not.
+        self.assertEqual(opt.resolve_solver_time_limit(30.0, 4.0), 4.0)
+        self.assertEqual(opt.resolve_solver_time_limit(30.0, -5.0),
+                         opt.MIN_SOLVER_TIME_LIMIT_S)
+
+    def test_status_distinguishes_timeout_from_proven_infeasible(self):
+        frame = _wide_projection_frame()
+        timed = opt._new_solver_status()
+        lineup, _ = opt.build_single_lineup(
+            frame, target="ceiling", time_limit_s=0.001, status_out=timed)
+        self.assertEqual(timed["status"], "time_limit")
+        self.assertTrue(timed["timed_out"])
+        self.assertFalse(timed["proven_infeasible"])
+        self.assertIsNone(lineup)
+
+        blocked = opt._new_solver_status()
+        missing, _ = opt.build_single_lineup(
+            diverse_projection_frame(), target="ceiling",
+            locks=["does-not-exist"], status_out=blocked)
+        self.assertIsNone(missing)
+        self.assertTrue(blocked["proven_infeasible"])
+        self.assertFalse(blocked["timed_out"])
+
+    def test_time_limited_incumbent_is_accepted_and_tagged(self):
+        frame = diverse_projection_frame()
+        status = opt._new_solver_status()
+        with _patch_milp(lambda real, *a, **k: _FakeMilpResult(real(*a, **k).x)):
+            lineup, _ = opt.build_single_lineup(
+                frame, target="ceiling", status_out=status)
+        # A feasible incumbent is verified against the same constraint matrix
+        # and kept, rather than thrown away because success is False.
+        self.assertIsNotNone(lineup)
+        self.assertEqual(len(lineup), opt.ROSTER_SIZE)
+        self.assertTrue(status["timed_out"])
+        self.assertEqual(status["optimality"], "time_limited")
+        self.assertEqual(lineup.attrs.get("optimality"), "time_limited")
+
+    def test_an_infeasible_incumbent_is_rejected_not_certified(self):
+        """Accepting an unverified incumbent would be worse than the bug."""
+        frame = diverse_projection_frame()
+        status = opt._new_solver_status()
+
+        def corrupt(real, *args, **kwargs):
+            x = real(*args, **kwargs).x
+            if x is not None:
+                x = x.copy()
+                x[:] = 1.0  # every assignment on at once: not a legal roster
+            return _FakeMilpResult(x)
+
+        with _patch_milp(corrupt):
+            lineup, _ = opt.build_single_lineup(
+                frame, target="ceiling", status_out=status)
+        self.assertIsNone(lineup)
+        self.assertTrue(status["incumbent_rejected"])
+
+    def test_bank_timeout_populates_failed_indices_with_no_relaxation(self):
+        result = opt.build_multi_lineup(
+            _wide_projection_frame(), n_lineups=3, mode="wta",
+            solver_time_limit_s=0.001,
+        )
+        self.assertEqual(result["lineups"], [])
+        self.assertEqual(result["failed_indices"], [0, 1, 2])
+        self.assertEqual(result["solver_report"]["timed_out_lineup_indices"], [0, 1, 2])
+        relaxations = result["relaxations"]
+        self.assertEqual(relaxations["overlap_relaxed_lineups"], 0)
+        self.assertEqual(relaxations["du_relaxed_lineups"], 0)
+        self.assertEqual(relaxations["du_relaxation_high_water"], -1)
+        self.assertEqual(relaxations["timed_out_lineup_count"], 3)
+        self.assertTrue(any("clock, not the pool" in w for w in relaxations["warnings"]))
+
+    def test_timeout_never_climbs_the_overlap_ladder(self):
+        """Deterministic: the solver is replaced, so nothing depends on speed."""
+        frame = diverse_projection_frame()
+        seen_overlaps = []
+        real = opt.build_single_lineup
+
+        def fake(projections_df, **kwargs):
+            status = kwargs.get("status_out")
+            seen_overlaps.append(kwargs.get("max_overlap"))
+            if len(seen_overlaps) == 1:
+                return real(projections_df, **kwargs)
+            opt._record_solver_status(
+                status, status="time_limit", timed_out=True,
+                proven_infeasible=False, message="Time limit reached",
+            )
+            return None, None
+
+        original = opt.build_single_lineup
+        opt.build_single_lineup = fake
+        try:
+            result = opt.build_multi_lineup(frame, n_lineups=3, mode="wta")
+        finally:
+            opt.build_single_lineup = original
+
+        # One solve per timed-out lineup: the ladder was never climbed and the
+        # DU relaxation order was never stepped.
+        self.assertEqual(len(seen_overlaps), 3)
+        self.assertEqual(result["failed_indices"], [1, 2])
+        self.assertEqual(result["relaxations"]["du_relaxation_high_water"], -1)
+        self.assertEqual(result["relaxations"]["overlap_relaxed_lineups"], 0)
+
+    def test_timed_out_cache_job_is_retried_on_a_later_slice(self):
+        frame = diverse_projection_frame()
+
+        def timing_out(projections_df, **kwargs):
+            opt._record_solver_status(
+                kwargs.get("status_out"), status="time_limit", timed_out=True,
+                proven_infeasible=False, message="Time limit reached")
+            return None, None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache = bank_cache.BankCache(path)
+            original = bank_cache.build_single_lineup
+            bank_cache.build_single_lineup = timing_out
+            try:
+                report = bank_cache.extend_bank(
+                    cache, frame, time_budget_s=2.0, max_candidates=3)
+            finally:
+                bank_cache.build_single_lineup = original
+            self.assertGreater(report["jobs_timed_out"], 0)
+            # A timeout is not an answer about the job, so it is not recorded and
+            # the next slice picks it up. Recording it was how the sliced path
+            # dropped exactly the jobs a second slice exists to finish.
+            self.assertEqual(cache.attempted, set())
+            self.assertEqual(bank_cache.BankCache(path).attempted, set())
+
+
+class AllocatorSolverStatusTests(unittest.TestCase):
+    """F13/F15 at the allocator boundary."""
+
+    @staticmethod
+    def _roster(seed):
+        return [f"{seed}-{i}" for i in range(10)]
+
+    def test_proven_infeasible_names_the_binding_constraint(self):
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary="AAA")
+                 for i in range(3)]
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6),
+            {"max_primary_stack_exposure_pct": 0.34},
+        )
+        self.assertFalse(result["passed"])
+        joined = " ".join(result["errors"])
+        self.assertIn("proven infeasible", joined)
+        self.assertIn("max_primary_stack_exposure_pct", joined)
+        self.assertNotIn("timed out", joined)
+
+    def test_time_limit_reports_the_gap_not_an_infeasibility(self):
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary=f"T{i}")
+                 for i in range(8)]
+        with _patch_milp(lambda real, *a, **k: _FakeMilpResult(None, mip_gap=0.0125)):
+            result = select_and_assign_entries(cands, _entry_reqs(4))
+        self.assertFalse(result["passed"])
+        joined = " ".join(result["errors"])
+        self.assertIn("time limit", joined)
+        self.assertIn("0.0125", joined)
+        self.assertIn("clock, not a proven infeasibility", joined)
+        report = result["allocation_solver_report"]
+        self.assertEqual(report["status"], "time_limit")
+        self.assertEqual(report["binding_constraints"], [])
+
+    def test_time_limited_allocation_incumbent_is_accepted_and_named(self):
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary=f"T{i}")
+                 for i in range(8)]
+        with _patch_milp(lambda real, *a, **k: _FakeMilpResult(real(*a, **k).x)):
+            result = select_and_assign_entries(cands, _entry_reqs(4))
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(result["allocation_optimality"], "time_limited")
+        self.assertTrue(any("time-limited incumbent" in w
+                            for w in result["warnings"]))
+
+    def test_stackless_candidates_do_not_form_a_phantom_cap_bucket(self):
+        # Every candidate carries the DU signature's no-stack sentinel. Read as
+        # a team it becomes one bucket of eight against a cap of two entries.
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary="NONE")
+                 for i in range(8)]
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6), {"max_primary_stack_exposure_pct": 0.34},
+        )
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(len(result["assignments"]), 6)
+        self.assertTrue(all(a["primary_stack"] == "" for a in result["assignments"]))
+
+    def test_stack_cap_binds_when_the_bank_is_concentrated(self):
+        cands = []
+        for slot, (team, base) in enumerate((("AAA", 100.0), ("BBB", 60.0), ("CCC", 30.0))):
+            cands += [
+                candidate(f"{team}{i}", self._roster(slot * 100 + i), base - i, primary=team)
+                for i in range(4)
+            ]
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6),
+            {"max_primary_stack_exposure_pct": 0.34, "max_candidate_reuse": 1},
+        )
+        self.assertTrue(result["passed"], result.get("errors"))
+        used = [a["primary_stack"] for a in result["assignments"]]
+        # floor(6 * 0.34) = 2. Without the emitted primary_stack the cap added no
+        # MILP rows at all and all six would have come from the top-scoring AAA.
+        self.assertEqual(result["direct_constraints"]["max_primary_stack_count"], 2)
+        self.assertLessEqual(used.count("AAA"), 2)
+        self.assertEqual(len(used), 6)
+
+    def test_excluded_new_teams_without_a_team_map_fails_closed(self):
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i) for i in range(3)]
+        reqs = _entry_reqs(1)
+        reqs[0]["excluded_new_teams"] = ["AAA"]
+        result = select_and_assign_entries(cands, reqs)
+        self.assertFalse(result["passed"])
+        self.assertIn("player_team_by_id", " ".join(result["errors"]))
+
+    def test_prefilter_keeps_forced_coverage_and_shrinks_the_solve(self):
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary=f"T{i % 4}")
+                 for i in range(120)]
+        reqs = _entry_reqs(2)
+        # Entry 0 admits exactly one candidate, and it is the worst-scoring one.
+        reqs[0]["allowed_candidate_ids"] = ["c119"]
+        result = select_and_assign_entries(cands, reqs, {"max_candidate_reuse": 1})
+        self.assertTrue(result["passed"], result.get("errors"))
+        report = result["allocation_solver_report"]["candidate_prefilter"]
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["candidates_in"], 120)
+        self.assertLessEqual(report["candidates_kept"], 120)
+        self.assertGreaterEqual(report["forced_coverage_kept"], 1)
+        chosen = {a["candidate_id"] for a in result["assignments"]}
+        self.assertIn("c119", chosen)
+
+
+class BankPayloadSeamTests(unittest.TestCase):
+    """F15. The fields the portfolio controls read must actually be emitted."""
+
+    @staticmethod
+    def _roster():
+        return [f"p{i}" for i in range(10)]
+
+    def test_candidate_primary_stack_maps_the_sentinel_to_blank(self):
+        stackless = pd.DataFrame([
+            {"Player_ID": f"h{i}", "Team": f"T{i}", "Position": "OF"} for i in range(10)
+        ])
+        self.assertEqual(opt._identify_primary_stack(stackless), "NONE")
+        self.assertEqual(opt.candidate_primary_stack(stackless), "")
+
+    def test_diverse_bank_records_carry_primary_stack_and_sp_ids(self):
+        bank = opt.build_diverse_candidate_bank(
+            diverse_projection_frame(), requested_n=4, mode="wta", target="ceiling",
+        )
+        records = bank["candidate_lineups"]
+        self.assertTrue(records)
+        for rec in records:
+            self.assertIn("primary_stack", rec)
+            self.assertIn("sp_ids", rec)
+            self.assertNotEqual(rec["primary_stack"], "NONE")
+            self.assertEqual(len(rec["sp_ids"]), 2)
+
+    def test_as_candidates_emits_stack_pair_and_shape_scores(self):
+        frame = diverse_projection_frame()
+        lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+        roster = bank_cache.ordered_roster(lineup)
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            cache.add(roster, 120.0, job="j")
+            payload = cache.as_candidates(
+                frame, requested_n=2, contest_shapes=["cash", "large_wta"])[0]
+            self.assertEqual(payload["sp_ids"], list(roster[:2]))
+            self.assertIn("primary_stack", payload)
+            self.assertNotEqual(payload["primary_stack"], "NONE")
+            # Cash used to rank on a ceiling-max score with a floor weight bolted
+            # on afterwards. Each shape is now scored in its own mode.
+            self.assertIn("cash", payload["contest_fit_by_shape"])
+            self.assertIn("large_wta", payload["contest_fit_by_shape"])
+            report = cache.last_payload_report
+            self.assertEqual(report["scored"], 1)
+            self.assertEqual(report["scoring_failed"], 0)
+            self.assertEqual(report["shapes_scored"], ["cash", "large_wta"])
+
+    def test_as_candidates_counts_scoring_failures_instead_of_swallowing_them(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            cache.add([f"absent{i}" for i in range(10)], 100.0, job="j")
+            payload = cache.as_candidates(frame, requested_n=1)
+            # The candidate survives, because a short bank leaves a blank
+            # reserved row and a blank row blocks certification.
+            self.assertEqual(len(payload), 1)
+            self.assertEqual(cache.last_payload_report["scoring_failed"], 1)
+            self.assertTrue(cache.last_payload_report["scoring_failure_reasons"])
+
+
+class RunSlateExclusionSeamTests(unittest.TestCase):
+    """F15. Excludes reached validation and feasibility but never the bank."""
+
+    def _inputs(self, root: Path):
+        salary = root / "salary.csv"
+        ids = write_salary(salary)
+        entries = root / "DKEntries.csv"
+        write_entries(entries)
+        return salary, entries, projection_frame(ids)
+
+    def test_excluded_players_never_enter_the_bank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, entries, frame = self._inputs(root)
+            dropped = str(frame[frame["Position"] != "P"]["Player_ID"].iloc[0])
+            result = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame, excluded_player_ids=[dropped],
+                portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                approve=True, assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+            )
+            bank = result.get("candidate_bank") or {}
+            self.assertEqual(bank.get("excluded_player_ids_applied"), [dropped])
+            self.assertTrue(bank.get("candidate_count"))
+            # The seam this closes: the bank used to be built without the
+            # excludes and the mistake surfaced only at the export gate, after
+            # the whole remaining budget had been spent building around them.
+            for assignment in result.get("assignments") or []:
+                self.assertNotIn(dropped, assignment["lineup_ids"])
+
+    def test_unmatched_exclusion_blocks_at_the_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, entries, frame = self._inputs(root)
+            result = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame,
+                excluded_player_ids=["not-in-this-pool"], approve=False,
+            )
+            block = result["exclusions"]
+            self.assertEqual(block["unmatched_player_ids"], ["not-in-this-pool"])
+            self.assertTrue(block["blockers"])
+            self.assertTrue(any("exclusions:" in w
+                                for w in result["checkpoint_plan"]["warnings"]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

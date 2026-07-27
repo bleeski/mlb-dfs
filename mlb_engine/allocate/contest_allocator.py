@@ -37,7 +37,7 @@ import json
 import math
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-VERSION = "v1.10"
+VERSION = "v1.11"
 
 CONTEST_TYPES = {"cash", "se_gpp", "portfolio_gpp", "wta", "satellite"}
 PRIORITY_MULTIPLIER = {"low": 0.80, "medium": 1.00, "high": 1.18, "must": 1.35}
@@ -516,8 +516,180 @@ def _candidate_pitcher_ids(candidate: Dict[str, Any]) -> Tuple[str, ...]:
 
 
 def _candidate_primary_stack(candidate: Dict[str, Any]) -> str:
+    """Primary stack team, or "" when the lineup has no primary stack.
+
+    F15: ``optimizer_v3._identify_primary_stack`` returns the literal 'NONE' as
+    the DU signature's no-stack sentinel. Read here it is a truthy team name, so
+    every stackless candidate landed in one phantom 'NONE' bucket and the
+    primary-stack exposure cap constrained it as if a team by that name existed.
+    On a bank with more stackless candidates than the cap allows, that is a
+    spurious infeasibility with no binding constraint a human can find.
+    """
     cf = candidate.get("contest_fit") or {}
-    return str(candidate.get("primary_stack") or cf.get("primary_stack") or "").strip().upper()
+    value = str(candidate.get("primary_stack") or cf.get("primary_stack") or "").strip().upper()
+    return "" if value == "NONE" else value
+
+
+# ---------------------------------------------------------------------------
+# v1.11 (F13) allocator solver semantics
+#
+# The allocator returned one string, "entry-level joint MILP infeasible or timed
+# out", for two conditions that call for opposite responses. Proven infeasible
+# means a control is arithmetically impossible against this bank and the fix is
+# to name it and change it. Time limit means the model was too big for the
+# clock and the fix is more time, fewer candidates, or the incumbent that was
+# already found. Collapsing them produced a message that pointed at neither.
+# ---------------------------------------------------------------------------
+
+# Candidates kept per requested entry before the joint MILP. The pairwise
+# overlap constraints are K-squared, so an unfiltered bank of several hundred is
+# where the allocator's own time limit comes from.
+DEFAULT_CANDIDATE_PREFILTER_MULTIPLE = 6
+MIN_CANDIDATE_PREFILTER_FLOOR = 40
+
+
+def _diagnose_binding_constraints(
+    entries_count: int,
+    stacks: Sequence[str],
+    sp_pairs: Sequence[Tuple[str, ...]],
+    signatures: Sequence[Tuple[str, ...]],
+    largest_contest_entries: int,
+    controls: Dict[str, Any],
+) -> List[str]:
+    """Name the controls that cannot be satisfied by this bank, arithmetically.
+
+    Every check here is a counting argument on the bank as handed in, not a
+    re-solve: buckets times cap has to reach the entry count or no assignment
+    exists. It cannot prove infeasibility on its own (the MILP already did
+    that), and it never guesses. When it finds nothing it says so, which is
+    itself the useful answer: the interaction, not any single cap, is binding.
+    """
+    findings: List[str] = []
+    total = int(entries_count)
+
+    stack_cap = _cap_count(total, controls.get("max_primary_stack_exposure_pct"))
+    if stack_cap:
+        buckets = len({x for x in stacks if x})
+        stackless = sum(1 for x in stacks if not x)
+        # Stackless candidates carry no bucket, so they are unconstrained here.
+        if not stackless and buckets * stack_cap < total:
+            findings.append(
+                f"max_primary_stack_exposure_pct: {buckets} distinct primary stacks x "
+                f"cap {stack_cap} = {buckets * stack_cap} < {total} entries"
+            )
+
+    pair_cap = controls.get("max_sp_pair_repetition")
+    if pair_cap is not None:
+        buckets = len(set(sp_pairs))
+        if buckets * int(pair_cap) < total:
+            findings.append(
+                f"max_sp_pair_repetition: {buckets} distinct SP pairs x cap "
+                f"{int(pair_cap)} = {buckets * int(pair_cap)} < {total} entries"
+            )
+
+    distinct_signatures = len(set(signatures))
+    max_reuse = controls.get("max_candidate_reuse")
+    if max_reuse is not None and distinct_signatures * int(max_reuse) < total:
+        findings.append(
+            f"max_candidate_reuse: {distinct_signatures} distinct lineups x cap "
+            f"{int(max_reuse)} = {distinct_signatures * int(max_reuse)} < {total} entries"
+        )
+
+    if largest_contest_entries > distinct_signatures:
+        findings.append(
+            f"per-contest lineup uniqueness: one contest reserves "
+            f"{largest_contest_entries} entries but the bank holds only "
+            f"{distinct_signatures} distinct lineups"
+        )
+
+    pitcher_cap = _cap_count(total, controls.get("max_pitcher_exposure_pct"))
+    if pitcher_cap:
+        arms = {pid for pair in sp_pairs for pid in pair}
+        # Two pitcher slots per lineup.
+        if len(arms) * pitcher_cap < total * 2:
+            findings.append(
+                f"max_pitcher_exposure_pct: {len(arms)} distinct starters x cap "
+                f"{pitcher_cap} = {len(arms) * pitcher_cap} < {total * 2} pitcher slots"
+            )
+    return findings
+
+
+def _prefilter_candidates(
+    candidates: Sequence[Dict[str, Any]],
+    entries: Sequence[Dict[str, Any]],
+    compatible: Sequence[Sequence[bool]],
+    keep_target: int,
+) -> Tuple[List[int], Dict[str, Any]]:
+    """Choose which candidate indices enter the joint MILP.
+
+    Forced coverage first: any candidate that is the only compatible option for
+    some entry is kept unconditionally, because dropping it makes the problem
+    infeasible outright. Then one representative per primary stack and per SP
+    pair, so no exposure cap loses its bucket and starts reporting a phantom
+    infeasibility. Then the best remaining by shape score until the target.
+    Ordering is deterministic: score descending, candidate id ascending.
+    """
+    K = len(candidates)
+    if K <= keep_target:
+        return list(range(K)), {
+            "applied": False, "candidates_in": K, "candidates_kept": K,
+            "keep_target": keep_target,
+        }
+
+    best_score: Dict[int, float] = {}
+    for k in range(K):
+        scores = [
+            _candidate_shape_score(candidates[k], str(e.get("contest_shape") or "large_wta"))
+            for e in entries
+        ]
+        best_score[k] = max(scores) if scores else 0.0
+    order = sorted(range(K), key=lambda k: (-best_score[k], _candidate_id(candidates[k], k)))
+
+    keep: List[int] = []
+    seen = set()
+
+    def _take(k: int) -> None:
+        if k not in seen:
+            seen.add(k)
+            keep.append(k)
+
+    forced = 0
+    for e in range(len(entries)):
+        options = [k for k in range(K) if compatible[e][k]]
+        if len(options) == 1:
+            forced += 1
+            _take(options[0])
+
+    covered_stacks = set()
+    covered_pairs = set()
+    for k in order:
+        stack = _candidate_primary_stack(candidates[k])
+        pair = _candidate_pitcher_ids(candidates[k])
+        if stack and stack not in covered_stacks:
+            covered_stacks.add(stack)
+            _take(k)
+        if pair and pair not in covered_pairs:
+            covered_pairs.add(pair)
+            _take(k)
+
+    for k in order:
+        if len(keep) >= keep_target:
+            break
+        _take(k)
+
+    keep.sort()
+    return keep, {
+        "applied": True,
+        "candidates_in": K,
+        "candidates_kept": len(keep),
+        "keep_target": keep_target,
+        "forced_coverage_kept": forced,
+        "distinct_stacks_represented": len(covered_stacks),
+        "distinct_sp_pairs_represented": len(covered_pairs),
+        "rule": "forced-coverage candidates, then one representative per primary "
+                "stack and SP pair, then best shape score; deterministic, never a "
+                "win-rate or probability claim",
+    }
 
 
 def _cap_count(total: int, pct: Optional[float]) -> Optional[int]:
@@ -1349,22 +1521,67 @@ def select_and_assign_entries(
             "errors": [str(exc)],
         }
 
-    E, K = len(entries), len(candidates)
-    rosters = [_candidate_ordered_roster(c) for c in candidates]
-    player_sets = [set(r) for r in rosters]
-    signatures = [tuple(sorted(r)) for r in rosters]
-    pitcher_sets = [set(_candidate_pitcher_ids(c) or rosters[i][:2]) for i, c in enumerate(candidates)]
-    sp_pairs = [tuple(sorted(x)) for x in pitcher_sets]
-    stacks = [_candidate_primary_stack(c) for c in candidates]
-    candidate_ids = [_candidate_id(c, i) for i, c in enumerate(candidates)]
-    compatible = [[_entry_candidate_compatible(candidates[k], entries[e]) for k in range(K)] for e in range(E)]
-    incompatible_entries = [entry_ids[e] for e in range(E) if not any(compatible[e])]
+    # F15: excluded_new_teams silently passed every candidate when the team map
+    # was missing, while the sibling game-exposure check below fails closed on
+    # the same class of missing input. A late-swap entry whose locked game admits
+    # no new players is the exact case where failing open puts an illegal lineup
+    # in a certified file.
+    team_map_errors: List[str] = []
+    for e, entry in enumerate(entries):
+        if not entry.get("excluded_new_teams"):
+            continue
+        team_map = {str(k) for k in (entry.get("player_team_by_id") or {})}
+        if not team_map:
+            team_map_errors.append(
+                f"Entry ID {entry_ids[e]} sets excluded_new_teams without "
+                f"player_team_by_id; the exclusion cannot be enforced"
+            )
+    if team_map_errors:
+        return {
+            "passed": False, "assignments": [], "selection_certified": False,
+            "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
+            "errors": team_map_errors,
+        }
+
+    E = len(entries)
+    all_rosters = [_candidate_ordered_roster(c) for c in candidates]
+    full_compatible = [
+        [_entry_candidate_compatible(candidates[k], entries[e]) for k in range(len(candidates))]
+        for e in range(E)
+    ]
+    incompatible_entries = [entry_ids[e] for e in range(E) if not any(full_compatible[e])]
     if incompatible_entries:
         return {
             "passed": False, "assignments": [], "selection_certified": False,
             "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
             "errors": [f"no compatible candidate for Entry ID {x}" for x in incompatible_entries],
         }
+
+    # F13: the pairwise overlap block is K-squared. An unfiltered bank is what
+    # pushes this solve into its own time limit, and a time limit here used to
+    # read as "infeasible". Prefiltering reduces search effort; it never touches
+    # the legal player set, and forced-coverage candidates are kept outright.
+    keep_target = max(
+        int(controls.get("candidate_prefilter_target")
+            or E * DEFAULT_CANDIDATE_PREFILTER_MULTIPLE),
+        MIN_CANDIDATE_PREFILTER_FLOOR,
+    )
+    kept_idx, prefilter_report = _prefilter_candidates(
+        candidates, entries, full_compatible, keep_target
+    )
+    if prefilter_report["applied"]:
+        candidates = [candidates[k] for k in kept_idx]
+        all_rosters = [all_rosters[k] for k in kept_idx]
+
+    K = len(candidates)
+    rosters = all_rosters
+    player_sets = [set(r) for r in rosters]
+    signatures = [tuple(sorted(r)) for r in rosters]
+    pitcher_sets = [set(_candidate_pitcher_ids(c) or rosters[i][:2]) for i, c in enumerate(candidates)]
+    sp_pairs = [tuple(sorted(x)) for x in pitcher_sets]
+    stacks = [_candidate_primary_stack(c) for c in candidates]
+    candidate_ids = [_candidate_id(c, i) for i, c in enumerate(candidates)]
+    compatible = [[full_compatible[e][k] for k in kept_idx] for e in range(E)]
 
     x_count = E * K
     use_y = controls.get("max_shared_players") is not None
@@ -1478,30 +1695,102 @@ def select_and_assign_entries(
         for k in range(K):
             if not compatible[e][k]:
                 upper[x_idx(e, k)] = 0.0
+    lb_array = np.array(lbs)
+    ub_array = np.array(ubs)
+    time_limit_s = float(controls.get("time_limit", 30))
     result = milp(
         c=objective,
         integrality=np.ones(n_vars, dtype=int),
         bounds=Bounds(lower, upper),
-        constraints=LinearConstraint(matrix, np.array(lbs), np.array(ubs)),
-        options={"time_limit": float(controls.get("time_limit", 30)), "disp": False},
+        constraints=LinearConstraint(matrix, lb_array, ub_array),
+        options={"time_limit": time_limit_s, "disp": False},
     )
     solver_status = str(getattr(result, "message", getattr(result, "status", "unknown")))
-    if not result.success or result.x is None:
+    scipy_status = getattr(result, "status", None)
+    timed_out = scipy_status == 1
+    mip_gap = getattr(result, "mip_gap", None)
+    largest_contest = max(
+        (len(v) for v in by_contest_entries.values()), default=0
+    )
+    solver_report = {
+        "scipy_status": scipy_status,
+        "status": {0: "optimal", 1: "time_limit", 2: "infeasible",
+                   3: "unbounded"}.get(scipy_status, "other"),
+        "message": solver_status,
+        "time_limit_s": time_limit_s,
+        "mip_gap": mip_gap,
+        "optimality": None,
+        "candidate_prefilter": prefilter_report,
+    }
+
+    incumbent = None
+    if result.x is not None:
+        x = np.asarray(result.x, dtype=float)
+        rounded = np.round(x)
+        if x.size and float(np.max(np.abs(x - rounded))) <= 1e-5:
+            lhs = matrix @ rounded
+            within_bounds = bool(
+                np.all(rounded >= lower - 1e-6) and np.all(rounded <= upper + 1e-6)
+            )
+            if within_bounds and np.all(lhs >= lb_array - 1e-6) and np.all(lhs <= ub_array + 1e-6):
+                incumbent = rounded
+
+    if incumbent is None:
+        if timed_out:
+            gap = "unknown" if mip_gap is None else f"{float(mip_gap):.4f}"
+            errors = [
+                f"entry-level joint MILP hit the {time_limit_s}s time limit at gap "
+                f"{gap} with no feasible incumbent; this is the clock, not a proven "
+                f"infeasibility. Raise controls['time_limit'] or lower "
+                f"controls['candidate_prefilter_target'] "
+                f"({prefilter_report['candidates_in']} candidates in, "
+                f"{prefilter_report['candidates_kept']} solved)"
+            ]
+        else:
+            binding = _diagnose_binding_constraints(
+                E, stacks, sp_pairs, signatures, largest_contest, controls
+            )
+            if binding:
+                errors = [f"entry-level joint MILP proven infeasible: {b}" for b in binding]
+            else:
+                errors = [
+                    "entry-level joint MILP proven infeasible: no single control is "
+                    "arithmetically binding against this bank, so the interaction of "
+                    "the active controls is. Active: "
+                    + ", ".join(
+                        f"{k}={controls.get(k)}" for k in sorted((
+                            "max_player_exposure_pct", "max_pitcher_exposure_pct",
+                            "max_primary_stack_exposure_pct", "max_sp_pair_repetition",
+                            "max_shared_players", "max_candidate_reuse",
+                        )) if controls.get(k) is not None
+                    )
+                ]
+        solver_report["binding_constraints"] = (
+            [] if timed_out else _diagnose_binding_constraints(
+                E, stacks, sp_pairs, signatures, largest_contest, controls)
+        )
         return {
             "passed": False, "assignments": [], "selection_certified": False,
             "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
             "allocation_solver_status": solver_status,
-            "errors": ["entry-level joint MILP infeasible or timed out"],
+            "allocation_solver_report": solver_report,
+            "errors": errors,
         }
+
+    # A time-limited incumbent satisfies every constraint in the matrix; it is
+    # simply not proven optimal. Verified above, accepted here, and named in the
+    # result so "time_limited" is never inferred from silence.
+    solver_report["optimality"] = "time_limited" if timed_out else "optimal"
 
     assignments: List[Dict[str, Any]] = []
     for e, entry in enumerate(entries):
-        chosen = [k for k in range(K) if result.x[x_idx(e, k)] > 0.5]
+        chosen = [k for k in range(K) if incumbent[x_idx(e, k)] > 0.5]
         if len(chosen) != 1:
             return {
                 "passed": False, "assignments": [], "selection_certified": False,
                 "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
                 "allocation_solver_status": solver_status,
+                "allocation_solver_report": solver_report,
                 "errors": [f"Entry ID {entry_ids[e]} resolved to {len(chosen)} candidates"],
             }
         k = chosen[0]
@@ -1528,6 +1817,18 @@ def select_and_assign_entries(
         "allocation_certified": True,
         "allocation_method": "scipy_milp_entry_level",
         "allocation_solver_status": solver_status,
+        "allocation_solver_report": solver_report,
+        "allocation_optimality": solver_report["optimality"],
+        "warnings": (
+            [f"allocation accepted from a time-limited incumbent at gap "
+             f"{'unknown' if mip_gap is None else format(float(mip_gap), '.4f')}; "
+             f"every constraint verified, optimality not proven"]
+            if timed_out else []
+        ) + (
+            [f"candidate prefilter kept {prefilter_report['candidates_kept']} of "
+             f"{prefilter_report['candidates_in']} candidates before the joint MILP"]
+            if prefilter_report.get("applied") else []
+        ),
         "candidate_reuse_counts": dict(reuse_counts),
         "direct_constraints": {
             "max_player_count": player_cap,

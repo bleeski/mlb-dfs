@@ -127,9 +127,93 @@ except Exception as exc:  # pragma: no cover - environment-dependent
     SCIPY_AVAILABLE = False
     SCIPY_IMPORT_ERROR = str(exc)
 
-OPTIMIZER_VERSION = 'v3.19'
+OPTIMIZER_VERSION = 'v3.20'
 LAST_SOLVER_BACKEND = None
 LAST_SOLVER_STATUS = None
+
+# ============================================================================
+# v3.20 (F13) solver timeout semantics
+#
+# The MILP time limit was the literal 30 hardcoded at the call site, and scipy
+# reports ``success=False`` when it hits that limit even when ``result.x``
+# carries a feasible incumbent. The old code discarded both facts: it returned a
+# bare ``None`` and the caller could not tell a clock from a proven-infeasible
+# problem. It responded to the clock by climbing the overlap ladder and stepping
+# DU relaxation, so a compute limit was recorded as a strategy change. CLAUDE.md
+# forbids exactly that inversion: an infrastructure limit may reduce search
+# effort, it may never reduce the legal player set or the construction rules.
+#
+# Three things change here. The limit is a named default and is threaded from
+# the caller. Every solve reports a structured status through an explicit
+# ``status_out`` dict rather than a module global that the next solve overwrites.
+# A time-limited incumbent is verified against the constraint matrix and then
+# accepted, tagged ``optimality='time_limited'``, instead of thrown away.
+# ============================================================================
+
+SOLVER_TIME_LIMIT_S = 30.0
+# Below this, a solve has no useful chance and the reserve arithmetic degenerates.
+MIN_SOLVER_TIME_LIMIT_S = 0.001
+
+# scipy.optimize.milp status -> the only distinction the caller has to act on.
+SCIPY_MILP_STATUS = {
+    0: 'optimal',
+    1: 'time_limit',
+    2: 'infeasible',
+    3: 'unbounded',
+    4: 'other',
+}
+
+LAST_SOLVER_RESULT: dict = {}
+
+
+def _new_solver_status() -> dict:
+    """A fresh, fully-populated status record. Never partially filled."""
+    return {
+        'backend': 'scipy_milp',
+        'status': 'not_run',
+        'scipy_status': None,
+        'message': '',
+        'timed_out': False,
+        'proven_infeasible': False,
+        'optimality': None,
+        'mip_gap': None,
+        'time_limit_s': None,
+        'elapsed_s': None,
+        'incumbent_rejected': False,
+    }
+
+
+def _record_solver_status(status_out, **fields) -> dict:
+    """Fill ``status_out`` in place, mirror to the module globals, return it.
+
+    The globals are kept because older callers read them; they remain unsafe for
+    anything but a single solve, which is why the structured record is passed in
+    by the caller instead.
+    """
+    global LAST_SOLVER_BACKEND, LAST_SOLVER_STATUS, LAST_SOLVER_RESULT
+    record = status_out if status_out is not None else _new_solver_status()
+    for key in _new_solver_status():
+        record.setdefault(key, None)
+    record.update(fields)
+    LAST_SOLVER_BACKEND = record.get('backend')
+    LAST_SOLVER_STATUS = record.get('message') or record.get('status')
+    LAST_SOLVER_RESULT = dict(record)
+    return record
+
+
+def resolve_solver_time_limit(time_limit_s=None, remaining_s=None):
+    """The seconds one solve may take, bounded by the budget it must fit inside.
+
+    ``remaining_s`` is what is left of the caller's wall-clock budget. Shrinking
+    the per-solve limit to fit is the correct response to a tight budget: it
+    reduces search effort and nothing else. Trimming the player pool to fit a
+    compute limit is the response CLAUDE.md forbids, and this function exists so
+    that the cheap correct lever is always available.
+    """
+    limit = SOLVER_TIME_LIMIT_S if time_limit_s is None else float(time_limit_s)
+    if remaining_s is not None:
+        limit = min(limit, float(remaining_s))
+    return max(MIN_SOLVER_TIME_LIMIT_S, limit)
 
 # ============================================================================
 # v3.3 constants (unchanged)
@@ -528,9 +612,10 @@ def _build_single_lineup_scipy(
     max_overlap=None,
     stack_core_blocklist=None,
     forbidden_player_combos=None,
+    time_limit_s=None,
+    status_out=None,
 ):
     """SciPy MILP backend with exact DraftKings slot assignment locks."""
-    global LAST_SOLVER_BACKEND, LAST_SOLVER_STATUS
     if not SCIPY_AVAILABLE:
         raise RuntimeError(f'scipy MILP backend unavailable: {SCIPY_IMPORT_ERROR}')
 
@@ -546,8 +631,11 @@ def _build_single_lineup_scipy(
             if required_pos in row['_pos_set']:
                 assign_keys.append((pid, slot))
     if not assign_keys:
-        LAST_SOLVER_BACKEND = 'scipy_milp'
-        LAST_SOLVER_STATUS = 'no_assignment_variables'
+        _record_solver_status(
+            status_out, status='no_assignment_variables',
+            message='no_assignment_variables', proven_infeasible=True,
+            time_limit_s=resolve_solver_time_limit(time_limit_s),
+        )
         return None, None
 
     assign_index = {key: idx for idx, key in enumerate(assign_keys)}
@@ -612,16 +700,22 @@ def _build_single_lineup_scipy(
         if pid_to_var_idxs.get(pid):
             add_constraint({idx: 1.0 for idx in pid_to_var_idxs[pid]}, 1.0, 1.0)
         else:
-            LAST_SOLVER_BACKEND = 'scipy_milp'
-            LAST_SOLVER_STATUS = f'locked_player_unavailable:{pid}'
+            _record_solver_status(
+                status_out, status='locked_player_unavailable',
+                message=f'locked_player_unavailable:{pid}', proven_infeasible=True,
+                time_limit_s=resolve_solver_time_limit(time_limit_s),
+            )
             return None, None
 
     for slot, pid in (locked_slot_assignments or {}).items():
         slot = str(slot)
         pid = str(pid)
         if slot not in required_by_slot or (pid, slot) not in assign_index:
-            LAST_SOLVER_BACKEND = 'scipy_milp'
-            LAST_SOLVER_STATUS = f'locked_slot_unavailable:{slot}:{pid}'
+            _record_solver_status(
+                status_out, status='locked_slot_unavailable',
+                message=f'locked_slot_unavailable:{slot}:{pid}', proven_infeasible=True,
+                time_limit_s=resolve_solver_time_limit(time_limit_s),
+            )
             return None, None
         add_constraint({assign_index[(pid, slot)]: 1.0}, 1.0, 1.0)
 
@@ -669,20 +763,72 @@ def _build_single_lineup_scipy(
             if value:
                 row_idx.append(row_number); col_idx.append(col); data.append(float(value))
     matrix = coo_matrix((data, (row_idx, col_idx)), shape=(len(rows), n_vars)).tocsr()
+    lb_array = np.array(lbs)
+    ub_array = np.array(ubs)
+    effective_limit = resolve_solver_time_limit(time_limit_s)
+    solve_started = _time.monotonic()
     result = milp(
         c=c, integrality=np.ones(n_vars, dtype=int),
         bounds=Bounds(np.zeros(n_vars), np.ones(n_vars)),
-        constraints=LinearConstraint(matrix, np.array(lbs), np.array(ubs)),
-        options={'time_limit': 30, 'disp': False},
+        constraints=LinearConstraint(matrix, lb_array, ub_array),
+        options={'time_limit': effective_limit, 'disp': False},
     )
-    LAST_SOLVER_BACKEND = 'scipy_milp'
-    LAST_SOLVER_STATUS = str(getattr(result, 'message', getattr(result, 'status', None)))
-    if not result.success or result.x is None:
+    elapsed = _time.monotonic() - solve_started
+    scipy_status = getattr(result, 'status', None)
+    status_name = SCIPY_MILP_STATUS.get(scipy_status, 'other')
+    timed_out = status_name == 'time_limit'
+    message = str(getattr(result, 'message', scipy_status))
+    base_fields = dict(
+        status=status_name, scipy_status=scipy_status, message=message,
+        timed_out=timed_out, proven_infeasible=(status_name == 'infeasible'),
+        mip_gap=getattr(result, 'mip_gap', None),
+        time_limit_s=effective_limit, elapsed_s=round(elapsed, 4),
+    )
+
+    if result.x is None:
+        _record_solver_status(status_out, **base_fields)
         return None, None
-    selected = [(pid, slot) for (pid, slot), idx in assign_index.items() if result.x[idx] > 0.5]
+
+    # A time-limited solve reports success=False even when result.x holds a
+    # feasible incumbent. Discarding it is what made a clock look like an
+    # infeasible pool. Accepting it unverified would be worse, so the incumbent
+    # is checked against the same constraint matrix the solver was given before
+    # it is allowed anywhere near a certified export.
+    x = np.asarray(result.x, dtype=float)
+    rounded = np.round(x)
+    integral = bool(np.max(np.abs(x - rounded)) <= 1e-5) if x.size else False
+    feasible = False
+    if integral:
+        lhs = matrix @ rounded
+        feasible = bool(
+            np.all(lhs >= lb_array - 1e-6) and np.all(lhs <= ub_array + 1e-6)
+        )
+    if not (result.success or (timed_out and integral and feasible)):
+        _record_solver_status(
+            status_out,
+            incumbent_rejected=bool(timed_out and not (integral and feasible)),
+            **base_fields,
+        )
+        return None, None
+
+    selected = [(pid, slot) for (pid, slot), idx in assign_index.items() if rounded[idx] > 0.5]
     if len(selected) != ROSTER_SIZE:
+        _record_solver_status(
+            status_out, incumbent_rejected=True,
+            **{**base_fields, 'status': 'roster_size_mismatch'},
+        )
         return None, None
-    return _build_lineup_output_from_selected(df, selected, suppression_bonus)
+
+    optimality = 'time_limited' if timed_out else 'optimal'
+    _record_solver_status(status_out, optimality=optimality, **base_fields)
+    lineup_df, objective = _build_lineup_output_from_selected(df, selected, suppression_bonus)
+    if lineup_df is not None:
+        try:
+            lineup_df.attrs['optimality'] = optimality
+            lineup_df.attrs['solver_time_limit_s'] = effective_limit
+        except Exception:  # noqa: BLE001 - attrs are a diagnostic, never a gate
+            pass
+    return lineup_df, objective
 
 
 # ============================================================================
@@ -705,8 +851,17 @@ def build_single_lineup(
     skip_feasibility_check=False,
     apply_suppression=True,
     solver_backend='auto',
+    time_limit_s=None,
+    status_out=None,
 ):
-    """Single-lineup optimizer with optional exact DK slot locks."""
+    """Single-lineup optimizer with optional exact DK slot locks.
+
+    ``time_limit_s`` bounds this one solve; ``None`` uses SOLVER_TIME_LIMIT_S.
+    ``status_out`` is a caller-owned dict filled with the structured solver
+    status (v3.20 / F13). Pass one whenever the difference between "the clock
+    ran out" and "this is infeasible" changes what you do next, which is every
+    caller that has a relaxation ladder.
+    """
     locked_ids = list(locks or [])
     for pid in (locked_slot_assignments or {}).values():
         if pid not in locked_ids:
@@ -722,6 +877,7 @@ def build_single_lineup(
         stack_constraints=stack_constraints, bringback_constraint=bringback_constraint,
         overlap_reference=overlap_reference, max_overlap=max_overlap,
         stack_core_blocklist=stack_core_blocklist, forbidden_player_combos=forbidden_player_combos,
+        time_limit_s=time_limit_s, status_out=status_out,
     )
 
 
@@ -752,6 +908,21 @@ def _identify_primary_stack(lineup_df):
         return 'NONE'
     eligible.sort(key=lambda x: (-x[1], x[0]))
     return eligible[0][0]
+
+
+def candidate_primary_stack(lineup_df):
+    """The primary stack as a payload field: a team, or "" for no stack.
+
+    ``_identify_primary_stack`` returns the literal ``'NONE'`` because the DU
+    signature needs a hashable bucket for "this lineup has no primary stack",
+    and inside the signature that is correct. Outside it is a trap: the
+    allocator treats any nonblank value as a team, so 'NONE' became a phantom
+    stack bucket that the exposure cap then constrained, and a bank of
+    stackless candidates went infeasible against a cap on a team that does not
+    exist. The signature keeps its sentinel; the payload gets the empty string.
+    """
+    stack = _identify_primary_stack(lineup_df)
+    return '' if str(stack).strip().upper() in ('', 'NONE') else str(stack)
 
 
 def _identify_secondary_stack(lineup_df, primary_stack):
@@ -1777,9 +1948,18 @@ def build_multi_lineup(
     sp_pair_coverage_plan=None,
     enforce_wta_stack_core_uniqueness=True,
     time_budget_s=None,
+    solver_time_limit_s=None,
     **single_lineup_kwargs
 ):
     """Multi-lineup wrapper with v3.4 DU enforcement and v3.7 anchor caps.
+
+    v3.20 (F13) separates the clock from the pool. A solve that hits the time
+    limit no longer climbs the overlap ladder, no longer steps DU relaxation,
+    and no longer contributes its cost to the per-lineup budget reserve. It is
+    recorded in ``failed_indices`` and named in ``solver_report`` as a timeout,
+    and the loop moves to the next lineup. Relaxing a construction rule because
+    the machine was slow is a strategy change that is invisible in the certified
+    output, which is the exact inversion CLAUDE.md forbids.
 
     v3.19 ``time_budget_s`` bounds the wall-clock spent generating lineups.
     Default None preserves prior behavior exactly (unbounded). When set, the
@@ -1888,6 +2068,34 @@ def build_multi_lineup(
     }
     per_lineup_cost = None
 
+    # F13 bookkeeping. Kept separate from failed_indices because "the pool could
+    # not produce a legal lineup" and "the solver ran out of seconds" call for
+    # opposite responses, and the old single None told the caller neither.
+    timed_out_indices = []
+    time_limited_accepted = 0
+    proven_infeasible_indices = []
+    solver_timeouts = 0
+
+    def _solve(**solve_kwargs):
+        """One solve, bounded by what is left of the budget, with its status.
+
+        Shrinking the per-solve limit to the remaining budget reduces search
+        effort. It never touches the legal player set, so it is the lever that
+        is allowed here.
+        """
+        status = _new_solver_status()
+        remaining = None
+        if budget_s is not None:
+            remaining = budget_s - (_time.monotonic() - budget_started)
+        solve_kwargs.setdefault(
+            'time_limit_s', resolve_solver_time_limit(solver_time_limit_s, remaining)
+        )
+        solve_kwargs['status_out'] = status
+        df_out, obj_out = build_single_lineup(
+            projections_df, target=target, **solve_kwargs
+        )
+        return df_out, obj_out, status
+
     for i in range(n_lineups):
         if budget_s is not None:
             elapsed = _time.monotonic() - budget_started
@@ -1955,6 +2163,8 @@ def build_multi_lineup(
             lineup_df, obj = None, None
             current_overlap = max_overlap_base
             relaxed_overlap_used = None
+            lineup_timed_out = False
+            solve_status = _new_solver_status()
 
             while current_overlap <= MAX_OVERLAP_CEILING:
                 attempt_kwargs = dict(iteration_kwargs)
@@ -1963,15 +2173,25 @@ def build_multi_lineup(
                     attempt_kwargs['max_overlap'] = current_overlap
 
                 try:
-                    lineup_df, obj = build_single_lineup(
-                        projections_df, target=target, **attempt_kwargs
-                    )
+                    lineup_df, obj, solve_status = _solve(**attempt_kwargs)
                 except StackInfeasibleError:
                     raise
 
+                if solve_status.get('timed_out'):
+                    solver_timeouts += 1
                 if lineup_df is not None:
+                    if solve_status.get('optimality') == 'time_limited':
+                        time_limited_accepted += 1
                     if current_overlap > max_overlap_base:
                         relaxed_overlap_used = current_overlap
+                    break
+
+                # F13: the overlap ladder answers "this pool cannot make a lineup
+                # this distinct from the priors". It does not answer "the solver
+                # ran out of seconds", and climbing it on a timeout records a
+                # loosened diversity rule the operator never chose.
+                if solve_status.get('timed_out'):
+                    lineup_timed_out = True
                     break
 
                 if not prior_lineup_ids:
@@ -1980,6 +2200,12 @@ def build_multi_lineup(
                 current_overlap += 1
 
             if lineup_df is None:
+                if lineup_timed_out:
+                    timed_out_indices.append(i)
+                    failed_indices.append(i)
+                    break
+                if solve_status.get('proven_infeasible'):
+                    proven_infeasible_indices.append(i)
                 if du_enforced and relaxation_idx + 1 < len(DU_RELAXATION_ORDER):
                     relaxation_idx += 1
                     du_relaxation_high_water = max(du_relaxation_high_water, relaxation_idx)
@@ -1995,6 +2221,7 @@ def build_multi_lineup(
                     'retry_count': 0,
                     'relaxation_idx': -1,
                     'relaxed_overlap': relaxed_overlap_used,
+                    'optimality': solve_status.get('optimality'),
                 }
                 break
 
@@ -2013,6 +2240,7 @@ def build_multi_lineup(
                     'retry_count': 0,
                     'relaxation_idx': relaxation_idx,
                     'relaxed_overlap': relaxed_overlap_used,
+                    'optimality': solve_status.get('optimality'),
                 }
                 break
 
@@ -2038,14 +2266,23 @@ def build_multi_lineup(
                 attempt_kwargs['penalized_players'] = penalty_dict
 
                 try:
-                    retry_lineup_df, retry_obj = build_single_lineup(
-                        projections_df, target=target, **attempt_kwargs
-                    )
+                    retry_lineup_df, retry_obj, retry_status = _solve(**attempt_kwargs)
                 except StackInfeasibleError:
                     raise
 
+                if retry_status.get('timed_out'):
+                    solver_timeouts += 1
+                    if retry_lineup_df is None:
+                        # Burning the remaining penalty retries against a clock
+                        # accomplishes nothing and then hands the loop a
+                        # relaxation step it did not earn.
+                        lineup_timed_out = True
+                        break
+
                 if retry_lineup_df is None:
                     continue
+                if retry_status.get('optimality') == 'time_limited':
+                    time_limited_accepted += 1
 
                 retry_sig = compute_unit_signature(retry_lineup_df, slate_metadata)
                 retry_violations = check_du_against_priors(
@@ -2062,13 +2299,20 @@ def build_multi_lineup(
                         'retry_count': retry,
                         'relaxation_idx': relaxation_idx,
                         'relaxed_overlap': relaxed_overlap_used,
+                        'optimality': retry_status.get('optimality'),
                     }
                     break
 
             if accepted is not None:
                 break
 
-            # Step relaxation
+            # Step relaxation. F13: not on a timeout. A DU threshold is a
+            # strategy control, and stepping it because the solver ran long
+            # writes a relaxation into the run record that no one decided.
+            if lineup_timed_out:
+                timed_out_indices.append(i)
+                failed_indices.append(i)
+                break
             if relaxation_idx + 1 < len(DU_RELAXATION_ORDER):
                 relaxation_idx += 1
                 du_relaxation_high_water = max(du_relaxation_high_water, relaxation_idx)
@@ -2084,6 +2328,8 @@ def build_multi_lineup(
             }
             if accepted.get('relaxed_overlap') is not None:
                 record['relaxed_overlap'] = accepted['relaxed_overlap']
+            if accepted.get('optimality') == 'time_limited':
+                record['optimality'] = 'time_limited'
             if du_enforced:
                 if accepted['retry_count'] > 0:
                     record['du_retry_count'] = accepted['retry_count']
@@ -2091,7 +2337,12 @@ def build_multi_lineup(
                     record['du_relaxation_idx'] = accepted['relaxation_idx']
             lineups.append(record)
             cost = _time.monotonic() - lineup_started
-            per_lineup_cost = cost if per_lineup_cost is None else max(per_lineup_cost, cost)
+            # F13: only a lineup that actually solved tells you what the next one
+            # costs. Folding a timed-out solve in sets the reserve to the time
+            # limit, and the loop then refuses to start any lineup with less than
+            # a full time limit left, which is how one slow solve ended the bank.
+            if accepted.get('optimality') != 'time_limited':
+                per_lineup_cost = cost if per_lineup_cost is None else max(per_lineup_cost, cost)
             prior_lineup_ids.append(accepted['lineup_df']['Player_ID'].tolist())
 
             accepted_sp_ids = _get_ordered_sp_ids(accepted['lineup_df'])
@@ -2194,6 +2445,11 @@ def build_multi_lineup(
         'failed_lineup_count': len(failed_indices),
         'requested': int(n_lineups),
         'built': len(lineups),
+        # F13: a timeout is a compute fact, not a relaxation. It is counted here
+        # so the run record can say "the clock, not the pool" without the reader
+        # having to infer it from a bare failed index.
+        'timed_out_lineup_count': len(timed_out_indices),
+        'time_limited_lineups': sum(1 for r in lineups if r.get('optimality') == 'time_limited'),
     }
     relaxations['clean'] = not (
         relaxations['overlap_relaxed_lineups']
@@ -2216,7 +2472,27 @@ def build_multi_lineup(
         warnings.append(
             f"{len(failed_indices)} of {n_lineups} requested lineups were not built "
             f"(indices {failed_indices[:10]})")
+    if timed_out_indices:
+        warnings.append(
+            f"{len(timed_out_indices)} lineups hit the {resolve_solver_time_limit(solver_time_limit_s)}s "
+            f"solver time limit and were skipped without relaxing any control "
+            f"(indices {timed_out_indices[:10]}); this is the clock, not the pool")
+    if relaxations['time_limited_lineups']:
+        warnings.append(
+            f"{relaxations['time_limited_lineups']} lineups were accepted from a "
+            f"time-limited incumbent (feasible and verified, not proven optimal)")
     relaxations['warnings'] = warnings
+
+    solver_report = {
+        'time_limit_s': resolve_solver_time_limit(solver_time_limit_s),
+        'solver_timeouts': solver_timeouts,
+        'timed_out_lineup_indices': list(timed_out_indices),
+        'time_limited_accepted': time_limited_accepted,
+        'proven_infeasible_lineup_indices': list(proven_infeasible_indices),
+        'relaxation_on_timeout': False,
+        'note': 'a solver time limit never steps the overlap ladder or the DU '
+                'relaxation order; deterministic bookkeeping, never a claim',
+    }
 
     return {
         'lineups': lineups,
@@ -2229,6 +2505,7 @@ def build_multi_lineup(
         'sp_pair_coverage_validation': sp_pair_coverage_validation,
         'budget': budget_report,
         'relaxations': relaxations,
+        'solver_report': solver_report,
     }
 
 # ============================================================================
@@ -3044,6 +3321,7 @@ def build_candidate_lineup_bank(
     contest_shapes=None,
     bank_constraint_scope='selection',
     time_budget_s=None,
+    solver_time_limit_s=None,
     **single_lineup_kwargs
 ):
     """Generate and score a candidate bank through the certified MILP path.
@@ -3076,6 +3354,7 @@ def build_candidate_lineup_bank(
         sp_pair_coverage_plan=sp_pair_coverage_plan,
         enforce_wta_stack_core_uniqueness=(scope == 'bank'),
         time_budget_s=time_budget_s,
+        solver_time_limit_s=solver_time_limit_s,
         **single_lineup_kwargs,
     )
 
@@ -3123,6 +3402,11 @@ def build_candidate_lineup_bank(
         enriched['contest_fit_by_shape'] = fit_by_shape
         enriched['player_ids'] = _lineup_player_ids(record['lineup'])
         enriched['sp_ids'] = _get_ordered_sp_ids(record['lineup'])
+        # F15: the allocator's primary-stack exposure cap reads this field. It
+        # was never emitted, so the cap added zero MILP rows and the stack
+        # concentration it exists to prevent was only discovered at the export
+        # gate, after the whole build had been spent.
+        enriched['primary_stack'] = candidate_primary_stack(record['lineup'])
         enriched['du_signature'] = sig
         scored.append(enriched)
 
@@ -3193,6 +3477,7 @@ def build_diverse_candidate_bank(
     coverage_target=None,
     max_sp_pair_repetition=None,
     time_budget_s=None,
+    solver_time_limit_s=None,
     **bank_kwargs
 ):
     """Coverage-guaranteed wrapper over build_candidate_lineup_bank (v3.18).
@@ -3224,7 +3509,8 @@ def build_diverse_candidate_bank(
         projections_df, requested_n=requested_n,
         candidate_bank_size=candidate_bank_size, mode=mode, target=target,
         max_sp_pair_repetition=max_sp_pair_repetition,
-        time_budget_s=_budget_s, **bank_kwargs,
+        time_budget_s=_budget_s, solver_time_limit_s=solver_time_limit_s,
+        **bank_kwargs,
     )
 
     slate_metadata = bank_kwargs.get('slate_metadata')
@@ -3312,11 +3598,19 @@ def build_diverse_candidate_bank(
     max_attempts = target_size * 4 + 60
     # Worst observed single augmentation solve, used as the reserve so the loop
     # stops before starting a solve it cannot finish rather than being killed.
+    # F13: only completed solves feed it. A timed-out solve costs exactly the
+    # time limit, so folding it in set the reserve to the limit and every later
+    # round then read as unaffordable: one slow solve ended the whole pass. The
+    # per-solve limit is instead shrunk to what is left, which reduces search
+    # effort and never touches the legal player set.
     aug_cost = {'max': 0.0}
+    aug_timeouts = {'n': 0, 'accepted_time_limited': 0}
 
     def _budget_exhausted():
         left = _budget_left()
-        return left is not None and left <= aug_cost['max']
+        if left is None:
+            return False
+        return left <= max(aug_cost['max'], MIN_SOLVER_TIME_LIMIT_S)
 
     def _try_accept(pair, team):
         nonlocal next_candidate_id
@@ -3324,15 +3618,25 @@ def build_diverse_candidate_bank(
         kwargs = dict(single_lineup_kwargs)
         kwargs['locks'] = list(set(kwargs.get('locks') or []) | set(pair))
         kwargs['stack_constraints'] = {'team': team, 'min_size': 4, 'max_size': 5}
+        kwargs['time_limit_s'] = resolve_solver_time_limit(
+            solver_time_limit_s, _budget_left()
+        )
+        status = _new_solver_status()
+        kwargs['status_out'] = status
         _attempt_started = _time.monotonic()
         try:
             ldf, obj = build_single_lineup(projections_df, target=target, **kwargs)
         except Exception:
+            aug_cost['max'] = max(aug_cost['max'], _time.monotonic() - _attempt_started)
             return False
-        finally:
+        if status.get('timed_out'):
+            aug_timeouts['n'] += 1
+        else:
             aug_cost['max'] = max(aug_cost['max'], _time.monotonic() - _attempt_started)
         if ldf is None:
             return False
+        if status.get('optimality') == 'time_limited':
+            aug_timeouts['accepted_time_limited'] += 1
         ids = frozenset(_lineup_player_ids(ldf))
         if ids in seen:
             return False
@@ -3365,6 +3669,7 @@ def build_diverse_candidate_bank(
         enriched['contest_fit_by_shape'] = fit_by_shape
         enriched['player_ids'] = _lineup_player_ids(ldf)
         enriched['sp_ids'] = _get_ordered_sp_ids(ldf)
+        enriched['primary_stack'] = candidate_primary_stack(ldf)  # F15
         enriched['du_signature'] = sig
         existing.append(record)
         existing_sigs.append(sig)
@@ -3431,6 +3736,9 @@ def build_diverse_candidate_bank(
     augmentation['final_candidate_count'] = len(scored)
     augmentation['distinct_sp_pairs'] = len([k for k, v in pair_counts.items() if v > 0])
     augmentation['attempts'] = attempts['n']
+    augmentation['solver_timeouts'] = aug_timeouts['n']
+    augmentation['time_limited_accepted'] = aug_timeouts['accepted_time_limited']
+    augmentation['base_bank_solver_report'] = bank.get('solver_report')
     # Built from observed state. The note used to assert "forced coverage across
     # N pairs" unconditionally, including when budget exhaustion no-opped both
     # phases and the pass appended nothing at all, so the run record claimed work

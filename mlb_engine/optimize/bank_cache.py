@@ -44,9 +44,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
-from mlb_engine.optimize.optimizer_v3 import build_single_lineup
+from mlb_engine.optimize.optimizer_v3 import (
+    build_single_lineup, _new_solver_status, resolve_solver_time_limit,
+)
 
-VERSION = "v1.1"
+VERSION = "v1.2"
 
 
 def pool_signature(salary_csv: str | Path, length: int = 10) -> str:
@@ -130,6 +132,9 @@ class BankCache:
         self.attempted: set[str] = set()
         self._seen: set[Tuple[str, ...]] = set()
         self.corrupt_on_load = False
+        # Filled by as_candidates: scored/failed counts for the payload it just
+        # emitted, so a silent scoring failure is countable (F15).
+        self.last_payload_report: Dict[str, Any] = {}
         if self.path.exists():
             self._load()
 
@@ -194,7 +199,8 @@ class BankCache:
         )
         return True
 
-    def as_candidates(self, projections_df=None, requested_n: int = 1) -> List[Dict[str, Any]]:
+    def as_candidates(self, projections_df=None, requested_n: int = 1,
+                      contest_shapes: Optional[Sequence[str]] = None) -> List[Dict[str, Any]]:
         """Shape the allocator and run_late_swap consume.
 
         Supply ``projections_df`` to attach contest-shape scoring. Without it
@@ -207,52 +213,109 @@ class BankCache:
         big slates are exactly when build_slate.py chooses the sliced path, and
         big slates are exactly when shape scoring matters most.
 
-        One score call per candidate is enough. The allocator's per-shape math
-        derives from contest_fit_score, floor_sum, and the right-tail counts, so
-        scoring each shape separately would multiply the cost for no additional
-        information.
+        v1.2 (F15) fixes three seams into the allocator.
+
+        ``primary_stack`` and ``sp_ids`` are emitted. The allocator's
+        primary-stack exposure cap reads ``primary_stack``; with the field
+        absent the cap added zero MILP rows and the concentration it exists to
+        prevent surfaced at the export gate instead, after the budget was spent.
+        The no-stack case is the empty string, never the DU signature's 'NONE'
+        sentinel, which the allocator would read as a team.
+
+        ``contest_shapes`` populates ``contest_fit_by_shape``. The single
+        ``mode="wta"`` score is a ceiling-max ranking, and the allocator's cash
+        branch then applies its floor weighting on top of it, so a cash entry
+        ranked on a ceiling score with a floor adjustment bolted on. Passing the
+        shapes the reserved CSV actually contains scores each one in its own
+        mode. Default None keeps the single-score behavior exactly.
+
+        Scoring failures are counted in ``self.last_payload_report`` instead of
+        vanishing into ``except: pass``. Degrading to the unscored payload is
+        still right, because a short bank leaves a blank reserved row and a
+        blank row blocks certification. Doing it silently is not.
         """
+        from mlb_engine.optimize.optimizer_v3 import (
+            candidate_primary_stack, score_lineup_candidate,
+            _mode_for_contest_shape,
+        )
+
+        shapes: List[str] = []
+        for shape in (contest_shapes or []):
+            key = str(shape).strip().lower()
+            if key and key not in shapes:
+                shapes.append(key)
+
         out = []
-        scorer = None
         by_id = None
+        scored_count = 0
+        failed_count = 0
+        failure_reasons: Dict[str, int] = {}
         if projections_df is not None and hasattr(projections_df, "columns"):
-            from mlb_engine.optimize.optimizer_v3 import score_lineup_candidate
-            scorer = score_lineup_candidate
             frame = projections_df.copy()
             frame["__pid__"] = frame["Player_ID"].astype(str)
             by_id = frame.set_index("__pid__", drop=False)
 
         for i, entry in enumerate(self.candidates):
             cid = f"bank{i}"
+            roster = [str(p) for p in entry["roster"]]
             payload: Dict[str, Any] = {
                 "lineup_id": cid,
                 "candidate_id": cid,
-                "roster_slot_ids": list(entry["roster"]),
-                "player_ids": list(entry["roster"]),
+                "roster_slot_ids": list(roster),
+                "player_ids": list(roster),
                 "objective": float(entry["objective"]),
+                # The cache stores rosters in ENTRY_ROSTER_SLOTS order, so the
+                # first two entries are P1 and P2 by construction.
+                "sp_ids": list(roster[:2]),
+                "primary_stack": "",
             }
-            if scorer is not None:
+            if by_id is not None:
                 try:
-                    ids = [str(p) for p in entry["roster"]]
-                    lineup_df = by_id.loc[[p for p in ids if p in by_id.index]]
-                    if len(lineup_df) == len(ids):
-                        score = scorer(lineup_df, projections_df, mode="wta",
-                                       candidate_id=cid, requested_n=requested_n)
-                        payload["contest_fit"] = {
-                            "contest_fit_score": score.get("contest_fit_score"),
-                            "floor_sum": score.get("floor_sum"),
-                            "ceiling_sum": score.get("ceiling_sum"),
-                            "right_tail_volatility_counts":
-                                score.get("right_tail_volatility_counts") or {},
-                        }
-                        payload["contest_fit_score"] = score.get("contest_fit_score")
-                        payload["floor_sum"] = score.get("floor_sum")
-                except Exception:
-                    # A scoring failure must degrade to the unscored payload,
-                    # never lose the candidate: a short bank leaves a blank
-                    # reserved row and a blank row blocks certification.
-                    pass
+                    lineup_df = by_id.loc[[p for p in roster if p in by_id.index]]
+                    if len(lineup_df) != len(roster):
+                        raise KeyError(
+                            f"{len(roster) - len(lineup_df)} roster ids absent from projections"
+                        )
+                    payload["primary_stack"] = candidate_primary_stack(lineup_df)
+                    score = score_lineup_candidate(
+                        lineup_df, projections_df, mode="wta",
+                        candidate_id=cid, requested_n=requested_n)
+                    payload["contest_fit"] = {
+                        "contest_fit_score": score.get("contest_fit_score"),
+                        "floor_sum": score.get("floor_sum"),
+                        "ceiling_sum": score.get("ceiling_sum"),
+                        "right_tail_volatility_counts":
+                            score.get("right_tail_volatility_counts") or {},
+                    }
+                    payload["contest_fit_score"] = score.get("contest_fit_score")
+                    payload["floor_sum"] = score.get("floor_sum")
+                    if shapes:
+                        by_shape: Dict[str, Any] = {}
+                        for shape in shapes:
+                            shape_score = score_lineup_candidate(
+                                lineup_df, projections_df,
+                                mode=_mode_for_contest_shape(shape, "wta"),
+                                candidate_id=cid, requested_n=requested_n,
+                                contest_shape=shape)
+                            by_shape[shape] = shape_score.get("contest_fit_score")
+                        payload["contest_fit_by_shape"] = by_shape
+                    scored_count += 1
+                except Exception as exc:  # noqa: BLE001 - never lose a candidate
+                    failed_count += 1
+                    reason = f"{type(exc).__name__}: {exc}"[:120]
+                    failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
             out.append(payload)
+
+        self.last_payload_report = {
+            "candidates": len(out),
+            "scored": scored_count,
+            "scoring_failed": failed_count,
+            "scoring_failure_reasons": dict(failure_reasons),
+            "shapes_scored": list(shapes),
+            "projections_supplied": by_id is not None,
+            "note": "an unscored candidate still allocates, on raw objective; "
+                    "deterministic bookkeeping, never a claim",
+        }
         return out
 
     def __len__(self) -> int:
@@ -323,6 +386,7 @@ def extend_bank(
     stack_min: int = 4,
     stack_max: int = 5,
     max_candidates: Optional[int] = None,
+    solver_time_limit_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
 
@@ -434,6 +498,8 @@ def extend_bank(
     built = 0
     attempted_now = 0
     worst = 0.0
+    timed_out_jobs = 0
+    time_limited_accepted = 0
     exhausted = True
     for pair, team in jobs:
         if max_candidates is not None and len(cache) >= max_candidates:
@@ -448,6 +514,7 @@ def extend_bank(
             continue
         attempted_now += 1
         attempt_started = time.monotonic()
+        status = _new_solver_status()
         try:
             lineup_df, objective = build_single_lineup(
                 projections_df, target=target,
@@ -456,6 +523,10 @@ def extend_bank(
                 excludes=excl or None,
                 stack_constraints=({"team": team, "min_size": stack_min,
                                     "max_size": stack_max} if stack_min >= 2 else None),
+                # F13: never let one solve overrun the slice's budget. Shrinking
+                # the per-solve limit reduces search effort and nothing else.
+                time_limit_s=resolve_solver_time_limit(solver_time_limit_s, remaining),
+                status_out=status,
             )
         except Exception:  # noqa: BLE001 - an infeasible combination is data, not an error
             worst = max(worst, time.monotonic() - attempt_started)
@@ -463,13 +534,24 @@ def extend_bank(
             # same conditions, so it is recorded and never retried.
             cache.attempted.add(key)
             continue
-        worst = max(worst, time.monotonic() - attempt_started)
+        if status.get("timed_out"):
+            # F13: a timeout is not an answer about this job, so it is not
+            # recorded as attempted and the next slice retries it. It also does
+            # not set the reserve: the reserve is what a completed solve costs,
+            # and a timeout costs exactly the limit, which would end the slice.
+            timed_out_jobs += 1
+            if lineup_df is None:
+                continue
+            time_limited_accepted += 1
+        else:
+            worst = max(worst, time.monotonic() - attempt_started)
         # Recorded only after the solve returned. Keys used to enter `attempted`
         # BEFORE the solve and persist, so a job that hit the time limit was
         # marked done forever and never retried on a later slice: the sliced path
         # is the big-slate path, and this quietly dropped exactly the jobs a
         # second slice exists to finish.
-        cache.attempted.add(key)
+        if not status.get("timed_out"):
+            cache.attempted.add(key)
         roster = ordered_roster(lineup_df)
         if roster is None:
             continue
@@ -513,6 +595,12 @@ def extend_bank(
         "unknown_game_pairs_kept": unknown_game_pairs,
         "free_hitter_slots": free_hitter_slots,
         "stack_min_relaxed_to": stack_relaxed_to,
+        # F13: named so a thin slice reads as the clock rather than as a pool
+        # that could not produce lineups. These jobs are retryable and a second
+        # slice will pick them up.
+        "jobs_timed_out": timed_out_jobs,
+        "time_limited_accepted": time_limited_accepted,
+        "solver_time_limit_s": resolve_solver_time_limit(solver_time_limit_s),
         "note": "deterministic candidate generation through the certified MILP path; "
                 "never an ROI, win-rate, or probability claim",
     }
