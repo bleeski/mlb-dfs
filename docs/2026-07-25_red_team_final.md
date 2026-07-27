@@ -8,6 +8,80 @@ Priorities: **P0** corrupts what gets uploaded or lets an invalid file certify. 
 
 ---
 
+## Landed 2026-07-27 (Stage 3: F16 and F17)
+
+**F16 LANDED. F17 LANDED.** live_data_adapters v1.5, late_swap_manager v1.4,
+audit v3.1 pins updated. Suite 312 (core 237), 22 modules. Every fix below was
+verified by sabotage: ten reverts, ten failing tests.
+
+F16, what changed. `tools/late_swap.py` resolves each contest's posture and shape
+through `_resolve_contest_postures`, the same function the build uses, and passes
+the resulting map into both `build_entry_requirements` and `run_late_swap`; a
+name that matches no archetype exits 3 naming `--postures`, and
+`--ignore-unresolved-postures` is the recorded override. `as_candidates` now gets
+the projection frame and the shapes the reserved file actually contains, so a
+cash entry is scored in cash mode instead of being ranked on a ceiling-max score
+with floor_sum reading 0.0; the payload report's scored/failed counts print. The
+disk feed is checked before anything else reads it: a feed whose `date` is not
+the slate date blocks, a feed over 90 minutes old warns, and the `Z`-suffix
+parse that Python 3.10 rejects is handled, without which the age check would have
+reported "unknown" on every real feed. After the solve, the incumbent roster and
+the chosen roster are scored under the entry's own shape and the per-entry delta
+prints; a negative delta refuses to mirror to `outputs/` without
+`--accept-downgrade`, and the run directory stays as the record either way.
+`validate_late_swap_delta` now distinguishes `None` (unrestricted) from an
+explicitly empty authorized set (nothing may change); it collapsed both to
+"anything may change", while `validate_template_preservation` had always read the
+empty set as fail-closed. The two now agree.
+
+F17, what changed. A side the feed marks `partial` no longer has its hitters
+stamped `Confirmed_Starter`; they are `Projected_Starter`, and the sides are
+reported in `partial_lineup_teams` and named in the pool report.
+`tools/fetch_slate_bundle.py` emits `partial` for any side with one to eight
+hitters posted, and `build_slate.py`'s own feed writer, which collapsed that case
+into `tbd`, now derives it the same way. The platoon reference is aged against
+the slate date instead of against its own `collected_date`, warning past 3 days
+and blocking past 7 when a TBD team is actually being filled from it
+(`stale_platoon_policy='warn'` downgrades it; `build_slate.py`'s existing SOFT
+tier already matches the blocker text, so it prints and the build ships). All
+four platoon report keys reach the operator instead of only `zero_fill_teams`.
+DK's `Starting=PO` maps to `viable_bulk_or_alt_sp` with a warning naming the
+player, which keeps an opener rosterable but outside
+`REQUIRED_SP_AUDIT_STATUSES`. The platoon file joins the tracked reference set in
+`refresh_reference_data.TRACKED_JSON`, aged from its own payload rather than from
+mtime, which a checkout resets.
+
+**Three corrections, because the claims did not hold as written.**
+
+1. F17 says `CONFIRMED_STARTER` sitting in `SAFE_UNLOCKED_STATUSES` is part of
+   the defect. `SAFE_UNLOCKED_STATUSES` has zero readers anywhere in the repo.
+   It is dead.
+2. F17 says partial-as-confirmed "defeats the TBD policy check". The only
+   consumers of `PlayerLineupStatus.status` are `validate_tbd_policy` and
+   `_eligible_for_pivot`, and neither has a caller anywhere, including in tests.
+   Every live consumer of the status map reads `is_locked()`, which is purely
+   time-based. So the mis-stamp was a false label with no live consequence, not
+   a defeated check. The fix still belongs (the field is wrong, it is cheap, and
+   the moment anything reads it the lie becomes real) but it closed a labels
+   violation, not a live hole. The observable win is the pool report line.
+3. F16 says late swap "asserts all gates true (F4)". F4 already fixed that on
+   2026-07-26: the tool derives three gates and names three assumed ones in
+   `LATE_SWAP_ASSUMED_GATES`. Nothing to do. The same is true of the
+   excluded-new-teams contradiction F16 inherits from F15, which F15 closed.
+
+Two things this deliberately did NOT do. The downgrade refusal branch is guarded
+by review, not by a test, because reaching it needs a promoted parent run and a
+completed joint solve; the scoring it is computed from is tested under two
+shapes. And `verify_export.py` still reports only `slots_changed`, because the
+swap tool owns the score comparison and `verify_export` has no projection frame.
+
+Open after this: F18 (factor ownership), F20 (caps, deferred by decision),
+F3b/F3c, F22, the F23 remainder, and Section 2 beyond G1 and G4. Nothing left in
+the backlog can cost a slate; what remains is lineup quality, test coverage,
+hygiene, and G7.
+
+---
+
 ## Landed 2026-07-26 (Stage 3: F21 and F19)
 
 **F21 LANDED. F19 LANDED.** Engine v3.21, new module `mlb_engine/determinism.py`
@@ -276,13 +350,13 @@ Dropped from RT's own list as below the value line at current stakes: portfolio 
 - **Why:** these are the seams through which this week's enrichment work fails to reach big-slate portfolios, and two of them convert into blocked runs at the worst moment.
 - **Fix:** emit `primary_stack`/`sp_ids` in the payload matching the direct bank's record; map `'NONE'` to `""` at the allocator boundary; score once per requested shape (shapes are known from the reserved CSV); return scored/failed counts into `solve.bank`; error when `excluded_new_teams` is set without full team-map coverage; pass excludes into `build_diverse_candidate_bank` (set `Excluded=True` pre-build) with a checkpoint blocker at `approve=False`. Done when: a stack-concentrated bank + 0.34 cap yields binding MILP rows; a stackless-candidate fixture allocates without phantom-bucket infeasibility; `run_slate(excluded_player_ids=[...])` produces a bank already free of them.
 
-### F16. Late swap erases contest identity and has no downgrade guard (P1, S) | RT N-10 + IC B12 part
+### F16. LANDED 2026-07-27 (two sub-claims were already closed by F4 and F15; see the Stage 3 block). Late swap erases contest identity and has no downgrade guard (P1, S) | RT N-10 + IC B12 part
 
 - **What:** `tools/late_swap.py` stamps every entry `large_wta`, calls `as_candidates()` with no projections (no scores at all), asserts all gates true (F4), has no incumbent-vs-chosen comparison, and reads the disk feed with no age check; `verify_export` reports only `slots_changed`. The excluded-new-teams contradiction (F15) lives here too. An explicitly empty `mutable_entry_ids` is read as "anything may change" (`late_swap_manager.py:350`).
 - **Why:** the only permitted post-delivery refinement runs closest to lock with the least verification; a cash entry's high-floor build silently becomes a ceiling build and the only signal is `chg=6`.
 - **Fix:** resolve postures/shapes as the build does (F3); pass projections; score the incumbent and refuse a negative delta without `--accept-downgrade`; age-check the feed; treat empty mutable set as "nothing mutable" (`None` = unrestricted). Done when: cash and WTA entries rank swap candidates differently; a downgrade requires the flag; before/after scores print per entry.
 
-### F17. Intake trust defects: partial lineups stamped confirmed, platoon staleness unobservable, opener token unmapped (P1, S) | IC B16/B17 + RT N-17a
+### F17. LANDED 2026-07-27 (the stated consequence of the partial-lineup stamp did not hold; see the Stage 3 block). Intake trust defects: partial lineups stamped confirmed, platoon staleness unobservable, opener token unmapped (P1, S) | IC B16/B17 + RT N-17a
 
 - **What:** every hitter in a posted lineup is stamped `CONFIRMED_STARTER` even when `lineup_status == "partial"` (**[verified]** `live_data_adapters.py:333-346`; only `confirmed_hitter_ids` is gated), and `CONFIRMED_STARTER` sits in `SAFE_UNLOCKED_STATUSES`. The platoon file's staleness is measured against its own `collected_date` (25 days old today, reads 0 stale), `stale_teams` is computed and never read, and `refresh_reference_data.py` does not track the file. DK's `PO` (probable opener) tag maps to the same `declared_probable_sp` role as a true starter; `ALLOWED_PITCHER_ROLES` carries a `viable_bulk_or_alt_sp` value nothing assigns.
 - **Why:** partial-as-confirmed defeats the TBD policy check; the stale platoon file is the mechanism that feeds F1; an opener projected as a starter is a material error on a two-pitcher roster.
@@ -388,7 +462,7 @@ Each stage is shippable alone; nothing in any stage blocks a build while incompl
 
 **Stage 2, evidence (half a day):** F9 miner fail-closed. F10 registry merge. F11 diagnostics honesty. F12 pointer portability. G4 own results, and persist per-slate ownership predictions from the next slate forward.
 
-**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). F16 late-swap identity. F17 intake trust. F18 factor ownership decision + doubleheader odds. ~~F19 determinism pin~~ (landed). F20 doctrine decision (deferred); ~~F21 Excluded coercion~~ (landed).
+**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). ~~F16 late-swap identity~~ (landed). ~~F17 intake trust~~ (landed). F18 factor ownership decision + doubleheader odds. ~~F19 determinism pin~~ (landed). F20 doctrine decision (deferred); ~~F21 Excluded coercion~~ (landed).
 
 **Stage 4, process and leverage (as time allows):** G2 skeptic pass. G3 ownership/dup wiring (after Stage 2, once the archive is trustworthy and at the 8-slate gate). G5 corpus split + ENGINE_STATE. G6 scheduled loops. G8 tier doctrine. F22 tests. F23 remainder. G7 stakes decision, dated, once G4 yields a number.
 

@@ -2459,6 +2459,18 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
             files[name] = {"fetched_at": (now - dt.timedelta(days=age)).isoformat()}
         (root / "reference_manifest.json").write_text(
             json.dumps({"files": files}), encoding="utf-8")
+        # F17: the platoon reference joined the tracked set. Its age comes from
+        # the payload's own collected_date, not from the manifest, because a
+        # checkout resets mtime and that file's failure mode is reading fresh.
+        from tools.refresh_reference_data import TRACKED_JSON
+        for name, spec in TRACKED_JSON.items():
+            if name in missing:
+                continue
+            age = (ages or {}).get(name, 0.0)
+            stamp = (now - dt.timedelta(days=age)).date().isoformat()
+            (root / name).write_text(
+                json.dumps({str(spec["date_key"]): stamp, "teams": []}),
+                encoding="utf-8")
         return root
 
     def test_resolve_reference_data_reports_ages_and_returns_paths(self):
@@ -4202,6 +4214,433 @@ class DeterminismTests(unittest.TestCase):
         digests = self._probe_digests(_DETERMINISM_PROBE, seeds=("1", "2"))
         self.assertEqual(digests[0], digests[1],
                          "identical inputs certified two different files")
+
+
+class IntakeTrustTests(unittest.TestCase):
+    """F17. Three intake facts that were labelled instead of measured.
+
+    A partial lineup was stamped Confirmed_Starter. The platoon reference's age
+    was measured against its own collected_date, the one date it cannot be stale
+    against. A DK probable opener entered as a plain declared starter.
+    """
+
+    def _salary(self, tmp, starting=None):
+        path = Path(tmp) / "salary.csv"
+        pool_salary_csv(path)
+        if starting:
+            with path.open(newline="", encoding="utf-8") as fh:
+                rows = list(csv.reader(fh))
+            header, body = rows[0], rows[1:]
+            header.append("Starting")
+            for row in body:
+                row.append(starting.get(row[2], ""))
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(header)
+                writer.writerows(body)
+        return path
+
+    @staticmethod
+    def _partial_feed(hitters=4):
+        feed = pool_lineups_feed()
+        side = feed["games"][1]["home"]        # T4, TBD in the base fixture
+        side["lineup_status"] = "partial"
+        side["lineup"] = [{"name": f"T4 Hitter{i+1}", "order": i + 1, "bat_side": "R"}
+                          for i in range(hitters)]
+        return feed
+
+    @staticmethod
+    def _platoon(collected="2026-07-10", page_updated=None, teams=("T4",)):
+        return {"collected_date": collected, "teams": [
+            {"abbrev": t, "page_updated": page_updated or collected,
+             "vs_RHP": [{"player": f"{t} Hitter{i+1}", "slot": i + 1} for i in range(9)],
+             "vs_LHP": [{"player": f"{t} Hitter{i+1}", "slot": i + 1} for i in range(9)]}
+            for t in teams]}
+
+    def test_partial_lineup_is_projected_not_confirmed(self):
+        """A side the feed calls 'partial' must not be stamped Confirmed_Starter.
+
+        Teeth: reverting to the unconditional ``status=CONFIRMED_STARTER`` fails
+        the first assertion. tools/fetch_slate_bundle.py emits 'partial' for any
+        side with one to eight hitters posted, so this is reachable on any early
+        build, not a synthetic state.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp)
+            result = lda.build_status_map_from_lineups_feed(
+                self._partial_feed(), str(salary))
+            posted = [p for p in result["status_by_player_id"].values()
+                      if p.team == "T4" and p.batting_order is not None]
+            self.assertEqual(len(posted), 4)
+            for player in posted:
+                self.assertEqual(player.status, "Projected_Starter")
+            self.assertNotIn("T4", result["confirmed_teams"])
+            for player in posted:
+                self.assertNotIn(player.player_id, result["confirmed_hitter_ids"])
+            self.assertEqual(
+                [(r["team"], r["hitters_posted"], r["lineup_status"])
+                 for r in result["partial_lineup_teams"]],
+                [("T4", 4, "partial")])
+
+    def test_partial_team_is_named_in_the_pool_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = lda.build_slate_pool(
+                self._salary(tmp), self._partial_feed(),
+                platoon_json=self._platoon(collected="2026-07-10"))
+            report = pool["pool_report"]
+            self.assertEqual(report["teams"]["T4"]["status"], "platoon")
+            self.assertTrue(any("T4" in w and "partial" in w and "Projected_Starter" in w
+                                for w in report["warnings"]),
+                            report["warnings"])
+
+    def test_stale_platoon_reference_blocks_a_tbd_dependent_build(self):
+        """Age is measured against the slate, and only bites when relied upon.
+
+        Teeth: before the fix nothing anywhere compared the file to the slate
+        date, so this blocker did not exist in any form and the assertion fails
+        on an empty blocker list. The 'warn' policy and the confirmed-slate case
+        below are the over-blocking guards.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp)
+            old = self._platoon(collected="2026-06-01")   # 39 days before the slate
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(), platoon_json=old)
+            report = pool["pool_report"]
+            self.assertEqual(report["slate_date"], "2026-07-10")
+            self.assertEqual(report["platoon_age_days"], 39)
+            self.assertEqual(report["platoon_dependent_teams"], ["T4"])
+            self.assertTrue(any("39 days old" in b and "T4" in b
+                                for b in report["blockers"]), report["blockers"])
+
+            warned = lda.build_slate_pool(salary, pool_lineups_feed(), platoon_json=old,
+                                          stale_platoon_policy="warn")["pool_report"]
+            self.assertEqual(warned["blockers"], [])
+            self.assertTrue(any("39 days old" in w for w in warned["warnings"]))
+
+    def test_stale_platoon_reference_is_silent_when_nothing_leans_on_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = lda.build_slate_pool(
+                self._salary(tmp), pool_lineups_feed(t4_confirmed=True),
+                platoon_json=self._platoon(collected="2026-06-01"))
+            report = pool["pool_report"]
+            self.assertEqual(report["platoon_dependent_teams"], [])
+            self.assertEqual(report["blockers"], [])
+            self.assertFalse(any("days old" in w for w in report["warnings"]))
+
+    def test_all_four_platoon_report_keys_reach_the_operator(self):
+        """stale_teams, teams_missing_from_file and hand_assumed_teams were
+        computed by the adapter and read by nobody; only zero_fill_teams was
+        forwarded. Teeth: dropping any of the three new forwarding loops fails
+        the matching assertion."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feed = pool_lineups_feed()
+            # T4's opposing hand comes from T3's probable; blank it so the
+            # platoon adapter has to assume a hand for T4.
+            feed["games"][1]["away"]["probable_pitcher"]["hand"] = None
+            feed["games"][1]["away"]["lineup_status"] = "tbd"       # T3 TBD, not in file
+            feed["games"][1]["away"]["lineup"] = []
+            platoon = self._platoon(collected="2026-07-10", page_updated="2026-05-01")
+            report = lda.build_slate_pool(
+                self._salary(tmp), feed, platoon_json=platoon)["pool_report"]
+            warnings = report["warnings"]
+            self.assertTrue(any("T3" in w and "absent from the platoon reference" in w
+                                for w in warnings), warnings)
+            self.assertTrue(any("T4" in w and "page last updated 2026-05-01" in w
+                                for w in warnings), warnings)
+            self.assertTrue(any("T4" in w and "opposing pitcher hand unknown" in w
+                                for w in warnings), warnings)
+
+    def test_dk_probable_opener_does_not_enter_as_a_plain_probable(self):
+        """DK's Starting=PO is a probable opener, not a starter.
+
+        Teeth: without the token branch every arm resolves to
+        declared_probable_sp and both the role assertion and the warning
+        assertion fail. Verified against a real file: SD's Randy Vasquez carries
+        Starting=PO in data/slates/2026-07-25/DKSalaries.csv and entered that
+        build as a declared starter.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, starting={"T4 Ace": "PO", "T1 Ace": "SP"})
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(),
+                                        platoon_json=self._platoon())
+            roles = pool["pitcher_roles"]
+            by_name = {r["Player_ID"]: r["Name"] for r in pool["projection_rows"]}
+            opener = [pid for pid, role in roles.items() if by_name[pid] == "T4 Ace"]
+            self.assertEqual(len(opener), 1)
+            self.assertEqual(roles[opener[0]], "viable_bulk_or_alt_sp")
+            self.assertEqual(roles[[p for p in roles if by_name[p] == "T1 Ace"][0]],
+                             "declared_probable_sp")
+            self.assertTrue(any("Starting=PO" in w and "T4 Ace" in w
+                                for w in pool["pool_report"]["warnings"]))
+            # An opener is still rosterable: the gate's allowed-role set and the
+            # export validator both accept viable_bulk_or_alt_sp. What changes is
+            # that it is outside REQUIRED_SP_AUDIT_STATUSES.
+            from mlb_engine.entries.dk_entries_manager import ALLOWED_PITCHER_ROLES
+            from mlb_engine.optimize.optimizer_v3 import REQUIRED_SP_AUDIT_STATUSES
+            self.assertIn("viable_bulk_or_alt_sp", ALLOWED_PITCHER_ROLES)
+            self.assertNotIn("viable_bulk_or_alt_sp", REQUIRED_SP_AUDIT_STATUSES)
+
+    def test_platoon_reference_is_tracked_and_aged_from_its_own_payload(self):
+        from tools.refresh_reference_data import TRACKED_JSON, reference_status
+        self.assertIn("fangraphs_platoon_lineups.json", TRACKED_JSON)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "fangraphs_platoon_lineups.json").write_text(
+                json.dumps({"collected_date": "2000-01-01", "teams": []}),
+                encoding="utf-8")
+            status = reference_status(root)["files"]["fangraphs_platoon_lineups.json"]
+            self.assertTrue(status["stale"])
+            self.assertEqual(status["age_basis"], "collected_date")
+            # mtime is minutes old here; reading it would have called this fresh.
+            self.assertGreater(status["age_days"], 9000)
+
+
+class LateSwapIdentityTests(unittest.TestCase):
+    """F16. The only permitted post-delivery path, given the identity and the
+    verification the build already had.
+
+    Coverage boundary, stated so it is not mistaken for more than it is: the
+    downgrade REFUSAL is not exercised end to end here, because reaching it
+    requires a promoted parent run and a completed joint solve. What is covered
+    is the scoring the refusal is computed from (``_score_roster`` under two
+    shapes, and the unscorable case reading as no-comparison rather than
+    no-downgrade). The refusal branch itself is guarded only by review.
+    """
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_late_swap_tool", Path(__file__).resolve().parents[1] / "tools" / "late_swap.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _slate(self, tmp, contest_names, date="2026-07-10", feed=None):
+        """A REPO-shaped temp tree: data/slates/<date>/{DKSalaries,lineups_feed}."""
+        repo = Path(tmp)
+        slate = repo / "data" / "slates" / date
+        slate.mkdir(parents=True)
+        pool_salary_csv(slate / "DKSalaries.csv")
+        (slate / "lineups_feed.json").write_text(
+            json.dumps(feed if feed is not None else pool_lineups_feed()),
+            encoding="utf-8")
+        parent = repo / "parent.csv"
+        with parent.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(HEADER)
+            for i, name in enumerate(contest_names, start=1):
+                writer.writerow([str(7000 + i), name, str(800 + i), "$1",
+                                 *([""] * 10), "", ""])
+        return repo, parent
+
+    def _run(self, tool, repo, parent, date="2026-07-10", extra=()):
+        import contextlib, io, sys
+        argv = ["late_swap.py", "--date", date, "--parent-entries", str(parent), *extra]
+        old_repo, old_argv = tool.REPO, sys.argv
+        tool.REPO = repo
+        sys.argv = argv
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = tool.main()
+        finally:
+            tool.REPO, sys.argv = old_repo, old_argv
+        return code, out.getvalue(), err.getvalue()
+
+    def test_unresolved_contest_identity_blocks_the_swap(self):
+        """A contest the archetypes do not recognise stops the swap.
+
+        Teeth: before the fix the tool never resolved a posture at all, so this
+        name silently became large_wta and main() proceeded. Removing the
+        resolution block makes this return something other than 3.
+        """
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, parent = self._slate(tmp, ["Some Contest Nobody Named"])
+            code, out, err = self._run(tool, repo, parent)
+            self.assertEqual(code, 3)
+            self.assertIn("POSTURE BLOCKER", err)
+            self.assertIn("--postures", err)
+
+    def test_operator_supplied_posture_resolves_and_routes(self):
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, parent = self._slate(tmp, ["Some Contest Nobody Named"])
+            code, out, err = self._run(
+                tool, repo, parent, extra=["--postures", "801=cash", "--dry-run"])
+            self.assertIn("contest 801 cash -> cash (operator_supplied)", out)
+            self.assertNotEqual(code, 3)
+
+    def test_two_contests_resolve_to_two_different_shapes(self):
+        """The defect in one line: every entry used to be stamped large_wta.
+
+        Teeth: with contest_shapes not passed through, both entries carry
+        'large_wta' and the inequality assertion fails.
+        """
+        from mlb_engine.pipeline.execution_pipeline import _resolve_contest_postures
+        from mlb_engine.swap.late_swap_manager import build_entry_requirements
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, parent = self._slate(
+                tmp, ["MLB $5 Double Up", "MLB Satellite to the Slam"])
+            postures = _resolve_contest_postures(
+                list(parse_dk_entry_rows(parent)),
+                tool._parse_postures("801=cash,802=wta_satellite"), None)
+            shapes = {cid: rec["contest_shape"] for cid, rec in postures.items()}
+            self.assertEqual(shapes, {"801": "cash", "802": "large_wta"})
+            reqs = build_entry_requirements(
+                parent, {}, NOW, shapes, missing_status_policy="treat_as_locked")
+            got = {r["entry_id"]: r["contest_shape"] for r in reqs}
+            self.assertEqual(got, {"7001": "cash", "7002": "large_wta"})
+            self.assertNotEqual(got["7001"], got["7002"])
+            default = build_entry_requirements(
+                parent, {}, NOW, None, missing_status_policy="treat_as_locked")
+            self.assertEqual({r["contest_shape"] for r in default}, {"large_wta"})
+
+    def test_candidates_are_scored_and_scored_in_each_contests_own_shape(self):
+        """The swap must hand the allocator scored candidates, not bare rosters.
+
+        ``as_candidates()`` with no projections carries roster and objective
+        only: floor_sum reads 0.0, so the cash branch cannot tell a high-floor
+        lineup from any other. ``last_payload_report`` records both facts, so a
+        dry run states them. Teeth: reverting the call to a bare
+        ``cache.as_candidates()`` makes projections_supplied False and
+        shapes_scored empty, and both assertions fail.
+        """
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, parent = self._slate(
+                tmp, ["MLB $5 Double Up", "MLB Satellite to the Slam"])
+            code, out, err = self._run(
+                tool, repo, parent,
+                extra=["--postures", "801=cash,802=wta_satellite",
+                       "--budget", "3", "--dry-run"])
+            self.assertEqual(code, 0, err)
+            payload = json.loads(out[out.index("{"):])
+            scoring = payload["candidate_scoring"]
+            self.assertTrue(scoring["projections_supplied"])
+            self.assertEqual(sorted(scoring["shapes_scored"]), ["cash", "large_wta"])
+            self.assertEqual(payload["contest_shapes"],
+                             {"801": "cash", "802": "large_wta"})
+
+    def test_feed_for_the_wrong_date_blocks_and_a_stale_feed_warns(self):
+        import datetime as dt
+        tool = self._tool()
+        now = dt.datetime(2026, 7, 10, 22, 0, tzinfo=dt.timezone.utc)
+        wrong = {"date": "2026-07-09", "fetched_at": "2026-07-10T21:55:00Z"}
+        blockers, warnings = tool._feed_age_report(wrong, "2026-07-10", now)
+        self.assertTrue(any("2026-07-09" in b for b in blockers))
+        stale = {"date": "2026-07-10", "fetched_at": "2026-07-10T17:00:00Z"}
+        blockers, warnings = tool._feed_age_report(stale, "2026-07-10", now)
+        self.assertEqual(blockers, [])
+        self.assertTrue(any("300 minutes ago" in w for w in warnings), warnings)
+        fresh = {"date": "2026-07-10", "fetched_at": "2026-07-10T21:55:00Z"}
+        self.assertEqual(tool._feed_age_report(fresh, "2026-07-10", now), ([], []))
+
+    def test_wrong_date_feed_stops_main_before_any_bank_work(self):
+        tool = self._tool()
+        feed = pool_lineups_feed()
+        feed["date"] = "2026-07-09"
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, parent = self._slate(tmp, ["MLB $5 Double Up"], feed=feed)
+            code, out, err = self._run(tool, repo, parent)
+            self.assertEqual(code, 3)
+            self.assertIn("FEED BLOCKER", err)
+
+    def test_bad_posture_token_is_rejected_eagerly(self):
+        tool = self._tool()
+        with self.assertRaises(SystemExit):
+            tool._parse_postures("801=gpp_but_not_really")
+        with self.assertRaises(SystemExit):
+            tool._parse_postures("801")
+        self.assertEqual(tool._parse_postures(None), {})
+
+    def test_cash_and_wta_shapes_rank_the_same_two_rosters_differently(self):
+        """The done-when for F16's scoring half.
+
+        A high-floor roster and a high-ceiling roster are scored under both
+        shapes. Cash weights floor, WTA takes pure ceiling, so the ordering
+        flips. Teeth: score both under one hardcoded mode (which is what
+        as_candidates() with no shapes did) and the two deltas have the same
+        sign, failing the flip assertion.
+        """
+        import pandas as pd
+        tool = self._tool()
+        rows = []
+        for i in range(10):
+            floor_heavy = i % 2 == 0
+            rows.append({
+                "Player_ID": str(90000 + i), "Name": f"P{i}",
+                "Position": "P" if i < 2 else "OF", "Team": "T1" if i % 2 else "T2",
+                "Salary": 5000, "Base": 10.0,
+                "Ceiling": 30.0 if not floor_heavy else 16.0,
+                "Floor": 4.0 if not floor_heavy else 13.0,
+                "Projected_Ownership_Pct": 12.0, "Batting_Order": (i % 9) + 1,
+            })
+        frame = pd.DataFrame(rows)
+        floor_roster = [r["Player_ID"] for r in rows if r["Floor"] > 10]
+        ceiling_roster = [r["Player_ID"] for r in rows if r["Floor"] <= 10]
+        cash_delta = (tool._score_roster(frame, floor_roster, "cash")
+                      - tool._score_roster(frame, ceiling_roster, "cash"))
+        wta_delta = (tool._score_roster(frame, floor_roster, "large_wta")
+                     - tool._score_roster(frame, ceiling_roster, "large_wta"))
+        self.assertGreater(cash_delta, wta_delta,
+                           "cash and WTA ranked the same rosters identically")
+        self.assertLess(wta_delta, 0, "WTA must prefer the ceiling roster")
+
+    def test_unscorable_roster_reads_as_no_comparison_not_no_downgrade(self):
+        import pandas as pd
+        tool = self._tool()
+        frame = pd.DataFrame([{"Player_ID": "1", "Ceiling": 10.0, "Floor": 5.0,
+                               "Salary": 4000, "Team": "T1", "Position": "OF"}])
+        self.assertIsNone(tool._score_roster(frame, ["1", "2"], "large_wta"))
+        self.assertIsNone(tool._score_roster(frame, [], "large_wta"))
+
+
+class LateSwapDeltaAuthorizationTests(unittest.TestCase):
+    """F16. An explicitly empty authorized set is not 'anything may change'."""
+
+    def _pair(self, tmp, changed: bool):
+        ids = write_salary(Path(tmp) / "salary.csv")
+        r1, r2 = legal_rosters(ids)
+        source = Path(tmp) / "source.csv"
+        candidate = Path(tmp) / "candidate.csv"
+        write_entries(source, [r1, r2])
+        write_entries(candidate, [r2 if changed else r1, r2])
+        return source, candidate
+
+    def test_empty_authorized_set_means_nothing_may_change(self):
+        """Teeth: restoring ``if mutable and entry_id not in mutable`` makes the
+        empty-set case pass, which is the bug. The None case below is the
+        over-blocking guard, and validate_template_preservation has always read
+        the empty set this way, so the two now agree."""
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        with tempfile.TemporaryDirectory() as tmp:
+            source, candidate = self._pair(tmp, changed=True)
+            empty = validate_late_swap_delta(source, candidate, mutable_entry_ids=[])
+            self.assertFalse(empty["passed"])
+            self.assertTrue(any("without permission" in e for e in empty["errors"]))
+            self.assertEqual(empty["authorization"], "0 authorized Entry ID(s)")
+
+            unrestricted = validate_late_swap_delta(source, candidate,
+                                                    mutable_entry_ids=None)
+            self.assertTrue(unrestricted["passed"])
+            self.assertEqual(unrestricted["authorization"], "unrestricted")
+            self.assertEqual(unrestricted["changed_entry_ids"], ["5001"])
+
+            authorized = validate_late_swap_delta(source, candidate,
+                                                  mutable_entry_ids=["5001"])
+            self.assertTrue(authorized["passed"])
+
+    def test_an_unchanged_file_passes_under_every_authorization(self):
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        with tempfile.TemporaryDirectory() as tmp:
+            source, candidate = self._pair(tmp, changed=False)
+            for mutable in (None, [], ["5001"]):
+                self.assertTrue(
+                    validate_late_swap_delta(source, candidate,
+                                             mutable_entry_ids=mutable)["passed"])
 
 
 if __name__ == "__main__":

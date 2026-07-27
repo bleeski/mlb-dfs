@@ -101,6 +101,26 @@ MANUAL_TARGETS = {
     "fangraphs_season_pitching.csv": FANGRAPHS_PITCHING_URL,
 }
 
+FANGRAPHS_ROSTER_RESOURCE_URL = (
+    "https://www.fangraphs.com/roster-resource/depth-charts"
+)
+
+# F17. JSON reference inputs this tool reports on but never fetches. The platoon
+# file is manual by decision and it was the one reference nothing aged: it is
+# absent from REQUIRED_COLUMNS, absent from the manifest, and the only staleness
+# measurement anywhere compared it to its own collected_date, which is the one
+# date it cannot be stale against. Age comes from the payload's own
+# ``collected_date`` rather than mtime, because a checkout or a copy resets
+# mtime and would report a month-old file as fresh.
+TRACKED_JSON: Dict[str, Dict[str, Any]] = {
+    "fangraphs_platoon_lineups.json": {
+        "source": FANGRAPHS_ROSTER_RESOURCE_URL,
+        "max_age_days": 7,
+        "date_key": "collected_date",
+        "feeds": "the TBD-team projected batting order in build_slate_pool",
+    },
+}
+
 
 # --------------------------------------------------------------------------- #
 # Stamp handling
@@ -170,6 +190,25 @@ def _age_days(stamp: Optional[str], path: Path) -> Optional[float]:
     return (_now() - when).total_seconds() / 86400.0
 
 
+def _json_payload_age_days(path: Path, date_key: str) -> Optional[float]:
+    """Age in days from a date stamped inside the JSON payload itself.
+
+    Filesystem mtime is not usable here: a git checkout or a copy resets it, and
+    this file's whole failure mode is reading as fresh when it is not.
+    """
+    if not path.exists():
+        return None
+    try:
+        with path.open(encoding="utf-8") as fh:
+            payload = json.load(fh)
+        stamp = str((payload or {}).get(date_key) or "")[:10]
+        y, m, d = (int(x) for x in stamp.split("-"))
+    except (OSError, ValueError, json.JSONDecodeError, AttributeError, TypeError):
+        return None
+    stamped = datetime(y, m, d, tzinfo=timezone.utc)
+    return (_now() - stamped).total_seconds() / 86400.0
+
+
 def reference_status(reference_dir: Path = REFERENCE_DIR,
                      max_age_days: float = DEFAULT_MAX_AGE_DAYS) -> Dict[str, Any]:
     """Report presence, age, and staleness for every enrichment input.
@@ -210,6 +249,37 @@ def reference_status(reference_dir: Path = REFERENCE_DIR,
             out["warnings"].append(
                 f"{name}: {out['files'][name]['age_days']} days old "
                 f"(limit {max_age_days}); season rates are drifting, {how}"
+            )
+    for name, spec in TRACKED_JSON.items():
+        path = reference_dir / name
+        limit = float(spec.get("max_age_days") or max_age_days)
+        exists = path.exists() and path.stat().st_size > 0
+        age = _json_payload_age_days(path, str(spec.get("date_key") or "collected_date"))
+        stale = bool(exists and age is not None and age > limit)
+        out["files"][name] = {
+            "path": str(path),
+            "exists": exists,
+            "age_days": round(age, 1) if age is not None else None,
+            "age_basis": spec.get("date_key") or "collected_date",
+            "stale": stale,
+            "manual": True,
+            "max_age_days": limit,
+        }
+        if not exists:
+            out["warnings"].append(
+                f"{name}: missing from data/reference/; {spec.get('feeds')} has no "
+                f"source. Rebuild it from {spec.get('source')}"
+            )
+        elif age is None:
+            out["warnings"].append(
+                f"{name}: no {spec.get('date_key')} in the payload, so its age is "
+                f"unknown; it cannot be aged against a slate"
+            )
+        elif stale:
+            out["warnings"].append(
+                f"{name}: {out['files'][name]['age_days']} days old "
+                f"(limit {limit}); it feeds {spec.get('feeds')}. Rebuild it from "
+                f"{spec.get('source')}"
             )
     out["usable"] = all(f["exists"] for f in out["files"].values())
     out["any_stale"] = any(f["stale"] for f in out["files"].values())

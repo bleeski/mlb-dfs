@@ -52,7 +52,7 @@ import statistics
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -61,7 +61,23 @@ from mlb_engine.swap.late_swap_manager import (
 )
 from mlb_engine.intake.slate_intake_manager import normalize_name
 
-VERSION = "v1.4"
+VERSION = "v1.5"
+
+# F17. The platoon reference's own staleness was measured against its own
+# collected_date, which is the one date it can never be stale against, so a file
+# collected weeks ago reported zero stale teams on every build. Age is measured
+# against the slate being built. A projected batting order predates trades,
+# call-ups and role changes; past the block threshold it is not thin signal, it
+# is a fabricated order that a stack would be built on.
+PLATOON_AGE_WARN_DAYS = 3
+PLATOON_AGE_BLOCK_DAYS = 7
+STALE_PLATOON_POLICIES = ("block", "warn")
+
+# DraftKings' Starting column tokens for arms. 'SP' is a declared starter. 'PO'
+# is a probable opener: one or two innings by design, and a two-pitcher Classic
+# roster priced on a starter's workload is a material error. 'PLR' is DK's
+# generic listed-player tag and carries no role claim.
+DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
 
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
@@ -267,10 +283,13 @@ def build_status_map_from_lineups_feed(
 
     Every salary player whose game appears in the feed receives a
     ``PlayerLineupStatus`` keyed by DraftKings Player_ID, with ``lock_time``
-    taken from the game's ``game_date_utc``. Players in a posted lineup are
-    ``Confirmed_Starter`` (with batting order); probable pitchers are
-    ``Projected_Starter``; everyone else gets ``unlisted_status`` (default
-    ``Unknown``, which counts as TBD). Salary players whose game is absent
+    taken from the game's ``game_date_utc``. Hitters on a side the feed marks
+    ``confirmed`` are ``Confirmed_Starter`` (with batting order); hitters on a
+    side the feed marks ``partial`` are ``Projected_Starter``, because a
+    partial lineup is a projection and calling it confirmed is a false label;
+    probable pitchers are ``Projected_Starter``; everyone else gets
+    ``unlisted_status`` (default ``Unknown``, which counts as TBD). Partial
+    sides are reported in ``partial_lineup_teams``. Salary players whose game is absent
     from the feed are returned in ``uncovered_salary_player_ids`` and are NOT
     given a status, so the default fail-closed late-swap policy blocks rather
     than guessing their lock state.
@@ -297,6 +316,7 @@ def build_status_map_from_lineups_feed(
     confirmed_hitter_ids: List[str] = []
     confirmed_order: Dict[str, int] = {}
     probable_pitcher_ids: List[str] = []
+    partial_lineup_teams: List[Dict[str, Any]] = []
     unmatched: List[Dict[str, str]] = []
 
     def match_dk_id(name: str, dk_team: str) -> Optional[str]:
@@ -328,19 +348,37 @@ def build_status_map_from_lineups_feed(
             excluded_game_ids.append(game_id)
 
         for side, dk_team in ((away, away_team), (home, home_team)):
-            if str(side.get("lineup_status") or "").strip().lower() == "confirmed":
+            # F17: one reading of the side's lineup state, used for the status
+            # stamp as well as for the confirmed sets. It used to be read twice
+            # and only the second read was gated: every hitter in a posted
+            # lineup was stamped Confirmed_Starter even on a side the feed calls
+            # 'partial', which tools/fetch_slate_bundle.py emits for any side
+            # with one to eight hitters posted. A projected slot is a labelled
+            # prior; stamping it 'Confirmed' is the labels rule broken at the
+            # front door.
+            posted = str(side.get("lineup_status") or "").strip().lower()
+            is_confirmed = posted == "confirmed"
+            lineup_rows = side.get("lineup") or []
+            if is_confirmed:
                 confirmed_teams.append(dk_team)
-            for hitter in side.get("lineup") or []:
+            elif lineup_rows:
+                partial_lineup_teams.append(
+                    {"team": dk_team, "game_id": game_id,
+                     "hitters_posted": len(lineup_rows),
+                     "lineup_status": posted or "unknown"}
+                )
+            for hitter in lineup_rows:
                 dk_id = match_dk_id(hitter.get("name"), dk_team)
                 if dk_id is None:
                     continue
                 order = hitter.get("order")
                 status_by_player_id[dk_id] = PlayerLineupStatus(
                     player_id=dk_id, name=str(hitter.get("name") or ""), team=dk_team,
-                    game_id=game_id, lock_time=lock_time, status=CONFIRMED_STARTER,
+                    game_id=game_id, lock_time=lock_time,
+                    status=CONFIRMED_STARTER if is_confirmed else PROJECTED_STARTER,
                     batting_order=int(order) if order is not None else None,
                 )
-                if str(side.get("lineup_status") or "").strip().lower() == "confirmed":
+                if is_confirmed:
                     confirmed_hitter_ids.append(dk_id)
                     if order is not None:
                         confirmed_order[dk_id] = int(order)
@@ -387,6 +425,8 @@ def build_status_map_from_lineups_feed(
         "game_meta": game_meta,
         "unmatched_feed_players": unmatched,
         "uncovered_salary_player_ids": sorted(uncovered),
+        "partial_lineup_teams": sorted(partial_lineup_teams,
+                                       key=lambda r: (r["team"], r["game_id"])),
         "doubleheader_legs_dropped": doubleheader_legs_dropped,
         "feed_date": feed.get("date"),
         "feed_fetched_at": feed.get("fetched_at"),
@@ -504,6 +544,7 @@ def build_slate_pool(
     tbd_fallback: str = "top9_appg",
     now: Optional[datetime] = None,
     lock_buffer_minutes: int = 5,
+    stale_platoon_policy: str = "block",
 ) -> Dict[str, Any]:
     """Restrict the slate to the players who can actually take the field.
 
@@ -536,6 +577,14 @@ def build_slate_pool(
     ``pool_report`` with per-team status, warnings, and blockers. Deterministic
     intake bookkeeping; it moves no projection and is never a win-rate, ROI, or
     probability claim.
+
+    ``stale_platoon_policy`` (F17) decides what happens when the platoon
+    reference is older than ``PLATOON_AGE_BLOCK_DAYS`` against the slate date
+    AND at least one TBD team on this slate is being filled from it. 'block'
+    (default) emits a pool blocker naming the refresh; 'warn' degrades it to a
+    warning. Age was previously measured against the file's own
+    ``collected_date``, so a file collected a month ago read as zero days
+    stale on every build.
     """
     from mlb_engine.intake.slate_intake_manager import (
         parse_dk_salary_csv, salary_status_tier, slate_clock,
@@ -615,10 +664,30 @@ def build_slate_pool(
                 f"watch for a late scratch"
             )
 
+    if stale_platoon_policy not in STALE_PLATOON_POLICIES:
+        raise ValueError(
+            f"stale_platoon_policy must be one of {list(STALE_PLATOON_POLICIES)}"
+        )
+
+    # F17: the date this pool is for, used to age the platoon reference. The
+    # feed states its own date; fall back to the caller's clock.
+    slate_date = None
+    for candidate in (status.get("feed_date"), None):
+        if candidate:
+            try:
+                y, m, d = (int(x) for x in str(candidate)[:10].split("-"))
+                slate_date = date(y, m, d)
+            except (TypeError, ValueError):
+                slate_date = None
+            break
+    if slate_date is None:
+        slate_date = (now or datetime.now(timezone.utc)).date()
+
     tbd_teams = [t for t in slate_teams if t not in confirmed_teams and t not in excluded_teams]
     platoon_order: Dict[str, int] = {}
     platoon_report: Optional[Dict[str, Any]] = None
     platoon_source: Optional[str] = None
+    platoon_age_days: Optional[int] = None
     if tbd_teams:
         try:
             from mlb_engine.intake.platoon_order_adapter import (
@@ -652,11 +721,40 @@ def build_slate_pool(
                     resolved, salary_csv, opp_throws, only_teams=list(tbd_teams),
                 )
                 platoon_order = {str(k): int(v) for k, v in platoon_order.items()}
-                for team in (platoon_report or {}).get("zero_fill_teams") or []:
+                # F17: all four report keys reach the operator. Three of the
+                # four were computed and never read, so a team the file did not
+                # cover, a team whose page predates the file, and a team whose
+                # opponent hand was guessed all looked identical to a clean
+                # fill.
+                report = platoon_report or {}
+                for team in report.get("zero_fill_teams") or []:
                     warnings.append(
                         f"{team}: covered by the platoon file but filled 0 hitters; "
                         "team-code or name crosswalk failure, not thin data"
                     )
+                for team in report.get("teams_missing_from_file") or []:
+                    warnings.append(
+                        f"{team}: TBD and absent from the platoon reference; "
+                        "no projected order exists for it"
+                    )
+                for rec in report.get("stale_teams") or []:
+                    warnings.append(
+                        f"{rec.get('team')}: platoon page last updated "
+                        f"{rec.get('page_updated')} ({rec.get('days_old')} days "
+                        f"before the file was collected)"
+                    )
+                for team in report.get("hand_assumed_teams") or []:
+                    warnings.append(
+                        f"{team}: opposing pitcher hand unknown; platoon order "
+                        f"taken from the default-hand view"
+                    )
+                collected = str(report.get("collected_date") or "")
+                if collected:
+                    try:
+                        y, m, d = (int(x) for x in collected.split("-"))
+                        platoon_age_days = (slate_date - date(y, m, d)).days
+                    except (TypeError, ValueError):
+                        platoon_age_days = None
         except Exception as exc:  # defensive: pool must degrade, not die
             warnings.append(f"platoon projected order unavailable: {exc}")
             platoon_order = {}
@@ -694,6 +792,18 @@ def build_slate_pool(
             blockers.append(detail + "; crosswalk failure, real lineup went unused")
         else:
             warnings.append(detail)
+
+    # F17: a side the feed marks 'partial' is not confirmed and never was, but
+    # nothing said so. Its posted hitters are stamped Projected_Starter and the
+    # team routes through the TBD path; the operator should see which teams are
+    # mid-post rather than infer it from their absence from the confirmed list.
+    for rec in status.get("partial_lineup_teams") or []:
+        if rec["team"] in slate_team_set and rec["team"] not in excluded_teams:
+            warnings.append(
+                f"{rec['team']}: lineup {rec['lineup_status']} with "
+                f"{rec['hitters_posted']}/9 hitters posted; treated as TBD and "
+                f"stamped Projected_Starter, not confirmed"
+            )
 
     # Feed/draftgroup alignment. Keyed on whether the feed contains the slate's
     # games at all, never on how many lineups have posted, because an early build
@@ -754,6 +864,31 @@ def build_slate_pool(
             f"{team}: TBD lineup; {'platoon filled ' + str(n) + '/9, ' if n > 0 else ''}"
             f"top-AvgPointsPerGame fallback supplied {filled - n} hitters"
         )
+    # F17: the platoon file's age against THIS slate, escalated only when the
+    # build actually leans on it. A stale reference on an all-confirmed slate
+    # costs nothing and says nothing; a stale reference supplying the projected
+    # nine for a team that may be stacked is the mechanism behind the whole F1
+    # class of defect and it was unobservable.
+    platoon_dependent_teams = sorted(
+        t for t in tbd_teams if platoon_by_team.get(t)
+    )
+    if platoon_age_days is not None and platoon_dependent_teams:
+        collected_text = (platoon_report or {}).get("collected_date")
+        detail = (
+            f"platoon reference collected {collected_text} is "
+            f"{platoon_age_days} days old against slate {slate_date.isoformat()} "
+            f"and supplies the projected order for "
+            f"{', '.join(platoon_dependent_teams)}"
+        )
+        if platoon_age_days > PLATOON_AGE_BLOCK_DAYS and stale_platoon_policy == "block":
+            blockers.append(
+                detail + "; refresh it from FanGraphs RosterResource "
+                "(python tools/fetch_rotowire_lineups.py writes the same schema) "
+                "or pass stale_platoon_policy='warn' to accept the age on the record"
+            )
+        elif platoon_age_days > PLATOON_AGE_WARN_DAYS:
+            warnings.append(detail)
+
     for team in sorted(excluded_teams):
         teams_report[team] = {"status": "excluded_postponed", "hitters": 0}
         warnings.append(f"{team}: game {team_game.get(team)} postponed/cancelled/suspended; team excluded")
@@ -798,7 +933,22 @@ def build_slate_pool(
         sp = by_id.get(str(pid))
         if sp is None or sp.team in excluded_teams:
             continue
-        pitcher_roles[str(pid)] = "declared_probable_sp"
+        # F17: DK's own Starting token decides the role. An opener and a
+        # starter arrived here as the same 'declared_probable_sp', so a
+        # two-inning arm was projected, priced and SP-pair-covered as a
+        # starter. viable_bulk_or_alt_sp is rosterable (it is in
+        # ALLOWED_PITCHER_ROLES and in OPTIONAL_SP_AUDIT_STATUSES) but it is
+        # outside REQUIRED_SP_AUDIT_STATUSES, so an opener no longer joins the
+        # required SP-pair coverage set.
+        if str(sp.starting).strip().upper() in DK_STARTING_OPENER_TOKENS:
+            pitcher_roles[str(pid)] = "viable_bulk_or_alt_sp"
+            warnings.append(
+                f"{sp.team} {sp.name} ({pid}): DK Starting={sp.starting} "
+                f"(probable opener), not a starter; role viable_bulk_or_alt_sp. "
+                f"Override via declared_pitchers if DK is wrong."
+            )
+        else:
+            pitcher_roles[str(pid)] = "declared_probable_sp"
         keep[str(pid)] = _pool_row(sp, batting_order=None)
     for pid, role in (declared_pitchers or {}).items():
         sp = by_id.get(str(pid))
@@ -876,6 +1026,10 @@ def build_slate_pool(
                 for pid, role in sorted(pitcher_roles.items()) if pid in by_id
             ],
             "unmatched_feed_players": status.get("unmatched_feed_players"),
+            "partial_lineup_teams": status.get("partial_lineup_teams") or [],
+            "platoon_age_days": platoon_age_days,
+            "platoon_dependent_teams": platoon_dependent_teams,
+            "slate_date": slate_date.isoformat(),
             "warnings": warnings,
             "blockers": blockers,
         },

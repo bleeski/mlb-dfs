@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  22 modules  294 tests`. The module count is derived from
+   `PASS  v2.26.0  22 modules  312 tests`. The module count is derived from
    the filesystem, so it moves on its own; the test count is a pin. A count
    mismatch with the suite passing is a WARNING, not a failure, and prints
    in brackets on the PASS line: proceed and fix the pin after the slate. A
@@ -66,7 +66,12 @@ data/reference/fangraphs_platoon_lineups.json by default, so a TBD team
 keeps a projected batting order instead of being guessed at by top-9
 AvgPointsPerGame or dropped from the slate. Refresh that reference from
 FanGraphs RosterResource periodically; the pool report names any team the
-file covers but cannot fill, and flags stale per-team pages.
+file covers but cannot fill, any TBD team the file does not cover, any team
+whose page predates the file, and any team whose opposing hand was assumed.
+Its age is measured against the SLATE, not against its own collected_date:
+past 7 days, with a TBD team being filled from it, that is a pool blocker
+(`stale_platoon_policy='warn'` downgrades it, and build_slate.py already
+tiers it SOFT so it prints and the build ships).
 1. live_data_adapters.build_slate_pool(salary_csv, lineups_feed,
    platoon_json, declared_pitchers) is the required intake front door.
    Hitters: the confirmed nine per posted lineup plus the platoon-projected
@@ -91,6 +96,12 @@ file covers but cannot fill, and flags stale per-team pages.
    `python tools/late_swap.py --date <date> --parent-entries <csv>` wraps
    that path, including the excluded-new-teams rule (a locked game admits
    no new players) and the pinned-slot candidate generation it requires.
+   It resolves each contest's posture and shape the way the build does and
+   blocks on a name that matches no archetype (`--postures <id>=<posture>`,
+   `--ignore-unresolved-postures` to accept the fallback); it blocks on a
+   feed for the wrong date and warns on a feed over 90 minutes old; and it
+   scores the incumbent lineup against the chosen one in each entry's own
+   contest shape, refusing a net downgrade without `--accept-downgrade`.
    `python tools/verify_export.py --entries <new> --parent <delivered>` is
    the swap-specific check: it runs every preflight rule plus contest-identity
    diff, slot churn, and the locked-game guard (derived from Game Info, not a

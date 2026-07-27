@@ -11,10 +11,18 @@ introducing any new player from a game that has already locked. That last rule i
 correct and load-bearing; none of it was documented outside a test. This wraps the
 whole path in one command.
 
+F16 added the identity and verification this path was missing. It resolves each
+contest's posture and shape the way the build does instead of stamping every
+entry ``large_wta``; it scores candidates in each contest's own shape instead of
+handing the allocator unscored rosters; it checks the disk feed's date and age;
+and it scores the incumbent lineup against the chosen one and refuses a
+downgrade without ``--accept-downgrade``.
+
 Usage:
     python tools/late_swap.py --date 2026-07-22 \
         --parent-entries runs/<run_id>/final/DKEntries.csv \
-        [--budget 30] [--entry-ids 123,456] [--dry-run]
+        [--budget 30] [--entry-ids 123,456] [--dry-run] \
+        [--postures <contest_id>=cash,...] [--accept-downgrade]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
 enters a contest, or moves money. Lineups move only at Ben's manual upload.
@@ -46,12 +54,24 @@ if str(REPO) not in sys.path:
 from mlb_engine.intake.live_data_adapters import (  # noqa: E402
     build_slate_pool, build_status_map_from_lineups_feed,
 )
-from mlb_engine.entries.dk_entries_manager import assert_contest_geometry  # noqa: E402
+from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
+    assert_contest_geometry, parse_dk_entry_rows,
+)
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
-    _assemble_projection_frame, run_late_swap,
+    _assemble_projection_frame, _resolve_contest_postures, run_late_swap,
+    unresolved_contest_blockers,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
+
+VALID_POSTURES = ("cash", "wta_satellite", "single_entry", "small_gpp",
+                  "large_gpp", "mme")
+
+# Past this the disk feed is describing a different state of the world than the
+# one the swap is being made in. It is a warning, not a block: a swap runs at
+# T-minutes and refusing on feed age would be the process preventing the lineup.
+# A feed for the WRONG DATE is a different thing and does block.
+FEED_AGE_WARN_MINUTES = 90
 
 # F4: these were eight hardcoded True values on the path that runs closest to
 # lock with the least verification. A swap does not re-derive weather, odds, or a
@@ -86,6 +106,94 @@ def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
     return out
 
 
+def _parse_postures(value: str | None) -> dict[str, str]:
+    """'<contest_id_or_name>=<posture>,...' -> dict, validated eagerly.
+
+    Same contract and same vocabulary as build_slate.py --postures. A typo that
+    resolved to a silent default would be the exact failure this closes.
+    """
+    out: dict[str, str] = {}
+    for item in str(value or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise SystemExit(f"--postures entry {item!r} is not <contest>=<posture>")
+        key, posture = (x.strip() for x in item.split("=", 1))
+        if posture not in VALID_POSTURES:
+            raise SystemExit(f"--postures: unknown posture {posture!r}; valid: "
+                             + ", ".join(VALID_POSTURES))
+        out[key] = posture
+    return out
+
+
+def _score_roster(projections, roster_ids, shape: str) -> float | None:
+    """Contest-fit score for one roster under one contest shape.
+
+    The same function and the same mode the bank payload is scored with, so the
+    incumbent and the chosen lineup are compared on one scale. Returns None when
+    the roster cannot be scored (an id absent from the frame), which reads as
+    "no comparison available" and never as "no downgrade".
+    """
+    from mlb_engine.optimize.optimizer_v3 import (
+        score_lineup_candidate, _mode_for_contest_shape,
+    )
+
+    ids = [str(p) for p in roster_ids if str(p).strip()]
+    frame = projections.copy()
+    frame["__pid__"] = frame["Player_ID"].astype(str)
+    by_id = frame.set_index("__pid__", drop=False)
+    present = [p for p in ids if p in by_id.index]
+    if not ids or len(present) != len(ids):
+        return None
+    try:
+        score = score_lineup_candidate(
+            by_id.loc[present], projections,
+            mode=_mode_for_contest_shape(shape, "wta"),
+            contest_shape=shape,
+        )
+    except Exception:  # noqa: BLE001 - a scoring failure is not a downgrade
+        return None
+    value = score.get("contest_fit_score")
+    return float(value) if value is not None else None
+
+
+def _feed_age_report(feed: dict, slate_date: str, now: dt.datetime) -> tuple[list[str], list[str]]:
+    """(blockers, warnings) about the age and identity of the disk feed."""
+    blockers: list[str] = []
+    warnings: list[str] = []
+    feed_date = str(feed.get("date") or "").strip()[:10]
+    if feed_date and feed_date != slate_date:
+        blockers.append(
+            f"lineups feed is for {feed_date}, this swap is for {slate_date}; "
+            f"refetch the feed before swapping"
+        )
+    elif not feed_date:
+        warnings.append("lineups feed carries no date; its identity is unverified")
+    fetched = str(feed.get("fetched_at") or "").strip()
+    if not fetched:
+        warnings.append("lineups feed carries no fetched_at; its age is unknown")
+        return blockers, warnings
+    try:
+        # Python 3.10's fromisoformat rejects a trailing 'Z', and the feeds this
+        # reads are written with one. Left unhandled, every real feed reported
+        # "age unknown" and the check was decorative.
+        when = dt.datetime.fromisoformat(
+            fetched[:-1] + "+00:00" if fetched.endswith("Z") else fetched)
+    except ValueError:
+        warnings.append(f"lineups feed fetched_at {fetched!r} is unparseable")
+        return blockers, warnings
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=dt.timezone.utc)
+    minutes = (now - when).total_seconds() / 60.0
+    if minutes > FEED_AGE_WARN_MINUTES:
+        warnings.append(
+            f"lineups feed was fetched {minutes:.0f} minutes ago; scratches and "
+            f"late lineup changes since then are invisible to this swap"
+        )
+    return blockers, warnings
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--date", required=True)
@@ -97,6 +205,20 @@ def main() -> int:
                                         "default authorizes every reserved entry")
     ap.add_argument("--dry-run", action="store_true",
                     help="report requirements and candidate coverage, do not swap")
+    ap.add_argument("--postures", default=None,
+                    help="comma-separated <contest_id_or_name>=<posture> pairs, the "
+                         "same vocabulary as build_slate.py --postures. A swap used "
+                         "to stamp every entry large_wta regardless of what the "
+                         "contest was, so a cash entry's high-floor build silently "
+                         "became a ceiling build. A contest whose name matches no "
+                         "archetype blocks until it is named here.")
+    ap.add_argument("--accept-downgrade", action="store_true",
+                    help="write the file even when a swapped entry scores below the "
+                         "lineup it replaced under its own contest shape. Recorded "
+                         "on stderr; there is no silent path.")
+    ap.add_argument("--ignore-unresolved-postures", action="store_true",
+                    help="proceed when a contest name matches no archetype, "
+                         "accepting the fallback posture. Recorded on stderr.")
     ap.add_argument("--controls-override", dest="controls_override", type=json.loads,
                     default=None,
                     help="JSON dict merged over the default PORTFOLIO_CONTROLS. A "
@@ -128,7 +250,40 @@ def main() -> int:
         print(f"contest geometry: {exc}", file=sys.stderr)
         return 3
 
+    now = dt.datetime.now(dt.timezone.utc)
     feed = json.loads(feed_path.read_text(encoding="utf-8"))
+
+    # F16: the feed was read from disk with no check that it describes this
+    # slate or this hour. A swap is the one build that runs after lineups move,
+    # so a feed for the wrong day is a wrong-slate build with locked-game
+    # exclusions computed from the wrong games.
+    feed_blockers, feed_warnings = _feed_age_report(feed, args.date, now)
+    for warning in feed_warnings:
+        print(f"feed: {warning}", file=sys.stderr)
+    for blocker in feed_blockers:
+        print(f"FEED BLOCKER: {blocker}", file=sys.stderr)
+    if feed_blockers:
+        return 3
+
+    # F16: contest identity. build_entry_requirements defaults every entry to
+    # 'large_wta' when no contest_shapes map is supplied, and this script never
+    # supplied one, so a Double Up and a satellite were refined on the same
+    # ceiling-max objective. Resolve identity the way the build does.
+    reserved_rows = list(parse_dk_entry_rows(args.parent_entries))
+    postures = _resolve_contest_postures(
+        reserved_rows, _parse_postures(args.postures), None)
+    unresolved = unresolved_contest_blockers(postures)
+    for blocker in unresolved:
+        label = ("POSTURE BLOCKER" if not args.ignore_unresolved_postures
+                 else "POSTURE BLOCKER OVERRIDDEN by --ignore-unresolved-postures")
+        print(f"{label}: {blocker}", file=sys.stderr)
+    if unresolved and not args.ignore_unresolved_postures:
+        return 3
+    contest_shapes = {cid: str(rec["contest_shape"]) for cid, rec in postures.items()}
+    for cid, rec in sorted(postures.items()):
+        print(f"contest {cid} {rec['posture']} -> {rec['contest_shape']} "
+              f"({rec['posture_source']})")
+
     status = build_status_map_from_lineups_feed(feed, str(salary))
     for dropped in status.get("doubleheader_legs_dropped") or []:
         print(f"doubleheader: dropped {dropped['game_id']} leg at "
@@ -148,10 +303,9 @@ def main() -> int:
         projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
     )
 
-    now = dt.datetime.now(dt.timezone.utc)
     authorized = [e.strip() for e in args.entry_ids.split(",")] if args.entry_ids else None
     requirements = build_entry_requirements(
-        args.parent_entries, status["status_by_player_id"], now, None,
+        args.parent_entries, status["status_by_player_id"], now, contest_shapes,
         mode="reoptimize", authorized_entry_ids=authorized,
         missing_status_policy="treat_as_locked",
     )
@@ -191,10 +345,28 @@ def main() -> int:
         print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
               f"+{slice_report['built_this_slice']} targeted candidates")
 
-    candidates = cache.as_candidates()
+    # F16: scored, and scored in each contest's own shape. as_candidates() with
+    # no projections carries roster and objective only: no stack-correlation
+    # bonus, no batting-order cluster, and floor_sum reads 0.0, so the cash
+    # branch could not tell a high-floor lineup from any other. The swap ranked
+    # every candidate on raw objective and called the result a refinement.
+    requested_shapes = sorted({str(r.get("contest_shape") or "") for r in requirements
+                               if r.get("contest_shape")})
+    candidates = cache.as_candidates(
+        projections, requested_n=max(1, len(requirements)),
+        contest_shapes=requested_shapes,
+    )
+    payload_report = cache.last_payload_report or {}
+    print(f"candidate scoring: {payload_report.get('scored')} scored, "
+          f"{payload_report.get('scoring_failed')} failed, shapes "
+          f"{payload_report.get('shapes_scored')}")
+    for reason, count in sorted((payload_report.get("scoring_failure_reasons") or {}).items()):
+        print(f"  scoring failure x{count}: {reason}", file=sys.stderr)
     if args.dry_run:
         print(json.dumps({"entries": len(requirements),
-                          "candidates": len(candidates)}, indent=1))
+                          "candidates": len(candidates),
+                          "contest_shapes": contest_shapes,
+                          "candidate_scoring": payload_report}, indent=1))
         return 0
 
     controls = dict(PORTFOLIO_CONTROLS)
@@ -206,6 +378,7 @@ def main() -> int:
         current_entries_csv=args.parent_entries,
         status_by_player_id=status["status_by_player_id"],
         as_of=now,
+        contest_shapes=contest_shapes,
         salary_csv=str(salary),
         projections=projections,
         candidates=candidates,
@@ -233,6 +406,50 @@ def main() -> int:
         return 3
 
     out = Path(result["output_path"])
+
+    # F16: the swap had no incumbent-vs-chosen comparison at all. The only
+    # signal that a lineup had been replaced by a worse one was verify_export's
+    # `chg=6`. Score both rosters under the entry's own contest shape and print
+    # the delta per changed entry; refuse a net downgrade unless it is asked
+    # for. The run directory already exists at this point and stays as the
+    # record; what a refusal withholds is the mirrored file, so nothing is
+    # uploadable by accident.
+    shape_by_entry = {str(r["entry_id"]): str(r.get("contest_shape") or "large_wta")
+                      for r in requirements}
+    after_rosters = _load_entry_rosters(out)
+    downgraded: list[str] = []
+    print("entry scores (incumbent -> chosen, in the entry's own contest shape):")
+    for entry_id in sorted(shape_by_entry):
+        before_ids = parent_rosters.get(entry_id) or []
+        after_ids = after_rosters.get(entry_id) or []
+        if before_ids == after_ids:
+            continue
+        shape = shape_by_entry[entry_id]
+        before_score = _score_roster(projections, before_ids, shape)
+        after_score = _score_roster(projections, after_ids, shape)
+        if before_score is None or after_score is None:
+            print(f"  {entry_id} [{shape}]: not comparable "
+                  f"(a roster id is absent from the projection frame)")
+            continue
+        delta = after_score - before_score
+        print(f"  {entry_id} [{shape}]: {before_score:.2f} -> {after_score:.2f} "
+              f"({delta:+.2f})")
+        if delta < 0:
+            downgraded.append(f"{entry_id} [{shape}] {delta:+.2f}")
+    if downgraded and not args.accept_downgrade:
+        print("late swap refused: these entries score below the lineups they "
+              "replaced:", file=sys.stderr)
+        for line in downgraded:
+            print(f"  {line}", file=sys.stderr)
+        print(f"the run record is at {result.get('run_dir')}; nothing was "
+              f"mirrored to outputs/. Re-run with --accept-downgrade to take it "
+              f"anyway (a forced swap off a scratch is a legitimate downgrade).",
+              file=sys.stderr)
+        return 3
+    if downgraded:
+        print("downgrade accepted by --accept-downgrade: " + "; ".join(downgraded),
+              file=sys.stderr)
+
     dest_dir = REPO / "outputs" / args.date
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / "DKEntries_lateswap.csv"

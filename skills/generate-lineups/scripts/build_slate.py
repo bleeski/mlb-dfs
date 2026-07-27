@@ -331,7 +331,12 @@ def fetch_lineups(date: str, dest: Path) -> dict:
                 players = lineups.get(lineup_key) or []
                 return {
                     "team_abbrev": team.get("abbreviation", ""),
-                    "lineup_status": "confirmed" if len(players) >= 9 else "tbd",
+                    # Same three-way derivation as tools/fetch_slate_bundle.py.
+                    # Collapsing 'partial' into 'tbd' here made two writers of
+                    # the same feed shape disagree about a side with one to
+                    # eight hitters posted (F17).
+                    "lineup_status": ("confirmed" if len(players) >= 9
+                                      else "partial" if players else "tbd"),
                     "lineup": [
                         {"order": i + 1, "id": p.get("id"), "name": p.get("fullName")}
                         for i, p in enumerate(players)

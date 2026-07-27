@@ -24,7 +24,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from mlb_engine.pipeline.build_state_manager import get_latest_promoted_run, verify_run_bundle
 from mlb_engine.entries.dk_entries_manager import ROSTER_SLOTS, parse_dk_entry_rows
 
-VERSION = "v1.3"
+VERSION = "v1.4"
 CONFIRMED_STARTER = "Confirmed_Starter"
 PROJECTED_STARTER = "Projected_Starter"
 BENCH_RISK = "Bench_Risk"
@@ -337,7 +337,22 @@ def validate_locked_immutability(source_path: str | Path, candidate_path: str | 
 
 
 def validate_late_swap_delta(source_path: str | Path, candidate_path: str | Path, mutable_entry_ids: Optional[Iterable[str]] = None) -> Dict[str, Any]:
-    mutable = {str(x) for x in (mutable_entry_ids or [])}
+    """Diff a swapped file against its parent and reject unauthorized changes.
+
+    ``mutable_entry_ids=None`` means unrestricted: no authorization was
+    expressed, so every change is allowed. An explicitly EMPTY collection means
+    nothing is mutable, and any roster change is an error.
+
+    Those two used to be the same thing (F16). ``{str(x) for x in (ids or [])}``
+    collapsed None and [] to the same empty set and the guard then read
+    ``if mutable and ...``, so an empty authorized set fell through to "anything
+    may change" on the one path that runs closest to lock. The empty case is
+    reachable from ``execute_portfolio``, which passes the entry_ids of the
+    requirements it built and builds none when every reserved entry is fully
+    locked. ``validate_template_preservation`` already fails closed on the same
+    input; these two now agree.
+    """
+    mutable = None if mutable_entry_ids is None else {str(x) for x in mutable_entry_ids}
     before = {row.entry_id: row for row in parse_dk_entry_rows(source_path)}
     after = {row.entry_id: row for row in parse_dk_entry_rows(candidate_path)}
     errors, changed = [], []
@@ -347,9 +362,11 @@ def validate_late_swap_delta(source_path: str | Path, candidate_path: str | Path
             errors.append(f"Entry ID {entry_id} missing after late swap")
         elif old.roster_cells != new.roster_cells:
             changed.append(entry_id)
-            if mutable and entry_id not in mutable:
+            if mutable is not None and entry_id not in mutable:
                 errors.append(f"Entry ID {entry_id} changed without permission")
-    return {"passed": not errors, "errors": errors, "changed_entry_ids": changed}
+    return {"passed": not errors, "errors": errors, "changed_entry_ids": changed,
+            "authorization": "unrestricted" if mutable is None
+                             else f"{len(mutable)} authorized Entry ID(s)"}
 
 
 def late_swap_certification(mode: str, optimization_result: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
