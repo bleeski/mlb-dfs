@@ -107,6 +107,17 @@ class ContestArchetype:
     payout_shape_default: str
     confidence: str
     notes: str = ""
+    # R1c. Two curated columns. ``objective_class`` is a cross-check, not a
+    # router: the objective is derived from the resolved shape by
+    # contest_shapes.OBJECTIVE_CLASS_BY_SHAPE, and a row that names a class
+    # contradicting its own payout_shape_default fails the load rather than
+    # disagreeing silently. ``ticket_count`` is real contest knowledge that no
+    # inference can recover from a title: one ticket is a first-place path and
+    # routes to the wta_ticket_satellite profile, more than one is a cut line
+    # and routes to the ticket-line blend. Blank stays blank and keeps the
+    # multi-ticket default, which is the honest reading of an unknown.
+    objective_class: Optional[str] = None
+    ticket_count: Optional[int] = None
 
 
 @dataclass
@@ -404,6 +415,57 @@ def find_archetypes_csv() -> Optional[str]:
     return None
 
 
+def _parse_ticket_count(raw: Any, pattern: str) -> Optional[int]:
+    """R1c. Blank is unknown and stays unknown; a present value must be sane.
+
+    A garbage ticket count is worse than none, because 1 routes a contest to a
+    first-place profile and anything else routes it to the cut-line blend.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        value = int(float(text))
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"dk_contest_archetypes row '{pattern}': ticket_count '{text}' is not "
+            f"a number; leave it blank if the count is unknown")
+    if value < 1:
+        raise ValueError(
+            f"dk_contest_archetypes row '{pattern}': ticket_count {value} is not "
+            f"a count; leave it blank if the count is unknown")
+    return value
+
+
+def _validated_objective_class(raw: Any, payout_shape_default: str,
+                               pattern: str) -> Optional[str]:
+    """R1c. The column is a cross-check on curated knowledge, never a router.
+
+    The live objective comes from the resolved shape. A curated row that names a
+    class its own payout_shape_default cannot produce is a disagreement between
+    two copies of one fact, which is this project's named failure class, so it
+    fails the load instead of picking a winner.
+    """
+    from mlb_engine.contest_shapes import (
+        OBJECTIVE_CLASSES, objective_class_for_payout_token,
+    )
+
+    text = str(raw or "").strip().lower()
+    if not text:
+        return None
+    if text not in OBJECTIVE_CLASSES:
+        raise ValueError(
+            f"dk_contest_archetypes row '{pattern}': objective_class '{text}' is "
+            f"not one of {sorted(OBJECTIVE_CLASSES)}")
+    implied = objective_class_for_payout_token(payout_shape_default)
+    if implied is not None and implied != text:
+        raise ValueError(
+            f"dk_contest_archetypes row '{pattern}': objective_class '{text}' "
+            f"contradicts payout_shape_default '{payout_shape_default}', which "
+            f"implies '{implied}'. Fix one of them; do not ship both.")
+    return text
+
+
 def load_archetypes(path: Optional[str] = None) -> List[ContestArchetype]:
     if not path:
         path = find_archetypes_csv()
@@ -412,14 +474,19 @@ def load_archetypes(path: Optional[str] = None) -> List[ContestArchetype]:
     output: List[ContestArchetype] = []
     with Path(path).open(newline="", encoding="utf-8-sig") as handle:
         for row in csv.DictReader(handle):
+            pattern = str(row.get("pattern") or "")
+            payout = str(row.get("payout_shape_default") or "unknown")
             output.append(ContestArchetype(
-                pattern=str(row.get("pattern") or ""),
+                pattern=pattern,
                 inferred_buy_in=parse_money(row.get("inferred_buy_in")) or None,
                 inferred_type=str(row.get("inferred_type") or "unknown"),
                 inferred_max_entries=int(float(row["inferred_max_entries"])) if row.get("inferred_max_entries") else None,
-                payout_shape_default=str(row.get("payout_shape_default") or "unknown"),
+                payout_shape_default=payout,
                 confidence=str(row.get("confidence") or CONFIDENCE_UNKNOWN),
                 notes=str(row.get("notes") or ""),
+                objective_class=_validated_objective_class(
+                    row.get("objective_class"), payout, pattern),
+                ticket_count=_parse_ticket_count(row.get("ticket_count"), pattern),
             ))
     return output
 
@@ -452,14 +519,19 @@ def infer_contest_archetype(contest_name: str, entry_fee: Optional[float] = None
         default=None,
     )
     if selected is None:
-        return {"inferred_type": "unknown", "inferred_max_entries": None, "payout_shape_default": "unknown", "confidence": CONFIDENCE_UNKNOWN, "decision_critical_gaps": ["contest_type"], "matched_pattern": None, "competing_patterns": []}
+        return {"inferred_type": "unknown", "inferred_max_entries": None, "payout_shape_default": "unknown", "objective_class": None, "ticket_count": None, "confidence": CONFIDENCE_UNKNOWN, "decision_critical_gaps": ["contest_type"], "matched_pattern": None, "competing_patterns": []}
     gaps: List[str] = []
     if selected.inferred_type == "satellite":
-        gaps = ["ticket_count", "ticket_value"]
+        # R1c: a curated ticket_count closes the first gap. It is the one fact
+        # here no title inference can recover, and it decides whether the
+        # contest is ranked for first place or for clearing a cut line.
+        gaps = ["ticket_value"] if selected.ticket_count else ["ticket_count", "ticket_value"]
     return {
         "inferred_type": selected.inferred_type,
         "inferred_max_entries": selected.inferred_max_entries,
         "payout_shape_default": selected.payout_shape_default,
+        "objective_class": selected.objective_class,
+        "ticket_count": selected.ticket_count,
         "confidence": selected.confidence,
         "inferred_buy_in": selected.inferred_buy_in if selected.inferred_buy_in is not None else entry_fee,
         "decision_critical_gaps": gaps,

@@ -1164,6 +1164,82 @@ class ContestShapeVocabularyTests(unittest.TestCase):
         for shape, profile in opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items():
             self.assertEqual(profile["mode_family"], OBJECTIVE_CLASS_BY_SHAPE[shape], shape)
 
+    def test_curated_ticket_count_reaches_the_shape_and_closes_the_gap(self):
+        """R1c: the one satellite fact no title inference can recover.
+
+        Teeth: resolve_contest_shape has read info['ticket_count'] since R1a and
+        infer_contest_archetype never returned one, so a single-ticket qualifier
+        could not reach the wta_ticket_satellite profile from a curated row no
+        matter what the row said.
+        """
+        from mlb_engine.entries.dk_entries_manager import (
+            ContestArchetype, infer_contest_archetype)
+
+        one = ContestArchetype("Qualifier", None, "satellite", None, "ticket_line",
+                               "inferred_high", ticket_count=1)
+        many = ContestArchetype("Qualifier", None, "satellite", None, "ticket_line",
+                                "inferred_high", ticket_count=6)
+        unknown = ContestArchetype("Qualifier", None, "satellite", None, "ticket_line",
+                                   "inferred_high")
+
+        single = infer_contest_archetype("MLB $5 Qualifier", archetypes=[one])
+        self.assertEqual(single["ticket_count"], 1)
+        self.assertEqual(epi.resolve_contest_shape("wta_satellite", single),
+                         "wta_ticket_satellite")
+        self.assertNotIn("ticket_count", single["decision_critical_gaps"])
+
+        multi = infer_contest_archetype("MLB $5 Qualifier", archetypes=[many])
+        self.assertEqual(epi.resolve_contest_shape("wta_satellite", multi), "satellite")
+
+        blank = infer_contest_archetype("MLB $5 Qualifier", archetypes=[unknown])
+        self.assertIsNone(blank["ticket_count"])
+        self.assertIn("ticket_count", blank["decision_critical_gaps"])
+        self.assertEqual(epi.resolve_contest_shape("wta_satellite", blank), "satellite")
+
+    def test_a_curated_objective_class_that_contradicts_its_row_fails_the_load(self):
+        """R1c: the column is a cross-check, never a router. Two copies of one
+        fact that can disagree is this project's named failure class, so the
+        disagreement is fatal at load instead of silent at build time."""
+        from mlb_engine.entries.dk_entries_manager import load_archetypes
+
+        header = ("pattern,inferred_buy_in,inferred_type,inferred_max_entries,"
+                  "payout_shape_default,confidence,notes,objective_class,ticket_count\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            good = Path(tmp) / "good.csv"
+            good.write_text(header + "Qualifier,,satellite,,ticket_line,inferred_high,,ticket_line,4\n",
+                            encoding="utf-8")
+            row = load_archetypes(str(good))[0]
+            self.assertEqual(row.objective_class, "ticket_line")
+            self.assertEqual(row.ticket_count, 4)
+
+            for bad_line, needle in (
+                ("Qualifier,,satellite,,ticket_line,inferred_high,,wta,4\n", "contradicts"),
+                ("Qualifier,,satellite,,ticket_line,inferred_high,,not_a_class,4\n", "not one of"),
+                ("Qualifier,,satellite,,ticket_line,inferred_high,,,many\n", "not a number"),
+                ("Qualifier,,satellite,,ticket_line,inferred_high,,,0\n", "not a count"),
+            ):
+                bad = Path(tmp) / "bad.csv"
+                bad.write_text(header + bad_line, encoding="utf-8")
+                with self.assertRaises(ValueError) as ctx:
+                    load_archetypes(str(bad))
+                self.assertIn(needle, str(ctx.exception))
+
+    def test_the_shipped_archetype_csv_carries_both_columns_and_loads(self):
+        """The curated file is the deliverable, not just the parser."""
+        from mlb_engine.entries.dk_entries_manager import (
+            DEFAULT_ARCHETYPES_CSV, load_archetypes)
+        from mlb_engine.contest_shapes import objective_class_for_payout_token
+
+        path = Path(DEFAULT_ARCHETYPES_CSV)
+        if not path.exists():  # pragma: no cover - repo-root dependent
+            self.skipTest(f"{DEFAULT_ARCHETYPES_CSV} not reachable from cwd")
+        rows = load_archetypes(str(path))
+        self.assertGreater(len(rows), 15)
+        for row in rows:
+            implied = objective_class_for_payout_token(row.payout_shape_default)
+            if implied is not None:
+                self.assertEqual(row.objective_class, implied, row.pattern)
+
     def test_du_reports_that_it_was_not_enforced_instead_of_passing(self):
         """R15, decision 2026-07-27: delete the dead stage, keep the primitive,
         and stop recording an all-clear for a control that did not run.

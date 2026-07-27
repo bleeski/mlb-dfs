@@ -134,6 +134,32 @@ def objective_class(shape: object, default: Optional[str] = None) -> str:
     return validate_shape(shape, "objective_class")
 
 
+# R1c. payout_shape_default is the curated CSV's own vocabulary and it is NOT
+# the shape vocabulary: it carries tokens like 'winner_take_all',
+# 'mme_top_heavy' and 'ticket_satellite' that no profile key uses. This maps the
+# tokens whose objective is unambiguous, so a curated objective_class can be
+# cross-checked against the row it sits on. A token absent here has no implied
+# objective and the cross-check passes by declining to guess, which is the same
+# rule objective_class() follows for an unknown shape.
+_OBJECTIVE_CLASS_BY_PAYOUT_TOKEN: Dict[str, str] = {
+    "flat_cash": "cash",
+    "cash": "cash",
+    "winner_take_all": "wta",
+    "ticket_line": "ticket_line",
+    "ticket_satellite": "ticket_line",
+    "single_entry_gpp": "gpp",
+    "broad_micro_gpp": "gpp",
+    "limited_entry_gpp": "gpp",
+    "portfolio_gpp": "gpp",
+    "mme_top_heavy": "gpp",
+}
+
+
+def objective_class_for_payout_token(token: object) -> Optional[str]:
+    """The objective a curated ``payout_shape_default`` implies, or None."""
+    return _OBJECTIVE_CLASS_BY_PAYOUT_TOKEN.get(str(token or "").strip().lower())
+
+
 def is_ticket_line(shape: object) -> bool:
     """True for shapes ranked on clearing a cut line rather than on first place."""
     return objective_class(shape, default="") == "ticket_line"

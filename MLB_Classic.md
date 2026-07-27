@@ -474,6 +474,12 @@ Required regression coverage includes:
 - Tail candidate scanner: all four signal paths, coverage-tier degradation, threshold overrides, and the park-only fallback.
 - xwOBA baseline correction: batter and pitcher ratio direction, PA shrinkage, clip bands, sub-floor neutral fallback, BOM handling, and unmatched fallback.
 - Contest-type classification from dk_contest_archetypes.csv by longest-pattern match.
+- Curated archetype columns (R1c, 2026-07-27): `objective_class` is a cross-check
+  against the row's own `payout_shape_default` and fails the load on a
+  disagreement, never routing anything; `ticket_count` is the one satellite fact
+  no title inference can recover, where 1 routes to the `wta_ticket_satellite`
+  profile, more than 1 routes to the ticket-line blend, and blank keeps the
+  multi-ticket default and stays a decision-critical gap at the checkpoint.
 - Front-door run_slate: plan-only creates no run, approved build promotes, bad schema blocks, posture mapping.
 - Projection-enrichment wiring (v2.23.0): the DK-keyed xwOBA correction demonstrably reaches the frame with the exact clipped values, a zero-match on a real pool raises the wiring error, the value guard caps the outlier hitter and never a pitcher and honors the opt-out, per-player xISO ceilings flow into Ceiling with unmatched rows at the uniform neutral, the F4 map applies only where no explicit F4 exists, compute_f4_factors quality-and-platoon math, and run_slate surfaces projection_enrichment.
 - Pitcher K-rate ceiling wiring (v2.24.0): the FanGraphs loader rejects a rate-less export, the multiplier scales/shrinks/floors and leaves a GS-0 reliever neutral, K% outranks K/9 when both exist, the DK-keyed join maps pitchers only and resolves a name collision to the higher-TBF row with the collision reported, the multipliers demonstrably reach Ceiling with hitters untouched, the K-rate and xISO values coexist in one Ceiling_Multiplier column, a zero-match on a 10-pitcher pool raises the wiring error, and run_slate surfaces projection_enrichment["pitcher_ceiling"].
