@@ -274,13 +274,28 @@ The joint solve enforces, as applicable:
 - Entry-specific exact-slot lock compatibility.
 - No introduction of players from already locked teams.
 
-Lean WTA/GPP defaults for at least four entries:
+**The production caps table is `execution_pipeline.STRATEGY_DEFAULTS`, keyed by
+posture.** `run_slate` merges it; an explicit `portfolio_controls_override` wins
+over it; `_slate_feasibility` floors any cap up to the slate minimum and reports
+what it floored. The numbers below are this section's own row, and they are the
+`wta_satellite` row as of the 2026-07-27 caps decision (ledger 3.11).
+
+Satellite and WTA family, at least four entries:
 
 - Player cap: 45%.
 - Pitcher cap: 43%.
 - Primary stack cap: 35%.
-- SP pair: about 12% of entries, minimum two.
+- SP pair: about 12% of entries, minimum two. `STRATEGY_DEFAULTS` pins a flat
+  two, which is equal below sixteen entries and tighter above.
 - Maximum shared players: five for portfolios of at least eight.
+  `STRATEGY_DEFAULTS` pins a flat five and lets the feasibility floor lift it.
+
+The GPP postures ladder deliberately and do not take the row above:
+`small_gpp` 0.50 / 0.60 / 0.55 / 6, `large_gpp` 0.40 / 0.55 / 0.50 / 6, `mme`
+0.35 / 0.50 / 0.45 / 6 (player / pitcher / stack / shared). A wider field gets
+wider exposure and more decorrelation, which one flat row cannot express. Read
+the divergence between those numbers and the row above as the ladder, not as
+drift.
 
 Any relaxed cap must be surfaced. Hard all-pairs SP coverage remains explicit opt-in only. The medium-postponement 25% cap from §5 is applied through the game exposure control, not as an advisory note.
 

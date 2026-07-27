@@ -1164,6 +1164,46 @@ class ContestShapeVocabularyTests(unittest.TestCase):
         for shape, profile in opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items():
             self.assertEqual(profile["mode_family"], OBJECTIVE_CLASS_BY_SHAPE[shape], shape)
 
+    def test_satellite_family_caps_are_section_8s_numbers(self):
+        """R5, dated decision 2026-07-27 (ledger 3.11).
+
+        Teeth: the caps a satellite portfolio is actually built under. These
+        reached the solver as 0.60 / 0.70 / 0.60 / 7 while MLB_Classic section 8
+        published 0.45 / 0.43 / 0.35 / 5, and duplication is the main enemy in a
+        satellite-heavy portfolio. The posture was NOT split, so a true WTA rides
+        the same row; the WTA-versus-cut-line difference is carried by
+        resolve_contest_shape and asserted separately above.
+        """
+        controls = epi.STRATEGY_DEFAULTS["wta_satellite"]["controls"]
+        self.assertEqual(controls["max_player_exposure_pct"], 0.45)
+        self.assertEqual(controls["max_pitcher_exposure_pct"], 0.43)
+        self.assertEqual(controls["max_primary_stack_exposure_pct"], 0.35)
+        self.assertEqual(controls["max_shared_players"], 5)
+        self.assertEqual(controls["max_sp_pair_repetition"], 2)
+
+    def test_the_tightened_caps_reach_a_merged_build(self):
+        """The dict is not the contract; what run_slate merges is."""
+        merged = epi._merged_controls_for_build(
+            {"c1": {"posture": "wta_satellite"}}, None)
+        self.assertEqual(merged["max_pitcher_exposure_pct"], 0.43)
+        self.assertEqual(merged["max_shared_players"], 5)
+        # Tightest cap wins across contests, so a satellite beside a large_gpp
+        # cannot loosen the satellite row.
+        both = epi._merged_controls_for_build(
+            {"c1": {"posture": "wta_satellite"}, "c2": {"posture": "large_gpp"}}, None)
+        self.assertEqual(both["max_pitcher_exposure_pct"], 0.43)
+        self.assertEqual(both["max_primary_stack_exposure_pct"], 0.35)
+        # An explicit override still wins over the tightened default, and a
+        # feasibility floor still relaxes it, both unchanged by R5.
+        self.assertEqual(
+            epi._merged_controls_for_build(
+                {"c1": {"posture": "wta_satellite"}},
+                {"max_pitcher_exposure_pct": 1.0})["max_pitcher_exposure_pct"], 1.0)
+        self.assertEqual(
+            epi._merged_controls_for_build(
+                {"c1": {"posture": "wta_satellite"}}, None,
+                {"max_shared_players": 8})["max_shared_players"], 8)
+
     def test_every_posture_resolves_to_a_real_profile_key(self):
         from mlb_engine.contest_shapes import CONTEST_SHAPE_SET
         postures = list(epi.STRATEGY_DEFAULTS) + ["not_a_posture"]
@@ -3411,11 +3451,17 @@ class PctFloorAndClockPipelineTests(unittest.TestCase):
             self.assertEqual(controls["max_sp_pair_repetition"], 6)
             self.assertAlmostEqual(controls["max_pitcher_exposure_pct"], 1.0)  # ceil(12/2)=6 of 6
             self.assertAlmostEqual(controls["max_player_exposure_pct"], 1.0)
-            self.assertAlmostEqual(controls["max_primary_stack_exposure_pct"], 0.6)  # ceil(6/2)=3 <= cap
+            # R5 moved the wta_satellite stack cap from 0.60 to 0.35. Two
+            # stackable teams over six entries need ceil(6/2)=3, so the
+            # feasibility floor now lifts 0.35 to 0.50 and says it did. Before
+            # R5 the 0.60 cap cleared that minimum on its own and no floor was
+            # recorded. The floor relaxing a tightened cap on a thin fixture is
+            # the designed behavior, visible in floors_applied.
+            self.assertAlmostEqual(controls["max_primary_stack_exposure_pct"], 0.5)
             applied = plan["checkpoint_plan"]["feasibility"]["controls_feasibility"]["floors_applied"]
             self.assertIn("max_pitcher_exposure_pct", applied)
             self.assertIn("max_player_exposure_pct", applied)
-            self.assertNotIn("max_primary_stack_exposure_pct", applied)
+            self.assertIn("max_primary_stack_exposure_pct", applied)
             clock = plan["checkpoint_plan"]["slate_clock"]
             self.assertTrue(clock["available"])
             self.assertEqual(clock["source"], "salary_game_info")

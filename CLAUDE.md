@@ -54,7 +54,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  23 modules  363 tests`. The module count comes off the
+   `PASS  v2.26.0  23 modules  365 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
@@ -129,8 +129,9 @@ build", never "upload-ready", and run the preflight on every deliverable.
 promoted run to refine. Bringing Showdown under the three gates is open
 backlog, not a decision left implicit.
 
-Two portfolio controls are non-negotiable and enforced in the solver, not in
-review: no two lineups share more than max_shared_players (4 of 6, counting
+Two portfolio controls are enforced in the solver, not in review, and relaxed
+only in the stated order and counted: no two lineups share more than
+max_shared_players (4 of 6, counting
 the player and not the role), and no captain exceeds max_cpt_exposure_pct
 (0.33, a floor() of pct * n, which is why it is not 0.35). Both relax before
 they truncate, in the order overlap then captain lock then thesis, because a

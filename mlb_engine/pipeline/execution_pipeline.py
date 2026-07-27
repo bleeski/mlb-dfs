@@ -611,12 +611,23 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "entry_count_policy": "scale_to_bank_coverage",
         "stack_plan": "tight_consecutive_1_5",
         "decorrelation": "moderate",
+        # R5, dated decision 2026-07-27, ledger 3.11. Was 0.60 / 0.70 / 0.60 /
+        # 2 / 7. These are MLB_Classic section 8's numbers, adopted for the whole
+        # posture rather than split into a separate satellite row: at more than
+        # one entry a true WTA also wants live independent shots, so the loose
+        # half of the old row was defending a case that does not hold. The
+        # WTA-versus-cut-line objective difference is carried at the shape level
+        # by resolve_contest_shape, not here. SP-pair stays 2, which is tighter
+        # than section 8's ~12%-of-entries rule above 16 entries and equal to it
+        # below.
         "controls": {
-            "max_player_exposure_pct": 0.60, "max_pitcher_exposure_pct": 0.70,
-            "max_primary_stack_exposure_pct": 0.60, "max_sp_pair_repetition": 2,
-            "max_shared_players": 7,
+            "max_player_exposure_pct": 0.45, "max_pitcher_exposure_pct": 0.43,
+            "max_primary_stack_exposure_pct": 0.35, "max_sp_pair_repetition": 2,
+            "max_shared_players": 5,
         },
-        "note": "first-place objective: ceiling and decorrelation, not floor",
+        "note": "cut-line and first-place objectives both want independent "
+                "shots; section 8 caps, floored up by _slate_feasibility when "
+                "a thin slate cannot carry them",
     },
     "small_gpp": {
         "construction": "multi",

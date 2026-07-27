@@ -467,7 +467,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 363 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 365 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

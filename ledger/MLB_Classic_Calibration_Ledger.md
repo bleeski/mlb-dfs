@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  23 modules  363 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  23 modules  365 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw). This applies to late swap too as of 2026-07-27 (F16): `tools/late_swap.py --postures <id>=<posture>` resolves identity the way the build does and blocks on a contest that matches no archetype, where it used to stamp every entry `large_wta`.
@@ -450,6 +450,86 @@ draws, and it would be its own decision at the composition site.
 resolver. F1 reads its park factor and F5 reads its venue, roof, azimuth and wind
 threshold from the same record, because two resolutions of one fact is this
 project's named no-op failure class.
+
+### 3.11 Portfolio caps for the satellite family (DATED DECISION, 2026-07-27, R5)
+
+**The question.** Two cap sets shipped and the strategy doc matched the one
+production does not run. `execution_pipeline.STRATEGY_DEFAULTS`, which
+`run_slate` merges by posture, gave `wta_satellite` a player cap of 0.60, a
+pitcher cap of 0.70, a primary-stack cap of 0.60 and 7 shared players.
+MLB_Classic section 8 published 0.45 / 0.43 / 0.35 / 5. Duplication is the main
+enemy in a satellite-heavy portfolio, so this was a live strategy fact and not a
+doc nit.
+
+| control | STRATEGY_DEFAULTS wta_satellite (was) | MLB_Classic section 8 | adopted |
+|---|---|---|---|
+| max_player_exposure_pct | 0.60 | 0.45 | 0.45 |
+| max_pitcher_exposure_pct | 0.70 | 0.43 | 0.43 |
+| max_primary_stack_exposure_pct | 0.60 | 0.35 | 0.35 |
+| max_sp_pair_repetition | 2 | ~12% of entries, min 2 | 2 |
+| max_shared_players | 7 | 5 at 8+ entries | 5 |
+
+**Two claims the draft of this entry carried were wrong, and correcting them
+changed the answer.** First, it named `contest_allocator.plan_and_assign_entries`
+as the path that already implements section 8. No such function exists on this
+tree. The section 8 numbers live in `select_and_assign_portfolio`
+(`contest_allocator.py:1873-1877`), which has zero production callers and one
+test caller. Second, and decisive: inside that function the caps block is gated
+on `tournament = bool(shapes) and all(x not in {"cash", "satellite"} ...)`, so a
+satellite card turns the caps off entirely. Section 8's numbers were never
+applied to a satellite anywhere, and section 8's own heading called them "Lean
+WTA/GPP defaults." Tightening the satellite family is therefore a new strategy
+choice, not a reconciliation, and it had to be argued rather than adopted.
+
+**The decision.** Adopt section 8's numbers on the existing `wta_satellite`
+posture. Do not split the posture.
+
+The draft preferred a split: a new `satellite` posture at section 8's numbers,
+with `wta_satellite` left concentrated at 0.70 / 0.60 / 7 for true winner-take-
+all. Rejected, because the premise does not hold. Loose caps for a true WTA
+assume concentration on the single best build is correct at any entry count, and
+it is correct only at one entry, which is the `single_entry` posture and already
+has caps of 1.0. At four or eight entries a WTA wants live independent shots at
+first place for the same reason a satellite wants them at the line. The
+objective difference between the two, first place versus clearing a cut, is real
+and it is already carried at the shape level by `resolve_contest_shape` and the
+0.58/0.42 ticket-line blend. It does not need a second expression in the caps
+table. Adding a fifth caps row and a change to the posture fold would buy a
+distinction for the contest type this portfolio enters least.
+
+**What this compounds with.** R1b made satellite ranking floor-aware. Tighter
+caps and a cut-line objective push the same direction: clear the line on shots
+that do not fail together.
+
+**The honest counterargument, unchanged from the draft.** Tighter caps buy
+decorrelation by forcing the portfolio off its best play. Pitcher 0.43 on an
+eight-entry portfolio means at least three entries take an arm the engine ranked
+below the top one, and on a four-game slate the third-best arm can be materially
+worse rather than marginally. `_slate_feasibility` derives the minimum feasible
+caps, floors the merged caps up before the explicit override, and reports the
+floor, so an infeasible slate degrades visibly. It does not protect against
+quality dilution, which is invisible in the certified output. Nothing in the
+archive measures this yet, which is why this is a judgment call and not a fit.
+
+**The GPP half of the divergence is retired in the doc, not the code.** Section 8
+published one flat row while `STRATEGY_DEFAULTS` ladders the GPP postures by
+field size (`small_gpp` 0.50 / 0.60 / 0.55 / 6, `large_gpp` 0.40 / 0.55 / 0.50 /
+6, `mme` 0.35 / 0.50 / 0.45 / 6). The ladder is the better reasoning and one flat
+row cannot express it, so section 8 now names `STRATEGY_DEFAULTS` as the
+production caps table and records the ladder as deliberate.
+
+**Also settled here.** CLAUDE.md's Showdown block called the two portfolio
+controls "non-negotiable and enforced in the solver", four lines above the
+sentence describing the order in which they relax. Now "enforced in the solver,
+not in review, and relaxed only in the stated order and counted" (RC 1.14, routed
+here by R3d).
+
+**What this does not do.** It sets caps for the `wta_satellite` posture only. It
+does not touch `single_entry`, `small_gpp`, `large_gpp`, `mme` or `cash`, and it
+does not change the feasibility floors, which may still relax any of these upward
+on a thin slate and say so. The golden replay overrides every cap
+(`LOOSE_CONTROLS`), so this change cannot move that baseline; R6(b)'s
+production-controls replay is what will exercise it.
 
 ## 4. CALIBRATION CONTENT (INERT until the Section 0 gate opens)
 
