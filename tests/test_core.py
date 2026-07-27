@@ -6,6 +6,7 @@ import json
 import tempfile
 import types
 import unittest
+import unittest.mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -1250,6 +1251,125 @@ class ContestShapeVocabularyTests(unittest.TestCase):
         for row in rows:
             self.assertIsNone(row.get(None), row.get("pattern"))
             float(row["payout_breadth"])
+
+
+class TicketLineScoringTests(unittest.TestCase):
+    """R1b/R1d: a ticket contest is ranked on the cut line, and no profile key
+    is decoration.
+
+    Teeth: score_lineup_candidate blended ceiling and floor for the `cash` mode
+    family only, so the satellite profile advertised floor_weight 0.42 and took
+    pure ceiling. `leverage_bonus_weight` and `right_tail_weight` were defined on
+    all twelve profiles and read by nothing.
+    """
+
+    POSITIONS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+
+    def _lineup(self, ceilings, floors):
+        n = len(ceilings)
+        return pd.DataFrame({
+            "Player_ID": [f"p{i}" for i in range(n)],
+            "Name": [f"P{i}" for i in range(n)],
+            "Position": self.POSITIONS[:n],
+            "Team": ["AAA"] * n,
+            "Opponent": ["ZZZ"] * n,
+            "Salary": [4000] * n,
+            "Ceiling": ceilings,
+            "Floor": floors,
+        })
+
+    def test_ticket_line_blends_floor_where_wta_takes_pure_ceiling(self):
+        lineup = self._lineup([12.0] * 10, [7.0] * 10)
+        sat = opt.score_lineup_candidate(lineup, contest_shape="satellite")
+        wta = opt.score_lineup_candidate(lineup, mode="wta", contest_shape="large_wta")
+        self.assertEqual(wta["score_components"]["projection"], wta["ceiling_sum"])
+        expected = 0.58 * sat["ceiling_sum"] + 0.42 * sat["floor_sum"]
+        self.assertAlmostEqual(sat["score_components"]["projection"], expected, places=6)
+        self.assertNotEqual(sat["score_components"]["projection"], sat["ceiling_sum"])
+
+    def test_floor_changes_a_ticket_ranking_and_leaves_wta_ranking_alone(self):
+        """The observable consequence: on one bank, two lineups with the same
+        ceiling and different floors tie under WTA and separate under a ticket
+        line. That is the objective actually changing, not a relabel."""
+        high_floor = self._lineup([12.0] * 10, [9.0] * 10)
+        low_floor = self._lineup([12.0] * 10, [4.0] * 10)
+        wta_scores = [opt.score_lineup_candidate(x, mode="wta", contest_shape="large_wta")
+                      ["contest_fit_score"] for x in (high_floor, low_floor)]
+        sat_scores = [opt.score_lineup_candidate(x, contest_shape="satellite")
+                      ["contest_fit_score"] for x in (high_floor, low_floor)]
+        self.assertAlmostEqual(wta_scores[0], wta_scores[1], places=6)
+        self.assertGreater(sat_scores[0], sat_scores[1])
+
+    def test_the_metric_is_labelled_a_proxy_and_names_the_right_objective(self):
+        lineup = self._lineup([12.0] * 10, [7.0] * 10)
+        sat = opt.score_lineup_candidate(lineup, contest_shape="satellite")
+        self.assertEqual(sat["contest_fit_metric"], "Ticket_Line_Advance_Proxy")
+        self.assertIn("Ticket_Line_Advance_Proxy", sat)
+        # Never a probability, a cash rate, or an ROI claim.
+        for key in sat:
+            lowered = str(key).lower()
+            for banned in ("roi", "win_rate", "cash_rate", "probability", "p_win"):
+                self.assertNotIn(banned, lowered)
+        self.assertEqual(opt._mode_for_contest_shape("satellite", "wta"), "ticket_line")
+        self.assertEqual(opt._mode_for_contest_shape("large_wta", "wta"), "wta")
+
+    def test_no_profile_weight_is_decoration(self):
+        """RC 1.2's contract test, cheap form: perturb each weight on each shape
+        against a fixed lineup and require the score to move, or the key to be
+        named inert on purpose."""
+        # ceiling/floor do not reach projection_component for the wta and gpp
+        # families; see the note above CONTEST_SHAPE_PROFILE_WEIGHTS.
+        inert_by_design = {"wta": {"ceiling_weight", "floor_weight"},
+                           "gpp": {"ceiling_weight", "floor_weight"}}
+        lineup = self._lineup([12.0, 11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0],
+                              [6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5])
+        lineup.loc[:4, "Team"] = "BBB"
+        lineup["Batting_Order"] = [1, 2, 3, 4, 5, 1, 2, 3, 4, 0]
+        lineup["Projected_Ownership_Pct"] = [20.0] * 10
+        lineup.loc[:4, "Salary"] = 5200
+        for shape, profile in sorted(opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items()):
+            family = profile["mode_family"]
+            base = opt.score_lineup_candidate(lineup, contest_shape=shape)["contest_fit_score"]
+            for key, value in sorted(profile.items()):
+                if key == "mode_family":
+                    continue
+                if key in inert_by_design.get(family, set()):
+                    continue
+                patched = dict(opt.CONTEST_SHAPE_PROFILE_WEIGHTS)
+                patched[shape] = dict(profile, **{key: float(value) + 1.5})
+                with unittest.mock.patch.object(
+                        opt, "CONTEST_SHAPE_PROFILE_WEIGHTS", patched):
+                    moved = opt.score_lineup_candidate(
+                        lineup, contest_shape=shape)["contest_fit_score"]
+                self.assertNotAlmostEqual(
+                    moved, base, places=6,
+                    msg=f"{shape}.{key} is defined and never reaches the score")
+
+    def test_the_blend_is_inert_on_uniform_proxy_projections(self):
+        """Stated so it is not rediscovered as a bug. Under the emergency-proxy
+        path every Floor is 0.58*Base and every Ceiling is 1.42*Base, so the
+        0.58/0.42 blend is a fixed 0.7515 multiple of ceiling and cannot reorder
+        anything. That is why the golden replay did not move on R1b, and it is
+        why the ticket objective only bites once Floor carries information
+        independent of Ceiling (the enriched path)."""
+        ratios = []
+        for bases in ([10, 9, 9, 8, 8, 7, 7, 6, 6, 5],
+                      [12, 8, 8, 8, 8, 7, 7, 6, 6, 4]):
+            lineup = self._lineup([b * 1.42 for b in bases], [b * 0.58 for b in bases])
+            scored = opt.score_lineup_candidate(lineup, contest_shape="satellite")
+            ratios.append(scored["score_components"]["projection"] / scored["ceiling_sum"])
+        self.assertAlmostEqual(ratios[0], ratios[1], places=9)
+        self.assertAlmostEqual(ratios[0], 0.58 * 1.42 / 1.42 + 0.42 * 0.58 / 1.42, places=9)
+
+    def test_the_deleted_knobs_are_gone_from_every_profile(self):
+        for shape, profile in opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items():
+            self.assertNotIn("leverage_bonus_weight", profile, shape)
+            self.assertNotIn("right_tail_weight", profile, shape)
+        # The signal itself still ships; only the unread weight is gone.
+        payload = opt.score_lineup_candidate(
+            self._lineup([12.0] * 10, [7.0] * 10), contest_shape="satellite")
+        self.assertIn("right_tail_bonus", payload)
+        self.assertIn("right_tail_volatility_counts", payload)
 
 
 class TailCandidateScannerTests(unittest.TestCase):

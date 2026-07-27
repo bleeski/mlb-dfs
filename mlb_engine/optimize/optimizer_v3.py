@@ -132,7 +132,7 @@ except Exception as exc:  # pragma: no cover - environment-dependent
     SCIPY_AVAILABLE = False
     SCIPY_IMPORT_ERROR = str(exc)
 
-OPTIMIZER_VERSION = 'v3.22'
+OPTIMIZER_VERSION = 'v3.23'
 LAST_SOLVER_BACKEND = None
 LAST_SOLVER_STATUS = None
 
@@ -2650,78 +2650,87 @@ BATTING_ORDER_CLUSTER_BASE_BONUS = {
     'NONE': 0.00,
 }
 
+# Post-solve candidate-selection weights, one profile per canonical contest
+# shape. These rerank an already-legal bank; they are not MILP constraints and
+# not an ROI or win-rate estimate.
+#
+# R1d: 'leverage_bonus_weight' and 'right_tail_weight' were defined on all
+# twelve profiles and read by nothing, and 'right_tail_bonus' was computed and
+# never added to the score. Deleted rather than consumed. Consuming right_tail
+# is one line, but it would rerank candidates on every shape at once, and a
+# change of that reach belongs in a dated ledger decision beside the caps
+# question (backlog R5), not in an integrity pass. Nothing is lost: the
+# right-tail signal still ships in the payload as 'right_tail_bonus' and
+# 'right_tail_volatility_counts', and contest_allocator already spends it in
+# _candidate_shape_score and in the right-tail retention quota.
+#
+# Still inert by design, and named here so it stays visible: for the 'wta' and
+# 'gpp' families, projection_component takes raw ceiling, so 'ceiling_weight'
+# and 'floor_weight' do not reach the score. On 'wta' that is harmless because
+# the pair is 1.00/0.00 and the blend would be identical. On 'gpp' it is a live
+# contradiction (0.72/0.28 advertised, pure ceiling applied). R1b deliberately
+# extends the blend to 'ticket_line' only; extending it to 'gpp' reranks every
+# GPP contest and is its own decision.
 CONTEST_SHAPE_PROFILE_WEIGHTS = {
     'small_wta': {
         'mode_family': 'wta', 'ceiling_weight': 1.00, 'floor_weight': 0.00,
-        'stack_bonus_weight': 1.00, 'batting_order_cluster_weight': 1.00, 'leverage_bonus_weight': 0.75,
-        'salary_uniqueness_weight': 0.55, 'right_tail_weight': 0.45,
-        'field_pressure_weight': 0.70,
+        'stack_bonus_weight': 1.00, 'batting_order_cluster_weight': 1.00,
+        'salary_uniqueness_weight': 0.55, 'field_pressure_weight': 0.70,
     },
     'mid_wta': {
         'mode_family': 'wta', 'ceiling_weight': 1.00, 'floor_weight': 0.00,
-        'stack_bonus_weight': 1.05, 'batting_order_cluster_weight': 1.00, 'leverage_bonus_weight': 0.95,
-        'salary_uniqueness_weight': 0.75, 'right_tail_weight': 0.70,
-        'field_pressure_weight': 0.90,
+        'stack_bonus_weight': 1.05, 'batting_order_cluster_weight': 1.00,
+        'salary_uniqueness_weight': 0.75, 'field_pressure_weight': 0.90,
     },
     'large_wta': {
         'mode_family': 'wta', 'ceiling_weight': 1.00, 'floor_weight': 0.00,
-        'stack_bonus_weight': 1.10, 'batting_order_cluster_weight': 1.00, 'leverage_bonus_weight': 1.20,
-        'salary_uniqueness_weight': 1.00, 'right_tail_weight': 1.00,
-        'field_pressure_weight': 1.15,
+        'stack_bonus_weight': 1.10, 'batting_order_cluster_weight': 1.00,
+        'salary_uniqueness_weight': 1.00, 'field_pressure_weight': 1.15,
     },
     'single_entry_gpp': {
         'mode_family': 'gpp', 'ceiling_weight': 0.78, 'floor_weight': 0.22,
-        'stack_bonus_weight': 0.55, 'batting_order_cluster_weight': 0.75, 'leverage_bonus_weight': 0.30,
-        'salary_uniqueness_weight': 0.25, 'right_tail_weight': 0.25,
-        'field_pressure_weight': 0.45,
+        'stack_bonus_weight': 0.55, 'batting_order_cluster_weight': 0.75,
+        'salary_uniqueness_weight': 0.25, 'field_pressure_weight': 0.45,
     },
     'portfolio_gpp': {
         'mode_family': 'gpp', 'ceiling_weight': 0.72, 'floor_weight': 0.28,
-        'stack_bonus_weight': 0.50, 'batting_order_cluster_weight': 0.75, 'leverage_bonus_weight': 0.35,
-        'salary_uniqueness_weight': 0.35, 'right_tail_weight': 0.35,
-        'field_pressure_weight': 0.55,
+        'stack_bonus_weight': 0.50, 'batting_order_cluster_weight': 0.75,
+        'salary_uniqueness_weight': 0.35, 'field_pressure_weight': 0.55,
     },
     'mme_gpp': {
         'mode_family': 'gpp', 'ceiling_weight': 0.70, 'floor_weight': 0.30,
-        'stack_bonus_weight': 0.50, 'batting_order_cluster_weight': 0.75, 'leverage_bonus_weight': 0.50,
-        'salary_uniqueness_weight': 0.55, 'right_tail_weight': 0.45,
-        'field_pressure_weight': 0.75,
+        'stack_bonus_weight': 0.50, 'batting_order_cluster_weight': 0.75,
+        'salary_uniqueness_weight': 0.55, 'field_pressure_weight': 0.75,
     },
     'small_field_gpp': {
         'mode_family': 'gpp', 'ceiling_weight': 0.80, 'floor_weight': 0.20,
-        'stack_bonus_weight': 0.60, 'batting_order_cluster_weight': 0.80, 'leverage_bonus_weight': 0.30,
-        'salary_uniqueness_weight': 0.25, 'right_tail_weight': 0.20,
-        'field_pressure_weight': 0.40,
+        'stack_bonus_weight': 0.60, 'batting_order_cluster_weight': 0.80,
+        'salary_uniqueness_weight': 0.25, 'field_pressure_weight': 0.40,
     },
     'mid_field_gpp': {
         'mode_family': 'gpp', 'ceiling_weight': 0.76, 'floor_weight': 0.24,
-        'stack_bonus_weight': 0.62, 'batting_order_cluster_weight': 0.80, 'leverage_bonus_weight': 0.42,
-        'salary_uniqueness_weight': 0.38, 'right_tail_weight': 0.32,
-        'field_pressure_weight': 0.58,
+        'stack_bonus_weight': 0.62, 'batting_order_cluster_weight': 0.80,
+        'salary_uniqueness_weight': 0.38, 'field_pressure_weight': 0.58,
     },
     'large_field_gpp': {
         'mode_family': 'gpp', 'ceiling_weight': 0.72, 'floor_weight': 0.28,
-        'stack_bonus_weight': 0.68, 'batting_order_cluster_weight': 0.80, 'leverage_bonus_weight': 0.58,
-        'salary_uniqueness_weight': 0.62, 'right_tail_weight': 0.50,
-        'field_pressure_weight': 0.82,
+        'stack_bonus_weight': 0.68, 'batting_order_cluster_weight': 0.80,
+        'salary_uniqueness_weight': 0.62, 'field_pressure_weight': 0.82,
     },
     'wta_ticket_satellite': {
         'mode_family': 'wta', 'ceiling_weight': 1.00, 'floor_weight': 0.00,
-        'stack_bonus_weight': 1.00, 'batting_order_cluster_weight': 1.00, 'leverage_bonus_weight': 0.85,
-        'salary_uniqueness_weight': 0.65, 'right_tail_weight': 0.55,
-        'field_pressure_weight': 0.80,
+        'stack_bonus_weight': 1.00, 'batting_order_cluster_weight': 1.00,
+        'salary_uniqueness_weight': 0.65, 'field_pressure_weight': 0.80,
     },
     'cash': {
         'mode_family': 'cash', 'ceiling_weight': 0.30, 'floor_weight': 0.70,
-        'stack_bonus_weight': 0.10, 'batting_order_cluster_weight': 0.20, 'leverage_bonus_weight': 0.00,
-        'salary_uniqueness_weight': 0.00, 'right_tail_weight': 0.00,
-        'field_pressure_weight': 0.10,
+        'stack_bonus_weight': 0.10, 'batting_order_cluster_weight': 0.20,
+        'salary_uniqueness_weight': 0.00, 'field_pressure_weight': 0.10,
     },
     'satellite': {
         'mode_family': 'ticket_line', 'ceiling_weight': 0.58, 'floor_weight': 0.42,
-        'stack_bonus_weight': 0.35, 'batting_order_cluster_weight': 0.55, 'leverage_bonus_weight': 0.15,
-        'salary_uniqueness_weight': 0.10, 'right_tail_weight': 0.10,
-        'field_pressure_weight': 0.25,
+        'stack_bonus_weight': 0.35, 'batting_order_cluster_weight': 0.55,
+        'salary_uniqueness_weight': 0.10, 'field_pressure_weight': 0.25,
     },
 }
 
@@ -3294,7 +3303,15 @@ def score_lineup_candidate(
     suppression_count = _suppression_trigger_count(lineup_df)
     salary_uniqueness_bonus = 0.40 if salary_used <= 49200 else 0.0
 
-    if profile['mode_family'] == 'cash':
+    # R1b. A ticket contest pays for clearing a cut line, not for finishing
+    # first, so its candidates are ranked on the profile's ceiling/floor blend
+    # (0.58/0.42 on the satellite profile) rather than on raw ceiling. This is a
+    # DETERMINISTIC REVIEW PROXY for "clears the line", not P(score >= cutline)
+    # and not a probability of any kind: the real quantity needs a field
+    # distribution, which is R10's ownership work. Before this branch existed,
+    # the satellite profile advertised a floor weight of 0.42 and took pure
+    # ceiling, so the number in the config was decoration.
+    if profile['mode_family'] in ('cash', 'ticket_line'):
         projection_component = profile['ceiling_weight'] * ceiling + profile['floor_weight'] * floor
     else:
         projection_component = ceiling
@@ -3309,7 +3326,10 @@ def score_lineup_candidate(
     marginal_portfolio_diversity_component = 0.0  # applied jointly, never guessed per lineup
     contest_fit = projection_component + correlation_component + duplication_component
 
-    metric_name = 'WTA_First_Place_Proxy' if mode == 'wta' else 'Portfolio_EV_Proxy'
+    if profile['mode_family'] == 'ticket_line':
+        metric_name = 'Ticket_Line_Advance_Proxy'
+    else:
+        metric_name = 'WTA_First_Place_Proxy' if mode == 'wta' else 'Portfolio_EV_Proxy'
     return {
         'candidate_id': candidate_id,
         'salary_used': salary_used,
@@ -3441,11 +3461,17 @@ def _portfolio_exposure_summary(lineup_records, projections_df=None):
     }
 
 def _mode_for_contest_shape(shape, fallback_mode='portfolio_ev'):
+    """Scoring mode for a shape. Feeds score_lineup_candidate only; it does not
+    pick a MILP construction mode (contest_shapes.WTA_CONSTRUCTION_SHAPES does)."""
     shape = str(shape or '').lower()
     if shape in {'small_wta', 'mid_wta', 'large_wta', 'wta_ticket_satellite'}:
         return 'wta'
     if shape == 'cash':
         return 'cash'
+    # R1b: a multi-ticket satellite was labelled Portfolio_EV_Proxy, which named
+    # the wrong objective on the contests most of the portfolio is entered into.
+    if is_ticket_line(shape):
+        return 'ticket_line'
     return fallback_mode if fallback_mode != 'wta' else 'portfolio_ev'
 
 
