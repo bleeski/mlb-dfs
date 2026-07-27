@@ -61,7 +61,7 @@ from mlb_engine.swap.late_swap_manager import (
 )
 from mlb_engine.intake.slate_intake_manager import normalize_name
 
-VERSION = "v1.5"
+VERSION = "v1.6"
 
 # F17. The platoon reference's own staleness was measured against its own
 # collected_date, which is the one date it can never be stale against, so a file
@@ -197,47 +197,51 @@ def _salary_game_times(players: Mapping[str, Any]) -> Dict[str, datetime]:
     return out
 
 
-def _select_slate_legs(
-    games: Sequence[Mapping[str, Any]],
-    salary_game_times: Mapping[str, datetime],
+def select_one_leg_per_matchup(
+    entries: Sequence[Any],
+    key_of,
+    start_of,
+    slate_game_times: Mapping[str, datetime],
     tolerance_minutes: int = 10,
-) -> Tuple[List[Mapping[str, Any]], List[Dict[str, Any]]]:
+) -> Tuple[List[Any], List[Dict[str, Any]]]:
     """Keep exactly the doubleheader leg that is on the DK slate.
 
-    A feed keyed only by ``AWAY@HOME`` collapses both legs of a doubleheader onto
-    one key, and a naive last-write-wins loop silently adopts the night game's
-    lock time for a matinee draftgroup. That is a missed-lock bug, not a cosmetic
-    one, so leg selection is resolved against the salary file rather than by
-    iteration order. Legs whose start disagrees with the salary file by more than
-    ``tolerance_minutes`` are dropped and reported.
+    Any source keyed only by ``AWAY@HOME`` collapses both legs of a doubleheader
+    onto one key, and a naive last-write-wins loop silently adopts the night
+    game's numbers for a matinee draftgroup. That is a wrong-game bug, not a
+    cosmetic one, so leg selection is resolved against the salary file rather
+    than by iteration order.
 
-    When the salary file has no time for a matchup the earliest leg is kept, which
-    is first-wins rather than last-wins and matches DK's one-leg-per-draftgroup
-    behavior.
+    This is the one implementation. The lineups feed and the odds packet both
+    call it, because two copies of a leg rule are two answers to one question.
+    ``key_of`` returns ``AWAY@HOME`` (or None to skip the entry) and ``start_of``
+    returns the leg's UTC start (or None when it cannot be parsed).
+
+    Legs whose start disagrees with the salary file by more than
+    ``tolerance_minutes`` are still resolved to the closest one, and the reason
+    says so. When the salary file has no time for a matchup the earliest leg is
+    kept, which is first-wins rather than last-wins and matches DK's
+    one-leg-per-draftgroup behavior.
+
+    Returns ``(kept, dropped)`` where each dropped record carries the entry
+    itself under ``entry`` so the caller can name it in its own vocabulary.
     """
-    by_key: Dict[str, List[Mapping[str, Any]]] = {}
-    for game_entry in games:
-        away = to_dk_abbrev((game_entry.get("away") or {}).get("team_abbrev"))
-        home = to_dk_abbrev((game_entry.get("home") or {}).get("team_abbrev"))
-        if not away or not home:
+    by_key: Dict[str, List[Any]] = {}
+    for entry in entries:
+        key = key_of(entry)
+        if not key:
             continue
-        by_key.setdefault(f"{away}@{home}", []).append(game_entry)
+        by_key.setdefault(str(key), []).append(entry)
 
-    kept: List[Mapping[str, Any]] = []
+    kept: List[Any] = []
     dropped: List[Dict[str, Any]] = []
-    for game_id, legs in by_key.items():
+    for game_id in sorted(by_key):
+        legs = by_key[game_id]
         if len(legs) == 1:
             kept.append(legs[0])
             continue
-        target = salary_game_times.get(game_id)
-
-        def _start(entry: Mapping[str, Any]) -> Optional[datetime]:
-            try:
-                return _parse_utc(entry.get("game_date_utc"))
-            except (TypeError, ValueError):
-                return None
-
-        dated = [(entry, _start(entry)) for entry in legs]
+        target = (slate_game_times or {}).get(game_id)
+        dated = [(entry, start_of(entry)) for entry in legs]
         dated = [(entry, start) for entry, start in dated if start is not None]
         if not dated:
             kept.append(legs[0])
@@ -263,11 +267,50 @@ def _select_slate_legs(
                 continue
             dropped.append({
                 "game_id": game_id,
-                "game_pk": entry.get("game_pk"),
                 "start_utc": start.isoformat(),
                 "reason": reason,
+                "entry": entry,
             })
     return kept, dropped
+
+
+def _select_slate_legs(
+    games: Sequence[Mapping[str, Any]],
+    salary_game_times: Mapping[str, datetime],
+    tolerance_minutes: int = 10,
+) -> Tuple[List[Mapping[str, Any]], List[Dict[str, Any]]]:
+    """Lineups-feed wrapper over ``select_one_leg_per_matchup``."""
+
+    def _key(game_entry: Mapping[str, Any]) -> Optional[str]:
+        away = to_dk_abbrev((game_entry.get("away") or {}).get("team_abbrev"))
+        home = to_dk_abbrev((game_entry.get("home") or {}).get("team_abbrev"))
+        return f"{away}@{home}" if away and home else None
+
+    def _start(entry: Mapping[str, Any]) -> Optional[datetime]:
+        try:
+            return _parse_utc(entry.get("game_date_utc"))
+        except (TypeError, ValueError):
+            return None
+
+    kept, dropped_raw = select_one_leg_per_matchup(
+        list(games), _key, _start, salary_game_times, tolerance_minutes)
+    dropped = [{
+        "game_id": record["game_id"],
+        "game_pk": (record["entry"] or {}).get("game_pk"),
+        "start_utc": record["start_utc"],
+        "reason": record["reason"],
+    } for record in dropped_raw]
+    return kept, dropped
+
+
+def salary_game_times(salary_players: Any) -> Dict[str, datetime]:
+    """Public wrapper: DK game_id -> the slate's start time, from a salary CSV.
+
+    This is what a caller outside this module passes to
+    ``parse_the_odds_api_totals`` so the odds packet resolves the same
+    doubleheader leg the lineups feed does.
+    """
+    return _salary_game_times(_load_salary_players(salary_players))
 
 
 # ---------------------------------------------------------------------------
@@ -1078,15 +1121,32 @@ def fetch_the_odds_api_totals(
     }}
 
 
-def parse_the_odds_api_totals(raw: Sequence[Mapping[str, Any]], fetched_at: Optional[str] = None) -> Dict[str, Any]:
+def parse_the_odds_api_totals(
+    raw: Sequence[Mapping[str, Any]],
+    fetched_at: Optional[str] = None,
+    slate_game_times: Optional[Mapping[str, datetime]] = None,
+    tolerance_minutes: int = 10,
+) -> Dict[str, Any]:
     """Parse a v4 odds response (markets=totals) into odds-gate packet entries.
 
     Output ``odds_by_game_id`` maps ``AWAY@HOME`` (DK abbreviations) to
     ``{"total", "source", "fetched_at", "books", "commence_time_utc"}``. The
     consensus total is the median across books. Merge each entry under the
     matching game's ``odds`` key in the slate context packet.
+
+    F18. A doubleheader ships two events under one ``AWAY@HOME`` key and this
+    dict assignment used to be last-write-wins, so the matinee draftgroup could
+    be priced off the night game's total with nothing saying so. The lineups
+    feed got leg resolution and the odds packet did not. Both now go through
+    ``select_one_leg_per_matchup``: pass ``slate_game_times`` (from
+    ``salary_game_times``) and the leg matching the salary file's start wins.
+    Without it the earliest leg wins, which is first-wins rather than the
+    silent last-wins this replaces. Every other leg is reported in
+    ``doubleheader_legs_dropped`` with its own total, and ``legs_by_game_id``
+    carries all legs so the second total is visible rather than erased.
     """
     odds_by_game_id: Dict[str, Dict[str, Any]] = {}
+    parsed_events: List[Dict[str, Any]] = []
     unmapped: List[str] = []
     for event in raw or []:
         home = team_name_to_dk_abbrev(event.get("home_team"))
@@ -1138,7 +1198,8 @@ def parse_the_odds_api_totals(raw: Sequence[Mapping[str, Any]], fetched_at: Opti
         if not books:
             continue
         stamp = fetched_at or latest_update or datetime.now(timezone.utc).isoformat()
-        odds_by_game_id[game_id] = {
+        parsed_events.append({
+            "game_id": game_id,
             "moneyline": moneyline,
             "total": float(statistics.median(sorted(books.values()))),
             "source": "the-odds-api:" + ",".join(sorted(books)),
@@ -1146,8 +1207,39 @@ def parse_the_odds_api_totals(raw: Sequence[Mapping[str, Any]], fetched_at: Opti
             "books": books,
             "commence_time_utc": event.get("commence_time"),
             "event_id": event.get("id"),
-        }
-    return {"odds_by_game_id": odds_by_game_id, "unmapped_teams": unmapped}
+        })
+
+    def _start(entry: Mapping[str, Any]) -> Optional[datetime]:
+        try:
+            return _parse_utc(entry.get("commence_time_utc"))
+        except (TypeError, ValueError):
+            return None
+
+    kept, dropped_raw = select_one_leg_per_matchup(
+        parsed_events, lambda entry: entry.get("game_id"), _start,
+        slate_game_times or {}, tolerance_minutes)
+
+    legs_by_game_id: Dict[str, List[Dict[str, Any]]] = {}
+    for entry in parsed_events:
+        legs_by_game_id.setdefault(entry["game_id"], []).append(
+            {k: v for k, v in entry.items() if k != "game_id"})
+    for entry in kept:
+        odds_by_game_id[entry["game_id"]] = {
+            k: v for k, v in entry.items() if k != "game_id"}
+    dropped = [{
+        "game_id": record["game_id"],
+        "event_id": (record["entry"] or {}).get("event_id"),
+        "total": (record["entry"] or {}).get("total"),
+        "start_utc": record["start_utc"],
+        "reason": record["reason"],
+    } for record in dropped_raw]
+    return {
+        "odds_by_game_id": odds_by_game_id,
+        "unmapped_teams": unmapped,
+        "doubleheader_legs_dropped": dropped,
+        "legs_by_game_id": {k: v for k, v in sorted(legs_by_game_id.items())
+                            if len(v) > 1},
+    }
 
 
 # ---------------------------------------------------------------------------

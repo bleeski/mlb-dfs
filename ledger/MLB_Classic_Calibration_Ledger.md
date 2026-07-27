@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  22 modules  312 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  22 modules  329 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw). This applies to late swap too as of 2026-07-27 (F16): `tools/late_swap.py --postures <id>=<posture>` resolves identity the way the build does and blocks on a contest that matches no archetype, where it used to stamp every entry `large_wta`.
@@ -25,6 +25,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 8. Report: gates, Run ID, provenance, promoted file, Blockers line, applied floors, enrichment counts. Opt-in only: tail scanner, mispricing screen, contested-slot audit, fill-depth narration, three-assumption kill list.
 9. Ship rule: certified beats perfect. Deterministic review proxies only; never ROI, win-rate, or probability claims. Upload-ready only after all three gates.
 10. Post-slate: attach the DK standings export, archive per 3.7, and only then does the full ledger read apply.
+11. Factor ownership (F18, decided 2026-07-27, full text in 3.10): F5 owns the ballpark; F1's implied total is DIVIDED by the game's park run factor before the slate-mean ratio, so Base x F1 x F5 prices the park once. The de-park does not cap the product; F1's clip applies to F1 alone.
 
 ---
 
@@ -408,6 +409,47 @@ Order of calibratability, therefore:
   and blocks allocation until the contest page is captured.
 - **The allocator is review-only.** It emits an explicit `contest_postures` dict
   (invariant 3.4) for Ben to pass; nothing auto-applies.
+
+### 3.10 Environment factor ownership (DATED DECISION, 2026-07-27, F18)
+
+**The question.** A posted game total already prices the ballpark. F1 is built
+from that total; F5's hitter factor is `park_run_factor x wind`. The two are
+multiplied into the same projection, so an extreme park was paid for twice. On
+the shipped park band (0.94 to 1.08) and F1's clip (0.85 to 1.15) the product
+reached 1.242 against a factor whose own band tops out at 1.15. The error is
+systematic and it concentrates exactly where stack decisions concentrate.
+
+**The decision.** F5 owns the ballpark. F1 owns the rest of the run environment.
+`build_f1_factors` divides each team's implied total by its game's
+`park_run_factor` before the slate-mean ratio, and the denominator is the mean of
+the same de-parked quantity. What reaches F1 is the market's view net of the
+ballpark: pitching matchup, lineup quality, bullpen, altitude-independent
+conditions. F5 is unchanged.
+
+**Why this way and not the other way.** The alternative was to leave F1 on the
+raw total and strip `park_run_factor` out of F5. Both price the park once. This
+one prices it from `f5_park_factors.csv`, a measured multi-year table, instead of
+inferring it from one night's line; and it keeps a park effect on a slate where
+the odds fetch failed, which the alternative does not. The third option on the
+table, de-parking F1 AND stripping park from F5, was rejected on inspection: it
+removes tonight's ballpark from the projection entirely, and the xwOBA Base
+correction only removes HISTORICAL park contamination from the base level, so
+nothing else would have added it back.
+
+**What this does not do, stated so it is not rediscovered as a bug.** De-parking
+removes the double count. It does not cap `Base x F1 x F5`. The clip is applied
+to F1 alone, so on a slate whose de-parked spread still exceeds the band, F1
+saturates at 1.15 and the product reaches `1.15 x park` anyway. The F18
+acceptance line in the backlog ("a Coors fixture's combined uplift stays inside
+the F1 clip band") is therefore true of realistic slates and false in general;
+the real 2026-07-25 four-game slate went from 1.242 to 1.131. A hard ceiling on
+the product would require F1 to read F5, which is the boundary this decision
+draws, and it would be its own decision at the composition site.
+
+**One venue resolution.** `build_slate.resolve_slate_venues` is the single
+resolver. F1 reads its park factor and F5 reads its venue, roof, azimuth and wind
+threshold from the same record, because two resolutions of one fact is this
+project's named no-op failure class.
 
 ## 4. CALIBRATION CONTENT (INERT until the Section 0 gate opens)
 

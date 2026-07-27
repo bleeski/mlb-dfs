@@ -8,6 +8,84 @@ Priorities: **P0** corrupts what gets uploaded or lets an invalid file certify. 
 
 ---
 
+## Landed 2026-07-27 (Stage 3: F18)
+
+**F18 LANDED.** projection_builder v1.6, live_data_adapters v1.6,
+slate_intake_manager v1.10, audit v3.2. Suite 329 (core 254), 22 modules. Seven
+sabotage reverts, seven failing gates.
+
+Park ownership is decided and recorded as a dated ledger decision (invariant
+3.10). F5 owns the ballpark; `build_f1_factors` divides each team's implied total
+by its game's `park_run_factor` before the slate-mean ratio, and the denominator
+is the mean of the same de-parked quantity, so `Base x F1 x F5` prices the park
+once. The rejected alternatives and the reasoning are in the ledger, not here.
+`implied_total_by_team` and `league_mean_implied_total` stay RAW, because the
+brief and the ownership work mean the market's number by those names;
+`deparked_implied_total_by_team`, `park_run_factor_by_team`,
+`f1_ratio_denominator` and `f1_ratio_basis` are new. Omitting the park map keeps
+the old behavior and sets `park_adjusted: False` with a note that says the park
+is being counted twice in that build.
+
+`select_one_leg_per_matchup` is now the one leg rule; `_select_slate_legs` is a
+thin lineups-feed wrapper over it and `parse_the_odds_api_totals` calls it too,
+so a doubleheader's two totals no longer collapse by last-write-wins. Pass
+`slate_game_times` (from the new public `salary_game_times`) and the leg matching
+the salary start wins; without it the earliest leg wins, which is a rule rather
+than an accident of iteration order. The other leg is reported in
+`doubleheader_legs_dropped` with its own total and `legs_by_game_id` keeps both.
+`build_slate.load_odds_packet`, `showdown_moneyline` and `tools/stage_slate.py`
+all pass the salary file.
+
+`build_slate.resolve_slate_venues` is the single venue resolution both F1 and F5
+read. It loads `game_venue_overrides.csv` keyed `(date, AWAY@HOME)`, which had a
+loader, a resolver and zero callers outside its own module; a `manual_required`
+row with no `Run_Factor_Applied` takes a NEUTRAL 1.0 park factor and is named on
+the checkpoint, because an unapproved special venue is not a licence to reuse the
+wrong park's number. A neutral site has no forecast under its own name in the
+bundle, so wind stays neutral there and the venue is named rather than borrowing
+another city's wind.
+
+Delay and postponement risk are derived from the forecast's precipitation
+probability instead of the hardcoded "none" that made both branches of
+`compute_f5_factor` unreachable; the level comes from the WORST hour in the game
+window, not the middle one the wind read uses. `risk_from_precip_probability` is
+the mapping and it gained a "none" band below 15%, which changes no number (delay
+low is a 1.000 factor and there is no postponement low row) and stops a 0%-rain
+forecast printing "low delay risk". The wind gate uses `OUTDOOR_ROOF_TYPES`
+instead of `== "outdoor"`, so Sutter Health Park (roof_type `temporary`,
+sensitivity HIGH, threshold 8mph, the most wind-sensitive park on the schedule)
+takes a wind adjustment for the first time.
+
+**Two corrections, because the item did not hold as written.**
+
+1. The acceptance line "a Coors fixture's combined uplift stays inside the F1
+   clip band" is not achievable by de-parking, and asserting it failed. F1's clip
+   is applied to F1 alone, so on a wide-enough slate F1 saturates at 1.15 and the
+   product still reaches `1.15 x park`. De-parking removes the double count; it
+   does not bound the product. The gate now asserts what is true (1.173 to 1.098
+   on a realistic spread; 1.242 to 1.131 on the real 07-25 four-game slate) and a
+   second test states the saturation limit in its own docstring so nobody reads
+   the first as a bound.
+2. "The legacy reader misreads the precip key" is true and was dead.
+   `_legacy_risk_from_precip` is reachable only from `_normalized_weather`, whose
+   only callers are `material_weather_adjustments` and
+   `validate_slate_context_packet`, and neither has a production caller anywhere
+   in the repo. So the key fix closed a latent defect, not a live one. It still
+   belongs, because `build_f5_map` now feeds real precipitation and the mapping
+   it calls is the same one.
+
+One thing this deliberately did NOT do. `tools/fetch_slate_bundle.py` still
+builds its venue list from `team_to_venue.csv` alone, so a neutral-site game's
+forecast is fetched at the nominal home park's coordinates and filed under the
+nominal home park's name. F5 refuses to use it and says so, which is the
+fail-safe behavior; fetching the right coordinates is a separate change to a
+network tool and belongs with F23 hygiene.
+
+Open after this: F20 (caps, deferred by decision), F3b/F3c, F22, the F23
+remainder, and Section 2 beyond G1 and G4. Cluster C is now clear.
+
+---
+
 ## Landed 2026-07-27 (Stage 3: F16 and F17)
 
 **F16 LANDED. F17 LANDED.** live_data_adapters v1.5, late_swap_manager v1.4,
@@ -362,7 +440,7 @@ Dropped from RT's own list as below the value line at current stakes: portfolio 
 - **Why:** partial-as-confirmed defeats the TBD policy check; the stale platoon file is the mechanism that feeds F1; an opener projected as a starter is a material error on a two-pitcher roster.
 - **Fix:** stamp `PROJECTED_STARTER` unless `lineup_status == "confirmed"`; compare `collected_date` to the slate date in `build_slate_pool` (warn past 3 days, block past 7 for TBD-dependent builds), forward all four platoon report keys, add the file to the tracked reference set; map `PO` to the bulk role or surface it as a blocker. Done when: a partial-lineup fixture yields projected status; today's file age produces a warning; a `PO` pitcher never enters as a plain probable.
 
-### F18. Environment factors: park priced twice, doubleheaders collapsed, wind skipped at the most wind-sensitive park (P1, M) | RT N-13
+### F18. LANDED 2026-07-27 (the Coors clip-band acceptance line does not hold as written, and the precip-key defect was dead code; see the Stage 3 block). Environment factors: park priced twice, doubleheaders collapsed, wind skipped at the most wind-sensitive park (P1, M) | RT N-13
 
 - **What:** F1 (Vegas total, park-inclusive) multiplies F5's `park_run_factor` again; the odds packet keys `AWAY@HOME` with last-write-wins so a doubleheader's two totals collapse (the lineups feed got leg resolution, odds did not); `build_f5_map` hardcodes delay/postponement to "none" (and the legacy reader misreads the precip key), making the delay/exclusion branches unreachable; wind gates on `roof_type == "outdoor"` while the library's own set includes `temporary` (Sutter Health Park, high sensitivity, never adjusted); `game_venue_overrides.csv` (neutral sites) is never loaded on the production path.
 - **Why:** these are the seams in this week's headline feature; the double count systematically overweights extreme parks, which is where stack decisions concentrate.
@@ -462,7 +540,7 @@ Each stage is shippable alone; nothing in any stage blocks a build while incompl
 
 **Stage 2, evidence (half a day):** F9 miner fail-closed. F10 registry merge. F11 diagnostics honesty. F12 pointer portability. G4 own results, and persist per-slate ownership predictions from the next slate forward.
 
-**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). ~~F16 late-swap identity~~ (landed). ~~F17 intake trust~~ (landed). F18 factor ownership decision + doubleheader odds. ~~F19 determinism pin~~ (landed). F20 doctrine decision (deferred); ~~F21 Excluded coercion~~ (landed).
+**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). ~~F16 late-swap identity~~ (landed). ~~F17 intake trust~~ (landed). ~~F18 factor ownership decision + doubleheader odds~~ (landed). ~~F19 determinism pin~~ (landed). F20 doctrine decision (deferred); ~~F21 Excluded coercion~~ (landed). Stage 3 is complete apart from F20, which is deferred by decision.
 
 **Stage 4, process and leverage (as time allows):** G2 skeptic pass. G3 ownership/dup wiring (after Stage 2, once the archive is trustworthy and at the 8-slate gate). G5 corpus split + ENGINE_STATE. G6 scheduled loops. G8 tier doctrine. F22 tests. F23 remainder. G7 stakes decision, dated, once G4 yields a number.
 

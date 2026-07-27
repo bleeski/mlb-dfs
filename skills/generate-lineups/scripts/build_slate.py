@@ -552,7 +552,7 @@ def resolve_reference_data(args) -> dict:
     }
 
 
-def load_odds_packet(args) -> tuple[dict, dict]:
+def load_odds_packet(args, salary_csv=None) -> tuple[dict, dict]:
     """Return ({game_id: odds entry}, note) for the slate, or ({}, note).
 
     Accepts an --odds file in either shape the project produces: a raw
@@ -560,10 +560,15 @@ def load_odds_packet(args) -> tuple[dict, dict]:
     slate_bundle carrying ``odds_raw_totals``. Falls back to fetching when
     THE_ODDS_API_KEY is set. The key is read from the environment, never
     printed, and scrubbed from any error text.
+
+    ``salary_csv`` resolves doubleheader legs (F18); omit it and the earliest
+    leg wins instead of the last one parsed.
     """
     import os
 
-    from mlb_engine.intake.live_data_adapters import parse_the_odds_api_totals
+    from mlb_engine.intake.live_data_adapters import (
+        parse_the_odds_api_totals, salary_game_times,
+    )
 
     raw = None
     source = None
@@ -607,18 +612,158 @@ def load_odds_packet(args) -> tuple[dict, dict]:
                         "warning": f"odds fetch failed ({scrubbed}); F1 stays neutral"}
         source = "the-odds-api"
 
-    parsed = parse_the_odds_api_totals(raw)
+    # F18. Two events share one AWAY@HOME key on a doubleheader date and this
+    # dict was last-write-wins, so a matinee draftgroup could be priced off the
+    # night game's total. The salary file is authoritative for which leg is on
+    # the slate, exactly as it is for the lineups feed.
+    slate_times: dict = {}
+    leg_note = None
+    if salary_csv:
+        try:
+            slate_times = salary_game_times(str(salary_csv))
+        except Exception as exc:  # noqa: BLE001 - leg resolution never blocks a build
+            slate_times = {}
+            leg_note = f"salary start times unreadable ({exc}); kept the earliest leg"
+    parsed = parse_the_odds_api_totals(raw, slate_game_times=slate_times)
     odds = parsed.get("odds_by_game_id") or {}
     with_ml = sum(1 for v in odds.values() if (v or {}).get("moneyline"))
-    return odds, {"source": source, "games": len(odds), "games_with_moneyline": with_ml}
+    note = {"source": source, "games": len(odds), "games_with_moneyline": with_ml,
+            "leg_resolution": "salary_start_time" if slate_times else "earliest_leg"}
+    if leg_note:
+        note["leg_resolution_note"] = leg_note
+    dropped = parsed.get("doubleheader_legs_dropped") or []
+    if dropped:
+        note["doubleheader_legs_dropped"] = dropped
+        note["warning"] = (
+            f"{len(dropped)} doubleheader odds leg(s) dropped: "
+            + "; ".join(f"{d['game_id']} @ {d['start_utc']} total "
+                        f"{d.get('total')} ({d['reason']})" for d in dropped))
+    return odds, note
 
 
-def build_f1_map(pool: dict, odds_by_game_id: dict) -> tuple[dict, dict]:
+def resolve_slate_venues(pool: dict, slate_date: str) -> tuple[dict, dict]:
+    """Return ({Game_ID: venue record}, report) for every game in the pool.
+
+    One venue resolution, read by both F1 (which needs the park run factor to
+    de-park the implied total) and F5 (which needs the venue, roof, azimuth and
+    wind threshold). Two resolutions would be two answers to one question, and
+    this project has been bitten by that before.
+
+    F18. ``game_venue_overrides.csv`` existed with a loader and a resolver and
+    was never called from the production path, so a neutral-site game silently
+    took the nominal home park's factors, coordinates and roof. It is loaded
+    here keyed ``(date, AWAY@HOME)``. A row whose ``Projection_F5_Status`` is
+    ``manual_required`` without a ``Run_Factor_Applied`` takes a NEUTRAL 1.0
+    park factor and is named in the report: an unapproved special venue is not
+    a licence to reuse the wrong park's number, and guessing one is worse than
+    saying we do not have it.
+    """
+    from mlb_engine.intake.slate_intake_manager import (
+        load_f5_park_factors, load_game_venue_overrides,
+        resolve_game_venue_overrides_path,
+    )
+
+    report: dict = {"games": {}, "override_games": [], "override_manual_required": [],
+                    "venues_without_park_factor": [], "games_without_venue": []}
+    team_to_venue = REPO / "data/reference/team_to_venue.csv"
+    try:
+        park_factors = load_f5_park_factors(str(REPO / "data/reference/f5_park_factors.csv"))
+        venue_rows: dict = {}
+        with team_to_venue.open(encoding="utf-8-sig", newline="") as fh:
+            for row in csv.DictReader(fh):
+                venue_rows[str(row.get("Home_Team", "")).strip().upper()] = row
+    except Exception as exc:
+        report["skipped"] = f"venue reference data unreadable: {exc}"
+        return {}, report
+
+    overrides: dict = {}
+    try:
+        overrides_path = resolve_game_venue_overrides_path(str(team_to_venue))
+        if overrides_path:
+            overrides = load_game_venue_overrides(overrides_path)
+            report["overrides_source"] = str(overrides_path)
+    except Exception as exc:
+        report["warning"] = f"game venue overrides unreadable ({exc}); home parks assumed"
+
+    game_ids = sorted({str(row.get("Game_ID") or "")
+                       for row in (pool.get("projection_rows") or [])
+                       if "@" in str(row.get("Game_ID") or "")})
+    by_game: dict = {}
+    for game_id in game_ids:
+        away, home = (part.strip().upper() for part in game_id.split("@", 1))
+        override = overrides.get((str(slate_date), f"{away}@{home}"))
+        if override:
+            manual = (override.get("projection_f5_status") == "manual_required"
+                      and override.get("run_factor_applied") in (None, ""))
+            park_run = (1.0 if manual
+                        else float(override.get("run_factor_applied") or 1.0))
+            record = {
+                "game_id": game_id, "away": away, "home": home,
+                "venue": override.get("venue") or "",
+                "roof_type": str(override.get("roof_type") or "unknown").strip().lower(),
+                "cf_azimuth_degrees": override.get("cf_azimuth_degrees"),
+                "wind_min_speed_mph": override.get("wind_min_speed_mph"),
+                "park_run_factor": park_run,
+                "park_factor_source": "override_manual_neutral" if manual else "override_row",
+                "venue_source": "game_override",
+                "manual_required": bool(manual),
+                "notes": override.get("notes") or "",
+            }
+            report["override_games"].append(
+                {"game_id": game_id, "venue": record["venue"],
+                 "park_run_factor": park_run, "notes": record["notes"]})
+            if manual:
+                report["override_manual_required"].append(
+                    {"game_id": game_id, "venue": record["venue"]})
+        else:
+            venue_row = venue_rows.get(home)
+            if not venue_row:
+                report["games_without_venue"].append(game_id)
+                continue
+            venue = str(venue_row.get("Venue", "")).strip()
+            park = park_factors.get(venue, {})
+            park_run = float(park.get("run_factor_applied") or 1.0)
+            if venue not in park_factors:
+                report["venues_without_park_factor"].append(venue or home)
+            threshold = venue_row.get("Wind_Min_Speed_MPH")
+            try:
+                threshold = float(threshold) if threshold not in (None, "") else None
+            except (TypeError, ValueError):
+                threshold = None
+            record = {
+                "game_id": game_id, "away": away, "home": home, "venue": venue,
+                "roof_type": str(venue_row.get("Roof_Type", "")).strip().lower(),
+                "cf_azimuth_degrees": venue_row.get("CF_Azimuth_Degrees"),
+                "wind_min_speed_mph": threshold,
+                "park_run_factor": park_run,
+                "park_factor_source": "f5_park_factors" if venue in park_factors else "missing_neutral",
+                "venue_source": "home_team_default",
+                "manual_required": False,
+                "notes": "",
+            }
+        by_game[game_id] = record
+        report["games"][game_id] = {
+            "venue": record["venue"], "roof_type": record["roof_type"],
+            "park_run_factor": record["park_run_factor"],
+            "venue_source": record["venue_source"],
+            "park_factor_source": record["park_factor_source"],
+        }
+    return by_game, report
+
+
+def build_f1_map(pool: dict, odds_by_game_id: dict,
+                 park_run_factor_by_game_id: dict | None = None) -> tuple[dict, dict]:
     """Return ({Player_ID: F1}, report) from the slate's posted game lines.
 
     Game environment is the strongest exogenous signal in MLB DFS and the market
     prices it for free. Pitchers are held at 1.0 in v1 so the opposing-team
     total is not counted twice. Labeled prior, never a run projection.
+
+    F18. The posted total already prices the ballpark and F5 multiplies the park
+    run factor again, so the park was counted twice. Park ownership is decided:
+    F5 owns it, and the implied total handed to F1 is divided by the game's park
+    factor first. The map comes from ``resolve_slate_venues`` so F1 and F5 read
+    one venue resolution.
     """
     from mlb_engine.projections.projection_builder import build_f1_factors
 
@@ -631,10 +776,12 @@ def build_f1_map(pool: dict, odds_by_game_id: dict) -> tuple[dict, dict]:
         team_by_player_id.setdefault(str(pid), salary_team.get(str(pid), ""))
     if not odds_by_game_id:
         return {}, {"skipped": "no odds packet available", "non_neutral_f1": 0}
-    return build_f1_factors(odds_by_game_id, team_by_player_id, pitcher_ids=pitcher_ids)
+    return build_f1_factors(
+        odds_by_game_id, team_by_player_id, pitcher_ids=pitcher_ids,
+        park_run_factor_by_game_id=park_run_factor_by_game_id or None)
 
 
-def build_f5_map(pool: dict, args) -> tuple[dict, dict]:
+def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tuple[dict, dict]:
     """Return ({Player_ID: F5}, report) from park factors and tonight's weather.
 
     F5 is the only enrichment with a HUMAN step that cannot be automated away.
@@ -645,15 +792,28 @@ def build_f5_map(pool: dict, args) -> tuple[dict, dict]:
     the game is named in a checkpoint warning for Ben to resolve by hand.
 
     Park factors apply on their own even with no forecast at all, which is most
-    of the available signal: Coors is Coors in any weather.
+    of the available signal: Coors is Coors in any weather. F18 confirmed park
+    as F5's to own; F1 now de-parks the implied total so it is priced once.
+
+    Three F18 fixes live here. The wind gate tested ``roof_type == "outdoor"``
+    while the library's own ``OUTDOOR_ROOF_TYPES`` also contains ``temporary``,
+    so Sutter Health Park (the ATH home, wind sensitivity HIGH, threshold 8mph,
+    the most wind-sensitive park on the schedule) never took a wind adjustment.
+    Delay and postponement risk were hardcoded to "none", which made both
+    branches of ``compute_f5_factor`` unreachable; they are now derived from the
+    forecast's precipitation probability. And the venue comes from
+    ``resolve_slate_venues``, so a neutral-site override reaches production.
     """
     from mlb_engine.intake.slate_intake_manager import (
-        compute_f5_factor, load_f5_park_factors, load_f5_weather_adjustments,
+        OUTDOOR_ROOF_TYPES, compute_f5_factor, load_f5_park_factors,
+        load_f5_weather_adjustments, risk_from_precip_probability,
     )
     from mlb_engine.optimize.optimizer_v3 import wind_bearing_to_f5_label
 
     report: dict = {"games_scored": 0, "retractable_unresolved": [],
-                    "venues_without_park_factor": [], "non_neutral_f5": 0}
+                    "venues_without_park_factor": [], "non_neutral_f5": 0,
+                    "delay_risk_by_team": {}, "override_venues": [],
+                    "forecast_missing_for_venue": []}
 
     bundle_path = getattr(args, "bundle", None)
     weather_by_venue: dict = {}
@@ -671,41 +831,44 @@ def build_f5_map(pool: dict, args) -> tuple[dict, dict]:
         park_factors = load_f5_park_factors(str(REPO / "data/reference/f5_park_factors.csv"))
         adjustments = load_f5_weather_adjustments(
             str(REPO / "data/reference/f5_weather_adjustments.csv"))
-        venue_rows = {}
-        with (REPO / "data/reference/team_to_venue.csv").open(encoding="utf-8-sig",
-                                                             newline="") as fh:
-            for row in csv.DictReader(fh):
-                venue_rows[str(row.get("Home_Team", "")).strip().upper()] = row
     except Exception as exc:
         report["skipped"] = f"F5 reference data unreadable: {exc}"
         return {}, report
 
-    # Game_ID is AWAY@HOME, so the home team names the venue.
+    venues_by_game_id = venues_by_game_id or {}
+    # Game_ID is AWAY@HOME, so the game names the venue.
     team_by_player_id = dict(pool.get("team_by_player_id") or {})
     pitcher_roles = pool.get("pitcher_roles") or {}
-    home_by_team: dict = {}
+    game_by_team: dict = {}
     for row in (pool.get("projection_rows") or []):
         game_id = str(row.get("Game_ID") or "")
         if "@" in game_id:
-            home_by_team[str(row.get("Team") or "").strip().upper()] = \
-                game_id.split("@", 1)[1].strip().upper()
+            game_by_team[str(row.get("Team") or "").strip().upper()] = game_id
         if str(row.get("Player_ID")) in pitcher_roles:
             team_by_player_id.setdefault(str(row.get("Player_ID")),
                                          str(row.get("Team") or ""))
 
     f5_by_team: dict = {}
     for team in sorted({str(t).strip().upper() for t in team_by_player_id.values() if t}):
-        home = home_by_team.get(team)
-        venue_row = venue_rows.get(home or "")
-        if not venue_row:
+        record = venues_by_game_id.get(game_by_team.get(team) or "")
+        if not record:
             continue
-        venue = str(venue_row.get("Venue", "")).strip()
-        if venue not in park_factors:
-            report["venues_without_park_factor"].append(venue or home or team)
-        roof_type = str(venue_row.get("Roof_Type", "")).strip().lower()
+        venue = str(record.get("venue") or "").strip()
+        if record.get("park_factor_source") == "missing_neutral" \
+                and venue not in report["venues_without_park_factor"]:
+            report["venues_without_park_factor"].append(venue or team)
+        roof_type = str(record.get("roof_type") or "").strip().lower()
         forecast = (weather_by_venue.get(venue) or {})
         hours = forecast.get("hourly_window") or []
         mid = hours[len(hours) // 2] if hours else {}
+        if record.get("venue_source") == "game_override":
+            if venue not in report["override_venues"]:
+                report["override_venues"].append(venue)
+            if not hours and venue not in report["forecast_missing_for_venue"]:
+                # The bundle keys weather by the nominal home venue, so a
+                # neutral site has no forecast under its own name. Wind stays
+                # neutral rather than borrowing another city's wind.
+                report["forecast_missing_for_venue"].append(venue)
 
         roof_closed = roof_type == "dome"
         if roof_type == "retractable" and venue not in report["retractable_unresolved"]:
@@ -713,23 +876,36 @@ def build_f5_map(pool: dict, args) -> tuple[dict, dict]:
             report["retractable_unresolved"].append(venue)
 
         wind_status = "cross"
-        if hours and roof_type == "outdoor":
+        if hours and roof_type in OUTDOOR_ROOF_TYPES:
             wind_status = wind_bearing_to_f5_label(
-                mid.get("wind_direction_deg"),
-                venue_row.get("CF_Azimuth_Degrees"))
+                mid.get("wind_direction_deg"), record.get("cf_azimuth_degrees"))
+        # Delay risk is the WORST hour in the game window, not the middle one:
+        # a shower an hour after first pitch shortens the same starter's outing
+        # as one at first pitch, and the middle hour cannot see it.
+        precip_values = [h.get("precip_probability_pct") for h in hours
+                         if h.get("precip_probability_pct") not in (None, "")]
+        precip_max = max((float(v) for v in precip_values), default=None)
+        delay_risk, postponement_risk = ("none", "none")
+        if precip_max is not None:
+            delay_risk, postponement_risk = risk_from_precip_probability(precip_max)
+            report["delay_risk_by_team"][team] = {
+                "precip_probability_pct_max": precip_max,
+                "delay_risk": delay_risk, "postponement_risk": postponement_risk}
         weather = {
             "wind_status": wind_status,
             "wind_speed_mph": mid.get("wind_speed_mph"),
-            "delay_risk": "none",
-            "postponement_risk": "none",
+            "delay_risk": delay_risk,
+            "postponement_risk": postponement_risk,
         }
-        threshold = venue_row.get("Wind_Min_Speed_MPH")
-        try:
-            threshold = float(threshold) if threshold not in (None, "") else None
-        except (TypeError, ValueError):
-            threshold = None
-        result = compute_f5_factor(venue, weather, park_factors, adjustments,
-                                   wind_threshold_mph=threshold,
+        # A park factor resolved by the override path is already in the record;
+        # pass it through the same table lookup compute_f5_factor uses by
+        # supplying a one-row override rather than a second multiplication site.
+        park_table = park_factors
+        if record.get("venue_source") == "game_override" or venue not in park_factors:
+            park_table = dict(park_factors)
+            park_table[venue] = {"run_factor_applied": float(record.get("park_run_factor") or 1.0)}
+        result = compute_f5_factor(venue, weather, park_table, adjustments,
+                                   wind_threshold_mph=record.get("wind_min_speed_mph"),
                                    roof_closed=roof_closed or roof_type == "retractable")
         f5_by_team[team] = result
         report["games_scored"] += 1
@@ -748,12 +924,22 @@ def build_f5_map(pool: dict, args) -> tuple[dict, dict]:
     report["f5_by_team"] = {
         t: {"venue": r["components"]["venue"],
             "hitter_f5": r["hitter_f5"], "pitcher_f5": r["pitcher_f5"],
-            "wind": r["components"].get("wind_row")}
+            "wind": r["components"].get("wind_row"),
+            "delay": r["components"].get("delay_row"),
+            "postponement": r["components"].get("postponement_row")}
         for t, r in sorted(f5_by_team.items())}
+    report["game_exposure_caps"] = {
+        t: r["game_exposure_cap"] for t, r in sorted(f5_by_team.items())
+        if r.get("game_exposure_cap") is not None}
+    report["excluded_games"] = sorted(
+        t for t, r in f5_by_team.items() if r.get("exclude_game"))
     report["note"] = (
         "Deterministic F5 prior: park run factor times a wind adjustment that "
-        "applies only when the roof is open, direction is out/in, and speed "
-        "meets the venue threshold. Retractable roofs are never guessed. "
+        "applies only when the roof is open (outdoor, temporary or open), "
+        "direction is out/in, and speed meets the venue threshold, times a "
+        "pitcher-only delay factor derived from the worst precipitation hour in "
+        "the game window. Retractable roofs are never guessed. F5 owns the park; "
+        "F1's implied total is de-parked so it is not counted twice. "
         "Labeled prior, never a run projection or probability claim.")
     return f5_by_player, report
 
@@ -980,19 +1166,50 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     if f4_report.get("warning"):
         print(f"enrichment warning: {f4_report['warning']}", file=sys.stderr)
 
-    odds_by_game_id, odds_note = load_odds_packet(args)
+    # One venue resolution, read by both F1 and F5 (F18). It has to run before
+    # F1 because F1 divides the implied total by the park factor it returns.
+    venues_by_game_id, venue_report = resolve_slate_venues(pool, args.date)
+    for entry in venue_report.get("override_manual_required") or []:
+        print(f"F5 VENUE: {entry['game_id']} is at {entry['venue']} by "
+              "game_venue_overrides.csv, and that venue has no approved park "
+              "run factor, so its park factor is NEUTRAL 1.0 for this build. "
+              "Supply Run_Factor_Applied in the override row to change that.",
+              file=sys.stderr)
+    if venue_report.get("games_without_venue"):
+        print("F5 VENUE: no venue row for "
+              f"{', '.join(venue_report['games_without_venue'])}; those games "
+              "take F1 without a park de-park and F5 stays neutral.",
+              file=sys.stderr)
+
+    odds_by_game_id, odds_note = load_odds_packet(args, salary_csv=salary)
     if odds_note.get("warning"):
         print(f"odds: {odds_note['warning']}", file=sys.stderr)
-    f1_by_player_id, f1_report = build_f1_map(pool, odds_by_game_id)
+    f1_by_player_id, f1_report = build_f1_map(
+        pool, odds_by_game_id,
+        park_run_factor_by_game_id={gid: rec["park_run_factor"]
+                                    for gid, rec in venues_by_game_id.items()})
     f1_report["odds"] = odds_note
+    f1_report["venues"] = venue_report
     if f1_report.get("warning"):
         print(f"enrichment warning: {f1_report['warning']}", file=sys.stderr)
 
-    f5_by_player_id, f5_report = build_f5_map(pool, args)
+    f5_by_player_id, f5_report = build_f5_map(pool, args, venues_by_game_id)
+    f5_report["venues"] = venue_report
     for venue in f5_report.get("retractable_unresolved") or []:
         print(f"F5 ROOF: {venue} is retractable and its open/closed state is "
               "unresolved; wind is NOT applied there. Confirm by hand if it "
               "matters to this slate.", file=sys.stderr)
+    for venue in f5_report.get("forecast_missing_for_venue") or []:
+        print(f"F5 WEATHER: no forecast for the override venue {venue}; wind "
+              "is neutral there rather than borrowed from the nominal home "
+              "park. Re-run tools/fetch_slate_bundle.py if that matters.",
+              file=sys.stderr)
+    for team, entry in sorted((f5_report.get("delay_risk_by_team") or {}).items()):
+        if entry["delay_risk"] in {"medium", "high"} or entry["postponement_risk"] != "none":
+            print(f"F5 RAIN: {team} at {entry['precip_probability_pct_max']:.0f}% "
+                  f"peak precipitation; delay risk {entry['delay_risk']}, "
+                  f"postponement risk {entry['postponement_risk']}.",
+                  file=sys.stderr)
 
     # Assemble the frame WITH the enrichments. This frame is not just the timing
     # probe: on the sliced-bank path it is the frame every cached candidate is
@@ -1335,10 +1552,14 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     return bat_side, facing, note
 
 
-def showdown_moneyline(args, df) -> tuple[dict, dict]:
-    """Return ({team: american odds}, note) for the single Showdown game."""
+def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict]:
+    """Return ({team: american odds}, note) for the single Showdown game.
+
+    ``salary_csv`` matters on a doubleheader: both legs post under one
+    AWAY@HOME key and a Showdown slate is one leg (F18).
+    """
     try:
-        odds, note = load_odds_packet(args)
+        odds, note = load_odds_packet(args, salary_csv=salary_csv)
     except Exception as exc:
         return {}, {"warning": f"odds unavailable ({exc}); entries split evenly"}
     teams = sorted(df["Team"].unique()) if len(df) else []
@@ -1377,7 +1598,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # best-effort: a Showdown build must not fail because an odds endpoint is
     # down, it must say the input was missing and build anyway.
     bat_side, pitcher_hand, feed_note = showdown_handedness(args, slate_dir, df)
-    moneyline, odds_note = showdown_moneyline(args, df)
+    moneyline, odds_note = showdown_moneyline(args, df, salary_csv=salary)
 
     basis = str(df["Pool_Basis"].iloc[0]) if len(df) else "empty"
     posted = int(df["Batting_Order"].notna().sum()) if len(df) else 0

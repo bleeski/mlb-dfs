@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import csv
+import inspect
 import json
 import tempfile
+import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -4641,6 +4643,368 @@ class LateSwapDeltaAuthorizationTests(unittest.TestCase):
                 self.assertTrue(
                     validate_late_swap_delta(source, candidate,
                                              mutable_entry_ids=mutable)["passed"])
+
+
+class EnvironmentFactorOwnershipTests(unittest.TestCase):
+    """F18. Park was priced twice, doubleheader totals collapsed, delay risk was
+    a constant, the most wind-sensitive park never took wind, and the neutral-site
+    override file was never loaded.
+
+    Park ownership decided on the record 2026-07-27: F5 owns the ballpark and F1's
+    implied total is de-parked before the slate-mean ratio, so the product prices
+    the park once. Every gate below was verified by sabotage; where a test passes
+    with and without the fix, its own docstring says so.
+    """
+
+    @staticmethod
+    def _pb():
+        from mlb_engine.projections import projection_builder as pb
+        return pb
+
+    @staticmethod
+    def _module():
+        return BuildSlateScriptTests._module()
+
+    # -- park priced once ---------------------------------------------------
+
+    def test_deparking_pulls_the_combined_uplift_back_inside_the_f1_clip(self):
+        """The defect in one number. An extreme park's hitters carried the park in
+        F1 (through the posted total) and again in F5, so Base x F1 x F5 escaped
+        the band F1's own clip defines. On a realistic slate spread the product is
+        1.173 before and 1.098 after, against a 1.15 clip ceiling.
+
+        Sabotage check: drop ``park_run_factor_by_game_id`` from the second call
+        and the combined product returns to 1.173, failing ``assertLessEqual``.
+        """
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 9.5}, "CCC@DDD": {"total": 8.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"}
+        parks = {"AAA@BBB": 1.08, "CCC@DDD": 0.94}
+        low, high = pb.F1_HITTER_CLIP
+
+        f1_raw, _ = pb.build_f1_factors(odds, teams)
+        self.assertGreater(f1_raw["b"] * parks["AAA@BBB"], high)
+
+        f1_deparked, report = pb.build_f1_factors(
+            odds, teams, park_run_factor_by_game_id=parks)
+        combined = f1_deparked["b"] * parks["AAA@BBB"]
+        self.assertLessEqual(combined, high)
+        self.assertGreaterEqual(combined, low)
+        self.assertLess(f1_deparked["b"], f1_raw["b"])
+        self.assertTrue(report["park_adjusted"])
+        self.assertEqual(report["f1_ratio_basis"], "deparked_implied_total")
+
+    def test_the_clip_band_is_not_a_bound_on_the_combined_product(self):
+        """Stated so it is not rediscovered as a bug. De-parking removes the
+        double count; it does not cap Base x F1 x F5. The clip is applied to F1
+        alone, so on a slate whose de-parked spread still exceeds the band, F1
+        saturates at 1.15 and the product reaches 1.15 x park anyway.
+
+        The backlog's F18 acceptance line ("a Coors fixture's combined uplift
+        stays inside the F1 clip band") is therefore true of realistic slates and
+        NOT true in general. Capping the product would require F1 to read F5,
+        which is the ownership boundary this item exists to draw. If the product
+        needs a hard ceiling it belongs at the composition site, as its own
+        decision.
+        """
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 12.0}, "CCC@DDD": {"total": 6.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"}
+        parks = {"AAA@BBB": 1.08, "CCC@DDD": 0.94}
+        _, high = pb.F1_HITTER_CLIP
+        f1, _ = pb.build_f1_factors(odds, teams, park_run_factor_by_game_id=parks)
+        self.assertAlmostEqual(f1["b"], high)
+        self.assertGreater(f1["b"] * parks["AAA@BBB"], high)
+
+    def test_two_equal_totals_in_unequal_parks_rank_by_the_deparked_view(self):
+        """A 9.0 total in a 1.08 park is a weaker offensive read than the same 9.0
+        in a 0.94 park, because the market has already paid for the ballpark. With
+        the park factor removed, the pitcher's-park team ranks higher.
+
+        Sabotage check: without the park map both games price identically and
+        assertGreater fails.
+        """
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 9.0}, "CCC@DDD": {"total": 9.0}}
+        teams = {"a": "AAA", "c": "CCC"}
+        flat, _ = pb.build_f1_factors(odds, teams)
+        self.assertAlmostEqual(flat["a"], flat["c"])
+        deparked, _ = pb.build_f1_factors(
+            odds, teams, park_run_factor_by_game_id={"AAA@BBB": 1.08, "CCC@DDD": 0.94})
+        self.assertGreater(deparked["c"], deparked["a"])
+
+    def test_raw_implied_totals_survive_de_parking_in_the_report(self):
+        """The de-park changes F1, not what "implied total" means. The brief and
+        the ownership work read ``implied_total_by_team`` as the market's number,
+        so it stays raw and the de-parked view gets its own key."""
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 9.0}}
+        _, report = pb.build_f1_factors(
+            odds, {"a": "AAA", "b": "BBB"},
+            park_run_factor_by_game_id={"AAA@BBB": 1.08})
+        self.assertAlmostEqual(report["implied_total_by_team"]["AAA"], 4.5)
+        self.assertAlmostEqual(report["deparked_implied_total_by_team"]["AAA"], 4.17)
+        self.assertAlmostEqual(report["league_mean_implied_total"], 4.5)
+        self.assertAlmostEqual(report["f1_ratio_denominator"], 4.167, places=3)
+
+    def test_a_game_with_no_park_factor_is_named_and_kept(self):
+        """Missing venue data divides by 1.0 and says which game. Dropping the
+        game would be the forbidden pool reduction arriving as a data condition."""
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 9.0}, "CCC@DDD": {"total": 9.0}}
+        f1, report = pb.build_f1_factors(
+            odds, {"a": "AAA", "c": "CCC"},
+            park_run_factor_by_game_id={"AAA@BBB": 1.08})
+        self.assertEqual(report["games_without_park_factor"], ["CCC@DDD"])
+        self.assertIn("c", f1)
+
+    def test_omitting_the_park_map_says_the_build_is_not_park_adjusted(self):
+        """A caller with no venue data still gets an F1, and the report refuses to
+        imply an adjustment it did not make."""
+        pb = self._pb()
+        _, report = pb.build_f1_factors({"AAA@BBB": {"total": 9.0}}, {"a": "AAA"})
+        self.assertFalse(report["park_adjusted"])
+        self.assertEqual(report["f1_ratio_basis"], "implied_total")
+        self.assertIn("NO park adjustment", report["note"])
+
+    # -- doubleheader legs --------------------------------------------------
+
+    @staticmethod
+    def _dh_events():
+        def event(event_id, commence, total):
+            return {"id": event_id, "home_team": "New York Yankees",
+                    "away_team": "Boston Red Sox", "commence_time": commence,
+                    "bookmakers": [{"key": "dk", "markets": [
+                        {"key": "totals", "outcomes": [{"point": total}]}]}]}
+        return [event("matinee", "2026-07-27T17:05:00Z", 7.5),
+                event("nightcap", "2026-07-27T23:05:00Z", 11.5)]
+
+    def test_odds_resolve_the_doubleheader_leg_the_salary_file_names(self):
+        """The lineups feed got leg resolution and the odds packet did not, so a
+        matinee draftgroup could be priced off the nightcap's total.
+
+        Sabotage check: restore the ``odds_by_game_id[game_id] = ...`` assignment
+        loop and the nightcap's 11.5 wins on input order alone, so the matinee
+        assertion below fails.
+        """
+        from mlb_engine.intake.live_data_adapters import parse_the_odds_api_totals
+        events = self._dh_events()
+        matinee = {"BOS@NYY": datetime(2026, 7, 27, 17, 5, tzinfo=timezone.utc)}
+        night = {"BOS@NYY": datetime(2026, 7, 27, 23, 5, tzinfo=timezone.utc)}
+        for source in (events, list(reversed(events))):
+            self.assertEqual(
+                parse_the_odds_api_totals(source, slate_game_times=matinee)
+                ["odds_by_game_id"]["BOS@NYY"]["total"], 7.5)
+            self.assertEqual(
+                parse_the_odds_api_totals(source, slate_game_times=night)
+                ["odds_by_game_id"]["BOS@NYY"]["total"], 11.5)
+
+    def test_the_dropped_odds_leg_is_reported_with_its_own_total(self):
+        """Both totals stay visible. A collapsed key that silently discards one is
+        how the wrong game gets priced without anything saying so."""
+        from mlb_engine.intake.live_data_adapters import parse_the_odds_api_totals
+        out = parse_the_odds_api_totals(
+            self._dh_events(),
+            slate_game_times={"BOS@NYY": datetime(2026, 7, 27, 17, 5, tzinfo=timezone.utc)})
+        dropped = out["doubleheader_legs_dropped"]
+        self.assertEqual([d["event_id"] for d in dropped], ["nightcap"])
+        self.assertEqual(dropped[0]["total"], 11.5)
+        self.assertEqual(
+            sorted(leg["total"] for leg in out["legs_by_game_id"]["BOS@NYY"]),
+            [7.5, 11.5])
+
+    def test_without_salary_times_the_earliest_leg_wins_not_the_last_parsed(self):
+        """First-wins is a rule; last-write-wins is an accident of iteration
+        order. This is the no-salary-file fallback and it matches what
+        ``_select_slate_legs`` already did for the lineups feed."""
+        from mlb_engine.intake.live_data_adapters import parse_the_odds_api_totals
+        events = self._dh_events()
+        for source in (events, list(reversed(events))):
+            self.assertEqual(
+                parse_the_odds_api_totals(source)["odds_by_game_id"]["BOS@NYY"]["total"],
+                7.5)
+
+    def test_one_leg_selector_serves_both_the_feed_and_the_odds(self):
+        """Two copies of a leg rule are two answers to one question. The feed
+        wrapper and the odds parser must CALL the same function, not merely
+        mention it: a first pass at this test matched the string anywhere in the
+        source and a genuine duplicated implementation slid past it, because the
+        wrapper's docstring still named the shared helper. The check is on the
+        parsed call graph for that reason."""
+        import ast
+        import textwrap
+        from mlb_engine.intake import live_data_adapters as lda
+
+        def calls(fn):
+            tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+            return {node.func.id for node in ast.walk(tree)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
+
+        self.assertTrue(hasattr(lda, "select_one_leg_per_matchup"))
+        self.assertIn("select_one_leg_per_matchup", calls(lda._select_slate_legs))
+        self.assertIn("select_one_leg_per_matchup", calls(lda.parse_the_odds_api_totals))
+
+    # -- delay and postponement risk ---------------------------------------
+
+    def test_precip_reader_accepts_the_key_the_bundle_actually_writes(self):
+        """``_legacy_risk_from_precip`` read ``precip_probability``. Nothing in the
+        repo emits that key; ``fetch_slate_bundle`` writes
+        ``precip_probability_pct``, so the reader returned ("", "") on every real
+        payload.
+
+        Sabotage check: narrow the key list back to ``precip_probability`` and the
+        ``_pct`` assertion below fails.
+        """
+        from mlb_engine.intake.slate_intake_manager import (
+            _legacy_risk_from_precip, risk_from_precip_probability,
+        )
+        self.assertEqual(_legacy_risk_from_precip({"precip_probability_pct": 70}),
+                         ("high", "medium"))
+        self.assertEqual(_legacy_risk_from_precip({"precip_probability": 70}),
+                         ("high", "medium"))
+        self.assertEqual(_legacy_risk_from_precip({}), ("", ""))
+        self.assertEqual(risk_from_precip_probability(40), ("medium", "low"))
+        self.assertEqual(risk_from_precip_probability(0), ("none", "none"))
+
+    def test_a_rained_out_forecast_reaches_the_pitcher_delay_factor(self):
+        """``build_f5_map`` hardcoded delay and postponement to "none", so both
+        branches of ``compute_f5_factor`` were unreachable from production.
+
+        Sabotage check: hardcode ``delay_risk="none"`` in ``build_f5_map`` again
+        and the pitcher factor returns to 1.0, failing the assertion below.
+        """
+        mod = self._module()
+        pool = {"team_by_player_id": {"1": "SEA"},
+                "pitcher_roles": {"9": "declared_probable_sp"},
+                "projection_rows": [
+                    {"Player_ID": "1", "Team": "SEA", "Game_ID": "SEA@ATH"},
+                    {"Player_ID": "9", "Team": "SEA", "Game_ID": "SEA@ATH"}]}
+        venues, _ = mod.resolve_slate_venues(pool, "2026-07-27")
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp) / "bundle.json"
+            bundle.write_text(json.dumps({"weather": {"Sutter Health Park": {
+                "hourly_window": [
+                    {"wind_speed_mph": 3.0, "wind_direction_deg": 200,
+                     "precip_probability_pct": 5},
+                    {"wind_speed_mph": 3.0, "wind_direction_deg": 200,
+                     "precip_probability_pct": 80}]}}}), encoding="utf-8")
+            args = types.SimpleNamespace(bundle=str(bundle))
+            f5, report = mod.build_f5_map(pool, args, venues)
+        entry = report["f5_by_team"]["SEA"]
+        self.assertEqual(entry["delay"]["level"], "high")
+        self.assertAlmostEqual(entry["delay"]["pitcher_factor"], 0.85)
+        self.assertAlmostEqual(f5["9"], 0.85)
+        self.assertEqual(report["delay_risk_by_team"]["SEA"]["postponement_risk"],
+                         "medium")
+        self.assertAlmostEqual(report["game_exposure_caps"]["SEA"], 0.25)
+
+    def test_delay_risk_reads_the_worst_hour_not_the_middle_one(self):
+        """A shower an hour after first pitch shortens the same starter's outing.
+        The middle hour, which is what the wind read uses, cannot see it."""
+        mod = self._module()
+        pool = {"team_by_player_id": {"1": "SEA"}, "pitcher_roles": {},
+                "projection_rows": [{"Player_ID": "1", "Team": "SEA",
+                                     "Game_ID": "SEA@ATH"}]}
+        venues, _ = mod.resolve_slate_venues(pool, "2026-07-27")
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp) / "bundle.json"
+            bundle.write_text(json.dumps({"weather": {"Sutter Health Park": {
+                "hourly_window": [{"precip_probability_pct": 0},
+                                  {"precip_probability_pct": 0},
+                                  {"precip_probability_pct": 65}]}}}),
+                encoding="utf-8")
+            _, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=str(bundle)),
+                                         venues)
+        self.assertEqual(report["delay_risk_by_team"]["SEA"]["delay_risk"], "high")
+
+    # -- the wind gate ------------------------------------------------------
+
+    def test_a_temporary_roof_takes_wind_like_any_other_open_park(self):
+        """The gate tested ``roof_type == "outdoor"`` while the library's own
+        ``OUTDOOR_ROOF_TYPES`` also holds "temporary". Sutter Health Park is the
+        only temporary roof on the schedule, and it is the most wind-sensitive
+        park there is: sensitivity HIGH, threshold 8mph.
+
+        Sabotage check: put the ``== "outdoor"`` gate back and wind_row is None,
+        failing every assertion below.
+        """
+        mod = self._module()
+        from mlb_engine.intake.slate_intake_manager import OUTDOOR_ROOF_TYPES
+        self.assertIn("temporary", OUTDOOR_ROOF_TYPES)
+        pool = {"team_by_player_id": {"1": "ATH"}, "pitcher_roles": {},
+                "projection_rows": [{"Player_ID": "1", "Team": "ATH",
+                                     "Game_ID": "SEA@ATH"}]}
+        venues, _ = mod.resolve_slate_venues(pool, "2026-07-27")
+        self.assertEqual(venues["SEA@ATH"]["roof_type"], "temporary")
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp) / "bundle.json"
+            bundle.write_text(json.dumps({"weather": {"Sutter Health Park": {
+                "hourly_window": [{"wind_speed_mph": 15.0,
+                                   "wind_direction_deg": 235,
+                                   "precip_probability_pct": 0}] * 3}}}),
+                encoding="utf-8")
+            f5, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=str(bundle)),
+                                          venues)
+        wind = report["f5_by_team"]["ATH"]["wind"]
+        self.assertIsNotNone(wind)
+        self.assertEqual(wind["direction"], "out")
+        self.assertNotAlmostEqual(f5["1"], venues["SEA@ATH"]["park_run_factor"])
+
+    # -- neutral-site overrides --------------------------------------------
+
+    def test_a_neutral_site_row_changes_the_venue_on_the_production_path(self):
+        """``game_venue_overrides.csv`` had a loader, a resolver and zero callers
+        outside its own module, so a Field of Dreams game silently took Target
+        Field's park factor, roof and coordinates.
+
+        Sabotage check: stop consulting the overrides in ``resolve_slate_venues``
+        and the venue reads "Target Field", failing the first assertion.
+        """
+        mod = self._module()
+        pool = {"team_by_player_id": {"1": "MIN"}, "pitcher_roles": {},
+                "projection_rows": [{"Player_ID": "1", "Team": "MIN",
+                                     "Game_ID": "PHI@MIN"}]}
+        on_date, report = mod.resolve_slate_venues(pool, "2026-08-13")
+        self.assertEqual(on_date["PHI@MIN"]["venue"], "Field of Dreams")
+        self.assertEqual(on_date["PHI@MIN"]["venue_source"], "game_override")
+        off_date, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        self.assertEqual(off_date["PHI@MIN"]["venue"], "Target Field")
+        self.assertEqual(off_date["PHI@MIN"]["venue_source"], "home_team_default")
+        self.assertEqual([e["game_id"] for e in report["override_manual_required"]],
+                         ["PHI@MIN"])
+
+    def test_manual_required_takes_a_neutral_park_factor_not_the_home_park(self):
+        """An unapproved special venue is not a licence to reuse the wrong park's
+        number. Neutral 1.0, named in the report, is the honest read."""
+        mod = self._module()
+        pool = {"team_by_player_id": {"1": "MIN"}, "pitcher_roles": {},
+                "projection_rows": [{"Player_ID": "1", "Team": "MIN",
+                                     "Game_ID": "PHI@MIN"}]}
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-13")
+        record = venues["PHI@MIN"]
+        self.assertTrue(record["manual_required"])
+        self.assertAlmostEqual(record["park_run_factor"], 1.0)
+        self.assertEqual(record["park_factor_source"], "override_manual_neutral")
+        f5, report = mod.build_f5_map(
+            pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["1"], 1.0)
+        self.assertEqual(report["forecast_missing_for_venue"], ["Field of Dreams"])
+
+    def test_f1_and_f5_read_one_venue_resolution(self):
+        """Two venue resolutions would be two answers to one question. The park
+        factor F1 de-parks with is the same record F5 prices the park from."""
+        mod = self._module()
+        pool = {"team_by_player_id": {"1": "MIN"}, "pitcher_roles": {},
+                "projection_rows": [{"Player_ID": "1", "Team": "MIN",
+                                     "Game_ID": "PHI@MIN"}]}
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        park = venues["PHI@MIN"]["park_run_factor"]
+        f5, _ = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["1"], park)
+        _, f1_report = mod.build_f1_map(
+            pool, {"PHI@MIN": {"total": 9.0}},
+            {gid: rec["park_run_factor"] for gid, rec in venues.items()})
+        self.assertAlmostEqual(f1_report["park_run_factor_by_team"]["MIN"], park)
 
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
-VERSION = "v1.5"
+VERSION = "v1.6"
 MODES = {"provider_projection", "emergency_proxy"}
 FACTOR_COLUMNS = ("F1", "F2", "F3", "F4", "F5")
 CORE_COLUMNS = (
@@ -586,6 +586,7 @@ def build_f1_factors(
     team_by_player_id: Mapping[str, str],
     pitcher_ids: Optional[Iterable[str]] = None,
     clip: Tuple[float, float] = F1_HITTER_CLIP,
+    park_run_factor_by_game_id: Optional[Mapping[str, float]] = None,
 ) -> Tuple[Dict[str, float], Dict[str, Any]]:
     """Return ({Player_ID: F1}, report) from posted game totals and moneylines.
 
@@ -595,18 +596,50 @@ def build_f1_factors(
     The team-to-game mapping is read off the keys, so no second input can drift
     from the first.
 
-    Hitter F1 is the team's implied total over the SLATE's mean implied total,
-    clipped. The slate mean rather than a season constant, because the optimizer
-    only ever ranks players against others on the same slate: on a uniformly
-    high-total night nobody deserves a uniform boost, but the best game on that
-    night still deserves the edge over the worst.
+    Hitter F1 is the team's DE-PARKED implied total over the SLATE's mean
+    de-parked implied total, clipped. The slate mean rather than a season
+    constant, because the optimizer only ever ranks players against others on
+    the same slate: on a uniformly high-total night nobody deserves a uniform
+    boost, but the best game on that night still deserves the edge over the
+    worst.
+
+    F18, park ownership, decided on the record 2026-07-27. A posted total
+    already prices the ballpark, and F5's hitter factor multiplies
+    ``park_run_factor`` again, so an extreme park was counted twice and the
+    product could reach 1.15 x 1.08 = 1.242, outside this function's own clip
+    band. The split: park is F5's, priced once from the measured multi-year
+    reference table, and F1 owns the rest of the run environment. So when
+    ``park_run_factor_by_game_id`` is supplied, each team's implied total is
+    divided by its game's park factor before the slate-mean ratio, and what
+    survives into F1 is the market's view net of the ballpark: pitching
+    matchup, lineup quality, bullpen, altitude-independent conditions.
+
+    A game with no park factor is divided by 1.0 and named in
+    ``games_without_park_factor``, never dropped. Omitting the map entirely
+    restores the pre-F18 park-inclusive behavior and sets
+    ``park_adjusted: False``, so a caller that has no venue data still gets a
+    usable F1 and the report says which basis it used.
 
     Every emitted F1 is a labeled deterministic prior, never a run projection,
     an edge, or a probability claim.
     """
+    park_factors = {
+        str(k).strip().upper(): float(v)
+        for k, v in (park_run_factor_by_game_id or {}).items()
+        if v not in (None, "") and float(v) > 0
+    }
+    park_adjusted = bool(park_factors)
+    # The odds feed covers the whole day and the park map covers this
+    # draftgroup, so most "missing" park factors are for games nobody on the
+    # slate plays in. Only a slate game's missing factor is worth naming; the
+    # rest would bury it.
+    pool_team_codes = {str(t).strip().upper() for t in (team_by_player_id or {}).values()}
     totals_by_team: Dict[str, float] = {}
+    deparked_by_team: Dict[str, float] = {}
+    park_factor_by_team: Dict[str, float] = {}
     games_used: Dict[str, Any] = {}
     games_without_moneyline: List[str] = []
+    games_without_park_factor: List[str] = []
     for game_id, entry in (odds_by_game_id or {}).items():
         if "@" not in str(game_id):
             continue
@@ -621,28 +654,52 @@ def build_f1_factors(
             continue
         if not moneyline.get(away) or not moneyline.get(home):
             games_without_moneyline.append(str(game_id))
+        park = park_factors.get(str(game_id).strip().upper())
+        if park_adjusted and park is None and (
+                not pool_team_codes or {away, home} & pool_team_codes):
+            games_without_park_factor.append(str(game_id))
+        divisor = park if park else 1.0
         totals_by_team[away], totals_by_team[home] = split
+        deparked_by_team[away] = split[0] / divisor
+        deparked_by_team[home] = split[1] / divisor
+        park_factor_by_team[away] = park_factor_by_team[home] = divisor
         games_used[str(game_id)] = {
             "total": (entry or {}).get("total"),
             "implied": {away: round(split[0], 2), home: round(split[1], 2)},
+            "park_run_factor": divisor,
+            "deparked_implied": {away: round(split[0] / divisor, 2),
+                                 home: round(split[1] / divisor, 2)},
             "source": (entry or {}).get("source"),
         }
 
     report: Dict[str, Any] = {
         "games_priced": len(games_used),
         "games_without_moneyline": sorted(games_without_moneyline),
+        "games_without_park_factor": sorted(games_without_park_factor),
+        "park_adjusted": park_adjusted,
         "games": games_used,
         "note": (
+            "Deterministic F1 prior: de-parked implied team total over the slate "
+            "mean of de-parked totals, clipped. Implied totals are derived from "
+            "the posted game total and moneyline, not published by the book, and "
+            "are divided by the venue's park run factor so the ballpark is priced "
+            "once, in F5. Labeled prior, never a run projection, ROI, win rate, "
+            "or probability claim. Pitcher F1 stays 1.0 in v1 so the "
+            "opposing-team total is not double counted."
+        ) if park_adjusted else (
             "Deterministic F1 prior: implied team total over the slate mean, "
-            "clipped. Implied totals are derived from the posted game total and "
-            "moneyline, not published by the book. Labeled prior, never a run "
-            "projection, ROI, win rate, or probability claim. Pitcher F1 stays "
-            "1.0 in v1 so the opposing-team total is not double counted."
+            "clipped, with NO park adjustment because no park factor map was "
+            "supplied; the ballpark is therefore priced in both F1 and F5 for "
+            "this build. Implied totals are derived from the posted game total "
+            "and moneyline, not published by the book. Labeled prior, never a "
+            "run projection, ROI, win rate, or probability claim. Pitcher F1 "
+            "stays 1.0 in v1 so the opposing-team total is not double counted."
         ),
     }
     if not totals_by_team:
         report["skipped"] = "no game carried a usable total"
         report["league_mean_implied_total"] = None
+        report["f1_ratio_denominator"] = None
         report["non_neutral_f1"] = 0
         report["hitters_scored"] = 0
         return {}, report
@@ -658,12 +715,25 @@ def build_f1_factors(
     # supplies none of them.
     pool_teams = {str(t).strip().upper() for t in (team_by_player_id or {}).values()}
     slate_totals = {k: v for k, v in totals_by_team.items() if k in pool_teams}
-    basis = slate_totals or totals_by_team
-    league_mean = sum(basis.values()) / len(basis)
+    basis_teams = set(slate_totals) or set(totals_by_team)
+    league_mean = sum(totals_by_team[k] for k in basis_teams) / len(basis_teams)
+    # The ratio denominator is the mean of the SAME quantity the numerator is,
+    # so it is the de-parked mean whenever the numerators are de-parked. Both
+    # are reported because the raw mean is what the brief and the ownership
+    # work mean by "the slate's implied totals", and quietly relabeling it
+    # would make the two disagree.
+    ratio_denominator = sum(deparked_by_team[k] for k in basis_teams) / len(basis_teams)
     report["mean_basis"] = "slate_teams" if slate_totals else "all_priced_teams"
-    report["mean_basis_team_count"] = len(basis)
+    report["mean_basis_team_count"] = len(basis_teams)
     report["league_mean_implied_total"] = round(league_mean, 3)
+    report["f1_ratio_denominator"] = round(ratio_denominator, 3)
+    report["f1_ratio_basis"] = "deparked_implied_total" if park_adjusted else "implied_total"
     report["implied_total_by_team"] = {k: round(v, 2) for k, v in sorted(totals_by_team.items())}
+    if park_adjusted:
+        report["deparked_implied_total_by_team"] = {
+            k: round(v, 2) for k, v in sorted(deparked_by_team.items())}
+        report["park_run_factor_by_team"] = {
+            k: round(v, 3) for k, v in sorted(park_factor_by_team.items())}
 
     low, high = clip
     pitchers = {str(p) for p in (pitcher_ids or [])}
@@ -674,12 +744,12 @@ def build_f1_factors(
         if pid in pitchers:
             f1_by_player[pid] = F1_PITCHER_NEUTRAL
             continue
-        team_total = totals_by_team.get(str(team).strip().upper())
-        if team_total is None or league_mean <= 0:
+        team_total = deparked_by_team.get(str(team).strip().upper())
+        if team_total is None or ratio_denominator <= 0:
             teams_without_odds.add(str(team).strip().upper())
             f1_by_player[pid] = 1.0
             continue
-        f1_by_player[pid] = float(min(high, max(low, team_total / league_mean)))
+        f1_by_player[pid] = float(min(high, max(low, team_total / ratio_denominator)))
 
     report["hitters_scored"] = len(f1_by_player) - len(pitchers & set(f1_by_player))
     report["teams_without_odds"] = sorted(teams_without_odds)

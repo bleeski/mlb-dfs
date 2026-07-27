@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  22 modules  312 tests`. The module count is derived from
+   `PASS  v2.26.0  22 modules  329 tests`. The module count is derived from
    the filesystem, so it moves on its own; the test count is a pin. A count
    mismatch with the suite passing is a WARNING, not a failure, and prints
    in brackets on the PASS line: proceed and fix the pin after the slate. A

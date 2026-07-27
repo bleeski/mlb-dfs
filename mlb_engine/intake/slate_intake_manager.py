@@ -63,7 +63,7 @@ from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-VERSION = "v1.9"
+VERSION = "v1.10"
 DK_ROSTER_SLOTS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
 HITTER_SLOTS = {"C", "1B", "2B", "3B", "SS", "OF"}
 PITCHER_ALIASES = {"P", "SP", "RP"}
@@ -601,15 +601,44 @@ def _extract_roof_status(pkt_game: Dict[str, Any], weather: Dict[str, Any]) -> D
     return {"roof_status": _normalize_roof_status(status), "source": source, "fetched_at": fetched_at}
 
 
-def _legacy_risk_from_precip(weather: Dict[str, Any]) -> Tuple[str, str]:
-    precip = _to_float_or_none(weather.get("precip_probability"))
+PRECIP_DELAY_BANDS = ((60.0, "high", "medium"), (35.0, "medium", "low"), (15.0, "low", "low"))
+
+
+def risk_from_precip_probability(precip_pct: Any) -> Tuple[str, str]:
+    """Return (delay_risk, postponement_risk) for a precipitation probability.
+
+    F18. This is the only mapping from rain to the delay and postponement
+    levels ``f5_weather_adjustments.csv`` is keyed on, and until now nothing
+    production reached it: ``build_f5_map`` hardcoded both to "none", so the
+    delay pitcher downgrade and the postponement exposure cap were unreachable
+    branches in ``compute_f5_factor``.
+
+    Below 15% both read "none" rather than "low". The two are identical in
+    effect (delay low is a 1.000 pitcher factor and there is no postponement
+    low row), so this changes no number; it stops a 0%-rain forecast from
+    printing "low delay risk" in the brief, which is a false label.
+    """
+    precip = _to_float_or_none(precip_pct)
     if precip is None:
         return "", ""
-    if precip >= 60:
-        return "high", "medium"
-    if precip >= 35:
-        return "medium", "low"
-    return "low", "low"
+    for threshold, delay, postpone in PRECIP_DELAY_BANDS:
+        if precip >= threshold:
+            return delay, postpone
+    return "none", "none"
+
+
+def _legacy_risk_from_precip(weather: Dict[str, Any]) -> Tuple[str, str]:
+    """Risk levels from whichever precipitation key the payload carries.
+
+    F18. This read ``precip_probability`` only. Nothing in the repo emits that
+    key: ``fetch_slate_bundle`` writes ``precip_probability_pct`` per forecast
+    hour, so the fallback returned ("", "") on every real bundle and the levels
+    were always whatever the caller had already set.
+    """
+    for key in ("precip_probability", "precip_probability_pct", "precip_pct"):
+        if weather.get(key) not in (None, ""):
+            return risk_from_precip_probability(weather.get(key))
+    return "", ""
 
 
 def _normalized_weather(weather: Dict[str, Any]) -> Dict[str, Any]:

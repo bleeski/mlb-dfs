@@ -145,7 +145,7 @@ def stage_slate(
     checkpoint and the morning brief. Deterministic bookkeeping only.
     """
     from mlb_engine.intake.live_data_adapters import (
-        build_slate_pool, parse_the_odds_api_totals,
+        build_slate_pool, parse_the_odds_api_totals, salary_game_times,
     )
     from mlb_engine.projections.projection_builder import (
         compute_f4_factors, load_savant_expected_stats,
@@ -243,7 +243,15 @@ def stage_slate(
     odds_packet: Dict[str, Any]
     if odds_raw:
         try:
-            odds_packet = parse_the_odds_api_totals(odds_raw, fetched_at=bundle.get("fetched_at"))
+            # F18: the salary file resolves which doubleheader leg is on this
+            # slate, for odds exactly as for the lineups feed.
+            odds_packet = parse_the_odds_api_totals(
+                odds_raw, fetched_at=bundle.get("fetched_at"),
+                slate_game_times=salary_game_times(str(salary_csv)))
+            for leg in odds_packet.get("doubleheader_legs_dropped") or []:
+                warnings.append(
+                    f"odds doubleheader leg dropped: {leg['game_id']} @ "
+                    f"{leg['start_utc']} total {leg.get('total')} ({leg['reason']})")
         except Exception as exc:
             odds_packet = {"odds_by_game_id": {}, "warning": f"odds parse failed: {exc}"}
             warnings.append(f"odds packet parse failed: {exc}")
