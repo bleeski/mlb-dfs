@@ -1,5 +1,12 @@
 # MLB Classic Engineering Backlog
 
+> **SUPERSEDED 2026-07-27 by docs/2026-07-27_backlog_v2.md, which is the single
+> live backlog.** This file is kept for the history of what was considered and
+> when. Do not add items here and do not work from it. Its baseline line below
+> is stale in three ways: the counts are from v2.23.0, and `project_audit.py`
+> does not exist in this layout (the audit is `python tools/audit.py
+> --run-tests --terse`).
+
 Baseline: audited clean at v2.23.0 on 2026-07-02. 24 active files (23 tracked checksums plus the checksum file itself), 93 of 93 tests passed, all active modules import, and `project_audit.py --run-tests` returns zero errors. Every item below is deferred cleanup or optional hardening. None blocks production use.
 
 How to read this file: each item notes whether it changes file bytes, because any byte change requires regenerating `checksums_sha256_v2_23_0.json` and re-running the audit. The project is at 24 of 26 active files (2 slots remain), so new tracked files have headroom. This backlog is not a tracked artifact; it will surface as a benign "non-active files in directory" audit warning.

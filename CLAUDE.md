@@ -40,8 +40,9 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    Every other salary row is absent, not excluded.
 2. The platoon reference ages against the SLATE, not its own collected_date.
    Past 7 days with a TBD team filled from it is a pool blocker
-   (`stale_platoon_policy='warn'` downgrades it; build_slate.py tiers it SOFT,
-   so it prints and the build ships).
+   (`stale_platoon_policy='warn'` downgrades it;
+   skills/generate-lineups/scripts/build_slate.py tiers it SOFT, so it prints
+   and the build ships).
 3. `run_slate(approve=False)` first, always. The checkpoint is the review:
    slate clock, pool report, postures, stack plan, caps, feasibility, and one
    Blockers line where every blocker maps to an engine action.

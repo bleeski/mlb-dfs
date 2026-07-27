@@ -1313,14 +1313,22 @@ class TicketLineScoringTests(unittest.TestCase):
         self.assertEqual(opt._mode_for_contest_shape("satellite", "wta"), "ticket_line")
         self.assertEqual(opt._mode_for_contest_shape("large_wta", "wta"), "wta")
 
-    def test_no_profile_weight_is_decoration(self):
+    def test_no_profile_weight_is_decoration_outside_two_named_exceptions(self):
         """RC 1.2's contract test, cheap form: perturb each weight on each shape
-        against a fixed lineup and require the score to move, or the key to be
-        named inert on purpose."""
-        # ceiling/floor do not reach projection_component for the wta and gpp
-        # families; see the note above CONTEST_SHAPE_PROFILE_WEIGHTS.
-        inert_by_design = {"wta": {"ceiling_weight", "floor_weight"},
-                           "gpp": {"ceiling_weight", "floor_weight"}}
+        against a fixed lineup and require the score to move.
+
+        The exceptions are in the name because they are not equal and the short
+        name outlives its own footnote. On the `wta` family ceiling/floor are
+        1.00/0.00, so the blend equals raw ceiling and skipping it is a no-op.
+        On the `gpp` family it is a LIVE CONTRADICTION: five profiles advertise
+        splits from 0.78/0.22 to 0.70/0.30 and projection_component takes pure
+        ceiling. That is the same defect R1b fixed one family over in
+        `ticket_line`; extending the blend to `gpp` reranks every GPP contest,
+        so it is its own decision and it is on the board. Until it is decided,
+        this test must not be readable as "every weight is live."
+        """
+        known_inert = {"wta": {"ceiling_weight", "floor_weight"},
+                       "gpp": {"ceiling_weight", "floor_weight"}}
         lineup = self._lineup([12.0, 11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0],
                               [6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5])
         lineup.loc[:4, "Team"] = "BBB"
@@ -1333,7 +1341,7 @@ class TicketLineScoringTests(unittest.TestCase):
             for key, value in sorted(profile.items()):
                 if key == "mode_family":
                     continue
-                if key in inert_by_design.get(family, set()):
+                if key in known_inert.get(family, set()):
                     continue
                 patched = dict(opt.CONTEST_SHAPE_PROFILE_WEIGHTS)
                 patched[shape] = dict(profile, **{key: float(value) + 1.5})
