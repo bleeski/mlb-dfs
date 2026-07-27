@@ -66,6 +66,10 @@ v3.9 additions:
   - Added deterministic WTA_First_Place_Proxy and Portfolio_EV_Proxy scoring.
   - Added Meta-Lineup field-pressure scoring and portfolio redundancy diagnostics.
   - Added final subset helper select_final_portfolio_from_candidate_bank().
+    REMOVED 2026-07-27 (R15): zero callers since it was written, and it was
+    built on the subset-then-allocate shape MLB_Classic section 8's opening
+    rule rejects. Production selects through
+    contest_allocator.select_and_assign_entries.
 
 v3.8 additions:
   - Salary suppression activation now supports SALARY_SUPPRESSION:<trigger>
@@ -2098,7 +2102,10 @@ def build_multi_lineup(
 
     Returns dict:
       lineups, failed_indices, max_overlap_base (v3.3 contract preserved)
-      du_validation: dict with pass/relaxation_applied/pairwise_summary
+      du_validation: dict with enforced/pass/relaxation_applied/pairwise_summary.
+        Read 'enforced' first: production reaches this function through
+        build_candidate_lineup_bank under bank_constraint_scope='selection',
+        which disables DU, and then 'pass' is None because nothing was checked.
       du_signatures: list of signature dicts (one per produced lineup)
       anchor_validation: dict with SP exposure and SP-pair cap provenance
       sp_pair_coverage_validation: dict with required pair coverage provenance
@@ -2493,6 +2500,7 @@ def build_multi_lineup(
             (active_within, active_across),
             scenario_families=scenario_families,
         )
+        validation['enforced'] = True
         relaxation_summary = _relaxation_summary(
             base_within, base_across, du_relaxation_high_water
         )
@@ -2528,13 +2536,23 @@ def build_multi_lineup(
                 f'{len(validation["across_family_violations"])} across-family violations'
             )
     else:
+        # R15, 2026-07-27. This used to report pass=True. Production runs with
+        # bank_constraint_scope='selection', which sets du_threshold_row=None,
+        # so DU is disabled on every certified build and every one of them
+        # recorded a DU pass for a control that never ran. A validation dict
+        # that cannot fail is not evidence, and the truthful-labels rule makes
+        # that a defect rather than a cosmetic one. 'enforced' is the field to
+        # read; 'pass' is None because there was no check to pass.
         validation = {
-            'pass': True,
+            'enforced': False,
+            'pass': None,
             'pairwise_distances': [],
             'within_family_violations': [],
             'across_family_violations': [],
             'relaxation_applied': None,
-            'pairwise_summary': None,
+            'pairwise_summary': 'DU not enforced on this build (du_threshold_row '
+                                'resolved to disabled); no pairwise distance was '
+                                'computed and nothing was checked',
         }
 
     anchor_validation = _anchor_validation_dict(
@@ -3945,333 +3963,6 @@ def _candidate_selection_score(record, contest_shape=None):
     return float(record.get('contest_fit', {}).get(
         'contest_fit_score', record.get('objective', float('-inf'))
     ))
-
-
-def _candidate_explicit_right_tail(record):
-    counts = record.get('contest_fit', {}).get('right_tail_volatility_counts') or {}
-    return counts.get('Eruption', 0) > 0 or counts.get('Volatile', 0) > 0
-
-
-def _selection_pairwise_incompatible(rec_a, rec_b, sig_a, sig_b, max_overlap, within_min):
-    ids_a = set(_lineup_player_ids(rec_a['lineup']))
-    ids_b = set(_lineup_player_ids(rec_b['lineup']))
-    if max_overlap is not None and len(ids_a & ids_b) > max_overlap:
-        return True
-    if within_min is not None and within_min > 0 and sig_a is not None and sig_b is not None:
-        if du_distance(sig_a, sig_b, exclude_anchor=True) < within_min:
-            return True
-    return False
-
-
-def _solve_candidate_subset_milp(
-    candidates,
-    signatures,
-    requested,
-    contest_shape,
-    max_overlap,
-    within_min,
-    max_sp_cap,
-    max_pair_cap,
-    coverage_plan,
-    right_tail_target,
-    redundancy_penalty_weight,
-):
-    """Solve one final-subset MILP attempt and return selected indices/status."""
-    if not SCIPY_AVAILABLE:
-        raise RuntimeError(f'scipy MILP backend unavailable: {SCIPY_IMPORT_ERROR}')
-    import numpy as np
-    from scipy.optimize import Bounds, LinearConstraint, milp
-    from scipy.sparse import coo_matrix
-
-    n = len(candidates)
-    if requested > n:
-        return None, 'insufficient_candidates'
-
-    sp_pairs = [_sp_pair_from_lineup(rec['lineup']) for rec in candidates]
-    observed_pairs = sorted({tuple(pair) for pair in sp_pairs if pair is not None}, key=str)
-    pair_to_candidates = {
-        pair: [i for i, candidate_pair in enumerate(sp_pairs) if candidate_pair is not None and frozenset(candidate_pair) == frozenset(pair)]
-        for pair in observed_pairs
-    }
-
-    # Pairwise soft redundancy variables. Hard-incompatible pairs are excluded
-    # through x_i + x_j <= 1 and do not receive a soft variable.
-    soft_pairs = []
-    hard_pairs = []
-    for i in range(n):
-        ids_i = set(_lineup_player_ids(candidates[i]['lineup']))
-        for j in range(i + 1, n):
-            if _selection_pairwise_incompatible(
-                candidates[i], candidates[j], signatures[i], signatures[j], max_overlap, within_min
-            ):
-                hard_pairs.append((i, j))
-                continue
-            shared = len(ids_i & set(_lineup_player_ids(candidates[j]['lineup'])))
-            matched = 0
-            if signatures[i] is not None and signatures[j] is not None:
-                matched = len(matched_units(signatures[i], signatures[j], exclude_anchor=False))
-            redundancy = shared + 0.5 * matched
-            if redundancy > 0:
-                soft_pairs.append((i, j, redundancy))
-
-    x_offset = 0
-    y_offset = n
-    a_offset = y_offset + len(soft_pairs)
-    n_vars = n + len(soft_pairs) + len(observed_pairs)
-    c = np.zeros(n_vars, dtype=float)
-    for i, rec in enumerate(candidates):
-        c[x_offset + i] = -_candidate_selection_score(rec, contest_shape)
-    for k, (_, _, redundancy) in enumerate(soft_pairs):
-        c[y_offset + k] = float(redundancy_penalty_weight) * float(redundancy)
-
-    priority_scores = coverage_plan.get('sp_pair_priority_scores', {}) if coverage_plan else {}
-    for p_idx, pair in enumerate(observed_pairs):
-        priority = priority_scores.get(tuple(pair), priority_scores.get(tuple(sorted(pair, key=str)), 0.0))
-        c[a_offset + p_idx] = -0.25 * float(priority or 0.0)
-
-    rows, lbs, ubs = [], [], []
-    def add(coefs, lb, ub):
-        rows.append(dict(coefs)); lbs.append(lb); ubs.append(ub)
-
-    add({i: 1.0 for i in range(n)}, requested, requested)
-
-    # Duplicate player signatures cannot both enter the selected portfolio.
-    signature_groups = {}
-    for i, rec in enumerate(candidates):
-        key = tuple(sorted(map(str, _lineup_player_ids(rec['lineup']))))
-        signature_groups.setdefault(key, []).append(i)
-    for idxs in signature_groups.values():
-        if len(idxs) > 1:
-            add({i: 1.0 for i in idxs}, -np.inf, 1.0)
-
-    for i, j in hard_pairs:
-        add({i: 1.0, j: 1.0}, -np.inf, 1.0)
-
-    # Anchor exposure constraints apply to the selected subset.
-    sp_to_candidates = {}
-    for i, rec in enumerate(candidates):
-        for sp_id in _get_ordered_sp_ids(rec['lineup']):
-            sp_to_candidates.setdefault(sp_id, []).append(i)
-    if max_sp_cap is not None:
-        for idxs in sp_to_candidates.values():
-            add({i: 1.0 for i in idxs}, -np.inf, max_sp_cap)
-    if max_pair_cap is not None:
-        for idxs in pair_to_candidates.values():
-            add({i: 1.0 for i in idxs}, -np.inf, max_pair_cap)
-
-    # SP-pair activation variables support hard exact coverage and weighted
-    # soft unique-pair breadth without treating every pair as equally valuable.
-    for p_idx, pair in enumerate(observed_pairs):
-        a = a_offset + p_idx
-        idxs = pair_to_candidates[pair]
-        coefs = {a: 1.0}
-        for i in idxs:
-            coefs[i] = coefs.get(i, 0.0) - 1.0
-        add(coefs, -np.inf, 0.0)  # a_pair <= selected lineups using pair
-
-    if coverage_plan:
-        required_pairs = [tuple(sorted(pair, key=str)) for pair in coverage_plan.get('required_sp_pairs') or []]
-        for pair in required_pairs:
-            idxs = [i for i, cp in enumerate(sp_pairs) if cp is not None and frozenset(cp) == frozenset(pair)]
-            if not idxs:
-                return None, f'missing_required_pair:{pair}'
-            add({i: 1.0 for i in idxs}, 1.0, np.inf)
-        target_unique = int(coverage_plan.get('target_unique_pairs') or 0)
-        target_unique = min(target_unique, requested, len(observed_pairs))
-        if target_unique > 0 and observed_pairs:
-            add({a_offset + p_idx: 1.0 for p_idx in range(len(observed_pairs))}, target_unique, np.inf)
-
-    if right_tail_target > 0:
-        tail_idxs = [i for i, rec in enumerate(candidates) if _candidate_explicit_right_tail(rec)]
-        if len(tail_idxs) < right_tail_target:
-            return None, 'insufficient_explicit_right_tail_candidates'
-        add({i: 1.0 for i in tail_idxs}, right_tail_target, np.inf)
-
-    # Linearize y_ij = x_i AND x_j for redundancy penalties.
-    for k, (i, j, _) in enumerate(soft_pairs):
-        y = y_offset + k
-        add({y: 1.0, i: -1.0}, -np.inf, 0.0)
-        add({y: 1.0, j: -1.0}, -np.inf, 0.0)
-        add({y: 1.0, i: -1.0, j: -1.0}, -1.0, np.inf)
-
-    row_idx, col_idx, data = [], [], []
-    for r, coefs in enumerate(rows):
-        for col, val in coefs.items():
-            if val:
-                row_idx.append(r); col_idx.append(col); data.append(float(val))
-    A = coo_matrix((data, (row_idx, col_idx)), shape=(len(rows), n_vars)).tocsr()
-    result = milp(
-        c=c,
-        integrality=np.ones(n_vars, dtype=int),
-        bounds=Bounds(np.zeros(n_vars), np.ones(n_vars)),
-        constraints=LinearConstraint(A, np.array(lbs, dtype=float), np.array(ubs, dtype=float)),
-        options={'time_limit': 30, 'disp': False},
-    )
-    status = str(getattr(result, 'message', getattr(result, 'status', None)))
-    if not result.success or result.x is None:
-        return None, status
-    selected = [i for i in range(n) if result.x[i] > 0.5]
-    if len(selected) != requested:
-        return None, f'solver_selected_{len(selected)}_of_{requested}'
-    return selected, status
-
-
-def select_final_portfolio_from_candidate_bank(
-    candidate_bank_result,
-    requested_n=None,
-    preserve_sp_pair_coverage=True,
-    selection_contest_shape=None,
-    mode=None,
-    overlap_preset=None,
-    du_threshold_row=None,
-    max_sp_exposure=None,
-    max_sp_pair_repetition=None,
-    right_tail_min_pct=0.0,
-    redundancy_penalty_weight=0.12,
-):
-    """Select the final portfolio with a second-stage scipy MILP.
-
-    The selected subset—not the oversized candidate bank—is certified against
-    overlap, DU, anchor exposure, SP-pair breadth, explicit right-tail quota,
-    and same-lineup duplication controls. Threshold-only DU and overlap
-    relaxation follows the existing optimizer policy when the strict model is
-    infeasible.
-    """
-    requested = int(requested_n or candidate_bank_result.get('requested_n') or 1)
-    candidates = list(candidate_bank_result.get('candidate_lineups') or [])
-    selection_shape = str(selection_contest_shape or '').strip().lower() or None
-    mode = mode or candidate_bank_result.get('mode') or 'portfolio_ev'
-    overlap_preset = overlap_preset or candidate_bank_result.get('overlap_preset') or 'typical'
-    coverage_plan = candidate_bank_result.get('sp_pair_coverage_plan') if preserve_sp_pair_coverage else None
-
-    signatures = []
-    bank_sigs = candidate_bank_result.get('du_signatures') or []
-    for idx, rec in enumerate(candidates):
-        signatures.append(
-            bank_sigs[idx] if idx < len(bank_sigs) and bank_sigs[idx] is not None
-            else compute_unit_signature(rec['lineup'], None)
-        )
-
-    eligible_sp_count = len({sp for rec in candidates for sp in _get_ordered_sp_ids(rec['lineup'])})
-    sp_setting = max_sp_exposure if max_sp_exposure is not None else candidate_bank_result.get('selection_max_sp_exposure')
-    pair_setting = max_sp_pair_repetition if max_sp_pair_repetition is not None else candidate_bank_result.get('selection_max_sp_pair_repetition')
-    active_sp_cap = _resolve_anchor_cap(sp_setting, 'sp', requested, eligible_sp_count)
-    active_pair_cap = _resolve_anchor_cap(pair_setting, 'pair', requested, eligible_sp_count)
-
-    resolved_du = _resolve_du_threshold_row(
-        requested, mode,
-        candidate_bank_result.get('selection_du_threshold_row', _DU_AUTO) if du_threshold_row == _DU_AUTO else du_threshold_row,
-    )
-    base_within = resolved_du[0] if resolved_du else None
-    base_overlap = max(2, int(ROSTER_SIZE * {'conservative': 0.60, 'typical': 0.45, 'aggressive': 0.30}[overlap_preset]))
-
-    tournament_shape = selection_shape in {
-        'small_wta', 'mid_wta', 'large_wta', 'wta_ticket_satellite',
-        'small_field_gpp', 'mid_field_gpp', 'large_field_gpp',
-        'single_entry_gpp', 'portfolio_gpp', 'mme_gpp',
-    } or (selection_shape is None and str(mode).lower() in {'wta', 'portfolio_ev', 'gpp'})
-    if right_tail_min_pct == 'auto':
-        tail_pct = 0.20 if tournament_shape and 8 <= requested <= 12 else 0.0
-    else:
-        tail_pct = max(0.0, float(right_tail_min_pct or 0.0))
-    right_tail_target = int(ceil(requested * tail_pct)) if tail_pct > 0 else 0
-
-    selected_indices = None
-    solver_status = None
-    applied_relaxation = None
-    used_within = base_within
-    used_overlap = base_overlap
-    relaxation_steps = [-1] + list(range(len(DU_RELAXATION_ORDER)))
-    for relaxation_idx in relaxation_steps:
-        within, _ = _compute_relaxed_thresholds(base_within, None, relaxation_idx)
-        for overlap in range(base_overlap, MAX_OVERLAP_CEILING + 1):
-            selected_indices, solver_status = _solve_candidate_subset_milp(
-                candidates, signatures, requested, selection_shape, overlap, within,
-                active_sp_cap, active_pair_cap, coverage_plan, right_tail_target,
-                redundancy_penalty_weight,
-            )
-            if selected_indices is not None:
-                used_within = within
-                used_overlap = overlap
-                du_note = _relaxation_summary(base_within, None, relaxation_idx)
-                overlap_note = f'max_overlap {base_overlap}->{overlap}' if overlap > base_overlap else None
-                applied_relaxation = '; '.join(x for x in (du_note, overlap_note) if x) or None
-                break
-        if selected_indices is not None:
-            break
-
-    if selected_indices is None:
-        return {
-            'lineups': [],
-            'selected_candidate_ids': [],
-            'requested_n': requested,
-            'candidate_count': len(candidates),
-            'selection_method': 'scipy_milp',
-            'selection_certified': False,
-            'selection_solver_status': solver_status,
-            'selection_failure_reason': solver_status or 'infeasible_final_selection',
-            'sp_pair_coverage_plan': coverage_plan,
-        }
-
-    selected = [candidates[i] for i in selected_indices]
-    final_signatures = [signatures[i] for i in selected_indices]
-    du_validation = validate_du_portfolio(final_signatures, mode, (used_within, None))
-    du_validation['relaxation_applied'] = applied_relaxation
-    sp_usage = Counter()
-    pair_usage = Counter()
-    for rec in selected:
-        sps = _get_ordered_sp_ids(rec['lineup'])
-        sp_usage.update(sps)
-        if len(sps) == 2:
-            pair_usage[frozenset(sps)] += 1
-    anchor_validation = _anchor_validation_dict(
-        sp_usage, pair_usage, active_sp_cap, active_pair_cap
-    )
-    pair_validation = validate_sp_pair_coverage(selected, coverage_plan)
-
-    max_observed_overlap = 0
-    for i in range(len(selected)):
-        ids_i = set(_lineup_player_ids(selected[i]['lineup']))
-        for j in range(i + 1, len(selected)):
-            max_observed_overlap = max(
-                max_observed_overlap,
-                len(ids_i & set(_lineup_player_ids(selected[j]['lineup'])))
-            )
-    overlap_validation = {
-        'pass': max_observed_overlap <= used_overlap,
-        'max_overlap_allowed': used_overlap,
-        'max_overlap_observed': max_observed_overlap,
-    }
-    certified = bool(
-        len(selected) == requested
-        and du_validation.get('pass')
-        and anchor_validation.get('pass')
-        and pair_validation.get('pass')
-        and overlap_validation.get('pass')
-    )
-    return {
-        'lineups': selected,
-        'selected_candidate_ids': [rec['candidate_id'] for rec in selected],
-        'requested_n': requested,
-        'candidate_count': len(candidates),
-        'du_signatures': final_signatures,
-        'du_validation': du_validation,
-        'anchor_validation': anchor_validation,
-        'overlap_validation': overlap_validation,
-        'portfolio_redundancy_report': portfolio_redundancy_report(selected, final_signatures),
-        'exposure_summary': _portfolio_exposure_summary(selected),
-        'contest_shape_profile': candidate_bank_result.get('contest_shape_profile'),
-        'sp_pair_coverage_plan': coverage_plan,
-        'sp_pair_coverage_validation': pair_validation,
-        'selection_method': 'scipy_milp',
-        'selection_certified': certified,
-        'selection_solver_status': solver_status,
-        'selection_contest_shape': selection_shape,
-        'selection_relaxation_applied': applied_relaxation,
-        'right_tail_target': right_tail_target,
-        'right_tail_selected': sum(1 for rec in selected if _candidate_explicit_right_tail(rec)),
-        'bank_constraint_scope': candidate_bank_result.get('bank_constraint_scope'),
-    }
 
 
 def _select_family_for_lineup(lineup_index, scenario_families):

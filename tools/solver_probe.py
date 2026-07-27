@@ -99,7 +99,14 @@ def main() -> int:
 
     probe_n = 5
     t0 = time.monotonic()
-    multi = build_multi_lineup(projections, n_lineups=probe_n, mode="wta", target="ceiling")
+    # R15, 2026-07-27: du_threshold_row=None matches production. The default is
+    # _DU_AUTO, which enforces DU, and production reaches build_multi_lineup
+    # through build_candidate_lineup_bank under bank_constraint_scope=
+    # 'selection', which passes None. The probe was measuring a strictly harder
+    # solve than the build it estimates, so its timing ran long and exit 3
+    # could fire on a constraint the build never applies.
+    multi = build_multi_lineup(projections, n_lineups=probe_n, mode="wta", target="ceiling",
+                               du_threshold_row=None)
     multi_s = time.monotonic() - t0
     built = len(multi["lineups"])
 

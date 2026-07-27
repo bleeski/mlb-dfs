@@ -1164,6 +1164,40 @@ class ContestShapeVocabularyTests(unittest.TestCase):
         for shape, profile in opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items():
             self.assertEqual(profile["mode_family"], OBJECTIVE_CLASS_BY_SHAPE[shape], shape)
 
+    def test_du_reports_that_it_was_not_enforced_instead_of_passing(self):
+        """R15, decision 2026-07-27: delete the dead stage, keep the primitive,
+        and stop recording an all-clear for a control that did not run.
+
+        Teeth: production reaches build_multi_lineup through
+        build_candidate_lineup_bank with bank_constraint_scope='selection',
+        which passes du_threshold_row=None. That used to return
+        du_validation={'pass': True}, and execution_pipeline carries the dict
+        into every run payload, so every certified build recorded a DU pass for
+        a check that never ran.
+        """
+        row = opt._resolve_du_threshold_row(8, "wta", None)
+        self.assertIsNone(row, "explicit None is the production value and means disabled")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = projection_frame(write_salary(Path(tmp) / "s.csv"))
+        result = opt.build_multi_lineup(frame, n_lineups=2, mode="wta",
+                                        target="ceiling", du_threshold_row=None)
+        validation = result["du_validation"]
+        self.assertFalse(validation["enforced"])
+        self.assertIsNone(validation["pass"], "a check that did not run cannot pass")
+        self.assertIn("not enforced", validation["pairwise_summary"])
+
+    def test_the_zero_caller_selection_stage_is_gone(self):
+        """R15: 327 lines with no caller since they were written, built on the
+        subset-then-allocate shape MLB_Classic section 8's opening rule rejects.
+        Production selects through contest_allocator.select_and_assign_entries.
+        """
+        for name in ("select_final_portfolio_from_candidate_bank",
+                     "_solve_candidate_subset_milp",
+                     "_selection_pairwise_incompatible",
+                     "_candidate_explicit_right_tail"):
+            self.assertFalse(hasattr(opt, name), f"{name} came back")
+
     def test_satellite_family_caps_are_section_8s_numbers(self):
         """R5, dated decision 2026-07-27 (ledger 3.11).
 

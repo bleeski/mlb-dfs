@@ -89,7 +89,10 @@ OBJECTIVE_CLASSES: Tuple[str, ...] = ("cash", "gpp", "wta", "ticket_line")
 # Shapes whose bank is CONSTRUCTED in MILP mode 'wta'. Deliberately broader than
 # the ``wta`` objective class: a satellite is ranked on a ticket-line blend but
 # still built from the WTA construction row, which is what it did before R1a.
-# Widening or narrowing this set moves DU thresholds and is a strategy change.
+# Widening or narrowing this set changes MILP construction mode and is a
+# strategy change. It does not move a DU threshold: R15 (2026-07-27) established
+# that DU is enforced nowhere on the production path, so the DU row is disabled
+# whichever side of this set a shape sits on.
 WTA_CONSTRUCTION_SHAPES = frozenset({
     "small_wta", "mid_wta", "large_wta", "wta_ticket_satellite",
     "satellite", "single_entry_gpp",

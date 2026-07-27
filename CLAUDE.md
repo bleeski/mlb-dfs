@@ -54,7 +54,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  23 modules  365 tests`. The module count comes off the
+   `PASS  v2.26.0  23 modules  367 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
@@ -92,9 +92,9 @@ inventory checks fail while the suite passes in full, build and flag it.
 - Never trim the player pool to fit a compute limit. An infrastructure limit
   may reduce search effort; it may never reduce the legal player set, because
   that is a strategy change and it is invisible in the certified output. A
-  timeout is recorded in `solver_report`, never climbs the overlap ladder,
-  never steps DU relaxation, and never enters `attempted` in the bank cache. A
-  time-limited incumbent is verified against the constraint matrix and then
+  timeout is recorded in `solver_report`, never climbs the overlap ladder, and
+  never enters `attempted` in the bank cache. A time-limited incumbent is
+  verified against the constraint matrix and then
   accepted, tagged `optimality='time_limited'`. The allocator says "time limit
   at gap X" or "proven infeasible: <constraint>", never both.
 - The Excluded column has one reading, in `optimizer_v3.excluded_flags`. Only
