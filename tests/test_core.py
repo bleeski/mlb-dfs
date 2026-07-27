@@ -1271,8 +1271,30 @@ class ContestShapeVocabularyTests(unittest.TestCase):
         for name in ("select_final_portfolio_from_candidate_bank",
                      "_solve_candidate_subset_milp",
                      "_selection_pairwise_incompatible",
-                     "_candidate_explicit_right_tail"):
+                     "_candidate_explicit_right_tail",
+                     # Orphaned by the same delete and missed on the first pass:
+                     # its only caller was _solve_candidate_subset_milp.
+                     "_candidate_selection_score"):
             self.assertFalse(hasattr(opt, name), f"{name} came back")
+
+    def test_the_bank_stops_reporting_a_handoff_to_the_deleted_stage(self):
+        """R15 follow-up. build_candidate_lineup_bank stamped
+        selection_du_threshold_row, selection_max_sp_exposure,
+        selection_max_sp_pair_repetition and
+        bank_constraints_deferred_to_selection=True onto every result. With the
+        selection stage deleted, those four described a handoff nothing
+        performs, which is the same false label R15 removed from du_validation.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = projection_frame(write_salary(Path(tmp) / "s.csv"))
+        bank = opt.build_candidate_lineup_bank(frame, requested_n=1,
+                                               candidate_bank_size=2, mode="wta")
+        for gone in ("selection_du_threshold_row", "selection_max_sp_exposure",
+                     "selection_max_sp_pair_repetition",
+                     "bank_constraints_deferred_to_selection"):
+            self.assertNotIn(gone, bank, gone)
+        self.assertEqual(bank["bank_constraint_scope"], "selection")
+        self.assertFalse(bank["bank_portfolio_controls_enforced"])
 
     def test_satellite_family_caps_are_section_8s_numbers(self):
         """R5, dated decision 2026-07-27 (ledger 3.11).

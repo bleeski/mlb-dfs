@@ -3527,10 +3527,14 @@ def build_candidate_lineup_bank(
     """Generate and score a candidate bank through the certified MILP path.
 
     ``bank_constraint_scope='selection'`` is the v3.14 default. It keeps DK
-    roster constraints and pairwise lineup overlap during candidate generation,
-    but defers DU/anchor portfolio constraints to the final selection MILP.
-    ``'bank'`` preserves the legacy behavior of enforcing those controls across
-    every candidate in the oversized bank.
+    roster constraints and pairwise lineup overlap during candidate generation
+    and DROPS the DU and anchor portfolio constraints. It was written to defer
+    them to a second-stage selection MILP; R15 (2026-07-27) established that
+    that stage never had a caller and deleted it, so on this default those three
+    controls are simply not enforced anywhere and the allocator's exposure caps
+    and shared-player limit are what shape the portfolio. ``'bank'`` enforces
+    them across every candidate in the oversized bank and is the only scope on
+    which DU is live.
     """
     bank_size = resolve_candidate_bank_size(requested_n, candidate_bank_size)
     scope = str(bank_constraint_scope or 'selection').lower()
@@ -3628,11 +3632,16 @@ def build_candidate_lineup_bank(
     result['mode'] = mode
     result['overlap_preset'] = overlap_preset
     result['scenario_families'] = scenario_families
-    result['selection_du_threshold_row'] = du_threshold_row
-    result['selection_max_sp_exposure'] = max_sp_exposure
-    result['selection_max_sp_pair_repetition'] = max_sp_pair_repetition
+    # R15 follow-up. Four keys lived here and all four described a handoff to
+    # the selection stage: the DU row, the SP caps it would have applied, and a
+    # 'deferred_to_selection' flag that read True on every production build.
+    # That stage is deleted, so those fields recorded a promise nothing keeps,
+    # which is the same false-label class R15 removed from du_validation. The
+    # scope survives because it is real provenance: it changed what the bank was
+    # built under, and 'selection' now means those controls were dropped rather
+    # than moved.
     result['bank_constraint_scope'] = scope
-    result['bank_constraints_deferred_to_selection'] = scope == 'selection'
+    result['bank_portfolio_controls_enforced'] = scope == 'bank'
     return result
 
 
@@ -3962,16 +3971,6 @@ def build_diverse_candidate_bank(
         )
     bank['diversity_augmentation'] = augmentation
     return bank
-
-
-def _candidate_selection_score(record, contest_shape=None):
-    if contest_shape:
-        by_shape = record.get('contest_fit_by_shape') or {}
-        if contest_shape in by_shape:
-            return float(by_shape[contest_shape])
-    return float(record.get('contest_fit', {}).get(
-        'contest_fit_score', record.get('objective', float('-inf'))
-    ))
 
 
 def _select_family_for_lineup(lineup_index, scenario_families):

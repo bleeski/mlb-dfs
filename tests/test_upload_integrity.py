@@ -1155,7 +1155,10 @@ class PreflightContractDocumentationTests(unittest.TestCase):
             self.assertIn(token, section)
         lowered = section.lower()
         self.assertNotIn("exits 0", lowered)
-        self.assertNotIn("exit 0\nclean", lowered)
+        # The old text read "Exit 0 clean, 2 hard failure, 3 IO error" on one
+        # wrapped line. Match the phrase, not the wrap, or the assertion can
+        # never fire once the section is reflowed.
+        self.assertNotIn("exit 0 clean", " ".join(lowered.split()))
         # The one thing an agent must do differently on 4: say what was overridden.
         self.assertIn("overridden", lowered)
         for waiver in ("--no-manifest", "--feed-lenient"):
