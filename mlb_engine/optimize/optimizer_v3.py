@@ -1,5 +1,6 @@
 """
-MLB Classic Optimizer — v3.18 (coverage-guaranteed candidate bank)
+MLB Classic Optimizer (coverage-guaranteed candidate bank)
+OPTIMIZER_VERSION is the authoritative version constant for this module.
 Framework integration: MLB Classic v2.16.0
 
 v3.18 additions:

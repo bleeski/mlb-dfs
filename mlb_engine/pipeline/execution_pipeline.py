@@ -1,4 +1,5 @@
-"""Canonical MLB Classic execution pipeline v1.9 (MLB Classic v2.26.0).
+"""Canonical MLB Classic execution pipeline (MLB Classic v2.26.0).
+VERSION is the authoritative version constant for this module.
 
 Initial builds and late swaps share one immutable, hash-bound production path.
 The exact final DKEntries file is re-read to derive all post-export gates.

@@ -1,5 +1,6 @@
 """
-MLB Classic Contest Allocator — v1.10
+MLB Classic Contest Allocator
+VERSION is the authoritative version constant for this module.
 Framework patch: MLB Classic v2.16.0 lean joint selection/allocation
 Compiled: 2026-06-11 (v1.10 reliability and game-exposure patch)
 

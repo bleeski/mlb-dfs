@@ -12,7 +12,7 @@
       "id": 1,
       "name": "showdown-single-game",
       "prompt": "Build my lineups for this MIN/CHC showdown, I've got the salary and entries files here.",
-      "expected_output": "A filled Showdown DKEntries CSV (CPT + 5 UTIL per entry) with the DK template preserved, reported as review-grade rather than certified because showdown.py is v0.1-review.",
+      "expected_output": "A filled Showdown DKEntries CSV (CPT + 5 UTIL per entry) with the DK template preserved, reported as review-grade rather than certified because Showdown does not pass through the three certification gates (workflow_valid, selection_certified, allocation_certified).",
       "files": ["inputs/DKSalaries_showdown_MIN_CHC.csv", "inputs/DKEntries_showdown_MIN_CHC.csv"]
     },
     {
