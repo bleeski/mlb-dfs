@@ -25,9 +25,16 @@ engine, so every layer can validate against it without a cycle:
 - ``WTA_CONSTRUCTION_SHAPES`` is a separate axis on purpose. Which MILP
   construction mode a shape builds in is not the same question as what its
   candidates are ranked for, and R1 changes only the second. Satellites are
-  listed here because they build in ``wta`` mode today, and moving them would
-  silently move the DU threshold row (``optimizer_v3._resolve_du_threshold_row``
-  keys on mode). Construction and caps are R5's decision, not this module's.
+  listed here because they build in ``wta`` mode today; keeping them there
+  means a scoring fix does not move construction as a side effect.
+  ``mode`` feeds ``build_multi_lineup``'s ``mode == 'wta'`` scenario-family
+  stack constraints and the DU threshold row. Note on the second one, corrected
+  after the fact: on the production path DU resolves to None either way,
+  because ``build_candidate_lineup_bank`` defaults ``bank_constraint_scope=
+  'selection'`` and nulls the threshold, and the selection stage that would
+  re-apply it has no callers. See backlog R15. The reason to pin construction
+  here is that a scoring commit should not change construction, not that the
+  DU row would visibly move. Construction and caps are R5's decision.
 
 Nothing here is a probability or an ROI claim. A shape is a label for an
 objective; the scores it selects are deterministic review proxies.
