@@ -350,18 +350,275 @@ class PreflightToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("truncated write", result.stdout)
 
-    def test_force_never_blocks_shipping(self):
+    def test_force_never_blocks_shipping_but_never_reports_clean(self):
+        """R2: --force used to exit 0, which is the one signal automation
+        trusts. A wrapper could not tell "upload-ready" from "the clock beat the
+        fix." It exits 4 now: the operator is still unblocked, the caller is
+        told the truth, and the overridden failures are still printed."""
         write_entries(self.entries, CLASSIC_HEADER,
                       [blank_classic_entry("900", "5")])
         self.assertEqual(self._run().returncode, 2)
         forced = self._run("--force")
-        self.assertEqual(forced.returncode, 0)
-        self.assertIn("FORCED", forced.stdout)
+        self.assertEqual(forced.returncode, 4)
+        self.assertIn("ACKNOWLEDGED", forced.stdout)
+        self.assertIn("blank reserved row", forced.stdout)
+        payload = json.loads(self._run("--force", "--json").stdout)
+        self.assertEqual(payload["verdict"], "acknowledged")
+        self.assertTrue(payload["failures"])
+
+    def test_a_clean_run_never_returns_a_nonzero_code_and_zero_means_clean(self):
+        """The other half of R2's done-when: no code path with a non-empty
+        failure list returns 0."""
+        clean = self._run("--json")
+        self.assertEqual(clean.returncode, 0)
+        self.assertEqual(json.loads(clean.stdout)["failures"], [])
+        self.assertEqual(json.loads(clean.stdout)["verdict"], "upload_ready")
 
     def test_json_output_is_parseable(self):
         payload = json.loads(self._run("--json").stdout)
         self.assertTrue(payload["passed"])
         self.assertEqual(payload["info"]["contest_type"], "classic")
+
+
+class PreflightManifestBindingTests(unittest.TestCase):
+    """R3: the manifest binding stops failing open at the check.
+
+    Teeth: mirror_to_outputs and _record_upload_manifest swallow every exception
+    by design, so a certified file could land in outputs/ with no manifest row
+    and nothing said so. Preflight only cross-checked a manifest when one
+    happened to be there.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        # A DELIVERED file lives under the repo's outputs/. Use a real
+        # subdirectory there so is_delivered_file resolves the way it will in
+        # production, and clean it up.
+        self.outputs = REPO / "outputs" / "_test_r3"
+        self.outputs.mkdir(parents=True, exist_ok=True)
+        self.entries = self.outputs / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+
+    def tearDown(self):
+        for path in sorted(self.outputs.glob("*")):
+            path.unlink()
+        self.outputs.rmdir()
+        self.tmp.cleanup()
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    def _write_manifest(self, **overrides):
+        import hashlib
+        digest = hashlib.sha256(self.entries.read_bytes()).hexdigest()
+        record = {"delivered_file": f"outputs/_test_r3/{self.entries.name}",
+                  "sha256": digest, "contest_type": "classic", "slate_tag": "t",
+                  "contest_ids": ["5"], "entries": 1, "status": "candidate",
+                  "certification": "certified", "projection_tier": "proxy",
+                  "strategy_state": {"state": "clean", "counts": {}}}
+        record.update(overrides)
+        (self.outputs / "upload_manifest.json").write_text(
+            json.dumps({"version": "1.1", "date": "2026-06-03",
+                        "deliveries": [record]}), encoding="utf-8")
+        return record
+
+    def test_a_delivered_file_with_no_manifest_is_a_hard_failure(self):
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("no upload manifest for this delivered file", result.stdout)
+
+    def test_the_waiver_is_explicit_and_says_so(self):
+        result = self._run("--no-manifest")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("waived by --no-manifest", result.stdout)
+
+    def test_a_manifest_whose_sha_does_not_match_is_a_hard_failure(self):
+        self._write_manifest(sha256="0" * 64)
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("changed after it was recorded", result.stdout)
+
+    def test_an_ad_hoc_file_outside_outputs_still_only_warns(self):
+        """The tool covers hand-built exports on purpose; those have no record
+        to be missing. Only a file in the delivery location is held to one."""
+        loose = self.dir / "DKEntries.csv"
+        write_entries(loose, CLASSIC_HEADER, [classic_entry("900", "5", self.lineup)])
+        result = run_preflight("--entries", str(loose), "--salary", str(self.salary))
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_preflight_stamps_its_verdict_onto_the_matching_record(self):
+        self._write_manifest()
+        self.assertEqual(self._run().returncode, 0)
+        after = json.loads((self.outputs / "upload_manifest.json").read_text())
+        record = after["deliveries"][0]
+        self.assertEqual(record["status"], "upload_ready")
+        self.assertEqual(record["preflight"]["verdict"], "upload_ready")
+        self.assertEqual(record["preflight"]["failures"], [])
+
+    def test_a_forced_run_records_acknowledged_with_the_failures(self):
+        write_entries(self.entries, CLASSIC_HEADER, [blank_classic_entry("900", "5")])
+        self._write_manifest()
+        self.assertEqual(self._run("--force").returncode, 4)
+        record = json.loads(
+            (self.outputs / "upload_manifest.json").read_text())["deliveries"][0]
+        self.assertEqual(record["status"], "acknowledged")
+        self.assertTrue(record["preflight"]["failures"])
+
+    def test_the_record_carries_projection_tier_and_strategy_state(self):
+        from mlb_engine.entries import upload_manifest as um
+        with tempfile.TemporaryDirectory() as tmp:
+            original = um.REPO_ROOT
+            um.REPO_ROOT = Path(tmp)
+            try:
+                delivered = Path(tmp) / "DKEntries.csv"
+                delivered.write_text("x", encoding="utf-8")
+                record = um.record_delivery(
+                    date="2026-06-03", delivered_file=delivered,
+                    contest_type="classic", slate_tag="1605_4g",
+                    projection_tier="enriched",
+                    strategy_state={"state": "relaxed", "counts": {"overlap": 2}})
+                self.assertEqual(record["status"], "candidate")
+                self.assertEqual(record["projection_tier"], "enriched")
+                self.assertEqual(record["strategy_state"]["state"], "relaxed")
+                self.assertIn("candidate", um.STATUS_VALUES)
+                self.assertIn("acknowledged", um.STATUS_VALUES)
+            finally:
+                um.REPO_ROOT = original
+
+    def test_the_tiers_are_derived_from_evidence_not_asserted(self):
+        from mlb_engine.pipeline import execution_pipeline as epi
+        proxy = {"projection_enrichment": {"f1": {"requested": 0, "applied_count": 0}}}
+        enriched = {"projection_enrichment": {"f1": {"requested": 9, "applied_count": 9}}}
+        self.assertEqual(epi.manifest_projection_tier(proxy), "proxy")
+        self.assertEqual(epi.manifest_projection_tier(enriched), "enriched")
+        self.assertEqual(epi.manifest_projection_tier({}), "proxy")
+        clean = epi.manifest_strategy_state({"bank_diagnostics": {"relaxations": {}}})
+        relaxed = epi.manifest_strategy_state(
+            {"bank_diagnostics": {"relaxations": {"overlap_steps": 2, "note": "x"}}})
+        self.assertEqual(clean["state"], "clean")
+        self.assertEqual(relaxed["state"], "relaxed")
+        self.assertEqual(relaxed["counts"], {"overlap_steps": 2})
+
+
+class PreflightFeedDefaultTests(unittest.TestCase):
+    """R4: the strongest check stops being opt-in twice.
+
+    Teeth: the posted-lineup cross-check ran only with --feed, and an absence
+    was a warning unless --feed-strict was ALSO passed. A 3:55pm bench with a
+    blank salary-file Status walked through the default check.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+        self.names = {p.player_id: p.name
+                      for p in parse_dk_salary_csv(str(self.salary))}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _feed(self, benched=(), status="confirmed", fetched_at=None):
+        from datetime import datetime, timezone
+        by_team = {}
+        for pid, name in self.names.items():
+            team = next(p.team for p in parse_dk_salary_csv(str(self.salary))
+                        if p.player_id == pid)
+            if pid in benched:
+                continue
+            by_team.setdefault(team, []).append({"name": name})
+        stamp = fetched_at or datetime.now(timezone.utc).isoformat()
+        games = [{"game_pk": 1, "status": "Scheduled",
+                  "away": {"team_abbrev": "AAA", "lineup_status": status,
+                           "lineup": by_team.get("AAA", []), "probable_pitcher": {}},
+                  "home": {"team_abbrev": "CCC", "lineup_status": status,
+                           "lineup": by_team.get("CCC", []), "probable_pitcher": {}}}]
+        path = self.dir / "lineups_feed.json"
+        path.write_text(json.dumps({"date": "2026-06-03", "fetched_at": stamp,
+                                    "games": games}), encoding="utf-8")
+        return path
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    def test_a_confirmed_team_bench_is_a_hard_failure_by_default(self):
+        feed = self._feed(benched=(self.lineup[3],))
+        result = self._run("--feed", str(feed))
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_the_lenient_flag_restores_the_old_warning(self):
+        feed = self._feed(benched=(self.lineup[3],))
+        result = self._run("--feed", str(feed), "--feed-lenient")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("WARN", result.stdout)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_a_team_that_has_not_posted_stays_soft(self):
+        feed = self._feed(benched=(self.lineup[3],), status="unconfirmed")
+        result = self._run("--feed", str(feed))
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_feed_age_is_printed_so_a_stale_all_clear_is_visibly_stale(self):
+        from datetime import datetime, timedelta, timezone
+        old = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
+        feed = self._feed(fetched_at=old)
+        result = self._run("--feed", str(feed))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("feed: lineups_feed.json (5.0h old)", result.stdout)
+        self.assertIn("old (fetched", result.stdout)
+
+    def _salary_on_date(self, date_mmddyyyy: str) -> Path:
+        """Same fixture, re-dated, so a slate with no feed on disk is reachable."""
+        path = self.dir / f"DKSalaries_{date_mmddyyyy.replace('/', '')}.csv"
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        for row in rows[1:]:
+            row[6] = row[6].replace("07/25/2026", date_mmddyyyy)
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return path
+
+    def test_a_missing_feed_degrades_to_one_warning_and_never_blocks(self):
+        salary = self._salary_on_date("01/02/2099")
+        result = run_preflight("--entries", str(self.entries), "--salary", str(salary))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("no lineups feed resolved", result.stdout)
+
+    def test_the_feed_is_auto_resolved_from_the_slate_date(self):
+        """No --feed passed. The fixture's Game Info dates the slate 2026-07-25,
+        and the repo carries data/slates/2026-07-25/lineups_feed.json, so the
+        resolver finds it without being told and says which file it used."""
+        payload = json.loads(self._run("--json").stdout)
+        self.assertIn("resolved", payload["info"]["feed_autoresolve"])
+        self.assertIn("2026-07-25", payload["info"]["feed_autoresolve"])
+        self.assertTrue(payload["info"]["feed_file"].endswith(".json"))
+        self.assertIn("feed_age_minutes", payload["info"])
+
+    def test_a_file_spanning_two_slate_dates_resolves_no_feed_rather_than_a_wrong_one(self):
+        from tools.preflight_upload import (
+            Report, load_entries, load_salary, resolve_feed_for_slate,
+        )
+        mixed = self._salary_on_date("01/02/2099")
+        with mixed.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        rows[1][6] = rows[1][6].replace("01/02/2099", "07/25/2026")
+        with mixed.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        _, _, entries, _, _ = load_entries(self.entries)
+        rep = Report()
+        self.assertIsNone(resolve_feed_for_slate(entries, load_salary(mixed), rep))
+        self.assertIn("spans 2 slate dates", rep.info["feed_autoresolve"])
 
 
 class UploadManifestTests(unittest.TestCase):

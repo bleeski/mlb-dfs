@@ -138,7 +138,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.13"
+VERSION = "v1.14"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -2877,9 +2877,22 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         dest = dest_dir / (f"{stem}_{tag}{source.suffix}" if tag and not stem.endswith(tag)
                            else source.name)
         dest.write_bytes(source.read_bytes())
-        _record_upload_manifest(slate_date, dest, result, tag)
+        recorded = _record_upload_manifest(slate_date, dest, result, tag)
+        # R3(a). Generation stays fail-open, because bookkeeping must never break
+        # a certified build. What was wrong was that it also failed SILENT: a
+        # file could land in outputs/ with no manifest row and nothing said so,
+        # which re-opens exactly the "which file do I upload" hole the manifest
+        # was built to close. Say it, loudly, and carry the flag on the payload.
+        if isinstance(result, dict):
+            result["manifest_recorded"] = bool(recorded)
+        if not recorded:
+            print(f"MANIFEST NOT RECORDED  {dest} was delivered with no manifest "
+                  f"row. Preflight will hard-fail it; re-run the build or pass "
+                  f"--no-manifest deliberately.")
         return str(dest)
     except Exception:  # noqa: BLE001 - a mirror must never fail a certified build
+        if isinstance(result, dict):
+            result.setdefault("manifest_recorded", False)
         return None
 
 
@@ -2905,9 +2918,43 @@ def _slate_tag(salary_csv: Any) -> str:
         return ""
 
 
+def manifest_projection_tier(result: Mapping[str, Any]) -> str:
+    """'enriched' when any enrichment map actually reached rows, else 'proxy'.
+
+    R3(c). The backlog specified deriving this from ``enrichment.signal_applied``;
+    no such key exists on this tree. The enrichment blocks each carry
+    ``requested`` and ``applied_count``, and ``_applied`` is already the helper
+    that reads them, so the tier is derived from those instead. A build whose
+    projections were handed in prebuilt has no enrichment at all and is 'proxy'.
+    """
+    enrichment = result.get("projection_enrichment") or {}
+    for key in ("xwoba", "ceiling", "value_guard", "f4", "f1", "f5", "pitcher_ceiling"):
+        if _applied(enrichment.get(key)):
+            return "enriched"
+    return "proxy"
+
+
+def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
+    """'clean' only when nothing was relaxed to make the portfolio fit.
+
+    R3(c). A relaxed portfolio and a clean one are different artifacts and the
+    difference lived in prose in the brief. It belongs on the record.
+    """
+    relaxations = ((result.get("bank_diagnostics") or {}).get("relaxations") or {})
+    counts = {k: v for k, v in relaxations.items()
+              if isinstance(v, int) and k != "note" and v}
+    warnings = list(relaxations.get("warnings") or [])
+    state = "relaxed" if (counts or warnings) else "clean"
+    return {"state": state, "counts": counts, "warnings": warnings[:10]}
+
+
 def _record_upload_manifest(slate_date: str, dest: Path, result: Mapping[str, Any],
-                            tag: str) -> None:
-    """One manifest record per delivery, so T-5 never has to guess which file."""
+                            tag: str) -> bool:
+    """One manifest record per delivery, so T-5 never has to guess which file.
+
+    Returns whether the record was written. The caller says so out loud when it
+    was not; see mirror_to_outputs.
+    """
     try:
         from mlb_engine.entries.upload_manifest import record_delivery
 
@@ -2927,8 +2974,11 @@ def _record_upload_manifest(slate_date: str, dest: Path, result: Mapping[str, An
                 str(v.get("contest_name") or "") for v in contests.values()),
             entries=entries_in_file,
             run_id=result.get("run_id"),
-            status="delivered",
+            status="candidate",
             certification="certified" if result.get("workflow_valid") else "not_certified",
+            projection_tier=manifest_projection_tier(result),
+            strategy_state=manifest_strategy_state(result),
         )
+        return True
     except Exception:  # noqa: BLE001 - bookkeeping must never fail a certified build
-        pass
+        return False

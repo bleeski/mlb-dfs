@@ -28,7 +28,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-VERSION = "1.0"
+VERSION = "1.1"
+
+# R3(c). The closed set of record statuses. 'candidate' is what a build writes:
+# the file exists and nothing has checked it yet. Only preflight moves a record
+# to 'upload_ready', and only for the exact bytes it hashed.
+STATUS_VALUES = ("candidate", "upload_ready", "blocked", "acknowledged", "superseded")
 
 MANIFEST_NAME = "upload_manifest.json"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -87,8 +92,10 @@ def record_delivery(
     contest_names: Optional[Sequence[str]] = None,
     entries: Optional[int] = None,
     run_id: Optional[str] = None,
-    status: str = "delivered",
+    status: str = "candidate",
     certification: str = "review_grade",
+    projection_tier: str = "unknown",
+    strategy_state: Optional[Mapping[str, Any]] = None,
     notes: str = "",
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
@@ -108,8 +115,19 @@ def record_delivery(
         "contest_names": sorted({str(c) for c in (contest_names or [])}),
         "entries": int(entries) if entries is not None else None,
         "run_id": run_id,
+        # R3(c). One of STATUS_VALUES. The build writes 'candidate'; preflight
+        # stamps 'upload_ready', 'blocked' or 'acknowledged' onto the record for
+        # the exact bytes it checked; a later delivery for the same slate marks
+        # this one 'superseded'. "Which file do I upload, and did it pass" is now
+        # one read of one file instead of a memory of what a terminal printed.
         "status": status,
         "certification": certification,
+        # 'enriched' or 'proxy'. A portfolio built on proxy projections is a
+        # different artifact from one built on the enrichment stack.
+        "projection_tier": str(projection_tier or "unknown"),
+        # {'state': 'clean'|'relaxed', 'counts': {...}}. A portfolio is not clean
+        # because the gates passed; it is clean when nothing was relaxed.
+        "strategy_state": dict(strategy_state or {"state": "unknown", "counts": {}}),
         "recorded_utc": datetime.now(timezone.utc).isoformat(),
         "notes": notes,
     }

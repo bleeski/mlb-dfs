@@ -86,11 +86,15 @@ tiers it SOFT so it prints and the build ships).
 4. **Before any upload, run the preflight.** One command, two files, no
    engine import, no network, under two seconds:
    `python tools/preflight_upload.py --entries <delivered.csv> --salary <salary.csv>`
-   Omit `--salary` and it resolves the promoted run's `inputs/` snapshot;
-   it finds `upload_manifest.json` next to the entries file on its own.
-   Exit 0 clean, 2 on any hard failure, 3 on an IO error. `--force` prints
-   the failures and exits 0, so this can never be the reason a slate is not
-   entered. This sentence is the pre-upload rule; nothing else is.
+   Omit `--salary` and it resolves the promoted run's `inputs/` snapshot; it
+   finds `upload_manifest.json` next to the entries file and the freshest
+   `lineups_feed.json` for the slate date on its own. Exit 0 clean, 2 on any
+   hard failure, 3 on an IO error, 4 acknowledged: `--force` prints the
+   failures and exits 4, never 0, so the operator is unblocked and the caller
+   is told. A delivered file under `outputs/` with no manifest row hard-fails
+   (`--no-manifest` waives it), and a rostered player absent from his team's
+   confirmed lineup hard-fails (`--feed-lenient` demotes it). This sentence is
+   the pre-upload rule; nothing else is.
 5. Ben uploads to DraftKings by hand. Refinements after delivery go
    through run_late_swap with authorized_entry_ids, never a rebuild.
    `python tools/late_swap.py --date <date> --parent-entries <csv>` wraps

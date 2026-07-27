@@ -9,7 +9,8 @@ Design constraints, all deliberate:
   - two files and nothing else in the core invocation: --entries and --salary
   - no engine import, no solver, no network, no LLM; target under two seconds
   - every hard check is a fact about the file, decidable from disk
-  - --force always exists, so this can never be the reason a slate is not entered
+  - --force always exists, so this can never be the reason a slate is not
+    entered. It exits 4, not 0: the operator is unblocked, the caller is told.
 
 Deterministic file checks. Nothing here is a projection, an ROI figure, a win
 rate, or a probability claim.
@@ -28,9 +29,19 @@ Hard checks (exit 2):
      (truncation is self-consistent on its face; it is only detectable against
      an external statement of how many entries the file should hold)
 
-Optional, never blocking on their own absence:
-  --manifest  cross-check contest IDs and sha256 against outputs/<date>/upload_manifest.json
-  --feed      flag rostered players absent from their team's posted lineup
+Resolved on their own when not passed, because a check that runs only when the
+operator remembers a flag is a check that does not run at T-5:
+  --manifest  outputs/<date>/upload_manifest.json, found next to the entries file.
+              A delivered file with no manifest row, or one whose sha256 differs
+              from the recorded one, is a HARD FAILURE (R3). --no-manifest is the
+              explicit waiver, for a file that was never meant to have a record.
+  --feed      the freshest lineups_feed.json for the slate date. A rostered
+              player absent from his team's CONFIRMED lineup is a HARD FAILURE
+              (R4); --feed-lenient restores the old warning. A team that has not
+              posted stays soft. The feed's age is printed next to the verdict,
+              so a stale all-clear is visibly stale.
+
+Optional, never blocking on its own absence:
   --parent    diff contest assignment against the file this one refines
 
 Advisory prints (never affect the exit code): exposure, lineup-overlap
@@ -41,7 +52,17 @@ Usage:
         [--salary data/slates/<date>/DKSalaries.csv] [--manifest ...] [--feed ...]
         [--parent ...] [--json] [--force]
 
-Exit 0 clean (or --force), 2 on any hard failure, 3 on a usage or IO error.
+Exit codes:
+  0  clean. Every hard check passed.
+  2  hard failure. Do not upload without reading the failures.
+  3  usage or IO error. The check did not run.
+  4  acknowledged, not ready. --force was given and hard checks failed; the
+     failures are printed, the file is not blocked, and the caller is told the
+     truth. Exit 0 is the one signal automation trusts, so --force never returns
+     it (R2). The design goal was that this tool can never be the reason a slate
+     is not entered; that requires the OPERATOR to stay unblocked, not the
+     caller to be misinformed.
+
 This is a file check. It never uploads anything and never contacts DraftKings.
 """
 from __future__ import annotations
@@ -56,9 +77,9 @@ import sys
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -532,8 +553,24 @@ def check_legality(contest: str, slots: Sequence[str], entries: Sequence[EntryRo
 # optional widenings
 # --------------------------------------------------------------------------
 
+def is_delivered_file(entries_path: Path) -> bool:
+    """A file under outputs/ is a delivery; anything else is ad hoc.
+
+    R3(b) hard-fails a DELIVERED file with no manifest row. The distinction
+    matters because this tool deliberately also covers hand-built exports that
+    never entered the pipeline, and those have no record to miss. outputs/ is
+    the delivery location, so a file sitting there with nothing saying which
+    delivery it is is exactly the ambiguity the manifest exists to kill.
+    """
+    try:
+        entries_path.resolve().relative_to((REPO_ROOT / "outputs").resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
 def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
-                   manifest_path: Path, rep: Report) -> None:
+                   manifest_path: Path, rep: Report, delivered: bool = False) -> None:
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -554,8 +591,9 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
                      f"{by_name[-1].get('sha256')} but this file hashes {digest}; "
                      f"the file changed after it was recorded")
         else:
-            rep.warn(f"no manifest record for {name} (sha256 {digest[:12]}); "
-                     f"this file was not produced by a recorded delivery path")
+            message = (f"no manifest record for {name} (sha256 {digest[:12]}); "
+                       f"this file was not produced by a recorded delivery path")
+            rep.fail(message) if delivered else rep.warn(message)
         return
     rep.info["manifest_run_id"] = match.get("run_id")
     recorded_entries = match.get("entries")
@@ -570,6 +608,93 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
     if recorded and recorded != actual:
         rep.fail(f"contest assignment differs from the manifest: recorded "
                  f"{sorted(recorded)}, file carries {sorted(actual)}")
+
+
+def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
+                          status: str, failures: Sequence[str], rep: Report) -> None:
+    """Write the preflight verdict onto the matching manifest record.
+
+    R3(c). "Upload-ready", "blocked" and "acknowledged" lived only in the
+    operator's memory of what the terminal said. They belong on the artifact
+    record, because the record is what a later session, a scheduled task, or a
+    late swap reads.
+
+    Deliberately narrow: it only ever updates a record whose sha256 already
+    equals these bytes, it never creates one, and a write failure is a warning.
+    No engine import; the manifest is plain JSON.
+    """
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    records = payload if isinstance(payload, list) else payload.get("deliveries", [])
+    target = next((r for r in records
+                   if isinstance(r, dict) and r.get("sha256") == entries_sha256), None)
+    if target is None:
+        return
+    target["status"] = status
+    target["preflight"] = {
+        "version": VERSION,
+        "verdict": status,
+        "failures": list(failures),
+        "checked_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        tmp = manifest_path.with_name(f".{manifest_path.name}.preflight.tmp")
+        tmp.write_text(json.dumps(payload, indent=1, sort_keys=False) + "\n",
+                       encoding="utf-8")
+        tmp.replace(manifest_path)
+        rep.info["manifest_status_stamped"] = status
+    except OSError as exc:
+        rep.warn(f"manifest status not stamped ({exc}); the verdict is this "
+                 f"output only")
+
+
+def resolve_feed_for_slate(entries: Sequence[EntryRow],
+                           salary: Dict[str, Dict[str, str]],
+                           rep: Report) -> Optional[Path]:
+    """Find the freshest lineups_feed*.json for this file's slate date.
+
+    R4. The posted-lineup cross-check was the strongest thing this tool could
+    say and it ran only when --feed was passed, which made the scratch-after-
+    build window opt-in. The feed is already on disk for every slate the engine
+    built; nothing has to be fetched to use it.
+    """
+    dates = set()
+    for entry in entries:
+        for pid in entry.cells:
+            row = salary.get(pid)
+            if not row:
+                continue
+            parsed = parse_game_info_datetime(row.get("Game Info"))
+            if parsed is not None:
+                dates.add(parsed.date().isoformat())
+    if len(dates) != 1:
+        if dates:
+            rep.info["feed_autoresolve"] = (
+                f"skipped: the file spans {len(dates)} slate dates {sorted(dates)}")
+        return None
+    slate_date = dates.pop()
+    candidates = sorted((REPO_ROOT / "data" / "slates" / slate_date).glob("lineups_feed*.json"))
+    if not candidates:
+        rep.info["feed_autoresolve"] = f"no lineups_feed*.json under data/slates/{slate_date}"
+        return None
+    freshest = max(candidates, key=lambda p: p.stat().st_mtime)
+    rep.info["feed_autoresolve"] = f"resolved {freshest.name} for {slate_date}"
+    return freshest
+
+
+def _feed_age_minutes(feed: Mapping[str, Any]) -> Optional[float]:
+    stamp = str(feed.get("fetched_at") or "")
+    if not stamp:
+        return None
+    try:
+        fetched = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if fetched.tzinfo is None:
+        fetched = fetched.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - fetched).total_seconds() / 60.0
 
 
 def check_parent(entries: Sequence[EntryRow], parent_path: Path, rep: Report) -> None:
@@ -589,14 +714,32 @@ def check_parent(entries: Sequence[EntryRow], parent_path: Path, rep: Report) ->
                      f"({p.contest_name}) to {e.contest_id} ({e.contest_name})")
 
 
+FEED_STALE_MINUTES = 90
+
+
 def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                feed_path: Path, strict: bool, rep: Report) -> None:
-    """Name-joined, so it warns by default; --feed-strict promotes it to a block."""
+    """A rostered player missing from his team's CONFIRMED lineup is a hard fail.
+
+    R4. It was a warning unless --feed AND --feed-strict were both passed, so a
+    3:55pm bench with a blank salary-file Status walked through the default
+    check. That is the classic DFS zero and the evidence to catch it was already
+    on disk. ``strict=False`` (--feed-lenient) restores the warning. A team that
+    has not posted is untouched either way: TEAM_UNCONFIRMED is not evidence.
+    """
     try:
         feed = json.loads(feed_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         rep.warn(f"feed unreadable ({exc}); posted-lineup cross-check skipped")
         return
+    age = _feed_age_minutes(feed)
+    if age is not None:
+        rep.info["feed_age_minutes"] = round(age, 1)
+        if age > FEED_STALE_MINUTES:
+            rep.warn(f"lineups feed is {age / 60:.1f}h old (fetched "
+                     f"{feed.get('fetched_at')}); a confirmed-lineup all-clear "
+                     f"from it is that old too")
+    rep.info["feed_file"] = str(feed_path)
     posted: Dict[str, set[str]] = {}
     confirmed_teams: set[str] = set()
     for game in feed.get("games", []) or []:
@@ -715,13 +858,35 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
         if sibling.exists():
             manifest = sibling
             rep.info["manifest_source"] = "found next to the entries file"
-    if manifest is not None:
+    delivered = is_delivered_file(entries_path)
+    rep.info["delivered_file"] = delivered
+    if args.no_manifest:
+        rep.info["manifest_source"] = "waived by --no-manifest"
+        rep.warn("manifest cross-check waived by --no-manifest; nothing on disk "
+                 "states this file is the one to upload")
+    elif manifest is not None:
         rep.info["manifest_file"] = str(manifest)
-        check_manifest(entries_path, entries, manifest, rep)
+        check_manifest(entries_path, entries, manifest, rep, delivered=delivered)
+    elif delivered:
+        # R3(b). The manifest generation path is fail-open by design, so a
+        # certified file can land in outputs/ with no record and nothing says
+        # so. Failing closed HERE closes that hole without ever letting
+        # bookkeeping break a build.
+        rep.fail(f"no upload manifest for this delivered file: nothing at "
+                 f"{entries_path.resolve().parent / 'upload_manifest.json'} states "
+                 f"which delivery these bytes are. Re-run the build, or pass "
+                 f"--no-manifest to waive it deliberately")
     if args.parent:
         check_parent(entries, Path(args.parent), rep)
-    if args.feed:
-        check_feed(entries, salary, Path(args.feed), args.feed_strict, rep)
+
+    feed_path = Path(args.feed) if args.feed else resolve_feed_for_slate(entries, salary, rep)
+    if feed_path is not None and feed_path.exists():
+        check_feed(entries, salary, feed_path, not args.feed_lenient, rep)
+    elif feed_path is not None:
+        rep.warn(f"feed {feed_path} does not exist; posted-lineup cross-check skipped")
+    else:
+        rep.warn("no lineups feed resolved; the posted-lineup cross-check did "
+                 "not run and a benched starter would not be caught here")
 
     report = {
         "tool": "preflight_upload", "version": VERSION,
@@ -738,10 +903,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--entries", required=True, help="the file about to be uploaded")
     ap.add_argument("--salary", help="DKSalaries.csv; defaults to the promoted run's snapshot")
     ap.add_argument("--manifest", help="outputs/<date>/upload_manifest.json")
+    ap.add_argument("--no-manifest", action="store_true",
+                    help="waive the manifest cross-check for a file that was "
+                         "never recorded as a delivery")
     ap.add_argument("--parent", help="the delivered file this one refines")
-    ap.add_argument("--feed", help="lineups_feed.json")
+    ap.add_argument("--feed", help="lineups_feed.json; auto-resolved for the slate date")
+    ap.add_argument("--feed-lenient", action="store_true",
+                    help="demote posted-lineup absences from failure to warning")
     ap.add_argument("--feed-strict", action="store_true",
-                    help="promote posted-lineup absences from warning to failure")
+                    help=argparse.SUPPRESS)  # R4: strict is the default; kept so
+                    # an existing invocation or script does not die on the flag.
     ap.add_argument("--expect-contest-type", choices=["classic", "showdown"],
                     help="fail if the file's geometry is not this")
     ap.add_argument("--expect-entries", type=int,
@@ -757,6 +928,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"ERROR  {exc}", file=sys.stderr)
         return 3
+
+    if not report["failures"]:
+        verdict, code = "upload_ready", 0
+    elif args.force:
+        verdict, code = "acknowledged", 4
+    else:
+        verdict, code = "blocked", 2
+    report["verdict"] = verdict
+    manifest_file = report["info"].get("manifest_file")
+    if manifest_file:
+        stamp_manifest_status(Path(manifest_file), report["info"]["entries_sha256"],
+                              verdict, report["failures"], rep)
 
     if args.json:
         print(json.dumps(report, indent=1, default=str))
@@ -780,6 +963,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"  duplicate lineup groups: {adv['duplicate_lineup_groups']}")
         if adv.get("overlap_histogram"):
             print(f"  lineup overlap histogram: {adv['overlap_histogram']}")
+        if info.get("feed_file"):
+            age = info.get("feed_age_minutes")
+            age_text = (f"{age / 60:.1f}h old" if isinstance(age, (int, float))
+                        else "age unknown")
+            print(f"  feed: {Path(info['feed_file']).name} ({age_text})")
         print()
         for w in report["warnings"]:
             print(f"WARN  {w}")
@@ -789,12 +977,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"PASS  {adv['entries']} {info['contest_type']} entries, "
                   f"all hard checks clean")
         elif args.force:
-            print(f"\nFORCED  {len(report['failures'])} hard failure(s) overridden "
-                  f"by --force; this file is being uploaded against the check")
+            print(f"\nACKNOWLEDGED  {len(report['failures'])} hard failure(s) "
+                  f"overridden by --force; this file is not blocked and it is not "
+                  f"clean. Exit 4.")
 
-    if report["failures"] and not args.force:
-        return 2
-    return 0
+    return code
 
 
 if __name__ == "__main__":
