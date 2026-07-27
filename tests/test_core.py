@@ -1374,6 +1374,26 @@ class TicketLineScoringTests(unittest.TestCase):
         self.assertAlmostEqual(wta_scores[0], wta_scores[1], places=6)
         self.assertGreater(sat_scores[0], sat_scores[1])
 
+    def test_the_gpp_family_advertises_no_split_it_does_not_apply(self):
+        """Ledger 3.12, 2026-07-27. Teeth: six gpp profiles carried a
+        ceiling/floor pair that projection_component never read, and the ladder
+        ran backwards, giving more floor weight as the field grew. Deleting the
+        keys is the decision; this asserts the table cannot re-grow them without
+        someone also wiring the branch that would consume them.
+        """
+        for shape, profile in opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items():
+            if profile["mode_family"] != "gpp":
+                continue
+            self.assertNotIn("ceiling_weight", profile, shape)
+            self.assertNotIn("floor_weight", profile, shape)
+        # And the score still takes raw ceiling for a gpp shape, unchanged.
+        lineup = self._lineup([12.0] * 10, [7.0] * 10)
+        gpp = opt.score_lineup_candidate(lineup, contest_shape="large_field_gpp")
+        self.assertEqual(gpp["score_components"]["projection"], gpp["ceiling_sum"])
+        # The two families whose objective IS floor-ish keep their blend.
+        for shape in ("cash", "satellite"):
+            self.assertIn("floor_weight", opt.CONTEST_SHAPE_PROFILE_WEIGHTS[shape])
+
     def test_the_metric_is_labelled_a_proxy_and_names_the_right_objective(self):
         lineup = self._lineup([12.0] * 10, [7.0] * 10)
         sat = opt.score_lineup_candidate(lineup, contest_shape="satellite")
@@ -1387,22 +1407,20 @@ class TicketLineScoringTests(unittest.TestCase):
         self.assertEqual(opt._mode_for_contest_shape("satellite", "wta"), "ticket_line")
         self.assertEqual(opt._mode_for_contest_shape("large_wta", "wta"), "wta")
 
-    def test_no_profile_weight_is_decoration_outside_two_named_exceptions(self):
+    def test_no_profile_weight_is_decoration_outside_one_named_exception(self):
         """RC 1.2's contract test, cheap form: perturb each weight on each shape
         against a fixed lineup and require the score to move.
 
-        The exceptions are in the name because they are not equal and the short
-        name outlives its own footnote. On the `wta` family ceiling/floor are
-        1.00/0.00, so the blend equals raw ceiling and skipping it is a no-op.
-        On the `gpp` family it is a LIVE CONTRADICTION: five profiles advertise
-        splits from 0.78/0.22 to 0.70/0.30 and projection_component takes pure
-        ceiling. That is the same defect R1b fixed one family over in
-        `ticket_line`; extending the blend to `gpp` reranks every GPP contest,
-        so it is its own decision and it is on the board. Until it is decided,
-        this test must not be readable as "every weight is live."
+        One exception survives and it is in the name so it cannot hide. On the
+        `wta` family ceiling/floor are 1.00/0.00, so the blend equals raw ceiling
+        and skipping it is a no-op. The `gpp` family used to be the second
+        exception and it was a live contradiction: six profiles advertised splits
+        from 0.80/0.20 to 0.70/0.30 while projection_component took pure ceiling.
+        Decided 2026-07-27 (ledger 3.12): the pair is deleted from the gpp
+        profiles, so there is nothing left to exempt. The rule is back to one
+        line: a weight in the table is consumed, or it is not in the table.
         """
-        known_inert = {"wta": {"ceiling_weight", "floor_weight"},
-                       "gpp": {"ceiling_weight", "floor_weight"}}
+        known_inert = {"wta": {"ceiling_weight", "floor_weight"}}
         lineup = self._lineup([12.0, 11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0],
                               [6.0, 5.5, 5.0, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5])
         lineup.loc[:4, "Team"] = "BBB"

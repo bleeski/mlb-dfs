@@ -2683,13 +2683,22 @@ BATTING_ORDER_CLUSTER_BASE_BONUS = {
 # 'right_tail_volatility_counts', and contest_allocator already spends it in
 # _candidate_shape_score and in the right-tail retention quota.
 #
-# Still inert by design, and named here so it stays visible: for the 'wta' and
-# 'gpp' families, projection_component takes raw ceiling, so 'ceiling_weight'
-# and 'floor_weight' do not reach the score. On 'wta' that is harmless because
-# the pair is 1.00/0.00 and the blend would be identical. On 'gpp' it is a live
-# contradiction (0.72/0.28 advertised, pure ceiling applied). R1b deliberately
-# extends the blend to 'ticket_line' only; extending it to 'gpp' reranks every
-# GPP contest and is its own decision.
+# The 'gpp' family carried a ceiling/floor pair too, from 0.80/0.20 on
+# small_field_gpp to 0.70/0.30 on mme_gpp, and projection_component took raw
+# ceiling for all six. DECIDED 2026-07-27, dated ledger entry 3.12: delete the
+# pair rather than consume it. GPP ranks on ceiling by design. Two reasons, both
+# in the ledger. The advertised ladder ran backwards, giving MORE floor weight as
+# the field grew, while field_pressure_weight and salary_uniqueness_weight in the
+# same profiles ladder the right way; that asymmetry is evidence the pair was
+# never reasoned to. And floor carries no enrichment signal, since xISO and
+# K-rate land on Ceiling while Floor stays a flat 0.58 multiple of Base, so
+# blending floor into a top-heavy objective discards the signal the enrichment
+# stack exists to produce. 'wta' keeps 1.00/0.00, which is the same statement in
+# the table's own vocabulary: ceiling, nothing else.
+#
+# Still inert by design, and named here so it stays visible: the 'wta' family's
+# 1.00/0.00 pair does not reach the score either, which is harmless because the
+# blend would be identical.
 CONTEST_SHAPE_PROFILE_WEIGHTS = {
     'small_wta': {
         'mode_family': 'wta', 'ceiling_weight': 1.00, 'floor_weight': 0.00,
@@ -2707,32 +2716,32 @@ CONTEST_SHAPE_PROFILE_WEIGHTS = {
         'salary_uniqueness_weight': 1.00, 'field_pressure_weight': 1.15,
     },
     'single_entry_gpp': {
-        'mode_family': 'gpp', 'ceiling_weight': 0.78, 'floor_weight': 0.22,
+        'mode_family': 'gpp',
         'stack_bonus_weight': 0.55, 'batting_order_cluster_weight': 0.75,
         'salary_uniqueness_weight': 0.25, 'field_pressure_weight': 0.45,
     },
     'portfolio_gpp': {
-        'mode_family': 'gpp', 'ceiling_weight': 0.72, 'floor_weight': 0.28,
+        'mode_family': 'gpp',
         'stack_bonus_weight': 0.50, 'batting_order_cluster_weight': 0.75,
         'salary_uniqueness_weight': 0.35, 'field_pressure_weight': 0.55,
     },
     'mme_gpp': {
-        'mode_family': 'gpp', 'ceiling_weight': 0.70, 'floor_weight': 0.30,
+        'mode_family': 'gpp',
         'stack_bonus_weight': 0.50, 'batting_order_cluster_weight': 0.75,
         'salary_uniqueness_weight': 0.55, 'field_pressure_weight': 0.75,
     },
     'small_field_gpp': {
-        'mode_family': 'gpp', 'ceiling_weight': 0.80, 'floor_weight': 0.20,
+        'mode_family': 'gpp',
         'stack_bonus_weight': 0.60, 'batting_order_cluster_weight': 0.80,
         'salary_uniqueness_weight': 0.25, 'field_pressure_weight': 0.40,
     },
     'mid_field_gpp': {
-        'mode_family': 'gpp', 'ceiling_weight': 0.76, 'floor_weight': 0.24,
+        'mode_family': 'gpp',
         'stack_bonus_weight': 0.62, 'batting_order_cluster_weight': 0.80,
         'salary_uniqueness_weight': 0.38, 'field_pressure_weight': 0.58,
     },
     'large_field_gpp': {
-        'mode_family': 'gpp', 'ceiling_weight': 0.72, 'floor_weight': 0.28,
+        'mode_family': 'gpp',
         'stack_bonus_weight': 0.68, 'batting_order_cluster_weight': 0.80,
         'salary_uniqueness_weight': 0.62, 'field_pressure_weight': 0.82,
     },

@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  23 modules  367 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  23 modules  368 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw). This applies to late swap too as of 2026-07-27 (F16): `tools/late_swap.py --postures <id>=<posture>` resolves identity the way the build does and blocks on a contest that matches no archetype, where it used to stamp every entry `large_wta`.
@@ -530,6 +530,52 @@ does not change the feasibility floors, which may still relax any of these upwar
 on a thin slate and say so. The golden replay overrides every cap
 (`LOOSE_CONTROLS`), so this change cannot move that baseline; R6(b)'s
 production-controls replay is what will exercise it.
+
+### 3.12 GPP ranks on ceiling, and the table stops saying otherwise (DATED DECISION, 2026-07-27)
+
+**The question.** `score_lineup_candidate` blends a profile's ceiling and floor
+weights for the `cash` and `ticket_line` families and takes raw ceiling for
+everything else. Six `gpp` profiles advertised a split anyway: `small_field_gpp`
+0.80/0.20, `single_entry_gpp` 0.78/0.22, `mid_field_gpp` 0.76/0.24,
+`large_field_gpp` and `portfolio_gpp` 0.72/0.28, `mme_gpp` 0.70/0.30. None of it
+reached the score. This is the same defect R1b fixed one family over, and R1b
+deliberately left it because extending the blend reranks every GPP contest.
+
+**Measured, not argued.** Patching the branch to include `gpp` and re-running the
+golden replay moved the baseline: 3 of 18 entries changed candidate. All four GPP
+entries sit in one contest (191047506), the same four candidates were selected
+before and after, and exposure and SP-pair distribution were byte-identical, so
+the change was a permutation of entry-to-lineup pairing inside one contest and
+not a change to what would be entered. All three certification gates held.
+
+**The decision.** Delete the pair from the six gpp profiles. GPP ranks on ceiling.
+
+**Why delete rather than consume.** Two reasons, both independent of the
+measurement. The advertised ladder ran backwards: floor weight RISES as the field
+grows, 0.20 at small field to 0.30 at MME, while a bigger and more top-heavy
+field is exactly where ceiling matters more and cashing matters less. In the same
+profiles `field_pressure_weight` (0.40 to 0.82) and `salary_uniqueness_weight`
+(0.25 to 0.62) ladder the right way, so the asymmetry is evidence the ceiling and
+floor pair was never reasoned to. Turning it on would ship that error into every
+GPP contest. Second, floor carries no enrichment signal. xISO hitter ceilings and
+K-rate pitcher ceilings both land on `Ceiling`; `Floor` stays a flat 0.58 multiple
+of Base unless something moves it. A 0.28 floor weight therefore discards 28% of
+the signal the enrichment stack exists to produce, in the contests where ceiling
+is the objective. The `wta` family already says the same thing in the table's own
+vocabulary with 1.00/0.00.
+
+**The honest counterargument.** Floor-awareness in a GPP is a normal commercial
+default and 20-30% is a normal number. The reason not to adopt it today is that
+under the emergency-proxy projections the golden replay runs, Floor is a fixed
+0.58 multiple of Base and Ceiling a fixed 1.42, so any blend is rank-equivalent
+to ceiling within the projection term and the measurement above cannot separate a
+good version of this change from a bad one. If GPP floor-awareness is wanted, the
+version to build is a corrected ladder, ceiling weight rising with field size,
+landed against R6(b)'s enriched golden replay where the effect is observable.
+
+**Rule restored.** A weight in `CONTEST_SHAPE_PROFILE_WEIGHTS` is consumed or it
+is not in the table. The weight-consumption contract test now carries one
+exemption, `wta`'s 1.00/0.00, instead of two.
 
 ## 4. CALIBRATION CONTENT (INERT until the Section 0 gate opens)
 
