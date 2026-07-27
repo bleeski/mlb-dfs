@@ -8,6 +8,60 @@ Priorities: **P0** corrupts what gets uploaded or lets an invalid file certify. 
 
 ---
 
+## Landed 2026-07-26 (Stage 3: F21 and F19)
+
+**F21 LANDED. F19 LANDED.** Engine v3.21, new module `mlb_engine/determinism.py`
+v1.0, audit v3.1. Suite 294 (core 219), 22 modules.
+
+F21, what changed. `excluded_flags` is the single reading of the Excluded
+column and the four `df['Excluded'] == False` sites now call `_drop_excluded_rows`
+instead. Only an affirmative token removes a player (`true/t/yes/y/1/x/exclude/
+excluded/drop/out`); blank, NaN, None, `"False"` and every other false-ish token
+keep them. An unrecognized token also keeps the player, is counted, and is named
+in the checkpoint as a blocker, because the defect being closed is players
+disappearing and guessing "exclude" on an ambiguous cell would reintroduce it in
+a new costume. Counts land in `checkpoint["exclusions"]["excluded_column"]`
+alongside the explicit exclusion set. The SP-cap denominator no longer shrinks on
+a blank cell, which is the part that changed the auto anchor caps silently.
+
+F19, what changed. `stable_union` and `stable_ids` in the new determinism module
+replace every `list(set(...))` on the solver path: the two lock merges and the
+exclude merge in `build_multi_lineup`, the lock merge in the augmentation pass,
+`locked_ids` in `build_single_lineup`, the stack-core blocklist, and the capped
+SP-pair combos (which were tuples unpacked from a frozenset, so their internal
+order was hash-dependent too). `tools/audit.py` runs the suite with
+`PYTHONHASHSEED=0`; `build_slate.py` and `tools/late_swap.py` re-exec once with
+it pinned, guarded on `__name__ == "__main__"` so importing them does not replace
+the importer's process. `runtime_preflight` now carries `hash_seed`, so a run
+record states which footing the build ran on.
+
+**A correction on F19, because the claim did not hold as written.** The review
+says an unpinned seed means "identical inputs can certify different files across
+processes". The mechanism is real and I confirmed half of it: set iteration order
+over these player IDs does vary by seed, and those lists did become MILP
+constraint rows. The consequence did not reproduce. With the sorting deliberately
+removed and three different seeds, both the small pipeline fixture and a tie-rich
+four-pitcher / six-SP-pair bank produced byte-identical exports every time; HiGHS
+presolve absorbs the row-order difference at these pool sizes. So F19 removed a
+real nondeterminism source, but no divergent export was ever observed, and the
+"same inputs, same file" claim was probably true in practice before this change.
+
+That distinction is reflected in the tests. `test_solver_inputs_are_identical_
+across_hash_seeds` is the gate with teeth: it captures every locks/excludes/
+forbidden-combo/stack-core list handed to the solver across three seeds, and it
+was verified by sabotage (three digests unsorted, one digest sorted).
+`test_two_processes_with_different_seeds_produce_one_file` is an end-to-end
+regression guard whose docstring says plainly that it passes with or without the
+fix on the fixtures available, so nobody later reads it as proof.
+
+Open after this: F16 (late-swap identity), F17 (intake trust), F18 (factor
+ownership), F20 (caps, deferred by decision), F3b/F3c, F22, the F23 remainder,
+and Section 2 beyond G1 and G4. F16 is the recommended next: it is the only
+permitted post-delivery path, it runs closest to lock with the least
+verification, and F4 and F15 both left work parked in it.
+
+---
+
 ## Landed 2026-07-26 (Stage 3 start: F13 and F15)
 
 **F13 LANDED. F15 LANDED.** Engine v3.20, allocator v1.11, bank_cache v1.2,
@@ -62,9 +116,9 @@ short bank leaves a blank reserved row. `excluded_new_teams` without
 carries an `exclusions` block that blocks at `approve=False` when an excluded id
 matches nobody in the pool.
 
-Open after this: F16, F17, F18, F19, F20 (deferred by decision), F21, F3b/F3c,
-the F23 remainder, and Section 2 beyond G1 and G4. F21 and F19 remain the
-natural next pair.
+Open after this: F16, F17, F18, F20 (deferred by decision), F3b/F3c, F22, the
+F23 remainder, and Section 2 beyond G1 and G4. (Superseded by the Stage 3 block
+above: F21 and F19 are now landed.)
 
 ---
 
@@ -240,7 +294,7 @@ Dropped from RT's own list as below the value line at current stakes: portfolio 
 - **Why:** these are the seams in this week's headline feature; the double count systematically overweights extreme parks, which is where stack decisions concentrate.
 - **Fix:** decide park ownership on the record (recommended: F1 owns run environment, de-park the implied total; F5 keeps wind/roof/delay); port `_select_slate_legs` to the odds parser; map the precip key and feed real delay risk; use `OUTDOOR_ROOF_TYPES`; load overrides keyed `(date, away, home)` honoring `manual_required`. Done when: a Coors fixture's combined uplift stays inside the F1 clip band; two-leg fixtures carry two totals; ATH-home wind applies; a neutral-site row changes the venue.
 
-### F19. Determinism: unpinned hash seed feeds MILP row order (P1, S) | IC B18, modified
+### F19. LANDED 2026-07-26 (mechanism removed; predicted divergence did not reproduce, see the Stage 3 block). Determinism: unpinned hash seed feeds MILP row order (P1, S) | IC B18, modified
 
 - **What:** lock merges via `list(set(...))` (confirmed at `optimizer_v3.py:3275`; re-locate IC's other two anchors during implementation) feed constraint rows in set order; `PYTHONHASHSEED` is pinned nowhere (**[verified]**); with the uniform 1.42 ceiling multiplier exact ties are routine, so identical inputs can certify different files across processes.
 - **Why:** it quietly undermines the golden replay and makes "same inputs, same file" unclaimable.
@@ -252,7 +306,7 @@ Dropped from RT's own list as below the value line at current stakes: portfolio 
 - **Why:** duplication is the main enemy in a satellite-heavy portfolio, so cap looseness is not cosmetic; and every future tuning session reads dead knobs as live.
 - **Fix:** pick a winner per control and edit the loser, recorded in the ledger (recommended: adopt §8's tighter caps for satellite postures, keep looser GPP caps only where feasibility floors demand); delete the uncalled stage and either enforce DU via `scope='bank'` or record that allocator overlap is the accepted control; delete `_default_candidate_bank_target`, the chatgpt relic, and the legacy allocator per the accepted 07-24 items. Done when: code and §8 agree or the divergence is a dated ledger decision; grep finds no uncalled certification stage.
 
-### F21. A blank Excluded cell silently removes players from the legal pool (P1, S) | IC B10
+### F21. LANDED 2026-07-26. A blank Excluded cell silently removes players from the legal pool (P1, S) | IC B10
 
 - **What:** `df[df['Excluded'] == False]` at four sites (**[verified]** `optimizer_v3.py:477, 978, 1008, 3117`); NaN/None/"False" all fail the comparison and the row drops; the column is only defaulted when entirely absent, so an override frame or CSV round-trip with one blank cell loses that player and shrinks the SP-cap denominator.
 - **Why:** this is the forbidden pool-reduction failure arriving from a data condition instead of a compute limit, invisible in the certified output.
@@ -334,7 +388,7 @@ Each stage is shippable alone; nothing in any stage blocks a build while incompl
 
 **Stage 2, evidence (half a day):** F9 miner fail-closed. F10 registry merge. F11 diagnostics honesty. F12 pointer portability. G4 own results, and persist per-slate ownership predictions from the next slate forward.
 
-**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). F16 late-swap identity. F17 intake trust. F18 factor ownership decision + doubleheader odds. F19 determinism pin. F20/F21 doctrine decisions and Excluded coercion.
+**Stage 3, quality (a day):** ~~F13 timeout semantics~~ (landed). ~~F14 cache correctness~~ (landed). ~~F15 payload seams~~ (landed). F16 late-swap identity. F17 intake trust. F18 factor ownership decision + doubleheader odds. ~~F19 determinism pin~~ (landed). F20 doctrine decision (deferred); ~~F21 Excluded coercion~~ (landed).
 
 **Stage 4, process and leverage (as time allows):** G2 skeptic pass. G3 ownership/dup wiring (after Stage 2, once the archive is trustworthy and at the 8-slate gate). G5 corpus split + ENGINE_STATE. G6 scheduled loops. G8 tier doctrine. F22 tests. F23 remainder. G7 stakes decision, dated, once G4 yields a number.
 

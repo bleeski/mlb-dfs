@@ -119,6 +119,8 @@ import pandas as pd
 from collections import Counter
 from math import ceil
 
+from mlb_engine.determinism import hash_seed_report, stable_ids, stable_union
+
 try:
     import scipy  # noqa: F401
     SCIPY_AVAILABLE = True
@@ -127,7 +129,7 @@ except Exception as exc:  # pragma: no cover - environment-dependent
     SCIPY_AVAILABLE = False
     SCIPY_IMPORT_ERROR = str(exc)
 
-OPTIMIZER_VERSION = 'v3.20'
+OPTIMIZER_VERSION = 'v3.21'
 LAST_SOLVER_BACKEND = None
 LAST_SOLVER_STATUS = None
 
@@ -349,6 +351,9 @@ def runtime_preflight():
         'supported_backend': 'scipy_milp',
         'active_backend_if_auto': 'scipy_milp' if SCIPY_AVAILABLE else None,
         'optimizer_certifiable': SCIPY_AVAILABLE,
+        # F19: carried into run provenance so an archived build states whether
+        # it ran with the hash seed pinned, rather than leaving it assumed.
+        'hash_seed': hash_seed_report(),
     }
 
 
@@ -540,6 +545,111 @@ def _check_stack_feasibility(projections_df, stack_constraints, locked_player_id
 # v3.3 build_single_lineup (unchanged)
 # ============================================================================
 
+# ============================================================================
+# v3.21 (F21) the Excluded column has exactly one reading
+#
+# Four sites did `df[df['Excluded'] == False]`. That comparison is False for
+# NaN, for None, and for the string "False", so any of those dropped the row.
+# The column is only defaulted when it is absent entirely, so a projections
+# override built by hand, or any CSV round-trip that leaves one cell blank,
+# silently removed that player from the legal pool. It also shrank the SP-cap
+# denominator, so the auto anchor caps were computed against a pool that no
+# longer matched the salary file.
+#
+# This is the pool reduction CLAUDE.md forbids, arriving from a data condition
+# instead of a compute limit, and invisible in the certified output.
+#
+# The reading is now: only an affirmative token excludes. Blank, missing and
+# false-ish keep the player. An unrecognized token also keeps the player and is
+# counted and named in the pool report, because the failure this closes is
+# players disappearing, and guessing "exclude" on an ambiguous cell would
+# reintroduce it in a new costume.
+# ============================================================================
+
+EXCLUDED_TRUE_TOKENS = frozenset({
+    'true', 't', 'yes', 'y', '1', 'x', 'exclude', 'excluded', 'drop', 'out',
+})
+EXCLUDED_FALSE_TOKENS = frozenset({
+    'false', 'f', 'no', 'n', '0', '', 'nan', 'none', 'null', 'na', 'n/a',
+    'include', 'included', 'in', '-',
+})
+
+
+def excluded_flags(projections_df):
+    """(boolean Series, report). The only reading of the Excluded column.
+
+    The Series is always aligned to ``projections_df`` and always real booleans,
+    so callers can filter with it directly instead of comparing to False.
+    """
+    report = {
+        'column_present': False,
+        'rows': int(len(projections_df)) if projections_df is not None else 0,
+        'excluded_true': 0,
+        'coerced_from_blank': 0,
+        'coerced_from_text': 0,
+        'unrecognized_kept': 0,
+        'unrecognized_values': [],
+        'note': 'only an affirmative Excluded token removes a player; blank and '
+                'unrecognized cells keep the player and are counted here',
+    }
+    if projections_df is None or 'Excluded' not in getattr(projections_df, 'columns', []):
+        return pd.Series(False, index=getattr(projections_df, 'index', None)), report
+
+    report['column_present'] = True
+    raw = projections_df['Excluded']
+    flags = []
+    unrecognized = []
+    for value in raw:
+        if isinstance(value, bool):
+            flags.append(value)
+            continue
+        if value is None or (not isinstance(value, str) and pd.isna(value)):
+            report['coerced_from_blank'] += 1
+            flags.append(False)
+            continue
+        if isinstance(value, (int, float)):
+            flags.append(bool(value))
+            continue
+        token = str(value).strip().lower()
+        if token in EXCLUDED_TRUE_TOKENS:
+            report['coerced_from_text'] += 1
+            flags.append(True)
+            continue
+        if token in EXCLUDED_FALSE_TOKENS:
+            if token in ('', 'nan', 'none', 'null', 'na', 'n/a'):
+                report['coerced_from_blank'] += 1
+            else:
+                report['coerced_from_text'] += 1
+            flags.append(False)
+            continue
+        report['unrecognized_kept'] += 1
+        unrecognized.append(str(value))
+        flags.append(False)
+
+    series = pd.Series(flags, index=projections_df.index, dtype=bool)
+    report['excluded_true'] = int(series.sum())
+    report['unrecognized_values'] = sorted(set(unrecognized))[:10]
+    return series, report
+
+
+def coerce_excluded_column(projections_df):
+    """Return a copy whose Excluded column is real booleans, plus the report."""
+    if projections_df is None or not hasattr(projections_df, 'columns'):
+        return projections_df, excluded_flags(projections_df)[1]
+    flags, report = excluded_flags(projections_df)
+    out = projections_df.copy()
+    out['Excluded'] = flags if report['column_present'] else False
+    return out, report
+
+
+def _drop_excluded_rows(df):
+    """The one place the Excluded column can remove a player from the pool."""
+    if 'Excluded' not in getattr(df, 'columns', []):
+        return df
+    flags, _ = excluded_flags(df)
+    return df[~flags]
+
+
 def _prepare_single_lineup_df(
     projections_df,
     target='ceiling',
@@ -557,8 +667,7 @@ def _prepare_single_lineup_df(
     df = projections_df.copy()
     if excludes:
         df = df[~df['Player_ID'].isin(excludes)]
-    if 'Excluded' in df.columns:
-        df = df[df['Excluded'] == False]
+    df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
 
     df['_pos_set'] = df['Position'].apply(_parse_positions)
 
@@ -862,10 +971,9 @@ def build_single_lineup(
     ran out" and "this is infeasible" changes what you do next, which is every
     caller that has a relaxation ladder.
     """
-    locked_ids = list(locks or [])
-    for pid in (locked_slot_assignments or {}).values():
-        if pid not in locked_ids:
-            locked_ids.append(pid)
+    # F19: sorted before constraint emission. These ids become one equality row
+    # each, and the row order is a branch-and-bound tie-break input.
+    locked_ids = stable_union(locks, (locked_slot_assignments or {}).values())
     df, suppression_bonus = _prepare_single_lineup_df(
         projections_df, target=target, locks=locked_ids, excludes=excludes,
         stack_constraints=stack_constraints, skip_feasibility_check=skip_feasibility_check,
@@ -1145,8 +1253,7 @@ def _eligible_sp_ids_for_anchor_caps(projections_df, excludes=None):
     df = projections_df.copy()
     if excludes:
         df = df[~df['Player_ID'].isin(excludes)]
-    if 'Excluded' in df.columns:
-        df = df[df['Excluded'] == False]
+    df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
     sp_df = df[df['Position'].apply(lambda p: 'P' in _parse_positions(p))]
     return sp_df['Player_ID'].tolist()
 
@@ -1175,8 +1282,7 @@ def resolve_viable_sp_pool(
     df = projections_df.copy()
     if excludes:
         df = df[~df['Player_ID'].isin(excludes)]
-    if 'Excluded' in df.columns:
-        df = df[df['Excluded'] == False]
+    df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
     sp_df = df[df['Position'].apply(lambda p: 'P' in _parse_positions(p))].copy()
 
     if audit_status_col in sp_df.columns:
@@ -2113,11 +2219,14 @@ def build_multi_lineup(
         while accepted is None:
             iteration_kwargs = dict(single_lineup_kwargs)
 
+            # F19: every merge below used to be list(set(...)), so the order of
+            # the locks and excludes handed to the solver came out of a
+            # hash-randomized set. Those lists become MILP constraint rows, and
+            # row order breaks ties in branch and bound. stable_union sorts once
+            # and the ordering stops depending on which process is running.
             if i < len(seed_sp_pairs):
-                forced_pair = set(seed_sp_pairs[i])
-                iteration_kwargs['locks'] = list(
-                    set(iteration_kwargs.get('locks') or []) | forced_pair
-                )
+                iteration_kwargs['locks'] = stable_union(
+                    iteration_kwargs.get('locks'), seed_sp_pairs[i])
 
             if mode == 'wta' and scenario_families:
                 family = _select_family_for_lineup(i, scenario_families)
@@ -2126,27 +2235,32 @@ def build_multi_lineup(
                     'min_size': family.get('min_size', 4),
                     'max_size': family.get('max_size', 5),
                 }
-                iteration_kwargs['locks'] = list(
-                    set(iteration_kwargs.get('locks') or []) | {family['anchor']}
-                )
+                iteration_kwargs['locks'] = stable_union(
+                    iteration_kwargs.get('locks'), [family['anchor']])
 
             if mode == 'wta' and enforce_wta_stack_core_uniqueness and stack_cores:
-                iteration_kwargs['stack_core_blocklist'] = stack_cores
+                iteration_kwargs['stack_core_blocklist'] = [
+                    sorted(core, key=str) for core in stack_cores
+                ]
 
             if active_sp_cap is not None:
-                capped_sps = {pid for pid, count in sp_usage.items() if count >= active_sp_cap}
+                capped_sps = {str(pid) for pid, count in sp_usage.items()
+                              if count >= active_sp_cap}
                 if i < len(seed_sp_pairs):
-                    capped_sps = capped_sps - set(seed_sp_pairs[i])
+                    capped_sps -= {str(x) for x in seed_sp_pairs[i]}
                 if capped_sps:
-                    iteration_kwargs['excludes'] = list(
-                        set(iteration_kwargs.get('excludes') or []) | capped_sps
-                    )
+                    iteration_kwargs['excludes'] = stable_union(
+                        iteration_kwargs.get('excludes'), capped_sps)
 
             if active_pair_cap is not None:
-                capped_pairs = [
-                    tuple(pair) for pair, count in sp_pair_usage.items()
-                    if count >= active_pair_cap
-                ]
+                # sp_pair_usage is keyed by frozenset, so tuple(pair) unpacked in
+                # hash order. Sorting inside the tuple and across the list makes
+                # the emitted combo rows identical run to run.
+                capped_pairs = sorted(
+                    (tuple(sorted(pair, key=str)) for pair, count in sp_pair_usage.items()
+                     if count >= active_pair_cap),
+                    key=lambda combo: tuple(str(x) for x in combo),
+                )
                 if capped_pairs:
                     iteration_kwargs['forbidden_player_combos'] = list(
                         iteration_kwargs.get('forbidden_player_combos') or []
@@ -3447,8 +3561,7 @@ def _stackable_teams_by_strength(projections_df, min_hitters=4, top_k=5):
     if not hasattr(projections_df, 'columns') or 'Team' not in projections_df.columns:
         return []
     df = projections_df
-    if 'Excluded' in df.columns:
-        df = df[df['Excluded'] == False]
+    df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
     hitters = df[df['Position'].apply(lambda p: 'P' not in _parse_positions(p))]
     has_ceiling = 'Ceiling' in hitters.columns
     strengths = []
@@ -3616,7 +3729,7 @@ def build_diverse_candidate_bank(
         nonlocal next_candidate_id
         attempts['n'] += 1
         kwargs = dict(single_lineup_kwargs)
-        kwargs['locks'] = list(set(kwargs.get('locks') or []) | set(pair))
+        kwargs['locks'] = stable_union(kwargs.get('locks'), pair)  # F19
         kwargs['stack_constraints'] = {'team': team, 'min_size': 4, 'max_size': 5}
         kwargs['time_limit_s'] = resolve_solver_time_limit(
             solver_time_limit_s, _budget_left()

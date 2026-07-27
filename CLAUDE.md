@@ -35,7 +35,7 @@ constant is intact.
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  21 modules  285 tests`. The module count is derived from
+   `PASS  v2.26.0  22 modules  294 tests`. The module count is derived from
    the filesystem, so it moves on its own; the test count is a pin. A count
    mismatch with the suite passing is a WARNING, not a failure, and prints
    in brackets on the PASS line: proceed and fix the pin after the slate. A
@@ -124,6 +124,15 @@ immediately with zero diagnostic narration.
   "time limit at gap X" or "proven infeasible: <constraint>", never both at
   once. Shrinking a per-solve limit to fit a budget is allowed; trimming the
   legal player set to fit compute is not.
+- The Excluded column has one reading, in `optimizer_v3.excluded_flags`. Only an
+  affirmative token removes a player; blank, NaN, "False" and unrecognized cells
+  keep them, and the counts land in `checkpoint["exclusions"]["excluded_column"]`.
+  Never compare the column to False directly. A player leaving the pool on a
+  blank cell is the forbidden pool reduction arriving as a data condition.
+- Determinism: every set that reaches the solver is sorted first
+  (`mlb_engine.determinism.stable_union`), and the script entry points pin
+  `PYTHONHASHSEED=0`. Never convert a set of player IDs to a list with
+  `list(set(...))`.
 - Blank reserved entry rows block certification. Never bypass.
 - Ledger edits are in place; the archive is append-only, newest first;
   never drop an invariant section.

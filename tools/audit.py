@@ -14,12 +14,13 @@ import importlib.util
 import json
 import py_compile
 import re
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-VERSION = "v3.0"
+VERSION = "v3.1"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
 # Every suite the audit gates. test_core alone left the Showdown suite and the
@@ -27,11 +28,11 @@ LAYOUT_VERSION = "v3.0.0-pre"
 # untracked while build_slate imported it unconditionally.
 AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   "tests.test_upload_integrity", "tests.test_golden_replay")
-EXPECTED_TEST_COUNT = 285  # core 210 + showdown 30 + upload_integrity 44 + golden 1
+EXPECTED_TEST_COUNT = 294  # core 219 + showdown 30 + upload_integrity 44 + golden 1
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
-    "mlb_engine/optimize/optimizer_v3.py": "OPTIMIZER_VERSION = 'v3.20'",
+    "mlb_engine/optimize/optimizer_v3.py": "OPTIMIZER_VERSION = 'v3.21'",
     "mlb_engine/allocate/contest_allocator.py": 'VERSION = "v1.11"',
     "mlb_engine/intake/slate_intake_manager.py": 'VERSION = "v1.9"',
     "mlb_engine/entries/dk_entries_manager.py": 'VERSION = "v1.6"',
@@ -44,6 +45,7 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/optimize/tail_candidate_scanner.py": 'VERSION = "v1.0"',
     "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.1"',
     "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.2"',
+    "mlb_engine/determinism.py": 'VERSION = "v1.0"',
 }
 
 CSV_REQUIRED = {
@@ -190,9 +192,13 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     suites = [name for name in AUDITED_SUITES
               if (root / "tests" / f"{name.split('.')[-1]}.py").exists()]
     if run_tests and suites:
+        # F19: the suite includes a determinism gate, and a gate that runs under
+        # a randomized hash seed cannot tell a fixed ordering from a lucky one.
+        test_env = dict(os.environ)
+        test_env["PYTHONHASHSEED"] = "0"
         proc = subprocess.run(
             [sys.executable, "-m", "unittest", *suites],
-            cwd=str(root), text=True, capture_output=True,
+            cwd=str(root), text=True, capture_output=True, env=test_env,
         )
         combined = proc.stdout + "\n" + proc.stderr
         match = re.search(r"Ran\s+(\d+)\s+tests?", combined)

@@ -27,10 +27,29 @@ import argparse
 import csv
 import datetime as dt
 import json
+import os
 import sys
 import time
 import urllib.request
 from pathlib import Path
+
+# F19: pinned before anything else runs, because the interpreter reads
+# PYTHONHASHSEED at startup and setting it later does nothing. This is the
+# build that writes the file Ben uploads, so "same inputs, same file" has to be
+# true here or it is not true anywhere. Solver-facing collections are sorted
+# regardless; this closes the gap for anything the sorting misses.
+#
+# Only when run as a script. The test suite imports this module to drive its
+# functions directly, and a module-level execve would replace the test runner's
+# process on import.
+if (__name__ == "__main__" and os.environ.get("PYTHONHASHSEED") != "0"
+        and sys.executable):
+    try:
+        os.execve(sys.executable, [sys.executable, *sys.argv],
+                  {**os.environ, "PYTHONHASHSEED": "0"})
+    except OSError:
+        pass  # a slate that builds on an unpinned seed beats one that does not
+
 
 def _find_repo() -> Path:
     """Locate the mlb-dfs engine root.

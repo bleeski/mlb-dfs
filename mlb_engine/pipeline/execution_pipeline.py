@@ -1551,16 +1551,36 @@ def _exclusion_block(
     silent: a wrong ID excludes nobody, the build proceeds around a player who
     should be gone, and the export gate finds it with no time to rebuild.
     """
+    from mlb_engine.optimize.optimizer_v3 import excluded_flags
+
     ids = [str(x) for x in (excluded_player_ids or [])]
     block: Dict[str, Any] = {
         "requested": ids,
         "requested_count": len(ids),
         "matched_player_ids": [],
         "unmatched_player_ids": [],
+        "excluded_column": {},
         "blockers": [],
         "note": "excludes are applied to the bank build and to every solve; "
                 "deterministic bookkeeping, never a claim",
     }
+
+    # F21: the Excluded column is the other way a player leaves the legal pool,
+    # and it used to do it silently on a blank cell. Its counts belong next to
+    # the explicit exclusion set, in the block the operator already reads.
+    try:
+        _, column_report = excluded_flags(projections)
+        block["excluded_column"] = column_report
+        if column_report.get("unrecognized_kept"):
+            block["blockers"].append(
+                f"{column_report['unrecognized_kept']} Excluded cell(s) hold values "
+                f"this engine does not recognize "
+                f"({column_report['unrecognized_values'][:5]}); those players were "
+                f"KEPT in the pool. Fix the cells or drop the players explicitly"
+            )
+    except Exception:  # noqa: BLE001 - never block the checkpoint on a frame quirk
+        block["excluded_column"] = {"note": "Excluded column not readable from this frame"}
+
     if not ids:
         return block
     try:

@@ -24,8 +24,20 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
+
+# F19: pinned before any import, for the same reason as build_slate.py. This
+# path writes a file that goes to DraftKings. Script-only, so importing this
+# module never replaces the importer's process.
+if (__name__ == "__main__" and os.environ.get("PYTHONHASHSEED") != "0"
+        and sys.executable):
+    try:
+        os.execve(sys.executable, [sys.executable, *sys.argv],
+                  {**os.environ, "PYTHONHASHSEED": "0"})
+    except OSError:
+        pass
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:

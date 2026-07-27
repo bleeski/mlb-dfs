@@ -4000,5 +4000,209 @@ class RunSlateExclusionSeamTests(unittest.TestCase):
                                 for w in result["checkpoint_plan"]["warnings"]))
 
 
+class ExcludedColumnCoercionTests(unittest.TestCase):
+    """F21. A blank cell used to remove a player from the legal pool."""
+
+    @staticmethod
+    def _mixed_frame():
+        frame = projection_frame(write_salary(Path(tempfile.mkdtemp()) / "s.csv"))
+        # One of each shape a real frame arrives in: a genuine exclusion, the
+        # string "False" that a CSV round-trip produces, an empty cell, a NaN,
+        # and a token nobody in this engine has ever defined.
+        frame.loc[0, "Excluded"] = True
+        frame.loc[1, "Excluded"] = "False"
+        frame.loc[2, "Excluded"] = ""
+        frame.loc[3, "Excluded"] = float("nan")
+        frame.loc[4, "Excluded"] = "maybe"
+        frame.loc[5, "Excluded"] = "yes"
+        return frame
+
+    def test_only_affirmative_tokens_exclude(self):
+        frame = self._mixed_frame()
+        flags, report = opt.excluded_flags(frame)
+        self.assertTrue(bool(flags.iloc[0]))
+        self.assertTrue(bool(flags.iloc[5]))
+        for idx in (1, 2, 3, 4):
+            self.assertFalse(bool(flags.iloc[idx]), f"row {idx} was dropped")
+        self.assertEqual(report["excluded_true"], 2)
+        self.assertEqual(report["coerced_from_blank"], 2)   # "" and NaN
+        self.assertEqual(report["coerced_from_text"], 2)    # "False" and "yes"
+        self.assertEqual(report["unrecognized_kept"], 1)
+        self.assertEqual(report["unrecognized_values"], ["maybe"])
+
+    def test_blank_cell_no_longer_shrinks_the_pool(self):
+        frame = self._mixed_frame()
+        kept = opt._drop_excluded_rows(frame)
+        # Two affirmative exclusions out of the frame, and nothing else.
+        self.assertEqual(len(kept), len(frame) - 2)
+
+    def test_blank_cell_no_longer_shrinks_the_sp_cap_denominator(self):
+        frame = projection_frame(write_salary(Path(tempfile.mkdtemp()) / "s.csv"))
+        baseline = len(opt._eligible_sp_ids_for_anchor_caps(frame))
+        pitchers = frame.index[frame["Position"] == "P"].tolist()
+        frame.loc[pitchers[0], "Excluded"] = float("nan")
+        frame.loc[pitchers[1], "Excluded"] = "False"
+        # Before F21 both of these dropped, halving the denominator the auto
+        # anchor caps are computed against.
+        self.assertEqual(len(opt._eligible_sp_ids_for_anchor_caps(frame)), baseline)
+
+    def test_missing_column_excludes_nobody(self):
+        frame = projection_frame(write_salary(Path(tempfile.mkdtemp()) / "s.csv"))
+        frame = frame.drop(columns=["Excluded"])
+        flags, report = opt.excluded_flags(frame)
+        self.assertFalse(report["column_present"])
+        self.assertEqual(len(opt._drop_excluded_rows(frame)), len(frame))
+
+    def test_checkpoint_names_unrecognized_cells(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            write_entries(entries)
+            frame = projection_frame(ids)
+            frame.loc[0, "Excluded"] = "probably not"
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame, approve=False,
+            )
+            column = plan["exclusions"]["excluded_column"]
+            self.assertEqual(column["unrecognized_kept"], 1)
+            self.assertTrue(any("does not recognize" in b
+                                for b in plan["exclusions"]["blockers"]))
+
+
+_SOLVER_INPUT_PROBE = r"""
+import hashlib, json, sys
+sys.path.insert(0, ".")
+from tests.test_core import diverse_projection_frame
+from mlb_engine.optimize import optimizer_v3 as opt
+
+calls = []
+real = opt.build_single_lineup
+
+
+def spy(projections_df, **kw):
+    calls.append([
+        list(kw.get("locks") or []),
+        list(kw.get("excludes") or []),
+        [list(c) for c in (kw.get("forbidden_player_combos") or [])],
+        [list(c) for c in (kw.get("stack_core_blocklist") or [])],
+    ])
+    return real(projections_df, **kw)
+
+
+opt.build_single_lineup = spy
+opt.build_multi_lineup(
+    diverse_projection_frame(), n_lineups=6, mode="wta", target="ceiling",
+    max_sp_exposure=2, max_sp_pair_repetition=1,
+)
+print(hashlib.sha256(json.dumps(calls).encode()).hexdigest())
+"""
+
+
+_DETERMINISM_PROBE = r"""
+import hashlib, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, ".")
+from tests.test_core import (
+    write_salary, write_entries, projection_frame, RunSlateFrontDoorTests,
+)
+from mlb_engine.pipeline.execution_pipeline import run_slate
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    salary = root / "salary.csv"
+    ids = write_salary(salary)
+    entries = root / "DKEntries.csv"
+    write_entries(entries)
+    built = run_slate(
+        runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+        projections_override=projection_frame(ids),
+        portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+        approve=True, assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+    )
+    if not built.get("passed"):
+        print("BUILD_FAILED " + str(built.get("errors")))
+        raise SystemExit(1)
+    data = Path(built["output_path"]).read_bytes()
+    print(hashlib.sha256(data).hexdigest())
+"""
+
+
+class DeterminismTests(unittest.TestCase):
+    """F19. Same inputs, same file, across processes."""
+
+    def test_stable_helpers_sort_and_dedupe(self):
+        from mlb_engine import determinism
+
+        self.assertEqual(determinism.stable_ids(["b", "a", "b", 3]), ["3", "a", "b"])
+        self.assertEqual(determinism.stable_ids(None), [])
+        self.assertEqual(
+            determinism.stable_union(["c"], None, {"a", "b"}, ["a"]),
+            ["a", "b", "c"],
+        )
+
+    def test_hash_seed_is_reported_in_optimizer_provenance(self):
+        report = opt.runtime_preflight()["hash_seed"]
+        self.assertIn("python_hash_seed", report)
+        self.assertEqual(report["expected"], "0")
+        # The audit runs the suite with the seed pinned, so a green suite under
+        # an unpinned seed means the gate is not doing its job.
+        self.assertTrue(report["pinned"] or report["python_hash_seed"] is None)
+
+    @staticmethod
+    def _probe_digests(source, seeds=("1", "2", "3")):
+        import os
+        import subprocess
+        import sys
+
+        digests = []
+        for seed in seeds:
+            env = dict(os.environ)
+            env["PYTHONHASHSEED"] = seed
+            proc = subprocess.run(
+                [sys.executable, "-c", source],
+                cwd=str(Path(__file__).resolve().parents[1]),
+                capture_output=True, text=True, env=env, timeout=300,
+            )
+            if proc.returncode != 0:
+                raise AssertionError(
+                    f"seed {seed} failed: {proc.stdout}\n{proc.stderr[-2000:]}")
+            digests.append(proc.stdout.strip().splitlines()[-1])
+        return digests
+
+    def test_solver_inputs_are_identical_across_hash_seeds(self):
+        """The assertion with teeth. Revert any sort and this goes red.
+
+        Every locks, excludes, forbidden-combo and stack-core list handed to the
+        solver is captured in order across three seeds. Verified by sabotage:
+        with stable_union returning list(set(...)) this produces three different
+        digests, and with the sort in place it produces one.
+        """
+        digests = self._probe_digests(_SOLVER_INPUT_PROBE)
+        self.assertEqual(len(set(digests)), 1,
+                         f"solver input order varied by hash seed: {digests}")
+
+    def test_two_processes_with_different_seeds_produce_one_file(self):
+        """End-to-end regression guard, stated honestly for what it is.
+
+        The review predicted that an unpinned seed could certify two different
+        files from one set of inputs. The mechanism was real (set order over
+        player IDs does vary by seed, and those lists became constraint rows),
+        but the divergence did NOT reproduce on any fixture available here:
+        with the sorting removed, both this build and a tie-rich six-pair bank
+        still produced byte-identical exports across seeds, because HiGHS
+        presolve absorbs the row-order difference on pools this size.
+
+        So this test is a guard against a future regression, not a reproduction
+        of a caught bug. The test above is the one that fails when the fix is
+        undone.
+        """
+        digests = self._probe_digests(_DETERMINISM_PROBE, seeds=("1", "2"))
+        self.assertEqual(digests[0], digests[1],
+                         "identical inputs certified two different files")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
