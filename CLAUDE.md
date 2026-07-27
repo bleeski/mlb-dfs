@@ -54,7 +54,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
 ## Session start
 1. `git status` must be clean; if not, say what is dirty before touching it.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  23 modules  360 tests`. The module count comes off the
+   `PASS  v2.26.0  23 modules  363 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The

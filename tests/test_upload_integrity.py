@@ -1114,5 +1114,53 @@ class OwnResultsTests(unittest.TestCase):
                              {"C1": 1.10, "C2": -0.25})
 
 
+class PreflightContractDocumentationTests(unittest.TestCase):
+    """R2, skill half: the documented contract has to match the exit codes.
+
+    Teeth: the tool started exiting 4 on --force, hard-failing a manifest-less
+    delivered file and a player absent from a confirmed lineup, but --help and
+    SKILL.md both still promised the old three-code contract. The caller reads
+    those, not the source, so a false doc is a false contract.
+    """
+
+    SKILL = REPO / "skills" / "generate-lineups" / "SKILL.md"
+
+    def _preflight_section(self) -> str:
+        text = self.SKILL.read_text(encoding="utf-8")
+        start = text.index("## Always run the preflight")
+        return text[start:text.index("\n## ", start + 1)]
+
+    def test_help_does_not_promise_exit_zero_on_force(self):
+        out = subprocess.run(
+            [sys.executable, str(REPO / "tools" / "preflight_upload.py"), "--help"],
+            capture_output=True, text=True, check=True).stdout
+        force = [ln for ln in out.splitlines() if "--force" in ln or "clock beats" in ln]
+        self.assertTrue(force, out)
+        blob = " ".join(force)
+        self.assertNotIn("exit 0", blob.lower())
+        self.assertIn("exit 4", blob.lower())
+
+    def test_the_docstring_exit_table_carries_all_four_codes(self):
+        import preflight_upload
+
+        doc = preflight_upload.__doc__ or ""
+        table = doc[doc.index("Exit codes:"):]
+        for code in ("0", "2", "3", "4"):
+            self.assertRegex(table, rf"(?m)^\s+{code}\s+\w")
+        self.assertIn("acknowledged", table.lower())
+
+    def test_the_skill_states_the_four_codes_and_never_says_force_exits_zero(self):
+        section = self._preflight_section()
+        for token in ("| 0 |", "| 2 |", "| 3 |", "| 4 |"):
+            self.assertIn(token, section)
+        lowered = section.lower()
+        self.assertNotIn("exits 0", lowered)
+        self.assertNotIn("exit 0\nclean", lowered)
+        # The one thing an agent must do differently on 4: say what was overridden.
+        self.assertIn("overridden", lowered)
+        for waiver in ("--no-manifest", "--feed-lenient"):
+            self.assertIn(waiver, section)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

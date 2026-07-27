@@ -296,19 +296,40 @@ engine, touches no network, and finishes in under two seconds.
 python <repo>/tools/preflight_upload.py --entries <delivered file>
 ```
 
-`--salary` is optional; without it the tool resolves the promoted run's
-`inputs/DKSalaries.csv` snapshot, which cannot be clobbered by a later same-date
-build the way the staged copy can. It finds `outputs/<date>/upload_manifest.json`
-next to the entries file on its own and cross-checks the sha256, the entry count,
-and the contest IDs.
+Three inputs resolve themselves, because a check that runs only when you remember
+a flag is a check that does not run at T-5:
 
-Report the one-line verdict and nothing more when it passes. When it fails, lead
-with the failure, quote it verbatim, and do not present the file as ready. Exit 0
-clean, 2 hard failure, 3 IO error.
+- `--salary`: the promoted run's `inputs/DKSalaries.csv` snapshot, which cannot be
+  clobbered by a later same-date build the way the staged copy can.
+- `--manifest`: `outputs/<date>/upload_manifest.json`, found next to the entries
+  file, cross-checked on sha256, entry count, and contest IDs. For a **delivered**
+  file, one resolving under `outputs/`, a missing manifest row or a sha256
+  mismatch is a hard failure; `--no-manifest` is the explicit waiver for a file
+  that was never meant to have a record. A hand-built file elsewhere still only
+  warns.
+- `--feed`: the freshest `lineups_feed.json` for the slate date, which the tool
+  reads off the entries file's own Game Info cells. A rostered player absent from
+  his team's CONFIRMED lineup is a hard failure; `--feed-lenient` demotes it to a
+  warning. A team that has not posted stays soft. The feed's age prints next to
+  the verdict and warns past 90 minutes, so a stale all-clear is visibly stale.
 
-If the clock genuinely beats the fix, `--force` prints the failures and exits 0.
-Use it only when Ben has seen the failure and said to ship anyway, and say in
-your reply that the file was forced past a failing check and which one.
+### The four exit codes
+
+| exit | verdict | what you say |
+|---|---|---|
+| 0 | `upload_ready` | the one-line verdict and nothing more |
+| 2 | `blocked` | lead with the failure, quote it verbatim, do not present the file as ready |
+| 3 | usage or IO error | the check did not run; say that, and do not report a clean file |
+| 4 | `acknowledged` | see below |
+
+**Exit 4 is not exit 0.** `--force` prints the failures, leaves the file
+unblocked, and exits 4, so the tool can never be the reason a slate is not
+entered while still telling the caller the truth. Use it only when Ben has seen
+the failure and said to ship anyway. On exit 4 your reply must name every
+overridden failure, quoted, and say the file was forced past a failing check.
+Never report an exit-4 file as clean, upload-ready, or certified: the manifest
+records it as `acknowledged` with the failure list, and your reply has to match
+the record.
 
 ## When the deadline has already passed
 
@@ -446,7 +467,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 360 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 363 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

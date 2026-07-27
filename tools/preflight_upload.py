@@ -920,7 +920,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--min-pool-overlap", type=float, default=0.95)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true",
-                    help="print failures and exit 0; for when the clock beats the fix")
+                    help="print failures and exit 4 (acknowledged, not clean); "
+                         "for when the clock beats the fix")
     args = ap.parse_args(argv)
 
     try:
