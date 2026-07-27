@@ -119,6 +119,9 @@ import pandas as pd
 from collections import Counter
 from math import ceil
 
+from mlb_engine.contest_shapes import (
+    CONTEST_SHAPES, OBJECTIVE_CLASS_BY_SHAPE, is_ticket_line, objective_class,
+)
 from mlb_engine.determinism import hash_seed_report, stable_ids, stable_union
 
 try:
@@ -129,7 +132,7 @@ except Exception as exc:  # pragma: no cover - environment-dependent
     SCIPY_AVAILABLE = False
     SCIPY_IMPORT_ERROR = str(exc)
 
-OPTIMIZER_VERSION = 'v3.21'
+OPTIMIZER_VERSION = 'v3.22'
 LAST_SOLVER_BACKEND = None
 LAST_SOLVER_STATUS = None
 
@@ -2721,6 +2724,35 @@ CONTEST_SHAPE_PROFILE_WEIGHTS = {
         'field_pressure_weight': 0.25,
     },
 }
+
+
+def _assert_profiles_match_canonical_shapes():
+    """R1a: the profile table and the canonical vocabulary agree, at import.
+
+    Before this, three modules each carried their own spelling of the shape set
+    and one of them (execution_pipeline) emitted a name that was not a profile
+    key. A table that disagrees with the vocabulary now fails on load instead of
+    on the one contest that routes to the missing key.
+    """
+    profile_keys = set(CONTEST_SHAPE_PROFILE_WEIGHTS)
+    canonical = set(CONTEST_SHAPES)
+    if profile_keys != canonical:
+        missing = ', '.join(sorted(canonical - profile_keys)) or 'none'
+        extra = ', '.join(sorted(profile_keys - canonical)) or 'none'
+        raise RuntimeError(
+            'CONTEST_SHAPE_PROFILE_WEIGHTS does not match contest_shapes.CONTEST_SHAPES; '
+            f'missing profiles: {missing}; profiles with no canonical shape: {extra}'
+        )
+    for key, profile in sorted(CONTEST_SHAPE_PROFILE_WEIGHTS.items()):
+        declared = OBJECTIVE_CLASS_BY_SHAPE[key]
+        if profile['mode_family'] != declared:
+            raise RuntimeError(
+                f"contest shape '{key}': profile mode_family "
+                f"'{profile['mode_family']}' contradicts objective class '{declared}'"
+            )
+
+
+_assert_profiles_match_canonical_shapes()
 
 
 def resolve_candidate_bank_size(requested_n, explicit=None, cap=DEFAULT_CANDIDATE_BANK_CAP):

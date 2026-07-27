@@ -1145,6 +1145,113 @@ class RunSlateFrontDoorTests(unittest.TestCase):
         self.assertEqual(normalize_posture("portfolio", "broad_micro_gpp", None), "large_gpp")
 
 
+class ContestShapeVocabularyTests(unittest.TestCase):
+    """R1a: one canonical shape vocabulary, and satellites reach their own profile.
+
+    Teeth: before this, `normalize_posture` folded inferred_type='satellite' and
+    payout_shape_default='ticket_line' into the wta_satellite posture, which
+    `_posture_to_shape` mapped to `large_wta`. The optimizer's `satellite`
+    profile (ticket_line, 0.58/0.42) and the allocator's floor-aware satellite
+    branch were both unreachable from a production build, and `mme` mapped to
+    `mme_top_heavy`, which is not a profile key at all.
+    """
+
+    def test_profile_table_covers_the_canonical_vocabulary_exactly(self):
+        from mlb_engine.contest_shapes import CONTEST_SHAPES, OBJECTIVE_CLASS_BY_SHAPE
+        self.assertEqual(set(opt.CONTEST_SHAPE_PROFILE_WEIGHTS), set(CONTEST_SHAPES))
+        self.assertEqual(set(OBJECTIVE_CLASS_BY_SHAPE), set(CONTEST_SHAPES))
+        for shape, profile in opt.CONTEST_SHAPE_PROFILE_WEIGHTS.items():
+            self.assertEqual(profile["mode_family"], OBJECTIVE_CLASS_BY_SHAPE[shape], shape)
+
+    def test_every_posture_resolves_to_a_real_profile_key(self):
+        from mlb_engine.contest_shapes import CONTEST_SHAPE_SET
+        postures = list(epi.STRATEGY_DEFAULTS) + ["not_a_posture"]
+        for posture in postures:
+            shape = epi._posture_to_shape(posture)
+            self.assertIn(shape, CONTEST_SHAPE_SET, posture)
+            # The real regression: this raised for mme before R1a.
+            self.assertEqual(
+                opt.resolve_contest_shape_profile(contest_shape=shape)["contest_shape"], shape)
+
+    def test_satellite_reaches_the_ticket_line_profile_not_large_wta(self):
+        inferred = {"inferred_type": "satellite", "payout_shape_default": "ticket_line"}
+        shape = epi.resolve_contest_shape("wta_satellite", inferred)
+        self.assertEqual(shape, "satellite")
+        profile = opt.resolve_contest_shape_profile(contest_shape=shape)
+        self.assertEqual(profile["mode_family"], "ticket_line")
+        self.assertGreater(profile["floor_weight"], 0.0)
+
+    def test_single_ticket_satellite_routes_to_the_wta_ticket_profile(self):
+        inferred = {"inferred_type": "satellite", "payout_shape_default": "ticket_line",
+                    "ticket_count": 1}
+        self.assertEqual(epi.resolve_contest_shape("wta_satellite", inferred),
+                         "wta_ticket_satellite")
+
+    def test_true_wta_and_operator_override_are_untouched(self):
+        self.assertEqual(
+            epi.resolve_contest_shape("wta_satellite",
+                                      {"inferred_type": "wta",
+                                       "payout_shape_default": "winner_take_all"}),
+            "large_wta")
+        self.assertEqual(
+            epi.resolve_contest_shape("wta_satellite",
+                                      {"inferred_type": "satellite",
+                                       "contest_shape": "large_wta"}),
+            "large_wta")
+        with self.assertRaises(ValueError):
+            epi.resolve_contest_shape("cash", {"contest_shape": "invented_shape"})
+
+    def test_satellite_keeps_its_caps_posture_and_its_construction_mode(self):
+        """R1 moves the ranking objective only. The posture (caps) and the MILP
+        construction mode both stay put; the caps divergence is backlog R5."""
+        from mlb_engine.contest_shapes import WTA_CONSTRUCTION_SHAPES
+        self.assertEqual(normalize_posture("satellite", "ticket_line", None), "wta_satellite")
+        for shape in ("satellite", "wta_ticket_satellite", "large_wta"):
+            self.assertIn(shape, WTA_CONSTRUCTION_SHAPES)
+
+    def test_a_satellite_named_contest_routes_end_to_end(self):
+        from mlb_engine.entries.dk_entries_manager import (
+            infer_contest_archetype, load_archetypes,
+        )
+        archetypes = load_archetypes(None)
+        cases = {
+            "MLB $5 Satellite to the $2 Pocket Cup MEGA Qualifier": "satellite",
+            "MLB $10 Winner Take All": "large_wta",
+            "MLB $5 Double Up": "cash",
+        }
+        for name, expected in cases.items():
+            inferred = infer_contest_archetype(name, 5.0, archetypes)
+            posture = normalize_posture(inferred.get("inferred_type"),
+                                        inferred.get("payout_shape_default"),
+                                        inferred.get("inferred_max_entries"))
+            self.assertEqual(epi.resolve_contest_shape(posture, inferred), expected, name)
+
+    def test_payout_breadth_fallback_covers_every_canonical_shape(self):
+        from mlb_engine.contest_shapes import CONTEST_SHAPES
+        for shape in CONTEST_SHAPES:
+            self.assertIn(shape, epi.PAYOUT_BREADTH_BY_SHAPE, shape)
+        satellite = epi._resolve_payout_breadth(
+            {"contest_shape": "satellite", "inferred": {}}, epi.PAYOUT_BREADTH_BY_SHAPE)
+        wta = epi._resolve_payout_breadth(
+            {"contest_shape": "large_wta", "inferred": {}}, epi.PAYOUT_BREADTH_BY_SHAPE)
+        self.assertGreater(satellite, wta)
+
+    def test_archetype_csv_parses_with_every_breadth_a_number(self):
+        """The ' SE' row carried unquoted commas in notes, so csv.DictReader put
+        ' POSE' in payout_breadth and the rest of the line in the restkey. It
+        fell back to the in-code prior silently; any new column would have
+        landed in the wrong field."""
+        from mlb_engine.entries.dk_entries_manager import find_archetypes_csv
+        path = find_archetypes_csv()
+        self.assertIsNotNone(path)
+        with Path(path).open(newline="", encoding="utf-8-sig") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertIsNone(row.get(None), row.get("pattern"))
+            float(row["payout_breadth"])
+
+
 class TailCandidateScannerTests(unittest.TestCase):
     """Tests for tail_candidate_scanner.scan_tail_candidates."""
 

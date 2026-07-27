@@ -5,7 +5,7 @@ Quarter,0.25,portfolio_gpp,,broad_micro_gpp,inferred_medium,Verify exact buy-in 
 Jukebox,0.25,portfolio_gpp,,broad_micro_gpp,inferred_medium,Recurring cheap GPP family; verify field size/max entries for close allocation.,0.15
 Daily Dollar,1.00,se_gpp,1,single_entry_gpp,inferred_medium,If title lacks Single Entry verify max entries.,0.01
 Single Entry,,se_gpp,1,single_entry_gpp,inferred_high,Max entries inferred from title.,0.01
- SE,,se_gpp,1,single_entry_gpp,inferred_medium,Leading space is intentional: prevents false-positive matches on titles containing USE, POSE, or similar substrings. Abbreviation can be ambiguous; verify if unclear.,0.01
+ SE,,se_gpp,1,single_entry_gpp,inferred_medium,"Leading space is intentional: prevents false-positive matches on titles containing USE, POSE, or similar substrings. Abbreviation can be ambiguous; verify if unclear.",0.01
 3-Max,,portfolio_gpp,3,limited_entry_gpp,inferred_high,Max entries explicit in title.,0.10
 20-Max,,portfolio_gpp,20,portfolio_gpp,inferred_high,Max entries explicit in title.,0.15
 150-Max,,portfolio_gpp,150,mme_top_heavy,inferred_high,Large-field MME posture.,0.15

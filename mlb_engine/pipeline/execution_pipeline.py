@@ -124,6 +124,10 @@ from mlb_engine.pipeline.build_state_manager import (
     snapshot_run_inputs, update_run_certification,
 )
 from mlb_engine.allocate.contest_allocator import select_and_assign_entries
+from mlb_engine.contest_shapes import (
+    SATELLITE_PAYOUT_TOKENS, SATELLITE_TYPE_TOKENS, WTA_CONSTRUCTION_SHAPES,
+    satellite_shape_for, validate_shape,
+)
 from mlb_engine.entries.dk_entries_manager import (
     derive_workflow_certification, reconcile_entries_against_assignments,
     validate_dk_entries_file, validate_template_preservation,
@@ -134,7 +138,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.12"
+VERSION = "v1.13"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -745,7 +749,7 @@ def _resolve_contest_postures(
             source = ("name_inference"
                       if inferred.get("inferred_type") not in (None, "", "unknown")
                       else "unresolved")
-        shape = str(inferred.get("contest_shape") or _posture_to_shape(posture))
+        shape = resolve_contest_shape(posture, inferred)
         resolved[cid] = {
             "contest_id": cid, "contest_name": cname, "posture": posture,
             "contest_shape": shape, "inferred": inferred,
@@ -900,15 +904,57 @@ def unresolved_contest_blockers(resolved: Mapping[str, Mapping[str, Any]]) -> Li
     return out
 
 
+_POSTURE_TO_SHAPE = {
+    "single_entry": "single_entry_gpp",
+    "wta_satellite": "large_wta",
+    "small_gpp": "small_field_gpp",
+    "large_gpp": "large_field_gpp",
+    # R1a: was "mme_top_heavy", which is a payout_shape_default token and not a
+    # profile key, so resolve_contest_shape_profile raised on it and every
+    # 150-Max contest died on the direct path. The MME profile is "mme_gpp".
+    "mme": "mme_gpp",
+    "cash": "cash",
+}
+_POSTURE_TO_SHAPE_FALLBACK = "large_field_gpp"
+
+# Validated at import, so a mapping entry that invents a shape name fails on
+# load rather than on the single contest that routes to it.
+for _shape in list(_POSTURE_TO_SHAPE.values()) + [_POSTURE_TO_SHAPE_FALLBACK]:
+    validate_shape(_shape, "execution_pipeline._POSTURE_TO_SHAPE")
+del _shape
+
+
 def _posture_to_shape(posture: str) -> str:
-    return {
-        "single_entry": "single_entry_gpp",
-        "wta_satellite": "large_wta",
-        "small_gpp": "small_field_gpp",
-        "large_gpp": "large_field_gpp",
-        "mme": "mme_top_heavy",
-        "cash": "cash",
-    }.get(posture, "large_field_gpp")
+    return _POSTURE_TO_SHAPE.get(posture, _POSTURE_TO_SHAPE_FALLBACK)
+
+
+def resolve_contest_shape(posture: str, inferred: Optional[Mapping[str, Any]] = None) -> str:
+    """Resolve the shape a contest's candidates are RANKED for.
+
+    R1a. The posture is a caps key and it is lossy: ``wta_satellite`` covers a
+    winner-take-all and a multi-ticket qualifier, which are different objectives.
+    Routing through the posture alone flattened every satellite to ``large_wta``,
+    a pure-ceiling profile, on a portfolio that is almost entirely satellites and
+    qualifiers. The contest's own identity is on hand in ``inferred``, so use it.
+
+    An explicit ``contest_shape`` in ``inferred`` still wins: an operator who
+    names the shape has said something the inference cannot.
+
+    The posture is deliberately NOT split here. Adding a ``satellite`` posture
+    means adding a caps row, and the caps divergence between STRATEGY_DEFAULTS
+    and MLB_Classic section 8 is an open dated decision (backlog R5). This
+    changes what candidates are ranked for and changes no cap.
+    """
+    info = dict(inferred or {})
+    explicit = str(info.get("contest_shape") or "").strip().lower()
+    if explicit:
+        return validate_shape(explicit, "contest_shape override")
+
+    itype = str(info.get("inferred_type") or "").strip().lower()
+    payout = str(info.get("payout_shape_default") or "").strip().lower()
+    if itype in SATELLITE_TYPE_TOKENS or payout in SATELLITE_PAYOUT_TOKENS:
+        return satellite_shape_for(info.get("ticket_count"))
+    return _posture_to_shape(posture)
 
 
 # ----------------------------------------------------------------------------
@@ -938,6 +984,19 @@ PAYOUT_BREADTH_BY_SHAPE: Dict[str, float] = {
     "large_wta": 0.02,
     "cash": 0.45,
     "flat_cash": 0.45,
+    # R1a: the fallback leg of _resolve_payout_breadth reads a contest_shape, so
+    # every canonical shape needs a row or a satellite silently takes the
+    # 0.12 global default instead of a satellite's breadth. Values mirror the
+    # payout_shape_default token each shape corresponds to: satellite is a cut
+    # line (ticket_line 0.22), a one-ticket satellite pays one spot
+    # (winner_take_all 0.002), mme_gpp is the mme_top_heavy row.
+    "satellite": 0.22,
+    "wta_ticket_satellite": 0.002,
+    "small_wta": 0.002,
+    "mid_wta": 0.002,
+    "mme_gpp": 0.02,
+    "mid_field_gpp": 0.15,
+    "ticket_satellite": 0.22,
 }
 _DEFAULT_PAYOUT_BREADTH = 0.12
 _PRIMARY_CEILING_RATIO = 0.75   # scripts within this ratio of the top are "primary"
@@ -2643,7 +2702,14 @@ def run_slate(
         for req in entry_requirements:
             shape_counts[req["contest_shape"]] = shape_counts.get(req["contest_shape"], 0) + 1
         dominant_shape = max(shape_counts, key=shape_counts.get) if shape_counts else "large_field_gpp"
-        mode = "wta" if dominant_shape in ("large_wta", "single_entry_gpp") else "gpp"
+        # R1a: construction mode is a separate axis from the ranking objective,
+        # and R1 moves only the second. A satellite now resolves to the
+        # `satellite` shape instead of `large_wta`; reading that off a literal
+        # tuple would have flipped it from wta to gpp construction, which moves
+        # the DU threshold row (_resolve_du_threshold_row keys on mode) as a
+        # side effect of a scoring fix. WTA_CONSTRUCTION_SHAPES holds the
+        # satellite family, so the bank is built exactly as it was.
+        mode = "wta" if dominant_shape in WTA_CONSTRUCTION_SHAPES else "gpp"
         n = int(requested_n or max(len(entry_requirements), 1))
         # v1.10: when a waterfall is supplied, the tier-derived coverage target from the
         # checkpoint (exactly the value displayed for review) drives the bank's
