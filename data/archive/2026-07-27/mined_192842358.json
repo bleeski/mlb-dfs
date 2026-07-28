@@ -1,0 +1,1185 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192842358",
+ "slate_date": "2026-07-27",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 22,
+  "roster_size": 10,
+  "entries_unparsed": 1,
+  "winning_points": 102.6,
+  "winning_entry_id": "5200830017",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 22,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 22
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2100,
+  "at_cap_entries": 8,
+  "at_cap_share_pct": 36.4,
+  "salary_left_histogram": {
+   "301-700": 3,
+   "701-1500": 5,
+   "<= 0": 6,
+   "1-100": 2,
+   "101-300": 3,
+   "> 1500": 3
+  },
+  "max_stack_histogram": {
+   "3": 6,
+   "4": 8,
+   "5": 8
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Payton Tolle",
+     "Tatsuya Imai"
+    ],
+    "count": 9,
+    "field_share_pct": 40.9
+   },
+   {
+    "pair": [
+     "Payton Tolle",
+     "Tyler Mahle"
+    ],
+    "count": 2,
+    "field_share_pct": 9.1
+   },
+   {
+    "pair": [
+     "Payton Tolle",
+     "Walbert Urena"
+    ],
+    "count": 2,
+    "field_share_pct": 9.1
+   },
+   {
+    "pair": [
+     "Brandon Sproat",
+     "Payton Tolle"
+    ],
+    "count": 2,
+    "field_share_pct": 9.1
+   },
+   {
+    "pair": [
+     "Brandon Sproat",
+     "Tatsuya Imai"
+    ],
+    "count": 2,
+    "field_share_pct": 9.1
+   },
+   {
+    "pair": [
+     "Brandon Sproat",
+     "Walbert Urena"
+    ],
+    "count": 1,
+    "field_share_pct": 4.5
+   },
+   {
+    "pair": [
+     "Jack Perkins",
+     "Payton Tolle"
+    ],
+    "count": 1,
+    "field_share_pct": 4.5
+   },
+   {
+    "pair": [
+     "Tatsuya Imai",
+     "Tyler Mahle"
+    ],
+    "count": 1,
+    "field_share_pct": 4.5
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Payton Tolle",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Tatsuya Imai",
+    "pct_drafted": 56.52
+   },
+   {
+    "player": "Brice Turang",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Yordan Alvarez",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Christian Yelich",
+    "pct_drafted": 39.13
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 4.35,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0435,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 220,
+  "roster_slots_expected": 220,
+  "recomputed_total_pct": 956.5,
+  "dk_table_total_pct": 952.2,
+  "dk_table_deficit_pts": 4.3,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 4.3 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5200830017",
+   "username": "bob1573",
+   "points": 102.6,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Brandon Sproat",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 21.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon sproat",
+    "brice turang",
+    "ceddanne rafaela",
+    "cooper pratt",
+    "jonah heim",
+    "mike trout",
+    "vaughn grissom",
+    "walbert urena",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5200934970",
+   "username": "whoisjohngalt420",
+   "points": 96.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 23.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "casey schmitt",
+    "heliot ramos",
+    "jesus rodriguez",
+    "jo adell",
+    "luis arraez",
+    "payton tolle",
+    "rafael devers",
+    "tyler mahle",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5200854211",
+   "username": "Ilost626",
+   "points": 94.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cooper pratt",
+    "curtis mead",
+    "josh lowe",
+    "nolan schanuel",
+    "payton tolle",
+    "walbert urena",
+    "william contreras",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5200944138",
+   "username": "aarond23",
+   "points": 89.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "jeremy pena",
+    "jose altuve",
+    "masataka yoshida",
+    "payton tolle",
+    "tyler mahle",
+    "willson contreras",
+    "wilyer abreu",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5200876926",
+   "username": "Jackie2424",
+   "points": 85.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Brandon Sproat",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon sproat",
+    "curtis mead",
+    "jorge soler",
+    "mike trout",
+    "payton tolle",
+    "tyler heineman",
+    "vaughn grissom",
+    "willson contreras",
+    "wilyer abreu",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5200746983",
+   "username": "ggb777",
+   "points": 81.15,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jack Perkins",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "brice turang",
+    "christian walker",
+    "christian yelich",
+    "grant mccray",
+    "isaac paredes",
+    "jack perkins",
+    "jeremy pena",
+    "payton tolle",
+    "william contreras",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5200727570",
+   "username": "grantgoupil",
+   "points": 69.0,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Tatsuya Imai",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "curtis mead",
+    "jacob wilson",
+    "masataka yoshida",
+    "tatsuya imai",
+    "tyler mahle",
+    "tyler soderstrom",
+    "willson contreras",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5200814132",
+   "username": "cpdk69",
+   "points": 68.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 23.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "isaac paredes",
+    "jackson chourio",
+    "jarren duran",
+    "jeremy pena",
+    "rafael devers",
+    "tyler mahle",
+    "walbert urena",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5200931856",
+   "username": "Raiderfanatic2195",
+   "points": 64.9,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brice turang",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "jackson chourio",
+    "masataka yoshida",
+    "payton tolle",
+    "tatsuya imai",
+    "william contreras",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5200929274",
+   "username": "FBehm319",
+   "points": 62.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "isaac paredes",
+    "jeremy pena",
+    "lucas spence",
+    "luis arraez",
+    "payton tolle",
+    "rafael devers",
+    "tatsuya imai",
+    "william contreras",
+    "wilyer abreu",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5200848336",
+   "username": "MIKEMETAL",
+   "points": 59.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 33.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "christian yelich",
+    "isaac paredes",
+    "jake bauers",
+    "jesus rodriguez",
+    "payton tolle",
+    "tatsuya imai",
+    "tyler soderstrom",
+    "willy adames",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5200764008",
+   "username": "fall54",
+   "points": 58.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "christian yelich",
+    "isaac paredes",
+    "jeremy pena",
+    "jesus rodriguez",
+    "josh lowe",
+    "payton tolle",
+    "rafael devers",
+    "tatsuya imai",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5200710923",
+   "username": "bkukor",
+   "points": 57.9,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "caleb durbin",
+    "christian yelich",
+    "cooper pratt",
+    "heliot ramos",
+    "jackson chourio",
+    "joey ortiz",
+    "payton tolle",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5200785059",
+   "username": "MissingManning",
+   "points": 57.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "ceddanne rafaela",
+    "isaac paredes",
+    "jarren duran",
+    "jeremy pena",
+    "payton tolle",
+    "rafael devers",
+    "tatsuya imai",
+    "william contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5200839570",
+   "username": "Wanna_Square_Up1567",
+   "points": 57.9,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "curtis mead",
+    "drew gilbert",
+    "heliot ramos",
+    "jesus rodriguez",
+    "luis arraez",
+    "payton tolle",
+    "tatsuya imai",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5200809256",
+   "username": "sportsfan14",
+   "points": 57.5,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Brandon Sproat",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 25.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon sproat",
+    "brice turang",
+    "christian yelich",
+    "jake bauers",
+    "joey ortiz",
+    "mike trout",
+    "nolan schanuel",
+    "payton tolle",
+    "tyler heineman",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5200933142",
+   "username": "L053R666",
+   "points": 55.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "christian yelich",
+    "connor wong",
+    "curtis mead",
+    "jackson chourio",
+    "payton tolle",
+    "rafael devers",
+    "tatsuya imai",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5200764925",
+   "username": "JRaab",
+   "points": 54.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 36.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "christian walker",
+    "christian yelich",
+    "connor wong",
+    "isaac paredes",
+    "jarren duran",
+    "jeremy pena",
+    "payton tolle",
+    "tatsuya imai",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5200848392",
+   "username": "joephoto",
+   "points": 53.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 36.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "curtis mead",
+    "jackson chourio",
+    "jake bauers",
+    "jeremy pena",
+    "josh lowe",
+    "payton tolle",
+    "tatsuya imai",
+    "william contreras",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5200728636",
+   "username": "pgk8",
+   "points": 49.6,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Brandon Sproat",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brandon sproat",
+    "brice turang",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "christian yelich",
+    "jackson chourio",
+    "tatsuya imai",
+    "william contreras",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5200940681",
+   "username": "bleeski",
+   "points": 46.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Brandon Sproat",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon sproat",
+    "brice turang",
+    "curtis mead",
+    "jake bauers",
+    "jarren duran",
+    "jeremy pena",
+    "jonah heim",
+    "tatsuya imai",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5200836841",
+   "username": "sopolis",
+   "points": 37.25,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Jack Perkins",
+    "Tatsuya Imai"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "heliot ramos",
+    "jack perkins",
+    "jackson chourio",
+    "jacob wilson",
+    "jake bauers",
+    "joey ortiz",
+    "tatsuya imai",
+    "tyler soderstrom",
+    "william contreras"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Payton Tolle",
+   "player_norm": "payton tolle",
+   "roster_position": "P",
+   "pct_drafted": 69.57,
+   "fpts": 22.4
+  },
+  {
+   "player": "Tatsuya Imai",
+   "player_norm": "tatsuya imai",
+   "roster_position": "P",
+   "pct_drafted": 56.52,
+   "fpts": -3.5
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "2B",
+   "pct_drafted": 47.83,
+   "fpts": 0.0
+  },
+  {
+   "player": "Yordan Alvarez",
+   "player_norm": "yordan alvarez",
+   "roster_position": "OF",
+   "pct_drafted": 43.48,
+   "fpts": 11.0
+  },
+  {
+   "player": "Christian Yelich",
+   "player_norm": "christian yelich",
+   "roster_position": "OF",
+   "pct_drafted": 39.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "C",
+   "pct_drafted": 39.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jeremy Pena",
+   "player_norm": "jeremy pena",
+   "roster_position": "SS",
+   "pct_drafted": 39.13,
+   "fpts": 9.0
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "1B",
+   "pct_drafted": 34.78,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "OF",
+   "pct_drafted": 30.43,
+   "fpts": 3.0
+  },
+  {
+   "player": "Curtis Mead",
+   "player_norm": "curtis mead",
+   "roster_position": "3B",
+   "pct_drafted": 30.43,
+   "fpts": 2.0
+  },
+  {
+   "player": "Isaac Paredes",
+   "player_norm": "isaac paredes",
+   "roster_position": "3B",
+   "pct_drafted": 30.43,
+   "fpts": 4.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 30.43,
+   "fpts": 4.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "1B",
+   "pct_drafted": 26.09,
+   "fpts": 2.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "2B",
+   "pct_drafted": 21.74,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 21.74,
+   "fpts": 20.0
+  },
+  {
+   "player": "Brandon Sproat",
+   "player_norm": "brandon sproat",
+   "roster_position": "P",
+   "pct_drafted": 21.74,
+   "fpts": 12.1
+  },
+  {
+   "player": "Heliot Ramos",
+   "player_norm": "heliot ramos",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Walbert Urena",
+   "player_norm": "walbert urena",
+   "roster_position": "P",
+   "pct_drafted": 17.39,
+   "fpts": 18.5
+  },
+  {
+   "player": "Tyler Mahle",
+   "player_norm": "tyler mahle",
+   "roster_position": "P",
+   "pct_drafted": 17.39,
+   "fpts": 20.5
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "SS",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jesus Rodriguez",
+   "player_norm": "jesus rodriguez",
+   "roster_position": "C",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "3B",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Cooper Pratt",
+   "player_norm": "cooper pratt",
+   "roster_position": "SS",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "Masataka Yoshida",
+   "player_norm": "masataka yoshida",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Tyler Soderstrom",
+   "player_norm": "tyler soderstrom",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 16.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Josh Lowe",
+   "player_norm": "josh lowe",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 7.0
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 4.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Luis Arraez",
+   "player_norm": "luis arraez",
+   "roster_position": "2B",
+   "pct_drafted": 13.04,
+   "fpts": 10.0
+  },
+  {
+   "player": "Jacob Wilson",
+   "player_norm": "jacob wilson",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Walker",
+   "player_norm": "christian walker",
+   "roster_position": "1B",
+   "pct_drafted": 8.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jack Perkins",
+   "player_norm": "jack perkins",
+   "roster_position": "P",
+   "pct_drafted": 8.7,
+   "fpts": 13.75
+  },
+  {
+   "player": "Tyler Heineman",
+   "player_norm": "tyler heineman",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 9.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "1B",
+   "pct_drafted": 8.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 14.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "1B",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Willy Adames",
+   "player_norm": "willy adames",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 2.0
+  },
+  {
+   "player": "Grant McCray",
+   "player_norm": "grant mccray",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 16.0
+  },
+  {
+   "player": "Yainer Diaz",
+   "player_norm": "yainer diaz",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Anthony Seigler",
+   "player_norm": "anthony seigler",
+   "roster_position": "2B",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "3B",
+   "pct_drafted": 4.35,
+   "fpts": 22.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 5.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jorge Soler",
+   "player_norm": "jorge soler",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 4.0
+  },
+  {
+   "player": "Lucas Spence",
+   "player_norm": "lucas spence",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 4.0
+  },
+  {
+   "player": "Jo Adell",
+   "player_norm": "jo adell",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 9.0
+  },
+  {
+   "player": "Casey Schmitt",
+   "player_norm": "casey schmitt",
+   "roster_position": "3B",
+   "pct_drafted": 4.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jose Altuve",
+   "player_norm": "jose altuve",
+   "roster_position": "2B",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 21,
+  "worst_rank": 21,
+  "best_finish_percentile": 13.04,
+  "median_finish_percentile": 13.04,
+  "best_points": 46.6,
+  "winning_points": 102.6,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

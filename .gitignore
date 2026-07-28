@@ -19,8 +19,30 @@ _scratch_*/
 # generate-lineups iteration scratch (build scripts, review HTML)
 skills/generate-lineups-workspace/
 
-# stray loose feed/bundle files at the slates root (per-slate dirs are ignored above)
-data/slates/_*.json
+# stray loose feed/bundle files at the slates root (per-slate dirs are ignored
+# above). Both shapes appear: an underscore-prefixed scratch name and a
+# date-prefixed raw feed dump, e.g. 2026-07-27_lineups_feed_raw.json.
+data/slates/*.json
+
+# stray root-level DK downloads. The authoritative copies live in
+# data/slates/<date>/ during a build and data/archive/<date>/ after it; a root
+# copy is a leftover and is never what a build reads.
+/DKEntries.csv
+/DKSalaries.csv
+/DKEntries*.csv
+/DKSalaries*.csv
+
+# audit stdout capture
+/audit_out.log
+audit_out.log
+
+# zero-byte DK exports quarantined by the pull step; they are failed pulls, not
+# evidence, and the contest stays on the awaiting list until a real pull lands
+data/standings/failed_pulls/
+
+# superseded worklists the sandbox could not delete; status lives in
+# CONTESTS_AWAITING_STANDINGS.md, which is tracked
+data/standings/PENDING_MINE_*.md
 
 # multi-session claims: live state, never history (keep the dir itself)
 claims/*

@@ -1,0 +1,7526 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192591926",
+ "slate_date": "2026-07-22",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 237,
+  "entries_complete_lineups": 233,
+  "roster_size": 10,
+  "entries_unparsed": 4,
+  "winning_points": 131.9,
+  "winning_entry_id": "5196633183",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 214,
+  "entries_in_duplicated_lineups": 29,
+  "share_duplicated_pct": 12.4,
+  "max_copies": 7,
+  "copies_histogram": {
+   "1": 204,
+   "2": 6,
+   "3": 2,
+   "4": 1,
+   "7": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2400,
+  "at_cap_entries": 104,
+  "at_cap_share_pct": 44.6,
+  "salary_left_histogram": {
+   "<= 0": 54,
+   "301-700": 40,
+   "1-100": 50,
+   "> 1500": 36,
+   "101-300": 40,
+   "701-1500": 13
+  },
+  "max_stack_histogram": {
+   "2": 39,
+   "3": 74,
+   "4": 73,
+   "5": 47
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Colin Rea",
+     "Peter Lambert"
+    ],
+    "count": 48,
+    "field_share_pct": 20.6
+   },
+   {
+    "pair": [
+     "Peter Lambert",
+     "Sandy Alcantara"
+    ],
+    "count": 47,
+    "field_share_pct": 20.2
+   },
+   {
+    "pair": [
+     "Colin Rea",
+     "Sandy Alcantara"
+    ],
+    "count": 27,
+    "field_share_pct": 11.6
+   },
+   {
+    "pair": [
+     "Keider Montero",
+     "Peter Lambert"
+    ],
+    "count": 25,
+    "field_share_pct": 10.7
+   },
+   {
+    "pair": [
+     "Anthony Kay",
+     "Peter Lambert"
+    ],
+    "count": 19,
+    "field_share_pct": 8.2
+   },
+   {
+    "pair": [
+     "Anthony Kay",
+     "Colin Rea"
+    ],
+    "count": 13,
+    "field_share_pct": 5.6
+   },
+   {
+    "pair": [
+     "Keider Montero",
+     "Sandy Alcantara"
+    ],
+    "count": 12,
+    "field_share_pct": 5.2
+   },
+   {
+    "pair": [
+     "Anthony Kay",
+     "Sandy Alcantara"
+    ],
+    "count": 12,
+    "field_share_pct": 5.2
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Peter Lambert",
+    "pct_drafted": 62.03
+   },
+   {
+    "player": "Wyatt Langford",
+    "pct_drafted": 44.73
+   },
+   {
+    "player": "Sandy Alcantara",
+    "pct_drafted": 41.77
+   },
+   {
+    "player": "Colin Rea",
+    "pct_drafted": 40.93
+   },
+   {
+    "player": "Yordan Alvarez",
+    "pct_drafted": 35.86
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0169,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 2330,
+  "roster_slots_expected": 2330,
+  "recomputed_total_pct": 983.1,
+  "dk_table_total_pct": 983.1,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5196633183",
+   "username": "atxryan",
+   "points": 131.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 21.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "dillon dingler",
+    "griffin conine",
+    "isaac paredes",
+    "jeremy pena",
+    "keider montero",
+    "nicky lopez",
+    "peter lambert",
+    "spencer torkelson",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5196607954",
+   "username": "jc000000",
+   "points": 124.899994,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.34,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "christian walker",
+    "isaac paredes",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "peter lambert",
+    "wyatt langford",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5196595559",
+   "username": "auweglman",
+   "points": 120.899994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 24.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "chase meidroth",
+    "ian happ",
+    "isaac paredes",
+    "jeremy pena",
+    "joe mack",
+    "keider montero",
+    "miguel vargas",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5196004599",
+   "username": "goofybh207",
+   "points": 120.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "dillon dingler",
+    "jeremy pena",
+    "kevin mcgonigle",
+    "peter lambert",
+    "riley greene",
+    "spencer torkelson",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5195939403",
+   "username": "Elraykinder1",
+   "points": 119.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "chase meidroth",
+    "christian walker",
+    "griffin conine",
+    "heriberto hernandez",
+    "jeremy pena",
+    "keider montero",
+    "peter lambert",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5195920899",
+   "username": "gocal1224",
+   "points": 118.65,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "Anthony Kay",
+    "Keider Montero"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 16.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "chase meidroth",
+    "heriberto hernandez",
+    "javier sanoja",
+    "keider montero",
+    "kevin mcgonigle",
+    "liam hicks",
+    "riley greene",
+    "sam antonacci",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5196621847",
+   "username": "dc7307",
+   "points": 114.899994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 23.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "chase meidroth",
+    "ezequiel duran",
+    "isaac paredes",
+    "keider montero",
+    "kyle stowers",
+    "peter lambert",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5196413179",
+   "username": "CCTIGER78",
+   "points": 113.899994,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 25.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "christian walker",
+    "elias diaz",
+    "isaac paredes",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "peter lambert",
+    "sam antonacci",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5196042758",
+   "username": "whoisjohngalt420",
+   "points": 111.95,
+   "salary_used": 45300,
+   "salary_left": 4700,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Keider Montero"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 17.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal quantrill",
+    "christian walker",
+    "heriberto hernandez",
+    "isaac paredes",
+    "jeremy pena",
+    "joe mack",
+    "justin foscue",
+    "keider montero",
+    "lamonte wade",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5196578581",
+   "username": "prymsu",
+   "points": 110.899994,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "isaac paredes",
+    "jeremy pena",
+    "keider montero",
+    "kerry carpenter",
+    "lamonte wade",
+    "nicky lopez",
+    "peter lambert",
+    "riley greene",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5196326360",
+   "username": "theduke211",
+   "points": 109.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 24.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "chase meidroth",
+    "dillon dingler",
+    "isaac paredes",
+    "keider montero",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "peter lambert",
+    "riley greene",
+    "spencer torkelson",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5196042763",
+   "username": "whoisjohngalt420",
+   "points": 107.65,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Keider Montero"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 19.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "dillon dingler",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "javier sanoja",
+    "keider montero",
+    "kevin mcgonigle",
+    "liam hicks",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5196446202",
+   "username": "RickDarling",
+   "points": 106.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 23.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "chase meidroth",
+    "ezequiel duran",
+    "isaac paredes",
+    "keider montero",
+    "munetaka murakami",
+    "peter lambert",
+    "riley greene",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5196626959",
+   "username": "Elwaysarmy",
+   "points": 106.25,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "isaac paredes",
+    "keider montero",
+    "kyle stowers",
+    "otto lopez",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5196590441",
+   "username": "Darrell1203",
+   "points": 106.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony kay",
+    "cam cauley",
+    "chase meidroth",
+    "jeremy pena",
+    "lamonte wade",
+    "miguel vargas",
+    "munetaka murakami",
+    "peter lambert",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5196621806",
+   "username": "crizzoman1",
+   "points": 105.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.43,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "christian vazquez",
+    "ezequiel duran",
+    "hao yu lee",
+    "keider montero",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "riley greene",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5196621821",
+   "username": "crizzoman1",
+   "points": 105.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.43,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "christian vazquez",
+    "ezequiel duran",
+    "hao yu lee",
+    "keider montero",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "riley greene",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5196621826",
+   "username": "crizzoman1",
+   "points": 105.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.43,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "christian vazquez",
+    "ezequiel duran",
+    "hao yu lee",
+    "keider montero",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "riley greene",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5196532875",
+   "username": "Skralph",
+   "points": 105.15,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "esteury ruiz",
+    "isaac paredes",
+    "jeremy pena",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "wyatt langford",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5196507218",
+   "username": "hatinthatjuice",
+   "points": 104.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 20.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "chase meidroth",
+    "edgar quero",
+    "isaac paredes",
+    "keider montero",
+    "matt vierling",
+    "miguel vargas",
+    "nick allen",
+    "peter lambert",
+    "riley greene",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5196634530",
+   "username": "ongbok",
+   "points": 102.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 24.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "dillon dingler",
+    "ezequiel duran",
+    "javier sanoja",
+    "keider montero",
+    "michael busch",
+    "pete crow armstrong",
+    "peter lambert",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5196042760",
+   "username": "whoisjohngalt420",
+   "points": 102.5,
+   "salary_used": 44500,
+   "salary_left": 5500,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 18.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "christian walker",
+    "colin rea",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "isaac paredes",
+    "javier sanoja",
+    "liam hicks",
+    "nico hoerner",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5196578620",
+   "username": "SivaMB",
+   "points": 100.95,
+   "salary_used": 42300,
+   "salary_left": 7700,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 11.86,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "colt keith",
+    "griffin conine",
+    "hao yu lee",
+    "javier sanoja",
+    "joe mack",
+    "keider montero",
+    "kerry carpenter",
+    "sandy alcantara",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5196628743",
+   "username": "barryhopkins25",
+   "points": 100.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 22.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "colson montgomery",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "kerry carpenter",
+    "liam hicks",
+    "riley greene",
+    "sandy alcantara",
+    "spencer torkelson",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "25",
+   "entry_id": "5196059588",
+   "username": "kevinbrock",
+   "points": 100.9,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 28.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "cam cauley",
+    "dillon dingler",
+    "ezequiel duran",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "miguel vargas",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5196050257",
+   "username": "Jdtracker",
+   "points": 100.15,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "dillon dingler",
+    "isaac paredes",
+    "jeremy pena",
+    "michael busch",
+    "michael conforto",
+    "nico hoerner",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5196624379",
+   "username": "bleeski",
+   "points": 100.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "christian walker",
+    "dillon dingler",
+    "isaac paredes",
+    "jeremy pena",
+    "nico hoerner",
+    "peter lambert",
+    "sam antonacci",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "28",
+   "entry_id": "5196578621",
+   "username": "SivaMB",
+   "points": 98.95,
+   "salary_used": 40000,
+   "salary_left": 10000,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 10.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "alejandro osuna",
+    "colt keith",
+    "griffin conine",
+    "hao yu lee",
+    "james outman",
+    "javier sanoja",
+    "joe mack",
+    "keider montero",
+    "sandy alcantara",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5196326359",
+   "username": "theduke211",
+   "points": 98.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "edgar quero",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5196504206",
+   "username": "lkptsg",
+   "points": 97.2,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "chase meidroth",
+    "dillon dingler",
+    "heriberto hernandez",
+    "isaac paredes",
+    "jeremy pena",
+    "munetaka murakami",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5195759651",
+   "username": "bjbsnoop",
+   "points": 96.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 22.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "ezequiel duran",
+    "javier sanoja",
+    "keider montero",
+    "michael conforto",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "spencer torkelson",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "32",
+   "entry_id": "5196630760",
+   "username": "moomoomess",
+   "points": 96.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 26.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "dillon dingler",
+    "ezequiel duran",
+    "kevin mcgonigle",
+    "nico hoerner",
+    "peter lambert",
+    "riley greene",
+    "spencer torkelson",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5196630942",
+   "username": "103dez",
+   "points": 95.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 24.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "ian happ",
+    "isaac paredes",
+    "liam hicks",
+    "otto lopez",
+    "seiya suzuki",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "34",
+   "entry_id": "5196326357",
+   "username": "theduke211",
+   "points": 94.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "keider montero",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5196624378",
+   "username": "bleeski",
+   "points": 93.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "dillon dingler",
+    "ezequiel duran",
+    "jake burger",
+    "jeremy pena",
+    "keider montero",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5196042762",
+   "username": "whoisjohngalt420",
+   "points": 93.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "colin rea",
+    "isaac paredes",
+    "jeremy pena",
+    "lamonte wade",
+    "nicky lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "seiya suzuki",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5196546669",
+   "username": "Gobuffalo716",
+   "points": 92.5,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "isaac paredes",
+    "jeremy pena",
+    "michael busch",
+    "nico hoerner",
+    "riley greene",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5196546689",
+   "username": "Gobuffalo716",
+   "points": 92.5,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "isaac paredes",
+    "jeremy pena",
+    "michael busch",
+    "nico hoerner",
+    "riley greene",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5196555844",
+   "username": "Gobuffalo716",
+   "points": 92.5,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "isaac paredes",
+    "jeremy pena",
+    "michael busch",
+    "nico hoerner",
+    "riley greene",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "40",
+   "entry_id": "5196042757",
+   "username": "whoisjohngalt420",
+   "points": 91.95,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Keider Montero"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 15.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal quantrill",
+    "esteury ruiz",
+    "isaac paredes",
+    "javier sanoja",
+    "keider montero",
+    "kyle stowers",
+    "lamonte wade",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5195944412",
+   "username": "Elraykinder1",
+   "points": 91.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Tyler Alexander"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 26.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "elias diaz",
+    "isaac paredes",
+    "jeremy pena",
+    "peter lambert",
+    "seiya suzuki",
+    "tyler alexander",
+    "wyatt langford",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "42",
+   "entry_id": "5196637152",
+   "username": "137666",
+   "points": 90.8,
+   "salary_used": 44100,
+   "salary_left": 5900,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Colin Rea"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal quantrill",
+    "colin rea",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "isaac paredes",
+    "javier sanoja",
+    "liam hicks",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "43",
+   "entry_id": "5196628107",
+   "username": "Biohazard",
+   "points": 90.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Keider Montero"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 19.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "anthony kay",
+    "christian walker",
+    "dillon dingler",
+    "ian happ",
+    "isaac paredes",
+    "keider montero",
+    "otto lopez",
+    "pete crow armstrong",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "44",
+   "entry_id": "5196631098",
+   "username": "3robertdawkins3",
+   "points": 90.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 24.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "elias diaz",
+    "ian happ",
+    "javier sanoja",
+    "justin foscue",
+    "otto lopez",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "spencer torkelson",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5196042761",
+   "username": "whoisjohngalt420",
+   "points": 90.15,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 21.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "chase meidroth",
+    "colson montgomery",
+    "dillon dingler",
+    "kerry carpenter",
+    "miguel vargas",
+    "peter lambert",
+    "riley greene",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "46",
+   "entry_id": "5195944419",
+   "username": "Elraykinder1",
+   "points": 90.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Tyler Alexander"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 23.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "chase meidroth",
+    "christian walker",
+    "ezequiel duran",
+    "isaac paredes",
+    "pete crow armstrong",
+    "peter lambert",
+    "tyler alexander",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5196361844",
+   "username": "koolflows",
+   "points": 89.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "braden montgomery",
+    "ezequiel duran",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "spencer torkelson",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "48",
+   "entry_id": "5196626956",
+   "username": "Elwaysarmy",
+   "points": 88.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "isaac paredes",
+    "jake burger",
+    "jeremy pena",
+    "justin foscue",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "49",
+   "entry_id": "5196622484",
+   "username": "dc7307",
+   "points": 88.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 25.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "ian happ",
+    "jeremy pena",
+    "keider montero",
+    "liam hicks",
+    "michael busch",
+    "riley greene",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "50",
+   "entry_id": "5195939741",
+   "username": "Elraykinder1",
+   "points": 87.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andrew benintendi",
+    "christian walker",
+    "colin rea",
+    "elias diaz",
+    "jeremy pena",
+    "peter lambert",
+    "seiya suzuki",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "50",
+   "entry_id": "5196532872",
+   "username": "Skralph",
+   "points": 87.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "colin rea",
+    "heriberto hernandez",
+    "jeremy pena",
+    "miguel vargas",
+    "peter lambert",
+    "sam antonacci",
+    "yainer diaz",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "52",
+   "entry_id": "5196619776",
+   "username": "Reboundboy",
+   "points": 87.5,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 23.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "dillon dingler",
+    "jeremy pena",
+    "justin foscue",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "lamonte wade",
+    "seiya suzuki",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5196612710",
+   "username": "Benzo555",
+   "points": 87.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 28.31,
+   "n_cheap": 1,
+   "players_norm": [
+    "dillon dingler",
+    "hao yu lee",
+    "javier sanoja",
+    "jeremy pena",
+    "michael busch",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5196612733",
+   "username": "Benzo555",
+   "points": 87.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 28.31,
+   "n_cheap": 1,
+   "players_norm": [
+    "dillon dingler",
+    "hao yu lee",
+    "javier sanoja",
+    "jeremy pena",
+    "michael busch",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5196623321",
+   "username": "dc7307",
+   "points": 87.45,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 25.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "ezequiel duran",
+    "ian happ",
+    "isaac paredes",
+    "kyle stowers",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "56",
+   "entry_id": "5196326361",
+   "username": "theduke211",
+   "points": 85.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "colin rea",
+    "isaac paredes",
+    "keider montero",
+    "otto lopez",
+    "sam antonacci",
+    "wyatt langford",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5196634490",
+   "username": "Bruwster42966",
+   "points": 84.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 26.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "elias diaz",
+    "isaac paredes",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "lamonte wade",
+    "pete crow armstrong",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "58",
+   "entry_id": "5196099075",
+   "username": "Ozarkian",
+   "points": 84.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "colin rea",
+    "ezequiel duran",
+    "jeremy pena",
+    "justin foscue",
+    "peter lambert",
+    "riley greene",
+    "wyatt langford",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "58",
+   "entry_id": "5196259736",
+   "username": "JRaab",
+   "points": 84.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "jeremy pena",
+    "justin foscue",
+    "munetaka murakami",
+    "peter lambert",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "60",
+   "entry_id": "5196633299",
+   "username": "bleeski",
+   "points": 84.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 23.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "heriberto hernandez",
+    "isaac paredes",
+    "liam hicks",
+    "munetaka murakami",
+    "otto lopez",
+    "sam antonacci",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "61",
+   "entry_id": "5196007597",
+   "username": "zephaniah",
+   "points": 84.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "isaac paredes",
+    "jeremy pena",
+    "joe mack",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "62",
+   "entry_id": "5195975995",
+   "username": "minrobertson210",
+   "points": 84.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "cam cauley",
+    "colson montgomery",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "63",
+   "entry_id": "5195927002",
+   "username": "modmaple",
+   "points": 83.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 19.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "colin rea",
+    "gleyber torres",
+    "keider montero",
+    "moises ballesteros",
+    "pete crow armstrong",
+    "shay whitcomb",
+    "spencer torkelson",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5196087375",
+   "username": "dudu1005",
+   "points": 82.75,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 26.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "ian happ",
+    "isaac paredes",
+    "justin foscue",
+    "liam hicks",
+    "michael busch",
+    "peter lambert",
+    "riley greene"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5196631898",
+   "username": "troubledsoe",
+   "points": 82.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "ian happ",
+    "michael busch",
+    "miguel vargas",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "66",
+   "entry_id": "5196041012",
+   "username": "Outlaw68",
+   "points": 81.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 28.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "christian vazquez",
+    "colin rea",
+    "jake burger",
+    "jeremy pena",
+    "justin foscue",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "67",
+   "entry_id": "5196626957",
+   "username": "Elwaysarmy",
+   "points": 81.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "heriberto hernandez",
+    "isaac paredes",
+    "kyle stowers",
+    "otto lopez",
+    "pete crow armstrong",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5196633157",
+   "username": "hart132",
+   "points": 80.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 22.19,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "cam cauley",
+    "dillon dingler",
+    "keider montero",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "otto lopez",
+    "riley greene",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "69",
+   "entry_id": "5196623016",
+   "username": "harrythepainter",
+   "points": 80.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "dillon dingler",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "jake burger",
+    "jeremy pena",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "69",
+   "entry_id": "5196630759",
+   "username": "moomoomess",
+   "points": 80.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "dillon dingler",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "jake burger",
+    "jeremy pena",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "71",
+   "entry_id": "5196042759",
+   "username": "whoisjohngalt420",
+   "points": 80.15,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.04,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony kay",
+    "christian walker",
+    "isaac paredes",
+    "jeremy pena",
+    "lucas spence",
+    "michael conforto",
+    "pete crow armstrong",
+    "peter lambert",
+    "yainer diaz",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "72",
+   "entry_id": "5196036085",
+   "username": "Dave2zone",
+   "points": 77.8,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 20.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colin rea",
+    "esteury ruiz",
+    "ian happ",
+    "jeremy pena",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "liam hicks",
+    "nico hoerner",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "73",
+   "entry_id": "5196622949",
+   "username": "dc7307",
+   "points": 77.45,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 22.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal quantrill",
+    "carson kelly",
+    "colt keith",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "justin foscue",
+    "pete crow armstrong",
+    "peter lambert",
+    "spencer torkelson",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "74",
+   "entry_id": "5196368732",
+   "username": "brennan_rooks",
+   "points": 76.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 24.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "chase meidroth",
+    "ian happ",
+    "javier sanoja",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "michael busch",
+    "peter lambert",
+    "sandy alcantara",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "74",
+   "entry_id": "5196490714",
+   "username": "90sdad",
+   "points": 76.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 24.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "christian walker",
+    "ian happ",
+    "javier sanoja",
+    "joe mack",
+    "nico hoerner",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "76",
+   "entry_id": "5195954579",
+   "username": "Cards1640",
+   "points": 76.2,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 21.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony kay",
+    "cam cauley",
+    "edgar quero",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "otto lopez",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "77",
+   "entry_id": "5196510625",
+   "username": "bengal16",
+   "points": 75.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "keider montero",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "otto lopez",
+    "riley greene",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "78",
+   "entry_id": "5196546666",
+   "username": "Gobuffalo716",
+   "points": 75.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colt keith",
+    "james outman",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "liam hicks",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "78",
+   "entry_id": "5196546695",
+   "username": "Gobuffalo716",
+   "points": 75.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colt keith",
+    "james outman",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "liam hicks",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "78",
+   "entry_id": "5196555431",
+   "username": "Gobuffalo716",
+   "points": 75.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colt keith",
+    "james outman",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "liam hicks",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "78",
+   "entry_id": "5196556052",
+   "username": "Gobuffalo716",
+   "points": 75.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colt keith",
+    "james outman",
+    "jeremy pena",
+    "justin foscue",
+    "keider montero",
+    "liam hicks",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "82",
+   "entry_id": "5196570053",
+   "username": "eddiedtodd",
+   "points": 75.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Cal Quantrill"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "cal quantrill",
+    "dansby swanson",
+    "isaac paredes",
+    "michael busch",
+    "nico hoerner",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "83",
+   "entry_id": "5196631889",
+   "username": "troubledsoe",
+   "points": 75.15,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 21.77,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "hao yu lee",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "michael busch",
+    "peter lambert",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "83",
+   "entry_id": "5196632090",
+   "username": "troubledsoe",
+   "points": 75.15,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 21.77,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "hao yu lee",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "michael busch",
+    "peter lambert",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "85",
+   "entry_id": "5196041287",
+   "username": "GrownManRick11",
+   "points": 74.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 22.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "colson montgomery",
+    "javier sanoja",
+    "lamonte wade",
+    "liam hicks",
+    "nico hoerner",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "86",
+   "entry_id": "5196626955",
+   "username": "Elwaysarmy",
+   "points": 74.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.74,
+   "n_cheap": 1,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "hao yu lee",
+    "jake burger",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5196423809",
+   "username": "The-Bomb-com",
+   "points": 74.25,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Colin Rea",
+    "Keider Montero"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "dansby swanson",
+    "dillon dingler",
+    "ezequiel duran",
+    "ian happ",
+    "keider montero",
+    "michael busch",
+    "nico hoerner",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "88",
+   "entry_id": "5196631821",
+   "username": "MUtiger21",
+   "points": 73.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 22.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "griffin conine",
+    "isaac paredes",
+    "joe mack",
+    "justin foscue",
+    "keider montero",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "sam antonacci",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "89",
+   "entry_id": "5196421154",
+   "username": "The-Bomb-com",
+   "points": 73.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 24.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "dillon dingler",
+    "ezequiel duran",
+    "ian happ",
+    "keider montero",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5196367763",
+   "username": "slophound",
+   "points": 73.8,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 23.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "ian happ",
+    "jeremy pena",
+    "joe mack",
+    "michael busch",
+    "michael conforto",
+    "miguel vargas",
+    "nico hoerner",
+    "sandy alcantara",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "91",
+   "entry_id": "5196416843",
+   "username": "peterjpacheco",
+   "points": 73.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 29.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "jake burger",
+    "jeremy pena",
+    "justin foscue",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "91",
+   "entry_id": "5196626953",
+   "username": "Elwaysarmy",
+   "points": 73.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "dillon dingler",
+    "hao yu lee",
+    "jake burger",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "93",
+   "entry_id": "5196585512",
+   "username": "auweglman",
+   "points": 73.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Peter Lambert",
+    "Tyler Alexander"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 21.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "christian walker",
+    "jeremy pena",
+    "joe mack",
+    "kevin mcgonigle",
+    "pete crow armstrong",
+    "peter lambert",
+    "seiya suzuki",
+    "tyler alexander",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "94",
+   "entry_id": "5196059587",
+   "username": "kevinbrock",
+   "points": 72.75,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "ian happ",
+    "jeremy pena",
+    "justin foscue",
+    "michael busch",
+    "miguel vargas",
+    "peter lambert",
+    "sam antonacci",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "94",
+   "entry_id": "5196586599",
+   "username": "auweglman",
+   "points": 72.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 30.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "jeremy pena",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "riley greene",
+    "wyatt langford",
+    "xavier edwards",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "96",
+   "entry_id": "5196015381",
+   "username": "zephaniah",
+   "points": 72.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 26.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andrew benintendi",
+    "jeremy pena",
+    "joe mack",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "97",
+   "entry_id": "5196638205",
+   "username": "theking573dddd",
+   "points": 71.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 23.21,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "braden montgomery",
+    "colson montgomery",
+    "dillon dingler",
+    "hao yu lee",
+    "michael busch",
+    "pete crow armstrong",
+    "peter lambert",
+    "riley greene"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "98",
+   "entry_id": "5196290619",
+   "username": "infy72",
+   "points": 70.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "edgar quero",
+    "justin foscue",
+    "keider montero",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "riley greene",
+    "sam antonacci"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5196631100",
+   "username": "3robertdawkins3",
+   "points": 70.75,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "ezequiel duran",
+    "michael busch",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5196631101",
+   "username": "3robertdawkins3",
+   "points": 70.75,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "ezequiel duran",
+    "michael busch",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "101",
+   "entry_id": "5196500237",
+   "username": "jetmet15",
+   "points": 70.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Keider Montero",
+    "Tyler Alexander"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 18.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colt keith",
+    "keider montero",
+    "kevin mcgonigle",
+    "michael busch",
+    "nico hoerner",
+    "sam antonacci",
+    "seiya suzuki",
+    "tyler alexander",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5196082285",
+   "username": "chicksports",
+   "points": 70.45,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 21.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon nimmo",
+    "chase meidroth",
+    "dansby swanson",
+    "dillon dingler",
+    "lamonte wade",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5196567823",
+   "username": "eddiedtodd",
+   "points": 70.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 26.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "colson montgomery",
+    "elias diaz",
+    "ian happ",
+    "jeremy pena",
+    "justin foscue",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5196612799",
+   "username": "Benzo555",
+   "points": 70.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 25.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal quantrill",
+    "jeremy pena",
+    "joe mack",
+    "michael busch",
+    "miguel vargas",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "105",
+   "entry_id": "5196622010",
+   "username": "troubledsoe",
+   "points": 68.95,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 17.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "esteury ruiz",
+    "griffin conine",
+    "javier sanoja",
+    "keider montero",
+    "liam hicks",
+    "miguel vargas",
+    "munetaka murakami",
+    "sandy alcantara",
+    "tristan peters",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "105",
+   "entry_id": "5196624383",
+   "username": "bleeski",
+   "points": 68.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 23.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "dillon dingler",
+    "heriberto hernandez",
+    "keider montero",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "otto lopez",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "105",
+   "entry_id": "5196631916",
+   "username": "troubledsoe",
+   "points": 68.95,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 17.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "esteury ruiz",
+    "griffin conine",
+    "javier sanoja",
+    "keider montero",
+    "liam hicks",
+    "miguel vargas",
+    "munetaka murakami",
+    "sandy alcantara",
+    "tristan peters",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "108",
+   "entry_id": "5196626954",
+   "username": "Elwaysarmy",
+   "points": 68.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "colin rea",
+    "dansby swanson",
+    "ian happ",
+    "jake burger",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "108",
+   "entry_id": "5196631099",
+   "username": "3robertdawkins3",
+   "points": 68.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 28.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "kevin mcgonigle",
+    "michael busch",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "110",
+   "entry_id": "5195977116",
+   "username": "boulderaggie",
+   "points": 68.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 24.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "jose altuve",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "otto lopez",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "110",
+   "entry_id": "5196532871",
+   "username": "Skralph",
+   "points": 68.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 24.77,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "colson montgomery",
+    "heriberto hernandez",
+    "justin foscue",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "112",
+   "entry_id": "5196203139",
+   "username": "greensae10",
+   "points": 68.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 18.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal quantrill",
+    "dansby swanson",
+    "gleyber torres",
+    "ian happ",
+    "jakob marsee",
+    "miguel vargas",
+    "peter lambert",
+    "spencer torkelson",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "113",
+   "entry_id": "5196379747",
+   "username": "BeastFuknNasty",
+   "points": 68.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Anthony Kay",
+    "Cal Quantrill"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 18.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "cal quantrill",
+    "dansby swanson",
+    "ian happ",
+    "liam hicks",
+    "miguel vargas",
+    "munetaka murakami",
+    "riley greene",
+    "yordan alvarez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "114",
+   "entry_id": "5195939734",
+   "username": "Elraykinder1",
+   "points": 67.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Colin Rea"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "cal quantrill",
+    "christian walker",
+    "colin rea",
+    "jeremy pena",
+    "pete crow armstrong",
+    "riley greene",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5196532870",
+   "username": "Skralph",
+   "points": 67.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "jake burger",
+    "justin foscue",
+    "miguel vargas",
+    "peter lambert",
+    "wyatt langford",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "116",
+   "entry_id": "5196007564",
+   "username": "zephaniah",
+   "points": 67.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 27.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "ian happ",
+    "isaac paredes",
+    "joe mack",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "117",
+   "entry_id": "5196545295",
+   "username": "auweglman",
+   "points": 66.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 29.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "dillon dingler",
+    "ezequiel duran",
+    "isaac paredes",
+    "munetaka murakami",
+    "nico hoerner",
+    "riley greene",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "118",
+   "entry_id": "5196326358",
+   "username": "theduke211",
+   "points": 66.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 26.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "cam cauley",
+    "colin rea",
+    "dansby swanson",
+    "justin foscue",
+    "michael busch",
+    "pete crow armstrong",
+    "peter lambert",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "119",
+   "entry_id": "5195975992",
+   "username": "minrobertson210",
+   "points": 66.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 28.35,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "elias diaz",
+    "ezequiel duran",
+    "justin foscue",
+    "munetaka murakami",
+    "otto lopez",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "119",
+   "entry_id": "5196621737",
+   "username": "Garynteed",
+   "points": 66.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 29.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "jake burger",
+    "joe mack",
+    "justin foscue",
+    "nicky lopez",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "121",
+   "entry_id": "5196290618",
+   "username": "infy72",
+   "points": 66.15,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 23.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "chase meidroth",
+    "ezequiel duran",
+    "ian happ",
+    "liam hicks",
+    "michael busch",
+    "michael conforto",
+    "pete crow armstrong",
+    "peter lambert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "122",
+   "entry_id": "5196635751",
+   "username": "dottiesmom",
+   "points": 65.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 21.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "chase meidroth",
+    "elias diaz",
+    "keider montero",
+    "michael conforto",
+    "munetaka murakami",
+    "otto lopez",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5196634489",
+   "username": "showmethemoney1974",
+   "points": 65.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andrew benintendi",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "ian happ",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "124",
+   "entry_id": "5196189246",
+   "username": "wondertwins17",
+   "points": 65.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "chase meidroth",
+    "dillon dingler",
+    "ezequiel duran",
+    "jake burger",
+    "miguel vargas",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "125",
+   "entry_id": "5196467200",
+   "username": "jorged.57",
+   "points": 65.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "brandon nimmo",
+    "dillon dingler",
+    "ian happ",
+    "jeremy pena",
+    "justin foscue",
+    "miguel vargas",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5196036086",
+   "username": "Dave2zone",
+   "points": 65.15,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 21.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "anthony kay",
+    "christian walker",
+    "jeremy pena",
+    "liam hicks",
+    "lucas spence",
+    "miguel vargas",
+    "peter lambert",
+    "sam antonacci",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "127",
+   "entry_id": "5196411692",
+   "username": "Relax43",
+   "points": 64.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "edgar quero",
+    "jeremy pena",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "munetaka murakami",
+    "sam antonacci",
+    "sandy alcantara",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "128",
+   "entry_id": "5196637153",
+   "username": "137666",
+   "points": 64.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "jeremy pena",
+    "miguel vargas",
+    "nicky lopez",
+    "peter lambert",
+    "sam antonacci",
+    "tristan peters",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "129",
+   "entry_id": "5196622049",
+   "username": "Tallen927",
+   "points": 64.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 24.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon nimmo",
+    "jake burger",
+    "jeremy pena",
+    "joe mack",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "seiya suzuki",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "130",
+   "entry_id": "5196290620",
+   "username": "infy72",
+   "points": 63.95,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 20.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "keider montero",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "liam hicks",
+    "michael busch",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "131",
+   "entry_id": "5195943462",
+   "username": "mrjenkaa",
+   "points": 63.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "colin rea",
+    "isaac paredes",
+    "liam hicks",
+    "michael busch",
+    "otto lopez",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "131",
+   "entry_id": "5196275045",
+   "username": "ctaylors",
+   "points": 63.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 20.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "agustin ramirez",
+    "alex bregman",
+    "andrew benintendi",
+    "colin rea",
+    "jose altuve",
+    "michael busch",
+    "otto lopez",
+    "sandy alcantara",
+    "seiya suzuki",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "131",
+   "entry_id": "5196481621",
+   "username": "danlovesthecubs",
+   "points": 63.8,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "ian happ",
+    "michael busch",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "134",
+   "entry_id": "5196375683",
+   "username": "iamtheky",
+   "points": 63.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 29.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colin rea",
+    "colson montgomery",
+    "jeremy pena",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford",
+    "xavier edwards",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5195975994",
+   "username": "minrobertson210",
+   "points": 63.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.8,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "cam cauley",
+    "carson kelly",
+    "ezequiel duran",
+    "justin foscue",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5196132053",
+   "username": "psereda",
+   "points": 63.45,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 21.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "colt keith",
+    "dillon dingler",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "peter lambert",
+    "sandy alcantara",
+    "spencer torkelson",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5196416842",
+   "username": "peterjpacheco",
+   "points": 63.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 27.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "eduardo valencia",
+    "ian happ",
+    "isaac paredes",
+    "munetaka murakami",
+    "otto lopez",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5196621831",
+   "username": "crizzoman1",
+   "points": 63.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 21.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "cal quantrill",
+    "christian vazquez",
+    "colt keith",
+    "ezequiel duran",
+    "hao yu lee",
+    "miguel vargas",
+    "pete crow armstrong",
+    "peter lambert",
+    "riley greene",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "139",
+   "entry_id": "5196596191",
+   "username": "ctnaranjo",
+   "points": 63.2,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 24.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "liam hicks",
+    "nico hoerner",
+    "otto lopez",
+    "sandy alcantara",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "140",
+   "entry_id": "5196059591",
+   "username": "kevinbrock",
+   "points": 63.15,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "chase meidroth",
+    "colson montgomery",
+    "dillon dingler",
+    "kevin mcgonigle",
+    "michael busch",
+    "peter lambert",
+    "sam antonacci",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "141",
+   "entry_id": "5195967089",
+   "username": "seapaw25",
+   "points": 62.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 21.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "chase meidroth",
+    "dillon dingler",
+    "jake burger",
+    "keider montero",
+    "kerry carpenter",
+    "miguel vargas",
+    "otto lopez",
+    "sandy alcantara",
+    "tristan peters",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "142",
+   "entry_id": "5196634098",
+   "username": "TMike61",
+   "points": 62.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon nimmo",
+    "dansby swanson",
+    "ian happ",
+    "keider montero",
+    "michael busch",
+    "peter lambert",
+    "wyatt langford",
+    "xavier edwards",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "143",
+   "entry_id": "5196624381",
+   "username": "bleeski",
+   "points": 62.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "jeremy pena",
+    "miguel vargas",
+    "munetaka murakami",
+    "nico hoerner",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "144",
+   "entry_id": "5195975996",
+   "username": "minrobertson210",
+   "points": 62.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 23.33,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony kay",
+    "cam cauley",
+    "colson montgomery",
+    "dillon dingler",
+    "munetaka murakami",
+    "otto lopez",
+    "sam antonacci",
+    "sandy alcantara",
+    "seiya suzuki",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "145",
+   "entry_id": "5196388217",
+   "username": "rs460",
+   "points": 61.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 21.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "colin rea",
+    "heriberto hernandez",
+    "jeremy pena",
+    "kyle stowers",
+    "liam hicks",
+    "miguel vargas",
+    "nicky lopez",
+    "pete crow armstrong",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "146",
+   "entry_id": "5196535061",
+   "username": "udod59",
+   "points": 61.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "dansby swanson",
+    "dillon dingler",
+    "ian happ",
+    "michael conforto",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara",
+    "spencer torkelson",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "147",
+   "entry_id": "5196636257",
+   "username": "FrankieNoLeaks",
+   "points": 61.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "brandon nimmo",
+    "carson kelly",
+    "dansby swanson",
+    "heriberto hernandez",
+    "miguel vargas",
+    "munetaka murakami",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "148",
+   "entry_id": "5196157236",
+   "username": "howardwi",
+   "points": 60.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 28.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "liam hicks",
+    "munetaka murakami",
+    "otto lopez",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "149",
+   "entry_id": "5196059593",
+   "username": "kevinbrock",
+   "points": 60.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 26.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "jake burger",
+    "miguel vargas",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "150",
+   "entry_id": "5195880887",
+   "username": "ktm4214",
+   "points": 60.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 21.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro osuna",
+    "anthony kay",
+    "chase meidroth",
+    "dansby swanson",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "151",
+   "entry_id": "5196606759",
+   "username": "caution1",
+   "points": 59.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 26.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "colson montgomery",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "riley greene",
+    "seiya suzuki",
+    "wyatt langford",
+    "xavier edwards",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5196617412",
+   "username": "brucedavis1",
+   "points": 59.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "carson kelly",
+    "chase meidroth",
+    "ezequiel duran",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "153",
+   "entry_id": "5195975991",
+   "username": "minrobertson210",
+   "points": 58.45,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 28.23,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "cam cauley",
+    "dillon dingler",
+    "ezequiel duran",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "154",
+   "entry_id": "5196532874",
+   "username": "Skralph",
+   "points": 58.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Anthony Kay",
+    "Cal Quantrill"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 17.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "cal quantrill",
+    "esteury ruiz",
+    "kyle stowers",
+    "liam hicks",
+    "otto lopez",
+    "pete crow armstrong",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5196532873",
+   "username": "Skralph",
+   "points": 57.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 26.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "chase meidroth",
+    "colin rea",
+    "colson montgomery",
+    "dillon dingler",
+    "heriberto hernandez",
+    "munetaka murakami",
+    "otto lopez",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5196626958",
+   "username": "Elwaysarmy",
+   "points": 57.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "esteury ruiz",
+    "kyle stowers",
+    "otto lopez",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "157",
+   "entry_id": "5196326363",
+   "username": "theduke211",
+   "points": 57.75,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Anthony Kay",
+    "Tyler Alexander"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 17.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "anthony kay",
+    "carson kelly",
+    "dansby swanson",
+    "lamonte wade",
+    "riley greene",
+    "seiya suzuki",
+    "tyler alexander",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "158",
+   "entry_id": "5196059592",
+   "username": "kevinbrock",
+   "points": 57.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "justin foscue",
+    "munetaka murakami",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "159",
+   "entry_id": "5196611341",
+   "username": "justbelowme",
+   "points": 56.8,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 25.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "colson montgomery",
+    "ezequiel duran",
+    "justin foscue",
+    "kyle stowers",
+    "liam hicks",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "160",
+   "entry_id": "5196568649",
+   "username": "eddiedtodd",
+   "points": 56.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Keider Montero",
+    "Tyler Alexander"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 19.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "colson montgomery",
+    "keider montero",
+    "lamonte wade",
+    "miguel vargas",
+    "sam antonacci",
+    "tyler alexander",
+    "xavier edwards",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "161",
+   "entry_id": "5195975993",
+   "username": "minrobertson210",
+   "points": 56.2,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 22.32,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony kay",
+    "cam cauley",
+    "dillon dingler",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "miguel vargas",
+    "sam antonacci",
+    "sandy alcantara",
+    "seiya suzuki",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "162",
+   "entry_id": "5196544487",
+   "username": "auweglman",
+   "points": 56.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 21.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "anthony kay",
+    "brandon nimmo",
+    "christian walker",
+    "dillon dingler",
+    "miguel vargas",
+    "nico hoerner",
+    "otto lopez",
+    "peter lambert",
+    "riley greene"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "163",
+   "entry_id": "5196445847",
+   "username": "peyton0923",
+   "points": 55.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "colin rea",
+    "griffin conine",
+    "ian happ",
+    "kyle stowers",
+    "liam hicks",
+    "otto lopez",
+    "sandy alcantara",
+    "xavier edwards",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "164",
+   "entry_id": "5196578619",
+   "username": "SivaMB",
+   "points": 55.75,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "christian walker",
+    "colin rea",
+    "dansby swanson",
+    "isaac paredes",
+    "nicky lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "seiya suzuki",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "165",
+   "entry_id": "5196423805",
+   "username": "The-Bomb-com",
+   "points": 55.2,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 22.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "dansby swanson",
+    "dillon dingler",
+    "ezequiel duran",
+    "ian happ",
+    "michael busch",
+    "nico hoerner",
+    "sandy alcantara",
+    "seiya suzuki",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "165",
+   "entry_id": "5196493815",
+   "username": "RoyalBigHead",
+   "points": 55.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 21.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "braden montgomery",
+    "dillon dingler",
+    "griffin conine",
+    "ian happ",
+    "miguel vargas",
+    "munetaka murakami",
+    "otto lopez",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "167",
+   "entry_id": "5196532869",
+   "username": "Skralph",
+   "points": 54.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "liam hicks",
+    "miguel vargas",
+    "munetaka murakami",
+    "otto lopez",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "168",
+   "entry_id": "5196423806",
+   "username": "The-Bomb-com",
+   "points": 54.75,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 26.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "dansby swanson",
+    "dillon dingler",
+    "ezequiel duran",
+    "ian happ",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "168",
+   "entry_id": "5196477257",
+   "username": "sinn24",
+   "points": 54.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 29.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "colin rea",
+    "ezequiel duran",
+    "miguel vargas",
+    "nico hoerner",
+    "peter lambert",
+    "riley greene",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "170",
+   "entry_id": "5195860343",
+   "username": "moshpitter6668",
+   "points": 54.45,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro osuna",
+    "chase meidroth",
+    "dillon dingler",
+    "javier sanoja",
+    "michael busch",
+    "nicky lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "170",
+   "entry_id": "5196416839",
+   "username": "peterjpacheco",
+   "points": 54.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 28.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "jake burger",
+    "justin foscue",
+    "otto lopez",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5196036087",
+   "username": "Dave2zone",
+   "points": 53.8,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 22.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "carson kelly",
+    "colin rea",
+    "ian happ",
+    "jeremy pena",
+    "kyle stowers",
+    "riley greene",
+    "sam antonacci",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "173",
+   "entry_id": "5196578618",
+   "username": "SivaMB",
+   "points": 53.75,
+   "salary_used": 44600,
+   "salary_left": 5400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 19.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "christian walker",
+    "colin rea",
+    "dansby swanson",
+    "isaac paredes",
+    "michael conforto",
+    "nicky lopez",
+    "peter lambert",
+    "seiya suzuki",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "173",
+   "entry_id": "5196578806",
+   "username": "ggb777",
+   "points": 53.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "ezequiel duran",
+    "justin foscue",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "173",
+   "entry_id": "5196635208",
+   "username": "Bombers04",
+   "points": 53.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 26.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "colin rea",
+    "ezequiel duran",
+    "jake burger",
+    "justin foscue",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "pete crow armstrong",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "176",
+   "entry_id": "5196416840",
+   "username": "peterjpacheco",
+   "points": 52.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 25.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "chase meidroth",
+    "colin rea",
+    "dansby swanson",
+    "liam hicks",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "176",
+   "entry_id": "5196624380",
+   "username": "bleeski",
+   "points": 52.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 26.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "heriberto hernandez",
+    "liam hicks",
+    "miguel vargas",
+    "munetaka murakami",
+    "otto lopez",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "178",
+   "entry_id": "5196168393",
+   "username": "pokemonJack",
+   "points": 52.65,
+   "salary_used": 42700,
+   "salary_left": 7300,
+   "sp_pair": [
+    "Anthony Kay",
+    "Keider Montero"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 9.96,
+   "n_cheap": 3,
+   "players_norm": [
+    "anthony kay",
+    "colson montgomery",
+    "dairon blanco",
+    "daniel johnson",
+    "jose altuve",
+    "keider montero",
+    "kyle teel",
+    "liam hicks",
+    "otto lopez",
+    "trei cruz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "179",
+   "entry_id": "5196021767",
+   "username": "stevmortc",
+   "points": 52.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Colin Rea"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "colin rea",
+    "dillon dingler",
+    "heriberto hernandez",
+    "kevin mcgonigle",
+    "liam hicks",
+    "otto lopez",
+    "pete crow armstrong",
+    "sam antonacci",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "180",
+   "entry_id": "5196569873",
+   "username": "ggb777",
+   "points": 52.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 31.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "dillon dingler",
+    "ezequiel duran",
+    "justin foscue",
+    "kevin mcgonigle",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "181",
+   "entry_id": "5196637154",
+   "username": "137666",
+   "points": 51.75,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 26.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "ezequiel duran",
+    "jake burger",
+    "lucas spence",
+    "nicky lopez",
+    "peter lambert",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "182",
+   "entry_id": "5195869263",
+   "username": "rsturm2021",
+   "points": 51.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 28.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "eduardo valencia",
+    "ezequiel duran",
+    "heriberto hernandez",
+    "miguel vargas",
+    "munetaka murakami",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "182",
+   "entry_id": "5196423808",
+   "username": "The-Bomb-com",
+   "points": 51.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 26.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "dillon dingler",
+    "ezequiel duran",
+    "ian happ",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "184",
+   "entry_id": "5196630987",
+   "username": "billyt1984",
+   "points": 50.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "colin rea",
+    "colt keith",
+    "elias diaz",
+    "ezequiel duran",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "185",
+   "entry_id": "5195975990",
+   "username": "minrobertson210",
+   "points": 50.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 27.34,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "dillon dingler",
+    "ezequiel duran",
+    "jake burger",
+    "justin foscue",
+    "otto lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "185",
+   "entry_id": "5196631828",
+   "username": "Cowboysfan4evaaaa",
+   "points": 50.45,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "colson montgomery",
+    "edgar quero",
+    "ezequiel duran",
+    "jake burger",
+    "justin foscue",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "187",
+   "entry_id": "5195968458",
+   "username": "ohernandez826",
+   "points": 50.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "dillon dingler",
+    "ezequiel duran",
+    "justin foscue",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "lamonte wade",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "187",
+   "entry_id": "5195973201",
+   "username": "ohernandez826",
+   "points": 50.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "dillon dingler",
+    "ezequiel duran",
+    "justin foscue",
+    "kevin mcgonigle",
+    "kyle stowers",
+    "lamonte wade",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5195987440",
+   "username": "Tburke34",
+   "points": 49.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "colin rea",
+    "colt keith",
+    "dillon dingler",
+    "justin foscue",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "lucas spence",
+    "pete crow armstrong",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5196059589",
+   "username": "kevinbrock",
+   "points": 49.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "colson montgomery",
+    "ezequiel duran",
+    "munetaka murakami",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5196416841",
+   "username": "peterjpacheco",
+   "points": 49.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 30.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "colin rea",
+    "dillon dingler",
+    "ezequiel duran",
+    "miguel vargas",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "192",
+   "entry_id": "5195976166",
+   "username": "mbrune101",
+   "points": 49.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 29.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "dillon dingler",
+    "ezequiel duran",
+    "jake burger",
+    "kevin mcgonigle",
+    "nico hoerner",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "192",
+   "entry_id": "5196629645",
+   "username": "Ahazeofsmoke",
+   "points": 49.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "edgar quero",
+    "ezequiel duran",
+    "jake burger",
+    "justin foscue",
+    "miguel vargas",
+    "peter lambert",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "194",
+   "entry_id": "5196624382",
+   "username": "bleeski",
+   "points": 49.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 21.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "dillon dingler",
+    "heriberto hernandez",
+    "ian happ",
+    "kyle stowers",
+    "miguel vargas",
+    "otto lopez",
+    "sam antonacci",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "194",
+   "entry_id": "5196631904",
+   "username": "troubledsoe",
+   "points": 49.2,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Anthony Kay",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 17.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony kay",
+    "carson kelly",
+    "colt keith",
+    "dansby swanson",
+    "kerry carpenter",
+    "michael busch",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "196",
+   "entry_id": "5196070604",
+   "username": "imgonnawin10106",
+   "points": 48.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 28.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "carson kelly",
+    "colin rea",
+    "ezequiel duran",
+    "kevin mcgonigle",
+    "miguel vargas",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "196",
+   "entry_id": "5196637156",
+   "username": "137666",
+   "points": 48.75,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "justin foscue",
+    "miguel vargas",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "198",
+   "entry_id": "5196621859",
+   "username": "4Mysweats1",
+   "points": 48.45,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 25.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "elias diaz",
+    "jake burger",
+    "javier sanoja",
+    "kevin mcgonigle",
+    "pete crow armstrong",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "wyatt langford",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "199",
+   "entry_id": "5196611145",
+   "username": "MIKEMETAL",
+   "points": 47.8,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 26.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "dansby swanson",
+    "ian happ",
+    "michael busch",
+    "miguel vargas",
+    "nico hoerner",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5195972340",
+   "username": "Dicskstone32",
+   "points": 47.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "elias diaz",
+    "ezequiel duran",
+    "justin foscue",
+    "miguel vargas",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269408",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269409",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269410",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269411",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269412",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269413",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5196269414",
+   "username": "MissingManning",
+   "points": 47.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "ian happ",
+    "justin foscue",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "208",
+   "entry_id": "5196638330",
+   "username": "habcommander",
+   "points": 46.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon nimmo",
+    "colin rea",
+    "dansby swanson",
+    "dillon dingler",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "209",
+   "entry_id": "5196365115",
+   "username": "Tommygunns81",
+   "points": 45.8,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 23.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "carson kelly",
+    "colin rea",
+    "jose altuve",
+    "liam hicks",
+    "otto lopez",
+    "riley greene",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "210",
+   "entry_id": "5196183603",
+   "username": "mrbig91",
+   "points": 45.45,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 26.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "elias diaz",
+    "ian happ",
+    "isaac paredes",
+    "kyle stowers",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "210",
+   "entry_id": "5196566753",
+   "username": "Cobra777666777",
+   "points": 45.45,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 23.63,
+   "n_cheap": 2,
+   "players_norm": [
+    "cam cauley",
+    "dillon dingler",
+    "jake burger",
+    "kevin mcgonigle",
+    "lucas spence",
+    "nico hoerner",
+    "otto lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "212",
+   "entry_id": "5196423807",
+   "username": "The-Bomb-com",
+   "points": 44.0,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Peter Lambert",
+    "Tyler Alexander"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "ezequiel duran",
+    "kevin mcgonigle",
+    "michael busch",
+    "nico hoerner",
+    "peter lambert",
+    "seiya suzuki",
+    "tristan peters",
+    "tyler alexander",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "213",
+   "entry_id": "5196379501",
+   "username": "ep3550",
+   "points": 43.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 24.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "liam hicks",
+    "michael busch",
+    "nicky lopez",
+    "otto lopez",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "213",
+   "entry_id": "5196552424",
+   "username": "hacker33",
+   "points": 43.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 28.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "ezequiel duran",
+    "ian happ",
+    "liam hicks",
+    "munetaka murakami",
+    "otto lopez",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "215",
+   "entry_id": "5196059590",
+   "username": "kevinbrock",
+   "points": 42.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "ezequiel duran",
+    "justin foscue",
+    "kyle stowers",
+    "liam hicks",
+    "miguel vargas",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "216",
+   "entry_id": "5196622502",
+   "username": "crazyaggie",
+   "points": 42.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon nimmo",
+    "carson kelly",
+    "ezequiel duran",
+    "ian happ",
+    "munetaka murakami",
+    "nico hoerner",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "217",
+   "entry_id": "5196578617",
+   "username": "SivaMB",
+   "points": 41.75,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 19.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "christian walker",
+    "colin rea",
+    "dansby swanson",
+    "isaac paredes",
+    "michael conforto",
+    "nicky lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "217",
+   "entry_id": "5196637155",
+   "username": "137666",
+   "points": 41.75,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "edgar quero",
+    "justin foscue",
+    "miguel vargas",
+    "munetaka murakami",
+    "nicky lopez",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "219",
+   "entry_id": "5196099076",
+   "username": "Ozarkian",
+   "points": 41.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andrew benintendi",
+    "brandon nimmo",
+    "elias diaz",
+    "ezequiel duran",
+    "michael busch",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "219",
+   "entry_id": "5196326362",
+   "username": "theduke211",
+   "points": 41.45,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 25.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam cauley",
+    "elias diaz",
+    "ezequiel duran",
+    "jake burger",
+    "miguel vargas",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "221",
+   "entry_id": "5196096357",
+   "username": "kkbailey",
+   "points": 39.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 26.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colin rea",
+    "dansby swanson",
+    "kevin mcgonigle",
+    "liam hicks",
+    "munetaka murakami",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "221",
+   "entry_id": "5196622014",
+   "username": "troubledsoe",
+   "points": 39.8,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "colin rea",
+    "elias diaz",
+    "ezequiel duran",
+    "jake burger",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "seiya suzuki",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "223",
+   "entry_id": "5196637227",
+   "username": "dabouch1988",
+   "points": 39.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 24.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "colin rea",
+    "ezequiel duran",
+    "liam hicks",
+    "michael busch",
+    "michael conforto",
+    "miguel vargas",
+    "nicky lopez",
+    "pete crow armstrong",
+    "peter lambert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "224",
+   "entry_id": "5196072162",
+   "username": "swenburhooden",
+   "points": 38.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 25.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "dansby swanson",
+    "edgar quero",
+    "michael busch",
+    "nicky lopez",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "224",
+   "entry_id": "5196386166",
+   "username": "famcjr",
+   "points": 38.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 21.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "dansby swanson",
+    "dillon dingler",
+    "ezequiel duran",
+    "gleyber torres",
+    "joc pederson",
+    "michael conforto",
+    "munetaka murakami",
+    "peter lambert",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "226",
+   "entry_id": "5196001901",
+   "username": "davidlobo4",
+   "points": 37.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Colin Rea",
+    "Peter Lambert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "justin foscue",
+    "miguel vargas",
+    "munetaka murakami",
+    "peter lambert",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "227",
+   "entry_id": "5195954576",
+   "username": "Cards1640",
+   "points": 37.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 22.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colson montgomery",
+    "james outman",
+    "kevin mcgonigle",
+    "lamonte wade",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "227",
+   "entry_id": "5196631097",
+   "username": "3robertdawkins3",
+   "points": 37.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 26.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "elias diaz",
+    "justin foscue",
+    "kevin mcgonigle",
+    "michael busch",
+    "otto lopez",
+    "peter lambert",
+    "riley greene",
+    "sandy alcantara",
+    "tristan peters",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "229",
+   "entry_id": "5196527094",
+   "username": "TallCoolOne_32",
+   "points": 36.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 23.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "edgar quero",
+    "jake burger",
+    "kevin mcgonigle",
+    "miguel vargas",
+    "nico hoerner",
+    "pete crow armstrong",
+    "peter lambert",
+    "sandy alcantara",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "229",
+   "entry_id": "5196630109",
+   "username": "chetpancakes",
+   "points": 36.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 23.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "dansby swanson",
+    "joe mack",
+    "michael conforto",
+    "miguel vargas",
+    "munetaka murakami",
+    "nico hoerner",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "231",
+   "entry_id": "5195939122",
+   "username": "coleycamp21",
+   "points": 34.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cal Quantrill",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 20.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon nimmo",
+    "cal quantrill",
+    "dansby swanson",
+    "dillon dingler",
+    "kevin mcgonigle",
+    "michael busch",
+    "pete crow armstrong",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "232",
+   "entry_id": "5196629696",
+   "username": "theking573dddd",
+   "points": 28.45,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Peter Lambert",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 28.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "colson montgomery",
+    "elias diaz",
+    "ezequiel duran",
+    "justin foscue",
+    "miguel vargas",
+    "peter lambert",
+    "sam antonacci",
+    "sandy alcantara",
+    "tristan peters",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "233",
+   "entry_id": "5196578582",
+   "username": "prymsu",
+   "points": 27.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Colin Rea",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 25.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "colin rea",
+    "colson montgomery",
+    "edgar quero",
+    "jake burger",
+    "otto lopez",
+    "pete crow armstrong",
+    "sam antonacci",
+    "sandy alcantara",
+    "wyatt langford",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Peter Lambert",
+   "player_norm": "peter lambert",
+   "roster_position": "P",
+   "pct_drafted": 62.03,
+   "fpts": 10.7
+  },
+  {
+   "player": "Wyatt Langford",
+   "player_norm": "wyatt langford",
+   "roster_position": "OF",
+   "pct_drafted": 44.73,
+   "fpts": 2.0
+  },
+  {
+   "player": "Sandy Alcantara",
+   "player_norm": "sandy alcantara",
+   "roster_position": "P",
+   "pct_drafted": 41.77,
+   "fpts": 5.75
+  },
+  {
+   "player": "Colin Rea",
+   "player_norm": "colin rea",
+   "roster_position": "P",
+   "pct_drafted": 40.93,
+   "fpts": 9.05
+  },
+  {
+   "player": "Yordan Alvarez",
+   "player_norm": "yordan alvarez",
+   "roster_position": "OF",
+   "pct_drafted": 35.86,
+   "fpts": 19.0
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "OF",
+   "pct_drafted": 27.43,
+   "fpts": 2.0
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "1B",
+   "pct_drafted": 27.0,
+   "fpts": 4.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "OF",
+   "pct_drafted": 26.16,
+   "fpts": 14.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 25.32,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jeremy Pena",
+   "player_norm": "jeremy pena",
+   "roster_position": "SS",
+   "pct_drafted": 25.32,
+   "fpts": 22.0
+  },
+  {
+   "player": "Justin Foscue",
+   "player_norm": "justin foscue",
+   "roster_position": "2B",
+   "pct_drafted": 24.05,
+   "fpts": 3.0
+  },
+  {
+   "player": "Xavier Edwards",
+   "player_norm": "xavier edwards",
+   "roster_position": "2B",
+   "pct_drafted": 23.21,
+   "fpts": 0.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 23.21,
+   "fpts": 0.0
+  },
+  {
+   "player": "Keider Montero",
+   "player_norm": "keider montero",
+   "roster_position": "P",
+   "pct_drafted": 21.94,
+   "fpts": 28.2
+  },
+  {
+   "player": "Anthony Kay",
+   "player_norm": "anthony kay",
+   "roster_position": "P",
+   "pct_drafted": 21.94,
+   "fpts": 14.45
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "1B",
+   "pct_drafted": 21.1,
+   "fpts": 3.0
+  },
+  {
+   "player": "Yainer Diaz",
+   "player_norm": "yainer diaz",
+   "roster_position": "C",
+   "pct_drafted": 21.1,
+   "fpts": 4.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "SS",
+   "pct_drafted": 20.25,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "OF",
+   "pct_drafted": 19.41,
+   "fpts": 10.0
+  },
+  {
+   "player": "Isaac Paredes",
+   "player_norm": "isaac paredes",
+   "roster_position": "3B",
+   "pct_drafted": 18.99,
+   "fpts": 17.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "2B",
+   "pct_drafted": 18.57,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "3B",
+   "pct_drafted": 18.14,
+   "fpts": 0.0
+  },
+  {
+   "player": "Riley Greene",
+   "player_norm": "riley greene",
+   "roster_position": "OF",
+   "pct_drafted": 18.14,
+   "fpts": 7.0
+  },
+  {
+   "player": "Braden Montgomery",
+   "player_norm": "braden montgomery",
+   "roster_position": "OF",
+   "pct_drafted": 17.3,
+   "fpts": 11.0
+  },
+  {
+   "player": "Otto Lopez",
+   "player_norm": "otto lopez",
+   "roster_position": "SS",
+   "pct_drafted": 16.88,
+   "fpts": 3.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "3B",
+   "pct_drafted": 14.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 13.92,
+   "fpts": 16.0
+  },
+  {
+   "player": "Heriberto Hernandez",
+   "player_norm": "heriberto hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 12.66,
+   "fpts": 13.0
+  },
+  {
+   "player": "Dansby Swanson",
+   "player_norm": "dansby swanson",
+   "roster_position": "SS",
+   "pct_drafted": 12.66,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "3B",
+   "pct_drafted": 12.66,
+   "fpts": 3.0
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "C",
+   "pct_drafted": 12.24,
+   "fpts": 5.0
+  },
+  {
+   "player": "Brandon Nimmo",
+   "player_norm": "brandon nimmo",
+   "roster_position": "OF",
+   "pct_drafted": 12.24,
+   "fpts": 5.0
+  },
+  {
+   "player": "Elias Diaz",
+   "player_norm": "elias diaz",
+   "roster_position": "C",
+   "pct_drafted": 11.81,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Burger",
+   "player_norm": "jake burger",
+   "roster_position": "1B",
+   "pct_drafted": 11.81,
+   "fpts": 2.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "3B",
+   "pct_drafted": 11.81,
+   "fpts": 5.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "3B",
+   "pct_drafted": 11.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Christian Walker",
+   "player_norm": "christian walker",
+   "roster_position": "1B",
+   "pct_drafted": 10.55,
+   "fpts": 3.0
+  },
+  {
+   "player": "Kyle Stowers",
+   "player_norm": "kyle stowers",
+   "roster_position": "1B",
+   "pct_drafted": 9.28,
+   "fpts": 0.0
+  },
+  {
+   "player": "Carson Kelly",
+   "player_norm": "carson kelly",
+   "roster_position": "C",
+   "pct_drafted": 8.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "SS",
+   "pct_drafted": 8.86,
+   "fpts": 3.0
+  },
+  {
+   "player": "Cam Cauley",
+   "player_norm": "cam cauley",
+   "roster_position": "OF",
+   "pct_drafted": 8.86,
+   "fpts": 16.0
+  },
+  {
+   "player": "Andrew Benintendi",
+   "player_norm": "andrew benintendi",
+   "roster_position": "OF",
+   "pct_drafted": 8.02,
+   "fpts": 10.0
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 7.59,
+   "fpts": 23.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 7.59,
+   "fpts": 2.0
+  },
+  {
+   "player": "Edgar Quero",
+   "player_norm": "edgar quero",
+   "roster_position": "C",
+   "pct_drafted": 7.59,
+   "fpts": 2.0
+  },
+  {
+   "player": "Tristan Peters",
+   "player_norm": "tristan peters",
+   "roster_position": "OF",
+   "pct_drafted": 6.75,
+   "fpts": 0.0
+  },
+  {
+   "player": "LaMonte Wade Jr.",
+   "player_norm": "lamonte wade",
+   "roster_position": "OF",
+   "pct_drafted": 6.33,
+   "fpts": 0.0
+  },
+  {
+   "player": "Colt Keith",
+   "player_norm": "colt keith",
+   "roster_position": "3B",
+   "pct_drafted": 6.33,
+   "fpts": 0.0
+  },
+  {
+   "player": "Joe Mack",
+   "player_norm": "joe mack",
+   "roster_position": "C",
+   "pct_drafted": 6.33,
+   "fpts": 5.0
+  },
+  {
+   "player": "Esteury Ruiz",
+   "player_norm": "esteury ruiz",
+   "roster_position": "OF",
+   "pct_drafted": 5.49,
+   "fpts": 13.0
+  },
+  {
+   "player": "Hao-Yu Lee",
+   "player_norm": "hao yu lee",
+   "roster_position": "2B",
+   "pct_drafted": 5.49,
+   "fpts": 18.0
+  },
+  {
+   "player": "Michael Conforto",
+   "player_norm": "michael conforto",
+   "roster_position": "OF",
+   "pct_drafted": 5.06,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kerry Carpenter",
+   "player_norm": "kerry carpenter",
+   "roster_position": "OF",
+   "pct_drafted": 5.06,
+   "fpts": 3.0
+  },
+  {
+   "player": "Cal Quantrill",
+   "player_norm": "cal quantrill",
+   "roster_position": "P",
+   "pct_drafted": 5.06,
+   "fpts": 1.75
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "2B",
+   "pct_drafted": 5.06,
+   "fpts": 7.0
+  },
+  {
+   "player": "Nicky Lopez",
+   "player_norm": "nicky lopez",
+   "roster_position": "2B",
+   "pct_drafted": 5.06,
+   "fpts": 0.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 4.22,
+   "fpts": 9.0
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "1B",
+   "pct_drafted": 4.22,
+   "fpts": 5.0
+  },
+  {
+   "player": "Griffin Conine",
+   "player_norm": "griffin conine",
+   "roster_position": "OF",
+   "pct_drafted": 3.8,
+   "fpts": 4.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "SS",
+   "pct_drafted": 3.8,
+   "fpts": 9.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "1B",
+   "pct_drafted": 3.8,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Alexander",
+   "player_norm": "tyler alexander",
+   "roster_position": "P",
+   "pct_drafted": 2.95,
+   "fpts": 3.3
+  },
+  {
+   "player": "LaMonte Wade Jr.",
+   "player_norm": "lamonte wade",
+   "roster_position": "1B",
+   "pct_drafted": 2.95,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Vazquez",
+   "player_norm": "christian vazquez",
+   "roster_position": "C",
+   "pct_drafted": 2.95,
+   "fpts": 0.0
+  },
+  {
+   "player": "James Outman",
+   "player_norm": "james outman",
+   "roster_position": "OF",
+   "pct_drafted": 2.53,
+   "fpts": 3.0
+  },
+  {
+   "player": "Lucas Spence",
+   "player_norm": "lucas spence",
+   "roster_position": "OF",
+   "pct_drafted": 2.11,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Altuve",
+   "player_norm": "jose altuve",
+   "roster_position": "2B",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nicky Lopez",
+   "player_norm": "nicky lopez",
+   "roster_position": "SS",
+   "pct_drafted": 1.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Alejandro Osuna",
+   "player_norm": "alejandro osuna",
+   "roster_position": "OF",
+   "pct_drafted": 1.27,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gleyber Torres",
+   "player_norm": "gleyber torres",
+   "roster_position": "2B",
+   "pct_drafted": 1.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Eduardo Valencia",
+   "player_norm": "eduardo valencia",
+   "roster_position": "C",
+   "pct_drafted": 0.84,
+   "fpts": 0.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "SS",
+   "pct_drafted": 0.84,
+   "fpts": 7.0
+  },
+  {
+   "player": "Shay Whitcomb",
+   "player_norm": "shay whitcomb",
+   "roster_position": "SS",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Moises Ballesteros",
+   "player_norm": "moises ballesteros",
+   "roster_position": "C",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Daniel Johnson",
+   "player_norm": "daniel johnson",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Trei Cruz",
+   "player_norm": "trei cruz",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dairon Blanco",
+   "player_norm": "dairon blanco",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Teel",
+   "player_norm": "kyle teel",
+   "roster_position": "C",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jakob Marsee",
+   "player_norm": "jakob marsee",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Agustin Ramirez",
+   "player_norm": "agustin ramirez",
+   "roster_position": "C",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "3B",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Joc Pederson",
+   "player_norm": "joc pederson",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Matt Vierling",
+   "player_norm": "matt vierling",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Allen",
+   "player_norm": "nick allen",
+   "roster_position": "SS",
+   "pct_drafted": 0.42,
+   "fpts": 5.0
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 237,
+  "best_rank": 26,
+  "worst_rank": 194,
+  "best_finish_percentile": 89.45,
+  "median_finish_percentile": 56.12,
+  "best_points": 100.15,
+  "winning_points": 131.9,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

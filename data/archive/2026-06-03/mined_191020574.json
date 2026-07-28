@@ -1,0 +1,6940 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "191020574",
+ "slate_date": "2026-06-03",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 224,
+  "entries_complete_lineups": 221,
+  "roster_size": 10,
+  "entries_unparsed": 3,
+  "winning_points": 154.85,
+  "winning_entry_id": "5157508405",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 183,
+  "entries_in_duplicated_lineups": 53,
+  "share_duplicated_pct": 24.0,
+  "max_copies": 10,
+  "copies_histogram": {
+   "1": 168,
+   "2": 8,
+   "3": 2,
+   "4": 1,
+   "5": 2,
+   "7": 1,
+   "10": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2000,
+  "at_cap_entries": 76,
+  "at_cap_share_pct": 34.4,
+  "salary_left_histogram": {
+   "1-100": 33,
+   "> 1500": 30,
+   "<= 0": 43,
+   "101-300": 32,
+   "301-700": 52,
+   "701-1500": 31
+  },
+  "max_stack_histogram": {
+   "2": 1,
+   "3": 29,
+   "4": 87,
+   "5": 104
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Cristopher Sanchez",
+     "Payton Tolle"
+    ],
+    "count": 135,
+    "field_share_pct": 61.1
+   },
+   {
+    "pair": [
+     "Chris Bassitt",
+     "Cristopher Sanchez"
+    ],
+    "count": 42,
+    "field_share_pct": 19.0
+   },
+   {
+    "pair": [
+     "Cristopher Sanchez",
+     "Walker Buehler"
+    ],
+    "count": 17,
+    "field_share_pct": 7.7
+   },
+   {
+    "pair": [
+     "Payton Tolle",
+     "Walker Buehler"
+    ],
+    "count": 11,
+    "field_share_pct": 5.0
+   },
+   {
+    "pair": [
+     "Chris Bassitt",
+     "Walker Buehler"
+    ],
+    "count": 8,
+    "field_share_pct": 3.6
+   },
+   {
+    "pair": [
+     "Chris Bassitt",
+     "Payton Tolle"
+    ],
+    "count": 8,
+    "field_share_pct": 3.6
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Cristopher Sanchez",
+    "pct_drafted": 86.61
+   },
+   {
+    "player": "Payton Tolle",
+    "pct_drafted": 68.75
+   },
+   {
+    "player": "Kyle Schwarber",
+    "pct_drafted": 52.23
+   },
+   {
+    "player": "Trea Turner",
+    "pct_drafted": 52.23
+   },
+   {
+    "player": "Mickey Gasper",
+    "pct_drafted": 49.11
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0134,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 2210,
+  "roster_slots_expected": 2210,
+  "recomputed_total_pct": 986.6,
+  "dk_table_total_pct": 986.6,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5157508405",
+   "username": "troubledsoe",
+   "points": 154.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.94,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryson stott",
+    "caleb durbin",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5157464665",
+   "username": "Albino_Zebra",
+   "points": 151.65,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 26.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "taylor ward",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5157029511",
+   "username": "donj9903",
+   "points": 147.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 38.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "manny machado",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5157060843",
+   "username": "bbehnke20",
+   "points": 147.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jackson holliday",
+    "jarren duran",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5157342802",
+   "username": "Cobra777666777",
+   "points": 147.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.46,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5156919876",
+   "username": "gocal1224",
+   "points": 145.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryson stott",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "kyle schwarber",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5157443859",
+   "username": "Flying1Tigers",
+   "points": 143.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 40.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "kyle schwarber",
+    "payton tolle",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5157370973",
+   "username": "wittwerjoe",
+   "points": 142.85,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 37.41,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryson stott",
+    "caleb durbin",
+    "cristopher sanchez",
+    "j t realmuto",
+    "justin crawford",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5157203032",
+   "username": "FrisbeeSmith1",
+   "points": 141.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryson stott",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5157533232",
+   "username": "littlebrassones",
+   "points": 140.85,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157167998",
+   "username": "giveitu",
+   "points": 138.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157195323",
+   "username": "FrisbeeSmith1",
+   "points": 138.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157445380",
+   "username": "DicVec",
+   "points": 138.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157514843",
+   "username": "abogandidi",
+   "points": 138.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157529292",
+   "username": "Nwylie313",
+   "points": 138.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 36.07,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "bryson stott",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jase bowen",
+    "kyle schwarber",
+    "miguel andujar",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157533235",
+   "username": "littlebrassones",
+   "points": 138.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5157541731",
+   "username": "Grimble",
+   "points": 138.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5157431602",
+   "username": "waterfowl14",
+   "points": 137.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 41.92,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "caleb durbin",
+    "cristopher sanchez",
+    "fernando tatis",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "ty france",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5157521360",
+   "username": "Jeter2333",
+   "points": 137.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "adolis garcia",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "j t realmuto",
+    "kyle schwarber",
+    "marcelo mayer",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5157530663",
+   "username": "ep3550",
+   "points": 137.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5156895017",
+   "username": "Stree",
+   "points": 137.65,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.14,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5157514848",
+   "username": "abogandidi",
+   "points": 136.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5156870345",
+   "username": "davidlobo4",
+   "points": 135.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 46.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5157362181",
+   "username": "bluenovember",
+   "points": 135.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 40.18,
+   "n_cheap": 2,
+   "players_norm": [
+    "bryson stott",
+    "caleb durbin",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jase bowen",
+    "kyle schwarber",
+    "payton tolle",
+    "pete alonso",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5157488822",
+   "username": "Patrick_Irish",
+   "points": 135.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.3,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "fernando tatis",
+    "isiah kiner falefa",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5157543481",
+   "username": "Birdzofprey15",
+   "points": 135.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5157242588",
+   "username": "Bradfor",
+   "points": 134.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.8,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "payton tolle",
+    "samuel basallo",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5157549724",
+   "username": "WhitehorsePK",
+   "points": 134.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5157464664",
+   "username": "Albino_Zebra",
+   "points": 134.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "masataka yoshida",
+    "taylor ward",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5157044794",
+   "username": "gcferraro",
+   "points": 133.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "fernando tatis",
+    "j t realmuto",
+    "jarren duran",
+    "marcelo mayer",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5157349081",
+   "username": "Tall_Texan",
+   "points": 133.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5157349132",
+   "username": "Tall_Texan",
+   "points": 133.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5157358642",
+   "username": "Tall_Texan",
+   "points": 133.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5157524654",
+   "username": "ed8802",
+   "points": 133.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5157536798",
+   "username": "Grimble",
+   "points": 133.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5157445379",
+   "username": "DicVec",
+   "points": 132.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5156830903",
+   "username": "lucko843",
+   "points": 131.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 37.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "taylor ward",
+    "ty france",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5157160142",
+   "username": "sportsfan14",
+   "points": 131.85,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5157195307",
+   "username": "FrisbeeSmith1",
+   "points": 131.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5157203012",
+   "username": "FrisbeeSmith1",
+   "points": 131.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5157508290",
+   "username": "troubledsoe",
+   "points": 131.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "marcelo mayer",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5157549598",
+   "username": "cassanova",
+   "points": 131.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.29,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "fernando tatis",
+    "gavin sheets",
+    "isiah kiner falefa",
+    "jarren duran",
+    "payton tolle",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "43",
+   "entry_id": "5157540085",
+   "username": "SadatGnosis",
+   "points": 130.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 42.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "cristopher sanchez",
+    "fernando tatis",
+    "gavin sheets",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "43",
+   "entry_id": "5157541180",
+   "username": "TyAmLegend",
+   "points": 130.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 38.39,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5157469804",
+   "username": "bleeski",
+   "points": 130.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "ceddanne rafaela",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jarren duran",
+    "marcelo mayer",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "46",
+   "entry_id": "5157388993",
+   "username": "109pghplayer",
+   "points": 129.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "kyle schwarber",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5156705509",
+   "username": "avdwolf",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325333",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325334",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325335",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325336",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325337",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325338",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157325339",
+   "username": "vavo27",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157349082",
+   "username": "Tall_Texan",
+   "points": 128.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157349133",
+   "username": "Tall_Texan",
+   "points": 128.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157358382",
+   "username": "Tall_Texan",
+   "points": 128.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157358643",
+   "username": "Tall_Texan",
+   "points": 128.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157370971",
+   "username": "wittwerjoe",
+   "points": 128.85,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "justin crawford",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157370974",
+   "username": "wittwerjoe",
+   "points": 128.85,
+   "salary_used": 45400,
+   "salary_left": 4600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.18,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "justin crawford",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157421337",
+   "username": "BolasViejas",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157433489",
+   "username": "bizzyG",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5157533229",
+   "username": "littlebrassones",
+   "points": 128.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5156645421",
+   "username": "stevmortc",
+   "points": 127.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 43.66,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5156895018",
+   "username": "Stree",
+   "points": 127.85,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "brandon marsh",
+    "bryson stott",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "66",
+   "entry_id": "5157195295",
+   "username": "FrisbeeSmith1",
+   "points": 126.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "66",
+   "entry_id": "5157538079",
+   "username": "cbright6",
+   "points": 126.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 45.4,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5157195298",
+   "username": "FrisbeeSmith1",
+   "points": 125.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5157484421",
+   "username": "137666",
+   "points": 125.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5157539055",
+   "username": "st2424522",
+   "points": 125.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.11,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "71",
+   "entry_id": "5157514847",
+   "username": "abogandidi",
+   "points": 124.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "72",
+   "entry_id": "5156847947",
+   "username": "Catblue1230",
+   "points": 123.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "72",
+   "entry_id": "5157031280",
+   "username": "howardwi",
+   "points": 123.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 46.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "72",
+   "entry_id": "5157513702",
+   "username": "troubledsoe",
+   "points": 123.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5156895020",
+   "username": "Stree",
+   "points": 123.65,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "isiah kiner falefa",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "taylor ward",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5157525488",
+   "username": "42Ballerz",
+   "points": 123.65,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "coby mayo",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "mickey gasper",
+    "pete alonso",
+    "walker buehler",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "77",
+   "entry_id": "5157152983",
+   "username": "gabhuot88",
+   "points": 122.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jarren duran",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "77",
+   "entry_id": "5157370968",
+   "username": "wittwerjoe",
+   "points": 122.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.53,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony seigler",
+    "bryson stott",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "77",
+   "entry_id": "5157444680",
+   "username": "rkbwv",
+   "points": 122.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jarren duran",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "77",
+   "entry_id": "5157445381",
+   "username": "DicVec",
+   "points": 122.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "fernando tatis",
+    "isiah kiner falefa",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "77",
+   "entry_id": "5157514844",
+   "username": "abogandidi",
+   "points": 122.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jarren duran",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "82",
+   "entry_id": "5157464663",
+   "username": "Albino_Zebra",
+   "points": 122.65,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "masataka yoshida",
+    "mickey gasper",
+    "samuel basallo",
+    "taylor ward",
+    "walker buehler",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "83",
+   "entry_id": "5157469802",
+   "username": "bleeski",
+   "points": 122.0,
+   "salary_used": 46400,
+   "salary_left": 3600,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jarren duran",
+    "manny machado",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "84",
+   "entry_id": "5156804174",
+   "username": "Sho_Nuff_Loc",
+   "points": 121.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 35.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryson stott",
+    "ceddanne rafaela",
+    "coby mayo",
+    "cristopher sanchez",
+    "gavin sheets",
+    "payton tolle",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "84",
+   "entry_id": "5157385861",
+   "username": "fan21",
+   "points": 121.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "bryce harper",
+    "coby mayo",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "taylor ward",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "84",
+   "entry_id": "5157504291",
+   "username": "Harmiles",
+   "points": 121.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 39.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "bryson stott",
+    "cristopher sanchez",
+    "manny machado",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5157533231",
+   "username": "littlebrassones",
+   "points": 120.85,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5157536208",
+   "username": "Jeter2333",
+   "points": 120.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.72,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jase bowen",
+    "kyle schwarber",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5157542165",
+   "username": "bdubya3",
+   "points": 120.85,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 40.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "blaze alexander",
+    "brandon marsh",
+    "caleb durbin",
+    "cristopher sanchez",
+    "fernando tatis",
+    "j t realmuto",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5156746450",
+   "username": "Trashgirl88",
+   "points": 119.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 38.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "kyle schwarber",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5156895021",
+   "username": "Stree",
+   "points": 119.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 46.7,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "cristopher sanchez",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5156896182",
+   "username": "mrbig91",
+   "points": 119.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 39.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "jackson holliday",
+    "manny machado",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5157139609",
+   "username": "slophound",
+   "points": 119.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "coby mayo",
+    "cristopher sanchez",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5157370972",
+   "username": "wittwerjoe",
+   "points": 119.85,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.46,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "garrett stubbs",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5157493421",
+   "username": "jgmoto12",
+   "points": 119.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 41.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5157524048",
+   "username": "cd73",
+   "points": 119.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 36.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "fernando tatis",
+    "isiah kiner falefa",
+    "jackson merrill",
+    "masataka yoshida",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "97",
+   "entry_id": "5157537155",
+   "username": "ST7423",
+   "points": 119.65,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "coby mayo",
+    "cristopher sanchez",
+    "gavin sheets",
+    "gunnar henderson",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "mickey gasper",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "98",
+   "entry_id": "5156979343",
+   "username": "FrisbeeSmith1",
+   "points": 119.0,
+   "salary_used": 46600,
+   "salary_left": 3400,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jarren duran",
+    "manny machado",
+    "mickey gasper",
+    "payton tolle",
+    "taylor ward",
+    "ty france",
+    "walker buehler",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5157126059",
+   "username": "TopShelf561",
+   "points": 118.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "manny machado",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "100",
+   "entry_id": "5157153090",
+   "username": "gocal1224",
+   "points": 118.65,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jarren duran",
+    "marcelo mayer",
+    "mickey gasper",
+    "miguel andujar",
+    "samuel basallo",
+    "taylor ward",
+    "walker buehler",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "101",
+   "entry_id": "5157543477",
+   "username": "Birdzofprey15",
+   "points": 117.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5156895022",
+   "username": "Stree",
+   "points": 116.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5157231366",
+   "username": "rjw1",
+   "points": 116.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "marcelo mayer",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5157463041",
+   "username": "bleeski",
+   "points": 116.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "marcelo mayer",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5157519821",
+   "username": "ryclo",
+   "points": 116.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.54,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "jase bowen",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5157524655",
+   "username": "ed8802",
+   "points": 116.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5157530666",
+   "username": "ep3550",
+   "points": 116.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.72,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "caleb durbin",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "masataka yoshida",
+    "payton tolle",
+    "rodolfo duran",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5157533233",
+   "username": "littlebrassones",
+   "points": 116.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "brandon marsh",
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "109",
+   "entry_id": "5157326851",
+   "username": "sphere3d",
+   "points": 115.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "cristopher sanchez",
+    "gavin sheets",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "110",
+   "entry_id": "5157464666",
+   "username": "Albino_Zebra",
+   "points": 114.65,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "caleb durbin",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "masataka yoshida",
+    "pete alonso",
+    "samuel basallo",
+    "tyler oneill",
+    "walker buehler",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "111",
+   "entry_id": "5156901637",
+   "username": "Dave2zone",
+   "points": 114.0,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 29.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "fernando tatis",
+    "jackson merrill",
+    "jarren duran",
+    "manny machado",
+    "payton tolle",
+    "trea turner",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "112",
+   "entry_id": "5157429435",
+   "username": "BadMOFO55",
+   "points": 113.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 38.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "brandon marsh",
+    "coby mayo",
+    "cristopher sanchez",
+    "fernando tatis",
+    "isiah kiner falefa",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "113",
+   "entry_id": "5156638667",
+   "username": "GrownManRick11",
+   "points": 113.0,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "jarren duran",
+    "kyle schwarber",
+    "manny machado",
+    "marcelo mayer",
+    "payton tolle",
+    "rodolfo duran",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "113",
+   "entry_id": "5157495788",
+   "username": "jcmemorabilia",
+   "points": 113.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "jarren duran",
+    "kyle schwarber",
+    "manny machado",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "walker buehler",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5156789097",
+   "username": "KennyLions",
+   "points": 112.85,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "cristopher sanchez",
+    "garrett stubbs",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "marcelo mayer",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5157289458",
+   "username": "hogshead8",
+   "points": 112.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 37.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "cristopher sanchez",
+    "gavin sheets",
+    "jackson holliday",
+    "jarren duran",
+    "mickey gasper",
+    "miguel andujar",
+    "payton tolle",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5157501564",
+   "username": "shin-nation",
+   "points": 112.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "blaze alexander",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5157508354",
+   "username": "troubledsoe",
+   "points": 112.85,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 40.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "justin crawford",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5157542338",
+   "username": "TyAmLegend",
+   "points": 112.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 40.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner",
+    "tyler oneill",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "120",
+   "entry_id": "5156890492",
+   "username": "starplay",
+   "points": 111.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "121",
+   "entry_id": "5157514846",
+   "username": "abogandidi",
+   "points": 110.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 47.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "121",
+   "entry_id": "5157537396",
+   "username": "TyAmLegend",
+   "points": 110.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 47.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5156763681",
+   "username": "TheBabz",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "justin crawford",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157188201",
+   "username": "JRaab",
+   "points": 109.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 47.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157231365",
+   "username": "rjw1",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "jarren duran",
+    "justin crawford",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303110",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303111",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303112",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303113",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303114",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303115",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157303116",
+   "username": "Dhawkins270",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157388051",
+   "username": "davebla",
+   "points": 109.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 43.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "coby mayo",
+    "cristopher sanchez",
+    "jarren duran",
+    "justin crawford",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5157514842",
+   "username": "abogandidi",
+   "points": 109.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 47.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5156854489",
+   "username": "SixShooters",
+   "points": 108.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.76,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "cristopher sanchez",
+    "jase bowen",
+    "kyle schwarber",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5156901634",
+   "username": "Dave2zone",
+   "points": 108.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "blaze alexander",
+    "cristopher sanchez",
+    "fernando tatis",
+    "jarren duran",
+    "payton tolle",
+    "rodolfo duran",
+    "trea turner",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5156958850",
+   "username": "the__moose",
+   "points": 108.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 40.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "ceddanne rafaela",
+    "coby mayo",
+    "cristopher sanchez",
+    "fernando tatis",
+    "jarren duran",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5157464660",
+   "username": "Albino_Zebra",
+   "points": 108.85,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.92,
+   "n_cheap": 1,
+   "players_norm": [
+    "cristopher sanchez",
+    "fernando tatis",
+    "jarren duran",
+    "jase bowen",
+    "marcelo mayer",
+    "miguel andujar",
+    "payton tolle",
+    "rodolfo duran",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5157530664",
+   "username": "ep3550",
+   "points": 108.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 39.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gavin sheets",
+    "jarren duran",
+    "manny machado",
+    "mickey gasper",
+    "payton tolle",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "140",
+   "entry_id": "5157461077",
+   "username": "herb8485",
+   "points": 108.65,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 29.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "manny machado",
+    "masataka yoshida",
+    "mickey gasper",
+    "pete alonso",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "140",
+   "entry_id": "5157533234",
+   "username": "littlebrassones",
+   "points": 108.65,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "coby mayo",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jackson holliday",
+    "jarren duran",
+    "masataka yoshida",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "142",
+   "entry_id": "5156998010",
+   "username": "Tburke34",
+   "points": 107.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "coby mayo",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "tyler oneill",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "142",
+   "entry_id": "5157403003",
+   "username": "Choker12",
+   "points": 107.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jase bowen",
+    "kyle schwarber",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "142",
+   "entry_id": "5157514845",
+   "username": "abogandidi",
+   "points": 107.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jarren duran",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "142",
+   "entry_id": "5157525954",
+   "username": "Bay101",
+   "points": 107.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "masataka yoshida",
+    "payton tolle",
+    "rodolfo duran",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "146",
+   "entry_id": "5157385862",
+   "username": "fan21",
+   "points": 106.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "coby mayo",
+    "jarren duran",
+    "kyle schwarber",
+    "marcelo mayer",
+    "payton tolle",
+    "pete alonso",
+    "walker buehler",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "147",
+   "entry_id": "5157270261",
+   "username": "The_Legend_2018",
+   "points": 105.0,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "bryson stott",
+    "coby mayo",
+    "gavin sheets",
+    "jarren duran",
+    "kyle schwarber",
+    "payton tolle",
+    "taylor ward",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "148",
+   "entry_id": "5157484420",
+   "username": "137666",
+   "points": 104.85,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 39.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "coby mayo",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jackson merrill",
+    "jarren duran",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "148",
+   "entry_id": "5157486686",
+   "username": "CashDaCapo",
+   "points": 104.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "coby mayo",
+    "cristopher sanchez",
+    "gavin sheets",
+    "isiah kiner falefa",
+    "j t realmuto",
+    "jackson merrill",
+    "kyle schwarber",
+    "payton tolle",
+    "pete alonso"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "150",
+   "entry_id": "5157044796",
+   "username": "gcferraro",
+   "points": 104.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jarren duran",
+    "masataka yoshida",
+    "mickey gasper",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "151",
+   "entry_id": "5157543476",
+   "username": "Birdzofprey15",
+   "points": 103.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "ceddanne rafaela",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "isiah kiner falefa",
+    "jarren duran",
+    "pete alonso",
+    "tyler oneill",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5157530667",
+   "username": "ep3550",
+   "points": 103.0,
+   "salary_used": 46000,
+   "salary_left": 4000,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "gavin sheets",
+    "jackson merrill",
+    "jarren duran",
+    "manny machado",
+    "mickey gasper",
+    "payton tolle",
+    "walker buehler",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "153",
+   "entry_id": "5157370969",
+   "username": "wittwerjoe",
+   "points": 101.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "connor wong",
+    "cristopher sanchez",
+    "isiah kiner falefa",
+    "jarren duran",
+    "kyle schwarber",
+    "payton tolle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "153",
+   "entry_id": "5157370970",
+   "username": "wittwerjoe",
+   "points": 101.85,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "ceddanne rafaela",
+    "cristopher sanchez",
+    "edmundo sosa",
+    "j t realmuto",
+    "jarren duran",
+    "marcelo mayer",
+    "masataka yoshida",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5156812661",
+   "username": "sackofpotatoes00",
+   "points": 101.65,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 39.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "ceddanne rafaela",
+    "coby mayo",
+    "cristopher sanchez",
+    "jackson holliday",
+    "jarren duran",
+    "mickey gasper",
+    "trea turner",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5157540497",
+   "username": "Nwylie313",
+   "points": 101.65,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "cristopher sanchez",
+    "fernando tatis",
+    "gavin sheets",
+    "j t realmuto",
+    "jarren duran",
+    "manny machado",
+    "taylor ward",
+    "trea turner",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "157",
+   "entry_id": "5157539992",
+   "username": "andyh6020",
+   "points": 101.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "j t realmuto",
+    "jackson holliday",
+    "jarren duran",
+    "kyle schwarber",
+    "payton tolle",
+    "taylor ward",
+    "trea turner",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "158",
+   "entry_id": "5157438062",
+   "username": "futball09",
+   "points": 100.85,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 21.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "gunnar henderson",
+    "jackson holliday",
+    "jackson merrill",
+    "kyle schwarber",
+    "manny machado",
+    "walker buehler",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "159",
+   "entry_id": "5157326901",
+   "username": "sphere3d",
+   "points": 99.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 46.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "cristopher sanchez",
+    "jarren duran",
+    "marcelo mayer",
+    "masataka yoshida",
+    "mickey gasper",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "160",
+   "entry_id": "5157482543",
+   "username": "Zardisking86",
+   "points": 98.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "fernando tatis",
+    "j t realmuto",
+    "jarren duran",
+    "kyle schwarber",
+    "taylor ward",
+    "ty france",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "161",
+   "entry_id": "5156805363",
+   "username": "bjbsnoop",
+   "points": 96.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 34.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "cristopher sanchez",
+    "jackson merrill",
+    "justin crawford",
+    "manny machado",
+    "mickey gasper",
+    "payton tolle",
+    "pete alonso",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "162",
+   "entry_id": "5157060846",
+   "username": "bbehnke20",
+   "points": 95.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "chris bassitt",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jackson holliday",
+    "jarren duran",
+    "kyle schwarber",
+    "trea turner",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "163",
+   "entry_id": "5157044798",
+   "username": "gcferraro",
+   "points": 95.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "cristopher sanchez",
+    "fernando tatis",
+    "jarren duran",
+    "kyle schwarber",
+    "masataka yoshida",
+    "rodolfo duran",
+    "trea turner",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "164",
+   "entry_id": "5157060844",
+   "username": "bbehnke20",
+   "points": 93.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "chris bassitt",
+    "cristopher sanchez",
+    "jarren duran",
+    "kyle schwarber",
+    "mickey gasper",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "165",
+   "entry_id": "5157060841",
+   "username": "bbehnke20",
+   "points": 92.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "jackson holliday",
+    "kyle schwarber",
+    "marcelo mayer",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "165",
+   "entry_id": "5157060847",
+   "username": "bbehnke20",
+   "points": 92.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.13,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "brandon marsh",
+    "caleb durbin",
+    "chris bassitt",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jarren duran",
+    "pete alonso",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "165",
+   "entry_id": "5157355802",
+   "username": "cinthia73184",
+   "points": 92.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 26.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "cristopher sanchez",
+    "fernando tatis",
+    "gavin sheets",
+    "manny machado",
+    "pete alonso",
+    "taylor ward",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "168",
+   "entry_id": "5157295592",
+   "username": "Dunn0131",
+   "points": 91.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cristopher Sanchez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "cristopher sanchez",
+    "gavin sheets",
+    "jarren duran",
+    "leody taveras",
+    "manny machado",
+    "payton tolle",
+    "rodolfo duran",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "169",
+   "entry_id": "5157060845",
+   "username": "bbehnke20",
+   "points": 91.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "chris bassitt",
+    "cristopher sanchez",
+    "jackson holliday",
+    "kyle schwarber",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "169",
+   "entry_id": "5157522122",
+   "username": "Jeter2333",
+   "points": 91.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "bryce harper",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "fernando tatis",
+    "j t realmuto",
+    "kyle schwarber",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "171",
+   "entry_id": "5157385863",
+   "username": "fan21",
+   "points": 88.7,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "bryce harper",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "jarren duran",
+    "marcelo mayer",
+    "taylor ward",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5157060842",
+   "username": "bbehnke20",
+   "points": 86.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 32.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jarren duran",
+    "samuel basallo",
+    "taylor ward",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5157540552",
+   "username": "Mrboozer",
+   "points": 86.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "alec bohm",
+    "bryson stott",
+    "chris bassitt",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "174",
+   "entry_id": "5157517165",
+   "username": "jc000000",
+   "points": 85.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "adolis garcia",
+    "brandon marsh",
+    "bryson stott",
+    "chris bassitt",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "miguel andujar",
+    "pete alonso",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "175",
+   "entry_id": "5157103088",
+   "username": "greensae10",
+   "points": 83.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 28.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "bryson stott",
+    "chris bassitt",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "manny machado",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "175",
+   "entry_id": "5157346985",
+   "username": "lornaz",
+   "points": 83.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 31.47,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "caleb durbin",
+    "chris bassitt",
+    "cristopher sanchez",
+    "gavin sheets",
+    "gunnar henderson",
+    "jackson holliday",
+    "kyle schwarber",
+    "samuel basallo"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "177",
+   "entry_id": "5157044795",
+   "username": "gcferraro",
+   "points": 82.85,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "gunnar henderson",
+    "jarren duran",
+    "kyle schwarber",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "178",
+   "entry_id": "5157160145",
+   "username": "sportsfan14",
+   "points": 82.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 33.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "179",
+   "entry_id": "5157454998",
+   "username": "SinMiedo",
+   "points": 82.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "gavin sheets",
+    "gunnar henderson",
+    "jackson merrill",
+    "jarren duran",
+    "manny machado",
+    "payton tolle",
+    "samuel basallo",
+    "taylor ward",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "180",
+   "entry_id": "5157530665",
+   "username": "ep3550",
+   "points": 81.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "adolis garcia",
+    "alec bohm",
+    "brandon marsh",
+    "chris bassitt",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "pete alonso",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "181",
+   "entry_id": "5156961817",
+   "username": "CHus510",
+   "points": 80.7,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "trea turner",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "181",
+   "entry_id": "5157160143",
+   "username": "sportsfan14",
+   "points": 80.7,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "trea turner",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "181",
+   "entry_id": "5157469801",
+   "username": "bleeski",
+   "points": 80.7,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "trea turner",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "184",
+   "entry_id": "5157513711",
+   "username": "troubledsoe",
+   "points": 79.7,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "ceddanne rafaela",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "185",
+   "entry_id": "5156736684",
+   "username": "mariusbr",
+   "points": 79.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Payton Tolle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "jackson holliday",
+    "jarren duran",
+    "manny machado",
+    "payton tolle",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "186",
+   "entry_id": "5157543479",
+   "username": "Birdzofprey15",
+   "points": 76.85,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 20.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "fernando tatis",
+    "gavin sheets",
+    "kyle schwarber",
+    "manny machado",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "187",
+   "entry_id": "5157044797",
+   "username": "gcferraro",
+   "points": 76.7,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "cristopher sanchez",
+    "jackson holliday",
+    "kyle schwarber",
+    "rodolfo duran",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "187",
+   "entry_id": "5157508339",
+   "username": "troubledsoe",
+   "points": 76.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "j t realmuto",
+    "jackson holliday",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5156894157",
+   "username": "Dave2zone",
+   "points": 75.7,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 29.2,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "fernando tatis",
+    "gunnar henderson",
+    "jase bowen",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5157416137",
+   "username": "mikebie11",
+   "points": 75.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5157416190",
+   "username": "mikebie11",
+   "points": 75.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5157416191",
+   "username": "mikebie11",
+   "points": 75.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5157416192",
+   "username": "mikebie11",
+   "points": 75.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5157416193",
+   "username": "mikebie11",
+   "points": 75.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryson stott",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5157549691",
+   "username": "ChrisA626",
+   "points": 75.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "jackson holliday",
+    "jackson merrill",
+    "jarren duran",
+    "kyle schwarber",
+    "samuel basallo",
+    "trea turner",
+    "ty france"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "196",
+   "entry_id": "5157507353",
+   "username": "rk053169",
+   "points": 74.85,
+   "salary_used": 42000,
+   "salary_left": 8000,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 25.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris bassitt",
+    "gavin sheets",
+    "jarren duran",
+    "manny machado",
+    "marcelo mayer",
+    "mickey gasper",
+    "pete alonso",
+    "walker buehler",
+    "wilyer abreu",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "197",
+   "entry_id": "5157518348",
+   "username": "Zardisking86",
+   "points": 74.7,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "jarren duran",
+    "kyle schwarber",
+    "pete alonso",
+    "rodolfo duran",
+    "taylor ward",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "198",
+   "entry_id": "5157469805",
+   "username": "bleeski",
+   "points": 74.05,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "fernando tatis",
+    "j t realmuto",
+    "jackson merrill",
+    "kyle schwarber",
+    "manny machado",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "199",
+   "entry_id": "5156901636",
+   "username": "Dave2zone",
+   "points": 73.7,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "brandon marsh",
+    "bryce harper",
+    "ceddanne rafaela",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "jackson merrill",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5157406146",
+   "username": "ZIBANENASTY93",
+   "points": 72.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "brandon marsh",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "isiah kiner falefa",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "201",
+   "entry_id": "5157543478",
+   "username": "Birdzofprey15",
+   "points": 71.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "cristopher sanchez",
+    "jackson holliday",
+    "justin crawford",
+    "kyle schwarber",
+    "trea turner",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "201",
+   "entry_id": "5157543480",
+   "username": "Birdzofprey15",
+   "points": 71.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "justin crawford",
+    "kyle schwarber",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "203",
+   "entry_id": "5157111023",
+   "username": "rockymav61832",
+   "points": 70.85,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 22.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "fernando tatis",
+    "gavin sheets",
+    "jackson merrill",
+    "jarren duran",
+    "kyle schwarber",
+    "manny machado",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "204",
+   "entry_id": "5157160147",
+   "username": "sportsfan14",
+   "points": 70.7,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "blaze alexander",
+    "chris bassitt",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward",
+    "trea turner",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "205",
+   "entry_id": "5157464661",
+   "username": "Albino_Zebra",
+   "points": 70.05,
+   "salary_used": 44800,
+   "salary_left": 5200,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "chris bassitt",
+    "fernando tatis",
+    "jackson merrill",
+    "kyle schwarber",
+    "miguel andujar",
+    "payton tolle",
+    "rodolfo duran",
+    "trea turner",
+    "ty france"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "206",
+   "entry_id": "5156813343",
+   "username": "deanlemcool",
+   "points": 69.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "bryce harper",
+    "bryson stott",
+    "chris bassitt",
+    "jarren duran",
+    "kyle schwarber",
+    "leody taveras",
+    "manny machado",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "206",
+   "entry_id": "5157464662",
+   "username": "Albino_Zebra",
+   "points": 69.05,
+   "salary_used": 45300,
+   "salary_left": 4700,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "chris bassitt",
+    "fernando tatis",
+    "j t realmuto",
+    "jackson merrill",
+    "jase bowen",
+    "kyle schwarber",
+    "miguel andujar",
+    "payton tolle",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "208",
+   "entry_id": "5157160146",
+   "username": "sportsfan14",
+   "points": 68.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "bryce harper",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "kyle schwarber",
+    "samuel basallo",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "209",
+   "entry_id": "5157200369",
+   "username": "cremesaver",
+   "points": 67.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "gavin sheets",
+    "gunnar henderson",
+    "jackson holliday",
+    "kyle schwarber",
+    "samuel basallo",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "210",
+   "entry_id": "5157469803",
+   "username": "bleeski",
+   "points": 66.85,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 15.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "fernando tatis",
+    "gunnar henderson",
+    "jackson merrill",
+    "manny machado",
+    "pete alonso",
+    "taylor ward",
+    "tyler oneill",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "210",
+   "entry_id": "5157469806",
+   "username": "bleeski",
+   "points": 66.85,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 16.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "fernando tatis",
+    "gavin sheets",
+    "gunnar henderson",
+    "jackson merrill",
+    "manny machado",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "212",
+   "entry_id": "5157540666",
+   "username": "andyh6020",
+   "points": 65.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "cristopher sanchez",
+    "jackson holliday",
+    "jarren duran",
+    "manny machado",
+    "marcelo mayer",
+    "samuel basallo",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "213",
+   "entry_id": "5156895016",
+   "username": "Stree",
+   "points": 65.05,
+   "salary_used": 45300,
+   "salary_left": 4700,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris bassitt",
+    "fernando tatis",
+    "jarren duran",
+    "justin crawford",
+    "kyle schwarber",
+    "manny machado",
+    "payton tolle",
+    "rodolfo duran",
+    "ty france",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "214",
+   "entry_id": "5157368049",
+   "username": "roche464",
+   "points": 64.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 28.12,
+   "n_cheap": 1,
+   "players_norm": [
+    "ceddanne rafaela",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "fernando tatis",
+    "gunnar henderson",
+    "jarren duran",
+    "jase bowen",
+    "pete alonso",
+    "samuel basallo"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "215",
+   "entry_id": "5156901635",
+   "username": "Dave2zone",
+   "points": 64.05,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "blaze alexander",
+    "bryce harper",
+    "ceddanne rafaela",
+    "chris bassitt",
+    "coby mayo",
+    "jackson merrill",
+    "jarren duran",
+    "payton tolle",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "216",
+   "entry_id": "5157160144",
+   "username": "sportsfan14",
+   "points": 63.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "chris bassitt",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "justin crawford",
+    "pete alonso",
+    "samuel basallo",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "216",
+   "entry_id": "5157160148",
+   "username": "sportsfan14",
+   "points": 63.7,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze alexander",
+    "brandon marsh",
+    "chris bassitt",
+    "coby mayo",
+    "cristopher sanchez",
+    "kyle schwarber",
+    "pete alonso",
+    "samuel basallo",
+    "trea turner",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "218",
+   "entry_id": "5157533230",
+   "username": "littlebrassones",
+   "points": 62.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Cristopher Sanchez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "blaze alexander",
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "cristopher sanchez",
+    "gunnar henderson",
+    "jackson holliday",
+    "samuel basallo",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "219",
+   "entry_id": "5156799736",
+   "username": "KennyLions",
+   "points": 60.85,
+   "salary_used": 43000,
+   "salary_left": 7000,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 16.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "chris bassitt",
+    "coby mayo",
+    "fernando tatis",
+    "gavin sheets",
+    "nick castellanos",
+    "pete alonso",
+    "taylor ward",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "220",
+   "entry_id": "5157513798",
+   "username": "troubledsoe",
+   "points": 59.050003,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 24.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "adolis garcia",
+    "bryce harper",
+    "chris bassitt",
+    "fernando tatis",
+    "justin crawford",
+    "kyle schwarber",
+    "miguel andujar",
+    "payton tolle",
+    "rodolfo duran",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "221",
+   "entry_id": "5156895019",
+   "username": "Stree",
+   "points": 57.050003,
+   "salary_used": 46200,
+   "salary_left": 3800,
+   "sp_pair": [
+    "Chris Bassitt",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.28,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "chris bassitt",
+    "fernando tatis",
+    "jase bowen",
+    "kyle schwarber",
+    "manny machado",
+    "payton tolle",
+    "rodolfo duran",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Cristopher Sanchez",
+   "player_norm": "cristopher sanchez",
+   "roster_position": "P",
+   "pct_drafted": 86.61,
+   "fpts": 30.75
+  },
+  {
+   "player": "Payton Tolle",
+   "player_norm": "payton tolle",
+   "roster_position": "P",
+   "pct_drafted": 68.75,
+   "fpts": 22.1
+  },
+  {
+   "player": "Kyle Schwarber",
+   "player_norm": "kyle schwarber",
+   "roster_position": "OF",
+   "pct_drafted": 52.23,
+   "fpts": 16.0
+  },
+  {
+   "player": "Trea Turner",
+   "player_norm": "trea turner",
+   "roster_position": "SS",
+   "pct_drafted": 52.23,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 48.66,
+   "fpts": 5.0
+  },
+  {
+   "player": "Mickey Gasper",
+   "player_norm": "mickey gasper",
+   "roster_position": "C",
+   "pct_drafted": 45.98,
+   "fpts": 16.0
+  },
+  {
+   "player": "Bryce Harper",
+   "player_norm": "bryce harper",
+   "roster_position": "1B",
+   "pct_drafted": 43.75,
+   "fpts": 2.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 38.39,
+   "fpts": 21.0
+  },
+  {
+   "player": "Bryson Stott",
+   "player_norm": "bryson stott",
+   "roster_position": "2B",
+   "pct_drafted": 37.95,
+   "fpts": 7.0
+  },
+  {
+   "player": "Brandon Marsh",
+   "player_norm": "brandon marsh",
+   "roster_position": "OF",
+   "pct_drafted": 36.61,
+   "fpts": 6.0
+  },
+  {
+   "player": "Alec Bohm",
+   "player_norm": "alec bohm",
+   "roster_position": "3B",
+   "pct_drafted": 35.27,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 26.79,
+   "fpts": 13.0
+  },
+  {
+   "player": "Chris Bassitt",
+   "player_norm": "chris bassitt",
+   "roster_position": "P",
+   "pct_drafted": 25.89,
+   "fpts": -2.05
+  },
+  {
+   "player": "Masataka Yoshida",
+   "player_norm": "masataka yoshida",
+   "roster_position": "OF",
+   "pct_drafted": 23.21,
+   "fpts": 9.0
+  },
+  {
+   "player": "Coby Mayo",
+   "player_norm": "coby mayo",
+   "roster_position": "3B",
+   "pct_drafted": 22.32,
+   "fpts": 3.0
+  },
+  {
+   "player": "Taylor Ward",
+   "player_norm": "taylor ward",
+   "roster_position": "OF",
+   "pct_drafted": 21.43,
+   "fpts": 13.0
+  },
+  {
+   "player": "Pete Alonso",
+   "player_norm": "pete alonso",
+   "roster_position": "1B",
+   "pct_drafted": 20.98,
+   "fpts": 3.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 20.09,
+   "fpts": 19.0
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "1B",
+   "pct_drafted": 19.2,
+   "fpts": 17.0
+  },
+  {
+   "player": "Adley Rutschman",
+   "player_norm": "adley rutschman",
+   "roster_position": "C",
+   "pct_drafted": 17.41,
+   "fpts": 13.0
+  },
+  {
+   "player": "Walker Buehler",
+   "player_norm": "walker buehler",
+   "roster_position": "P",
+   "pct_drafted": 16.07,
+   "fpts": 19.9
+  },
+  {
+   "player": "J.T. Realmuto",
+   "player_norm": "j t realmuto",
+   "roster_position": "C",
+   "pct_drafted": 16.07,
+   "fpts": 14.0
+  },
+  {
+   "player": "Fernando Tatis Jr.",
+   "player_norm": "fernando tatis",
+   "roster_position": "2B",
+   "pct_drafted": 15.63,
+   "fpts": 5.0
+  },
+  {
+   "player": "Gunnar Henderson",
+   "player_norm": "gunnar henderson",
+   "roster_position": "SS",
+   "pct_drafted": 13.84,
+   "fpts": 5.0
+  },
+  {
+   "player": "Manny Machado",
+   "player_norm": "manny machado",
+   "roster_position": "3B",
+   "pct_drafted": 13.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Isiah Kiner-Falefa",
+   "player_norm": "isiah kiner falefa",
+   "roster_position": "2B",
+   "pct_drafted": 13.39,
+   "fpts": 9.0
+  },
+  {
+   "player": "Marcelo Mayer",
+   "player_norm": "marcelo mayer",
+   "roster_position": "2B",
+   "pct_drafted": 12.95,
+   "fpts": 3.0
+  },
+  {
+   "player": "Xander Bogaerts",
+   "player_norm": "xander bogaerts",
+   "roster_position": "SS",
+   "pct_drafted": 12.05,
+   "fpts": 4.0
+  },
+  {
+   "player": "Isiah Kiner-Falefa",
+   "player_norm": "isiah kiner falefa",
+   "roster_position": "SS",
+   "pct_drafted": 12.05,
+   "fpts": 9.0
+  },
+  {
+   "player": "Samuel Basallo",
+   "player_norm": "samuel basallo",
+   "roster_position": "C",
+   "pct_drafted": 12.05,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jackson Holliday",
+   "player_norm": "jackson holliday",
+   "roster_position": "2B",
+   "pct_drafted": 11.61,
+   "fpts": 3.0
+  },
+  {
+   "player": "Justin Crawford",
+   "player_norm": "justin crawford",
+   "roster_position": "OF",
+   "pct_drafted": 11.61,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jase Bowen",
+   "player_norm": "jase bowen",
+   "roster_position": "OF",
+   "pct_drafted": 8.48,
+   "fpts": 0.0
+  },
+  {
+   "player": "Gavin Sheets",
+   "player_norm": "gavin sheets",
+   "roster_position": "1B",
+   "pct_drafted": 8.48,
+   "fpts": 2.0
+  },
+  {
+   "player": "Marcelo Mayer",
+   "player_norm": "marcelo mayer",
+   "roster_position": "SS",
+   "pct_drafted": 8.48,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jackson Merrill",
+   "player_norm": "jackson merrill",
+   "roster_position": "OF",
+   "pct_drafted": 7.59,
+   "fpts": 5.0
+  },
+  {
+   "player": "Adolis Garcia",
+   "player_norm": "adolis garcia",
+   "roster_position": "OF",
+   "pct_drafted": 7.14,
+   "fpts": 7.0
+  },
+  {
+   "player": "Blaze Alexander",
+   "player_norm": "blaze alexander",
+   "roster_position": "2B",
+   "pct_drafted": 7.14,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Andujar",
+   "player_norm": "miguel andujar",
+   "roster_position": "3B",
+   "pct_drafted": 6.25,
+   "fpts": 3.0
+  },
+  {
+   "player": "Tyler O'Neill",
+   "player_norm": "tyler oneill",
+   "roster_position": "OF",
+   "pct_drafted": 6.25,
+   "fpts": 2.0
+  },
+  {
+   "player": "Rodolfo Duran",
+   "player_norm": "rodolfo duran",
+   "roster_position": "C",
+   "pct_drafted": 5.8,
+   "fpts": 2.0
+  },
+  {
+   "player": "Gavin Sheets",
+   "player_norm": "gavin sheets",
+   "roster_position": "OF",
+   "pct_drafted": 3.57,
+   "fpts": 2.0
+  },
+  {
+   "player": "Ty France",
+   "player_norm": "ty france",
+   "roster_position": "1B",
+   "pct_drafted": 3.13,
+   "fpts": 10.0
+  },
+  {
+   "player": "Mickey Gasper",
+   "player_norm": "mickey gasper",
+   "roster_position": "1B",
+   "pct_drafted": 3.13,
+   "fpts": 16.0
+  },
+  {
+   "player": "Blaze Alexander",
+   "player_norm": "blaze alexander",
+   "roster_position": "OF",
+   "pct_drafted": 2.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Garrett Stubbs",
+   "player_norm": "garrett stubbs",
+   "roster_position": "C",
+   "pct_drafted": 0.89,
+   "fpts": 0.0
+  },
+  {
+   "player": "Leody Taveras",
+   "player_norm": "leody taveras",
+   "roster_position": "OF",
+   "pct_drafted": 0.89,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Castellanos",
+   "player_norm": "nick castellanos",
+   "roster_position": "OF",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Anthony Seigler",
+   "player_norm": "anthony seigler",
+   "roster_position": "3B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Edmundo Sosa",
+   "player_norm": "edmundo sosa",
+   "roster_position": "3B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Weston Wilson",
+   "player_norm": "weston wilson",
+   "roster_position": "3B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 224,
+  "best_rank": 45,
+  "worst_rank": 210,
+  "best_finish_percentile": 80.36,
+  "median_finish_percentile": 19.64,
+  "best_points": 130.65,
+  "winning_points": 154.85,
+  "own_lineups_duplicated_by_field": 2,
+  "max_copies_of_an_own_lineup": 3,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

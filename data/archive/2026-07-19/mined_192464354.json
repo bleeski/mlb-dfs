@@ -1,0 +1,7019 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192464354",
+ "slate_date": "2026-07-19",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 223,
+  "entries_complete_lineups": 220,
+  "roster_size": 10,
+  "entries_unparsed": 3,
+  "winning_points": 134.55,
+  "winning_entry_id": "5193427738",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 207,
+  "entries_in_duplicated_lineups": 21,
+  "share_duplicated_pct": 9.5,
+  "max_copies": 7,
+  "copies_histogram": {
+   "1": 199,
+   "2": 7,
+   "7": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2300,
+  "at_cap_entries": 91,
+  "at_cap_share_pct": 41.4,
+  "salary_left_histogram": {
+   "1-100": 36,
+   "<= 0": 55,
+   "701-1500": 25,
+   "301-700": 43,
+   "101-300": 54,
+   "> 1500": 7
+  },
+  "max_stack_histogram": {
+   "2": 2,
+   "3": 56,
+   "4": 57,
+   "5": 105
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Yoshinobu Yamamoto"
+    ],
+    "count": 54,
+    "field_share_pct": 24.5
+   },
+   {
+    "pair": [
+     "Sean Burke",
+     "Yoshinobu Yamamoto"
+    ],
+    "count": 51,
+    "field_share_pct": 23.2
+   },
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Sean Burke"
+    ],
+    "count": 42,
+    "field_share_pct": 19.1
+   },
+   {
+    "pair": [
+     "Trey Yesavage",
+     "Yoshinobu Yamamoto"
+    ],
+    "count": 30,
+    "field_share_pct": 13.6
+   },
+   {
+    "pair": [
+     "Sean Burke",
+     "Trey Yesavage"
+    ],
+    "count": 24,
+    "field_share_pct": 10.9
+   },
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Trey Yesavage"
+    ],
+    "count": 19,
+    "field_share_pct": 8.6
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Yoshinobu Yamamoto",
+    "pct_drafted": 60.54
+   },
+   {
+    "player": "Ernie Clement",
+    "pct_drafted": 57.4
+   },
+   {
+    "player": "Sean Burke",
+    "pct_drafted": 52.47
+   },
+   {
+    "player": "Cam Schlittler",
+    "pct_drafted": 51.57
+   },
+   {
+    "player": "Sam Antonacci",
+    "pct_drafted": 43.05
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0135,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 2200,
+  "roster_slots_expected": 2200,
+  "recomputed_total_pct": 986.5,
+  "dk_table_total_pct": 986.6,
+  "dk_table_deficit_pts": -0.1,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5193427738",
+   "username": "Mrboozer",
+   "points": 134.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5193734839",
+   "username": "beepbeep2",
+   "points": 133.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "colson montgomery",
+    "drew romo",
+    "mookie betts",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5193184020",
+   "username": "aarond23",
+   "points": 129.55,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.87,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "colson montgomery",
+    "drew romo",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5193571729",
+   "username": "bleeski",
+   "points": 129.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "colson montgomery",
+    "dalton rushing",
+    "miguel vargas",
+    "mookie betts",
+    "sean burke",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5193609898",
+   "username": "gocal1224",
+   "points": 129.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.39,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andrew benintendi",
+    "braden montgomery",
+    "colson montgomery",
+    "max muncy",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5193398577",
+   "username": "tcardaro7644",
+   "points": 126.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 30.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "cody bellinger",
+    "colson montgomery",
+    "dalton rushing",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5193471451",
+   "username": "JamesBlond057",
+   "points": 126.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ben rice",
+    "braden montgomery",
+    "brandon valenzuela",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5193465858",
+   "username": "whoisjohngalt420",
+   "points": 125.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "dalton rushing",
+    "miguel vargas",
+    "munetaka murakami",
+    "nathan lukes",
+    "sean burke",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5193305439",
+   "username": "TheBabz",
+   "points": 123.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "miguel vargas",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5193780944",
+   "username": "dperry6969",
+   "points": 120.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "brandon valenzuela",
+    "colson montgomery",
+    "ernie clement",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5193761247",
+   "username": "gary3791",
+   "points": 119.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "colson montgomery",
+    "dalton rushing",
+    "ernie clement",
+    "freddie freeman",
+    "miguel vargas",
+    "sean burke",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5193755743",
+   "username": "Nick628",
+   "points": 117.5,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.57,
+   "n_cheap": 1,
+   "players_norm": [
+    "anthony volpe",
+    "dalton rushing",
+    "daulton varsho",
+    "freddie freeman",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5193663902",
+   "username": "Elwaysarmy",
+   "points": 116.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.53,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "drew romo",
+    "kyle tucker",
+    "mookie betts",
+    "randal grichuk",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5193741489",
+   "username": "Reboundboy",
+   "points": 116.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "jonatan clase",
+    "miguel vargas",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5193734838",
+   "username": "beepbeep2",
+   "points": 114.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "dalton rushing",
+    "daulton varsho",
+    "max muncy",
+    "sean keys",
+    "teoscar hernandez",
+    "tommy edman",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5193397364",
+   "username": "tbjones2121",
+   "points": 114.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "max muncy",
+    "munetaka murakami",
+    "nathan lukes",
+    "sam antonacci",
+    "sean burke",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5193760092",
+   "username": "peterjpacheco",
+   "points": 114.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "dalton rushing",
+    "jonatan clase",
+    "miguel vargas",
+    "mookie betts",
+    "munetaka murakami",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5193397360",
+   "username": "tbjones2121",
+   "points": 113.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "kyle tucker",
+    "max muncy",
+    "sam antonacci",
+    "sean burke",
+    "sean keys",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5193681499",
+   "username": "bmoney615",
+   "points": 113.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 33.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "brandon valenzuela",
+    "colson montgomery",
+    "munetaka murakami",
+    "nathan lukes",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5193736891",
+   "username": "loganmcthunder",
+   "points": 112.649994,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "max muncy",
+    "nathan lukes",
+    "sean keys",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5193455467",
+   "username": "tampayardie",
+   "points": 112.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "jasson dominguez",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5193471450",
+   "username": "JamesBlond057",
+   "points": 112.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "braden montgomery",
+    "brandon valenzuela",
+    "colson montgomery",
+    "jazz chisholm",
+    "jonatan clase",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5193397365",
+   "username": "tbjones2121",
+   "points": 111.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "dalton rushing",
+    "freddie freeman",
+    "kyle tucker",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5193749376",
+   "username": "JamesBlond057",
+   "points": 111.55,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "colson montgomery",
+    "ernie clement",
+    "kazuma okamoto",
+    "nathan lukes",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "25",
+   "entry_id": "5193734841",
+   "username": "beepbeep2",
+   "points": 111.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.94,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "kyle tucker",
+    "max muncy",
+    "max schuemann",
+    "sean burke",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5193272916",
+   "username": "AddyLovesYou",
+   "points": 110.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 33.32,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "ernie clement",
+    "j c escarra",
+    "kyle tucker",
+    "max muncy",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5193480896",
+   "username": "BCoopSTL",
+   "points": 110.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 29.82,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "colson montgomery",
+    "jazz chisholm",
+    "miguel vargas",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5193771102",
+   "username": "xXxPLOSIVE",
+   "points": 110.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 39.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5193768943",
+   "username": "tchu125",
+   "points": 109.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "colson montgomery",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "max schuemann",
+    "mookie betts",
+    "munetaka murakami",
+    "sean burke",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5193392130",
+   "username": "minrobertson210",
+   "points": 108.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "colson montgomery",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "nathan lukes",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5193471449",
+   "username": "JamesBlond057",
+   "points": 108.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "brandon valenzuela",
+    "colson montgomery",
+    "ernie clement",
+    "jasson dominguez",
+    "nathan lukes",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5193694192",
+   "username": "Tuckersteam36",
+   "points": 108.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "colson montgomery",
+    "jonatan clase",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5193771098",
+   "username": "xXxPLOSIVE",
+   "points": 108.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "nathan lukes",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "34",
+   "entry_id": "5193397363",
+   "username": "tbjones2121",
+   "points": 107.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.66,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andrew benintendi",
+    "miguel vargas",
+    "mookie betts",
+    "munetaka murakami",
+    "sean burke",
+    "teoscar hernandez",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5193536378",
+   "username": "troubledsoe",
+   "points": 106.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "colson montgomery",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5193771101",
+   "username": "xXxPLOSIVE",
+   "points": 106.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 35.25,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "ernie clement",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5193480895",
+   "username": "BCoopSTL",
+   "points": 105.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "dalton rushing",
+    "ernie clement",
+    "jasson dominguez",
+    "jazz chisholm",
+    "miguel vargas",
+    "sean burke",
+    "shohei ohtani",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "38",
+   "entry_id": "5193751472",
+   "username": "DetrickThompson",
+   "points": 105.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 21.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "ben rice",
+    "dalton rushing",
+    "jasson dominguez",
+    "max muncy",
+    "max schuemann",
+    "sean burke",
+    "teoscar hernandez",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5193671106",
+   "username": "beisbol7",
+   "points": 103.649994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 28.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "dalton rushing",
+    "ernie clement",
+    "freddie freeman",
+    "kazuma okamoto",
+    "nathan lukes",
+    "randal grichuk",
+    "trent grisham",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5193781664",
+   "username": "UltimateWin4",
+   "points": 103.649994,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "sean keys",
+    "shohei ohtani",
+    "tommy edman",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5193397996",
+   "username": "tcardaro7644",
+   "points": 101.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "freddie freeman",
+    "jazz chisholm",
+    "jonatan clase",
+    "ryan mcmahon",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "42",
+   "entry_id": "5193580646",
+   "username": "7Daniel3",
+   "points": 101.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "43",
+   "entry_id": "5193769218",
+   "username": "mne836",
+   "points": 101.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "colson montgomery",
+    "ernie clement",
+    "jonatan clase",
+    "miguel vargas",
+    "munetaka murakami",
+    "sean burke",
+    "shohei ohtani",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "44",
+   "entry_id": "5193663901",
+   "username": "Elwaysarmy",
+   "points": 101.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 24.08,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "andy pages",
+    "jazz chisholm",
+    "kyle tucker",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5193471454",
+   "username": "JamesBlond057",
+   "points": 100.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 34.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "anthony volpe",
+    "ben rice",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jasson dominguez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "46",
+   "entry_id": "5193636490",
+   "username": "137666",
+   "points": 100.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "nathan lukes",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5193480894",
+   "username": "BCoopSTL",
+   "points": 100.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.4,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "braden montgomery",
+    "ernie clement",
+    "kyle tucker",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5193480898",
+   "username": "BCoopSTL",
+   "points": 100.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "braden montgomery",
+    "dalton rushing",
+    "jazz chisholm",
+    "miguel vargas",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "49",
+   "entry_id": "5193465862",
+   "username": "whoisjohngalt420",
+   "points": 100.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.29,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "freddie freeman",
+    "jasson dominguez",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "49",
+   "entry_id": "5193539273",
+   "username": "Dave2zone",
+   "points": 100.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "ben rice",
+    "brandon valenzuela",
+    "cody bellinger",
+    "colson montgomery",
+    "jazz chisholm",
+    "jonatan clase",
+    "max muncy",
+    "sean burke",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "51",
+   "entry_id": "5193388396",
+   "username": "tcardaro7644",
+   "points": 99.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "daulton varsho",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "tommy edman",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "52",
+   "entry_id": "5193634871",
+   "username": "bigstick17",
+   "points": 99.649994,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "colson montgomery",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5193351797",
+   "username": "Pebbs44",
+   "points": 99.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 29.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "brandon valenzuela",
+    "daulton varsho",
+    "george springer",
+    "max muncy",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5193388481",
+   "username": "tcardaro7644",
+   "points": 99.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "colson montgomery",
+    "jazz chisholm",
+    "jonatan clase",
+    "max muncy",
+    "max schuemann",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5193479987",
+   "username": "MarcoRacin",
+   "points": 99.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "alejandro kirk",
+    "ben rice",
+    "chase meidroth",
+    "ernie clement",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "56",
+   "entry_id": "5193556078",
+   "username": "allpoints03",
+   "points": 99.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 29.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "ben rice",
+    "brandon valenzuela",
+    "cody bellinger",
+    "colson montgomery",
+    "ernie clement",
+    "kyle tucker",
+    "sean burke",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "56",
+   "entry_id": "5193719631",
+   "username": "envymygrind",
+   "points": 99.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 25.07,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andy pages",
+    "ernie clement",
+    "freddie freeman",
+    "jazz chisholm",
+    "kyle tucker",
+    "max muncy",
+    "nathan lukes",
+    "sean burke",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "56",
+   "entry_id": "5193724292",
+   "username": "luckymark62",
+   "points": 99.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 26.06,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "anthony volpe",
+    "ben rice",
+    "brandon valenzuela",
+    "jasson dominguez",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "59",
+   "entry_id": "5193781667",
+   "username": "UltimateWin4",
+   "points": 98.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "dalton rushing",
+    "daulton varsho",
+    "jonatan clase",
+    "kazuma okamoto",
+    "nathan lukes",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "60",
+   "entry_id": "5193734840",
+   "username": "beepbeep2",
+   "points": 98.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "daulton varsho",
+    "jonatan clase",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "tommy edman",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "61",
+   "entry_id": "5193390690",
+   "username": "jpeyton1219",
+   "points": 98.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 33.28,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon valenzuela",
+    "cody bellinger",
+    "ernie clement",
+    "jasson dominguez",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "61",
+   "entry_id": "5193429568",
+   "username": "lions937",
+   "points": 98.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.09,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "ernie clement",
+    "freddie freeman",
+    "randal grichuk",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "61",
+   "entry_id": "5193490588",
+   "username": "drshaka17",
+   "points": 98.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 30.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "jonatan clase",
+    "kyle tucker",
+    "max muncy",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5193471453",
+   "username": "JamesBlond057",
+   "points": 97.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "jazz chisholm",
+    "nathan lukes",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "65",
+   "entry_id": "5193184016",
+   "username": "aarond23",
+   "points": 97.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.83,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "cam schlittler",
+    "jasson dominguez",
+    "jazz chisholm",
+    "max muncy",
+    "randal grichuk",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "66",
+   "entry_id": "5193480900",
+   "username": "BCoopSTL",
+   "points": 97.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andres gimenez",
+    "andrew benintendi",
+    "jazz chisholm",
+    "kyle tucker",
+    "miguel vargas",
+    "munetaka murakami",
+    "sean burke",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "66",
+   "entry_id": "5193681374",
+   "username": "GPStakes",
+   "points": 97.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "daulton varsho",
+    "drew romo",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "mookie betts",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5193383316",
+   "username": "mythicalrhymer01",
+   "points": 97.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.54,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "dalton rushing",
+    "ernie clement",
+    "jasson dominguez",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5193690238",
+   "username": "hawkins3250",
+   "points": 97.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "cody bellinger",
+    "colson montgomery",
+    "dalton rushing",
+    "ernie clement",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "sean burke",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "70",
+   "entry_id": "5193663897",
+   "username": "Elwaysarmy",
+   "points": 96.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.01,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andres gimenez",
+    "daulton varsho",
+    "ernie clement",
+    "freddie freeman",
+    "jonatan clase",
+    "max muncy",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "71",
+   "entry_id": "5193565878",
+   "username": "troubledsoe",
+   "points": 95.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "ernie clement",
+    "kazuma okamoto",
+    "miguel vargas",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "71",
+   "entry_id": "5193781668",
+   "username": "UltimateWin4",
+   "points": 95.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "kyle tucker",
+    "max muncy",
+    "nathan lukes",
+    "sean keys",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "73",
+   "entry_id": "5193383312",
+   "username": "mythicalrhymer01",
+   "points": 95.649994,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "mookie betts",
+    "nathan lukes",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "73",
+   "entry_id": "5193781510",
+   "username": "harshreality18",
+   "points": 95.649994,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "mookie betts",
+    "nathan lukes",
+    "ryan mcmahon",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5193480899",
+   "username": "BCoopSTL",
+   "points": 95.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 30.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "dalton rushing",
+    "freddie freeman",
+    "jasson dominguez",
+    "jazz chisholm",
+    "mookie betts",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "76",
+   "entry_id": "5193571730",
+   "username": "bleeski",
+   "points": 95.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.57,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rice",
+    "dalton rushing",
+    "jasson dominguez",
+    "jazz chisholm",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "76",
+   "entry_id": "5193760095",
+   "username": "peterjpacheco",
+   "points": 95.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.57,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rice",
+    "dalton rushing",
+    "jasson dominguez",
+    "jazz chisholm",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "78",
+   "entry_id": "5193782104",
+   "username": "themitten",
+   "points": 94.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 33.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "cam schlittler",
+    "drew romo",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "tommy edman",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "79",
+   "entry_id": "5193629794",
+   "username": "wormlove3",
+   "points": 94.649994,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "daulton varsho",
+    "ernie clement",
+    "kyle tucker",
+    "max muncy",
+    "sean keys",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "79",
+   "entry_id": "5193629795",
+   "username": "wormlove3",
+   "points": 94.649994,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "jonatan clase",
+    "kazuma okamoto",
+    "mookie betts",
+    "munetaka murakami",
+    "nathan lukes",
+    "teoscar hernandez",
+    "tommy edman",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "81",
+   "entry_id": "5193685545",
+   "username": "waterfowl14",
+   "points": 94.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 38.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "82",
+   "entry_id": "5193645331",
+   "username": "TallCoolOne_32",
+   "points": 94.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.8,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rice",
+    "braden montgomery",
+    "dalton rushing",
+    "jasson dominguez",
+    "jazz chisholm",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "83",
+   "entry_id": "5193392132",
+   "username": "minrobertson210",
+   "points": 93.649994,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "braden montgomery",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "83",
+   "entry_id": "5193760091",
+   "username": "peterjpacheco",
+   "points": 93.649994,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "braden montgomery",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "85",
+   "entry_id": "5193622395",
+   "username": "3WildDogs",
+   "points": 93.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 30.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "colson montgomery",
+    "ernie clement",
+    "freddie freeman",
+    "jasson dominguez",
+    "jonatan clase",
+    "miguel vargas",
+    "sean burke",
+    "shohei ohtani",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "85",
+   "entry_id": "5193715104",
+   "username": "luckymark62",
+   "points": 93.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "colson montgomery",
+    "freddie freeman",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5193565877",
+   "username": "troubledsoe",
+   "points": 92.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andrew benintendi",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "miguel vargas",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "88",
+   "entry_id": "5193712382",
+   "username": "luckymark62",
+   "points": 91.75,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "munetaka murakami",
+    "nathan lukes",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "89",
+   "entry_id": "5193392135",
+   "username": "minrobertson210",
+   "points": 91.649994,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "nathan lukes",
+    "sam antonacci",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5193565880",
+   "username": "troubledsoe",
+   "points": 90.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "miguel vargas",
+    "nathan lukes",
+    "randal grichuk",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5193565881",
+   "username": "troubledsoe",
+   "points": 90.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "miguel vargas",
+    "nathan lukes",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "92",
+   "entry_id": "5193722182",
+   "username": "luckymark62",
+   "points": 90.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "braden montgomery",
+    "cam schlittler",
+    "dalton rushing",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "92",
+   "entry_id": "5193763090",
+   "username": "greensae10",
+   "points": 90.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.12,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rice",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kyle tucker",
+    "ryan mcmahon",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "92",
+   "entry_id": "5193771099",
+   "username": "xXxPLOSIVE",
+   "points": 90.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 36.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "95",
+   "entry_id": "5193571727",
+   "username": "bleeski",
+   "points": 90.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "mookie betts",
+    "sean keys",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "96",
+   "entry_id": "5193565876",
+   "username": "troubledsoe",
+   "points": 90.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "dalton rushing",
+    "ernie clement",
+    "miguel vargas",
+    "mookie betts",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "96",
+   "entry_id": "5193591458",
+   "username": "2gethe2one221",
+   "points": 90.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 33.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cody bellinger",
+    "dalton rushing",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "98",
+   "entry_id": "5193493198",
+   "username": "vixinalia",
+   "points": 90.5,
+   "salary_used": 43300,
+   "salary_left": 6700,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 24.71,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "colson montgomery",
+    "ernie clement",
+    "miguel rojas",
+    "miguel vargas",
+    "myles straw",
+    "sean burke",
+    "spencer jones",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5193763091",
+   "username": "dartshub",
+   "points": 89.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 33.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "jazz chisholm",
+    "jonatan clase",
+    "kazuma okamoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5193781663",
+   "username": "UltimateWin4",
+   "points": 89.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "jonatan clase",
+    "max muncy",
+    "nathan lukes",
+    "teoscar hernandez",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5193781665",
+   "username": "UltimateWin4",
+   "points": 89.9,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "jonatan clase",
+    "max muncy",
+    "nathan lukes",
+    "sean keys",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5193465860",
+   "username": "whoisjohngalt420",
+   "points": 89.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.23,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "cody bellinger",
+    "max schuemann",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "103",
+   "entry_id": "5193354595",
+   "username": "bostonpoker",
+   "points": 88.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 25.34,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "cam schlittler",
+    "ernie clement",
+    "kazuma okamoto",
+    "kyle teel",
+    "kyle tucker",
+    "luis urias",
+    "paul goldschmidt",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "103",
+   "entry_id": "5193474236",
+   "username": "the__moose",
+   "points": 88.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "105",
+   "entry_id": "5193397366",
+   "username": "tbjones2121",
+   "points": 88.75,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 30.09,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rice",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "jazz chisholm",
+    "randal grichuk",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "106",
+   "entry_id": "5193424871",
+   "username": "Goldfisheh",
+   "points": 88.649994,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "andy pages",
+    "colson montgomery",
+    "ernie clement",
+    "george springer",
+    "jonatan clase",
+    "kazuma okamoto",
+    "miguel vargas",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5193608009",
+   "username": "Choker12",
+   "points": 87.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "nathan lukes",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5193609171",
+   "username": "habcommander",
+   "points": 87.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "nathan lukes",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5193743413",
+   "username": "Gsmoney2469",
+   "points": 87.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jonatan clase",
+    "miguel vargas",
+    "sam antonacci",
+    "sean keys",
+    "trent grisham",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5193755742",
+   "username": "Nick628",
+   "points": 87.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "111",
+   "entry_id": "5193562164",
+   "username": "bleeski",
+   "points": 87.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 27.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andrew benintendi",
+    "ben rice",
+    "cam schlittler",
+    "colson montgomery",
+    "jasson dominguez",
+    "jazz chisholm",
+    "miguel vargas",
+    "randal grichuk",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "111",
+   "entry_id": "5193640681",
+   "username": "samir.ist",
+   "points": 87.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.97,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "cam schlittler",
+    "colson montgomery",
+    "jasson dominguez",
+    "jazz chisholm",
+    "miguel vargas",
+    "sean burke",
+    "trent grisham",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "113",
+   "entry_id": "5193646695",
+   "username": "TallCoolOne_32",
+   "points": 87.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cody bellinger",
+    "dalton rushing",
+    "ernie clement",
+    "kazuma okamoto",
+    "mookie betts",
+    "nathan lukes",
+    "sean keys",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "114",
+   "entry_id": "5193222766",
+   "username": "maverick8505",
+   "points": 87.5,
+   "salary_used": 44800,
+   "salary_left": 5200,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 15.92,
+   "n_cheap": 3,
+   "players_norm": [
+    "andy pages",
+    "dalton rushing",
+    "giancarlo stanton",
+    "jesus sanchez",
+    "juan yepez",
+    "mookie betts",
+    "oswaldo cabrera",
+    "sean burke",
+    "tommy edman",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5193426524",
+   "username": "jgorms3322",
+   "points": 85.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "kazuma okamoto",
+    "nathan lukes",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5193760093",
+   "username": "peterjpacheco",
+   "points": 85.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 32.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "jasson dominguez",
+    "jonatan clase",
+    "ryan mcmahon",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "117",
+   "entry_id": "5193383313",
+   "username": "mythicalrhymer01",
+   "points": 85.75,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.39,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rice",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "jasson dominguez",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "117",
+   "entry_id": "5193724932",
+   "username": "harvick2010",
+   "points": 85.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 35.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "jasson dominguez",
+    "miguel vargas",
+    "munetaka murakami",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "117",
+   "entry_id": "5193771103",
+   "username": "xXxPLOSIVE",
+   "points": 85.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 36.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "120",
+   "entry_id": "5193392134",
+   "username": "minrobertson210",
+   "points": 85.649994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage",
+    "tristan peters",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "120",
+   "entry_id": "5193752996",
+   "username": "ed8802",
+   "points": 85.649994,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "122",
+   "entry_id": "5193689838",
+   "username": "jdwize",
+   "points": 85.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 34.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andres gimenez",
+    "ernie clement",
+    "miguel vargas",
+    "randal grichuk",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5193746570",
+   "username": "lkennebrew_STL",
+   "points": 84.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "max schuemann",
+    "randal grichuk",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5193781666",
+   "username": "UltimateWin4",
+   "points": 84.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "freddie freeman",
+    "jonatan clase",
+    "kazuma okamoto",
+    "nathan lukes",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5193781669",
+   "username": "UltimateWin4",
+   "points": 84.9,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jonatan clase",
+    "max muncy",
+    "sean keys",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5193651880",
+   "username": "TallCoolOne_32",
+   "points": 84.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "jazz chisholm",
+    "max schuemann",
+    "miguel vargas",
+    "munetaka murakami",
+    "sean burke",
+    "trent grisham",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5193724930",
+   "username": "harvick2010",
+   "points": 84.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 30.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andrew benintendi",
+    "ben rice",
+    "brandon valenzuela",
+    "cam schlittler",
+    "miguel vargas",
+    "nathan lukes",
+    "sam antonacci",
+    "sean burke",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5193764084",
+   "username": "samir.ist",
+   "points": 84.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "drew romo",
+    "jasson dominguez",
+    "jazz chisholm",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5193776627",
+   "username": "edwardharper",
+   "points": 84.75,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "drew romo",
+    "jasson dominguez",
+    "jazz chisholm",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5193782186",
+   "username": "rstash24",
+   "points": 84.75,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 30.41,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andrew benintendi",
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "jazz chisholm",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "131",
+   "entry_id": "5193452645",
+   "username": "KDonehunnid",
+   "points": 84.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 23.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rice",
+    "chase meidroth",
+    "cody bellinger",
+    "colson montgomery",
+    "ernie clement",
+    "kyle teel",
+    "sean burke",
+    "tanner murray",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "132",
+   "entry_id": "5193388494",
+   "username": "tcardaro7644",
+   "points": 83.75,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "ben rice",
+    "cam schlittler",
+    "dalton rushing",
+    "jonatan clase",
+    "max schuemann",
+    "miguel vargas",
+    "randal grichuk",
+    "sean burke",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "132",
+   "entry_id": "5193480897",
+   "username": "BCoopSTL",
+   "points": 83.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 31.88,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "cam schlittler",
+    "dalton rushing",
+    "jasson dominguez",
+    "jazz chisholm",
+    "mookie betts",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "132",
+   "entry_id": "5193636491",
+   "username": "137666",
+   "points": 83.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 28.97,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andrew benintendi",
+    "anthony volpe",
+    "cam schlittler",
+    "jazz chisholm",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5193747767",
+   "username": "EALLEN215",
+   "points": 83.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "ernie clement",
+    "kazuma okamoto",
+    "max schuemann",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5193748305",
+   "username": "Aubsas",
+   "points": 83.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "brandon valenzuela",
+    "cody bellinger",
+    "ernie clement",
+    "max muncy",
+    "max schuemann",
+    "nathan lukes",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "137",
+   "entry_id": "5193184019",
+   "username": "aarond23",
+   "points": 83.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.02,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kyle tucker",
+    "mookie betts",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193170773",
+   "username": "jstiever",
+   "points": 82.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "chase meidroth",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "ernie clement",
+    "munetaka murakami",
+    "nathan lukes",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193328930",
+   "username": "Dicskstone32",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193567825",
+   "username": "exit154",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193618442",
+   "username": "howardwi",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193629792",
+   "username": "wormlove3",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193678415",
+   "username": "hacker33",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193724929",
+   "username": "harvick2010",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5193771097",
+   "username": "xXxPLOSIVE",
+   "points": 82.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "146",
+   "entry_id": "5193611319",
+   "username": "bowersjl1",
+   "points": 82.850006,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "jazz chisholm",
+    "trent grisham",
+    "trey yesavage",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "147",
+   "entry_id": "5193483556",
+   "username": "stevmortc",
+   "points": 82.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "ernie clement",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "147",
+   "entry_id": "5193522112",
+   "username": "2gethe2one221",
+   "points": 82.55,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "cody bellinger",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "149",
+   "entry_id": "5193478106",
+   "username": "Jdtracker",
+   "points": 81.9,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "drew romo",
+    "ernie clement",
+    "ryan mcmahon",
+    "sam antonacci",
+    "teoscar hernandez",
+    "tommy edman",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "149",
+   "entry_id": "5193571731",
+   "username": "bleeski",
+   "points": 81.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "149",
+   "entry_id": "5193745103",
+   "username": "flintmonster",
+   "points": 81.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5193465859",
+   "username": "whoisjohngalt420",
+   "points": 81.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.02,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "jazz chisholm",
+    "max schuemann",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5193734844",
+   "username": "beepbeep2",
+   "points": 81.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.79,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andrew benintendi",
+    "cam schlittler",
+    "colson montgomery",
+    "jasson dominguez",
+    "jazz chisholm",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5193758566",
+   "username": "samir.ist",
+   "points": 81.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.02,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "colson montgomery",
+    "jazz chisholm",
+    "max schuemann",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5193388405",
+   "username": "tcardaro7644",
+   "points": 81.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 26.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "anthony volpe",
+    "ben rice",
+    "brandon valenzuela",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "max schuemann",
+    "trey yesavage",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5193392136",
+   "username": "minrobertson210",
+   "points": 81.649994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "mookie betts",
+    "nathan lukes",
+    "sam antonacci",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "155",
+   "entry_id": "5193781508",
+   "username": "harshreality18",
+   "points": 81.649994,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "mookie betts",
+    "sam antonacci",
+    "sean keys",
+    "shohei ohtani",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "158",
+   "entry_id": "5193558449",
+   "username": "Coubs23",
+   "points": 80.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 36.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "brandon valenzuela",
+    "cam schlittler",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "tommy edman",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "158",
+   "entry_id": "5193656134",
+   "username": "david197576",
+   "points": 80.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "kazuma okamoto",
+    "nathan lukes",
+    "randal grichuk",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "158",
+   "entry_id": "5193730808",
+   "username": "luckymark62",
+   "points": 80.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.85,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "andres gimenez",
+    "andy pages",
+    "cam schlittler",
+    "ernie clement",
+    "randal grichuk",
+    "ryan mcmahon",
+    "shohei ohtani",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "161",
+   "entry_id": "5193397362",
+   "username": "tbjones2121",
+   "points": 80.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "braden montgomery",
+    "cam schlittler",
+    "drew romo",
+    "jazz chisholm",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "161",
+   "entry_id": "5193571728",
+   "username": "bleeski",
+   "points": 80.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "braden montgomery",
+    "cam schlittler",
+    "drew romo",
+    "jazz chisholm",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "161",
+   "entry_id": "5193714226",
+   "username": "Howie1960",
+   "points": 80.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 37.8,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "164",
+   "entry_id": "5193392131",
+   "username": "minrobertson210",
+   "points": 80.649994,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "165",
+   "entry_id": "5193734842",
+   "username": "beepbeep2",
+   "points": 79.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "ernie clement",
+    "miguel vargas",
+    "randal grichuk",
+    "tristan peters",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "166",
+   "entry_id": "5193724931",
+   "username": "harvick2010",
+   "points": 79.850006,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "cam schlittler",
+    "colson montgomery",
+    "dalton rushing",
+    "jazz chisholm",
+    "jonatan clase",
+    "munetaka murakami",
+    "ryan mcmahon",
+    "trey yesavage",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "167",
+   "entry_id": "5193663896",
+   "username": "Elwaysarmy",
+   "points": 79.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.71,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "andy pages",
+    "anthony volpe",
+    "cam schlittler",
+    "jasson dominguez",
+    "jazz chisholm",
+    "munetaka murakami",
+    "ryan mcmahon",
+    "sean burke",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "167",
+   "entry_id": "5193768471",
+   "username": "calnuss",
+   "points": 79.75,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 34.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jasson dominguez",
+    "max schuemann",
+    "miguel vargas",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "169",
+   "entry_id": "5193718004",
+   "username": "luckymark62",
+   "points": 79.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "ernie clement",
+    "jonatan clase",
+    "kyle tucker",
+    "max muncy",
+    "miguel vargas",
+    "sam antonacci",
+    "trey yesavage",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "170",
+   "entry_id": "5193540990",
+   "username": "Dave2zone",
+   "points": 79.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "ben rice",
+    "brandon valenzuela",
+    "cody bellinger",
+    "ernie clement",
+    "max muncy",
+    "sean burke",
+    "trey yesavage",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "171",
+   "entry_id": "5193562081",
+   "username": "mpkane65",
+   "points": 78.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 23.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "anthony volpe",
+    "cam schlittler",
+    "chase meidroth",
+    "kazuma okamoto",
+    "kyle teel",
+    "miguel vargas",
+    "nathan lukes",
+    "sean burke",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5193344765",
+   "username": "seapaw25",
+   "points": 78.649994,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 34.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "ernie clement",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "kyle tucker",
+    "nathan lukes",
+    "sam antonacci",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "173",
+   "entry_id": "5193629796",
+   "username": "wormlove3",
+   "points": 77.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "drew romo",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "nathan lukes",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "174",
+   "entry_id": "5193638178",
+   "username": "bench-press",
+   "points": 77.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "brandon valenzuela",
+    "cam schlittler",
+    "colson montgomery",
+    "ernie clement",
+    "jasson dominguez",
+    "miguel vargas",
+    "randal grichuk",
+    "teoscar hernandez",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "175",
+   "entry_id": "5193302423",
+   "username": "ZIBANENASTY93",
+   "points": 77.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 32.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "drew romo",
+    "jazz chisholm",
+    "nathan lukes",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "176",
+   "entry_id": "5193184017",
+   "username": "aarond23",
+   "points": 76.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "176",
+   "entry_id": "5193627293",
+   "username": "jokerdpo",
+   "points": 76.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "drew romo",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "tristan peters",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "178",
+   "entry_id": "5193392133",
+   "username": "minrobertson210",
+   "points": 76.649994,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Trey Yesavage",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "dalton rushing",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "kyle tucker",
+    "sam antonacci",
+    "trey yesavage",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "179",
+   "entry_id": "5193539272",
+   "username": "Dave2zone",
+   "points": 76.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "cody bellinger",
+    "dalton rushing",
+    "jazz chisholm",
+    "miguel vargas",
+    "nathan lukes",
+    "sam antonacci",
+    "sean burke",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "180",
+   "entry_id": "5193751390",
+   "username": "DetrickThompson",
+   "points": 75.9,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andrew benintendi",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "181",
+   "entry_id": "5193427681",
+   "username": "jaydom2322",
+   "points": 75.55,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Sean Burke",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 15.29,
+   "n_cheap": 2,
+   "players_norm": [
+    "aaron judge",
+    "giancarlo stanton",
+    "j c escarra",
+    "jose caballero",
+    "kike hernandez",
+    "lenyn sosa",
+    "miguel rojas",
+    "sean burke",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "182",
+   "entry_id": "5193465861",
+   "username": "whoisjohngalt420",
+   "points": 74.85,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 26.28,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "andres gimenez",
+    "cam schlittler",
+    "daulton varsho",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "sean keys",
+    "shohei ohtani",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "182",
+   "entry_id": "5193663899",
+   "username": "Elwaysarmy",
+   "points": 74.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "ernie clement",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "184",
+   "entry_id": "5193158667",
+   "username": "koolflows",
+   "points": 74.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "chase meidroth",
+    "colson montgomery",
+    "jasson dominguez",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "184",
+   "entry_id": "5193388513",
+   "username": "tcardaro7644",
+   "points": 74.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 32.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jonatan clase",
+    "kazuma okamoto",
+    "mookie betts",
+    "sean burke",
+    "shohei ohtani",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "186",
+   "entry_id": "5193184018",
+   "username": "aarond23",
+   "points": 73.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "drew romo",
+    "jazz chisholm",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "186",
+   "entry_id": "5193476132",
+   "username": "mftexas54",
+   "points": 73.75,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.21,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "colson montgomery",
+    "jasson dominguez",
+    "jazz chisholm",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "186",
+   "entry_id": "5193601273",
+   "username": "Khappy",
+   "points": 73.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 25.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "amed rosario",
+    "andrew benintendi",
+    "andy pages",
+    "cam schlittler",
+    "drew romo",
+    "jazz chisholm",
+    "mookie betts",
+    "sam antonacci",
+    "sean burke",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "189",
+   "entry_id": "5193713535",
+   "username": "luckymark62",
+   "points": 72.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 34.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "andy pages",
+    "cam schlittler",
+    "colson montgomery",
+    "daulton varsho",
+    "ernie clement",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "190",
+   "entry_id": "5193270060",
+   "username": "kikiwilson91",
+   "points": 72.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 18.34,
+   "n_cheap": 2,
+   "players_norm": [
+    "aaron judge",
+    "cam schlittler",
+    "hyeseong kim",
+    "j c escarra",
+    "jonatan clase",
+    "max muncy",
+    "mookie betts",
+    "sean burke",
+    "shohei ohtani",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "190",
+   "entry_id": "5193771100",
+   "username": "xXxPLOSIVE",
+   "points": 72.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jazz chisholm",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke",
+    "trent grisham",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "192",
+   "entry_id": "5193760094",
+   "username": "peterjpacheco",
+   "points": 71.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jazz chisholm",
+    "jonatan clase",
+    "kazuma okamoto",
+    "munetaka murakami",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "192",
+   "entry_id": "5193781509",
+   "username": "harshreality18",
+   "points": 71.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "daulton varsho",
+    "drew romo",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean keys",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "194",
+   "entry_id": "5193178314",
+   "username": "bjbsnoop",
+   "points": 71.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 31.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "anthony volpe",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "195",
+   "entry_id": "5193724933",
+   "username": "harvick2010",
+   "points": 70.75,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 34.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "braden montgomery",
+    "cam schlittler",
+    "dalton rushing",
+    "ernie clement",
+    "kyle tucker",
+    "miguel vargas",
+    "sam antonacci",
+    "sean burke",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "196",
+   "entry_id": "5193471452",
+   "username": "JamesBlond057",
+   "points": 69.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.08,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "jasson dominguez",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "197",
+   "entry_id": "5193184022",
+   "username": "aarond23",
+   "points": 69.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "ernie clement",
+    "kazuma okamoto",
+    "sean keys",
+    "shohei ohtani",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "198",
+   "entry_id": "5193383315",
+   "username": "mythicalrhymer01",
+   "points": 69.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "anthony volpe",
+    "cam schlittler",
+    "drew romo",
+    "jazz chisholm",
+    "max schuemann",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "199",
+   "entry_id": "5193151575",
+   "username": "zacheme64",
+   "points": 69.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Sean Burke",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "cody bellinger",
+    "ernie clement",
+    "kazuma okamoto",
+    "kyle teel",
+    "kyle tucker",
+    "munetaka murakami",
+    "sean burke",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "200",
+   "entry_id": "5193384813",
+   "username": "samwise1256",
+   "points": 68.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam schlittler",
+    "chase meidroth",
+    "colson montgomery",
+    "jose caballero",
+    "kyle teel",
+    "miguel vargas",
+    "myles straw",
+    "sam antonacci",
+    "spencer jones",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "201",
+   "entry_id": "5193184021",
+   "username": "aarond23",
+   "points": 68.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.77,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "andres gimenez",
+    "ben rice",
+    "cam schlittler",
+    "cody bellinger",
+    "jazz chisholm",
+    "nathan lukes",
+    "ryan mcmahon",
+    "shohei ohtani",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "202",
+   "entry_id": "5193629793",
+   "username": "wormlove3",
+   "points": 67.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "drew romo",
+    "ernie clement",
+    "miguel vargas",
+    "munetaka murakami",
+    "nathan lukes",
+    "randal grichuk",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "203",
+   "entry_id": "5193383311",
+   "username": "mythicalrhymer01",
+   "points": 67.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "max schuemann",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "203",
+   "entry_id": "5193742368",
+   "username": "rd8211c",
+   "points": 67.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "braden montgomery",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "jazz chisholm",
+    "munetaka murakami",
+    "ryan mcmahon",
+    "sam antonacci",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "205",
+   "entry_id": "5193465864",
+   "username": "whoisjohngalt420",
+   "points": 67.75,
+   "salary_used": 45100,
+   "salary_left": 4900,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.19,
+   "n_cheap": 2,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "ben rice",
+    "braden montgomery",
+    "cam schlittler",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "sam antonacci",
+    "sean burke",
+    "tristan peters"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "206",
+   "entry_id": "5193663900",
+   "username": "Elwaysarmy",
+   "points": 65.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "daulton varsho",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "shohei ohtani",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "207",
+   "entry_id": "5193242914",
+   "username": "hitch0403",
+   "points": 64.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "andres gimenez",
+    "braden montgomery",
+    "cam schlittler",
+    "ernie clement",
+    "george springer",
+    "miguel vargas",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "207",
+   "entry_id": "5193383314",
+   "username": "mythicalrhymer01",
+   "points": 64.9,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "drew romo",
+    "ernie clement",
+    "jonatan clase",
+    "miguel vargas",
+    "munetaka murakami",
+    "nathan lukes",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "209",
+   "entry_id": "5193471088",
+   "username": "bigjoeral",
+   "points": 63.899998,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 23.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex freeland",
+    "amed rosario",
+    "brandon valenzuela",
+    "cam schlittler",
+    "jose caballero",
+    "kyle tucker",
+    "sam antonacci",
+    "teoscar hernandez",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "210",
+   "entry_id": "5193424093",
+   "username": "coastrat69",
+   "points": 62.899998,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "cam schlittler",
+    "ernie clement",
+    "kazuma okamoto",
+    "kyle tucker",
+    "randal grichuk",
+    "sam antonacci",
+    "vladimir guerrero",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "211",
+   "entry_id": "5193136156",
+   "username": "starplay",
+   "points": 62.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "daulton varsho",
+    "ernie clement",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "nathan lukes",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "211",
+   "entry_id": "5193734843",
+   "username": "beepbeep2",
+   "points": 62.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "trent grisham",
+    "trey yesavage",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "213",
+   "entry_id": "5193565879",
+   "username": "troubledsoe",
+   "points": 61.899998,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cam schlittler",
+    "drew romo",
+    "ernie clement",
+    "jonatan clase",
+    "miguel vargas",
+    "munetaka murakami",
+    "randal grichuk",
+    "sam antonacci",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "214",
+   "entry_id": "5193465863",
+   "username": "whoisjohngalt420",
+   "points": 60.85,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "ernie clement",
+    "kazuma okamoto",
+    "max schuemann",
+    "trent grisham",
+    "trey yesavage",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "214",
+   "entry_id": "5193571732",
+   "username": "bleeski",
+   "points": 60.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ben rice",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "ernie clement",
+    "jasson dominguez",
+    "kazuma okamoto",
+    "trent grisham",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "214",
+   "entry_id": "5193663898",
+   "username": "Elwaysarmy",
+   "points": 60.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.06,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "daulton varsho",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "shohei ohtani",
+    "trey yesavage",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "217",
+   "entry_id": "5193383317",
+   "username": "mythicalrhymer01",
+   "points": 59.85,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 30.18,
+   "n_cheap": 1,
+   "players_norm": [
+    "ali sanchez",
+    "ben rice",
+    "cam schlittler",
+    "cody bellinger",
+    "ernie clement",
+    "jazz chisholm",
+    "jonatan clase",
+    "kazuma okamoto",
+    "nathan lukes",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "218",
+   "entry_id": "5193397361",
+   "username": "tbjones2121",
+   "points": 56.75,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "cam schlittler",
+    "cody bellinger",
+    "drew romo",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "max schuemann",
+    "munetaka murakami",
+    "sean burke"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "218",
+   "entry_id": "5193513440",
+   "username": "Scotty321",
+   "points": 56.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Sean Burke"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 35.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andy pages",
+    "brandon valenzuela",
+    "cam schlittler",
+    "cody bellinger",
+    "ernie clement",
+    "kazuma okamoto",
+    "sam antonacci",
+    "sean burke",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "220",
+   "entry_id": "5193715178",
+   "username": "Harmiles",
+   "points": 55.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 27.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cam schlittler",
+    "jasson dominguez",
+    "jazz chisholm",
+    "kazuma okamoto",
+    "max schuemann",
+    "mookie betts",
+    "munetaka murakami",
+    "nathan lukes",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Yoshinobu Yamamoto",
+   "player_norm": "yoshinobu yamamoto",
+   "roster_position": "P",
+   "pct_drafted": 60.54,
+   "fpts": 34.35
+  },
+  {
+   "player": "Sean Burke",
+   "player_norm": "sean burke",
+   "roster_position": "P",
+   "pct_drafted": 52.47,
+   "fpts": 27.2
+  },
+  {
+   "player": "Cam Schlittler",
+   "player_norm": "cam schlittler",
+   "roster_position": "P",
+   "pct_drafted": 51.57,
+   "fpts": 15.55
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "2B",
+   "pct_drafted": 46.19,
+   "fpts": 5.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 43.05,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "3B",
+   "pct_drafted": 38.12,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brandon Valenzuela",
+   "player_norm": "brandon valenzuela",
+   "roster_position": "C",
+   "pct_drafted": 34.53,
+   "fpts": 0.0
+  },
+  {
+   "player": "Trey Yesavage",
+   "player_norm": "trey yesavage",
+   "roster_position": "P",
+   "pct_drafted": 32.74,
+   "fpts": 21.3
+  },
+  {
+   "player": "Braden Montgomery",
+   "player_norm": "braden montgomery",
+   "roster_position": "OF",
+   "pct_drafted": 30.94,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jazz Chisholm Jr.",
+   "player_norm": "jazz chisholm",
+   "roster_position": "2B",
+   "pct_drafted": 30.49,
+   "fpts": 7.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 29.15,
+   "fpts": 17.0
+  },
+  {
+   "player": "Andres Gimenez",
+   "player_norm": "andres gimenez",
+   "roster_position": "SS",
+   "pct_drafted": 28.25,
+   "fpts": 0.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "OF",
+   "pct_drafted": 25.56,
+   "fpts": 3.0
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "1B",
+   "pct_drafted": 25.11,
+   "fpts": 2.0
+  },
+  {
+   "player": "Dalton Rushing",
+   "player_norm": "dalton rushing",
+   "roster_position": "C",
+   "pct_drafted": 24.66,
+   "fpts": 8.0
+  },
+  {
+   "player": "Ben Rice",
+   "player_norm": "ben rice",
+   "roster_position": "1B",
+   "pct_drafted": 21.08,
+   "fpts": 5.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "OF",
+   "pct_drafted": 21.08,
+   "fpts": 14.0
+  },
+  {
+   "player": "Vladimir Guerrero Jr.",
+   "player_norm": "vladimir guerrero",
+   "roster_position": "1B",
+   "pct_drafted": 21.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jasson Dominguez",
+   "player_norm": "jasson dominguez",
+   "roster_position": "OF",
+   "pct_drafted": 20.63,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nathan Lukes",
+   "player_norm": "nathan lukes",
+   "roster_position": "OF",
+   "pct_drafted": 19.73,
+   "fpts": 6.0
+  },
+  {
+   "player": "Trent Grisham",
+   "player_norm": "trent grisham",
+   "roster_position": "OF",
+   "pct_drafted": 18.83,
+   "fpts": 14.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "3B",
+   "pct_drafted": 18.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jonatan Clase",
+   "player_norm": "jonatan clase",
+   "roster_position": "OF",
+   "pct_drafted": 17.94,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ali Sanchez",
+   "player_norm": "ali sanchez",
+   "roster_position": "C",
+   "pct_drafted": 17.49,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ryan McMahon",
+   "player_norm": "ryan mcmahon",
+   "roster_position": "3B",
+   "pct_drafted": 17.49,
+   "fpts": 0.0
+  },
+  {
+   "player": "Drew Romo",
+   "player_norm": "drew romo",
+   "roster_position": "C",
+   "pct_drafted": 17.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "2B",
+   "pct_drafted": 17.04,
+   "fpts": 18.0
+  },
+  {
+   "player": "Cody Bellinger",
+   "player_norm": "cody bellinger",
+   "roster_position": "OF",
+   "pct_drafted": 15.25,
+   "fpts": 0.0
+  },
+  {
+   "player": "Anthony Volpe",
+   "player_norm": "anthony volpe",
+   "roster_position": "SS",
+   "pct_drafted": 14.8,
+   "fpts": 5.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "SS",
+   "pct_drafted": 13.9,
+   "fpts": 4.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "OF",
+   "pct_drafted": 13.45,
+   "fpts": 9.0
+  },
+  {
+   "player": "Andrew Benintendi",
+   "player_norm": "andrew benintendi",
+   "roster_position": "OF",
+   "pct_drafted": 12.56,
+   "fpts": 11.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "1B",
+   "pct_drafted": 12.56,
+   "fpts": 14.0
+  },
+  {
+   "player": "Tristan Peters",
+   "player_norm": "tristan peters",
+   "roster_position": "OF",
+   "pct_drafted": 12.56,
+   "fpts": 0.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "3B",
+   "pct_drafted": 12.11,
+   "fpts": 17.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "SS",
+   "pct_drafted": 11.21,
+   "fpts": 5.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "3B",
+   "pct_drafted": 10.76,
+   "fpts": 12.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "OF",
+   "pct_drafted": 10.31,
+   "fpts": 5.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 8.97,
+   "fpts": 9.0
+  },
+  {
+   "player": "Max Schuemann",
+   "player_norm": "max schuemann",
+   "roster_position": "OF",
+   "pct_drafted": 8.52,
+   "fpts": 0.0
+  },
+  {
+   "player": "Randal Grichuk",
+   "player_norm": "randal grichuk",
+   "roster_position": "OF",
+   "pct_drafted": 7.62,
+   "fpts": 3.0
+  },
+  {
+   "player": "Sean Keys",
+   "player_norm": "sean keys",
+   "roster_position": "1B",
+   "pct_drafted": 6.73,
+   "fpts": 0.0
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "1B",
+   "pct_drafted": 5.83,
+   "fpts": 7.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "1B",
+   "pct_drafted": 4.93,
+   "fpts": 2.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 2.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "OF",
+   "pct_drafted": 2.69,
+   "fpts": 18.0
+  },
+  {
+   "player": "Kyle Teel",
+   "player_norm": "kyle teel",
+   "roster_position": "C",
+   "pct_drafted": 2.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "OF",
+   "pct_drafted": 1.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Alejandro Kirk",
+   "player_norm": "alejandro kirk",
+   "roster_position": "C",
+   "pct_drafted": 1.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "J.C. Escarra",
+   "player_norm": "j c escarra",
+   "roster_position": "C",
+   "pct_drafted": 1.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Caballero",
+   "player_norm": "jose caballero",
+   "roster_position": "SS",
+   "pct_drafted": 1.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Giancarlo Stanton",
+   "player_norm": "giancarlo stanton",
+   "roster_position": "OF",
+   "pct_drafted": 0.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Aaron Judge",
+   "player_norm": "aaron judge",
+   "roster_position": "OF",
+   "pct_drafted": 0.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Myles Straw",
+   "player_norm": "myles straw",
+   "roster_position": "OF",
+   "pct_drafted": 0.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Spencer Jones",
+   "player_norm": "spencer jones",
+   "roster_position": "OF",
+   "pct_drafted": 0.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Rojas",
+   "player_norm": "miguel rojas",
+   "roster_position": "2B",
+   "pct_drafted": 0.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Amed Rosario",
+   "player_norm": "amed rosario",
+   "roster_position": "3B",
+   "pct_drafted": 0.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Juan Yepez",
+   "player_norm": "juan yepez",
+   "roster_position": "1B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jesus Sanchez",
+   "player_norm": "jesus sanchez",
+   "roster_position": "OF",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Oswaldo Cabrera",
+   "player_norm": "oswaldo cabrera",
+   "roster_position": "3B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Hyeseong Kim",
+   "player_norm": "hyeseong kim",
+   "roster_position": "2B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Yohendrick Pinango",
+   "player_norm": "yohendrick pinango",
+   "roster_position": "OF",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Paul Goldschmidt",
+   "player_norm": "paul goldschmidt",
+   "roster_position": "1B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Urias",
+   "player_norm": "luis urias",
+   "roster_position": "2B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "3B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Lenyn Sosa",
+   "player_norm": "lenyn sosa",
+   "roster_position": "1B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tanner Murray",
+   "player_norm": "tanner murray",
+   "roster_position": "OF",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Alex Freeland",
+   "player_norm": "alex freeland",
+   "roster_position": "2B",
+   "pct_drafted": 0.45,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 223,
+  "best_rank": 3,
+  "worst_rank": 214,
+  "best_finish_percentile": 99.1,
+  "median_finish_percentile": 50.67,
+  "best_points": 129.55,
+  "winning_points": 134.55,
+  "own_lineups_duplicated_by_field": 3,
+  "max_copies_of_an_own_lineup": 2,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

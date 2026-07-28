@@ -1,0 +1,821 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192851120",
+ "slate_date": "2026-07-27",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 78.85,
+  "winning_entry_id": "5201048493",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 22,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 8.7,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 21,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3400,
+  "at_cap_entries": 8,
+  "at_cap_share_pct": 34.8,
+  "salary_left_histogram": {
+   "1-100": 4,
+   "301-700": 5,
+   "101-300": 4,
+   "<= 0": 4,
+   "701-1500": 4,
+   "> 1500": 2
+  },
+  "max_stack_histogram": {
+   "3": 9,
+   "4": 4,
+   "5": 10
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Tyler Mahle",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Cooper Pratt",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Rafael Devers",
+    "pct_drafted": 43.47
+   },
+   {
+    "player": "Drew Gilbert",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Jackson Chourio",
+    "pct_drafted": 39.13
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 21.74,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 569.6,
+  "dk_table_deficit_pts": 30.4,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 6 distinct players); DK's %Drafted table sums 30.4 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5201048493",
+   "username": "beccapatt",
+   "points": 78.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.99,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon sproat",
+    "drew gilbert",
+    "grant mccray",
+    "luis arraez",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5200955884",
+   "username": "sportsfan14",
+   "points": 66.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 31.16,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "grant mccray",
+    "heliot ramos",
+    "jake bauers",
+    "luis arraez",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5200945784",
+   "username": "bleeski",
+   "points": 63.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "grant mccray",
+    "jake bauers",
+    "luis arraez",
+    "rafael devers",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5200951651",
+   "username": "Raiderfanatic2195",
+   "points": 61.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 23.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "casey schmitt",
+    "grant mccray",
+    "heliot ramos",
+    "tyler mahle",
+    "william contreras",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5201020501",
+   "username": "BigDawg4224",
+   "points": 54.6,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 32.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon sproat",
+    "grant mccray",
+    "jackson chourio",
+    "joey ortiz",
+    "rafael devers",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5200921737",
+   "username": "Q33Q",
+   "points": 52.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon sproat",
+    "bryce eldridge",
+    "cooper pratt",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5200902610",
+   "username": "sabal23",
+   "points": 50.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon sproat",
+    "cooper pratt",
+    "drew gilbert",
+    "rafael devers",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5200997233",
+   "username": "GuitarBet1",
+   "points": 50.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon sproat",
+    "cooper pratt",
+    "drew gilbert",
+    "rafael devers",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5200934492",
+   "username": "L053R666",
+   "points": 48.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon sproat",
+    "cooper pratt",
+    "drew gilbert",
+    "tyler mahle",
+    "william contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5200978907",
+   "username": "303Nandy",
+   "points": 41.5,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "cooper pratt",
+    "jake bauers",
+    "luis arraez",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5201003249",
+   "username": "steverson7",
+   "points": 40.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "cooper pratt",
+    "luis arraez",
+    "rafael devers",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5200976958",
+   "username": "Alancey",
+   "points": 34.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon sproat",
+    "christian yelich",
+    "cooper pratt",
+    "heliot ramos",
+    "jesus rodriguez",
+    "rafael devers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5201023291",
+   "username": "jc000000",
+   "points": 33.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "bryce eldridge",
+    "drew gilbert",
+    "heliot ramos",
+    "rafael devers",
+    "tyler mahle"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5201035685",
+   "username": "grantgoupil",
+   "points": 32.6,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 24.64,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon sproat",
+    "brice turang",
+    "garrett mitchell",
+    "grant mccray",
+    "jake bauers",
+    "william contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5201040445",
+   "username": "Rhombus87",
+   "points": 26.15,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon sproat",
+    "christian yelich",
+    "cooper pratt",
+    "drew gilbert",
+    "jackson chourio",
+    "joey ortiz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5201018518",
+   "username": "Aoteoroa",
+   "points": 20.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 32.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "christian yelich",
+    "jackson chourio",
+    "jake bauers",
+    "rafael devers",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5201001932",
+   "username": "cpdk69",
+   "points": 19.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon sproat",
+    "bryce eldridge",
+    "christian yelich",
+    "cooper pratt",
+    "gary sanchez",
+    "jake bauers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5200941379",
+   "username": "CBarbarian",
+   "points": 19.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "casey schmitt",
+    "christian yelich",
+    "drew gilbert",
+    "jackson chourio",
+    "luis arraez",
+    "william contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5200972889",
+   "username": "jbhintz",
+   "points": 16.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "casey schmitt",
+    "christian yelich",
+    "drew gilbert",
+    "jackson chourio",
+    "jesus rodriguez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5200966768",
+   "username": "jarradkern",
+   "points": 12.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "bryce eldridge",
+    "casey schmitt",
+    "jackson chourio",
+    "jake bauers",
+    "joey ortiz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5201023099",
+   "username": "Boltmantom",
+   "points": 12.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "drew gilbert",
+    "jackson chourio",
+    "jake bauers",
+    "rafael devers",
+    "william contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5201046710",
+   "username": "dmartin139",
+   "points": 12.0,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 30.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "christian yelich",
+    "cooper pratt",
+    "garrett mitchell",
+    "jackson chourio",
+    "jesus rodriguez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5201052865",
+   "username": "Missyymarie",
+   "points": 12.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "christian yelich",
+    "cooper pratt",
+    "jackson chourio",
+    "rafael devers"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Cooper Pratt",
+   "player_norm": "cooper pratt",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 2.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Tyler Mahle",
+   "player_norm": "tyler mahle",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 20.5
+  },
+  {
+   "player": "Christian Yelich",
+   "player_norm": "christian yelich",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 2.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 5.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 2.0
+  },
+  {
+   "player": "Luis Arraez",
+   "player_norm": "luis arraez",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 10.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 3.0
+  },
+  {
+   "player": "Grant McCray",
+   "player_norm": "grant mccray",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 16.0
+  },
+  {
+   "player": "Brandon Sproat",
+   "player_norm": "brandon sproat",
+   "roster_position": "CPT",
+   "pct_drafted": 21.74,
+   "fpts": 18.15
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Mahle",
+   "player_norm": "tyler mahle",
+   "roster_position": "CPT",
+   "pct_drafted": 17.39,
+   "fpts": 30.75
+  },
+  {
+   "player": "Heliot Ramos",
+   "player_norm": "heliot ramos",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Casey Schmitt",
+   "player_norm": "casey schmitt",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jesus Rodriguez",
+   "player_norm": "jesus rodriguez",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 7.0
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "CPT",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "CPT",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Willy Adames",
+   "player_norm": "willy adames",
+   "roster_position": "CPT",
+   "pct_drafted": 8.7,
+   "fpts": 10.5
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "CPT",
+   "pct_drafted": 8.7,
+   "fpts": 4.5
+  },
+  {
+   "player": "Garrett Mitchell",
+   "player_norm": "garrett mitchell",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "CPT",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Casey Schmitt",
+   "player_norm": "casey schmitt",
+   "roster_position": "CPT",
+   "pct_drafted": 4.35,
+   "fpts": 4.5
+  },
+  {
+   "player": "Cooper Pratt",
+   "player_norm": "cooper pratt",
+   "roster_position": "CPT",
+   "pct_drafted": 4.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gary Sanchez",
+   "player_norm": "gary sanchez",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Yelich",
+   "player_norm": "christian yelich",
+   "roster_position": "CPT",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 3,
+  "worst_rank": 3,
+  "best_finish_percentile": 91.3,
+  "median_finish_percentile": 91.3,
+  "best_points": 63.75,
+  "winning_points": 78.85,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

@@ -1,0 +1,3934 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192623315",
+ "slate_date": "2026-07-23",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 118,
+  "entries_complete_lineups": 118,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 118.1,
+  "winning_entry_id": "5197179508",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 113,
+  "entries_in_duplicated_lineups": 10,
+  "share_duplicated_pct": 8.5,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 108,
+   "2": 5
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2300,
+  "at_cap_entries": 30,
+  "at_cap_share_pct": 25.4,
+  "salary_left_histogram": {
+   "> 1500": 26,
+   "301-700": 24,
+   "101-300": 18,
+   "701-1500": 20,
+   "<= 0": 18,
+   "1-100": 12
+  },
+  "max_stack_histogram": {
+   "2": 1,
+   "3": 14,
+   "4": 48,
+   "5": 55
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Michael McGreevy",
+     "Troy Melton"
+    ],
+    "count": 56,
+    "field_share_pct": 47.5
+   },
+   {
+    "pair": [
+     "Brandon Pfaadt",
+     "Troy Melton"
+    ],
+    "count": 33,
+    "field_share_pct": 28.0
+   },
+   {
+    "pair": [
+     "Randy Dobnak",
+     "Troy Melton"
+    ],
+    "count": 15,
+    "field_share_pct": 12.7
+   },
+   {
+    "pair": [
+     "Brandon Pfaadt",
+     "Michael McGreevy"
+    ],
+    "count": 9,
+    "field_share_pct": 7.6
+   },
+   {
+    "pair": [
+     "Brandon Pfaadt",
+     "Randy Dobnak"
+    ],
+    "count": 4,
+    "field_share_pct": 3.4
+   },
+   {
+    "pair": [
+     "Michael McGreevy",
+     "Randy Dobnak"
+    ],
+    "count": 1,
+    "field_share_pct": 0.8
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Troy Melton",
+    "pct_drafted": 88.14
+   },
+   {
+    "player": "Kevin McGonigle",
+    "pct_drafted": 72.04
+   },
+   {
+    "player": "Riley Greene",
+    "pct_drafted": 66.1
+   },
+   {
+    "player": "Michael McGreevy",
+    "pct_drafted": 55.93
+   },
+   {
+    "player": "Jordan Walker",
+    "pct_drafted": 46.61
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 6.78,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1180,
+  "roster_slots_expected": 1180,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 993.2,
+  "dk_table_deficit_pts": 6.8,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 6.8 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5197179508",
+   "username": "jrevelle3",
+   "points": 118.1,
+   "salary_used": 44600,
+   "salary_left": 5400,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 29.83,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian del castillo",
+    "blaze jordan",
+    "corbin carroll",
+    "jj wetherholt",
+    "jordan walker",
+    "masyn winn",
+    "max kepler",
+    "randy dobnak",
+    "troy melton",
+    "tyler locklear"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5197179507",
+   "username": "jrevelle3",
+   "points": 112.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "randy dobnak",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5196794994",
+   "username": "JRaab",
+   "points": 110.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "jordan walker",
+    "lars nootbaar",
+    "randy dobnak",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5197085174",
+   "username": "wittwerjoe",
+   "points": 110.1,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "alec burleson",
+    "corbin carroll",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "randy dobnak",
+    "ryan waldschmidt",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5197044821",
+   "username": "howardwi",
+   "points": 107.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "max kepler",
+    "randy dobnak",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5197214215",
+   "username": "fatcolumbus",
+   "points": 106.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ildemaro vargas",
+    "jordan walker",
+    "nick loftin",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5197105776",
+   "username": "olrat14",
+   "points": 105.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "max kepler",
+    "randy dobnak",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5197191701",
+   "username": "Naboka",
+   "points": 103.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 40.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "alec burleson",
+    "brandon pfaadt",
+    "colt keith",
+    "corbin carroll",
+    "ildemaro vargas",
+    "jordan walker",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5197165899",
+   "username": "tmoney88",
+   "points": 101.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ildemaro vargas",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "max kepler",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5196994569",
+   "username": "jaakko",
+   "points": 100.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "randy dobnak",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5197208859",
+   "username": "bleeski",
+   "points": 100.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jordan walker",
+    "ketel marte",
+    "lars nootbaar",
+    "randy dobnak",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5197132351",
+   "username": "BearDown1985",
+   "points": 98.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.47,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "gleyber torres",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "riley greene",
+    "troy melton",
+    "tyler locklear"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5197213959",
+   "username": "hcnpower",
+   "points": 98.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "james outman",
+    "kevin mcgonigle",
+    "riley greene",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5196894999",
+   "username": "TheBabz",
+   "points": 97.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "james outman",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "kevin mcgonigle",
+    "masyn winn",
+    "michael mcgreevy",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5197186678",
+   "username": "jc000000",
+   "points": 97.1,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "alec burleson",
+    "blaze jordan",
+    "jj wetherholt",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5196885118",
+   "username": "andrewp332",
+   "points": 96.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 40.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "randy dobnak",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5197062265",
+   "username": "gwarrick0639",
+   "points": 96.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ketel marte",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "nathan church",
+    "randy dobnak",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5197177214",
+   "username": "kafedaiv",
+   "points": 96.1,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "corbin carroll",
+    "gabriel moreno",
+    "jordan walker",
+    "ketel marte",
+    "lars nootbaar",
+    "masyn winn",
+    "randy dobnak",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5196740926",
+   "username": "cptnspaulding",
+   "points": 95.95,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "corbin carroll",
+    "gabriel moreno",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "riley greene",
+    "troy melton",
+    "tyler locklear",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5196994737",
+   "username": "blnielson63",
+   "points": 94.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 36.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "carter jensen",
+    "corbin carroll",
+    "ildemaro vargas",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lane thomas",
+    "randy dobnak",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5197085957",
+   "username": "peterjpacheco",
+   "points": 93.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.25,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "brandon pfaadt",
+    "dillon dingler",
+    "jj wetherholt",
+    "josh rojas",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5197195017",
+   "username": "sasmallen",
+   "points": 90.95,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "brandon pfaadt",
+    "geraldo perdomo",
+    "james outman",
+    "jj wetherholt",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5197189956",
+   "username": "tab8385",
+   "points": 90.35,
+   "salary_used": 46400,
+   "salary_left": 3600,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 21.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "isaac collins",
+    "ketel marte",
+    "lane thomas",
+    "nick loftin",
+    "randy dobnak",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "24",
+   "entry_id": "5197105774",
+   "username": "olrat14",
+   "points": 89.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "gleyber torres",
+    "james outman",
+    "kevin mcgonigle",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "24",
+   "entry_id": "5197200672",
+   "username": "brennan_rooks",
+   "points": 89.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "brandon pfaadt",
+    "corbin carroll",
+    "geraldo perdomo",
+    "gleyber torres",
+    "jordan walker",
+    "kevin mcgonigle",
+    "ryan waldschmidt",
+    "troy melton",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5197085955",
+   "username": "peterjpacheco",
+   "points": 88.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 43.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "corbin carroll",
+    "dillon dingler",
+    "jj wetherholt",
+    "jose fermin",
+    "kevin mcgonigle",
+    "randy dobnak",
+    "riley greene",
+    "ryan waldschmidt",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5197131502",
+   "username": "ecaras0381",
+   "points": 88.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 41.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "gabriel moreno",
+    "gleyber torres",
+    "isaac collins",
+    "jordan walker",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "28",
+   "entry_id": "5197006035",
+   "username": "chex43",
+   "points": 86.95,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "brandon pfaadt",
+    "colt keith",
+    "corbin carroll",
+    "ildemaro vargas",
+    "jordan walker",
+    "kevin mcgonigle",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5197093933",
+   "username": "hgh13",
+   "points": 86.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "dillon dingler",
+    "gleyber torres",
+    "james outman",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5197189955",
+   "username": "tab8385",
+   "points": 86.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "dillon dingler",
+    "gleyber torres",
+    "james outman",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5197204150",
+   "username": "grantgoupil",
+   "points": 85.95,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "alec burleson",
+    "brandon pfaadt",
+    "geraldo perdomo",
+    "ketel marte",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5197209241",
+   "username": "Phlegmgoat",
+   "points": 85.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "gleyber torres",
+    "ildemaro vargas",
+    "kevin mcgonigle",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5196740924",
+   "username": "cptnspaulding",
+   "points": 85.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "dillon dingler",
+    "jordan walker",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5197132350",
+   "username": "BearDown1985",
+   "points": 85.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 46.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "alec burleson",
+    "gleyber torres",
+    "jordan walker",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5197178301",
+   "username": "Jerard",
+   "points": 85.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 43.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "gleyber torres",
+    "jose fermin",
+    "michael mcgreevy",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5197189954",
+   "username": "tab8385",
+   "points": 84.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 36.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "ildemaro vargas",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael massey",
+    "nick loftin",
+    "ryan waldschmidt",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5196869192",
+   "username": "befeld",
+   "points": 84.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "gleyber torres",
+    "jordan walker",
+    "jose fermin",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5196928346",
+   "username": "ravensfan929",
+   "points": 84.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "gleyber torres",
+    "jordan walker",
+    "jose fermin",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5196919479",
+   "username": "jpeyton1219",
+   "points": 83.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 40.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "corbin carroll",
+    "geraldo perdomo",
+    "ildemaro vargas",
+    "james mccann",
+    "jj wetherholt",
+    "jordan walker",
+    "kevin mcgonigle",
+    "randy dobnak",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5196994568",
+   "username": "jaakko",
+   "points": 83.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5196996516",
+   "username": "whoisjohngalt420",
+   "points": 83.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "kerry carpenter",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5197150630",
+   "username": "Nayrb29",
+   "points": 83.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "kerry carpenter",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5197209029",
+   "username": "Phlegmgoat",
+   "points": 83.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 46.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "gleyber torres",
+    "jordan walker",
+    "jose fermin",
+    "josh rojas",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "44",
+   "entry_id": "5197208888",
+   "username": "bleeski",
+   "points": 82.35,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 20.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "corbin carroll",
+    "geraldo perdomo",
+    "isaac collins",
+    "ketel marte",
+    "max kepler",
+    "nick loftin",
+    "randy dobnak",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5197132349",
+   "username": "BearDown1985",
+   "points": 82.1,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "gabriel moreno",
+    "jj wetherholt",
+    "kerry carpenter",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5197169950",
+   "username": "Shamrock3333",
+   "points": 82.1,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "colt keith",
+    "jj wetherholt",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5197189032",
+   "username": "nbarcenas",
+   "points": 82.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 44.66,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian del castillo",
+    "andrew velazquez",
+    "corbin carroll",
+    "jj wetherholt",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "48",
+   "entry_id": "5197000151",
+   "username": "donj9903",
+   "points": 81.1,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 40.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "blaze jordan",
+    "dillon dingler",
+    "geraldo perdomo",
+    "jordan walker",
+    "jose fermin",
+    "michael massey",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "48",
+   "entry_id": "5197131409",
+   "username": "touchdown3000",
+   "points": 81.1,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "gabriel moreno",
+    "gleyber torres",
+    "jordan walker",
+    "lane thomas",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "48",
+   "entry_id": "5197165898",
+   "username": "tmoney88",
+   "points": 81.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "corbin carroll",
+    "gleyber torres",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "51",
+   "entry_id": "5197179509",
+   "username": "jrevelle3",
+   "points": 80.35,
+   "salary_used": 43800,
+   "salary_left": 6200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "isaac collins",
+    "james outman",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael massey",
+    "michael mcgreevy",
+    "salvador perez",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "52",
+   "entry_id": "5197009004",
+   "username": "BigRedMachine1975",
+   "points": 80.1,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 41.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "jordan walker",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "spencer torkelson",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "52",
+   "entry_id": "5197110549",
+   "username": "Pokey0612",
+   "points": 80.1,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 45.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "gleyber torres",
+    "isaac collins",
+    "kevin mcgonigle",
+    "masyn winn",
+    "max kepler",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "54",
+   "entry_id": "5197169536",
+   "username": "CNOLAN",
+   "points": 79.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 41.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "ildemaro vargas",
+    "jordan walker",
+    "kevin mcgonigle",
+    "masyn winn",
+    "max kepler",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "54",
+   "entry_id": "5197178990",
+   "username": "mattyn773",
+   "points": 79.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "riley greene",
+    "tim tawa",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "54",
+   "entry_id": "5197205122",
+   "username": "Flackbar",
+   "points": 79.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ketel marte",
+    "lars nootbaar",
+    "nick loftin",
+    "ryan waldschmidt",
+    "troy melton",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5197085956",
+   "username": "peterjpacheco",
+   "points": 79.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "geraldo perdomo",
+    "gleyber torres",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "randy dobnak",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5197092533",
+   "username": "Cbcox41",
+   "points": 79.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dillon dingler",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "spencer torkelson",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5197159294",
+   "username": "cashyobe",
+   "points": 79.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5197173736",
+   "username": "Noflyzone52",
+   "points": 79.1,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "gabriel moreno",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5197201239",
+   "username": "Parvez",
+   "points": 79.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "jose fermin",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "ryan waldschmidt",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "62",
+   "entry_id": "5196740925",
+   "username": "cptnspaulding",
+   "points": 78.1,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.37,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "corbin carroll",
+    "james outman",
+    "jimmy crooks",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "62",
+   "entry_id": "5197130985",
+   "username": "relevanthought",
+   "points": 78.1,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "gleyber torres",
+    "jose fermin",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5196824130",
+   "username": "JHart62",
+   "points": 77.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ildemaro vargas",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5197204148",
+   "username": "grantgoupil",
+   "points": 77.95,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 44.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "dillon dingler",
+    "jj wetherholt",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "66",
+   "entry_id": "5197211520",
+   "username": "Zander0504",
+   "points": 77.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 47.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "ryan waldschmidt",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "67",
+   "entry_id": "5197208887",
+   "username": "bleeski",
+   "points": 76.5,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 25.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jj wetherholt",
+    "jordan walker",
+    "lane thomas",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "nick loftin",
+    "randy dobnak",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "68",
+   "entry_id": "5196996514",
+   "username": "whoisjohngalt420",
+   "points": 76.35,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "corbin carroll",
+    "geraldo perdomo",
+    "josh rojas",
+    "lane thomas",
+    "max kepler",
+    "nick loftin",
+    "randy dobnak",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "69",
+   "entry_id": "5197015550",
+   "username": "jep4576",
+   "points": 76.1,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "nathan church",
+    "riley greene",
+    "salvador perez",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "69",
+   "entry_id": "5197131965",
+   "username": "ecaras0381",
+   "points": 76.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "corbin carroll",
+    "dillon dingler",
+    "masyn winn",
+    "max kepler",
+    "michael massey",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "69",
+   "entry_id": "5197195159",
+   "username": "kwwagner1142",
+   "points": 76.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 47.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "corbin carroll",
+    "jimmy crooks",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "69",
+   "entry_id": "5197214216",
+   "username": "fatcolumbus",
+   "points": 76.1,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 45.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew velazquez",
+    "dillon dingler",
+    "gleyber torres",
+    "ildemaro vargas",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "73",
+   "entry_id": "5197190381",
+   "username": "sasmallen",
+   "points": 75.95,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "tim tawa",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "74",
+   "entry_id": "5197183538",
+   "username": "bradydcallahan",
+   "points": 74.35,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "colt keith",
+    "corbin carroll",
+    "isaac collins",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael massey",
+    "michael mcgreevy",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5196980535",
+   "username": "seaone",
+   "points": 74.1,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 48.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "max kepler",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5197061348",
+   "username": "Cortezdaven",
+   "points": 74.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "masyn winn",
+    "max kepler",
+    "michael mcgreevy",
+    "nathan church",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5197128819",
+   "username": "Chadg20",
+   "points": 74.1,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "carter jensen",
+    "colt keith",
+    "gleyber torres",
+    "jordan walker",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "nathan church",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5197159293",
+   "username": "cashyobe",
+   "points": 74.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "79",
+   "entry_id": "5197178991",
+   "username": "mattyn773",
+   "points": 73.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian del castillo",
+    "brandon pfaadt",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ketel marte",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "80",
+   "entry_id": "5197128820",
+   "username": "Chadg20",
+   "points": 73.35,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.83,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon pfaadt",
+    "dillon dingler",
+    "gleyber torres",
+    "jordan walker",
+    "josh rojas",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael mcgreevy",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "81",
+   "entry_id": "5197101999",
+   "username": "bartletto",
+   "points": 73.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 46.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "dillon dingler",
+    "jordan walker",
+    "kevin mcgonigle",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "ryan waldschmidt",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "81",
+   "entry_id": "5197178989",
+   "username": "mattyn773",
+   "points": 73.1,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "dillon dingler",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "nathan church",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "81",
+   "entry_id": "5197204149",
+   "username": "grantgoupil",
+   "points": 73.1,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "corbin carroll",
+    "gabriel moreno",
+    "gleyber torres",
+    "jordan walker",
+    "kerry carpenter",
+    "michael mcgreevy",
+    "spencer torkelson",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "84",
+   "entry_id": "5197130986",
+   "username": "relevanthought",
+   "points": 71.95,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 39.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "gleyber torres",
+    "riley greene",
+    "spencer torkelson",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "84",
+   "entry_id": "5197140586",
+   "username": "Glaze",
+   "points": 71.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 41.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jj wetherholt",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "salvador perez",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "86",
+   "entry_id": "5197174617",
+   "username": "Scoring32",
+   "points": 71.1,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "jimmy crooks",
+    "jj wetherholt",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "86",
+   "entry_id": "5197186997",
+   "username": "volfan7.7",
+   "points": 71.1,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "gleyber torres",
+    "jimmy crooks",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "86",
+   "entry_id": "5197197219",
+   "username": "djensen221",
+   "points": 71.1,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "gleyber torres",
+    "jimmy crooks",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "89",
+   "entry_id": "5197007871",
+   "username": "rphdallas",
+   "points": 70.95,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "corbin carroll",
+    "dillon dingler",
+    "ildemaro vargas",
+    "ketel marte",
+    "kevin mcgonigle",
+    "ryan waldschmidt",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5197140587",
+   "username": "Glaze",
+   "points": 69.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 40.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "colt keith",
+    "corbin carroll",
+    "gleyber torres",
+    "ildemaro vargas",
+    "kevin mcgonigle",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "91",
+   "entry_id": "5196994570",
+   "username": "jaakko",
+   "points": 69.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dillon dingler",
+    "gleyber torres",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "91",
+   "entry_id": "5197165900",
+   "username": "tmoney88",
+   "points": 69.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "jj wetherholt",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "salvador perez",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "91",
+   "entry_id": "5197213958",
+   "username": "hcnpower",
+   "points": 69.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec burleson",
+    "colt keith",
+    "jimmy crooks",
+    "jj wetherholt",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "nathan church",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "94",
+   "entry_id": "5197177216",
+   "username": "kafedaiv",
+   "points": 68.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "ildemaro vargas",
+    "jordan walker",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "95",
+   "entry_id": "5197085175",
+   "username": "wittwerjoe",
+   "points": 67.95,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "gabriel moreno",
+    "gleyber torres",
+    "ildemaro vargas",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "96",
+   "entry_id": "5196473481",
+   "username": "amiezin",
+   "points": 67.35,
+   "salary_used": 47500,
+   "salary_left": 2500,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 37.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "dillon dingler",
+    "geraldo perdomo",
+    "gleyber torres",
+    "kerry carpenter",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "97",
+   "entry_id": "5196562962",
+   "username": "CrazyNate96",
+   "points": 67.1,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "gage workman",
+    "ildemaro vargas",
+    "isaac collins",
+    "ivan herrera",
+    "jordan walker",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael mcgreevy",
+    "nick loftin",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "97",
+   "entry_id": "5197207145",
+   "username": "Scoring32",
+   "points": 67.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "jj wetherholt",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5197105775",
+   "username": "olrat14",
+   "points": 66.95,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "gleyber torres",
+    "max kepler",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "100",
+   "entry_id": "5197050023",
+   "username": "ga33",
+   "points": 65.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "ketel marte",
+    "kevin mcgonigle",
+    "ryan waldschmidt",
+    "spencer torkelson",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "100",
+   "entry_id": "5197085176",
+   "username": "wittwerjoe",
+   "points": 65.95,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "colt keith",
+    "gabriel moreno",
+    "gleyber torres",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "100",
+   "entry_id": "5197178286",
+   "username": "falstaff64",
+   "points": 65.95,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.75,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew velazquez",
+    "brandon pfaadt",
+    "carter jensen",
+    "gleyber torres",
+    "isaac collins",
+    "kevin mcgonigle",
+    "lane thomas",
+    "riley greene",
+    "troy melton",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "103",
+   "entry_id": "5197216135",
+   "username": "bigbone33",
+   "points": 65.1,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "nathan church",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "104",
+   "entry_id": "5197162914",
+   "username": "newulmspeedy",
+   "points": 64.95,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 38.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "gabriel moreno",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "lane thomas",
+    "masyn winn",
+    "max kepler",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "105",
+   "entry_id": "5196996515",
+   "username": "whoisjohngalt420",
+   "points": 64.35,
+   "salary_used": 45700,
+   "salary_left": 4300,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "gleyber torres",
+    "isaac collins",
+    "josh rojas",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael mcgreevy",
+    "riley greene",
+    "salvador perez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "106",
+   "entry_id": "5197214214",
+   "username": "fatcolumbus",
+   "points": 64.1,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dillon dingler",
+    "gleyber torres",
+    "jordan walker",
+    "lars nootbaar",
+    "masyn winn",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5197130987",
+   "username": "relevanthought",
+   "points": 63.35,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.54,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "corbin carroll",
+    "josh rojas",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael massey",
+    "michael mcgreevy",
+    "riley greene",
+    "salvador perez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "108",
+   "entry_id": "5197124708",
+   "username": "ecaras0381",
+   "points": 62.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lane thomas",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "108",
+   "entry_id": "5197195942",
+   "username": "libo66",
+   "points": 62.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew velazquez",
+    "dillon dingler",
+    "jj wetherholt",
+    "jordan walker",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "ryan waldschmidt",
+    "salvador perez",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "110",
+   "entry_id": "5197128818",
+   "username": "Chadg20",
+   "points": 60.35,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ketel marte",
+    "kevin mcgonigle",
+    "lane thomas",
+    "max kepler",
+    "randy dobnak",
+    "salvador perez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "111",
+   "entry_id": "5196953827",
+   "username": "YoDoggs",
+   "points": 60.1,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "jj wetherholt",
+    "kevin mcgonigle",
+    "lars nootbaar",
+    "michael mcgreevy",
+    "riley greene",
+    "ryan waldschmidt",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "112",
+   "entry_id": "5197042376",
+   "username": "jokerdpo",
+   "points": 59.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "kerry carpenter",
+    "ketel marte",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "112",
+   "entry_id": "5197195184",
+   "username": "gitsum40",
+   "points": 59.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "kerry carpenter",
+    "ketel marte",
+    "kevin mcgonigle",
+    "max kepler",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "114",
+   "entry_id": "5197177215",
+   "username": "kafedaiv",
+   "points": 57.35,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew velazquez",
+    "brandon pfaadt",
+    "carter jensen",
+    "corbin carroll",
+    "gleyber torres",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5197170767",
+   "username": "lazshuwa",
+   "points": 53.35,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "geraldo perdomo",
+    "kevin mcgonigle",
+    "lane thomas",
+    "matt vierling",
+    "michael massey",
+    "michael mcgreevy",
+    "riley greene",
+    "vinnie pasquantino"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "116",
+   "entry_id": "5197213329",
+   "username": "Phlegmgoat",
+   "points": 49.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "geraldo perdomo",
+    "kerry carpenter",
+    "ketel marte",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "ryan waldschmidt",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "117",
+   "entry_id": "5197066267",
+   "username": "orenict",
+   "points": 47.1,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Michael McGreevy",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "blaze jordan",
+    "gleyber torres",
+    "jimmy crooks",
+    "jordan walker",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "michael mcgreevy",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "118",
+   "entry_id": "5197195046",
+   "username": "sasmallen",
+   "points": 46.35,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Brandon Pfaadt",
+    "Michael McGreevy"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "carter jensen",
+    "colt keith",
+    "kerry carpenter",
+    "kevin mcgonigle",
+    "lane thomas",
+    "michael massey",
+    "michael mcgreevy",
+    "riley greene",
+    "salvador perez"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Troy Melton",
+   "player_norm": "troy melton",
+   "roster_position": "P",
+   "pct_drafted": 88.14,
+   "fpts": 11.85
+  },
+  {
+   "player": "Riley Greene",
+   "player_norm": "riley greene",
+   "roster_position": "OF",
+   "pct_drafted": 66.1,
+   "fpts": 3.0
+  },
+  {
+   "player": "Michael McGreevy",
+   "player_norm": "michael mcgreevy",
+   "roster_position": "P",
+   "pct_drafted": 55.93,
+   "fpts": 6.25
+  },
+  {
+   "player": "Jordan Walker",
+   "player_norm": "jordan walker",
+   "roster_position": "OF",
+   "pct_drafted": 46.61,
+   "fpts": 12.0
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "OF",
+   "pct_drafted": 45.76,
+   "fpts": 12.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 43.22,
+   "fpts": 14.0
+  },
+  {
+   "player": "Alec Burleson",
+   "player_norm": "alec burleson",
+   "roster_position": "1B",
+   "pct_drafted": 42.37,
+   "fpts": 15.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "3B",
+   "pct_drafted": 41.53,
+   "fpts": 3.0
+  },
+  {
+   "player": "Brandon Pfaadt",
+   "player_norm": "brandon pfaadt",
+   "roster_position": "P",
+   "pct_drafted": 38.98,
+   "fpts": 10.1
+  },
+  {
+   "player": "Lars Nootbaar",
+   "player_norm": "lars nootbaar",
+   "roster_position": "OF",
+   "pct_drafted": 35.59,
+   "fpts": 12.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "SS",
+   "pct_drafted": 33.9,
+   "fpts": 6.0
+  },
+  {
+   "player": "Gleyber Torres",
+   "player_norm": "gleyber torres",
+   "roster_position": "2B",
+   "pct_drafted": 33.05,
+   "fpts": 3.0
+  },
+  {
+   "player": "JJ Wetherholt",
+   "player_norm": "jj wetherholt",
+   "roster_position": "2B",
+   "pct_drafted": 32.2,
+   "fpts": 10.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "SS",
+   "pct_drafted": 30.51,
+   "fpts": 3.0
+  },
+  {
+   "player": "Kerry Carpenter",
+   "player_norm": "kerry carpenter",
+   "roster_position": "OF",
+   "pct_drafted": 28.81,
+   "fpts": 5.0
+  },
+  {
+   "player": "Colt Keith",
+   "player_norm": "colt keith",
+   "roster_position": "3B",
+   "pct_drafted": 26.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "C",
+   "pct_drafted": 25.42,
+   "fpts": 17.0
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 24.58,
+   "fpts": 0.0
+  },
+  {
+   "player": "Masyn Winn",
+   "player_norm": "masyn winn",
+   "roster_position": "SS",
+   "pct_drafted": 24.58,
+   "fpts": 2.0
+  },
+  {
+   "player": "Max Kepler",
+   "player_norm": "max kepler",
+   "roster_position": "OF",
+   "pct_drafted": 19.49,
+   "fpts": 4.0
+  },
+  {
+   "player": "Randy Dobnak",
+   "player_norm": "randy dobnak",
+   "roster_position": "P",
+   "pct_drafted": 16.95,
+   "fpts": 14.25
+  },
+  {
+   "player": "Lane Thomas",
+   "player_norm": "lane thomas",
+   "roster_position": "OF",
+   "pct_drafted": 14.41,
+   "fpts": 2.0
+  },
+  {
+   "player": "Carter Jensen",
+   "player_norm": "carter jensen",
+   "roster_position": "C",
+   "pct_drafted": 12.71,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ketel Marte",
+   "player_norm": "ketel marte",
+   "roster_position": "2B",
+   "pct_drafted": 11.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Blaze Jordan",
+   "player_norm": "blaze jordan",
+   "roster_position": "3B",
+   "pct_drafted": 11.02,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ryan Waldschmidt",
+   "player_norm": "ryan waldschmidt",
+   "roster_position": "OF",
+   "pct_drafted": 11.02,
+   "fpts": 0.0
+  },
+  {
+   "player": "Adrian Del Castillo",
+   "player_norm": "adrian del castillo",
+   "roster_position": "C",
+   "pct_drafted": 11.02,
+   "fpts": 24.0
+  },
+  {
+   "player": "Vinnie Pasquantino",
+   "player_norm": "vinnie pasquantino",
+   "roster_position": "1B",
+   "pct_drafted": 10.17,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jose Fermin",
+   "player_norm": "jose fermin",
+   "roster_position": "3B",
+   "pct_drafted": 10.17,
+   "fpts": 5.0
+  },
+  {
+   "player": "Isaac Collins",
+   "player_norm": "isaac collins",
+   "roster_position": "OF",
+   "pct_drafted": 7.63,
+   "fpts": 18.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "2B",
+   "pct_drafted": 7.63,
+   "fpts": 6.0
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "1B",
+   "pct_drafted": 7.63,
+   "fpts": 2.0
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "OF",
+   "pct_drafted": 7.63,
+   "fpts": 9.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "3B",
+   "pct_drafted": 6.78,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ildemaro Vargas",
+   "player_norm": "ildemaro vargas",
+   "roster_position": "1B",
+   "pct_drafted": 6.78,
+   "fpts": 11.0
+  },
+  {
+   "player": "James Outman",
+   "player_norm": "james outman",
+   "roster_position": "OF",
+   "pct_drafted": 6.78,
+   "fpts": 18.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "SS",
+   "pct_drafted": 6.78,
+   "fpts": 6.0
+  },
+  {
+   "player": "Michael Massey",
+   "player_norm": "michael massey",
+   "roster_position": "2B",
+   "pct_drafted": 6.78,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jimmy Crooks",
+   "player_norm": "jimmy crooks",
+   "roster_position": "C",
+   "pct_drafted": 5.93,
+   "fpts": 3.0
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "1B",
+   "pct_drafted": 5.93,
+   "fpts": 9.0
+  },
+  {
+   "player": "Nathan Church",
+   "player_norm": "nathan church",
+   "roster_position": "OF",
+   "pct_drafted": 5.93,
+   "fpts": 5.0
+  },
+  {
+   "player": "Josh Rojas",
+   "player_norm": "josh rojas",
+   "roster_position": "3B",
+   "pct_drafted": 4.24,
+   "fpts": 10.0
+  },
+  {
+   "player": "Andrew Velazquez",
+   "player_norm": "andrew velazquez",
+   "roster_position": "SS",
+   "pct_drafted": 4.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Fermin",
+   "player_norm": "jose fermin",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Tyler Locklear",
+   "player_norm": "tyler locklear",
+   "roster_position": "1B",
+   "pct_drafted": 2.54,
+   "fpts": 28.0
+  },
+  {
+   "player": "Ivan Herrera",
+   "player_norm": "ivan herrera",
+   "roster_position": "C",
+   "pct_drafted": 0.85,
+   "fpts": 0.0
+  },
+  {
+   "player": "Gage Workman",
+   "player_norm": "gage workman",
+   "roster_position": "2B",
+   "pct_drafted": 0.85,
+   "fpts": 0.0
+  },
+  {
+   "player": "James McCann",
+   "player_norm": "james mccann",
+   "roster_position": "C",
+   "pct_drafted": 0.85,
+   "fpts": 0.0
+  },
+  {
+   "player": "Josh Rojas",
+   "player_norm": "josh rojas",
+   "roster_position": "2B",
+   "pct_drafted": 0.85,
+   "fpts": 10.0
+  },
+  {
+   "player": "Matt Vierling",
+   "player_norm": "matt vierling",
+   "roster_position": "OF",
+   "pct_drafted": 0.85,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 3,
+  "requested": 3,
+  "field_size": 118,
+  "best_rank": 10,
+  "worst_rank": 67,
+  "best_finish_percentile": 92.37,
+  "median_finish_percentile": 63.56,
+  "best_points": 100.1,
+  "winning_points": 118.1,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

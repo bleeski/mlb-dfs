@@ -1,0 +1,1285 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192708063",
+ "slate_date": "2026-07-25",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 45,
+  "entries_complete_lineups": 45,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 130.28,
+  "winning_entry_id": "5198796348",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 34,
+  "entries_in_duplicated_lineups": 15,
+  "share_duplicated_pct": 33.3,
+  "max_copies": 5,
+  "copies_histogram": {
+   "1": 30,
+   "3": 2,
+   "4": 1,
+   "5": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 19,
+  "at_cap_share_pct": 42.2,
+  "salary_left_histogram": {
+   "<= 0": 7,
+   "701-1500": 3,
+   "301-700": 18,
+   "101-300": 5,
+   "1-100": 12
+  },
+  "max_stack_histogram": {
+   "3": 10,
+   "4": 24,
+   "5": 11
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Sonny Gray",
+    "pct_drafted": 77.78
+   },
+   {
+    "player": "Dylan Cease",
+    "pct_drafted": 73.33
+   },
+   {
+    "player": "Nathan Lukes",
+    "pct_drafted": 62.22
+   },
+   {
+    "player": "Masataka Yoshida",
+    "pct_drafted": 51.11
+   },
+   {
+    "player": "Anthony Seigler",
+    "pct_drafted": 46.67
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 270,
+  "roster_slots_expected": 270,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5198796348",
+   "username": "edwardharper",
+   "points": 130.28,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "dylan cease",
+    "george springer",
+    "masataka yoshida",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5198884626",
+   "username": "RFinch_Kings",
+   "points": 119.28,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "brandon valenzuela",
+    "daulton varsho",
+    "dylan cease",
+    "george springer",
+    "nathan lukes"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5198479418",
+   "username": "Aoteoroa",
+   "points": 118.28,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "dylan cease",
+    "george springer",
+    "kazuma okamoto",
+    "masataka yoshida"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5198902871",
+   "username": "sportsfan14",
+   "points": 112.35,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "dylan cease",
+    "ernie clement",
+    "george springer",
+    "nathan lukes",
+    "wilyer abreu",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5198965650",
+   "username": "davidlobo4",
+   "points": 106.35,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "daulton varsho",
+    "dylan cease",
+    "george springer",
+    "nathan lukes",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5198331779",
+   "username": "jazzyj0619",
+   "points": 105.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 53.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5198835135",
+   "username": "Diesel",
+   "points": 105.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 53.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5198874863",
+   "username": "beccapatt",
+   "points": 105.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 53.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5198945261",
+   "username": "mister_eddie6",
+   "points": 102.53,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "andruw monasterio",
+    "dylan cease",
+    "louis varland",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5198465541",
+   "username": "try3255",
+   "points": 101.28,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "george springer",
+    "willson contreras",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5198663018",
+   "username": "macyfan",
+   "points": 97.53,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5198899155",
+   "username": "xXxPLOSIVE",
+   "points": 97.53,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5198939717",
+   "username": "DanDePo",
+   "points": 97.53,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5198952665",
+   "username": "Handcuff2006",
+   "points": 97.53,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5198968498",
+   "username": "Alancey",
+   "points": 97.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 57.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor wong",
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5198902901",
+   "username": "thampton45",
+   "points": 97.1,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 55.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "dylan cease",
+    "george springer",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5198627530",
+   "username": "howardwi",
+   "points": 93.53,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 51.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "connor wong",
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5198911161",
+   "username": "GuitarBet1",
+   "points": 93.53,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "dylan cease",
+    "justin slaten",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5198784161",
+   "username": "mythicalrhymer01",
+   "points": 91.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 54.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5198852355",
+   "username": "crf_333",
+   "points": 91.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 54.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5198939170",
+   "username": "qbjjj",
+   "points": 91.53,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 54.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5198888415",
+   "username": "Harvesters0812",
+   "points": 79.53,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dylan cease",
+    "masataka yoshida",
+    "ryan watson",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5198967708",
+   "username": "TheBabz",
+   "points": 78.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 52.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor wong",
+    "daulton varsho",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "24",
+   "entry_id": "5198776219",
+   "username": "SportsJoker12",
+   "points": 74.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "brandon valenzuela",
+    "dylan cease",
+    "kazuma okamoto",
+    "masataka yoshida",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "25",
+   "entry_id": "5198868813",
+   "username": "corruption79",
+   "points": 72.73,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5198498118",
+   "username": "fan21",
+   "points": 72.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 47.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ceddanne rafaela",
+    "connor wong",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5198740002",
+   "username": "krusherz77",
+   "points": 69.1,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 51.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "caleb durbin",
+    "dylan cease",
+    "nathan lukes",
+    "sonny gray",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5198904368",
+   "username": "jrmurphy2",
+   "points": 69.1,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 54.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "caleb durbin",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5198731014",
+   "username": "xshonuff03x",
+   "points": 66.73,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5198856016",
+   "username": "jarradkern",
+   "points": 66.73,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5198916416",
+   "username": "137666",
+   "points": 66.73,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5198968451",
+   "username": "Rallycap",
+   "points": 66.73,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 57.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "connor wong",
+    "dylan cease",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5198781784",
+   "username": "wittwerjoe",
+   "points": 64.1,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 50.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor wong",
+    "dylan cease",
+    "jarren duran",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "34",
+   "entry_id": "5198941117",
+   "username": "cv0563",
+   "points": 47.25,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "george springer",
+    "masataka yoshida",
+    "sonny gray",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5198840257",
+   "username": "bleeski",
+   "points": 37.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "caleb durbin",
+    "daulton varsho",
+    "george springer",
+    "sonny gray",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5198743511",
+   "username": "gwarrick0639",
+   "points": 36.88,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "george springer",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5198529663",
+   "username": "whoisjohngalt420",
+   "points": 32.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 27.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "caleb durbin",
+    "daulton varsho",
+    "vladimir guerrero",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "38",
+   "entry_id": "5198042757",
+   "username": "aramisj22",
+   "points": 25.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 17.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "ceddanne rafaela",
+    "vladimir guerrero",
+    "willson contreras",
+    "wilyer abreu",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5198898914",
+   "username": "gallantpca",
+   "points": 23.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 17.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "ernie clement",
+    "jarren duran",
+    "kazuma okamoto",
+    "masataka yoshida",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "40",
+   "entry_id": "5198744744",
+   "username": "briguy13",
+   "points": 22.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "anthony seigler",
+    "daulton varsho",
+    "jarren duran",
+    "sonny gray",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5198518593",
+   "username": "RCW1231",
+   "points": 20.88,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 27.41,
+   "n_cheap": 1,
+   "players_norm": [
+    "alejandro kirk",
+    "anthony seigler",
+    "jahmai jones",
+    "sonny gray",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "42",
+   "entry_id": "5198883339",
+   "username": "H-Rex",
+   "points": 19.88,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "caleb durbin",
+    "masataka yoshida",
+    "nathan lukes",
+    "sonny gray",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "43",
+   "entry_id": "5198555416",
+   "username": "jep4576",
+   "points": 19.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "connor wong",
+    "ernie clement",
+    "masataka yoshida",
+    "sonny gray",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "44",
+   "entry_id": "5198501385",
+   "username": "tlynch0",
+   "points": 18.88,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "anthony seigler",
+    "caleb durbin",
+    "daulton varsho",
+    "sonny gray",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "44",
+   "entry_id": "5198778898",
+   "username": "20taylormade20",
+   "points": 18.88,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "anthony seigler",
+    "aroldis chapman",
+    "kazuma okamoto",
+    "sonny gray",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Sonny Gray",
+   "player_norm": "sonny gray",
+   "roster_position": "UTIL",
+   "pct_drafted": 77.78,
+   "fpts": 1.25
+  },
+  {
+   "player": "Dylan Cease",
+   "player_norm": "dylan cease",
+   "roster_position": "UTIL",
+   "pct_drafted": 73.33,
+   "fpts": 50.85
+  },
+  {
+   "player": "Nathan Lukes",
+   "player_norm": "nathan lukes",
+   "roster_position": "UTIL",
+   "pct_drafted": 62.22,
+   "fpts": 12.0
+  },
+  {
+   "player": "Masataka Yoshida",
+   "player_norm": "masataka yoshida",
+   "roster_position": "UTIL",
+   "pct_drafted": 51.11,
+   "fpts": 0.0
+  },
+  {
+   "player": "Anthony Seigler",
+   "player_norm": "anthony seigler",
+   "roster_position": "UTIL",
+   "pct_drafted": 46.67,
+   "fpts": 2.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "UTIL",
+   "pct_drafted": 46.67,
+   "fpts": 8.0
+  },
+  {
+   "player": "Yohendrick Pinango",
+   "player_norm": "yohendrick pinango",
+   "roster_position": "UTIL",
+   "pct_drafted": 35.56,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "UTIL",
+   "pct_drafted": 33.33,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andres Gimenez",
+   "player_norm": "andres gimenez",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.67,
+   "fpts": 8.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.22,
+   "fpts": 21.0
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.78,
+   "fpts": 2.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.56,
+   "fpts": 2.0
+  },
+  {
+   "player": "Vladimir Guerrero Jr.",
+   "player_norm": "vladimir guerrero",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.33,
+   "fpts": 17.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.89,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.89,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "UTIL",
+   "pct_drafted": 6.67,
+   "fpts": 18.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "UTIL",
+   "pct_drafted": 6.67,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "UTIL",
+   "pct_drafted": 6.67,
+   "fpts": 5.0
+  },
+  {
+   "player": "Brandon Valenzuela",
+   "player_norm": "brandon valenzuela",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Alejandro Kirk",
+   "player_norm": "alejandro kirk",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jahmai Jones",
+   "player_norm": "jahmai jones",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Justin Slaten",
+   "player_norm": "justin slaten",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ryan Watson",
+   "player_norm": "ryan watson",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Louis Varland",
+   "player_norm": "louis varland",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Aroldis Chapman",
+   "player_norm": "aroldis chapman",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 45,
+  "best_rank": 35,
+  "worst_rank": 35,
+  "best_finish_percentile": 24.44,
+  "median_finish_percentile": 24.44,
+  "best_points": 37.25,
+  "winning_points": 130.28,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}
