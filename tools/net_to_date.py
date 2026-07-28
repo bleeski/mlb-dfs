@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import uuid
 from collections import defaultdict
 from pathlib import Path
 
@@ -53,7 +54,9 @@ def append_record(record: dict, path: Path = LEDGER) -> None:
     contests.append(record)
     payload["contests"] = sorted(contests, key=lambda c: (str(c.get("slate_date") or ""),
                                                           str(c.get("contest_id") or "")))
-    tmp = path.with_name(f".{path.name}.tmp")
+    # R21: a fixed tmp name let two concurrent miners interleave into one tmp
+    # file; a unique name keeps every stage-and-replace private to its writer.
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
     tmp.replace(path)
 

@@ -43,6 +43,10 @@ operator remembers a flag is a check that does not run at T-5:
 
 Optional, never blocking on its own absence:
   --parent    diff contest assignment against the file this one refines
+  --expect-sha256  hard-fail unless the file hashes to the given sha256 (full
+              hex or a prefix of 12+ chars). The brief records
+              delivered_sha256; this is the flag that pairs the upload with
+              it at T-5 (R20a)
 
 Advisory prints (never affect the exit code): exposure, lineup-overlap
 histogram, duplicate-lineup groups, first lock.
@@ -75,6 +79,7 @@ import json
 import re
 import sys
 import unicodedata
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -640,7 +645,11 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
         "checked_utc": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        tmp = manifest_path.with_name(f".{manifest_path.name}.preflight.tmp")
+        # R21: the fixed tmp name here let two concurrent preflights
+        # interleave into one tmp file and rename partial bytes over the
+        # manifest; a unique name keeps each stamp private to its writer.
+        tmp = manifest_path.with_name(
+            f".{manifest_path.name}.preflight.{uuid.uuid4().hex}.tmp")
         tmp.write_text(json.dumps(payload, indent=1, sort_keys=False) + "\n",
                        encoding="utf-8")
         tmp.replace(manifest_path)
@@ -826,6 +835,25 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     rep.info["entries_file"] = str(entries_path)
     rep.info["entries_sha256"] = sha256_of(entries_path)
 
+    if getattr(args, "expect_sha256", None):
+        # R20a. The brief records delivered_sha256; this pairs the file Ben
+        # actually selects at upload with the one the session reported. A
+        # prefix under 12 chars is refused rather than matched, because a
+        # check that can pass by accident is not a check.
+        expected = str(args.expect_sha256).strip().lower()
+        if len(expected) < 12 or any(c not in "0123456789abcdef" for c in expected):
+            raise ValueError(
+                "--expect-sha256 needs at least 12 hex characters; a shorter "
+                "prefix is too easy to match by accident")
+        actual = rep.info["entries_sha256"]
+        if actual == expected or actual.startswith(expected):
+            rep.info["expect_sha256"] = "matched"
+        else:
+            rep.fail(f"these bytes hash {actual[:12]} but --expect-sha256 says "
+                     f"{expected[:12]}; the file about to be uploaded is not "
+                     f"the one the brief reported. Do not upload without "
+                     f"resolving which delivery this is")
+
     if args.expect_contest_type and args.expect_contest_type.lower() != contest:
         rep.fail(f"declared contest type '{args.expect_contest_type}' but the file's "
                  f"header geometry is {contest}")
@@ -917,6 +945,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help="fail if the file's geometry is not this")
     ap.add_argument("--expect-entries", type=int,
                     help="reserved-entry count this file must hold; catches truncation")
+    ap.add_argument("--expect-sha256",
+                    help="hard-fail unless the entries file hashes to this "
+                         "sha256 (full hex, or a prefix of 12+ chars); pairs "
+                         "the upload with the brief's delivered_sha256 (R20a)")
     ap.add_argument("--min-pool-overlap", type=float, default=0.95)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true",

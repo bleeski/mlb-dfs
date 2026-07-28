@@ -34,6 +34,7 @@ import datetime as dt
 import json
 import os
 import sys
+import uuid
 from pathlib import Path
 
 # F19: pinned before any import, for the same reason as build_slate.py. This
@@ -58,9 +59,10 @@ from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
     assert_contest_geometry, parse_dk_entry_rows,
 )
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
+from mlb_engine.entries.upload_manifest import record_delivery  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
-    _assemble_projection_frame, _resolve_contest_postures, run_late_swap,
-    unresolved_contest_blockers,
+    _assemble_projection_frame, _resolve_contest_postures, _slate_tag,
+    run_late_swap, unresolved_contest_blockers,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -92,6 +94,20 @@ PORTFOLIO_CONTROLS = {
     "max_primary_stack_exposure_pct": 0.6, "max_sp_pair_repetition": 1,
     "max_shared_players": 7,
 }
+
+
+def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
+    """DKEntries_lateswap_<tag>_<runid8>.csv (R21).
+
+    The old fixed name silently overwrote the previous swap. The tag is the
+    same value the build's mirror uses, so the manifest supersession key
+    (contest_type, slate_tag) matches and the swap replaces the parent build
+    as "the" delivery for this slate; the run-id suffix makes two swaps two
+    files instead of one overwrite.
+    """
+    tag = str(slate_tag or "").strip() or "untagged"
+    suffix = str(run_id or "").rsplit("_", 1)[-1][:8] or "norun"
+    return f"DKEntries_lateswap_{tag}_{suffix}.csv"
 
 
 def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
@@ -450,14 +466,46 @@ def main() -> int:
         print("downgrade accepted by --accept-downgrade: " + "; ".join(downgraded),
               file=sys.stderr)
 
+    # R21: the fixed DKEntries_lateswap.csv silently overwrote the previous
+    # swap and landed with no manifest row, which default preflight then
+    # hard-fails. The name now carries the draftgroup tag and the swap run's
+    # id, the write is staged then replaced, and the delivery is recorded so
+    # "which file do I upload" stays one read of one file.
     dest_dir = REPO / "outputs" / args.date
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / "DKEntries_lateswap.csv"
-    dest.write_bytes(out.read_bytes())
+    try:
+        slate_tag = _slate_tag(str(salary))
+    except Exception:  # noqa: BLE001 - naming must never block the file
+        slate_tag = ""
+    dest = dest_dir / lateswap_dest_name(slate_tag, str(result.get("run_id") or ""))
+    tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
+    tmp.write_bytes(out.read_bytes())
+    os.replace(tmp, dest)
     print(f"gates: workflow_valid={result.get('workflow_valid')} "
           f"selection={result.get('selection_certified')} "
           f"allocation={result.get('allocation_certified')}")
+    delivered_sha = ""
+    try:
+        record = record_delivery(
+            date=args.date, delivered_file=dest, contest_type="classic",
+            slate_tag=slate_tag, contest_ids=sorted(contest_shapes),
+            entries=len(after_rosters), run_id=result.get("run_id"),
+            status="candidate",
+            certification=("certified" if result.get("workflow_valid")
+                           else "not_certified"),
+            projection_tier="proxy",  # the swap assembles emergency-proxy projections
+            notes=f"late swap; parent {args.parent_entries}",
+        )
+        delivered_sha = str(record.get("sha256") or "")
+    except Exception as exc:  # noqa: BLE001 - bookkeeping must never block the file
+        print(f"MANIFEST NOT RECORDED for {dest.name}: {exc}; default "
+              f"preflight will hard-fail this delivery until a record exists",
+              file=sys.stderr)
     print(f"wrote {dest}")
+    if delivered_sha:
+        print(f"delivered sha256: {delivered_sha}")
+        print(f"verify at upload: tools/preflight_upload.py --entries {dest} "
+              f"--expect-sha256 {delivered_sha[:12]}")
     print("Upload by hand. Nothing here entered a contest or moved money.")
     return 0
 

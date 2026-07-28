@@ -328,6 +328,12 @@ a flag is a check that does not run at T-5:
   warning. A team that has not posted stays soft. The feed's age prints next to
   the verdict and warns past 90 minutes, so a stale all-clear is visibly stale.
 
+One optional flag closes the identity loop the report's sha256 line opens:
+`--expect-sha256 <hex>` (12+ chars of the brief's `delivered_sha256`)
+hard-fails unless the file on disk hashes to it, so the file Ben selects at
+upload is provably the file that certified. Use it when re-checking a file
+you did not just build, and always after a late swap.
+
 ### The four exit codes
 
 | exit | verdict | what you say |
@@ -482,7 +488,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 372 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 385 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

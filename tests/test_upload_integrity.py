@@ -1165,5 +1165,63 @@ class PreflightContractDocumentationTests(unittest.TestCase):
             self.assertIn(waiver, section)
 
 
+class ExpectSha256Tests(unittest.TestCase):
+    """R20a: --expect-sha256 ties the file Ben selects at upload to the one
+    the brief reported. The brief already records delivered_sha256; this is
+    the check that makes the pairing enforceable at T-5 instead of a thing
+    to eyeball."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+        import hashlib
+        self.digest = hashlib.sha256(self.entries.read_bytes()).hexdigest()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    def test_matching_full_sha_passes(self):
+        result = self._run("--expect-sha256", self.digest)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_matching_prefix_of_twelve_passes(self):
+        result = self._run("--expect-sha256", self.digest[:12])
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_mismatch_is_a_hard_failure(self):
+        result = self._run("--expect-sha256", "0" * 64)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("is not the one the brief reported",
+                      result.stdout + result.stderr)
+
+    def test_a_short_prefix_is_a_usage_error_not_a_pass(self):
+        result = self._run("--expect-sha256", "abc")
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+
+
+class FixedTmpNameRegressionTests(unittest.TestCase):
+    """R21: a fixed tmp name means two concurrent writers interleave into one
+    tmp file and either can rename partial bytes over the real target. Pin
+    both known sites to unique names so the defect cannot quietly return."""
+
+    def test_no_fixed_tmp_names_remain(self):
+        preflight = (REPO / "tools" / "preflight_upload.py").read_text(
+            encoding="utf-8")
+        self.assertNotIn('.preflight.tmp"', preflight)
+        self.assertIn("uuid.uuid4().hex", preflight)
+        net = (REPO / "tools" / "net_to_date.py").read_text(encoding="utf-8")
+        self.assertNotIn('f".{path.name}.tmp"', net)
+        self.assertIn("uuid.uuid4().hex", net)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

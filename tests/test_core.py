@@ -5438,5 +5438,109 @@ class EnvironmentFactorOwnershipTests(unittest.TestCase):
         self.assertAlmostEqual(f1_report["park_run_factor_by_team"]["MIN"], park)
 
 
+class ClaimToolTests(unittest.TestCase):
+    """R19: the multi-session claim protocol as one command.
+
+    The contract's primitive is an atomic mkdir; these pin the tool's exit
+    codes and bookkeeping around it, against a temp root so no test touches
+    the repo's live claims/.
+    """
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = self._tmp.name
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _claim(self, *argv):
+        import subprocess
+        import sys as _sys
+        repo = Path(__file__).resolve().parents[1]
+        return subprocess.run(
+            [_sys.executable, str(repo / "tools" / "claim.py"),
+             "--root", self.root, *argv],
+            capture_output=True, text=True, timeout=120)
+
+    def test_take_writes_owner_and_exits_zero(self):
+        import json as _json
+        proc = self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD",
+                           "--scope", "main slate")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        owner = _json.loads(Path(self.root, "claims", "slate_2026-07-29_1905",
+                                 "owner.json").read_text(encoding="utf-8"))
+        self.assertEqual(owner["role"], "BUILD")
+        self.assertIsNone(owner["released_utc"])
+
+    def test_second_take_is_held_exit_2_and_names_the_owner(self):
+        self._claim("take", "ledger", "--role", "ARCHIVE", "--date", "2026-07-28")
+        proc = self._claim("take", "ledger", "--role", "DEV",
+                           "--date", "2026-07-28")
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("HELD", proc.stdout)
+        self.assertIn("ARCHIVE", proc.stdout)
+
+    def test_release_then_retake_succeeds(self):
+        self._claim("take", "engine", "--role", "DEV", "--date", "2026-07-28")
+        released = self._claim("release", "engine", "--date", "2026-07-28")
+        self.assertEqual(released.returncode, 0, released.stderr)
+        self.assertTrue(Path(self.root, "claims", "engine_2026-07-28",
+                             "RELEASED").exists())
+        check = self._claim("check", "engine", "--date", "2026-07-28")
+        self.assertEqual(check.returncode, 0)
+        self.assertIn("released", check.stdout)
+        retake = self._claim("take", "engine", "--role", "DEV",
+                             "--date", "2026-07-28")
+        self.assertEqual(retake.returncode, 0, retake.stdout)
+
+    def test_sweep_reports_a_stale_held_claim_and_deletes_nothing(self):
+        self._claim("take", "inbox", "--role", "ARCHIVE", "--date", "2020-01-01")
+        proc = self._claim("sweep")
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("STALE", proc.stdout)
+        self.assertIn("inbox_2020-01-01", proc.stdout)
+        self.assertTrue(Path(self.root, "claims", "inbox_2020-01-01").exists())
+
+    def test_dirt_blocks_on_foreign_dirt_inside_the_write_set(self):
+        proc = self._claim("dirt", "--role", "DEV",
+                           "--porcelain", " M tools/preflight_upload.py\n")
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("BLOCK", proc.stdout)
+
+    def test_dirt_notes_outside_dirt_and_never_blocks_fragments(self):
+        porcelain = ("?? ledger/own_results.json\n"
+                     "?? docs/backlog_inbox/2026-07-28_build_note.md\n")
+        proc = self._claim("dirt", "--role", "DEV", "--porcelain", porcelain)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("note", proc.stdout)
+        self.assertIn("frag", proc.stdout)
+
+
+class LateSwapDeliveryNameTests(unittest.TestCase):
+    """R21: two late swaps are two files, and the delivered name carries the
+    same draftgroup tag the build's mirror uses, so the manifest supersession
+    key (contest_type, slate_tag) matches and the swap replaces the parent
+    build as "the" delivery for this slate."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        repo = Path(__file__).resolve().parents[1]
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_tool", repo / "tools" / "late_swap.py")
+        cls.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.mod)
+
+    def test_name_carries_tag_and_run_suffix(self):
+        self.assertEqual(
+            self.mod.lateswap_dest_name("2138_3g", "20260728T120000Z_1dbcfc3b"),
+            "DKEntries_lateswap_2138_3g_1dbcfc3b.csv")
+
+    def test_fallbacks_when_tag_or_run_id_is_missing(self):
+        self.assertEqual(self.mod.lateswap_dest_name("", ""),
+                         "DKEntries_lateswap_untagged_norun.csv")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
