@@ -23,6 +23,13 @@ files.
 5. Labels are non-negotiable: everything captured here is an observed outcome or
    a deterministic descriptive statistic, never a win-rate, ROI, or probability
    claim.
+6. Multi-session: this runbook is the ARCHIVE role (CLAUDE.md,
+   multi-session contract). Before Job 1, take the claims:
+   `mkdir claims/ledger_<utc-date>` and `mkdir claims/inbox_<utc-date>`;
+   a failed mkdir means another session holds it, so stop. Write a
+   RELEASED file inside both when the archival session is done. Never run
+   Job 1 during a live build window, and never edit the ledger without
+   holding its claim.
 
 ## Job 1: Post-slate archival (highest value; run after every slate)
 
@@ -125,6 +132,10 @@ Per contest:
      copies, winner copies.
    - Contest JSON complete: fee, paid places, cash line, seats where
      applicable, own Entry IDs.
+8. Merge any fragments waiting in `ledger/inbox/`: apply each note to the
+   ledger in place or under the slate's `A-NNN` entry, then delete the
+   consumed fragment file. Fragments are create-only for every other
+   role; ARCHIVE is the only merger.
 
 After all contests on the slate: return the updated ledger, the updated
 registry, and the mined JSON files to the claude.ai project session.

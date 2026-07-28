@@ -39,6 +39,19 @@ the certified output, so nobody reviewing the file can see it happened.
 eligibility. Never correct it against real-world rosters. If the salary file and a
 data feed disagree, the salary file wins.
 
+## Multi-session check, before anything else
+
+CLAUDE.md carries the multi-session contract; a build session is BUILD.
+As soon as you have printed the slate identity and before staging, take
+the slate claim: `mkdir claims/slate_<date>_<tag>` (plain mkdir, never
+`-p`; a failure means another session owns this slate). If the claim is
+held, stop and tell Ben rather than build, because portfolio caps hold
+across the whole entered set, and two certified files for one contest are
+one combined portfolio no gate ever saw. Write owner.json after taking
+it, and write a RELEASED file inside at delivery. Never edit the ledger
+or the backlog from a build session; drop a fragment in ledger/inbox/ or
+docs/backlog_inbox/ instead.
+
 ## Preflight: one call, always, even inside T-20
 
 A fresh sandbox has no scipy, and `scipy.optimize.milp` is the only solver the
@@ -260,6 +273,8 @@ Ben so he can confirm which draftgroup he is entering.
 Lead with the file and whether it is certified. Then a short brief, roughly:
 
 - **Gates**: all three pass, or exactly which failed
+- **Identity**: the delivered file's exact path and its sha256, so Ben can
+  confirm at upload that the file he selects is the file that certified
 - **Time**: minutes to the T-5 delivery deadline, and whether the slate clock
   agreed with the salary file (`salary_cross_check`). On disagreement the salary
   file wins and the clock is rewritten, which is the correct behavior. Read the

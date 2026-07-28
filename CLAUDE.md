@@ -52,7 +52,9 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    authorized_entry_ids, never a rebuild. A locked game admits no new players.
 
 ## Session start
-1. `git status` must be clean; if not, say what is dirty before touching it.
+1. `git status`: apply the foreign-dirt rule in the multi-session contract
+   below. Say what is dirty, and whose it is where a claim names an owner,
+   before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
    `PASS  v2.26.0  23 modules  372 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
@@ -115,6 +117,53 @@ inventory checks fail while the suite passes in full, build and flag it.
 - Deliverables land in outputs/<date>/ with exact paths stated.
 - Ceiling below Floor is a hard error, never silently repaired.
 
+## Multi-session contract (v1)
+Cowork sessions sharing this folder have no coordination: no locks, no
+messages, no registry. This file and the filesystem are the only channels.
+Every session follows this section before its first write.
+
+Roles; Ben's first message assigns one:
+- BUILD, one slate: writes runs/, outputs/<its date>/,
+  data/slates/<its date>/, and its own bank cache. Nothing else.
+- ARCHIVE: writes ledger/, data/archive/, data/standings/,
+  data/reference/. Runs only outside live build windows.
+- DEV: writes mlb_engine/, tools/, tests/, docs/, skills/. Never edits
+  engine paths while any slate claim is live: builds re-import modules
+  between steps, so a mid-slate edit changes a running build.
+Unassigned: if claims/ is empty, act as SOLO (all roles, still claim);
+otherwise stay read-only and ask Ben.
+
+Claims are live session state in claims/, gitignored except .gitkeep.
+Take with plain mkdir (atomic, fails when held):
+`mkdir claims/<resource>_<utc-date>`, then write owner.json (role, scope,
+taken_utc). Resources: slate_<date>_<tag>, ledger, inbox, engine. A
+failed mkdir means held: read owner.json and stop; never delete or take
+over another session's claim. Yesterday's claims are stale by definition;
+a stale claim today is Ben's to arbitrate. Release by writing a RELEASED
+file inside the claim. Re-read claims/ immediately before writing any
+contended surface, not only at session start. BUILD claims its slate
+before staging; ARCHIVE claims ledger and inbox before mining; DEV claims
+engine before touching code.
+
+Git under multiple sessions: classify dirty paths against your write set.
+Foreign dirt inside it blocks and names the owner; foreign dirt elsewhere
+is reported and left alone. `git add` by explicit path only, never `-A`.
+While any claim you do not own is live: no checkout, reset, stash,
+restore, or clean.
+
+One writer per contended file. Only ARCHIVE edits the ledger; only DEV
+edits the backlog and this file, and contract changes happen only with no
+other session live. Everyone else records by dropping a fragment in
+ledger/inbox/ or docs/backlog_inbox/ (create-only for every role, one
+note per file, named <date>_<role>_<slug>.md); the owning role merges and
+deletes consumed fragments.
+
+One slate, one session, always. Portfolio caps are properties of the
+whole entered set and certification is per run, so two sessions'
+certified files for one contest are one combined portfolio no gate ever
+saw. Every brief states the delivered file's sha256; Ben checks it at
+upload before entering anything.
+
 ## T-schedule
 At T-20 skip optional steps. At T-10 approve on posture defaults and
 auto-floors. At T-5 present the best certified file immediately with zero
@@ -141,7 +190,9 @@ gates passed; it is clean when the relaxation counts are zero.
 
 ## Scheduled task sessions
 Each scheduled run is its own session. Read this file and the ledger Quick
-Card first. Stay file-scoped: no DraftKings fetching, no destructive git
+Card first. A scheduled task runs as ARCHIVE: take the ledger and inbox
+claims first, and a claim you cannot take turns the run into a report,
+never a write. Stay file-scoped: no DraftKings fetching, no destructive git
 operations. A scheduled task may process standings CSVs Ben has already
 dropped in the inbox and remind him which contests still need a manual pull.
 Commit with a descriptive message when a task changes tracked files.
