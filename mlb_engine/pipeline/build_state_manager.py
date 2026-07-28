@@ -258,14 +258,98 @@ def verify_run_bundle(run_dir: str | Path) -> Dict[str, Any]:
     }
 
 
+def verify_inputs_unmoved(run_dir: str | Path) -> Dict[str, Any]:
+    """R20(b): the staged sources this run read still hash what intake recorded.
+
+    :func:`verify_run_bundle` checks the snapshots inside the run, which
+    nothing outside the run can touch. The exposure is the staged working
+    copies the build actually reads (``data/slates/<date>/...``): on
+    2026-07-23 a Showdown stage clobbered an in-flight Classic build's staged
+    inputs and certification could not see it. This check can: at promotion
+    the sources must still match the intake hashes, or the run was built on a
+    world that moved underneath it. Meaningful only within the building
+    session, because ``source_path`` is absolute against that session's
+    mount, and promotion is exactly where that holds.
+    """
+    manifest = _load_manifest(run_dir)
+    moved: list[str] = []
+    missing: list[str] = []
+    checked = 0
+    for name, record in manifest.get("inputs", {}).items():
+        source = Path(str(record.get("source_path") or ""))
+        try:
+            exists = source.exists() and source.is_file()
+        except OSError:
+            exists = False
+        if not exists:
+            missing.append(name)
+            continue
+        checked += 1
+        if sha256_file(source) != record.get("sha256"):
+            moved.append(name)
+    errors = [f"inputs moved underneath the run: {name}" for name in sorted(moved)]
+    errors += [f"input source vanished underneath the run: {name}"
+               for name in sorted(missing)]
+    return {"passed": not errors, "errors": errors, "checked": checked,
+            "moved": sorted(moved), "missing_sources": sorted(missing)}
+
+
+_POINTER_UNCHECKED = object()
+
+
+def read_pointer_sha256(runs_root: str | Path) -> Optional[str]:
+    """Current sha256 of the latest-run pointer file, or None when absent.
+
+    R20(c): capture this the moment a run is created, hand it back to
+    :func:`promote_run` as ``expected_pointer_sha256``, and a promotion that
+    would silently overwrite another session's promotion becomes a loud
+    refusal instead of a lost update.
+    """
+    pointer = Path(runs_root) / LATEST_POINTER
+    try:
+        return sha256_file(pointer) if pointer.exists() else None
+    except OSError:
+        return None
+
+
 def promote_run(
     run_dir: str | Path,
     latest_pointer_path: Optional[str | Path] = None,
+    *,
+    expected_pointer_sha256: Any = _POINTER_UNCHECKED,
 ) -> Dict[str, Any]:
-    """Promote a validated run and atomically update the latest-run pointer."""
+    """Promote a validated run and atomically update the latest-run pointer.
+
+    ``expected_pointer_sha256`` is the compare half of a compare-and-swap
+    (R20c): pass what :func:`read_pointer_sha256` returned when this run was
+    created (None when no pointer existed yet). A pointer that has since
+    changed means another session promoted while this run was building; the
+    promotion is refused without mutating the run, which stays ``building``
+    and remains valid. Omitting the argument keeps the old unconditional
+    write, which is the manual-recovery path after review.
+    """
     run_path = Path(run_dir)
     manifest = _load_manifest(run_path)
     _assert_mutable(manifest)
+    pointer = Path(latest_pointer_path) if latest_pointer_path else run_path.parent / LATEST_POINTER
+    if expected_pointer_sha256 is not _POINTER_UNCHECKED:
+        try:
+            current = sha256_file(pointer) if pointer.exists() else None
+        except OSError:
+            current = None
+        if current != expected_pointer_sha256:
+            return {
+                "passed": False,
+                "run_id": manifest.get("run_id"),
+                "pointer_conflict": True,
+                "errors": [
+                    "promotion refused: the latest-run pointer changed while "
+                    "this run was building, so another session promoted a run "
+                    "in the meantime. This run is untouched and stays "
+                    "'building'; re-read the pointer and decide which "
+                    "portfolio is the delivery, or promote manually (without "
+                    "expected_pointer_sha256) after review"],
+            }
     cert = manifest.get("certification", {})
     errors: list[str] = []
     if not cert.get("workflow_valid"):
@@ -277,6 +361,13 @@ def promote_run(
         errors.append("allocation_certified is false")
     verification = verify_run_bundle(run_path)
     errors.extend(verification["errors"])
+    # R20(b): the snapshots verified above live inside the run where nothing
+    # else can touch them; the staged sources the build actually read are
+    # not so protected. A source that no longer hashes what intake recorded
+    # means the world moved underneath this run, and the certified claim
+    # must not ship.
+    sources = verify_inputs_unmoved(run_path)
+    errors.extend(sources["errors"])
     if errors:
         manifest["status"] = "blocked"
         manifest["errors"] = sorted(set(manifest.get("errors", []) + errors))
@@ -286,7 +377,6 @@ def promote_run(
     manifest["status"] = "promoted"
     manifest["promoted_utc"] = _iso()
     _save_manifest(run_path, manifest)
-    pointer = Path(latest_pointer_path) if latest_pointer_path else run_path.parent / LATEST_POINTER
     _atomic_write_json(pointer, {
         "run_id": manifest["run_id"],
         # Relative to the pointer's own directory, which is runs_root. A pointer

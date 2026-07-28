@@ -121,8 +121,8 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 import pandas as pd
 
 from mlb_engine.pipeline.build_state_manager import (
-    create_run, promote_run, register_artifact, sha256_file,
-    snapshot_run_inputs, update_run_certification,
+    create_run, promote_run, read_pointer_sha256, register_artifact,
+    sha256_file, snapshot_run_inputs, update_run_certification,
 )
 from mlb_engine.allocate.contest_allocator import select_and_assign_entries
 from mlb_engine.contest_shapes import (
@@ -287,6 +287,10 @@ def execute_portfolio(
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
     run = create_run(runs_root, mode, parent_run_id=parent_run_id, metadata={"pipeline_version": VERSION, **(metadata or {})})
+    # R20(c): the compare half of promotion's compare-and-swap, captured the
+    # moment this run begins. If another session promotes while this run is
+    # building, promotion below refuses instead of silently overwriting.
+    pointer_sha_at_create = read_pointer_sha256(runs_root)
     run_dir = Path(run["run_dir"])
     input_paths = [salary_csv, entries_csv, *(additional_input_paths or [])]
     snapshot_run_inputs(run_dir, input_paths)
@@ -447,7 +451,7 @@ def execute_portfolio(
             "errors": [f"failed post-export gate: {x}" for x in certification["failed_post_export_gates"]],
             "diagnostics_path": str(diagnostic_path), "workflow_valid": False,
         }
-    promotion = promote_run(run_dir)
+    promotion = promote_run(run_dir, expected_pointer_sha256=pointer_sha_at_create)
     return {
         "passed": bool(promotion["passed"]),
         "run_id": run["run_id"],
@@ -476,6 +480,29 @@ def _parent_export_sha256(parent: Mapping[str, Any]) -> str:
     return ""
 
 
+def _assert_parent_lineage(lineage: Mapping[str, Any],
+                           allow_parent_mismatch: bool) -> None:
+    """R20(c): a swap that does not descend from the promoted export blocks.
+
+    The swap resolves its parent through the latest-run pointer at call time.
+    A session that promoted between this file's delivery and this swap makes
+    the pointer name a different portfolio, and refining the wrong parent was
+    previously recorded in lineage metadata and allowed to proceed. It blocks
+    now; ``allow_parent_mismatch=True`` is the reviewed override, and the
+    mismatch stays on the record either way.
+    """
+    if lineage.get("current_matches_parent_export"):
+        return
+    if allow_parent_mismatch:
+        return
+    raise ValueError(
+        "late swap parent mismatch: the entries file does not hash to the "
+        "promoted run's export, so the latest promotion is not the portfolio "
+        "this file came from (another session may have promoted since "
+        "delivery). Re-resolve the parent, or pass allow_parent_mismatch=True "
+        "after reviewing the lineage")
+
+
 def run_late_swap(
     *,
     runs_root: str | Path,
@@ -489,6 +516,7 @@ def run_late_swap(
     confirmed_order_by_player_id: Optional[Mapping[str, int]] = None,
     starter_player_ids: Optional[Iterable[str]] = None,
     confirmed_teams: Optional[Iterable[str]] = None,
+    allow_parent_mismatch: bool = False,
     **kwargs: Any,
 ) -> Dict[str, Any]:
     """Execute a late swap against the verified latest promoted parent run.
@@ -512,6 +540,7 @@ def run_late_swap(
         "current_entries_sha256": current_hash,
         "current_matches_parent_export": bool(parent_export_hash) and parent_export_hash == current_hash,
     }
+    _assert_parent_lineage(lineage_metadata, allow_parent_mismatch)
 
     requirements = build_entry_requirements(
         current_entries_csv, status_by_player_id, as_of, contest_shapes,

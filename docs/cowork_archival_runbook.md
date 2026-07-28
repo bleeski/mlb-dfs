@@ -116,10 +116,14 @@ Per contest:
    number this produces is the input to the open stakes decision, and that
    decision cannot be made without it.
 
-6. Paste the emitted block into the ledger archive under the slate's `A-NNN`
-   entry, newest first. Reconcile the living sections the same session: if the
-   slate contradicts a provisional rule, adjust the rule's grade and note the
-   contest ID.
+6. The miner writes the emitted block to `ledger/inbox/` as a fragment and no
+   longer prints it, so a block cannot be pasted twice (R23). Merge each
+   fragment into the ledger archive under the slate's `A-NNN` entry, newest
+   first, then delete the consumed fragment (step 8). Reconcile the living
+   sections the same session: if the slate contradicts a provisional rule,
+   adjust the rule's grade and note the contest ID. A successful mine also
+   moves its standings CSV from the inbox to `data/archive/<slate_date>/`
+   itself; `--no-archive-move` opts out.
 7. Verification checklist before closing the contest:
    - File read cleanly with the BOM (`utf-8-sig`); header matched the ledger
      3.1 schema.

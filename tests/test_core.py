@@ -5542,5 +5542,255 @@ class LateSwapDeliveryNameTests(unittest.TestCase):
                          "DKEntries_lateswap_untagged_norun.csv")
 
 
+class BankCacheMergeOnSaveTests(unittest.TestCase):
+    """R22: the later of two concurrent slices must merge the earlier one's
+    work instead of discarding it, and one session's stale-purge must not
+    erase another session's live work from the shared file."""
+
+    @staticmethod
+    def _roster(tag):
+        return [f"{tag}{i}" for i in range(10)]
+
+    def test_two_writers_union_on_disk(self):
+        import tempfile
+        from mlb_engine.optimize.bank_cache import BankCache
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            a = BankCache(path)
+            b = BankCache(path)
+            a.add(self._roster("a"), 1.0, job="pa|TA||SIG1")
+            a.attempted.add("pa|TA||SIG1")
+            b.add(self._roster("b"), 2.0, job="pb|TB||SIG2")
+            b.attempted.add("pb|TB||SIG2")
+            b.save()
+            a.save()  # the last writer used to win; now it merges
+            merged = BankCache(path)
+            rosters = {tuple(c["roster"]) for c in merged.candidates}
+            self.assertIn(tuple(self._roster("a")), rosters)
+            self.assertIn(tuple(self._roster("b")), rosters)
+            self.assertEqual(merged.attempted, {"pa|TA||SIG1", "pb|TB||SIG2"})
+
+    def test_memory_stays_the_writers_own_view(self):
+        import tempfile
+        from mlb_engine.optimize.bank_cache import BankCache
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            a = BankCache(path)  # loads before b writes, like a real race
+            b = BankCache(path)
+            b.add(self._roster("b"), 2.0, job="pb|TB||SIG2")
+            b.save()
+            a.add(self._roster("a"), 1.0, job="pa|TA||SIG1")
+            a.save()
+            self.assertEqual(len(a.candidates), 1)  # a serves only its own work
+            on_disk = {tuple(c["roster"]) for c in BankCache(path).candidates}
+            self.assertEqual(on_disk, {tuple(self._roster("a")),
+                                       tuple(self._roster("b"))})
+
+    def test_a_purge_no_longer_erases_the_other_sessions_work_on_disk(self):
+        import tempfile
+        from mlb_engine.optimize.bank_cache import BankCache
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            seed = BankCache(path)
+            seed.add(self._roster("a"), 1.0, job="pa|TA||SIG1")
+            seed.attempted.add("pa|TA||SIG1")
+            seed.add(self._roster("b"), 2.0, job="pb|TB||SIG2")
+            seed.attempted.add("pb|TB||SIG2")
+            seed.save()
+            purger = BankCache(path)
+            purger.drop_stale_jobs("SIG1")  # memory keeps SIG1 only
+            self.assertEqual(len(purger.candidates), 1)
+            purger.save()
+            after = BankCache(path)
+            rosters = {tuple(c["roster"]) for c in after.candidates}
+            self.assertIn(tuple(self._roster("b")), rosters,
+                          "the purge leaked to disk and erased SIG2's work")
+            self.assertIn("pb|TB||SIG2", after.attempted)
+
+
+class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
+    """R23: the miner owns the inbox move, and the ledger block becomes a
+    consumable fragment instead of stdout to paste twice."""
+
+    def test_moves_only_repo_inbox_files(self):
+        import tempfile
+        from mlb_engine.field.field_miner import archive_mined_standings
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            inbox = root / "data" / "standings" / "inbox"
+            inbox.mkdir(parents=True)
+            src = inbox / "contest-standings-42.csv"
+            src.write_text("x", encoding="utf-8")
+            dest = archive_mined_standings(src, "2026-07-01", repo_root=root)
+            self.assertEqual(
+                Path(dest),
+                root / "data" / "archive" / "2026-07-01" / src.name)
+            self.assertFalse(src.exists())
+            self.assertTrue(Path(dest).exists())
+
+    def test_leaves_files_outside_the_inbox_alone(self):
+        import tempfile
+        from mlb_engine.field.field_miner import archive_mined_standings
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            loose = root / "contest-standings-42.csv"
+            loose.write_text("x", encoding="utf-8")
+            self.assertIsNone(
+                archive_mined_standings(loose, "2026-07-01", repo_root=root))
+            self.assertTrue(loose.exists())
+
+    def test_no_slate_date_means_no_move(self):
+        import tempfile
+        from mlb_engine.field.field_miner import archive_mined_standings
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            inbox = root / "data" / "standings" / "inbox"
+            inbox.mkdir(parents=True)
+            src = inbox / "contest-standings-42.csv"
+            src.write_text("x", encoding="utf-8")
+            self.assertIsNone(archive_mined_standings(src, "", repo_root=root))
+            self.assertTrue(src.exists())
+
+    def test_fragment_is_written_and_named_for_its_contest(self):
+        import tempfile
+        from mlb_engine.field.field_miner import write_ledger_fragment
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = write_ledger_fragment("## A-XXX block", "2026-07-01",
+                                         "192784", repo_root=root)
+            expected = root / "ledger" / "inbox" / "2026-07-01_miner_192784.md"
+            self.assertEqual(Path(path), expected)
+            self.assertIn("A-XXX", expected.read_text(encoding="utf-8"))
+
+
+class PromotePointerCasTests(unittest.TestCase):
+    """R20(c): last-promoter-wins on runs/latest_valid_run.json becomes one
+    winner and one loud refusal that leaves the losing run valid."""
+
+    @staticmethod
+    def _certified_run(root):
+        from mlb_engine.pipeline.build_state_manager import (
+            create_run, update_run_certification)
+        run = create_run(root, "initial_build")
+        update_run_certification(run["run_dir"], {
+            "workflow_valid": True, "selection_certified": True,
+            "allocation_certified": True})
+        return run
+
+    def test_promotion_refused_when_the_pointer_moved(self):
+        import json as _json
+        import tempfile
+        from mlb_engine.pipeline.build_state_manager import (
+            promote_run, read_pointer_sha256)
+        with tempfile.TemporaryDirectory() as tmp:
+            a = self._certified_run(tmp)
+            b = self._certified_run(tmp)
+            expected = read_pointer_sha256(tmp)  # None: no pointer yet
+            self.assertTrue(promote_run(a["run_dir"])["passed"])
+            refused = promote_run(b["run_dir"],
+                                  expected_pointer_sha256=expected)
+            self.assertFalse(refused["passed"])
+            self.assertTrue(refused.get("pointer_conflict"))
+            manifest = _json.loads(
+                (Path(b["run_dir"]) / "manifest.json").read_text(
+                    encoding="utf-8"))
+            self.assertEqual(manifest["status"], "building",
+                             "a refused promotion must not poison the run")
+
+    def test_promotion_succeeds_when_the_pointer_is_unmoved(self):
+        import tempfile
+        from mlb_engine.pipeline.build_state_manager import (
+            promote_run, read_pointer_sha256)
+        with tempfile.TemporaryDirectory() as tmp:
+            a = self._certified_run(tmp)
+            first = promote_run(a["run_dir"],
+                                expected_pointer_sha256=read_pointer_sha256(tmp))
+            self.assertTrue(first["passed"], first["errors"])
+            b = self._certified_run(tmp)
+            second = promote_run(b["run_dir"],
+                                 expected_pointer_sha256=read_pointer_sha256(tmp))
+            self.assertTrue(second["passed"], second["errors"])
+
+    def test_legacy_promote_stays_unconditional(self):
+        import tempfile
+        from mlb_engine.pipeline.build_state_manager import promote_run
+        with tempfile.TemporaryDirectory() as tmp:
+            a = self._certified_run(tmp)
+            b = self._certified_run(tmp)
+            self.assertTrue(promote_run(a["run_dir"])["passed"])
+            self.assertTrue(promote_run(b["run_dir"])["passed"],
+                            "the manual-recovery path must keep working")
+
+
+class InputsUnmovedTests(unittest.TestCase):
+    """R20(b): a staged source clobbered mid-build (the 2026-07-23 incident)
+    blocks promotion by name instead of certifying against a vanished world."""
+
+    @staticmethod
+    def _run_with_source(root):
+        from mlb_engine.pipeline.build_state_manager import (
+            create_run, snapshot_run_inputs, update_run_certification)
+        source = Path(root) / "DKSalaries.csv"
+        source.write_text("v1", encoding="utf-8")
+        run = create_run(Path(root) / "runs", "initial_build")
+        snapshot_run_inputs(run["run_dir"], [source])
+        update_run_certification(run["run_dir"], {
+            "workflow_valid": True, "selection_certified": True,
+            "allocation_certified": True})
+        return run, source
+
+    def test_a_clobbered_staged_source_blocks_promotion(self):
+        import json as _json
+        import tempfile
+        from mlb_engine.pipeline.build_state_manager import promote_run
+        with tempfile.TemporaryDirectory() as tmp:
+            run, source = self._run_with_source(tmp)
+            source.write_text("v2 clobbered by another session",
+                              encoding="utf-8")
+            result = promote_run(run["run_dir"])
+            self.assertFalse(result["passed"])
+            self.assertTrue(any("moved underneath the run" in e
+                                for e in result["errors"]), result["errors"])
+            manifest = _json.loads(
+                (Path(run["run_dir"]) / "manifest.json").read_text(
+                    encoding="utf-8"))
+            self.assertEqual(manifest["status"], "blocked")
+
+    def test_untouched_sources_promote_clean(self):
+        import tempfile
+        from mlb_engine.pipeline.build_state_manager import promote_run
+        with tempfile.TemporaryDirectory() as tmp:
+            run, _ = self._run_with_source(tmp)
+            result = promote_run(run["run_dir"])
+            self.assertTrue(result["passed"], result["errors"])
+
+    def test_a_vanished_source_blocks_too(self):
+        import tempfile
+        from mlb_engine.pipeline.build_state_manager import promote_run
+        with tempfile.TemporaryDirectory() as tmp:
+            run, source = self._run_with_source(tmp)
+            source.unlink()
+            result = promote_run(run["run_dir"])
+            self.assertFalse(result["passed"])
+            self.assertTrue(any("vanished underneath the run" in e
+                                for e in result["errors"]), result["errors"])
+
+
+class ParentLineageGuardTests(unittest.TestCase):
+    """R20(c), swap half: refining a parent the pointer no longer names is a
+    block, not a metadata note."""
+
+    def test_a_mismatch_raises(self):
+        from mlb_engine.pipeline.execution_pipeline import _assert_parent_lineage
+        with self.assertRaises(ValueError):
+            _assert_parent_lineage(
+                {"current_matches_parent_export": False}, False)
+
+    def test_a_match_passes_and_the_override_is_explicit(self):
+        from mlb_engine.pipeline.execution_pipeline import _assert_parent_lineage
+        _assert_parent_lineage({"current_matches_parent_export": True}, False)
+        _assert_parent_lineage({"current_matches_parent_export": False}, True)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

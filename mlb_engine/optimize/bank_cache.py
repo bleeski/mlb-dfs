@@ -178,13 +178,42 @@ class BankCache:
         return len(stale_attempts) + len(stale_candidates)
 
     def save(self) -> None:
-        """tmp + os.replace: a kill mid-save used to poison the file permanently."""
+        """Reload-and-union, then tmp + os.replace (R22).
+
+        The write was already atomic (a kill mid-save used to poison the file
+        permanently), but it was a whole-file replace at the end of a
+        read-modify-write window minutes long, so the later of two concurrent
+        slices discarded the earlier one's candidates and attempted keys, and
+        one session's drop_stale_jobs persisted the erasure of another
+        session's live work. The union written here keeps every writer's work
+        on disk. Memory deliberately keeps this writer's own view: it is what
+        as_candidates serves and what the suffix-filtered report counts read,
+        and entries built under someone else's conditions signature are not
+        answers to this session's question. They survive in the file for that
+        session's next resume instead of being erased by this one.
+        """
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        disk_candidates: List[Dict[str, Any]] = []
+        disk_attempted: set[str] = set()
+        if self.path.exists():
+            try:
+                payload = json.loads(self.path.read_text(encoding="utf-8"))
+                disk_candidates = list(payload.get("candidates") or [])
+                disk_attempted = set(payload.get("attempted") or [])
+            except (OSError, ValueError):
+                pass  # unreadable disk state is rebuilt, the same policy as _load
+        merged_seen = set(self._seen)
+        merged_candidates = list(self.candidates)
+        for cand in disk_candidates:
+            key = tuple(str(p) for p in (cand.get("roster") or []))
+            if len(key) == 10 and all(key) and key not in merged_seen:
+                merged_seen.add(key)
+                merged_candidates.append(cand)
         tmp = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
         tmp.write_text(json.dumps({
             "version": VERSION,
-            "candidates": self.candidates,
-            "attempted": sorted(self.attempted),
+            "candidates": merged_candidates,
+            "attempted": sorted(self.attempted | disk_attempted),
         }, indent=1), encoding="utf-8")
         os.replace(tmp, self.path)
 

@@ -232,6 +232,12 @@ def main() -> int:
                     help="write the file even when a swapped entry scores below the "
                          "lineup it replaced under its own contest shape. Recorded "
                          "on stderr; there is no silent path.")
+    ap.add_argument("--allow-parent-mismatch", action="store_true",
+                    help="proceed when --parent-entries does not hash to the "
+                         "promoted run's export (R20c blocks this by default, "
+                         "because it means the latest promotion is not the "
+                         "portfolio this file came from). The mismatch is "
+                         "recorded either way.")
     ap.add_argument("--ignore-unresolved-postures", action="store_true",
                     help="proceed when a contest name matches no archetype, "
                          "accepting the fallback posture. Recorded on stderr.")
@@ -403,6 +409,7 @@ def main() -> int:
         confirmed_teams=status["confirmed_teams"],
         starter_player_ids=status["starter_player_ids"],
         authorized_entry_ids=authorized,
+        allow_parent_mismatch=args.allow_parent_mismatch,
         workflow_gates={**WORKFLOW_GATES, **{g: True for g in LATE_SWAP_ASSUMED_GATES},
                         # Derived, not assumed: all three parsed above or this
                         # script would already have exited.

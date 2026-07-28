@@ -1344,6 +1344,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--slate-date", default="")
     ap.add_argument("--registry")
     ap.add_argument("--emit-ledger", action="store_true")
+    ap.add_argument("--no-archive-move", action="store_true",
+                    help="leave a mined inbox CSV in place instead of moving it "
+                         "to data/archive/<slate_date>/ (R23; the move only ever "
+                         "applies to files inside data/standings/inbox/)")
     ap.add_argument("--json", dest="json_out")
     ap.add_argument("--my-entry-ids",
                     help="comma-separated Entry IDs of Ben's own entries. Omit and "
@@ -1475,8 +1479,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             json.dump(slim, fh, indent=1, default=list)
         print(f"json written: {args.json_out}")
     if args.emit_ledger:
+        block = emit_ledger_block(mined)
+        fragment = write_ledger_fragment(
+            block, args.slate_date or mined.get("slate_date") or "",
+            args.contest_id or mined.get("contest_id") or "")
         print()
-        print(emit_ledger_block(mined))
+        print(f"ledger block written to {fragment}")
+        print("ARCHIVE merges it into the ledger and deletes the fragment; the "
+              "block is deliberately not printed here, so it cannot be pasted "
+              "twice (R23)")
     else:
         g = mined["diagnostics"]
         join_txt = f"join {g['salary_join_rate_pct']}%" if g["salary_join_rate_pct"] is not None else "join n/a"
@@ -1485,7 +1496,72 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"{mined['duplication']['distinct_lineups']} distinct lineups, "
               f"{join_txt}, "
               f"ownership recompute {'OK' if g['ownership_recompute_ok'] else 'CHECK'}")
+    if args.standings and not args.no_archive_move:
+        moved = archive_mined_standings(
+            args.standings, args.slate_date or mined.get("slate_date") or "")
+        if moved:
+            print(f"standings archived: {moved}")
     return 0
+
+
+def archive_mined_standings(standings_path: str | Path, slate_date: str,
+                            repo_root: str | Path | None = None) -> Optional[str]:
+    """Move a successfully mined inbox CSV to data/archive/<slate_date>/ (R23).
+
+    The runbook documented this move; nothing performed it, so the inbox
+    accumulated mined-but-present CSVs (122 on 2026-07-28) and only the
+    per-contest dedupe stood between a re-run and a double count. The miner
+    owns the move now, and only for files that actually live in the repo's
+    inbox: a fixture, a tmp file, or any ad-hoc path is never moved. Fail-open
+    on OSError, because a mount without the delete grant can refuse the
+    rename, and a completed mine must not report failure over housekeeping.
+    Returns the destination path, or None when no move applies.
+    """
+    if not slate_date:
+        return None
+    src = Path(standings_path).resolve()
+    root = (Path(repo_root).resolve() if repo_root
+            else Path(__file__).resolve().parents[2])
+    inbox = (root / "data" / "standings" / "inbox").resolve()
+    try:
+        if src.parent != inbox or not src.is_file():
+            return None
+    except OSError:
+        return None
+    dest_dir = root / "data" / "archive" / str(slate_date)
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / src.name
+        os.replace(str(src), str(dest))
+    except OSError as exc:
+        print(f"standings not archived ({exc}); the file stays in the inbox "
+              f"and the per-contest dedupe still holds")
+        return None
+    return str(dest)
+
+
+def write_ledger_fragment(block: str, slate_date: str, contest_id: str,
+                          repo_root: str | Path | None = None) -> str:
+    """Write the emitted ledger block to ledger/inbox/ as a fragment (R23).
+
+    Printing the block made the paste a human step, and a block pasted twice
+    double-counts in the one file whose archetype-conditioned counts feed the
+    R10 gate. A fragment is consumed on merge: ARCHIVE applies it to the
+    ledger and deletes it, so the same block cannot land twice. A re-mine of
+    the same contest overwrites its own fragment, the same replace-not-append
+    rule own_results.json follows.
+    """
+    root = (Path(repo_root).resolve() if repo_root
+            else Path(__file__).resolve().parents[2])
+    frag_dir = root / "ledger" / "inbox"
+    frag_dir.mkdir(parents=True, exist_ok=True)
+    date_part = str(slate_date or "undated")
+    cid_part = str(contest_id or "unknown")
+    dest = frag_dir / f"{date_part}_miner_{cid_part}.md"
+    tmp = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
+    tmp.write_text(str(block).rstrip() + "\n", encoding="utf-8")
+    os.replace(str(tmp), str(dest))
+    return str(dest)
 
 
 if __name__ == "__main__":
