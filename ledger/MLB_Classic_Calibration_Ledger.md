@@ -643,15 +643,65 @@ unresolvable.
 
 ### 3.14 The satellite leg, measured end to end (DATED FINDING, 2026-07-29)
 
-Observed outcomes over 4,736 entries that no model predicted. Not ROI, not a win
-rate, not a probability claim. This grades the operation, not the engine.
+Observed outcomes over 4,201 MLB satellite entries (4,736 across all sports) that no
+model predicted. Not ROI, not a win rate, not a probability claim. This grades the
+operation, not the engine.
 
-Satellite block (name contains `satellite` **or** `supersat`): 4,736 entries,
-**$391.35 fees, $3.90 direct cash, $325.00 ticket face won.** Every satellite fee is
-fresh cash: the entry-fee distribution tops out at $1.00 with a single $3.00 outlier,
-and the smallest ticket ever won is $2.00 and is locked to a named target contest, so
-no ticket can fund a satellite. Recycled ticket value into satellites is **zero
-percent**; recycling happens strictly downstream.
+**Read the MLB column first. This is an MLB ledger and the source export is
+all-sports** (`Sport` column: MLB 4,879 of 6,526 entries, then GOLF 737, NBA 432,
+NHL 187, SOC 151, NFL 120, and a tail). Every all-sports figure below is labelled as
+such and none of them belongs in an MLB decision.
+
+**MLB only** (`Sport == 'MLB'`), and this is the line that matters:
+
+| | entries | fees | cash | ticket face |
+|---|---|---|---|---|
+| all MLB | 4,879 | $563.36 | $251.05 | $216.00 |
+| MLB satellites | 4,201 | $262.35 | **$3.90** | $216.00 |
+| MLB non-satellite | 678 | $301.01 | **$247.15** | $0.00 |
+
+MLB net cash of -$312.31 splits -$258.45 satellite and -$53.86 non-satellite on raw
+columns. Attributing the $14.00 that ticket-funded Pocket Cup entries returned back to
+the satellites that produced the tickets puts the satellite leg at **-$244.45**. Use
+one view or the other; never sum them, because the $14 sits in the non-satellite
+column too. Either way **the satellite block carries roughly four fifths of the MLB
+loss on 86% of the MLB entries, and the engine's actual domain, MLB non-satellite
+Classic and Showdown, is close to break-even on observed outcomes** ($301.01 against
+$247.15, and May returned $66.24 on $63.55).
+
+**Of the $216 in ticket face MLB satellites won, only $61 is a prize this engine can
+play.** Decomposed by the sport of the *prize*, not the sport of the entry:
+
+| prize sport | target | satellite entries | satellite fees | ticket face |
+|---|---|---|---|---|
+| MLB Best Ball | Midseason Best Ball $5 Knuckleball | 207 | $36.45 | $55.00 |
+| **NFL** | NFL Best Ball $25 Millionaire | 380 | $65.45 | $50.00 |
+| MLB | $15 Relay Throw | 215 | $30.20 | $30.00 |
+| **NBA** | NBA Best Ball $20 Shootaround | 2 | $2.00 | $20.00 |
+| **TEN** | TEN $20 French Slam | 4 | $1.50 | $20.00 |
+| MLB | $2 Pocket Cup MEGA Qualifier | 2,915 | $29.15 | $18.00 |
+| MLB | $5M FBWC $13 Qualifier | 193 | $19.30 | $13.00 |
+| **NFL** | NFL $5 Fantasy Football Millionaire | 87 | $15.60 | $10.00 |
+
+$61 MLB Classic/Showdown-playable, $55 MLB Best Ball (a season-long product, not this
+engine), **$100 prizes in other sports entirely.** MLB DFS entries are the vehicle;
+NFL, NBA and tennis prizes are a large part of the cargo. The Best Ball
+classification is inferred from the contest name and is the one soft cell in the
+table.
+
+MLB satellite leg, cash only, end to end: **$262.35 fees out, $3.90 direct cash back,
+$14.00 back through redeemed MLB-target tickets, $17.90 returned, -$244.45 observed
+net.** No MLB satellite has ever produced a ticket that converted to more than $14 in
+total. The single $40 conversion in the table further down was a GOLF satellite.
+
+**All-sports context, for the ticket-chain mechanics only.** Satellite block across
+every sport (name contains `satellite` **or** `supersat`): 4,736 entries, $391.35
+fees, $3.90 direct cash, $325.00 ticket face won. Every satellite fee is fresh cash:
+the entry-fee distribution tops out at $1.00 with a single $3.00 outlier, and the
+smallest ticket ever won is $2.00 and is locked to a named target contest, so no
+ticket can fund a satellite. Recycled ticket value into satellites is **zero
+percent**; recycling happens strictly downstream. The chain table below is all-sports
+because the chains themselves cross sports.
 
 Of the $325 in ticket face, **$150 was redeemed and traceable, and it returned $54.00
 in cash.** Six single-ticket chains matched a target entry on exact fee and consistent
