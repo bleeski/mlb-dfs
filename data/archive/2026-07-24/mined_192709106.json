@@ -1,7 +1,7 @@
 {
  "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
  "version": "0.5-review",
- "coverage": "full",
+ "coverage": "standings_only",
  "contest_id": "192709106",
  "slate_date": "2026-07-24",
  "contest_type": "classic",
@@ -25,24 +25,11 @@
   "winner_copies": 1
  },
  "construction": {
-  "cheap_salary_threshold": 2100,
-  "at_cap_entries": 31,
-  "at_cap_share_pct": 52.5,
-  "salary_left_histogram": {
-   "701-1500": 3,
-   "1-100": 15,
-   "<= 0": 16,
-   "101-300": 17,
-   "301-700": 7,
-   "> 1500": 1
-  },
-  "max_stack_histogram": {
-   "1": 1,
-   "2": 7,
-   "3": 6,
-   "4": 14,
-   "5": 31
-  },
+  "cheap_salary_threshold": null,
+  "at_cap_entries": null,
+  "at_cap_share_pct": null,
+  "salary_left_histogram": {},
+  "max_stack_histogram": {},
   "sp_pair_top": [
    {
     "pair": [
@@ -133,16 +120,17 @@
   ]
  },
  "diagnostics": {
-  "salary_join_rate_pct": 100.0,
+  "salary_join_rate_pct": null,
   "unmatched_names_top": [],
-  "salary_name_collisions": [
-   "jose fermin",
-   "max muncy"
-  ],
+  "salary_name_collisions": [],
   "ownership_recompute_max_diff_pts": 6.78,
   "ownership_recompute_denominator": "all_entries",
   "ownership_recompute_ok": false,
   "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
   "intra_entry_duplicate_entry_ids": [],
   "roster_slots_observed": 590,
   "roster_slots_expected": 590,
@@ -154,19 +142,20 @@
  },
  "entries": [
   {
+   "rank": "1",
    "entry_id": "5198000774",
    "username": "ShineCrazyDiamond",
    "points": 117.25,
-   "salary_used": 49200,
-   "salary_left": 800,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Trevor Rogers"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 7.96,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "ben williamson",
     "cedric mullins",
@@ -182,19 +171,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "2",
    "entry_id": "5198131321",
    "username": "FantasyCrusader",
    "points": 115.25,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Trevor Rogers"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 11.35,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "andruw monasterio",
     "anthony seigler",
@@ -210,19 +200,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "3",
    "entry_id": "5198096479",
    "username": "hcnpower",
    "points": 112.2,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Davis Martin",
     "Roki Sasaki"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-3-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 7.63,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "cal raleigh",
     "chase meidroth",
@@ -238,19 +229,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "4",
    "entry_id": "5198058222",
    "username": "nflfreak_28",
    "points": 109.95,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 10.51,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "casey schmitt",
     "daniel susac",
@@ -266,19 +258,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "5",
    "entry_id": "5198135270",
    "username": "cpdk69",
    "points": 109.75,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dax Fulton",
     "Roki Sasaki"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-1-1-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 7.12,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "andy pages",
     "dax fulton",
@@ -294,19 +287,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "6",
    "entry_id": "5198093045",
    "username": "bleeski",
    "points": 107.9,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Davis Martin",
     "Grant Holmes"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 5.25,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "davis martin",
     "drake baldwin",
@@ -322,19 +316,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "7",
    "entry_id": "5198055220",
    "username": "wittwerjoe",
    "points": 103.95,
-   "salary_used": 49400,
-   "salary_left": 600,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 11.19,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "chandler simpson",
     "dustin may",
@@ -350,19 +345,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "8",
    "entry_id": "5198031195",
    "username": "Wanna_Square_Up1567",
    "points": 103.25,
-   "salary_used": 46800,
-   "salary_left": 3200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "MacKenzie Gore",
     "Trey Yesavage"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 8.3,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "christian encarnacion strand",
     "colton cowser",
@@ -378,19 +374,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "9",
    "entry_id": "5198079312",
    "username": "bleeski",
    "points": 103.2,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Davis Martin",
     "Roki Sasaki"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 6.61,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "cole young",
     "davis martin",
@@ -406,19 +403,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "10",
    "entry_id": "5198102641",
    "username": "pgk8",
    "points": 98.95,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 11.69,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "andrew benintendi",
     "braden montgomery",
@@ -434,19 +432,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "11",
    "entry_id": "5198096478",
    "username": "hcnpower",
    "points": 98.55,
-   "salary_used": 49500,
-   "salary_left": 500,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Joey Cantillo",
     "Logan Webb"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-3-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 10.51,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "andy pages",
@@ -462,19 +461,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "12",
    "entry_id": "5198112679",
    "username": "meitbe2014",
    "points": 95.5,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Logan Webb"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-3-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 14.06,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "braden montgomery",
     "bryce miller",
@@ -490,19 +490,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "13",
    "entry_id": "5198126165",
    "username": "kaladin",
    "points": 94.95,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-3-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 12.37,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alec burleson",
     "dustin may",
@@ -518,19 +519,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "14",
    "entry_id": "5198031196",
    "username": "Wanna_Square_Up1567",
    "points": 94.25,
-   "salary_used": 48600,
-   "salary_left": 1400,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "MacKenzie Gore",
     "Trey Yesavage"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 9.66,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "colton cowser",
     "drake baldwin",
@@ -546,19 +548,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "15",
    "entry_id": "5198072706",
    "username": "sasmallen",
    "points": 90.95,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 21.02,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "donovan walton",
@@ -574,19 +577,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "16",
    "entry_id": "5198102642",
    "username": "pgk8",
    "points": 90.25,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Shane McClanahan",
     "Trey Yesavage"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-4",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 6.1,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "cal raleigh",
     "dominic canzone",
@@ -602,19 +606,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "17",
    "entry_id": "5198076905",
    "username": "Rhombus87",
    "points": 86.55,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 14.41,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "austin riley",
     "heriberto hernandez",
@@ -630,19 +635,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "18",
    "entry_id": "5198066810",
    "username": "iamtheky",
    "points": 85.75,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Spencer Arrighetti"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 12.54,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "cam smith",
@@ -658,19 +664,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "19",
    "entry_id": "5198110948",
    "username": "oaktownchamps",
    "points": 85.55,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Shane McClanahan"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 20.0,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "byron buxton",
@@ -686,19 +693,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "20",
    "entry_id": "5198026395",
    "username": "Jackie2424",
    "points": 84.95,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 12.37,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "colson montgomery",
     "davis schneider",
@@ -714,19 +722,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "21",
    "entry_id": "5198131320",
    "username": "FantasyCrusader",
    "points": 84.65,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Shane McClanahan"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 9.49,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "blaze jordan",
     "braden montgomery",
@@ -742,19 +751,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "22",
    "entry_id": "5198087116",
    "username": "ggriggcubsfan",
    "points": 83.6,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Zebby Matthews"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 13.39,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "heriberto hernandez",
     "jackson merrill",
@@ -770,19 +780,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "23",
    "entry_id": "5198116160",
    "username": "SmokinJoe42069",
    "points": 80.25,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Trevor Rogers"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 13.05,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "connor wong",
     "donovan walton",
@@ -798,19 +809,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "24",
    "entry_id": "5198052846",
    "username": "salatso22",
    "points": 78.9,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Dustin May"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 11.02,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "andrew benintendi",
     "bryce miller",
@@ -826,19 +838,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "25",
    "entry_id": "5198051389",
    "username": "ChokeHoldem1",
    "points": 78.55,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Joey Cantillo",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 14.07,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "dominic canzone",
     "heriberto hernandez",
@@ -854,19 +867,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "26",
    "entry_id": "5198087115",
    "username": "ggriggcubsfan",
    "points": 78.25,
-   "salary_used": 49600,
-   "salary_left": 400,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Trevor Rogers"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-1-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.27,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "dustin may",
@@ -882,19 +896,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "27",
    "entry_id": "5198092214",
    "username": "seth1374",
    "points": 77.9,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Dustin May"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 10.17,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "bryce miller",
     "casey schmitt",
@@ -910,19 +925,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "28",
    "entry_id": "5198124113",
    "username": "joephoto",
    "points": 77.55,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Joey Cantillo",
     "Logan Webb"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-1-1-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.95,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "heriberto hernandez",
@@ -938,19 +954,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "28",
    "entry_id": "5198129067",
    "username": "Chris_1188",
    "points": 77.55,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "MacKenzie Gore"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-4",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.61,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "davis schneider",
@@ -966,19 +983,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "30",
    "entry_id": "5198013438",
    "username": "A_playa_named_gus",
    "points": 73.95,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Shane McClanahan"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 18.13,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "carlos cortes",
@@ -994,19 +1012,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "30",
    "entry_id": "5198141124",
    "username": "A1HoosierSales",
    "points": 73.95,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 15.08,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "dustin may",
@@ -1022,19 +1041,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "32",
    "entry_id": "5198115641",
    "username": "heathie512",
    "points": 73.8,
-   "salary_used": 49400,
-   "salary_left": 600,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 14.57,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "davis schneider",
@@ -1050,19 +1070,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "33",
    "entry_id": "5198135269",
    "username": "cpdk69",
    "points": 73.45,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Roki Sasaki"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 11.86,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alec burleson",
     "jo adell",
@@ -1078,19 +1099,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "34",
    "entry_id": "5198095254",
    "username": "Bamzclaz",
    "points": 70.7,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "MacKenzie Gore",
     "Shane McClanahan"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-4",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 12.88,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "andy pages",
     "griffin conine",
@@ -1106,19 +1128,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "35",
    "entry_id": "5198141728",
    "username": "UltimateWin4",
    "points": 70.5,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 13.39,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "andrew benintendi",
@@ -1134,19 +1157,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "36",
    "entry_id": "5198055219",
    "username": "wittwerjoe",
    "points": 69.8,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 15.25,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "austin riley",
     "byron buxton",
@@ -1162,19 +1186,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "37",
    "entry_id": "5198000775",
    "username": "ShineCrazyDiamond",
    "points": 69.65,
-   "salary_used": 49200,
-   "salary_left": 800,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 9.83,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "bryce miller",
     "daulton varsho",
@@ -1190,19 +1215,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "38",
    "entry_id": "5198142754",
    "username": "dr_jpop",
    "points": 67.85,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Trevor Rogers"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-3-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.44,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "blaze jordan",
     "fernando tatis",
@@ -1218,19 +1244,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "39",
    "entry_id": "5198094072",
    "username": "Bamzclaz",
    "points": 67.8,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Logan Webb"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 18.47,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alec burleson",
     "alejandro kirk",
@@ -1246,19 +1273,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "40",
    "entry_id": "5198104107",
    "username": "dragon8700",
    "points": 67.7,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Zebby Matthews"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-1-1-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 8.3,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "brayan rocchio",
     "bryce miller",
@@ -1274,19 +1302,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "41",
    "entry_id": "5198147797",
    "username": "y2kFrog",
    "points": 67.55,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Roki Sasaki"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-4",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 12.2,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "austin riley",
     "bryce miller",
@@ -1302,19 +1331,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "42",
    "entry_id": "5198141729",
    "username": "UltimateWin4",
    "points": 67.5,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 15.59,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "bryce miller",
@@ -1330,19 +1360,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "43",
    "entry_id": "5198054314",
    "username": "GammaDaFrat",
    "points": 66.85,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Trevor Rogers"
    ],
-   "max_stack": 1,
-   "stack_pattern": "1-1-1-1-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 12.71,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "evan carter",
     "fernando tatis",
@@ -1358,19 +1389,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "44",
    "entry_id": "5198010875",
    "username": "A_playa_named_gus",
    "points": 65.95,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 19.66,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "carlos cortes",
@@ -1386,19 +1418,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "45",
    "entry_id": "5198034151",
    "username": "sh-13",
    "points": 65.55,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Shane McClanahan"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 14.07,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "blaze jordan",
     "cal raleigh",
@@ -1414,19 +1447,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "46",
    "entry_id": "5198119054",
    "username": "cb777",
    "points": 65.1,
-   "salary_used": 49300,
-   "salary_left": 700,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Trey Yesavage"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 14.07,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "alejandro kirk",
     "byron buxton",
@@ -1442,19 +1476,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "47",
    "entry_id": "5198134801",
    "username": "ayoung1327",
    "points": 64.55,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "MacKenzie Gore"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 19.32,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "heriberto hernandez",
     "jackson merrill",
@@ -1470,19 +1505,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "48",
    "entry_id": "5198115628",
    "username": "heathie512",
    "points": 62.25,
-   "salary_used": 49300,
-   "salary_left": 700,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Dustin May",
     "Trevor Rogers"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.27,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "brooks lee",
     "byron buxton",
@@ -1498,19 +1534,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "49",
    "entry_id": "5198025060",
    "username": "tmoney88",
    "points": 59.55,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "Shane McClanahan"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 13.73,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "austin riley",
     "byron buxton",
@@ -1526,19 +1563,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "49",
    "entry_id": "5198134800",
    "username": "ayoung1327",
    "points": 59.55,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "MacKenzie Gore"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 21.86,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "byron buxton",
     "donovan walton",
@@ -1554,19 +1592,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "51",
    "entry_id": "5198118740",
    "username": "cb777",
    "points": 59.5,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 17.29,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "bryce miller",
     "carlos cortes",
@@ -1582,19 +1621,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "52",
    "entry_id": "5198084310",
    "username": "Paulyforfun",
    "points": 58.75,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "German Marquez",
     "Zebby Matthews"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-3-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 6.44,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "fernando tatis",
     "german marquez",
@@ -1610,19 +1650,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "53",
    "entry_id": "5198124998",
    "username": "liamhyyc",
    "points": 58.65,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 17.29,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "bryce miller",
     "carlos cortes",
@@ -1638,19 +1679,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "54",
    "entry_id": "5198092220",
    "username": "seth1374",
    "points": 57.55,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Logan Webb",
     "MacKenzie Gore"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 13.73,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "andrew benintendi",
     "andy pages",
@@ -1666,19 +1708,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "55",
    "entry_id": "5198097565",
    "username": "rk053169",
    "points": 56.7,
-   "salary_used": 49400,
-   "salary_left": 600,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Zebby Matthews"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 10.34,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "brayan rocchio",
     "bryce miller",
@@ -1694,19 +1737,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "56",
    "entry_id": "5198025059",
    "username": "tmoney88",
    "points": 50.55,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Roki Sasaki"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 10.0,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alec burleson",
     "bryce miller",
@@ -1722,19 +1766,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "57",
    "entry_id": "5198052845",
    "username": "salatso22",
    "points": 47.55,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Joey Cantillo",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 8.81,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "bryce eldridge",
     "cal raleigh",
@@ -1750,19 +1795,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "58",
    "entry_id": "5198076906",
    "username": "Rhombus87",
    "points": 47.5,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Logan Webb"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 15.93,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "austin martin",
     "brooks lee",
@@ -1778,19 +1824,20 @@
    "lineup_complete": true
   },
   {
+   "rank": "59",
    "entry_id": "5198132328",
    "username": "libo66",
    "points": 47.0,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Bryce Miller",
     "Grayson Rodriguez"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-3",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 8.81,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "bryce miller",
     "fernando tatis",
@@ -2927,5 +2974,23 @@
    "pct_drafted": 1.69,
    "fpts": 0.0
   }
- ]
+ ],
+ "own_results": {
+  "matched": 2,
+  "requested": 2,
+  "field_size": 59,
+  "best_rank": 6,
+  "worst_rank": 9,
+  "best_finish_percentile": 91.53,
+  "median_finish_percentile": 88.98,
+  "best_points": 107.9,
+  "winning_points": 117.25,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.5,
+  "winnings_total": 0.0,
+  "net": -0.5,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
 }

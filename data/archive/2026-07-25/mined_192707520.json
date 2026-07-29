@@ -2446,10 +2446,10 @@
   "winning_points": 177.55,
   "own_lineups_duplicated_by_field": 0,
   "max_copies_of_an_own_lineup": 1,
-  "entry_fee": null,
-  "fees_total": null,
-  "winnings_total": null,
-  "net": null,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": 0.0,
+  "net": -0.1,
   "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
  }
 }

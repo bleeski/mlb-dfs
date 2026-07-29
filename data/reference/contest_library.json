@@ -54,6 +54,23 @@
    "name": "MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
    "observations": 3
   },
+  "mlb $1.25k solo shot (early)|1.00": {
+   "breadth": 0.2355,
+   "entry_fee": 1.0,
+   "field_size": 1486,
+   "history": [
+    {
+     "date": "2026-07-29",
+     "field_size": 1486,
+     "paid_places": 350,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-07-29",
+   "name": "MLB $1.25K Solo Shot (Early)",
+   "observations": 1,
+   "paid_places": 350
+  },
   "mlb satellite to $15 relay throw (early)|na": {
    "entry_fee": null,
    "field_size": 150,
@@ -290,6 +307,6 @@
   }
  },
  "label": "observed contest history and name-inferred payout shape; observed values are observed history and inferred values are labeled priors; never win rate, cash rate, ROI, or probability; review-only, nothing auto-applies",
- "updated": "2026-07-19",
+ "updated": "2026-07-29",
  "version": "0.1-review"
 }

@@ -1,12 +1,15 @@
 {
  "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
- "version": "0.4-review",
+ "version": "0.5-review",
  "coverage": "standings_only",
  "contest_id": "191506960",
  "slate_date": "2026-06-20",
+ "contest_type": "classic",
  "meta": {
   "entries_total": 23,
   "entries_complete_lineups": 23,
+  "roster_size": 10,
+  "entries_unparsed": 0,
   "winning_points": 154.0,
   "winning_entry_id": "5171129496",
   "multi_entry_flag": false
@@ -124,6 +127,10 @@
   "ownership_recompute_denominator": "all_entries",
   "ownership_recompute_ok": true,
   "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
   "intra_entry_duplicate_entry_ids": [],
   "roster_slots_observed": 230,
   "roster_slots_expected": 230,
@@ -135,6 +142,7 @@
  },
  "entries": [
   {
+   "rank": "1",
    "entry_id": "5171129496",
    "username": "Billyboy10",
    "points": 154.0,
@@ -163,6 +171,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "2",
    "entry_id": "5171422173",
    "username": "mcooper2300",
    "points": 117.45,
@@ -191,6 +200,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "3",
    "entry_id": "5171396652",
    "username": "djprymek",
    "points": 112.15,
@@ -219,6 +229,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "4",
    "entry_id": "5171451895",
    "username": "auweglman",
    "points": 112.0,
@@ -247,6 +258,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "5",
    "entry_id": "5171448353",
    "username": "dmartins1",
    "points": 106.45,
@@ -275,6 +287,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "6",
    "entry_id": "5171437594",
    "username": "wittwerjoe",
    "points": 102.6,
@@ -303,6 +316,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "7",
    "entry_id": "5171435314",
    "username": "Patrick_Irish",
    "points": 101.6,
@@ -331,6 +345,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "8",
    "entry_id": "5171363920",
    "username": "corruption79",
    "points": 101.25,
@@ -359,6 +374,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "9",
    "entry_id": "5171125860",
    "username": "mrbig91",
    "points": 98.7,
@@ -387,6 +403,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "10",
    "entry_id": "5171448243",
    "username": "volfan7.7",
    "points": 97.7,
@@ -415,6 +432,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "11",
    "entry_id": "5171150498",
    "username": "howardwi",
    "points": 96.6,
@@ -443,6 +461,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "12",
    "entry_id": "5171462966",
    "username": "dbsultan",
    "points": 96.15,
@@ -471,6 +490,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "13",
    "entry_id": "5171468790",
    "username": "kenielsen2",
    "points": 93.7,
@@ -499,6 +519,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "14",
    "entry_id": "5171407600",
    "username": "bleeski",
    "points": 93.15,
@@ -527,6 +548,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "15",
    "entry_id": "5171387878",
    "username": "prymsu",
    "points": 92.0,
@@ -555,6 +577,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "16",
    "entry_id": "5171225591",
    "username": "jokerdpo",
    "points": 87.7,
@@ -583,6 +606,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "17",
    "entry_id": "5171465133",
    "username": "Harmiles",
    "points": 84.7,
@@ -611,6 +635,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "18",
    "entry_id": "5171040775",
    "username": "Emac",
    "points": 81.45,
@@ -639,6 +664,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "19",
    "entry_id": "5171476188",
    "username": "pigskin23",
    "points": 76.0,
@@ -667,6 +693,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "20",
    "entry_id": "5171346541",
    "username": "bobby244",
    "points": 68.45,
@@ -695,6 +722,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "21",
    "entry_id": "5171397699",
    "username": "DicVec",
    "points": 66.3,
@@ -723,6 +751,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "22",
    "entry_id": "5171426307",
    "username": "marquie007",
    "points": 61.5,
@@ -751,6 +780,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "23",
    "entry_id": "5170997432",
    "username": "coastrat69",
    "points": 60.5,
@@ -1249,5 +1279,23 @@
    "pct_drafted": 4.35,
    "fpts": 13.0
   }
- ]
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 14,
+  "worst_rank": 14,
+  "best_finish_percentile": 43.48,
+  "median_finish_percentile": 43.48,
+  "best_points": 93.15,
+  "winning_points": 154.0,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
 }

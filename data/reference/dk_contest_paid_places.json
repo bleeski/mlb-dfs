@@ -1,0 +1,807 @@
+{
+ "_label": "Observed Places_Paid and field_size per archived contest, read from Ben's DraftKings contest entry history export on 2026-07-29. Observed history, never a prediction, an ROI figure, or a probability claim. For a satellite, paid_places is the ticket count the contest awarded. Parked here because no CLI can write paid_places into the archive: the miner has no --paid-places flag and own_results.json has no field for it. See ledger 3.13.",
+ "source": "draftkings-contest-entry-history.csv",
+ "collected_date": "2026-07-29",
+ "contests": {
+  "192784475": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIL @ SF) (6/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192784476": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIL @ SF) (4/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192784479": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ SF)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192798445": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Showdown $2K Solo Shot (MIL @ SF)",
+   "entry_fee": 1.0,
+   "field_size": 2378,
+   "paid_places": 616,
+   "breadth": 0.259
+  },
+  "192851120": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ SF)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192784653": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Night) (2/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 1,
+   "breadth": 0.0085
+  },
+  "192784672": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192784673": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192784674": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192798437": {
+   "slate_date": "2026-07-27",
+   "name": "MLB $10K mini-MAX [150 Entry Max] (Night)",
+   "entry_fee": 1.0,
+   "field_size": 11890,
+   "paid_places": 2732,
+   "breadth": 0.2298
+  },
+  "192842358": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192853093": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192853339": {
+   "slate_date": "2026-07-27",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192708093": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (LAD @ NYM) (7/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192708094": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (LAD @ NYM) (3/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192708096": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (LAD @ NYM)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192708097": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (LAD @ NYM)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192754543": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown $30 Quarter Jukebox [Just $0.25!] (LAD @ NYM) (1/2)",
+   "entry_fee": 0.25,
+   "field_size": 142,
+   "paid_places": 33,
+   "breadth": 0.2324
+  },
+  "192708059": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TOR @ BOS) (4/7)",
+   "entry_fee": 0.01,
+   "field_size": 182,
+   "paid_places": 1,
+   "breadth": 0.0055
+  },
+  "192708060": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TOR @ BOS) (2/7)",
+   "entry_fee": 0.01,
+   "field_size": 193,
+   "paid_places": 1,
+   "breadth": 0.0052
+  },
+  "192708062": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TOR @ BOS)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192708063": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TOR @ BOS)",
+   "entry_fee": 0.1,
+   "field_size": 45,
+   "paid_places": 1,
+   "breadth": 0.0222
+  },
+  "192707612": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (3/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 1,
+   "breadth": 0.0085
+  },
+  "192710507": {
+   "slate_date": "2026-07-25",
+   "name": "MLB $750 Daily Dollar [Single Entry]",
+   "entry_fee": 1.0,
+   "field_size": 891,
+   "paid_places": 204,
+   "breadth": 0.229
+  },
+  "192744091": {
+   "slate_date": "2026-07-25",
+   "name": "MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (1/3)",
+   "entry_fee": 0.1,
+   "field_size": 118,
+   "paid_places": 2,
+   "breadth": 0.0169
+  },
+  "192746313": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192747269": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192747982": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192748828": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192753671": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192707473": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to $15 Relay Throw (Early) (2/2)",
+   "entry_fee": 0.25,
+   "field_size": 67,
+   "paid_places": 1,
+   "breadth": 0.0149
+  },
+  "192707481": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Early) (1/3)",
+   "entry_fee": 0.25,
+   "field_size": 112,
+   "paid_places": 1,
+   "breadth": 0.0089
+  },
+  "192707519": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192707520": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192707521": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192707522": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192707523": {
+   "slate_date": "2026-07-25",
+   "name": "MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Early) (3/3)",
+   "entry_fee": 0.1,
+   "field_size": 118,
+   "paid_places": 2,
+   "breadth": 0.0169
+  },
+  "192710479": {
+   "slate_date": "2026-07-25",
+   "name": "MLB $750 Daily Dollar [Single Entry]  (Early)",
+   "entry_fee": 1.0,
+   "field_size": 891,
+   "paid_places": 204,
+   "breadth": 0.229
+  },
+  "192738861": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192740560": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192741308": {
+   "slate_date": "2026-07-25",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "192529275": {
+   "slate_date": "2026-07-21",
+   "name": "MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #175-184 (1/4)",
+   "entry_fee": 2.0,
+   "field_size": 4670,
+   "paid_places": 1088,
+   "breadth": 0.233
+  },
+  "192442890": {
+   "slate_date": "2026-07-19",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Afternoon) (4/8)",
+   "entry_fee": 0.1,
+   "field_size": 297,
+   "paid_places": 1,
+   "breadth": 0.0034
+  },
+  "192500593": {
+   "slate_date": "2026-07-19",
+   "name": "MLB $30 Daily Dollar [Single Entry] (Afternoon)",
+   "entry_fee": 1.0,
+   "field_size": 35,
+   "paid_places": 9,
+   "breadth": 0.2571
+  },
+  "192464310": {
+   "slate_date": "2026-07-19",
+   "name": "MLB $1.25K Solo Shot (Turbo)",
+   "entry_fee": 1.0,
+   "field_size": 1486,
+   "paid_places": 350,
+   "breadth": 0.2355
+  },
+  "192464354": {
+   "slate_date": "2026-07-19",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (4/7)",
+   "entry_fee": 0.01,
+   "field_size": 223,
+   "paid_places": 1,
+   "breadth": 0.0045
+  },
+  "192464355": {
+   "slate_date": "2026-07-19",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (4/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192443599": {
+   "slate_date": "2026-07-19",
+   "name": "MLB Satellite to $15 Relay Throw (4/5)",
+   "entry_fee": 0.1,
+   "field_size": 178,
+   "paid_places": 1,
+   "breadth": 0.0056
+  },
+  "192443606": {
+   "slate_date": "2026-07-19",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (4/8)",
+   "entry_fee": 0.1,
+   "field_size": 297,
+   "paid_places": 1,
+   "breadth": 0.0034
+  },
+  "192454586": {
+   "slate_date": "2026-07-19",
+   "name": "MLB $1K Daily Dollar [Single Entry]",
+   "entry_fee": 1.0,
+   "field_size": 1189,
+   "paid_places": 285,
+   "breadth": 0.2397
+  },
+  "192413131": {
+   "slate_date": "2026-07-18",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIN @ CHC) (5/7)",
+   "entry_fee": 0.01,
+   "field_size": 222,
+   "paid_places": 1,
+   "breadth": 0.0045
+  },
+  "192413132": {
+   "slate_date": "2026-07-18",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIN @ CHC) (1/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192344519": {
+   "slate_date": "2026-07-17",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SF @ SEA) (6/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192344520": {
+   "slate_date": "2026-07-17",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SF @ SEA) (5/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192344257": {
+   "slate_date": "2026-07-17",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Night) (1/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 1,
+   "breadth": 0.0085
+  },
+  "192344259": {
+   "slate_date": "2026-07-17",
+   "name": "MLB Satellite to $5M FBWC $13 Qualifier (Night) (2/4)",
+   "entry_fee": 0.1,
+   "field_size": 101,
+   "paid_places": 1,
+   "breadth": 0.0099
+  },
+  "192369212": {
+   "slate_date": "2026-07-17",
+   "name": "MLB Satellite to World Cup Final Special (Night)",
+   "entry_fee": 1.0,
+   "field_size": 29,
+   "paid_places": 1,
+   "breadth": 0.0345
+  },
+  "191020573": {
+   "slate_date": "2026-06-03",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (7/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "191020574": {
+   "slate_date": "2026-06-03",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (5/7)",
+   "entry_fee": 0.01,
+   "field_size": 224,
+   "paid_places": 1,
+   "breadth": 0.0045
+  },
+  "192657349": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night) (1/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192657350": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night) (4/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192658268": {
+   "slate_date": "2026-07-24",
+   "name": "MLB $3K Solo Shot (Night)",
+   "entry_fee": 1.0,
+   "field_size": 3567,
+   "paid_places": 911,
+   "breadth": 0.2554
+  },
+  "192667458": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192701222": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192701224": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192701225": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192705822": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (1/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 1,
+   "breadth": 0.0085
+  },
+  "192709106": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Satellite to $15 Relay Throw (2/2)",
+   "entry_fee": 0.25,
+   "field_size": 59,
+   "paid_places": 1,
+   "breadth": 0.0169
+  },
+  "192712196": {
+   "slate_date": "2026-07-24",
+   "name": "MLB $1K Chin Music [Single Entry]",
+   "entry_fee": 5.0,
+   "field_size": 237,
+   "paid_places": 55,
+   "breadth": 0.2321
+  },
+  "192657334": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (LAD @ NYM) (3/7)",
+   "entry_fee": 0.01,
+   "field_size": 188,
+   "paid_places": 1,
+   "breadth": 0.0053
+  },
+  "192657335": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (LAD @ NYM) (3/7)",
+   "entry_fee": 0.01,
+   "field_size": 203,
+   "paid_places": 1,
+   "breadth": 0.0049
+  },
+  "192667460": {
+   "slate_date": "2026-07-24",
+   "name": "MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (LAD @ NYM)",
+   "entry_fee": 0.1,
+   "field_size": 49,
+   "paid_places": 1,
+   "breadth": 0.0204
+  },
+  "192630776": {
+   "slate_date": "2026-07-23",
+   "name": "MLB Showdown $2K Solo Shot (KC @ DET)",
+   "entry_fee": 1.0,
+   "field_size": 2378,
+   "paid_places": 616,
+   "breadth": 0.259
+  },
+  "192652559": {
+   "slate_date": "2026-07-23",
+   "name": "MLB Showdown SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (KC @ DET) (3/3)",
+   "entry_fee": 0.1,
+   "field_size": 118,
+   "paid_places": 2,
+   "breadth": 0.0169
+  },
+  "192652560": {
+   "slate_date": "2026-07-23",
+   "name": "MLB Showdown SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [5x] (KC @ DET) (3/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 5,
+   "breadth": 0.0424
+  },
+  "192652561": {
+   "slate_date": "2026-07-23",
+   "name": "MLB Showdown SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [5x] (KC @ DET)",
+   "entry_fee": 1.0,
+   "field_size": 29,
+   "paid_places": 5,
+   "breadth": 0.1724
+  },
+  "192623314": {
+   "slate_date": "2026-07-23",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Night) (1/8)",
+   "entry_fee": 0.1,
+   "field_size": 297,
+   "paid_places": 1,
+   "breadth": 0.0034
+  },
+  "192623315": {
+   "slate_date": "2026-07-23",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Night) (1/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 1,
+   "breadth": 0.0085
+  },
+  "192656508": {
+   "slate_date": "2026-07-23",
+   "name": "MLB $500 Solo Shot (Night)",
+   "entry_fee": 1.0,
+   "field_size": 594,
+   "paid_places": 136,
+   "breadth": 0.229
+  },
+  "192591926": {
+   "slate_date": "2026-07-22",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night) (2/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192591927": {
+   "slate_date": "2026-07-22",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night) (3/7)",
+   "entry_fee": 0.01,
+   "field_size": 237,
+   "paid_places": 1,
+   "breadth": 0.0042
+  },
+  "192627933": {
+   "slate_date": "2026-07-22",
+   "name": "MLB $500 Solo Shot (Night)",
+   "entry_fee": 1.0,
+   "field_size": 594,
+   "paid_places": 136,
+   "breadth": 0.229
+  },
+  "192591443": {
+   "slate_date": "2026-07-22",
+   "name": "MLB Satellite to $15 Relay Throw (Early) (3/5)",
+   "entry_fee": 0.1,
+   "field_size": 178,
+   "paid_places": 1,
+   "breadth": 0.0056
+  },
+  "192591459": {
+   "slate_date": "2026-07-22",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Early) (3/3)",
+   "entry_fee": 0.25,
+   "field_size": 118,
+   "paid_places": 1,
+   "breadth": 0.0085
+  },
+  "192591504": {
+   "slate_date": "2026-07-22",
+   "name": "MLB Satellite to NBA Best Ball $20 Shootaround (Early)",
+   "entry_fee": 1.0,
+   "field_size": 15,
+   "paid_places": 1,
+   "breadth": 0.0667
+  },
+  "192593054": {
+   "slate_date": "2026-07-22",
+   "name": "MLB $500 Daily Dollar [Single Entry] (Early)",
+   "entry_fee": 1.0,
+   "field_size": 594,
+   "paid_places": 136,
+   "breadth": 0.229
+  },
+  "192464820": {
+   "slate_date": "2026-07-18",
+   "name": "MLB $1 Triple Up [Top 9 Win $3] (Late Night)",
+   "entry_fee": 1.0,
+   "field_size": 31,
+   "paid_places": 9,
+   "breadth": 0.2903
+  },
+  "192413146": {
+   "slate_date": "2026-07-18",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (1/7)",
+   "entry_fee": 0.01,
+   "field_size": 203,
+   "paid_places": 1,
+   "breadth": 0.0049
+  },
+  "192413147": {
+   "slate_date": "2026-07-18",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (5/7)",
+   "entry_fee": 0.01,
+   "field_size": 210,
+   "paid_places": 1,
+   "breadth": 0.0048
+  },
+  "192444379": {
+   "slate_date": "2026-07-18",
+   "name": "MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
+   "entry_fee": 1.0,
+   "field_size": 31,
+   "paid_places": 9,
+   "breadth": 0.2903
+  },
+  "191787184": {
+   "slate_date": "2026-06-29",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo) (4/7)",
+   "entry_fee": 0.01,
+   "field_size": 222,
+   "paid_places": 1,
+   "breadth": 0.0045
+  },
+  "191787186": {
+   "slate_date": "2026-06-29",
+   "name": "MLB Satellite to Midseason Best Ball $5 Knuckleball (Turbo)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "191823035": {
+   "slate_date": "2026-06-29",
+   "name": "MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
+   "entry_fee": 1.0,
+   "field_size": 29,
+   "paid_places": 9,
+   "breadth": 0.3103
+  },
+  "191506958": {
+   "slate_date": "2026-06-20",
+   "name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Afternoon) (7/7)",
+   "entry_fee": 0.01,
+   "field_size": 193,
+   "paid_places": 1,
+   "breadth": 0.0052
+  },
+  "191506960": {
+   "slate_date": "2026-06-20",
+   "name": "MLB Satellite to Midseason Best Ball $5 Knuckleball (Afternoon)",
+   "entry_fee": 0.25,
+   "field_size": 23,
+   "paid_places": 1,
+   "breadth": 0.0435
+  },
+  "191507209": {
+   "slate_date": "2026-06-20",
+   "name": "MLB Satellite to $15 Relay Throw (Early) (4/5)",
+   "entry_fee": 0.1,
+   "field_size": 150,
+   "paid_places": 1,
+   "breadth": 0.0067
+  },
+  "191507213": {
+   "slate_date": "2026-06-20",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (Early) (2/8)",
+   "entry_fee": 0.1,
+   "field_size": 242,
+   "paid_places": 1,
+   "breadth": 0.0041
+  },
+  "191507220": {
+   "slate_date": "2026-06-20",
+   "name": "MLB Satellite to $5M FBWC $13 Qualifier (Early) (1/4)",
+   "entry_fee": 0.1,
+   "field_size": 110,
+   "paid_places": 1,
+   "breadth": 0.0091
+  },
+  "191488360": {
+   "slate_date": "2026-06-19",
+   "name": "MLB Satellite to $15 Relay Throw (1/5)",
+   "entry_fee": 0.1,
+   "field_size": 177,
+   "paid_places": 1,
+   "breadth": 0.0056
+  },
+  "191488366": {
+   "slate_date": "2026-06-19",
+   "name": "MLB Satellite to NFL Best Ball $25 Millionaire (5/8)",
+   "entry_fee": 0.1,
+   "field_size": 297,
+   "paid_places": 1,
+   "breadth": 0.0034
+  }
+ }
+}

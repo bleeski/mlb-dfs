@@ -1,7 +1,7 @@
 {
  "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
  "version": "0.5-review",
- "coverage": "full",
+ "coverage": "standings_only",
  "contest_id": "192591504",
  "slate_date": "2026-07-22",
  "contest_type": "classic",
@@ -25,21 +25,11 @@
   "winner_copies": 1
  },
  "construction": {
-  "cheap_salary_threshold": 2200,
-  "at_cap_entries": 10,
-  "at_cap_share_pct": 66.7,
-  "salary_left_histogram": {
-   "<= 0": 6,
-   "1-100": 4,
-   "301-700": 2,
-   "101-300": 3
-  },
-  "max_stack_histogram": {
-   "2": 3,
-   "3": 7,
-   "4": 2,
-   "5": 3
-  },
+  "cheap_salary_threshold": null,
+  "at_cap_entries": null,
+  "at_cap_share_pct": null,
+  "salary_left_histogram": {},
+  "max_stack_histogram": {},
   "sp_pair_top": [
    {
     "pair": [
@@ -130,11 +120,9 @@
   ]
  },
  "diagnostics": {
-  "salary_join_rate_pct": 100.0,
+  "salary_join_rate_pct": null,
   "unmatched_names_top": [],
-  "salary_name_collisions": [
-   "jose fermin"
-  ],
+  "salary_name_collisions": [],
   "ownership_recompute_max_diff_pts": 0.0,
   "ownership_recompute_denominator": "all_entries",
   "ownership_recompute_ok": true,
@@ -158,16 +146,16 @@
    "entry_id": "5196299654",
    "username": "Wanna_Square_Up1567",
    "points": 140.15,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Brady Singer",
     "Gerrit Cole"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 18.67,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "brady singer",
     "cj abrams",
@@ -187,16 +175,16 @@
    "entry_id": "5196300577",
    "username": "wittwerjoe",
    "points": 139.4,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Christian Scott",
     "Gerrit Cole"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 18.67,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "caleb durbin",
     "carson benge",
@@ -216,16 +204,16 @@
    "entry_id": "5195908238",
    "username": "bleeski",
    "points": 136.25,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Cade Cavalli",
     "Gerrit Cole"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 17.33,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "a j ewing",
     "ben rice",
@@ -245,16 +233,16 @@
    "entry_id": "5196160894",
    "username": "salatso22",
    "points": 120.15,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Emerson Hancock",
     "Logan Henderson"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 22.66,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "caleb durbin",
     "ceddanne rafaela",
@@ -274,16 +262,16 @@
    "entry_id": "5195878245",
    "username": "donj9903",
    "points": 111.15,
-   "salary_used": 49500,
-   "salary_left": 500,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Brady Singer",
     "Jake Bennett"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-1-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 22.67,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "alec burleson",
     "brady singer",
@@ -303,16 +291,16 @@
    "entry_id": "5196316569",
    "username": "Archlich",
    "points": 109.95,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Gerrit Cole",
     "Reid Detmers"
    ],
-   "max_stack": 4,
-   "stack_pattern": "4-3-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 21.33,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "ben rice",
     "ceddanne rafaela",
@@ -332,16 +320,16 @@
    "entry_id": "5196264582",
    "username": "turkohutch",
    "points": 105.25,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Emerson Hancock",
     "Gerrit Cole"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 18.67,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "cody bellinger",
     "daylen lile",
@@ -361,16 +349,16 @@
    "entry_id": "5196156183",
    "username": "collinguy",
    "points": 104.95,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Jake Bennett",
     "Reid Detmers"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 17.34,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "ben rice",
     "cal raleigh",
@@ -390,16 +378,16 @@
    "entry_id": "5195865944",
    "username": "aschuite",
    "points": 99.7,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Gerrit Cole",
     "Jake Bennett"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 24.0,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "ben rice",
     "cal raleigh",
@@ -419,16 +407,16 @@
    "entry_id": "5196279431",
    "username": "snugg26",
    "points": 99.65,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Gage Jump",
     "Gerrit Cole"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.67,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "austin wells",
     "christian encarnacion strand",
@@ -448,16 +436,16 @@
    "entry_id": "5196315043",
    "username": "mikecapp12",
    "points": 99.4,
-   "salary_used": 49800,
-   "salary_left": 200,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Brady Singer",
     "Reid Detmers"
    ],
-   "max_stack": 5,
-   "stack_pattern": "5-2-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 25.33,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "brady singer",
     "caleb durbin",
@@ -477,16 +465,16 @@
    "entry_id": "5196317170",
    "username": "duncan_nelson",
    "points": 90.95,
-   "salary_used": 49900,
-   "salary_left": 100,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Gerrit Cole",
     "Reid Detmers"
    ],
-   "max_stack": 3,
-   "stack_pattern": "3-2-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 23.33,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "austin wells",
     "bryce eldridge",
@@ -506,16 +494,16 @@
    "entry_id": "5196316694",
    "username": "cbright6",
    "points": 86.6,
-   "salary_used": 50000,
-   "salary_left": 0,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Jake Bennett",
     "Logan Henderson"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 19.34,
-   "n_cheap": 0,
+   "n_cheap": null,
    "players_norm": [
     "caleb durbin",
     "cole carrigg",
@@ -535,16 +523,16 @@
    "entry_id": "5196183945",
    "username": "jsanders41",
    "points": 85.35,
-   "salary_used": 49700,
-   "salary_left": 300,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Landen Roupp",
     "Logan Henderson"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-2-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 15.33,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "cole carrigg",
     "hunter goodman",
@@ -564,16 +552,16 @@
    "entry_id": "5196301855",
    "username": "theorion23",
    "points": 71.15,
-   "salary_used": 49600,
-   "salary_left": 400,
+   "salary_used": null,
+   "salary_left": null,
    "sp_pair": [
     "Emerson Hancock",
     "Logan Henderson"
    ],
-   "max_stack": 2,
-   "stack_pattern": "2-2-1-1-1-1",
+   "max_stack": null,
+   "stack_pattern": null,
    "chalk_score": 16.0,
-   "n_cheap": 1,
+   "n_cheap": null,
    "players_norm": [
     "coby mayo",
     "emerson hancock",
@@ -1114,10 +1102,10 @@
   "winning_points": 140.15,
   "own_lineups_duplicated_by_field": 0,
   "max_copies_of_an_own_lineup": 1,
-  "entry_fee": null,
-  "fees_total": null,
-  "winnings_total": null,
-  "net": null,
+  "entry_fee": 1.0,
+  "fees_total": 1.0,
+  "winnings_total": 0.0,
+  "net": -1.0,
   "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
  }
 }

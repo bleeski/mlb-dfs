@@ -1,12 +1,15 @@
 {
  "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
- "version": "0.4-review",
+ "version": "0.5-review",
  "coverage": "standings_only",
  "contest_id": "192444379",
  "slate_date": "2026-07-18",
+ "contest_type": "classic",
  "meta": {
   "entries_total": 31,
   "entries_complete_lineups": 31,
+  "roster_size": 10,
+  "entries_unparsed": 0,
   "winning_points": 140.6,
   "winning_entry_id": "5192702978",
   "multi_entry_flag": false
@@ -116,6 +119,10 @@
   "ownership_recompute_denominator": "all_entries",
   "ownership_recompute_ok": true,
   "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
   "intra_entry_duplicate_entry_ids": [],
   "roster_slots_observed": 310,
   "roster_slots_expected": 310,
@@ -127,6 +134,7 @@
  },
  "entries": [
   {
+   "rank": "1",
    "entry_id": "5192702978",
    "username": "sethrollins12",
    "points": 140.6,
@@ -155,6 +163,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "1",
    "entry_id": "5192792515",
    "username": "nauldyboy",
    "points": 140.6,
@@ -183,6 +192,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "3",
    "entry_id": "5192793860",
    "username": "rmknks",
    "points": 110.35,
@@ -211,6 +221,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "4",
    "entry_id": "5192681304",
    "username": "juliom328",
    "points": 108.6,
@@ -239,6 +250,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "5",
    "entry_id": "5192683544",
    "username": "tripp01",
    "points": 106.35,
@@ -267,6 +279,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "6",
    "entry_id": "5192650135",
    "username": "Mulligan4J",
    "points": 105.4,
@@ -295,6 +308,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "7",
    "entry_id": "5192670634",
    "username": "nickenyon6",
    "points": 98.35,
@@ -323,6 +337,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "8",
    "entry_id": "5192770176",
    "username": "roryjr82",
    "points": 93.25,
@@ -351,6 +366,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "9",
    "entry_id": "5192782057",
    "username": "Paulo21613",
    "points": 91.9,
@@ -379,6 +395,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "10",
    "entry_id": "5192645374",
    "username": "apenn21",
    "points": 91.6,
@@ -407,6 +424,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "11",
    "entry_id": "5192706677",
    "username": "WHITGAR",
    "points": 89.4,
@@ -435,6 +453,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "12",
    "entry_id": "5192795032",
    "username": "Jbucna",
    "points": 85.4,
@@ -463,6 +482,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "12",
    "entry_id": "5192803005",
    "username": "heat00veride",
    "points": 85.4,
@@ -491,6 +511,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "14",
    "entry_id": "5192663771",
    "username": "SlobberKnockers1",
    "points": 81.75,
@@ -519,6 +540,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "15",
    "entry_id": "5192648027",
    "username": "bleeski",
    "points": 81.4,
@@ -547,6 +569,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "16",
    "entry_id": "5192702878",
    "username": "TexasHeat12",
    "points": 80.35,
@@ -575,6 +598,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "17",
    "entry_id": "5192729412",
    "username": "Letspickemright",
    "points": 79.4,
@@ -603,6 +627,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "18",
    "entry_id": "5192652729",
    "username": "winboy27",
    "points": 78.35,
@@ -631,6 +656,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "19",
    "entry_id": "5192690769",
    "username": "Harpua99",
    "points": 77.75,
@@ -659,6 +685,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "20",
    "entry_id": "5192671297",
    "username": "macyfan",
    "points": 66.35,
@@ -687,6 +714,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "20",
    "entry_id": "5192727597",
    "username": "Boudin71",
    "points": 66.35,
@@ -715,6 +743,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "22",
    "entry_id": "5192780065",
    "username": "ConnorClark11",
    "points": 64.4,
@@ -743,6 +772,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "23",
    "entry_id": "5192684086",
    "username": "jc000000",
    "points": 55.35,
@@ -771,6 +801,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "24",
    "entry_id": "5192791815",
    "username": "hicks357",
    "points": 55.25,
@@ -799,6 +830,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "25",
    "entry_id": "5192747555",
    "username": "MichaelBayneTech",
    "points": 54.4,
@@ -827,6 +859,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "26",
    "entry_id": "5192746070",
    "username": "srqdave",
    "points": 54.35,
@@ -855,6 +888,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "27",
    "entry_id": "5192716571",
    "username": "Skralph",
    "points": 53.35,
@@ -883,6 +917,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "28",
    "entry_id": "5192650383",
    "username": "colemandizzy",
    "points": 49.4,
@@ -911,6 +946,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "29",
    "entry_id": "5192740404",
    "username": "MO-TRUBBLE",
    "points": 45.8,
@@ -939,6 +975,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "30",
    "entry_id": "5192703062",
    "username": "cr323",
    "points": 30.8,
@@ -967,6 +1004,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "31",
    "entry_id": "5192721657",
    "username": "BigRedMachine1975",
    "points": 28.8,
@@ -1437,5 +1475,23 @@
    "pct_drafted": 3.23,
    "fpts": 14.0
   }
- ]
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 31,
+  "best_rank": 15,
+  "worst_rank": 15,
+  "best_finish_percentile": 54.84,
+  "median_finish_percentile": 54.84,
+  "best_points": 81.4,
+  "winning_points": 140.6,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 1.0,
+  "fees_total": 1.0,
+  "winnings_total": 0.0,
+  "net": -1.0,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
 }

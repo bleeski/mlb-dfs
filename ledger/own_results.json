@@ -13,10 +13,10 @@
    "best_points": 140.85,
    "winning_points": 154.65,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "191020574",
@@ -30,10 +30,129 @@
    "best_points": 130.65,
    "winning_points": 154.85,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "191488360",
+   "slate_date": "2026-06-19",
+   "contest_name": null,
+   "matched": 5,
+   "field_size": 177,
+   "best_rank": 36,
+   "best_finish_percentile": 80.23,
+   "median_finish_percentile": 24.86,
+   "best_points": 134.55,
+   "winning_points": 179.0,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
+  },
+  {
+   "contest_id": "191488366",
+   "slate_date": "2026-06-19",
+   "contest_name": null,
+   "matched": 8,
+   "field_size": 297,
+   "best_rank": 19,
+   "best_finish_percentile": 93.94,
+   "median_finish_percentile": 61.62,
+   "best_points": 151.55,
+   "winning_points": 189.4,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.8,
+   "winnings_total": 0.0,
+   "net": -0.8
+  },
+  {
+   "contest_id": "191506958",
+   "slate_date": "2026-06-20",
+   "contest_name": null,
+   "matched": 7,
+   "field_size": 193,
+   "best_rank": 37,
+   "best_finish_percentile": 81.35,
+   "median_finish_percentile": 47.67,
+   "best_points": 112.7,
+   "winning_points": 149.55,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "191506960",
+   "slate_date": "2026-06-20",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 23,
+   "best_rank": 14,
+   "best_finish_percentile": 43.48,
+   "median_finish_percentile": 43.48,
+   "best_points": 93.15,
+   "winning_points": 154.0,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
+  },
+  {
+   "contest_id": "191507209",
+   "slate_date": "2026-06-20",
+   "contest_name": null,
+   "matched": 5,
+   "field_size": 150,
+   "best_rank": 19,
+   "best_finish_percentile": 88.0,
+   "median_finish_percentile": 75.33,
+   "best_points": 123.7,
+   "winning_points": 157.9,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
+  },
+  {
+   "contest_id": "191507213",
+   "slate_date": "2026-06-20",
+   "contest_name": null,
+   "matched": 8,
+   "field_size": 242,
+   "best_rank": 24,
+   "best_finish_percentile": 90.5,
+   "median_finish_percentile": 56.4,
+   "best_points": 124.149994,
+   "winning_points": 155.0,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.8,
+   "winnings_total": 0.0,
+   "net": -0.8
+  },
+  {
+   "contest_id": "191507220",
+   "slate_date": "2026-06-20",
+   "contest_name": null,
+   "matched": 4,
+   "field_size": 110,
+   "best_rank": 17,
+   "best_finish_percentile": 85.45,
+   "median_finish_percentile": 80.91,
+   "best_points": 122.45,
+   "winning_points": 155.25,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.4,
+   "winnings_total": 0.0,
+   "net": -0.4
   },
   {
    "contest_id": "192344257",
@@ -47,10 +166,10 @@
    "best_points": 159.75,
    "winning_points": 244.05,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192344259",
@@ -64,10 +183,10 @@
    "best_points": 156.85,
    "winning_points": 244.05,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.4,
+   "winnings_total": 0.0,
+   "net": -0.4
   },
   {
    "contest_id": "192344519",
@@ -81,10 +200,10 @@
    "best_points": 58.25,
    "winning_points": 95.125,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192344520",
@@ -98,10 +217,10 @@
    "best_points": 84.75,
    "winning_points": 95.125,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192369212",
@@ -115,10 +234,10 @@
    "best_points": 79.7,
    "winning_points": 204.05,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192413131",
@@ -132,10 +251,10 @@
    "best_points": 70.0,
    "winning_points": 100.1,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192413132",
@@ -149,10 +268,78 @@
    "best_points": 71.65,
    "winning_points": 86.65,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "192413146",
+   "slate_date": "2026-07-18",
+   "contest_name": null,
+   "matched": 7,
+   "field_size": 203,
+   "best_rank": 24,
+   "best_finish_percentile": 88.67,
+   "median_finish_percentile": 49.26,
+   "best_points": 112.25,
+   "winning_points": 144.6,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "192413147",
+   "slate_date": "2026-07-18",
+   "contest_name": null,
+   "matched": 7,
+   "field_size": 210,
+   "best_rank": 26,
+   "best_finish_percentile": 88.1,
+   "median_finish_percentile": 51.9,
+   "best_points": 112.25,
+   "winning_points": 142.25,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "192444379",
+   "slate_date": "2026-07-18",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 31,
+   "best_rank": 15,
+   "best_finish_percentile": 54.84,
+   "median_finish_percentile": 54.84,
+   "best_points": 81.4,
+   "winning_points": 140.6,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
+  },
+  {
+   "contest_id": "192464820",
+   "slate_date": "2026-07-18",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 31,
+   "best_rank": 22,
+   "best_finish_percentile": 32.26,
+   "median_finish_percentile": 32.26,
+   "best_points": 93.75,
+   "winning_points": 183.6,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192442890",
@@ -166,10 +353,10 @@
    "best_points": 139.85,
    "winning_points": 156.85,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.8,
+   "winnings_total": 0.0,
+   "net": -0.8
   },
   {
    "contest_id": "192443599",
@@ -183,10 +370,10 @@
    "best_points": 229.45,
    "winning_points": 235.85,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
   },
   {
    "contest_id": "192443606",
@@ -200,10 +387,10 @@
    "best_points": 229.45,
    "winning_points": 255.25,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.8,
+   "winnings_total": 0.0,
+   "net": -0.8
   },
   {
    "contest_id": "192454586",
@@ -217,10 +404,10 @@
    "best_points": 229.45,
    "winning_points": 255.25,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 20.0,
+   "net": 19.0
   },
   {
    "contest_id": "192464310",
@@ -234,10 +421,10 @@
    "best_points": 60.85,
    "winning_points": 151.55,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192464354",
@@ -251,10 +438,10 @@
    "best_points": 129.55,
    "winning_points": 134.55,
    "own_lineups_duplicated_by_field": 3,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192464355",
@@ -268,10 +455,10 @@
    "best_points": 129.55,
    "winning_points": 134.55,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192500593",
@@ -285,10 +472,10 @@
    "best_points": 97.1,
    "winning_points": 141.85,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192529275",
@@ -302,10 +489,10 @@
    "best_points": 139.1,
    "winning_points": 214.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 2.0,
+   "fees_total": 8.0,
+   "winnings_total": 7.0,
+   "net": -1.0
   },
   {
    "contest_id": "192591443",
@@ -319,10 +506,10 @@
    "best_points": 108.8,
    "winning_points": 186.95,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
   },
   {
    "contest_id": "192591459",
@@ -336,10 +523,10 @@
    "best_points": 131.95,
    "winning_points": 186.95,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192591504",
@@ -353,10 +540,10 @@
    "best_points": 136.25,
    "winning_points": 140.15,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192591926",
@@ -370,10 +557,10 @@
    "best_points": 100.15,
    "winning_points": 131.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192591927",
@@ -387,10 +574,10 @@
    "best_points": 100.15,
    "winning_points": 133.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192593054",
@@ -404,10 +591,10 @@
    "best_points": 85.45,
    "winning_points": 178.6,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192627933",
@@ -421,10 +608,10 @@
    "best_points": 79.75,
    "winning_points": 149.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192623314",
@@ -438,10 +625,10 @@
    "best_points": 100.1,
    "winning_points": 122.95,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.8,
+   "winnings_total": 0.0,
+   "net": -0.8
   },
   {
    "contest_id": "192623315",
@@ -455,10 +642,10 @@
    "best_points": 100.1,
    "winning_points": 118.1,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192630776",
@@ -472,10 +659,10 @@
    "best_points": 52.775,
    "winning_points": 92.025,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192652559",
@@ -489,10 +676,10 @@
    "best_points": 61.1,
    "winning_points": 92.025,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.30000000000000004,
+   "winnings_total": 0.0,
+   "net": -0.3
   },
   {
    "contest_id": "192652560",
@@ -506,10 +693,10 @@
    "best_points": 56.85,
    "winning_points": 80.025,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192652561",
@@ -523,10 +710,10 @@
    "best_points": 65.1,
    "winning_points": 70.03,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192656508",
@@ -540,10 +727,10 @@
    "best_points": 60.35,
    "winning_points": 122.95,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192657334",
@@ -557,10 +744,10 @@
    "best_points": 66.125,
    "winning_points": 109.825,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192657335",
@@ -574,10 +761,78 @@
    "best_points": 63.75,
    "winning_points": 109.825,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "192657349",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 7,
+   "field_size": 237,
+   "best_rank": 21,
+   "best_finish_percentile": 91.56,
+   "median_finish_percentile": 83.12,
+   "best_points": 97.75,
+   "winning_points": 118.9,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "192657350",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 7,
+   "field_size": 237,
+   "best_rank": 17,
+   "best_finish_percentile": 93.25,
+   "median_finish_percentile": 83.12,
+   "best_points": 97.75,
+   "winning_points": 139.75,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
+  },
+  {
+   "contest_id": "192658268",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 3567,
+   "best_rank": 728,
+   "best_finish_percentile": 79.62,
+   "median_finish_percentile": 79.62,
+   "best_points": 86.6,
+   "winning_points": 145.95,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 1.5,
+   "net": 0.5
+  },
+  {
+   "contest_id": "192667458",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 59,
+   "best_rank": 9,
+   "best_finish_percentile": 86.44,
+   "median_finish_percentile": 86.44,
+   "best_points": 89.55,
+   "winning_points": 110.8,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192667460",
@@ -591,10 +846,112 @@
    "best_points": 65.75,
    "winning_points": 100.83,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
+  },
+  {
+   "contest_id": "192701222",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 59,
+   "best_rank": 16,
+   "best_finish_percentile": 74.58,
+   "median_finish_percentile": 74.58,
+   "best_points": 94.25,
+   "winning_points": 123.6,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
+  },
+  {
+   "contest_id": "192701224",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 59,
+   "best_rank": 4,
+   "best_finish_percentile": 94.92,
+   "median_finish_percentile": 94.92,
+   "best_points": 103.55,
+   "winning_points": 129.45,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
+  },
+  {
+   "contest_id": "192701225",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 59,
+   "best_rank": 21,
+   "best_finish_percentile": 66.1,
+   "median_finish_percentile": 66.1,
+   "best_points": 89.2,
+   "winning_points": 132.8,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
+  },
+  {
+   "contest_id": "192705822",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 3,
+   "field_size": 118,
+   "best_rank": 13,
+   "best_finish_percentile": 89.83,
+   "median_finish_percentile": 87.29,
+   "best_points": 108.95,
+   "winning_points": 126.75,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
+  },
+  {
+   "contest_id": "192709106",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 2,
+   "field_size": 59,
+   "best_rank": 6,
+   "best_finish_percentile": 91.53,
+   "median_finish_percentile": 88.98,
+   "best_points": 107.9,
+   "winning_points": 117.25,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 0.25,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
+  },
+  {
+   "contest_id": "192712196",
+   "slate_date": "2026-07-24",
+   "contest_name": null,
+   "matched": 1,
+   "field_size": 237,
+   "best_rank": 225,
+   "best_finish_percentile": 5.49,
+   "median_finish_percentile": 5.49,
+   "best_points": 48.25,
+   "winning_points": 133.0,
+   "own_lineups_duplicated_by_field": 0,
+   "entry_fee": 5.0,
+   "fees_total": 5.0,
+   "winnings_total": 0.0,
+   "net": -5.0
   },
   {
    "contest_id": "192707473",
@@ -608,10 +965,10 @@
    "best_points": 108.149994,
    "winning_points": 172.1,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
   },
   {
    "contest_id": "192707481",
@@ -625,10 +982,10 @@
    "best_points": 133.55,
    "winning_points": 177.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192707519",
@@ -642,10 +999,10 @@
    "best_points": 78.0,
    "winning_points": 177.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192707520",
@@ -659,10 +1016,10 @@
    "best_points": 71.5,
    "winning_points": 177.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192707521",
@@ -676,10 +1033,10 @@
    "best_points": 76.05,
    "winning_points": 150.05,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192707522",
@@ -693,10 +1050,10 @@
    "best_points": 49.45,
    "winning_points": 173.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192707523",
@@ -710,10 +1067,10 @@
    "best_points": 96.75,
    "winning_points": 186.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.30000000000000004,
+   "winnings_total": 0.0,
+   "net": -0.3
   },
   {
    "contest_id": "192707612",
@@ -727,10 +1084,10 @@
    "best_points": 92.15,
    "winning_points": 141.6,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192708059",
@@ -744,10 +1101,10 @@
    "best_points": 116.275,
    "winning_points": 134.275,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192708060",
@@ -761,10 +1118,10 @@
    "best_points": 97.85,
    "winning_points": 137.275,
    "own_lineups_duplicated_by_field": 2,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192708062",
@@ -778,10 +1135,10 @@
    "best_points": 28.0,
    "winning_points": 130.28,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192708063",
@@ -795,10 +1152,10 @@
    "best_points": 37.25,
    "winning_points": 130.28,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192708093",
@@ -812,10 +1169,10 @@
    "best_points": 72.7,
    "winning_points": 79.3,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192708094",
@@ -829,10 +1186,10 @@
    "best_points": 51.15,
    "winning_points": 79.3,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192708096",
@@ -846,10 +1203,10 @@
    "best_points": 30.0,
    "winning_points": 74.3,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192708097",
@@ -863,10 +1220,10 @@
    "best_points": 28.0,
    "winning_points": 75.05,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192710479",
@@ -880,10 +1237,10 @@
    "best_points": 58.9,
    "winning_points": 182.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192710507",
@@ -897,10 +1254,10 @@
    "best_points": 83.4,
    "winning_points": 161.5,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192738861",
@@ -914,10 +1271,10 @@
    "best_points": 100.05,
    "winning_points": 177.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192740560",
@@ -931,10 +1288,10 @@
    "best_points": 33.6,
    "winning_points": 177.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192741308",
@@ -948,10 +1305,10 @@
    "best_points": 110.9,
    "winning_points": 177.55,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192744091",
@@ -965,10 +1322,10 @@
    "best_points": 66.5,
    "winning_points": 148.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.30000000000000004,
+   "winnings_total": 0.0,
+   "net": -0.3
   },
   {
    "contest_id": "192746313",
@@ -982,10 +1339,10 @@
    "best_points": 104.6,
    "winning_points": 141.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192747269",
@@ -999,10 +1356,10 @@
    "best_points": 64.15,
    "winning_points": 141.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192747982",
@@ -1016,10 +1373,10 @@
    "best_points": 108.65,
    "winning_points": 141.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192748828",
@@ -1033,10 +1390,10 @@
    "best_points": 90.25,
    "winning_points": 141.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192753671",
@@ -1050,10 +1407,10 @@
    "best_points": 100.65,
    "winning_points": 141.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192754543",
@@ -1067,10 +1424,10 @@
    "best_points": 55.300003,
    "winning_points": 78.7,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.5,
+   "winnings_total": 0.0,
+   "net": -0.5
   },
   {
    "contest_id": "192784475",
@@ -1084,10 +1441,10 @@
    "best_points": 51.75,
    "winning_points": 78.85,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192784476",
@@ -1101,10 +1458,10 @@
    "best_points": 61.6,
    "winning_points": 78.85,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.01,
+   "fees_total": 0.07,
+   "winnings_total": 0.0,
+   "net": -0.07
   },
   {
    "contest_id": "192784479",
@@ -1118,10 +1475,10 @@
    "best_points": 17.1,
    "winning_points": 78.85,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192784653",
@@ -1135,10 +1492,10 @@
    "best_points": 109.9,
    "winning_points": 113.0,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.75,
+   "winnings_total": 0.0,
+   "net": -0.75
   },
   {
    "contest_id": "192784672",
@@ -1152,10 +1509,10 @@
    "best_points": 79.6,
    "winning_points": 102.5,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192784673",
@@ -1169,10 +1526,10 @@
    "best_points": 84.9,
    "winning_points": 121.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192784674",
@@ -1186,10 +1543,10 @@
    "best_points": 40.9,
    "winning_points": 103.5,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.1,
+   "fees_total": 0.1,
+   "winnings_total": 0.0,
+   "net": -0.1
   },
   {
    "contest_id": "192798437",
@@ -1203,10 +1560,10 @@
    "best_points": 58.6,
    "winning_points": 136.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 0.0,
+   "net": -1.0
   },
   {
    "contest_id": "192798445",
@@ -1220,10 +1577,10 @@
    "best_points": 50.75,
    "winning_points": 80.85,
    "own_lineups_duplicated_by_field": 1,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 1.0,
+   "fees_total": 1.0,
+   "winnings_total": 1.5,
+   "net": 0.5
   },
   {
    "contest_id": "192842358",
@@ -1237,10 +1594,10 @@
    "best_points": 46.6,
    "winning_points": 102.6,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192851120",
@@ -1254,10 +1611,10 @@
    "best_points": 63.75,
    "winning_points": 78.85,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192853093",
@@ -1271,10 +1628,10 @@
    "best_points": 73.9,
    "winning_points": 89.9,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   },
   {
    "contest_id": "192853339",
@@ -1288,10 +1645,10 @@
    "best_points": 75.0,
    "winning_points": 102.6,
    "own_lineups_duplicated_by_field": 0,
-   "entry_fee": null,
-   "fees_total": null,
-   "winnings_total": null,
-   "net": null
+   "entry_fee": 0.25,
+   "fees_total": 0.25,
+   "winnings_total": 0.0,
+   "net": -0.25
   }
  ]
 }

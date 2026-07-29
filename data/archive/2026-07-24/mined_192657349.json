@@ -143,6 +143,10 @@
   "ownership_recompute_denominator": "all_entries",
   "ownership_recompute_ok": true,
   "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.038,
   "intra_entry_duplicate_entry_ids": [],
   "roster_slots_observed": 2280,
   "roster_slots_expected": 2280,
@@ -154,6 +158,7 @@
  },
  "entries": [
   {
+   "rank": "1",
    "entry_id": "5198156437",
    "username": "auweglman",
    "points": 118.9,
@@ -182,6 +187,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "2",
    "entry_id": "5197621859",
    "username": "whoisjohngalt420",
    "points": 115.95,
@@ -210,6 +216,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "3",
    "entry_id": "5197883902",
    "username": "briguy13",
    "points": 114.8,
@@ -238,6 +245,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "4",
    "entry_id": "5197621858",
    "username": "whoisjohngalt420",
    "points": 113.95,
@@ -266,6 +274,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "5",
    "entry_id": "5198095452",
    "username": "kelt2332",
    "points": 111.75,
@@ -294,6 +303,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "6",
    "entry_id": "5197745969",
    "username": "Elwaysarmy",
    "points": 106.95,
@@ -322,6 +332,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "7",
    "entry_id": "5197621861",
    "username": "whoisjohngalt420",
    "points": 105.75,
@@ -350,6 +361,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "8",
    "entry_id": "5197661405",
    "username": "bbehnke20",
    "points": 105.35,
@@ -378,6 +390,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "9",
    "entry_id": "5197621860",
    "username": "whoisjohngalt420",
    "points": 102.95,
@@ -406,6 +419,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "10",
    "entry_id": "5197571982",
    "username": "Dicskstone32",
    "points": 101.6,
@@ -434,6 +448,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "11",
    "entry_id": "5198148773",
    "username": "auweglman",
    "points": 101.55,
@@ -462,6 +477,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "12",
    "entry_id": "5197745971",
    "username": "Elwaysarmy",
    "points": 100.899994,
@@ -490,6 +506,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "13",
    "entry_id": "5197738290",
    "username": "giveitu",
    "points": 100.85,
@@ -518,6 +535,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "14",
    "entry_id": "5197621857",
    "username": "whoisjohngalt420",
    "points": 99.95,
@@ -546,6 +564,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "14",
    "entry_id": "5197693131",
    "username": "Extraqtt",
    "points": 99.95,
@@ -574,6 +593,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "14",
    "entry_id": "5197724433",
    "username": "properlyrooted",
    "points": 99.95,
@@ -602,6 +622,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "17",
    "entry_id": "5197715997",
    "username": "properlyrooted",
    "points": 99.8,
@@ -630,6 +651,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "18",
    "entry_id": "5197572612",
    "username": "mythicalrhymer01",
    "points": 98.95,
@@ -658,6 +680,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "19",
    "entry_id": "5197715943",
    "username": "properlyrooted",
    "points": 98.8,
@@ -686,6 +709,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "20",
    "entry_id": "5197693130",
    "username": "Extraqtt",
    "points": 97.8,
@@ -714,6 +738,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "21",
    "entry_id": "5198101189",
    "username": "bleeski",
    "points": 97.75,
@@ -742,6 +767,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "22",
    "entry_id": "5197391367",
    "username": "jwswan5",
    "points": 96.8,
@@ -770,6 +796,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "23",
    "entry_id": "5198101190",
    "username": "bleeski",
    "points": 96.7,
@@ -798,6 +825,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "24",
    "entry_id": "5197482952",
    "username": "sportsfan14",
    "points": 95.95,
@@ -826,6 +854,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "24",
    "entry_id": "5197724434",
    "username": "properlyrooted",
    "points": 95.95,
@@ -854,6 +883,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "26",
    "entry_id": "5197693127",
    "username": "Extraqtt",
    "points": 94.899994,
@@ -882,6 +912,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "27",
    "entry_id": "5197810081",
    "username": "kkbailey",
    "points": 94.8,
@@ -910,6 +941,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "28",
    "entry_id": "5198150105",
    "username": "RedFern2012",
    "points": 94.55,
@@ -938,6 +970,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "29",
    "entry_id": "5198101191",
    "username": "bleeski",
    "points": 94.45,
@@ -966,6 +999,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "30",
    "entry_id": "5198082648",
    "username": "Skralph",
    "points": 93.95,
@@ -994,6 +1028,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "30",
    "entry_id": "5198150108",
    "username": "Gsmoney2469",
    "points": 93.95,
@@ -1022,6 +1057,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "32",
    "entry_id": "5197644680",
    "username": "Ozarkian",
    "points": 93.5,
@@ -1050,6 +1086,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "33",
    "entry_id": "5197577780",
    "username": "minrobertson210",
    "points": 93.35,
@@ -1078,6 +1115,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "34",
    "entry_id": "5198082644",
    "username": "Skralph",
    "points": 92.95,
@@ -1106,6 +1144,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "35",
    "entry_id": "5197604102",
    "username": "starplay",
    "points": 92.75,
@@ -1134,6 +1173,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "36",
    "entry_id": "5197952117",
    "username": "psereda",
    "points": 92.55,
@@ -1162,6 +1202,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "36",
    "entry_id": "5197959847",
    "username": "jaakko",
    "points": 92.55,
@@ -1190,6 +1231,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "38",
    "entry_id": "5197416951",
    "username": "swenburhooden",
    "points": 89.95,
@@ -1218,6 +1260,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "38",
    "entry_id": "5197416961",
    "username": "swenburhooden",
    "points": 89.95,
@@ -1246,6 +1289,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "38",
    "entry_id": "5198067747",
    "username": "timothy.beechler",
    "points": 89.95,
@@ -1274,6 +1318,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "41",
    "entry_id": "5198101193",
    "username": "bleeski",
    "points": 89.55,
@@ -1302,6 +1347,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "42",
    "entry_id": "5197883903",
    "username": "briguy13",
    "points": 88.95,
@@ -1330,6 +1376,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "43",
    "entry_id": "5198067749",
    "username": "timothy.beechler",
    "points": 88.899994,
@@ -1358,6 +1405,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "44",
    "entry_id": "5197725762",
    "username": "jdub.14",
    "points": 87.8,
@@ -1386,6 +1434,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "45",
    "entry_id": "5197644681",
    "username": "Ozarkian",
    "points": 87.549995,
@@ -1414,6 +1463,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "46",
    "entry_id": "5197693129",
    "username": "Extraqtt",
    "points": 86.95,
@@ -1442,6 +1492,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "47",
    "entry_id": "5198101192",
    "username": "bleeski",
    "points": 86.899994,
@@ -1470,6 +1521,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "48",
    "entry_id": "5197556913",
    "username": "sonny1123",
    "points": 86.75,
@@ -1498,6 +1550,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "49",
    "entry_id": "5197745970",
    "username": "Elwaysarmy",
    "points": 86.05,
@@ -1526,6 +1579,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "50",
    "entry_id": "5197883905",
    "username": "briguy13",
    "points": 85.95,
@@ -1554,6 +1608,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "51",
    "entry_id": "5198150252",
    "username": "Bachibawlz",
    "points": 85.75,
@@ -1582,6 +1637,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "52",
    "entry_id": "5197885971",
    "username": "aarond23",
    "points": 84.95,
@@ -1610,6 +1666,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "52",
    "entry_id": "5198082643",
    "username": "Skralph",
    "points": 84.95,
@@ -1638,6 +1695,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "54",
    "entry_id": "5198082649",
    "username": "Skralph",
    "points": 84.8,
@@ -1666,6 +1724,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "55",
    "entry_id": "5197815044",
    "username": "ajaxjonsin",
    "points": 84.75,
@@ -1694,6 +1753,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "56",
    "entry_id": "5197693128",
    "username": "Extraqtt",
    "points": 84.55,
@@ -1722,6 +1782,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "56",
    "entry_id": "5198146492",
    "username": "selmade",
    "points": 84.55,
@@ -1750,6 +1811,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "56",
    "entry_id": "5198150765",
    "username": "bengra99",
    "points": 84.55,
@@ -1778,6 +1840,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "59",
    "entry_id": "5197572616",
    "username": "mythicalrhymer01",
    "points": 83.9,
@@ -1806,6 +1869,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "59",
    "entry_id": "5197745966",
    "username": "Elwaysarmy",
    "points": 83.899994,
@@ -1834,6 +1898,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "61",
    "entry_id": "5197739314",
    "username": "donj9903",
    "points": 83.75,
@@ -1862,6 +1927,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "62",
    "entry_id": "5197591212",
    "username": "seapaw25",
    "points": 83.5,
@@ -1890,6 +1956,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "63",
    "entry_id": "5197643576",
    "username": "jdub.14",
    "points": 82.95,
@@ -1918,6 +1985,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "63",
    "entry_id": "5197883907",
    "username": "briguy13",
    "points": 82.95,
@@ -1946,6 +2014,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "65",
    "entry_id": "5197745968",
    "username": "Elwaysarmy",
    "points": 82.8,
@@ -1974,6 +2043,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "66",
    "entry_id": "5198143393",
    "username": "zero611",
    "points": 82.6,
@@ -2002,6 +2072,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "67",
    "entry_id": "5197329971",
    "username": "Dave2zone",
    "points": 82.55,
@@ -2030,6 +2101,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "68",
    "entry_id": "5197482956",
    "username": "sportsfan14",
    "points": 81.95,
@@ -2058,6 +2130,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "69",
    "entry_id": "5197693132",
    "username": "Extraqtt",
    "points": 81.6,
@@ -2086,6 +2159,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "69",
    "entry_id": "5197959850",
    "username": "jaakko",
    "points": 81.6,
@@ -2114,6 +2188,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "71",
    "entry_id": "5197604101",
    "username": "starplay",
    "points": 81.5,
@@ -2142,6 +2217,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "72",
    "entry_id": "5198082646",
    "username": "Skralph",
    "points": 80.95,
@@ -2170,6 +2246,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "73",
    "entry_id": "5197790476",
    "username": "amdaws818",
    "points": 80.6,
@@ -2198,6 +2275,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "74",
    "entry_id": "5197883906",
    "username": "briguy13",
    "points": 78.899994,
@@ -2226,6 +2304,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "75",
    "entry_id": "5198127794",
    "username": "cpdk69",
    "points": 78.75,
@@ -2254,6 +2333,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "76",
    "entry_id": "5198060593",
    "username": "timothy.beechler",
    "points": 78.65,
@@ -2282,6 +2362,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "77",
    "entry_id": "5197661410",
    "username": "bbehnke20",
    "points": 77.95,
@@ -2310,6 +2391,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "77",
    "entry_id": "5198082645",
    "username": "Skralph",
    "points": 77.95,
@@ -2338,6 +2420,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "79",
    "entry_id": "5197745965",
    "username": "Elwaysarmy",
    "points": 77.899994,
@@ -2366,6 +2449,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "80",
    "entry_id": "5197284448",
    "username": "stevmortc",
    "points": 77.8,
@@ -2394,6 +2478,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "81",
    "entry_id": "5197572615",
    "username": "mythicalrhymer01",
    "points": 77.65,
@@ -2422,6 +2507,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "82",
    "entry_id": "5198086437",
    "username": "mwear",
    "points": 77.55,
@@ -2450,6 +2536,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "83",
    "entry_id": "5197329973",
    "username": "Dave2zone",
    "points": 77.5,
@@ -2478,6 +2565,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "84",
    "entry_id": "5197661407",
    "username": "bbehnke20",
    "points": 77.35,
@@ -2506,6 +2594,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "85",
    "entry_id": "5198113084",
    "username": "bananaspeel",
    "points": 76.95,
@@ -2534,6 +2623,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "86",
    "entry_id": "5197577781",
    "username": "minrobertson210",
    "points": 76.75,
@@ -2562,6 +2652,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "87",
    "entry_id": "5198124011",
    "username": "hoosierpack",
    "points": 76.700005,
@@ -2590,6 +2681,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "88",
    "entry_id": "5197643923",
    "username": "NHLgamer",
    "points": 75.75,
@@ -2618,6 +2710,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "89",
    "entry_id": "5197709836",
    "username": "adonis112",
    "points": 75.600006,
@@ -2646,6 +2739,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "90",
    "entry_id": "5197693133",
    "username": "Extraqtt",
    "points": 74.899994,
@@ -2674,6 +2768,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "90",
    "entry_id": "5198157412",
    "username": "auweglman",
    "points": 74.899994,
@@ -2702,6 +2797,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "92",
    "entry_id": "5197875119",
    "username": "YoDoggs",
    "points": 74.8,
@@ -2730,6 +2826,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "92",
    "entry_id": "5198000961",
    "username": "rjw1",
    "points": 74.8,
@@ -2758,6 +2855,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "94",
    "entry_id": "5198150719",
    "username": "Poloman42",
    "points": 74.7,
@@ -2786,6 +2884,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "95",
    "entry_id": "5198108712",
    "username": "bleeski",
    "points": 74.3,
@@ -2814,6 +2913,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "96",
    "entry_id": "5197724542",
    "username": "properlyrooted",
    "points": 74.1,
@@ -2842,6 +2942,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "97",
    "entry_id": "5197476929",
    "username": "Opfor4481",
    "points": 73.55,
@@ -2870,6 +2971,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "97",
    "entry_id": "5197476931",
    "username": "Opfor4481",
    "points": 73.55,
@@ -2898,6 +3000,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "99",
    "entry_id": "5198046845",
    "username": "PSULucky7",
    "points": 73.5,
@@ -2926,6 +3029,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "100",
    "entry_id": "5198081696",
    "username": "FantanaXJ",
    "points": 72.35,
@@ -2954,6 +3058,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "101",
    "entry_id": "5197191043",
    "username": "illiamShine",
    "points": 72.0,
@@ -2982,6 +3087,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "101",
    "entry_id": "5198151627",
    "username": "rickd2424",
    "points": 72.0,
@@ -3010,6 +3116,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "103",
    "entry_id": "5197984608",
    "username": "beerNsurf",
    "points": 71.7,
@@ -3038,6 +3145,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "104",
    "entry_id": "5197265294",
    "username": "bjbsnoop",
    "points": 71.5,
@@ -3066,6 +3174,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "105",
    "entry_id": "5197315142",
    "username": "TucknMadRub33",
    "points": 70.899994,
@@ -3094,6 +3203,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "105",
    "entry_id": "5198151625",
    "username": "rickd2424",
    "points": 70.899994,
@@ -3122,6 +3232,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "107",
    "entry_id": "5197482957",
    "username": "sportsfan14",
    "points": 70.55,
@@ -3150,6 +3261,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "108",
    "entry_id": "5197640434",
    "username": "Chasman1",
    "points": 70.5,
@@ -3178,6 +3290,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "109",
    "entry_id": "5197680525",
    "username": "hitch0403",
    "points": 69.9,
@@ -3206,6 +3319,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "110",
    "entry_id": "5197885970",
    "username": "aarond23",
    "points": 69.8,
@@ -3234,6 +3348,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "110",
    "entry_id": "5198000962",
    "username": "rjw1",
    "points": 69.8,
@@ -3262,6 +3377,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "110",
    "entry_id": "5198151624",
    "username": "rickd2424",
    "points": 69.8,
@@ -3290,6 +3406,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "113",
    "entry_id": "5197418684",
    "username": "JRaab",
    "points": 69.55,
@@ -3318,6 +3435,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "113",
    "entry_id": "5197577782",
    "username": "minrobertson210",
    "points": 69.55,
@@ -3346,6 +3464,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "115",
    "entry_id": "5198082647",
    "username": "Skralph",
    "points": 68.95,
@@ -3374,6 +3493,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "116",
    "entry_id": "5197572610",
    "username": "mythicalrhymer01",
    "points": 68.899994,
@@ -3402,6 +3522,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "117",
    "entry_id": "5197577784",
    "username": "minrobertson210",
    "points": 68.649994,
@@ -3430,6 +3551,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "118",
    "entry_id": "5197883908",
    "username": "briguy13",
    "points": 66.95,
@@ -3458,6 +3580,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "119",
    "entry_id": "5197454079",
    "username": "earlharwick",
    "points": 66.600006,
@@ -3486,6 +3609,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "120",
    "entry_id": "5197871962",
    "username": "ggb777",
    "points": 66.55,
@@ -3514,6 +3638,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "121",
    "entry_id": "5197389492",
    "username": "xhangar18x",
    "points": 65.9,
@@ -3542,6 +3667,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "121",
    "entry_id": "5198055673",
    "username": "hacker33",
    "points": 65.9,
@@ -3570,6 +3696,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "123",
    "entry_id": "5197482955",
    "username": "sportsfan14",
    "points": 65.7,
@@ -3598,6 +3725,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "124",
    "entry_id": "5197329972",
    "username": "Dave2zone",
    "points": 65.65,
@@ -3626,6 +3754,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "125",
    "entry_id": "5197885969",
    "username": "aarond23",
    "points": 65.55,
@@ -3654,6 +3783,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "126",
    "entry_id": "5197577779",
    "username": "minrobertson210",
    "points": 64.95,
@@ -3682,6 +3812,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "127",
    "entry_id": "5197307111",
    "username": "davidlobo4",
    "points": 64.8,
@@ -3710,6 +3841,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "127",
    "entry_id": "5197867879",
    "username": "kevinbrock",
    "points": 64.8,
@@ -3738,6 +3870,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "127",
    "entry_id": "5198111023",
    "username": "ga33",
    "points": 64.8,
@@ -3766,6 +3899,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "130",
    "entry_id": "5197661406",
    "username": "bbehnke20",
    "points": 64.75,
@@ -3794,6 +3928,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775262",
    "username": "MissingManning",
    "points": 64.55,
@@ -3822,6 +3957,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775263",
    "username": "MissingManning",
    "points": 64.55,
@@ -3850,6 +3986,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775264",
    "username": "MissingManning",
    "points": 64.55,
@@ -3878,6 +4015,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775265",
    "username": "MissingManning",
    "points": 64.55,
@@ -3906,6 +4044,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775266",
    "username": "MissingManning",
    "points": 64.55,
@@ -3934,6 +4073,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775267",
    "username": "MissingManning",
    "points": 64.55,
@@ -3962,6 +4102,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197775268",
    "username": "MissingManning",
    "points": 64.55,
@@ -3990,6 +4131,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197806915",
    "username": "peterjpacheco",
    "points": 64.55,
@@ -4018,6 +4160,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "131",
    "entry_id": "5197806916",
    "username": "peterjpacheco",
    "points": 64.55,
@@ -4046,6 +4189,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "140",
    "entry_id": "5197867876",
    "username": "kevinbrock",
    "points": 64.5,
@@ -4074,6 +4218,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "141",
    "entry_id": "5197621856",
    "username": "whoisjohngalt420",
    "points": 64.05,
@@ -4102,6 +4247,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "142",
    "entry_id": "5197806917",
    "username": "peterjpacheco",
    "points": 63.65,
@@ -4130,6 +4276,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "143",
    "entry_id": "5197621911",
    "username": "aylsg",
    "points": 62.800003,
@@ -4158,6 +4305,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "144",
    "entry_id": "5197482954",
    "username": "sportsfan14",
    "points": 62.7,
@@ -4186,6 +4334,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "144",
    "entry_id": "5198118051",
    "username": "hoosierpack",
    "points": 62.7,
@@ -4214,6 +4363,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "146",
    "entry_id": "5197883904",
    "username": "briguy13",
    "points": 61.75,
@@ -4242,6 +4392,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "147",
    "entry_id": "5197621862",
    "username": "whoisjohngalt420",
    "points": 61.65,
@@ -4270,6 +4421,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "148",
    "entry_id": "5198042606",
    "username": "crf_333",
    "points": 61.45,
@@ -4298,6 +4450,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "149",
    "entry_id": "5198067751",
    "username": "timothy.beechler",
    "points": 60.75,
@@ -4326,6 +4479,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "150",
    "entry_id": "5197780791",
    "username": "jokerdpo",
    "points": 60.5,
@@ -4354,6 +4508,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "151",
    "entry_id": "5198157154",
    "username": "auweglman",
    "points": 59.7,
@@ -4382,6 +4537,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "152",
    "entry_id": "5198120345",
    "username": "mphill2323",
    "points": 59.550003,
@@ -4410,6 +4566,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "153",
    "entry_id": "5197612264",
    "username": "Sportmanwin",
    "points": 59.5,
@@ -4438,6 +4595,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "154",
    "entry_id": "5197806918",
    "username": "peterjpacheco",
    "points": 58.949997,
@@ -4466,6 +4624,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "154",
    "entry_id": "5197806919",
    "username": "peterjpacheco",
    "points": 58.949997,
@@ -4494,6 +4653,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "156",
    "entry_id": "5197644682",
    "username": "Ozarkian",
    "points": 58.899998,
@@ -4522,6 +4682,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "157",
    "entry_id": "5197482953",
    "username": "sportsfan14",
    "points": 58.7,
@@ -4550,6 +4711,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "158",
    "entry_id": "5197864496",
    "username": "2gethe2one221",
    "points": 58.600002,
@@ -4578,6 +4740,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "159",
    "entry_id": "5198097563",
    "username": "slophound",
    "points": 57.949997,
@@ -4606,6 +4769,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "160",
    "entry_id": "5197885968",
    "username": "aarond23",
    "points": 57.550003,
@@ -4634,6 +4798,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "161",
    "entry_id": "5197572614",
    "username": "mythicalrhymer01",
    "points": 56.95,
@@ -4662,6 +4827,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "162",
    "entry_id": "5198067750",
    "username": "timothy.beechler",
    "points": 56.65,
@@ -4690,6 +4856,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "162",
    "entry_id": "5197644679",
    "username": "Ozarkian",
    "points": 56.649998,
@@ -4718,6 +4885,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "164",
    "entry_id": "5197491483",
    "username": "troubledsoe",
    "points": 56.600002,
@@ -4746,6 +4914,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "165",
    "entry_id": "5197661409",
    "username": "bbehnke20",
    "points": 56.55,
@@ -4774,6 +4943,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "166",
    "entry_id": "5197867877",
    "username": "kevinbrock",
    "points": 55.899998,
@@ -4802,6 +4972,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "167",
    "entry_id": "5198155717",
    "username": "auweglman",
    "points": 55.5,
@@ -4830,6 +5001,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "168",
    "entry_id": "5197661408",
    "username": "bbehnke20",
    "points": 54.95,
@@ -4858,6 +5030,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "169",
    "entry_id": "5197867874",
    "username": "kevinbrock",
    "points": 54.8,
@@ -4886,6 +5059,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "170",
    "entry_id": "5197959851",
    "username": "jaakko",
    "points": 54.7,
@@ -4914,6 +5088,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "171",
    "entry_id": "5197874986",
    "username": "ggb777",
    "points": 54.550003,
@@ -4942,6 +5117,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "171",
    "entry_id": "5197885966",
    "username": "aarond23",
    "points": 54.550003,
@@ -4970,6 +5146,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "173",
    "entry_id": "5197959848",
    "username": "jaakko",
    "points": 53.8,
@@ -4998,6 +5175,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "174",
    "entry_id": "5198150106",
    "username": "RedFern2012",
    "points": 53.550003,
@@ -5026,6 +5204,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "175",
    "entry_id": "5197698318",
    "username": "wondertwins17",
    "points": 53.5,
@@ -5054,6 +5233,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "175",
    "entry_id": "5198156401",
    "username": "ChokeHoldem1",
    "points": 53.5,
@@ -5082,6 +5262,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "177",
    "entry_id": "5197681275",
    "username": "howardwi",
    "points": 53.050003,
@@ -5110,6 +5291,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "178",
    "entry_id": "5198067748",
    "username": "timothy.beechler",
    "points": 52.95,
@@ -5138,6 +5320,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "179",
    "entry_id": "5197592858",
    "username": "dbokey8",
    "points": 52.899998,
@@ -5166,6 +5349,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "179",
    "entry_id": "5198067746",
    "username": "timothy.beechler",
    "points": 52.899998,
@@ -5194,6 +5378,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "181",
    "entry_id": "5197491484",
    "username": "troubledsoe",
    "points": 52.600002,
@@ -5222,6 +5407,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "182",
    "entry_id": "5197487599",
    "username": "Og9erFaithfull",
    "points": 52.5,
@@ -5250,6 +5436,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "183",
    "entry_id": "5198081697",
    "username": "FantanaXJ",
    "points": 52.050003,
@@ -5278,6 +5465,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "184",
    "entry_id": "5197491487",
    "username": "troubledsoe",
    "points": 51.600002,
@@ -5306,6 +5494,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "185",
    "entry_id": "5197482958",
    "username": "sportsfan14",
    "points": 51.550003,
@@ -5334,6 +5523,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "185",
    "entry_id": "5197885965",
    "username": "aarond23",
    "points": 51.550003,
@@ -5362,6 +5552,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "187",
    "entry_id": "5197308147",
    "username": "mshollyallick",
    "points": 50.899998,
@@ -5390,6 +5581,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "188",
    "entry_id": "5197806920",
    "username": "peterjpacheco",
    "points": 50.550003,
@@ -5418,6 +5610,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "189",
    "entry_id": "5198151626",
    "username": "rickd2424",
    "points": 50.5,
@@ -5446,6 +5639,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "190",
    "entry_id": "5198124526",
    "username": "pack88",
    "points": 48.949997,
@@ -5474,6 +5668,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "191",
    "entry_id": "5197959849",
    "username": "jaakko",
    "points": 48.899998,
@@ -5502,6 +5697,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "192",
    "entry_id": "5197801199",
    "username": "Tburke34",
    "points": 47.5,
@@ -5530,6 +5726,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "193",
    "entry_id": "5197572611",
    "username": "mythicalrhymer01",
    "points": 46.7,
@@ -5558,6 +5755,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "194",
    "entry_id": "5197481726",
    "username": "troubledsoe",
    "points": 46.600002,
@@ -5586,6 +5784,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "194",
    "entry_id": "5197491485",
    "username": "troubledsoe",
    "points": 46.600002,
@@ -5614,6 +5813,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "194",
    "entry_id": "5197491486",
    "username": "troubledsoe",
    "points": 46.600002,
@@ -5642,6 +5842,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "197",
    "entry_id": "5197867880",
    "username": "kevinbrock",
    "points": 45.5,
@@ -5670,6 +5871,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "198",
    "entry_id": "5197491488",
    "username": "troubledsoe",
    "points": 44.65,
@@ -5698,6 +5900,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "199",
    "entry_id": "5197661411",
    "username": "bbehnke20",
    "points": 44.35,
@@ -5726,6 +5929,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "200",
    "entry_id": "5198155787",
    "username": "Bold1-86",
    "points": 43.9,
@@ -5754,6 +5958,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "201",
    "entry_id": "5198099576",
    "username": "sparky162",
    "points": 43.65,
@@ -5782,6 +5987,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "202",
    "entry_id": "5197822471",
    "username": "greensae10",
    "points": 43.550003,
@@ -5810,6 +6016,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "203",
    "entry_id": "5197743062",
    "username": "JamoDab2232",
    "points": 43.5,
@@ -5838,6 +6045,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "204",
    "entry_id": "5197355782",
    "username": "newbeeatthis2",
    "points": 42.899998,
@@ -5866,6 +6074,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "205",
    "entry_id": "5198084981",
    "username": "dsmith21144",
    "points": 42.7,
@@ -5894,6 +6103,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "206",
    "entry_id": "5197935871",
    "username": "Mrboozer",
    "points": 41.899998,
@@ -5922,6 +6132,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "207",
    "entry_id": "5197885967",
    "username": "aarond23",
    "points": 41.5,
@@ -5950,6 +6161,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "207",
    "entry_id": "5197959845",
    "username": "jaakko",
    "points": 41.5,
@@ -5978,6 +6190,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "207",
    "entry_id": "5198101194",
    "username": "bleeski",
    "points": 41.5,
@@ -6006,6 +6219,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "210",
    "entry_id": "5197577785",
    "username": "minrobertson210",
    "points": 40.649998,
@@ -6034,6 +6248,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "211",
    "entry_id": "5197988919",
    "username": "flintmonster",
    "points": 40.5,
@@ -6062,6 +6277,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "212",
    "entry_id": "5197560987",
    "username": "The-Bomb-com",
    "points": 40.0,
@@ -6090,6 +6306,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "213",
    "entry_id": "5197577783",
    "username": "minrobertson210",
    "points": 39.649998,
@@ -6118,6 +6335,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "214",
    "entry_id": "5197444511",
    "username": "TheBabz",
    "points": 36.9,
@@ -6146,6 +6364,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "215",
    "entry_id": "5197959846",
    "username": "jaakko",
    "points": 36.5,
@@ -6174,6 +6393,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "215",
    "entry_id": "5198046844",
    "username": "PSULucky7",
    "points": 36.5,
@@ -6202,6 +6422,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "217",
    "entry_id": "5197745967",
    "username": "Elwaysarmy",
    "points": 36.0,
@@ -6230,6 +6451,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "218",
    "entry_id": "5197191062",
    "username": "illiamShine",
    "points": 35.7,
@@ -6258,6 +6480,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "219",
    "entry_id": "5197641171",
    "username": "pokemonJack",
    "points": 35.0,
@@ -6286,6 +6509,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "219",
    "entry_id": "5197645302",
    "username": "pokemonJack",
    "points": 35.0,
@@ -6314,6 +6538,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "221",
    "entry_id": "5197599417",
    "username": "bigbone33",
    "points": 34.600002,
@@ -6342,6 +6567,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "222",
    "entry_id": "5197867875",
    "username": "kevinbrock",
    "points": 34.5,
@@ -6370,6 +6596,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "223",
    "entry_id": "5198046842",
    "username": "PSULucky7",
    "points": 33.5,
@@ -6398,6 +6625,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "223",
    "entry_id": "5198046843",
    "username": "PSULucky7",
    "points": 33.5,
@@ -6426,6 +6654,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "225",
    "entry_id": "5197572613",
    "username": "mythicalrhymer01",
    "points": 32.65,
@@ -6454,6 +6683,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "226",
    "entry_id": "5197183536",
    "username": "wtf9169",
    "points": 30.699999,
@@ -6482,6 +6712,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "227",
    "entry_id": "5197867878",
    "username": "kevinbrock",
    "points": 22.5,
@@ -6510,6 +6741,7 @@
    "lineup_complete": true
   },
   {
+   "rank": "228",
    "entry_id": "5197559793",
    "username": "ep3550",
    "points": 20.5,
@@ -7281,5 +7513,23 @@
    "pct_drafted": 0.42,
    "fpts": 6.0
   }
- ]
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 237,
+  "best_rank": 21,
+  "worst_rank": 207,
+  "best_finish_percentile": 91.56,
+  "median_finish_percentile": 83.12,
+  "best_points": 97.75,
+  "winning_points": 118.9,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.01,
+  "fees_total": 0.07,
+  "winnings_total": 0.0,
+  "net": -0.07,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
 }
