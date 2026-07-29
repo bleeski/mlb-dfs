@@ -41,14 +41,17 @@ data feed disagree, the salary file wins.
 
 ## Multi-session check, before anything else
 
-CLAUDE.md carries the multi-session contract; a build session is BUILD.
-As soon as you have printed the slate identity and before staging, take
-the slate claim: `mkdir claims/slate_<date>_<tag>` (plain mkdir, never
-`-p`; a failure means another session owns this slate). If the claim is
-held, stop and tell Ben rather than build, because portfolio caps hold
-across the whole entered set, and two certified files for one contest are
-one combined portfolio no gate ever saw. Write owner.json after taking
-it, and write a RELEASED file inside at delivery. Never edit the ledger
+CLAUDE.md carries the multi-session contract; a build session is BUILD,
+and builds never block builds. As soon as you have printed the slate
+identity and before staging, light the slate beacon:
+`python tools/claim.py take slate_<date>_<tag> --role BUILD --beacon`
+(plain `mkdir claims/slate_<date>_<tag>` plus an owner.json works too). A
+beacon another session already lit means a parallel build is running:
+note it to Ben and continue, never stop and never wait. The beacon exists
+so DEV knows builds are live and a same-slate double delivery is a
+visible fact; the upload manifest's supersession and the sha256 in your
+report name the delivery, and Ben's check at upload is the arbiter. Write
+a RELEASED file inside your own beacon at delivery. Never edit the ledger
 or the backlog from a build session; drop a fragment in ledger/inbox/ or
 docs/backlog_inbox/ instead.
 
@@ -488,7 +491,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 400 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 404 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

@@ -138,6 +138,10 @@ def cmd_take(args: argparse.Namespace) -> int:
             print(f"HELD  {name} by {owner.get('role', '?')} since "
                   f"{owner.get('taken_utc', '?')}"
                   + (f"  scope: {owner['scope']}" if owner.get("scope") else ""))
+            if getattr(args, "beacon", False):
+                print("beacon already lit: a parallel build is running; builds "
+                      "never block builds, so proceed and note it to Ben")
+                return 0
             print("never delete or take over another session's claim; a stale "
                   "claim is Ben's to arbitrate")
             return 2
@@ -276,6 +280,12 @@ def main(argv=None) -> int:
     p.add_argument("--role", required=True, choices=ROLES)
     p.add_argument("--scope", help="one line: what this session is doing")
     p.add_argument("--date", help="UTC date suffix; defaults to today")
+    p.add_argument("--beacon", action="store_true",
+                   help="advisory presence marker: a claim someone else holds "
+                        "is noted and exits 0 instead of 2. BUILD lights slate "
+                        "beacons this way, because builds never block builds; "
+                        "engine, ledger, and inbox stay mutexes and never use "
+                        "this flag.")
 
     p = sub.add_parser("check", help="list claims, or one resource's state")
     p.add_argument("resource", nargs="?")

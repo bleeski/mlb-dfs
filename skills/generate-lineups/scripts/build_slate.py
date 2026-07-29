@@ -1113,7 +1113,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         _assemble_projection_frame, run_slate,
     )
 
-    pool = build_slate_pool(str(salary), feed, platoon_json=resolve_platoon_json(args))
+    # The stale-platoon condition prints as SOFT below, and CLAUDE.md's build
+    # contract says it prints and the build ships; inheriting the engine's
+    # 'block' default made lineup_gate_passed fail with no cause printed
+    # (docs/backlog_inbox/2026-07-28_build_stale-platoon-block-default.md,
+    # merged as R27). 'warn' makes reality match the stated contract; the
+    # age still prints, and a RotoWire merge still clears it entirely.
+    pool = build_slate_pool(str(salary), feed, platoon_json=resolve_platoon_json(args),
+                            stale_platoon_policy="warn")
     report = pool["pool_report"]
     clock = pool.get("clock") or {}
     kwargs = pool["run_slate_kwargs"]

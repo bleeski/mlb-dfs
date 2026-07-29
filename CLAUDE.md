@@ -39,10 +39,10 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    nine per TBD team; pitchers are feed probables plus explicit declarations.
    Every other salary row is absent, not excluded.
 2. The platoon reference ages against the SLATE, not its own collected_date.
-   Past 7 days with a TBD team filled from it is a pool blocker
-   (`stale_platoon_policy='warn'` downgrades it;
-   skills/generate-lineups/scripts/build_slate.py tiers it SOFT, so it prints
-   and the build ships).
+   Past 7 days with a TBD team filled from it is a pool blocker at the
+   engine default (`stale_platoon_policy='block'`); build_slate.py and
+   late_swap.py pass `'warn'`, so it prints and the build ships (R27). A
+   fresh RotoWire merge (no `--no-rotowire`) clears the age entirely.
 3. `run_slate(approve=False)` first, always. The checkpoint is the review:
    slate clock, pool report, postures, stack plan, caps, feasibility, and one
    Blockers line where every blocker maps to an engine action.
@@ -56,7 +56,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  23 modules  400 tests`. The module count comes off the
+   `PASS  v2.26.0  23 modules  404 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
@@ -117,7 +117,7 @@ inventory checks fail while the suite passes in full, build and flag it.
 - Deliverables land in outputs/<date>/ with exact paths stated.
 - Ceiling below Floor is a hard error, never silently repaired.
 
-## Multi-session contract (v1)
+## Multi-session contract (v1.1)
 Cowork sessions sharing this folder have no coordination: no locks, no
 messages, no registry. This file and the filesystem are the only channels.
 Every session follows this section before its first write.
@@ -128,22 +128,27 @@ Roles; Ben's first message assigns one:
 - ARCHIVE: writes ledger/, data/archive/, data/standings/,
   data/reference/. Runs only outside live build windows.
 - DEV: writes mlb_engine/, tools/, tests/, docs/, skills/. Never edits
-  engine paths while any slate claim is live: builds re-import modules
+  engine paths while any slate beacon is lit: builds re-import modules
   between steps, so a mid-slate edit changes a running build.
-Unassigned: if claims/ is empty, act as SOLO (all roles, still claim);
-otherwise stay read-only and ask Ben.
+Unassigned: building lineups is always permitted, claims present or not;
+light the beacon and go. Ledger, inbox, engine, and contract surfaces
+still need their role and its mutex; outside a build, when in doubt, ask
+Ben.
 
 Claims are live session state in claims/, gitignored except .gitkeep.
 Take with plain mkdir (atomic, fails when held):
 `mkdir claims/<resource>_<utc-date>`, then write owner.json (role, scope,
-taken_utc). Resources: slate_<date>_<tag>, ledger, inbox, engine. A
-failed mkdir means held: read owner.json and stop; never delete or take
-over another session's claim. Yesterday's claims are stale by definition;
-a stale claim today is Ben's to arbitrate. Release by writing a RELEASED
-file inside the claim. Re-read claims/ immediately before writing any
-contended surface, not only at session start. BUILD claims its slate
-before staging; ARCHIVE claims ledger and inbox before mining; DEV claims
-engine before touching code.
+taken_utc). Two kinds. Engine, ledger, and inbox are MUTEXES: a failed
+mkdir means held, read owner.json and stop; never delete or take over
+another session's claim. Slate claims are BEACONS: BUILD lights one
+before staging (`python tools/claim.py take slate_<date>_<tag> --role
+BUILD --beacon`) so DEV can see that builds are live, and a beacon
+another session already lit means a parallel build, which never stops a
+build. Yesterday's claims are stale by definition; a stale claim today is
+Ben's to arbitrate. Release by writing a RELEASED file inside your own
+claim. Re-read claims/ immediately before writing any contended surface,
+not only at session start. ARCHIVE claims ledger and inbox before mining;
+DEV claims engine before touching code.
 
 Git under multiple sessions: classify dirty paths against your write set.
 Foreign dirt inside it blocks and names the owner; foreign dirt elsewhere
@@ -158,11 +163,15 @@ ledger/inbox/ or docs/backlog_inbox/ (create-only for every role, one
 note per file, named <date>_<role>_<slug>.md); the owning role merges and
 deletes consumed fragments.
 
-One slate, one session, always. Portfolio caps are properties of the
-whole entered set and certification is per run, so two sessions'
-certified files for one contest are one combined portfolio no gate ever
-saw. Every brief states the delivered file's sha256; Ben checks it at
-upload before entering anything.
+Builds never block builds, the same slate included: Entry IDs are fixed
+by the DK template, so two certified files for one contest are
+alternatives, not a union, and the manifest's supersession plus the
+sha256 in every brief name the delivery. One ban survives, because it is
+structural: never split one entry bank across sessions by Entry ID
+ranges. Portfolio caps are properties of the whole entered set and
+certification is per run, so a stitched union passed no gate. Every
+brief states the delivered file's sha256; Ben checks it at upload before
+entering anything.
 
 ## T-schedule
 At T-20 skip optional steps. At T-10 approve on posture defaults and

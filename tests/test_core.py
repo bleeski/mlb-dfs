@@ -5516,6 +5516,22 @@ class ClaimToolTests(unittest.TestCase):
         self.assertIn("note", proc.stdout)
         self.assertIn("frag", proc.stdout)
 
+    def test_a_beacon_on_a_held_claim_exits_zero_and_says_proceed(self):
+        """R24: builds never block builds; the beacon informs, never stops."""
+        self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD",
+                    "--scope", "first build")
+        proc = self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD",
+                           "--scope", "second build", "--beacon")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("never block builds", proc.stdout)
+
+    def test_a_held_slate_without_the_beacon_flag_still_reports_held(self):
+        """The flag carries the semantics, not the resource name, so mutex
+        behavior stays available on any resource."""
+        self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD")
+        proc = self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD")
+        self.assertEqual(proc.returncode, 2)
+
 
 class LateSwapDeliveryNameTests(unittest.TestCase):
     """R21: two late swaps are two files, and the delivered name carries the
@@ -5540,6 +5556,18 @@ class LateSwapDeliveryNameTests(unittest.TestCase):
     def test_fallbacks_when_tag_or_run_id_is_missing(self):
         self.assertEqual(self.mod.lateswap_dest_name("", ""),
                          "DKEntries_lateswap_untagged_norun.csv")
+
+    def test_solver_budget_bounds_the_joint_solve(self):
+        """R25: the joint MILP's time limit becomes a first-class flag."""
+        controls = self.mod.resolve_swap_controls(
+            {"max_shared_players": 7}, None, 15)
+        self.assertEqual(controls["time_limit"], 15.0)
+        self.assertEqual(controls["max_shared_players"], 7)
+
+    def test_an_explicit_controls_override_still_wins(self):
+        controls = self.mod.resolve_swap_controls(
+            {"max_shared_players": 7}, {"time_limit": 25}, 15)
+        self.assertEqual(controls["time_limit"], 25)
 
 
 class BankCacheMergeOnSaveTests(unittest.TestCase):

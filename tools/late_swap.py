@@ -21,7 +21,8 @@ downgrade without ``--accept-downgrade``.
 Usage:
     python tools/late_swap.py --date 2026-07-22 \
         --parent-entries runs/<run_id>/final/DKEntries.csv \
-        [--budget 30] [--entry-ids 123,456] [--dry-run] \
+        [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
+        [--entry-ids 123,456] [--dry-run] \
         [--postures <contest_id>=cash,...] [--accept-downgrade]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
@@ -34,6 +35,7 @@ import datetime as dt
 import json
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -108,6 +110,24 @@ def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
     tag = str(slate_tag or "").strip() or "untagged"
     suffix = str(run_id or "").rsplit("_", 1)[-1][:8] or "norun"
     return f"DKEntries_lateswap_{tag}_{suffix}.csv"
+
+
+def resolve_swap_controls(defaults, override, solver_budget) -> dict:
+    """Merged portfolio controls for the swap, with the joint solve bounded (R25).
+
+    The entry-level joint MILP reads its time limit from
+    ``controls['time_limit']`` (contest_allocator, default 30s). That was
+    reachable only through --controls-override and documented nowhere, so a
+    swap that had to fit a bounded call window had no supported way to shrink
+    its one monolithic stage. --solver-budget is that way; an explicit
+    --controls-override time_limit still wins, because an operator who passed
+    JSON meant it.
+    """
+    controls = dict(defaults)
+    if solver_budget is not None:
+        controls["time_limit"] = float(solver_budget)
+    controls.update(override or {})
+    return controls
 
 
 def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
@@ -216,7 +236,26 @@ def main() -> int:
     ap.add_argument("--parent-entries", required=True,
                     help="the delivered DKEntries.csv being refined")
     ap.add_argument("--budget", type=float, default=30.0,
-                    help="seconds per candidate-generation slice")
+                    help="TOTAL seconds across every candidate-generation slice "
+                         "(the general slice plus one per pinned entry). This was "
+                         "per-slice, so three pinned entries cost four budgets "
+                         "before the joint solve began. The bank cache persists "
+                         "between runs, so re-running the same command resumes "
+                         "instead of restarting.")
+    ap.add_argument("--solver-budget", type=float, default=None,
+                    help="seconds for the entry-level joint MILP (allocator "
+                         "default 30). The swap re-certifies the WHOLE delivered "
+                         "portfolio, so this stage is irreducible; bound it to "
+                         "fit the call window (sandbox arithmetic: ~15s import + "
+                         "--budget + this). A time-limited incumbent is verified "
+                         "and accepted, tagged optimality='time_limited', per the "
+                         "timeout guardrail.")
+    ap.add_argument("--lineups",
+                    help="fresher lineups_feed.json for THIS swap, read-only "
+                         "(mirrors build_slate.py --lineups). Without it the swap "
+                         "reads the shared data/slates/<date>/lineups_feed.json "
+                         "cache, which is as old as whatever wrote it and is also "
+                         "read and written by concurrent builds.")
     ap.add_argument("--entry-ids", help="comma-separated Entry IDs to authorize; "
                                         "default authorizes every reserved entry")
     ap.add_argument("--dry-run", action="store_true",
@@ -255,7 +294,11 @@ def main() -> int:
 
     slate = REPO / "data" / "slates" / args.date
     salary = slate / "DKSalaries.csv"
-    feed_path = slate / "lineups_feed.json"
+    # R25: the feed path was hardcoded to the shared per-slate cache, which is
+    # as old as whatever wrote it; a swap blocked on hours-old TBD teams that
+    # had long since posted. --lineups supplies a fresh feed without touching
+    # the shared file other concurrent sessions read and write.
+    feed_path = Path(args.lineups) if args.lineups else slate / "lineups_feed.json"
     for path in (salary, feed_path, Path(args.parent_entries)):
         if not path.exists():
             print(f"missing input: {path}", file=sys.stderr)
@@ -311,7 +354,12 @@ def main() -> int:
         print(f"doubleheader: dropped {dropped['game_id']} leg at "
               f"{dropped['start_utc']} ({dropped['reason']})")
 
-    pool = build_slate_pool(str(salary), feed)
+    # A swap runs post-lock: confirmed lineups dominate the pool, and the
+    # platoon reference only shapes projections for still-TBD teams. Blocking
+    # a T-minus swap on that reference's age is the process preventing the
+    # lineup (the same reasoning as FEED_AGE_WARN_MINUTES above), so the
+    # staleness prints here instead of failing the gate.
+    pool = build_slate_pool(str(salary), feed, stale_platoon_policy="warn")
     kwargs = pool["run_slate_kwargs"]
     if pool.get("platoon_source"):
         print(f"platoon fallback: {pool['platoon_source']}")
@@ -335,10 +383,20 @@ def main() -> int:
     cache_path = REPO / "runs" / f"bank_cache_{args.date}_{pool_signature(salary)}.json"
     cache = BankCache(cache_path)
 
+    # R25: --budget is the TOTAL slicing budget. It used to be per
+    # extend_bank call (one general plus one per pinned entry), so three
+    # pinned entries cost four budgets before the joint solve ever began;
+    # that is the timeout documented in
+    # docs/backlog_inbox/2026-07-28_build_late-swap-times-out.md.
+    slice_deadline = time.monotonic() + max(1.0, float(args.budget))
+
+    def _slice_budget() -> float:
+        return max(1.0, slice_deadline - time.monotonic())
+
     # A general bank covers entries with no locked slots. Entries that already hold
     # locked players need candidates built against those exact pins and against the
     # excluded-new-teams rule, or the allocator reports "no compatible candidate".
-    report = extend_bank(cache, projections, time_budget_s=args.budget)
+    report = extend_bank(cache, projections, time_budget_s=_slice_budget())
     print(f"bank: {report['total_candidates']} candidates "
           f"(+{report['built_this_slice']} this slice, "
           f"{report['jobs_attempted']}/{report['jobs_total']} jobs)")
@@ -361,7 +419,7 @@ def main() -> int:
         excludes = [p for p in all_ids
                     if team_by_id.get(p) in excluded_teams and p not in current]
         slice_report = extend_bank(
-            cache, projections, time_budget_s=args.budget,
+            cache, projections, time_budget_s=_slice_budget(),
             locked_slot_assignments=lsa, excludes=excludes,
         )
         print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
@@ -391,9 +449,12 @@ def main() -> int:
                           "candidate_scoring": payload_report}, indent=1))
         return 0
 
-    controls = dict(PORTFOLIO_CONTROLS)
-    if args.controls_override:
-        controls.update(args.controls_override)
+    controls = resolve_swap_controls(PORTFOLIO_CONTROLS, args.controls_override,
+                                     args.solver_budget)
+    print(f"joint solve next: {len(requirements)} entries, {len(candidates)} "
+          f"candidates, time_limit {controls.get('time_limit', 30)}s (the swap "
+          f"re-certifies the whole portfolio, so this stage runs over every "
+          f"entry, not only the authorized ones)")
 
     result = run_late_swap(
         runs_root=str(REPO / "runs"),
