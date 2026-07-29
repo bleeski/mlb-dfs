@@ -685,11 +685,60 @@ def build_slate_pool(
 
     slate_teams = sorted({p.team for p in players if p.team})
     team_game = {p.team: (p.game_id or p.game_info) for p in players if p.team}
-    excluded_teams = {t for t, g in team_game.items() if g in excluded_game_ids}
 
     warnings: List[str] = []
     blockers: List[str] = []
     teams_report: Dict[str, Dict[str, Any]] = {}
+
+    # R26: a postponed game is excluded on either of two independent signals,
+    # because the 2026-07-28 incident (ATL@NYM, Chris Sale reaching the bank
+    # as P1) was exactly their disagreement. DK marks a postponed game's Game
+    # Info with the literal string 'Postponed', so the parsed game_id is empty
+    # and team_game carries the literal, which can never equal a feed-derived
+    # id like 'ATL@NYM'. Matching only id-to-id let both teams fall through to
+    # tbd_teams and take platoon-projected orders, silently.
+    #
+    # Signal 1, the salary file: a non-blank Game Info that does not parse as
+    # a matchup (no 'AWY@HOM' first token, the same predicate
+    # infer_opponent_and_game_id applies) is DK stating the game is not
+    # schedulable on this slate, and the CSV is authoritative for eligibility.
+    # Signal 2, the feed: a game the feed marks postponed/cancelled/suspended
+    # excludes its teams BY TEAM NAME, not by game-id equality, so the match
+    # survives the salary side carrying a literal instead of an id. A blank
+    # Game Info excludes nothing, because a blank cell never removes a player;
+    # it warns below, and Signal 2 can still exclude the team.
+    feed_excluded_team_status: Dict[str, str] = {}
+    for gid in excluded_game_ids:
+        state = str(((status.get("game_meta") or {}).get(gid) or {}).get("status")
+                    or "postponed/cancelled/suspended")
+        for side_team in str(gid).split("@"):
+            feed_excluded_team_status[side_team] = state
+    salary_unparsed_game: Dict[str, str] = {
+        t: str(g) for t, g in team_game.items()
+        if str(g or "").strip() and "@" not in str(g).strip().split()[0]
+    }
+    if salary_unparsed_game and set(salary_unparsed_game) == set(team_game):
+        # A whole slate of postponements is implausible; every Game Info
+        # failing at once is a DK format change or the wrong file. Excluding
+        # everything would relabel a parser failure as weather, so Signal 1
+        # stands down and this blocker carries the cause instead.
+        sample = next(iter(sorted(salary_unparsed_game.values())))
+        blockers.append(
+            "every salary row's Game Info failed to parse as a matchup "
+            f"(sample: '{sample}'); DK format change or wrong file, not a "
+            "slate of postponements. No team excluded on it; fix the input."
+        )
+        salary_unparsed_game = {}
+    excluded_teams = {t for t, g in team_game.items() if g in excluded_game_ids}
+    excluded_teams |= set(salary_unparsed_game)
+    excluded_teams |= {t for t in team_game if t in feed_excluded_team_status}
+    for team in sorted(t for t, g in team_game.items() if not str(g or "").strip()):
+        if team not in excluded_teams:
+            warnings.append(
+                f"{team}: salary Game Info is blank; the game cannot be "
+                "matched against the feed. Not excluded on a blank cell; "
+                "verify the salary file."
+            )
 
     # One line per shelved player, naming player and team. A count alone is not
     # reviewable: the operator has to be able to see that the name he expected to
@@ -934,7 +983,25 @@ def build_slate_pool(
 
     for team in sorted(excluded_teams):
         teams_report[team] = {"status": "excluded_postponed", "hitters": 0}
-        warnings.append(f"{team}: game {team_game.get(team)} postponed/cancelled/suspended; team excluded")
+        # R26: name the signal that fired, so a salary-only exclusion (feed
+        # not yet aware) reads differently from a feed-status one.
+        reasons: List[str] = []
+        if team in salary_unparsed_game:
+            reasons.append(
+                f"salary Game Info reads '{salary_unparsed_game[team]}', not a matchup"
+            )
+        if team in feed_excluded_team_status:
+            reasons.append(
+                f"lineups feed marks the game {feed_excluded_team_status[team]}"
+            )
+        if not reasons:
+            reasons.append(
+                f"game {team_game.get(team)} postponed/cancelled/suspended in the feed"
+            )
+        warnings.append(
+            f"{team}: game postponed/cancelled/suspended "
+            f"({'; '.join(reasons)}); team excluded"
+        )
 
     # DK's Starting column is the authoritative confirmed order, in the
     # authoritative file, and only Showdown ever read it. Use it as a check on
@@ -997,6 +1064,14 @@ def build_slate_pool(
         sp = by_id.get(str(pid))
         if sp is None:
             warnings.append(f"declared pitcher id {pid} not on the salary file; skipped")
+            continue
+        if sp.team in excluded_teams:
+            # R26: probables already skip excluded teams; an explicit
+            # declaration must not be the back door into a postponed game.
+            warnings.append(
+                f"{sp.team} {sp.name} ({pid}): declared, but the game is "
+                f"postponed/cancelled/suspended; excluded"
+            )
             continue
         pitcher_roles[str(pid)] = str(role or "declared_probable_sp")
         keep.setdefault(str(pid), _pool_row(sp, batting_order=None))
@@ -1063,6 +1138,9 @@ def build_slate_pool(
             "hitters_kept": len(team_by_player_id),
             "pitchers_kept": len(pitcher_roles),
             "teams": teams_report,
+            # R26: the bucket that stayed empty on 2026-07-28. One key, so a
+            # caller checks postponement exclusions without walking teams.
+            "excluded_postponed_teams": sorted(excluded_teams),
             "pitchers": [
                 {"player_id": pid, "name": by_id[pid].name, "team": by_id[pid].team,
                  "role": role}

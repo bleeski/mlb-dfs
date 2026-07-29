@@ -1427,6 +1427,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     if not result.get("passed"):
         for blocker in result.get("contest_identity_blockers") or []:
             print(f"contest identity: {blocker}", file=sys.stderr)
+        # R27 (open half): when a pre-export gate fails, its cause prints
+        # here, on the failing command's own output. No session should ever
+        # again reproduce the pool by hand to learn why a gate failed.
+        detail = gate_failure_detail(result, report)
+        for name in detail.get("failed_gates") or []:
+            print(f"gate {name}: {detail['gate_evidence'][name]}", file=sys.stderr)
+        for blocker in detail.get("pool_blockers") or []:
+            print(f"pool blocker: {blocker}", file=sys.stderr)
         # A failed joint allocation is frequently a small-slate control
         # infeasibility, not a real "no legal lineup" wall: too few games means
         # too few distinct SP pairs and team stacks to keep every portfolio
@@ -1436,7 +1444,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # it here so the fix is "rerun with --controls-override" instead of a
         # from-scratch debugging session.
         feas = result.get("feasibility") or {}
-        payload = {"status": "not_certified", "errors": result.get("errors")}
+        payload = {"status": "not_certified", "errors": result.get("errors"),
+                   **detail}
         if not feas.get("passed", True):
             payload["feasibility"] = feas
             payload["hint"] = (
@@ -1876,6 +1885,38 @@ SOFT_POOL_BLOCKER_RE = _re.compile(
 ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
                    "weather_gate_passed", "odds_gate_passed")
+
+# The two shapes validate_upload_ready_gates emits, and nothing else.
+_GATE_ERROR_RE = _re.compile(r"^(?:Missing|Failed) pre-export gate: (\w+)")
+
+
+def gate_failure_detail(result: dict, pool_report: dict | None) -> dict:
+    """R27 (open half): everything a failed pre-export gate can say for
+    itself, collected from evidence the engine already recorded.
+
+    The 2026-07-28 session watched lineup_gate_passed fail with no cause on
+    screen and rebuilt the pool by hand to find the blocker text. The cause
+    was on the result the whole time: every derived gate carries one evidence
+    line (workflow_gate_evidence), and the pool report carries the blockers
+    the lineup gate read. Returns {"failed_gates", "gate_evidence",
+    "pool_blockers"}, each key present only when it has content, ready to
+    merge into the not_certified payload.
+    """
+    evidence = (result or {}).get("workflow_gate_evidence") or {}
+    names: list[str] = []
+    for err in (result or {}).get("errors") or []:
+        match = _GATE_ERROR_RE.match(str(err))
+        if match and match.group(1) not in names:
+            names.append(match.group(1))
+    detail: dict = {}
+    if names:
+        detail["failed_gates"] = names
+        detail["gate_evidence"] = {
+            n: str(evidence.get(n) or "no evidence recorded") for n in names}
+    blockers = [str(b) for b in (pool_report or {}).get("blockers") or []]
+    if blockers:
+        detail["pool_blockers"] = blockers
+    return detail
 
 
 def parse_assume_gates_arg(value: str | None) -> list[str]:

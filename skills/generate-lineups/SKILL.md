@@ -44,16 +44,15 @@ data feed disagree, the salary file wins.
 CLAUDE.md carries the multi-session contract; a build session is BUILD,
 and builds never block builds. As soon as you have printed the slate
 identity and before staging, light the slate beacon:
-`python tools/claim.py take slate_<date>_<tag> --role BUILD --beacon`
-(plain `mkdir claims/slate_<date>_<tag>` plus an owner.json works too). A
+`python tools/claim.py take slate_<date>_<tag> --role BUILD --beacon`. A
 beacon another session already lit means a parallel build is running:
 note it to Ben and continue, never stop and never wait. The beacon exists
 so DEV knows builds are live and a same-slate double delivery is a
 visible fact; the upload manifest's supersession and the sha256 in your
-report name the delivery, and Ben's check at upload is the arbiter. Write
-a RELEASED file inside your own beacon at delivery. Never edit the ledger
-or the backlog from a build session; drop a fragment in ledger/inbox/ or
-docs/backlog_inbox/ instead.
+report name the delivery, and Ben's check at upload is the arbiter. At
+delivery, release it: `python tools/claim.py release slate_<date>_<tag>`.
+Never edit the ledger or the backlog from a build session; drop a
+fragment in ledger/inbox/ or docs/backlog_inbox/ instead.
 
 ## Preflight: one call, always, even inside T-20
 
@@ -491,7 +490,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 404 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 410 tests
 ```
 
 The audit checks dependencies first and names the install command if something is

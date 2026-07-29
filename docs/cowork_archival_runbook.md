@@ -25,11 +25,13 @@ files.
    claim.
 6. Multi-session: this runbook is the ARCHIVE role (CLAUDE.md,
    multi-session contract). Before Job 1, take the claims:
-   `mkdir claims/ledger_<utc-date>` and `mkdir claims/inbox_<utc-date>`;
-   a failed mkdir means another session holds it, so stop. Write a
-   RELEASED file inside both when the archival session is done. Never run
-   Job 1 during a live build window, and never edit the ledger without
-   holding its claim.
+   `python tools/claim.py take ledger --role ARCHIVE` and
+   `python tools/claim.py take inbox --role ARCHIVE` (the tool adds the
+   UTC date). A held claim exits nonzero and prints the owner: stop.
+   When the archival session is done, release both:
+   `python tools/claim.py release ledger` and
+   `python tools/claim.py release inbox`. Never run Job 1 during a live
+   build window, and never edit the ledger without holding its claim.
 
 ## Job 1: Post-slate archival (highest value; run after every slate)
 

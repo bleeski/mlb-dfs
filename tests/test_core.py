@@ -170,9 +170,12 @@ def _entry_reqs(n, contest_id="900", shape="large_wta"):
     return [{"entry_id": str(i), "contest_id": contest_id, "contest_shape": shape} for i in range(n)]
 
 
-def pool_salary_csv(path: Path, game_dt_et: str = "07/10/2026 07:05PM ET") -> None:
+def pool_salary_csv(path: Path, game_dt_et: str = "07/10/2026 07:05PM ET",
+                    postponed_teams: tuple = ()) -> None:
     """Four-team salary file for pool-contract tests: per team, 9 lineup-caliber
-    hitters, 4 bench bats, 1 probable SP, and 3 relievers (68 rows total)."""
+    hitters, 4 bench bats, 1 probable SP, and 3 relievers (68 rows total).
+    Teams named in ``postponed_teams`` get DK's literal 'Postponed' as their
+    whole Game Info cell, the shape the 2026-07-28 incident arrived in (R26)."""
     header = ["Position", "Name + ID", "Name", "ID", "Roster Position", "Salary",
               "Game Info", "AvgPointsPerGame", "TeamAbbrev"]
     games = {"T1": "T1@T2", "T2": "T1@T2", "T3": "T3@T4", "T4": "T3@T4"}
@@ -180,7 +183,7 @@ def pool_salary_csv(path: Path, game_dt_et: str = "07/10/2026 07:05PM ET") -> No
     rows = []
     pid = 30000
     for team in ("T1", "T2", "T3", "T4"):
-        gi = f"{games[team]} {game_dt_et}"
+        gi = "Postponed" if team in postponed_teams else f"{games[team]} {game_dt_et}"
         for i in range(9):
             pid += 1
             rows.append([hit_pos[i], f"{team} Hitter{i+1} ({pid})", f"{team} Hitter{i+1}",
@@ -2600,9 +2603,9 @@ class SlateClockTests(unittest.TestCase):
 
 
 class BuildSlatePoolTests(unittest.TestCase):
-    def _pool(self, tmp: str, feed=None, platoon="default", **kwargs):
+    def _pool(self, tmp: str, feed=None, platoon="default", postponed_teams=(), **kwargs):
         salary = Path(tmp) / "salary.csv"
-        pool_salary_csv(salary)
+        pool_salary_csv(salary, postponed_teams=postponed_teams)
         if platoon == "default":
             platoon = pool_platoon_json()
         return lda.build_slate_pool(
@@ -2683,6 +2686,71 @@ class BuildSlatePoolTests(unittest.TestCase):
             self.assertEqual(teams_kept, {"T1", "T2"})
             self.assertTrue(any("postponed" in w for w in report["warnings"]))
             self.assertEqual(report["blockers"], [])
+
+    def test_pool_postponed_literal_game_info_excluded(self):
+        """R26: DK marks a postponed game's Game Info with the literal string
+        'Postponed', so the parsed game_id is empty and id-to-id matching can
+        never exclude the team. Regression for 2026-07-28 (ATL@NYM): both
+        teams fell into tbd_teams, took platoon-projected orders, and the
+        postponed game's probable reached the bank as P1."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, feed=pool_lineups_feed(postpone_game2=True),
+                              postponed_teams=("T3", "T4"))
+            report = pool["pool_report"]
+            self.assertEqual(report["teams"]["T3"]["status"], "excluded_postponed")
+            self.assertEqual(report["teams"]["T4"]["status"], "excluded_postponed")
+            self.assertEqual(report["excluded_postponed_teams"], ["T3", "T4"])
+            teams_kept = {r["Team"] for r in pool["projection_rows"]}
+            self.assertEqual(teams_kept, {"T1", "T2"})  # never reach keep
+            self.assertEqual(report["kept"], 20)
+            self.assertEqual(report["pitchers_kept"], 2)
+            self.assertEqual(pool["run_slate_kwargs"]["confirmed_teams"], ["T1", "T2"])
+            self.assertTrue(any("not a matchup" in w for w in report["warnings"]))
+            self.assertEqual(report["blockers"], [])
+
+    def test_pool_salary_postponed_literal_alone_excludes(self):
+        """R26 Signal 1: the salary file can know before the feed does. A
+        stale feed still says Scheduled with confirmed lineups; DK's literal
+        wins, because the salary CSV is authoritative for eligibility."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, postponed_teams=("T3", "T4"))
+            report = pool["pool_report"]
+            self.assertEqual(report["teams"]["T3"]["status"], "excluded_postponed")
+            self.assertEqual(report["teams"]["T4"]["status"], "excluded_postponed")
+            teams_kept = {r["Team"] for r in pool["projection_rows"]}
+            self.assertEqual(teams_kept, {"T1", "T2"})
+            self.assertTrue(any("salary Game Info reads 'Postponed'" in w
+                                for w in report["warnings"]))
+
+    def test_pool_declared_pitcher_on_postponed_team_excluded(self):
+        """R26: an explicit declaration is not a back door into a postponed
+        game. T4 Ace is pid 30065 by fixture construction."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            pool_salary_csv(salary, postponed_teams=("T3", "T4"))
+            pool = lda.build_slate_pool(
+                salary, pool_lineups_feed(postpone_game2=True),
+                platoon_json=pool_platoon_json(),
+                declared_pitchers={"30065": "declared_probable_sp"},
+            )
+            self.assertNotIn("30065", pool["pitcher_roles"])
+            kept_ids = {r["Player_ID"] for r in pool["projection_rows"]}
+            self.assertNotIn("30065", kept_ids)
+            self.assertTrue(any("declared, but the game is" in w
+                                for w in pool["pool_report"]["warnings"]))
+
+    def test_pool_all_game_info_unparsed_is_blocker_not_exclusion(self):
+        """R26: every Game Info failing at once is a DK format change or the
+        wrong file, not a slate of postponements. The pool blocks loudly
+        instead of relabeling a parser failure as weather."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, postponed_teams=("T1", "T2", "T3", "T4"))
+            report = pool["pool_report"]
+            self.assertTrue(any("format change" in b for b in report["blockers"]))
+            statuses = {v["status"] for v in report["teams"].values()}
+            self.assertNotIn("excluded_postponed", statuses)
+            self.assertEqual(report["excluded_postponed_teams"], [])
+            self.assertEqual(report["kept"], 40)  # nothing silently dropped
 
     def test_pool_ignores_feed_teams_outside_the_draftgroup(self):
         """The feed covers the whole day; the salary file defines the slate.
@@ -2787,6 +2855,37 @@ class BuildSlateScriptTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
+
+    def test_gate_failure_detail_collects_cause(self):
+        """R27 open half: a failed pre-export gate names itself, its evidence
+        line, and the pool blockers, so the not_certified payload carries the
+        cause instead of leaving it to a by-hand pool rebuild."""
+        mod = self._module()
+        result = {
+            "errors": [
+                "Failed pre-export gate: lineup_gate_passed",
+                "Missing pre-export gate: odds_gate_passed",
+                "Failed pre-export gate: lineup_gate_passed",  # dupe collapses
+                "allocation failed",  # non-gate error stays out
+            ],
+            "workflow_gate_evidence": {
+                "lineup_gate_passed":
+                    "pool report: 1 blockers, 0 team(s) under nine hitters",
+            },
+        }
+        report = {"blockers": ["platoon reference is 27 days old against slate"]}
+        detail = mod.gate_failure_detail(result, report)
+        self.assertEqual(detail["failed_gates"],
+                         ["lineup_gate_passed", "odds_gate_passed"])
+        self.assertEqual(detail["gate_evidence"]["lineup_gate_passed"],
+                         "pool report: 1 blockers, 0 team(s) under nine hitters")
+        self.assertEqual(detail["gate_evidence"]["odds_gate_passed"],
+                         "no evidence recorded")
+        self.assertEqual(detail["pool_blockers"],
+                         ["platoon reference is 27 days old against slate"])
+        # Empty inputs produce an empty dict, so the payload merge is a no-op.
+        self.assertEqual(mod.gate_failure_detail({}, {}), {})
+        self.assertEqual(mod.gate_failure_detail({"errors": ["x"]}, None), {})
 
     def test_feed_age_minutes_reads_fetched_at(self):
         import datetime as dt
@@ -5531,6 +5630,27 @@ class ClaimToolTests(unittest.TestCase):
         self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD")
         proc = self._claim("take", "slate_2026-07-29_1905", "--role", "BUILD")
         self.assertEqual(proc.returncode, 2)
+
+    def test_docs_instruct_the_tool_not_the_raw_mkdir(self):
+        """R19 done-when: SKILL.md and the runbook each instruct one command.
+
+        The raw mkdir procedure stays correct and stays documented in
+        CLAUDE.md's contract text; the two operating procedures must name
+        the tool, because a protocol that is a procedure gets skipped at
+        T-20. This pins the docs to the tool so they cannot drift back.
+        """
+        repo = Path(__file__).resolve().parents[1]
+        skill = (repo / "skills" / "generate-lineups" / "SKILL.md"
+                 ).read_text(encoding="utf-8")
+        runbook = (repo / "docs" / "cowork_archival_runbook.md"
+                   ).read_text(encoding="utf-8")
+        for name, text in (("SKILL.md", skill), ("runbook", runbook)):
+            self.assertIn("tools/claim.py", text,
+                          f"{name} no longer names the claim tool")
+            self.assertNotIn("mkdir claims/", text,
+                             f"{name} still instructs the raw mkdir")
+            self.assertIn("claim.py release", text,
+                          f"{name} must instruct release as one command too")
 
 
 class LateSwapDeliveryNameTests(unittest.TestCase):
