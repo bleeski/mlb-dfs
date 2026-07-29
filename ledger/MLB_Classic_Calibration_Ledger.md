@@ -641,11 +641,19 @@ unresolvable.
   guards correctness. The standings inbox is drained of CSVs (46 source .zip files
   remain, which is expected and harmless).
 
-### 3.14 The satellite leg, measured end to end (DATED FINDING, 2026-07-29)
+### 3.14 The satellite leg, partially measured: cash and ticket face only (DATED FINDING, 2026-07-29)
 
 Observed outcomes over 4,201 MLB satellite entries (4,736 across all sports) that no
 model predicted. Not ROI, not a win rate, not a probability claim. This grades the
 operation, not the engine.
+
+**Scope warning, and it is the most important line in this section.** Everything here
+is cash and ticket face, because those are the only columns the export has. A third
+channel, DraftKings promotional benefits tied to ticket acquisition and contest-entry
+volume, is real and is invisible to this data. It is not netted anywhere below. The
+section title said "measured end to end" for one commit; that was wrong and is
+retracted. See the third-channel paragraph after the unresolved-face discussion before
+quoting any net figure from this section.
 
 **Read the MLB column first. This is an MLB ledger and the source export is
 all-sports** (`Sport` column: MLB 4,879 of 6,526 entries, then GOLF 737, NBA 432,
@@ -665,9 +673,11 @@ columns. Attributing the $14.00 that ticket-funded Pocket Cup entries returned b
 the satellites that produced the tickets puts the satellite leg at **-$244.45**. Use
 one view or the other; never sum them, because the $14 sits in the non-satellite
 column too. Either way **the satellite block carries roughly four fifths of the MLB
-loss on 86% of the MLB entries, and the engine's actual domain, MLB non-satellite
+cash loss on 86% of the MLB entries, and the engine's actual domain, MLB non-satellite
 Classic and Showdown, is close to break-even on observed outcomes** ($301.01 against
-$247.15, and May returned $66.24 on $63.55).
+$247.15, and May returned $66.24 on $63.55). Read "cash loss" literally: promotional
+consideration is not in it, and the third-channel paragraph below is a condition on
+this whole comparison, not a caveat to it.
 
 **Of the $216 in ticket face MLB satellites won, only $61 is a prize this engine can
 play.** Decomposed by the sport of the *prize*, not the sport of the entry:
@@ -722,15 +732,45 @@ against nine $2 target entries at two redemption dates.
 $0.25 GOLF satellite on 05-10 became a $25 ticket became $40. The penny Pocket Cup
 satellites became $18 of tickets became $14. Nothing else has come back.
 
-**$175 of ticket face is unaccounted for and $150 of that cannot be resolved from
-this export.** $150 sits in Best Ball products (3 x $25 NFL Best Ball Millionaire,
-11 x $5 Midseason Best Ball Knuckleball, 1 x $20 NBA Best Ball Shootaround) with zero
-matching entries anywhere in the file. Best Ball entries *do* appear in this export
-when they complete (two $1 drafts from 2024 and 2025 are present), so the absence
-means either unspent or spent-and-still-scoring, and the completed-contests-only
-limitation makes those two indistinguishable. Do not estimate this leg. The remaining
-$25 is genuinely pending, not lost: 2 x $5 NFL Fantasy Football Millionaire tickets
-target a 2026-09-13 contest, and a second $15 Relay Throw ticket was won 2026-07-28.
+**$175 of ticket face is not yet resolved, and it is HELD INVENTORY, not a loss**
+(corrected 2026-07-29 on Ben's read; the first pass filed it as an unresolvable hole,
+which framed an asset as a leak). $150 sits in Best Ball products (3 x $25 NFL Best
+Ball Millionaire, 11 x $5 Midseason Best Ball Knuckleball, 1 x $20 NBA Best Ball
+Shootaround) with zero matching entries in the file. **Several of those contests have
+not commenced.** NFL Best Ball drafts score across a season starting September 2026
+and NBA Best Ball from October, both after this export's last date by construction, so
+their absence is expected rather than diagnostic. Best Ball entries do appear in this
+export once they complete (two $1 drafts from 2024 and 2025 are present), which is why
+the first pass could not separate unspent from still-scoring. Do not estimate this leg
+and do not carry it as a loss. The remaining $25 is pending on the same logic: 2 x $5
+NFL Fantasy Football Millionaire tickets target a 2026-09-13 contest, and a second $15
+Relay Throw ticket was won 2026-07-28. Re-export the entry history after the Best Ball
+seasons settle and the whole $175 resolves in the record.
+
+**A third channel exists and this export cannot see it: DraftKings promotional
+benefits attached to acquiring tickets and to entering contests.** Ben's standing
+correction, recorded 2026-07-29. The entry history carries `Entry_Fee`,
+`Winnings_Non_Ticket`, and `Winnings_Ticket` and nothing else, so every figure in this
+section is **cash and ticket face only**. Promotional consideration earned by holding
+or acquiring tickets, and by contest-entry volume, is invisible here and is not in any
+number above.
+
+This is not a rounding caveat, and it plausibly runs the opposite way from the cash
+result. A satellite entry at $0.01 to $0.25 is the cheapest available unit of
+"contest entered", so any promotion that keys on entry counts, contest counts, or
+ticket acquisition is served far more efficiently by 4,201 penny satellites than by
+678 dollar contests. **The satellite leg therefore cannot be graded from this export,
+and the -$244.45 must be read as a cash-only figure, never as the result of the
+strategy.** Any claim that the satellites are the loss, including the "four fifths of
+the MLB net loss" line above, is a statement about the cash column and is conditional
+on the promotional channel being worth less than the gap. Nothing in this project has
+measured that. Until it is measured, the satellite volume is an open question, not a
+finding, and no recommendation to cut it rests on evidence.
+
+What would close it: any DK record of promotional credits, reward-tier progress, or
+mission completions, joined to this export by date. Ben knows the promotional
+structure; the repo does not. Until such a record exists, the honest label for the
+satellite leg is **partially measured**.
 
 **MLB and GOLF satellites are not the same instrument.**
 
