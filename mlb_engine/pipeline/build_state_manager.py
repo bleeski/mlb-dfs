@@ -1,8 +1,12 @@
-"""MLB Classic immutable run manager v1.3.
+"""MLB Classic immutable run manager v1.4.
 
 Creates hash-bound, immutable execution runs. A run may be written while in
 ``building`` state, but production artifacts are never overwritten after the run
 is promoted. ``latest_valid_run.json`` is only a pointer; it is not an artifact.
+
+v1.4 (R7): every manifest records the runtime environment (Python and engine
+package versions, plus the sha256 of requirements.lock when present), so a
+result can always be tied to the resolver state that produced it.
 """
 from __future__ import annotations
 
@@ -16,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence
 
-VERSION = "v1.3"
+VERSION = "v1.4"
 MANIFEST_NAME = "manifest.json"
 LATEST_POINTER = "latest_valid_run.json"
 RUN_SUBDIRS = ("inputs", "candidate", "final")
@@ -64,6 +68,33 @@ def _assert_mutable(manifest: Dict[str, Any]) -> None:
         raise RuntimeError("promoted runs are immutable")
 
 
+def runtime_environment(runs_root: str | Path) -> Dict[str, Any]:
+    """Snapshot the runtime the run executes under (R7).
+
+    Package versions come from live imports, because what imported is what
+    ran; a dep that fails to import records None rather than raising, since
+    ``validate_only`` work may legitimately run without the solver. The lock
+    sha256 ties the manifest to the exact resolution set; ``runs/`` sits at
+    the repo root, so the lock is looked up beside it and records None when
+    absent rather than guessing.
+    """
+    import platform
+
+    packages: Dict[str, Optional[str]] = {}
+    for name in ("numpy", "pandas", "scipy"):
+        try:
+            packages[name] = str(getattr(__import__(name), "__version__", "unknown"))
+        except ImportError:
+            packages[name] = None
+    lock = Path(runs_root).resolve().parent / "requirements.lock"
+    return {
+        "python": platform.python_version(),
+        "packages": packages,
+        "lock_file": lock.name if lock.exists() else None,
+        "lock_sha256": sha256_file(lock) if lock.exists() else None,
+    }
+
+
 def create_run(
     runs_root: str | Path,
     mode: str,
@@ -90,6 +121,7 @@ def create_run(
         "parent_run_id": parent_run_id,
         "created_utc": _iso(ts),
         "status": "building",
+        "environment": runtime_environment(root),
         "metadata": metadata or {},
         "inputs": {},
         "artifacts": {},

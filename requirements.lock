@@ -1,0 +1,30 @@
+# requirements.lock — R7. Exact pins plus sha256 wheel hashes for the supported
+# runtime: Python 3.10, linux x86_64 (the Cowork sandbox the engine runs in).
+# Generated 2026-07-29 from a live resolve; requirements.txt remains the
+# cross-platform floor and the audit's import-name source.
+#
+# Install (cold sandbox):
+#   pip install -r requirements.lock --require-hashes --break-system-packages -q
+# Probe first; install only on failure:
+#   python tools/env_probe.py --install
+#
+# Regenerate (after a deliberate version move only; this file changing means
+# engine behavior may move under MILP and CSV handling):
+#   pip download <pins> --only-binary=:all: -d /tmp/wheels && sha256sum /tmp/wheels/*.whl
+#
+# Engine deps (the warmth criterion in env_probe):
+numpy==2.2.6 \
+    --hash=sha256:fc7b73d02efb0e18c000e9ad8b83480dfcd5dfd11065997ed4c6747470ae8915
+pandas==2.3.3 \
+    --hash=sha256:dd7478f1463441ae4ca7308a70e90b33470fa593429f9d4c578dd00d1fa78838
+scipy==1.15.3 \
+    --hash=sha256:9e2abc762b0811e09a0d3258abee2d98e0c703eee49464ce0069590846f31d40
+# Transitive closure (pandas), pinned so a cold install resolves identically:
+python-dateutil==2.9.0.post0 \
+    --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+pytz==2026.2 \
+    --hash=sha256:04156e608bee23d3792fd45c94ae47fae1036688e75032eea2e3bf0323d1f126
+six==1.17.0 \
+    --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
+tzdata==2026.2 \
+    --hash=sha256:bbe9af844f658da81a5f95019480da3a89415801f6cc966806612cc7169bffe7

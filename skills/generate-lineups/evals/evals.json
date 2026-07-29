@@ -1,26 +1,308 @@
 {
   "skill_name": "generate-lineups",
+  "format": "fixture/v2 (R6d): every eval pins an exit code, artifact states, and forbidden claims; run with run_evals.py. The three original prose scenarios are ids 0-2; ids 3-7 are the RC 2.8 adversarial cases.",
   "evals": [
     {
       "id": 0,
-      "name": "classic-eight-game-slate",
-      "prompt": "Here are my DraftKings files for today's early MLB slate. Generate lineups for all my entries.",
-      "expected_output": "A certified DKEntries CSV in outputs/<date>/ with every reserved entry filled, all three gates passing, plus a short brief covering gates, slate clock, pool and stacks.",
-      "files": ["inputs/DKSalaries_classic.csv", "inputs/DKEntries_classic.csv"]
+      "name": "classic-grid-refusal-is-loud-and-caused",
+      "was": "classic-eight-game-slate (prose, expected a certified file). Two facts changed under it: the archived slate is two games, and today's production caps prove the 18-entry grid jointly infeasible even after auto-floors fire (frozen in the production golden replay, carried as backlog R28). The truthful pin is the refusal: loud, caused, no brief, no partial file, never a quiet certification. When R28 lands, re-pin this to exit 0 alongside the golden baseline.",
+      "fixture": "classic",
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--lineups",
+        "${WORK}/lineups_feed.json",
+        "--no-rotowire",
+        "--postures",
+        "191020573=wta_satellite,191020574=wta_satellite,191047506=large_gpp",
+        "--assume-gates",
+        "odds_gate_passed,weather_gate_passed,pitcher_audit_gate_passed",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 3,
+      "expected_artifacts": [
+        {
+          "path": "${WORK}/brief.json",
+          "must_exist": false
+        }
+      ],
+      "required_output": [
+        "proven infeasible",
+        "interaction of the active controls",
+        "not_certified"
+      ],
+      "forbidden_claims": [
+        "\"status\": \"certified\"",
+        "upload[- ]ready(?! after)",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 180
     },
     {
       "id": 1,
-      "name": "showdown-single-game",
-      "prompt": "Build my lineups for this MIN/CHC showdown, I've got the salary and entries files here.",
-      "expected_output": "A filled Showdown DKEntries CSV (CPT + 5 UTIL per entry) with the DK template preserved, reported as review-grade rather than certified because Showdown does not pass through the three certification gates (workflow_valid, selection_certified, allocation_certified).",
-      "files": ["inputs/DKSalaries_showdown_MIN_CHC.csv", "inputs/DKEntries_showdown_MIN_CHC.csv"]
+      "name": "showdown-single-game-review-grade",
+      "fixture": "showdown",
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 0,
+      "expected_artifacts": [
+        {
+          "path": "${WORK}/brief.json",
+          "must_exist": true,
+          "json_equals": {
+            "status": "review_grade_build"
+          }
+        }
+      ],
+      "required_output": [
+        "review[- _]grade"
+      ],
+      "forbidden_claims": [
+        "upload[- ]ready",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 180
     },
     {
       "id": 2,
-      "name": "classic-under-deadline",
-      "prompt": "First pitch is in about 20 minutes and I haven't built anything yet. Salary and entries CSVs are attached, I need something I can upload.",
-      "expected_output": "A certified file produced quickly, skipping optional steps, with the delivery deadline surfaced and no player pool trimming used to save time.",
-      "files": ["inputs/DKSalaries_classic.csv", "inputs/DKEntries_classic.csv"]
+      "name": "classic-under-deadline-refuses-rather-than-trims",
+      "fixture": "classic",
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--lineups",
+        "${WORK}/lineups_feed.json",
+        "--no-rotowire",
+        "--postures",
+        "191020573=wta_satellite,191020574=wta_satellite,191047506=large_gpp",
+        "--max-seconds",
+        "25",
+        "--assume-gates",
+        "odds_gate_passed,weather_gate_passed,pitcher_audit_gate_passed",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 3,
+      "expected_artifacts": [
+        {
+          "path": "${WORK}/brief.json",
+          "must_exist": false
+        }
+      ],
+      "forbidden_claims": [
+        "trimmed the pool",
+        "reduced the (player )?pool",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 120,
+      "notes": "Same grid as eval 0 under a 25s budget. The contract under deadline pressure is that a compute limit never trims the pool and an infeasible portfolio refuses loudly rather than shipping something uncertified. Re-pin with eval 0 when R28 lands.",
+      "required_output": [
+        "proven infeasible|not_certified"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "adversarial-stale-manifest",
+      "notes": "RC 2.8: a delivered file whose recorded sha no longer matches must hard-fail preflight, never pass quietly.",
+      "fixture": "stale_manifest",
+      "command": [
+        "${REPO}/tools/preflight_upload.py",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--expect-sha256",
+        "${EXPECTED_SHA}"
+      ],
+      "expected_exit_code": 2,
+      "required_output": [
+        "sha256"
+      ],
+      "forbidden_claims": [
+        "^PASS\\b",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 60
+    },
+    {
+      "id": 4,
+      "name": "adversarial-absent-confirmed-starter",
+      "notes": "RC 2.8: the feed's probable for PHI matches no salary row; the pool must fail closed with the starter named, never silently build without him.",
+      "fixture": "classic",
+      "fixture_options": {
+        "mutate_probable_team": "PHI"
+      },
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--lineups",
+        "${WORK}/lineups_feed.json",
+        "--no-rotowire",
+        "--postures",
+        "191020573=wta_satellite,191020574=wta_satellite,191047506=large_gpp",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 3,
+      "required_output": [
+        "Nobody Anywhere|probable|unmatched"
+      ],
+      "forbidden_claims": [
+        "\"status\": \"certified\"",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 120
+    },
+    {
+      "id": 5,
+      "name": "adversarial-multi-ticket-satellite",
+      "notes": "RC 2.8: a multi-entry satellite resolves through the explicit posture, and the build says satellite, not large_wta.",
+      "fixture": "classic+satellite",
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries_satellite.csv",
+        "--lineups",
+        "${WORK}/lineups_feed.json",
+        "--no-rotowire",
+        "--postures",
+        "555001=wta_satellite",
+        "--assume-gates",
+        "odds_gate_passed,weather_gate_passed,pitcher_audit_gate_passed",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 0,
+      "expected_artifacts": [
+        {
+          "path": "${WORK}/brief.json",
+          "must_exist": true,
+          "json_equals": {
+            "status": "certified"
+          }
+        }
+      ],
+      "required_output": [
+        "satellite"
+      ],
+      "forbidden_claims": [
+        "large_wta",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 180
+    },
+    {
+      "id": 6,
+      "name": "adversarial-past-lock",
+      "notes": "RC 2.8: every lock on this un-shifted slate passed weeks ago. KNOWN GAP, pinned on purpose: the build path today says NOTHING about the clock; the refusal below is the unrelated cap-interaction error, and a lock-line assertion would be fiction. This pin breaks in two futures, both wanted: R28 makes the grid certifiable (a past slate then CERTIFIES, the forbidden claim fires, and the missing lock check gets a decision), or a lock check lands (re-pin required_output to its message).",
+      "fixture": "classic",
+      "fixture_options": {
+        "shift": "past"
+      },
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--lineups",
+        "${WORK}/lineups_feed.json",
+        "--no-rotowire",
+        "--postures",
+        "191020573=wta_satellite,191020574=wta_satellite,191047506=large_gpp",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 3,
+      "required_output": [
+        "not_certified"
+      ],
+      "forbidden_claims": [
+        "\"status\": \"certified\"",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 120
+    },
+    {
+      "id": 7,
+      "name": "adversarial-missing-scipy",
+      "notes": "RC 2.8: no solver, no build, loudly. The shim makes scipy unimportable; the build must die naming the missing solver, never quietly deliver a partial. Observed reality pinned here: build_slate has no front-door dependency check (the skill preflight and the audit are those layers), so the failure is an unhandled RuntimeError at exit 1 from the first solve. Loud, but later and costlier than a front-door refusal; flagged in the backlog notes rather than papered over with a wished-for exit code.",
+      "fixture": "classic",
+      "env": {
+        "PYTHONPATH": "${REPO}/skills/generate-lineups/evals/inputs/no_scipy_shim"
+      },
+      "command": [
+        "${REPO}/skills/generate-lineups/scripts/build_slate.py",
+        "--salary",
+        "${WORK}/DKSalaries.csv",
+        "--entries",
+        "${WORK}/DKEntries.csv",
+        "--lineups",
+        "${WORK}/lineups_feed.json",
+        "--no-rotowire",
+        "--brief",
+        "${WORK}/brief.json"
+      ],
+      "expected_exit_code": 1,
+      "required_output": [
+        "scipy MILP backend unavailable"
+      ],
+      "forbidden_claims": [
+        "\"status\": \"certified\"",
+        "(estimated|expected|projected) (ROI|win[- ]rate)",
+        "ROI of \\d",
+        "win[- ]rate of \\d",
+        "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
+        "probability of (winning|cashing)"
+      ],
+      "timeout_s": 90
     }
   ]
 }

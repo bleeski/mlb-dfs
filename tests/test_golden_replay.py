@@ -327,5 +327,213 @@ class GoldenReplayTests(unittest.TestCase):
             )
 
 
+PRODUCTION_GOLDEN_PATH = GOLDEN_DIR / f"golden_replay_production_{SLATE_DATE}.json"
+ENRICHMENT_FIXTURES = REPO_ROOT / "tests" / "fixtures" / "enrichment"
+PRODUCTION_POSTURES = {
+    "191020573": "wta_satellite", "191020574": "wta_satellite", "191047506": "large_gpp",
+}
+# The one recorded operator action that makes this thin archived grid certify
+# under otherwise-untouched production controls (see the class docstring). One
+# key, one notch: the satellite/large_gpp merge resolves player exposure to
+# 0.40, and 0.40 x 18 entries floors to 7 appearances against a 4-game bank
+# whose rosters cannot avoid overlapping that hard. 0.50 is the first rung
+# that certifies; pitcher (0.43), stack (0.35), shared-players, and pair caps
+# all stay at their production-merged values and all visibly bind in the
+# frozen assignment (exposure_max is exactly 9 = 0.50 x 18; no SP pair
+# appears more than twice).
+PRODUCTION_CERT_OVERRIDE = {"max_player_exposure_pct": 0.5}
+
+
+class GoldenProductionReplayTests(unittest.TestCase):
+    """R6(b): the production-controls, real-enrichment golden gate.
+
+    The loose replay above proves the front door still certifies and its bytes
+    are stable, but it runs LOOSE_CONTROLS and no enrichment inputs, so the
+    enrichment stack and the portfolio controls sit outside the one
+    end-to-end gate. This class closes that gap with two scenarios over the
+    same archived 2026-06-03 slate, the same live-built candidate bank, and
+    the same frozen enrichment fixtures:
+
+    1. PURE: explicit production postures (the Quick Card forbids trusting
+       name inference), zero overrides. Today's engine PROVES this grid
+       jointly infeasible: R5's satellite caps against a 4-game bank fail on
+       control interaction, not on any single cap, and the checkpoint's
+       pool-keyed feasibility arithmetic cannot see it (floors key on pool
+       counts; the interaction lives in the bank). That verdict, error text
+       included, is frozen. If caps, floors, the allocator, or the bank
+       builder change behavior, this baseline moves and says so. The
+       checkpoint-green-then-build-infeasible disagreement is a real
+       thin-slate landmine and is filed on the backlog (R28), not papered
+       over here.
+
+    2. CERTIFIED: the same run plus the minimal recorded operator action the
+       thin-slate contract prescribes ("explicit overrides win", surfaced in
+       controls_feasibility): PRODUCTION_CERT_OVERRIDE, one key one notch.
+       Everything else is production-merged and binds in the output. All
+       three gates pass and the allocation is frozen with aggregates and
+       assignment asserted SEPARATELY, so a drift report names the layer
+       that moved.
+
+    Enrichment is real and live: the frozen Savant/FanGraphs fixture CSVs
+    join through the same DK-keyed crosswalks production uses, the xwOBA
+    correction applies (projection rows carry AvgPointsPerGame exactly so it
+    can), xISO and K-rate land on Ceiling, and the value guard clips. The
+    fixture copies are frozen because data/reference/ refreshes between
+    sessions and a golden gate may not read moving inputs.
+
+    The bank is built in-test through the sliced production path
+    (bank_cache.extend_bank), which exhausts this pool's 64 (SP pair, stack
+    team) jobs in about a second where the joint auto-bank path needs
+    minutes. job_list_exhausted is asserted, so a slow box fails loudly
+    rather than silently freezing a partial bank; solver determinism across
+    machines is backed by requirements.lock pinning scipy (R7).
+
+    Total cost is a few seconds, which is what lets this run inside the
+    session-start audit macro's one-call budget.
+    """
+
+    payload: Dict[str, Any]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        GoldenReplayTests.setUpClass()
+        cls.salary_csv = GoldenReplayTests.salary_csv
+        cls.entries_csv = GoldenReplayTests.entries_csv
+        for name in ("expected_stats_batting_frozen_2026-07-25.csv",
+                     "expected_stats_pitching_frozen_2026-07-25.csv",
+                     "fangraphs_season_pitching_frozen_2026-07-16.csv"):
+            if not (ENRICHMENT_FIXTURES / name).exists():
+                raise unittest.SkipTest(f"enrichment fixture missing: {name}")
+
+        from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+        from mlb_engine.pipeline.execution_pipeline import _assemble_projection_frame
+
+        rows = _projection_rows_from_salary_csv(cls.salary_csv)
+        for r in rows:
+            # The xwOBA correction is applied to AvgPointsPerGame (base_in) and
+            # writes Base (base_out); rows that carry only Base leave the
+            # correction structurally inert, which is exactly the silent no-op
+            # this gate exists to catch.
+            r["AvgPointsPerGame"] = r["Base"]
+        enr = dict(
+            savant_batting_csv=ENRICHMENT_FIXTURES / "expected_stats_batting_frozen_2026-07-25.csv",
+            savant_pitching_csv=ENRICHMENT_FIXTURES / "expected_stats_pitching_frozen_2026-07-25.csv",
+            fangraphs_pitching_csv=ENRICHMENT_FIXTURES / "fangraphs_season_pitching_frozen_2026-07-16.csv",
+        )
+        projections, _ = _assemble_projection_frame(
+            salary_csv=cls.salary_csv, projection_rows=[dict(r) for r in rows],
+            projection_mode="emergency_proxy", source_metadata=None, **enr)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = BankCache(Path(tmp) / "bank.json")
+            report = extend_bank(cache, projections, time_budget_s=60)
+            assert report["job_list_exhausted"], (
+                "the sliced bank build did not exhaust its job list inside the "
+                f"budget; freezing a partial bank would freeze noise: {report}")
+            candidates = cache.as_candidates(
+                projections, requested_n=18,
+                contest_shapes=["satellite", "large_field_gpp"])
+
+            common = dict(
+                salary_csv=cls.salary_csv, entries_csv=cls.entries_csv,
+                projection_mode="emergency_proxy",
+                contest_postures=PRODUCTION_POSTURES,
+                candidates_override=candidates,
+                assume_gates=["odds_gate_passed", "weather_gate_passed",
+                              "pitcher_audit_gate_passed"], **enr)
+
+            pure = run_slate(runs_root=Path(tmp) / "runs_pure",
+                             projection_rows=[dict(r) for r in rows],
+                             approve=True, **common)
+            plan = run_slate(runs_root=Path(tmp) / "runs_plan",
+                             projection_rows=[dict(r) for r in rows],
+                             portfolio_controls_override=PRODUCTION_CERT_OVERRIDE,
+                             approve=False, **common)
+            cert = run_slate(runs_root=Path(tmp) / "runs_cert",
+                             projection_rows=[dict(r) for r in rows],
+                             portfolio_controls_override=PRODUCTION_CERT_OVERRIDE,
+                             approve=True, **common)
+
+            cls.pure_result = {"passed": pure.get("passed"), "errors": list(pure.get("errors") or [])}
+            cls.plan_passed = bool(plan.get("passed"))
+            cls.cert_result = cert
+            cls.cert_gates = {g: cert.get(g) for g in (
+                "workflow_valid", "selection_certified", "allocation_certified")}
+            summary = _summarize_allocation(Path(cert["assignments_path"]))
+            diag = json.loads(Path(cert["diagnostics_path"]).read_text(encoding="utf-8"))
+            pe = diag.get("projection_enrichment") or {}
+            cls.payload = {
+                "meta": {
+                    "slate_date": SLATE_DATE,
+                    "postures": PRODUCTION_POSTURES,
+                    "cert_override": PRODUCTION_CERT_OVERRIDE,
+                    "source": {"salary_csv": cls.salary_csv.name,
+                               "entries_csv": cls.entries_csv.name},
+                },
+                "pure_verdict": cls.pure_result,
+                "aggregates": {
+                    "bank": {
+                        "candidates": len(candidates),
+                        "jobs_total": report["jobs_total"],
+                        "conditions_signature": report["conditions_signature"],
+                    },
+                    "enrichment": {
+                        "xwoba_applied": (pe.get("xwoba") or {}).get("applied"),
+                        "xwoba_non_neutral": (pe.get("xwoba") or {}).get("non_neutral_applied"),
+                        "ceiling_differentiated": (pe.get("ceiling") or {}).get("differentiated_rows"),
+                        "pitcher_ceiling_differentiated": (pe.get("pitcher_ceiling") or {}).get("differentiated_rows"),
+                        "value_guard_clipped": (pe.get("value_guard") or {}).get("clipped_count"),
+                    },
+                    "entry_count": summary["entry_count"],
+                    "exposure_summary": summary["exposure_summary"],
+                    "sp_pair_distribution": summary["sp_pair_distribution"],
+                },
+                "assignments": summary["assignments"],
+            }
+
+    @classmethod
+    def _baseline(cls) -> Dict[str, Any]:
+        if not PRODUCTION_GOLDEN_PATH.exists():
+            GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
+            PRODUCTION_GOLDEN_PATH.write_text(
+                json.dumps(cls.payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            raise AssertionError(
+                f"No production golden baseline existed at {PRODUCTION_GOLDEN_PATH}; froze "
+                "this run as the new baseline (expected on the first run ever). Re-run now "
+                "-- it must come back green -- then commit the baseline file.")
+        return json.loads(PRODUCTION_GOLDEN_PATH.read_text(encoding="utf-8"))
+
+    def test_certified_scenario_passes_all_three_gates(self) -> None:
+        self.assertTrue(self.plan_passed, "approve=False checkpoint did not pass")
+        for gate, value in self.cert_gates.items():
+            self.assertTrue(value, f"{gate} is not true on the certified scenario")
+
+    def test_pure_production_postures_verdict_is_pinned(self) -> None:
+        baseline = self._baseline()
+        self.assertEqual(
+            {"passed": self.pure_result["passed"], "errors": self.pure_result["errors"]},
+            baseline["pure_verdict"],
+            "the PURE production-postures verdict moved: either the thin-slate "
+            "cap interaction was fixed (celebrate, then re-freeze deliberately "
+            "with the backlog item closed) or caps/floors/allocator behavior "
+            "drifted (investigate before touching the baseline).")
+
+    def test_aggregates_match_baseline(self) -> None:
+        baseline = self._baseline()
+        self.assertEqual(
+            self.payload["aggregates"], baseline["aggregates"],
+            "production-replay AGGREGATES drifted (bank composition, enrichment "
+            "counters, exposure summary, or SP-pair distribution) for an "
+            "unchanged input slate.")
+
+    def test_assignment_matches_baseline(self) -> None:
+        baseline = self._baseline()
+        self.assertEqual(
+            self.payload["assignments"], baseline["assignments"],
+            "production-replay ASSIGNMENT drifted: entry-to-lineup mapping "
+            "changed for an unchanged input slate while aggregates may still "
+            "match; this is the selection/allocation layer moving on its own.")
+
+
 if __name__ == "__main__":
     unittest.main()

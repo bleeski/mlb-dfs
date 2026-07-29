@@ -28,7 +28,7 @@ LAYOUT_VERSION = "v3.0.0-pre"
 # untracked while build_slate imported it unconditionally.
 AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   "tests.test_upload_integrity", "tests.test_golden_replay")
-EXPECTED_TEST_COUNT = 410  # core 311 + showdown 30 + upload_integrity 68 + golden 1
+EXPECTED_TEST_COUNT = 425  # core 322 + showdown 30 + upload_integrity 68 + golden 5
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -37,7 +37,7 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/intake/slate_intake_manager.py": 'VERSION = "v1.10"',
     "mlb_engine/entries/dk_entries_manager.py": 'VERSION = "v1.6"',
     "mlb_engine/swap/late_swap_manager.py": 'VERSION = "v1.4"',
-    "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.3"',
+    "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.4"',
     "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.14"',
     "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.6"',
     "mlb_engine/projections/xwoba_base_correction.py": 'VERSION = "v1.2"',
@@ -108,7 +108,7 @@ def check_dependencies(root: Path) -> Dict[str, Any]:
         "missing": missing,
         "scipy_milp_available": milp_ok,
         "passed": not missing and milp_ok,
-        "remedy": ("pip install -r requirements.txt --break-system-packages"
+        "remedy": ("python tools/env_probe.py --install"
                    if missing or not milp_ok else None),
     }
 

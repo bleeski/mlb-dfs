@@ -1,0 +1,276 @@
+{
+ "date": "__SLATE_DATE__",
+ "fetched_at": "__FETCHED_AT__",
+ "games": [
+  {
+   "game_pk": 700000,
+   "game_date_utc": "__GAME_DATE_UTC__",
+   "status": "Scheduled",
+   "away": {
+    "team_abbrev": "BAL",
+    "lineup_status": "confirmed",
+    "lineup": [
+     {
+      "order": 1,
+      "id": 90001,
+      "name": "Gunnar Henderson",
+      "bat_side": "R"
+     },
+     {
+      "order": 2,
+      "id": 90002,
+      "name": "Pete Alonso",
+      "bat_side": "R"
+     },
+     {
+      "order": 3,
+      "id": 90003,
+      "name": "Adley Rutschman",
+      "bat_side": "R"
+     },
+     {
+      "order": 4,
+      "id": 90004,
+      "name": "Taylor Ward",
+      "bat_side": "R"
+     },
+     {
+      "order": 5,
+      "id": 90005,
+      "name": "Jordan Westburg",
+      "bat_side": "R"
+     },
+     {
+      "order": 6,
+      "id": 90006,
+      "name": "Samuel Basallo",
+      "bat_side": "R"
+     },
+     {
+      "order": 7,
+      "id": 90007,
+      "name": "Jackson Holliday",
+      "bat_side": "R"
+     },
+     {
+      "order": 8,
+      "id": 90008,
+      "name": "Leody Taveras",
+      "bat_side": "R"
+     },
+     {
+      "order": 9,
+      "id": 90009,
+      "name": "Coby Mayo",
+      "bat_side": "R"
+     }
+    ],
+    "probable_pitcher": {
+     "id": 90010,
+     "name": "Shane Baz",
+     "hand": "R"
+    }
+   },
+   "home": {
+    "team_abbrev": "BOS",
+    "lineup_status": "confirmed",
+    "lineup": [
+     {
+      "order": 1,
+      "id": 90011,
+      "name": "Jarren Duran",
+      "bat_side": "R"
+     },
+     {
+      "order": 2,
+      "id": 90012,
+      "name": "Roman Anthony",
+      "bat_side": "R"
+     },
+     {
+      "order": 3,
+      "id": 90013,
+      "name": "Willson Contreras",
+      "bat_side": "R"
+     },
+     {
+      "order": 4,
+      "id": 90014,
+      "name": "Wilyer Abreu",
+      "bat_side": "R"
+     },
+     {
+      "order": 5,
+      "id": 90015,
+      "name": "Trevor Story",
+      "bat_side": "R"
+     },
+     {
+      "order": 6,
+      "id": 90016,
+      "name": "Ceddanne Rafaela",
+      "bat_side": "R"
+     },
+     {
+      "order": 7,
+      "id": 90017,
+      "name": "Mickey Gasper",
+      "bat_side": "R"
+     },
+     {
+      "order": 8,
+      "id": 90018,
+      "name": "Nick Sogard",
+      "bat_side": "R"
+     },
+     {
+      "order": 9,
+      "id": 90019,
+      "name": "Romy Gonzalez",
+      "bat_side": "R"
+     }
+    ],
+    "probable_pitcher": {
+     "id": 90020,
+     "name": "Garrett Crochet",
+     "hand": "R"
+    }
+   }
+  },
+  {
+   "game_pk": 700001,
+   "game_date_utc": "__GAME_DATE_UTC__",
+   "status": "Scheduled",
+   "away": {
+    "team_abbrev": "SD",
+    "lineup_status": "confirmed",
+    "lineup": [
+     {
+      "order": 1,
+      "id": 90021,
+      "name": "Fernando Tatis Jr.",
+      "bat_side": "R"
+     },
+     {
+      "order": 2,
+      "id": 90022,
+      "name": "Manny Machado",
+      "bat_side": "R"
+     },
+     {
+      "order": 3,
+      "id": 90023,
+      "name": "Xander Bogaerts",
+      "bat_side": "R"
+     },
+     {
+      "order": 4,
+      "id": 90024,
+      "name": "Jackson Merrill",
+      "bat_side": "R"
+     },
+     {
+      "order": 5,
+      "id": 90025,
+      "name": "Ramon Laureano",
+      "bat_side": "R"
+     },
+     {
+      "order": 6,
+      "id": 90026,
+      "name": "Miguel Andujar",
+      "bat_side": "R"
+     },
+     {
+      "order": 7,
+      "id": 90027,
+      "name": "Gavin Sheets",
+      "bat_side": "R"
+     },
+     {
+      "order": 8,
+      "id": 90028,
+      "name": "Ty France",
+      "bat_side": "R"
+     },
+     {
+      "order": 9,
+      "id": 90029,
+      "name": "Luis Campusano",
+      "bat_side": "R"
+     }
+    ],
+    "probable_pitcher": {
+     "id": 90030,
+     "name": "Nick Pivetta",
+     "hand": "R"
+    }
+   },
+   "home": {
+    "team_abbrev": "PHI",
+    "lineup_status": "confirmed",
+    "lineup": [
+     {
+      "order": 1,
+      "id": 90031,
+      "name": "Kyle Schwarber",
+      "bat_side": "R"
+     },
+     {
+      "order": 2,
+      "id": 90032,
+      "name": "Bryce Harper",
+      "bat_side": "R"
+     },
+     {
+      "order": 3,
+      "id": 90033,
+      "name": "Trea Turner",
+      "bat_side": "R"
+     },
+     {
+      "order": 4,
+      "id": 90034,
+      "name": "Brandon Marsh",
+      "bat_side": "R"
+     },
+     {
+      "order": 5,
+      "id": 90035,
+      "name": "Bryson Stott",
+      "bat_side": "R"
+     },
+     {
+      "order": 6,
+      "id": 90036,
+      "name": "J.T. Realmuto",
+      "bat_side": "R"
+     },
+     {
+      "order": 7,
+      "id": 90037,
+      "name": "Johan Rojas",
+      "bat_side": "R"
+     },
+     {
+      "order": 8,
+      "id": 90038,
+      "name": "Alec Bohm",
+      "bat_side": "R"
+     },
+     {
+      "order": 9,
+      "id": 90039,
+      "name": "Justin Crawford",
+      "bat_side": "R"
+     }
+    ],
+    "probable_pitcher": {
+     "id": 90040,
+     "name": "Cristopher Sanchez",
+     "hand": "R"
+    }
+   }
+  }
+ ]
+}

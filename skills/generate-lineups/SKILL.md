@@ -66,14 +66,18 @@ never hardcode the path you saw last time:
 
 ```bash
 REPO=$(ls -d /sessions/*/mnt/mlb-dfs | head -1)
-cd "$REPO" && pip install -r requirements.txt --break-system-packages -q
-python -c "from scipy.optimize import milp; print('milp OK')"
+cd "$REPO" && python tools/env_probe.py --install
 ```
 
-If that last line does not print `milp OK`, stop and say so rather than starting
-a build that cannot finish. `tools/wheel_fetch.py` is the fallback for when a
-single call genuinely cannot finish the download, which the 9-second measurement
-says is not the normal case; reach for it only after a plain install has failed.
+Probe-then-install (R7): a warm sandbox prints `env warm ... pip skipped` and
+exits 0 in about a second, never touching pip. A cold one installs the exact
+pins in `requirements.lock` (hashes verified), so every session runs the same
+resolver state instead of whatever PyPI serves that day. Exit 0 is the green
+light; on any other exit, stop and say so rather than starting a build that
+cannot finish. `tools/wheel_fetch.py` is the fallback for when a single call
+genuinely cannot finish the download; reach for it only after the locked
+install has failed. Never hand-`pip install` around a failed probe: an
+unpinned resolve is the drift the lock exists to end.
 
 ## The fast path
 
@@ -490,7 +494,15 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 410 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 425 tests
+```
+
+When the skill or its scripts change, run the fixture evals too (not part of
+the audit; they are the skill-development harness and each pins an exit code,
+artifact states, and forbidden claims):
+
+```bash
+python skills/generate-lineups/evals/run_evals.py    # --only <id> for one
 ```
 
 The audit checks dependencies first and names the install command if something is

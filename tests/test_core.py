@@ -5940,5 +5940,291 @@ class ParentLineageGuardTests(unittest.TestCase):
         _assert_parent_lineage({"current_matches_parent_export": False}, True)
 
 
+class SolverIndependentBehaviorTests(unittest.TestCase):
+    """R6(a): the five behavior tests from the 07-25 final, plus the loud-scipy
+    pin. Every test here runs and means something with scipy absent, because
+    each drives a production validation or resolution surface that must hold
+    whether or not a solver ever runs. The MILP-side enforcement of the same
+    contracts is pinned end-to-end by the two golden replays."""
+
+    # -- 1. blank-row block ---------------------------------------------------
+    def test_blank_reserved_row_blocks_and_is_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            r1, _ = legal_rosters(ids)
+            # entry 5001 filled, entry 5002 left blank in the "export"
+            write_entries(entries, rosters=[r1, None])
+            report = validate_dk_entries_file(
+                entries, salary_csv_path=salary, require_all_reserved_filled=True)
+            self.assertFalse(report["passed"])
+            self.assertEqual(report["blank_entries"], ["5002"])
+            self.assertTrue(any("5002" in e for e in report["errors"]),
+                            "the blocking error must name the blank entry")
+            # certification derivation refuses the same fact downstream
+            from mlb_engine.entries.dk_entries_manager import derive_workflow_certification
+            cert = derive_workflow_certification(
+                pre_export={"passed": True, "selection_certified": True},
+                post_export={**{k: True for k in (
+                    "template_preservation_passed", "entry_reconciliation_passed",
+                    "roster_legality_passed", "portfolio_caps_passed",
+                    "locked_immutability_passed", "export_hash_binding_passed")},
+                    "entry_reconciliation_passed": False},
+                allocation_required=False)
+            self.assertFalse(cert["workflow_valid"])
+            self.assertIn("entry_reconciliation_passed", cert["failed_post_export_gates"])
+
+    # -- 2. over-cap rejection ------------------------------------------------
+    def test_over_cap_portfolio_is_rejected_by_the_post_export_validator(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            r1, r2 = legal_rosters(ids)
+            write_entries(entries, rosters=[r1, r2])
+            # both rosters carry the same SP pair; cap 1 makes count 2 over-cap
+            report = validate_dk_entries_file(
+                entries, salary_csv_path=salary,
+                portfolio_controls={"max_sp_pair_repetition": 1})
+            self.assertFalse(report["portfolio_caps_passed"])
+            self.assertTrue(any("SP pair" in e and ">1" in e for e in report["errors"]))
+            # and the same file under a permissive cap passes the caps gate
+            clean = validate_dk_entries_file(
+                entries, salary_csv_path=salary,
+                portfolio_controls={"max_sp_pair_repetition": 2})
+            self.assertTrue(clean["portfolio_caps_passed"])
+
+    def test_cap_count_arithmetic_is_floor_and_both_copies_agree(self):
+        """dk_entries_manager._cap_count promises in its docstring that the
+        solved model and the post-export validator can never disagree on a cap
+        value. Nothing held the two implementations together until now."""
+        from mlb_engine.allocate.contest_allocator import _cap_count as solve_side
+        from mlb_engine.entries.dk_entries_manager import _cap_count as export_side
+        cases = [(18, 0.5), (14, 0.43), (7, 0.35), (4, 0.4), (10, 0.05),
+                 (100, 0.29), (18, 1.0), (1, 0.99), (2, 0.5)]
+        for total, pct in cases:
+            self.assertEqual(solve_side(total, pct), export_side(total, pct),
+                             f"cap arithmetic disagrees at ({total}, {pct})")
+        self.assertEqual(export_side(18, 0.5), 9)     # exact
+        self.assertEqual(export_side(14, 0.43), 6)    # floor(6.02)
+        self.assertEqual(export_side(7, 0.35), 2)     # floor(2.45)
+        self.assertEqual(export_side(4, 0.4), 1)      # floor(1.6): thin-slate pinch
+        self.assertEqual(export_side(10, 0.05), 1)    # max(1, floor(0.5))
+        self.assertEqual(export_side(100, 0.29), 29)  # epsilon rescues 28.999...
+        self.assertIsNone(export_side(18, None))      # unset means unset
+        self.assertIsNone(export_side(18, 0))         # <=0 means not set
+
+    # -- 3. overlap honored on a produced bank --------------------------------
+    def test_overlap_and_du_arithmetic_on_fixture_rosters(self):
+        """The pairwise overlap contract, tested on the arithmetic the solver
+        constraints and the post-export validator are built from. Also the
+        first direct coverage of the DU primitives R15 kept (its correction
+        note records they had zero direct references in the suite)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            r1, r2 = legal_rosters(ids)
+            write_entries(entries, rosters=[r1, r2])
+            # r1 and r2 share exactly the two pitchers
+            report = validate_dk_entries_file(
+                entries, salary_csv_path=salary,
+                portfolio_controls={"max_shared_players": 1})
+            self.assertEqual(
+                [(v["entry_a"], v["entry_b"], v["shared"]) for v in report["overlap_violations"]],
+                [("5001", "5002", 2)])
+            ok = validate_dk_entries_file(
+                entries, salary_csv_path=salary,
+                portfolio_controls={"max_shared_players": 2})
+            self.assertEqual(ok["overlap_violations"], [])
+            # identical signature across contests is approved reuse, never overlap
+            same = root / "DKEntries_same.csv"
+            write_entries(same, rosters=[r1, r1], contest_ids=["900", "901"])
+            reused = validate_dk_entries_file(
+                same, salary_csv_path=salary,
+                portfolio_controls={"max_shared_players": 1})
+            self.assertEqual(reused["overlap_violations"], [])
+        from mlb_engine.optimize.optimizer_v3 import du_distance, validate_du_portfolio
+        sig_a = {"sp_pair": "10001/10002", "primary_stack": "AAA",
+                 "secondary_stack": "CCC", "game_environment": "AAA@BBB",
+                 "chalk_one_off": "none"}
+        sig_b = dict(sig_a, primary_stack="CCC", secondary_stack="AAA")
+        sig_c = dict(sig_a, sp_pair="10001/10003")
+        self.assertEqual(du_distance(sig_a, sig_a), 0)
+        self.assertEqual(du_distance(sig_a, sig_b), 2)
+        self.assertEqual(du_distance(sig_a, sig_c), 1)
+        self.assertEqual(du_distance(sig_a, sig_c, exclude_anchor=True), 0)
+        verdict = validate_du_portfolio([sig_a, sig_b, sig_c], "wta", (3, 3))
+        self.assertFalse(verdict["pass"])
+        pairs = {(v["lineup_i"], v["lineup_j"]) for v in verdict["within_family_violations"]}
+        self.assertIn((0, 2), pairs)  # distance 1 < 3, recorded i<j
+        self.assertTrue(validate_du_portfolio([sig_a, sig_b], "wta", (2, 2))["pass"])
+
+    # -- 4. posture/shape resolution at the front door ------------------------
+    def test_checkpoint_resolves_explicit_postures_shapes_and_floors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            write_entries(entries, contest_ids=["900", "901"])
+            frame = projection_frame(ids)
+            result = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame, approve=False,
+                contest_postures={"900": "wta_satellite", "901": "large_gpp"})
+            self.assertTrue(result["passed"])
+            postures = result["posture_by_contest"]
+            self.assertEqual(postures["900"]["posture"], "wta_satellite")
+            self.assertEqual(postures["901"]["posture"], "large_gpp")
+            shapes = {cid: rec["contest_shape"] for cid, rec in postures.items()}
+            self.assertNotEqual(shapes["900"], shapes["901"])
+            # the satellite pair cap survives the merge with the gpp posture
+            self.assertEqual(result["merged_controls"].get("max_sp_pair_repetition"), 2)
+            # auto-floors on this deliberately thin fixture are applied AND said
+            floors = result["feasibility"]["controls_feasibility"]["floors_applied"]
+            self.assertIn("max_shared_players", floors)
+            self.assertEqual(floors["max_shared_players"]["reason"], "feasibility floor")
+            self.assertNotIn(
+                "runs", {p.name for p in root.iterdir()},
+                "approve=False must not create a run directory")
+
+    # -- 5. export geometry ----------------------------------------------------
+    def test_export_geometry_is_preserved_and_drift_is_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ids = write_salary(root / "salary.csv")
+            r1, r2 = legal_rosters(ids)
+            template = root / "template.csv"
+            write_entries(template, rosters=[r1, r2])
+            # identical copy preserves
+            copy = root / "copy.csv"
+            copy.write_bytes(template.read_bytes())
+            self.assertTrue(validate_template_preservation(template, copy)["passed"])
+            # a mutated non-roster cell (contest id) is named by row and column
+            rows = [line.split(",") for line in template.read_text().splitlines()]
+            rows[1][2] = "999"
+            tampered = root / "tampered.csv"
+            tampered.write_text("\n".join(",".join(r) for r in rows))
+            verdict = validate_template_preservation(template, tampered)
+            self.assertFalse(verdict["passed"])
+            self.assertTrue(any("non-roster cell changed at row 2" in e
+                                for e in verdict["errors"]))
+            # a completed row's roster may change only with an explicit grant
+            rows2 = [line.split(",") for line in template.read_text().splitlines()]
+            r1_swapped = list(r1); r1_swapped[-1], r1_swapped[-2] = r1_swapped[-2], r1_swapped[-1]
+            rows2[1][4:14] = r1_swapped
+            swapped = root / "swapped.csv"
+            swapped.write_text("\n".join(",".join(r) for r in rows2))
+            self.assertFalse(validate_template_preservation(template, swapped)["passed"])
+            self.assertTrue(validate_template_preservation(
+                template, swapped, mutable_entry_ids=["5001"])["passed"])
+
+    # -- done-when: blocking scipy is loud, never quiet ------------------------
+    def test_missing_scipy_is_loud_not_quiet(self):
+        from mlb_engine.optimize import optimizer_v3 as opt_mod
+        with unittest.mock.patch.object(opt_mod, "SCIPY_AVAILABLE", False), \
+                unittest.mock.patch.object(opt_mod, "SCIPY_IMPORT_ERROR", "simulated absence"):
+            avail = opt_mod.runtime_preflight()
+            self.assertFalse(avail["scipy_available"])
+            self.assertFalse(avail["optimizer_certifiable"])
+            with self.assertRaises(RuntimeError) as ctx:
+                opt_mod._select_solver_backend("auto")
+            self.assertIn("simulated absence", str(ctx.exception))
+            # optimizer_provenance_line() reports solve HISTORY, not current
+            # availability, so it is deliberately not asserted here: under
+            # full-suite ordering earlier solves have already succeeded and
+            # the line truthfully says so.
+
+
+class EnvLockTests(unittest.TestCase):
+    """R7: pinned runtime. The lock is the resolution authority, the probe is
+    the one instructed command, and every manifest names the versions it ran
+    under. The decision logic is tested pure; nothing here touches pip."""
+
+    def _lock_path(self):
+        return Path(__file__).resolve().parent.parent / "requirements.lock"
+
+    def test_lock_pins_engine_deps_with_hashes_and_satisfies_floors(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        try:
+            import env_probe
+        finally:
+            sys.path.pop(0)
+        text = self._lock_path().read_text(encoding="utf-8")
+        pins = env_probe.parse_lock(text)
+        for name in ("numpy", "pandas", "scipy"):
+            self.assertIn(name, pins, f"lock must pin {name}")
+        # every pinned distribution carries a hash line
+        pin_lines = [ln for ln in text.splitlines()
+                     if ln.strip() and not ln.strip().startswith("#")]
+        dists = [ln for ln in pin_lines if "==" in ln]
+        hashes = [ln for ln in pin_lines if ln.strip().startswith("--hash=sha256:")]
+        self.assertEqual(len(dists), len(hashes),
+                         "one sha256 hash per pinned distribution")
+        # floors in requirements.txt hold under the pins
+        floors = {"numpy": (2, 0), "pandas": (2, 2), "scipy": (1, 13)}
+        for name, floor in floors.items():
+            got = tuple(int(p) for p in pins[name].split(".")[:2])
+            self.assertGreaterEqual(got, floor,
+                                    f"{name} pin below requirements.txt floor")
+
+    def test_probe_decision_table(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        try:
+            import env_probe
+        finally:
+            sys.path.pop(0)
+        pins = {"numpy": "2.2.6", "pandas": "2.3.3", "scipy": "1.15.3"}
+        warm = {"numpy": "2.2.6", "pandas": "2.3.3", "scipy": "1.15.3"}
+        v = env_probe.evaluate(warm, pins, milp_ok=True)
+        self.assertTrue(v["warm"])
+        # missing scipy is cold, not a soft warning
+        v = env_probe.evaluate({**warm, "scipy": None}, pins, milp_ok=False)
+        self.assertFalse(v["warm"])
+        self.assertEqual(v["missing"], ["scipy"])
+        # a drifted version is cold even though the import succeeds
+        v = env_probe.evaluate({**warm, "numpy": "2.3.0"}, pins, milp_ok=True)
+        self.assertFalse(v["warm"])
+        self.assertIn("numpy 2.3.0 != 2.2.6", v["mismatched"])
+        # scipy importable but milp gone is cold: the solver is the point
+        v = env_probe.evaluate(warm, pins, milp_ok=False)
+        self.assertFalse(v["warm"])
+
+    def test_manifest_records_environment_and_lock_sha(self):
+        import numpy, pandas, scipy  # noqa: E401
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            lock_src = self._lock_path()
+            (root / "requirements.lock").write_text(
+                lock_src.read_text(encoding="utf-8"), encoding="utf-8")
+            run = create_run(root / "runs", "validate_only")
+            env = run["manifest"]["environment"]
+            self.assertEqual(env["packages"]["numpy"], numpy.__version__)
+            self.assertEqual(env["packages"]["pandas"], pandas.__version__)
+            self.assertEqual(env["packages"]["scipy"], scipy.__version__)
+            self.assertEqual(env["lock_sha256"], sha256_file(root / "requirements.lock"))
+        # without a lock beside runs/, the manifest says so rather than guessing
+        with tempfile.TemporaryDirectory() as td:
+            run = create_run(Path(td) / "runs", "validate_only")
+            self.assertIsNone(run["manifest"]["environment"]["lock_sha256"])
+
+    def test_docs_instruct_the_probe_not_raw_pip(self):
+        root = Path(__file__).resolve().parent.parent
+        skill = (root / "skills" / "generate-lineups" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("tools/env_probe.py --install", skill)
+        self.assertNotIn("pip install -r requirements.txt", skill,
+                         "SKILL.md must not instruct the unpinned resolve")
+        audit_src = (root / "tools" / "audit.py").read_text(encoding="utf-8")
+        self.assertIn("env_probe.py --install", audit_src,
+                      "the audit remedy names the probe")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
