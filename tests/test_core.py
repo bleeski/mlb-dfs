@@ -2557,6 +2557,132 @@ class FeasibilityAndDiverseBankTests(unittest.TestCase):
             self.assertFalse((root / "runs").exists())
 
 
+class PlanJointAllocationTests(unittest.TestCase):
+    """R28(1): the approve=False checkpoint solves the build's joint MILP.
+
+    The golden replay pins that the plan and the build AGREE on the archived
+    06-03 grid. These pin the contract around that agreement: the verdict is
+    always emitted, it never creates a run directory, it distinguishes an exact
+    solve from a plan-bank proxy, and it never reports a clock as a proof.
+    """
+
+    def _plan(self, root, **kw):
+        salary = root / "salary.csv"; ids = write_salary(salary)
+        entries = root / "DKEntries.csv"; write_entries(entries)
+        proj = projection_frame(ids)
+        plan = run_slate(
+            runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+            projections_override=proj, approve=False, **kw)
+        return plan, ids
+
+    def test_the_verdict_is_always_present_and_never_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, _ = self._plan(root)
+            joint = plan["checkpoint_plan"]["joint_allocation"]
+            self.assertIn(joint["verdict"], ("would_certify", "proven_infeasible", "unchecked"))
+            self.assertTrue(joint["summary"], "an empty summary is the silence the item forbids")
+            self.assertEqual(joint, plan["joint_allocation"])
+
+    def test_an_exact_solve_on_supplied_candidates_says_it_is_exact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            proj = projection_frame(ids)
+            rosters = legal_rosters(ids)
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj,
+                candidates_override=[candidate("A", rosters[0], 100),
+                                     candidate("B", rosters[1], 99)],
+                approve=False)
+            joint = plan["checkpoint_plan"]["joint_allocation"]
+            self.assertEqual(joint["bank_source"], "candidates_override")
+            self.assertTrue(joint["exact_for_this_build"])
+            self.assertEqual(joint["candidate_count"], 2)
+            self.assertFalse((root / "runs").exists())
+
+    def test_the_sliced_plan_bank_never_claims_to_be_the_builds_bank(self):
+        """Without candidates_override the plan builds its own sliced bank, and
+        the build would build a different one through build_diverse_candidate_bank.
+        Reporting that verdict as exact would be a claim the engine cannot make."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, _ = self._plan(root)
+            joint = plan["checkpoint_plan"]["joint_allocation"]
+            self.assertEqual(joint["bank_source"], "sliced_plan_bank")
+            self.assertFalse(joint["exact_for_this_build"])
+            self.assertIn("not the build's", joint["summary"])
+            self.assertFalse((root / "runs").exists())
+
+    def test_a_zero_budget_is_unchecked_and_names_the_budget(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, _ = self._plan(root, plan_solve_budget_s=0)
+            joint = plan["checkpoint_plan"]["joint_allocation"]
+            self.assertEqual(joint["verdict"], "unchecked")
+            self.assertFalse(joint["available"])
+            self.assertIn("unchecked", joint["summary"])
+            self.assertIn("0s", joint["summary"])
+            self.assertIn("joint_allocation:", " ".join(plan["checkpoint_plan"]["warnings"]))
+
+    def test_a_non_certifying_verdict_warns_but_never_blocks_the_checkpoint(self):
+        """The checkpoint is the review, not a gate. A predicted refusal is a
+        warning the operator reads, not a refusal to let them run the build."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan, _ = self._plan(root, plan_solve_budget_s=0)
+            self.assertTrue(plan["passed"])
+            self.assertEqual(plan["status"], "plan_pending_approval")
+            self.assertFalse((root / "runs").exists())
+
+    def test_an_allocator_time_limit_is_unchecked_not_proven_infeasible(self):
+        """The allocator distinguishes the clock from a proof and says which in
+        its own error text. Collapsing the two here would reintroduce exactly
+        the mislabel R28 exists to remove."""
+        from mlb_engine.pipeline import execution_pipeline as ep
+
+        def fake_alloc(candidates, entries, controls):
+            return {"passed": False, "errors": ["entry-level joint MILP hit the 30s time limit"],
+                    "allocation_solver_report": {"status": "time_limit"}}
+
+        original = ep.select_and_assign_entries
+        ep.select_and_assign_entries = fake_alloc
+        try:
+            verdict = ep._plan_joint_allocation(
+                None, [{"entry_id": "1", "contest_id": "900", "contest_shape": "large_field_gpp"}],
+                {}, budget_s=25.0, candidates_override=[{"candidate_id": "A"}])
+        finally:
+            ep.select_and_assign_entries = original
+        self.assertEqual(verdict["verdict"], "unchecked")
+        self.assertIn("the clock, not a proven infeasibility", verdict["summary"])
+
+    def test_no_entries_is_trivially_satisfiable_rather_than_unchecked(self):
+        from mlb_engine.pipeline import execution_pipeline as ep
+        verdict = ep._plan_joint_allocation(None, [], {}, budget_s=25.0)
+        self.assertEqual(verdict["verdict"], "would_certify")
+        self.assertEqual(verdict["candidate_count"], 0)
+
+    def test_a_raising_plan_solve_degrades_to_unchecked_and_never_propagates(self):
+        """The checkpoint may never be the thing that breaks a build path."""
+        from mlb_engine.pipeline import execution_pipeline as ep
+
+        def boom(*a, **k):
+            raise RuntimeError("solver exploded")
+
+        original = ep.select_and_assign_entries
+        ep.select_and_assign_entries = boom
+        try:
+            verdict = ep._plan_joint_allocation(
+                None, [{"entry_id": "1", "contest_id": "900", "contest_shape": "large_field_gpp"}],
+                {}, budget_s=25.0, candidates_override=[{"candidate_id": "A"}])
+        finally:
+            ep.select_and_assign_entries = original
+        self.assertEqual(verdict["verdict"], "unchecked")
+        self.assertIn("RuntimeError", verdict["summary"])
+
+
 class SlateClockTests(unittest.TestCase):
     def test_parse_game_info_datetime_et(self):
         from mlb_engine.intake.slate_intake_manager import parse_game_info_datetime

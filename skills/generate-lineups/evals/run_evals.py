@@ -188,7 +188,7 @@ def run_eval(spec: dict, keep: bool) -> dict:
 
 
 class RepoSurfaceGuard:
-    """Snapshot data/slates/ and outputs/ and restore them exactly.
+    """Snapshot data/slates/, outputs/ and the per-slate bank caches, restore exactly.
 
     build_slate.py stages inputs into the repo's data/slates/<date>/ and
     delivers into outputs/<date>/ no matter where its arguments live, so an
@@ -199,9 +199,26 @@ class RepoSurfaceGuard:
     roots total a few MB, so the honest fix is a full snapshot at runner
     start and a byte-exact restore at the end: new paths deleted, changed or
     deleted paths restored from the snapshot.
+
+    R28, 2026-07-29: the guard reached one directory short of the damage.
+    build_slate also writes ``runs/bank_cache_<date>_<poolsig>.json``, which
+    was outside ROOTS, so every eval run left a per-slate bank cache behind.
+    Two consequences, both observed on the same day. Evals stopped being
+    reproducible: a leftover eight-candidate cache short-circuited the bank
+    build and the identical command refused in 4.6s where clean runs certify
+    in about 26s, which is a pinned exit code decided by whether someone ran
+    the eval before. And the worse half, the reason this is guarded rather
+    than documented: that file is keyed by slate date and pool signature, so
+    a REAL build for the same date would read an eval's bank. runs/ is NOT
+    guarded wholesale -- it holds live run directories and the promotion
+    pointer, and snapshotting those would fight a concurrent build (the
+    multi-session contract's BUILD role owns them). Only the bank caches,
+    which are derived data that any build can rebuild, are covered.
     """
 
     ROOTS = ("data/slates", "outputs")
+    # Derived, per-slate, safe to delete: rebuilding one costs a slice.
+    FILE_GLOBS = ("runs/bank_cache_*.json",)
 
     def __init__(self):
         self.backup = Path(tempfile.mkdtemp(prefix="eval_surface_guard_"))
@@ -209,6 +226,16 @@ class RepoSurfaceGuard:
             source = REPO / root
             if source.exists():
                 shutil.copytree(source, self.backup / root, symlinks=True)
+        self.saved_files = {}
+        for pattern in self.FILE_GLOBS:
+            for live in REPO.glob(pattern):
+                if not live.is_file():
+                    continue
+                rel = live.relative_to(REPO)
+                target = self.backup / "_files" / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(live, target)
+                self.saved_files[rel] = target
 
     def restore(self) -> list:
         actions = []
@@ -232,6 +259,20 @@ class RepoSurfaceGuard:
                     actions.append(f"restored {root}/{rel}")
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, target)
+        for pattern in self.FILE_GLOBS:
+            for live in sorted(REPO.glob(pattern)):
+                if not live.is_file():
+                    continue
+                rel = live.relative_to(REPO)
+                if rel not in self.saved_files:
+                    actions.append(f"removed {rel}")
+                    live.unlink(missing_ok=True)
+        for rel, source in sorted(self.saved_files.items()):
+            target = REPO / rel
+            if not target.exists() or target.read_bytes() != source.read_bytes():
+                actions.append(f"restored {rel}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
         shutil.rmtree(self.backup, ignore_errors=True)
         return actions
 

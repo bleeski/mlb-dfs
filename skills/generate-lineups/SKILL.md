@@ -96,10 +96,25 @@ fits the budget, builds, certifies, verifies the written CSV, and writes a brief
 to `outputs/<date>/build_brief.json`.
 
 Exit codes: `0` certified, `10` partial progress saved (run the exact same command
-again, it resumes), `3` built but did not certify, `4` inputs missing.
+again, it resumes), `3` built but did not certify, `4` a precondition was never
+met (inputs missing, solver missing, or the slate's first lock already passed).
 
 An exit of `10` is normal on a big slate, not a failure. The bank persists between
 runs. Just run it again.
+
+Three refusals happen before anything is staged, so they cost one line and leave
+no byproducts (R28):
+
+- **`missing_dependencies`** — the same import check `tools/audit.py` runs, at the
+  front door. Fix with `python tools/env_probe.py --install`, never hand-pip.
+- **`past_slate_locks_passed`** — this slate's first lock is in the past, so no
+  lineup built from it can be entered. Replays and evals pass
+  `--past-slate-replay`; a live build never needs it.
+- **`missing_inputs`** — the salary or entries path does not exist.
+
+A build that runs and then does not certify (exit `3`) now always writes its
+brief, including to an explicit `--brief` path, carrying `status: not_certified`
+with `failed_gates` and `pool_blockers`. A refusal is no longer stdout-only.
 
 Inside Cowork's bash sandbox this command usually will not fit in one call. Read
 "Running inside the Cowork sandbox" below before you start, and confirm the salary
@@ -494,7 +509,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 425 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 437 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

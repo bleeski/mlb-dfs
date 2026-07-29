@@ -1,11 +1,10 @@
 {
   "skill_name": "generate-lineups",
-  "format": "fixture/v2 (R6d): every eval pins an exit code, artifact states, and forbidden claims; run with run_evals.py. The three original prose scenarios are ids 0-2; ids 3-7 are the RC 2.8 adversarial cases.",
+  "format": "fixture/v2 (R6d): every eval pins an exit code, artifact states, and forbidden claims; run with run_evals.py. The three original prose scenarios are ids 0-2; ids 3-7 are the RC 2.8 adversarial cases. Ids 0, 2, 6 and 7 were re-pinned when R28 landed (2026-07-29); each one's notes say what moved and why.",
   "evals": [
     {
       "id": 0,
-      "name": "classic-grid-refusal-is-loud-and-caused",
-      "was": "classic-eight-game-slate (prose, expected a certified file). Two facts changed under it: the archived slate is two games, and today's production caps prove the 18-entry grid jointly infeasible even after auto-floors fire (frozen in the production golden replay, carried as backlog R28). The truthful pin is the refusal: loud, caused, no brief, no partial file, never a quiet certification. When R28 lands, re-pin this to exit 0 alongside the golden baseline.",
+      "name": "classic-grid-certifies-on-the-auto-bank",
       "fixture": "classic",
       "command": [
         "${REPO}/skills/generate-lineups/scripts/build_slate.py",
@@ -23,20 +22,21 @@
         "--brief",
         "${WORK}/brief.json"
       ],
-      "expected_exit_code": 3,
+      "expected_exit_code": 0,
       "expected_artifacts": [
         {
           "path": "${WORK}/brief.json",
-          "must_exist": false
+          "must_exist": true,
+          "json_equals": {
+            "status": "certified"
+          }
         }
       ],
       "required_output": [
-        "proven infeasible",
-        "interaction of the active controls",
-        "not_certified"
+        "\"status\": \"certified\"",
+        "allocation_certified"
       ],
       "forbidden_claims": [
-        "\"status\": \"certified\"",
         "upload[- ]ready(?! after)",
         "(estimated|expected|projected) (ROI|win[- ]rate)",
         "ROI of \\d",
@@ -44,7 +44,8 @@
         "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
         "probability of (winning|cashing)"
       ],
-      "timeout_s": 180
+      "timeout_s": 180,
+      "notes": "R28 LANDED and this is the deliberate re-pin, exit 3 -> exit 0. The item's premise was measured wrong and this eval inherited the error. 'Today's engine cannot certify the archived 18-entry, three-contest grid' is true of the GOLDEN's frozen 30-candidate sliced bank and false of the BUILD path: build_slate's auto-bank is larger, and on a clean tree this grid certified 3 of 3 runs in about 26s. The old exit-3 pin was reproducing a poisoned run, not the engine: eval runs used to leave runs/bank_cache_<date>_<sig>.json behind (outside RepoSurfaceGuard's reach until R28 widened it), and a leftover eight-candidate cache short-circuited the bank build so the identical command refused in 4.6s. So the infeasibility R28 was written around is a property of a small bank, not of the grid, and the checkpoint work still stands on its own: R28(1) makes approve=False predict whichever way this goes instead of passing a plan the build might refuse. Eval 2 holds the refusal pin under a 25s budget, which is the same grid on a bank too small to satisfy the caps."
     },
     {
       "id": 1,
@@ -56,6 +57,7 @@
         "${WORK}/DKSalaries.csv",
         "--entries",
         "${WORK}/DKEntries.csv",
+        "--past-slate-replay",
         "--brief",
         "${WORK}/brief.json"
       ],
@@ -80,7 +82,8 @@
         "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
         "probability of (winning|cashing)"
       ],
-      "timeout_s": 180
+      "timeout_s": 180,
+      "notes": "R28(3) consequence, handled rather than exempted: materialize_showdown copies the archived 2026-07-18 MIN@CHC fixture with no date shift, so its first lock passed weeks ago and the new past-lock guard refuses it at exit 4. That is the guard working -- a past Showdown slate is as unenterable as a past Classic one -- so the eval declares what it is with --past-slate-replay instead of the guard carving out an exception for Showdown. The flag exists for exactly this caller."
     },
     {
       "id": 2,
@@ -108,7 +111,10 @@
       "expected_artifacts": [
         {
           "path": "${WORK}/brief.json",
-          "must_exist": false
+          "must_exist": true,
+          "json_equals": {
+            "status": "not_certified"
+          }
         }
       ],
       "forbidden_claims": [
@@ -121,7 +127,7 @@
         "probability of (winning|cashing)"
       ],
       "timeout_s": 120,
-      "notes": "Same grid as eval 0 under a 25s budget. The contract under deadline pressure is that a compute limit never trims the pool and an infeasible portfolio refuses loudly rather than shipping something uncertified. Re-pin with eval 0 when R28 lands.",
+      "notes": "Same grid as eval 0 under a 25s budget. The contract under deadline pressure is that a compute limit never trims the pool and an infeasible portfolio refuses loudly rather than shipping something uncertified. Re-pinned with eval 0 when R28 landed: the refusal is unchanged at exit 3, and R28(5) now leaves a brief behind, so the deadline path also stops costing the reader its cause.",
       "required_output": [
         "proven infeasible|not_certified"
       ]
@@ -237,7 +243,7 @@
     {
       "id": 6,
       "name": "adversarial-past-lock",
-      "notes": "RC 2.8: every lock on this un-shifted slate passed weeks ago. KNOWN GAP, pinned on purpose: the build path today says NOTHING about the clock; the refusal below is the unrelated cap-interaction error, and a lock-line assertion would be fiction. This pin breaks in two futures, both wanted: R28 makes the grid certifiable (a past slate then CERTIFIES, the forbidden claim fires, and the missing lock check gets a decision), or a lock check lands (re-pin required_output to its message).",
+      "notes": "R28(3) LANDED and closed the gap this eval was pinned open against. The build path used to say NOTHING about the clock, so this slate's weeks-past locks produced the unrelated cap-interaction refusal and a lock assertion would have been fiction. Now a first lock in the past refuses before staging and names the clock, and --past-slate-replay is the one way through. Exit 4 rather than 3 on purpose: 3 is a build that ran and refused, 4 is a precondition that was never met, which is what this is. No brief, because nothing was staged and no build ran.",
       "fixture": "classic",
       "fixture_options": {
         "shift": "past"
@@ -256,9 +262,10 @@
         "--brief",
         "${WORK}/brief.json"
       ],
-      "expected_exit_code": 3,
+      "expected_exit_code": 4,
       "required_output": [
-        "not_certified"
+        "past_slate_locks_passed",
+        "--past-slate-replay"
       ],
       "forbidden_claims": [
         "\"status\": \"certified\"",
@@ -268,12 +275,18 @@
         "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
         "probability of (winning|cashing)"
       ],
-      "timeout_s": 120
+      "timeout_s": 120,
+      "expected_artifacts": [
+        {
+          "path": "${WORK}/brief.json",
+          "must_exist": false
+        }
+      ]
     },
     {
       "id": 7,
       "name": "adversarial-missing-scipy",
-      "notes": "RC 2.8: no solver, no build, loudly. The shim makes scipy unimportable; the build must die naming the missing solver, never quietly deliver a partial. Observed reality pinned here: build_slate has no front-door dependency check (the skill preflight and the audit are those layers), so the failure is an unhandled RuntimeError at exit 1 from the first solve. Loud, but later and costlier than a front-door refusal; flagged in the backlog notes rather than papered over with a wished-for exit code.",
+      "notes": "RC 2.8: no solver, no build, loudly. The shim makes scipy unimportable. R28(4) LANDED and moved this one: the failure used to be an unhandled RuntimeError at exit 1 from the first solve, after staging and after the whole pool build. build_slate now runs the audit's own check_dependencies at the front door, so the refusal costs one line and nothing is staged. Exit 4 for the same reason as eval 6: an unmet precondition, not a build that ran and refused. Re-pinned deliberately alongside evals 0, 2 and 6.",
       "fixture": "classic",
       "env": {
         "PYTHONPATH": "${REPO}/skills/generate-lineups/evals/inputs/no_scipy_shim"
@@ -290,9 +303,10 @@
         "--brief",
         "${WORK}/brief.json"
       ],
-      "expected_exit_code": 1,
+      "expected_exit_code": 4,
       "required_output": [
-        "scipy MILP backend unavailable"
+        "missing_dependencies",
+        "env_probe.py --install"
       ],
       "forbidden_claims": [
         "\"status\": \"certified\"",
@@ -302,7 +316,13 @@
         "\\d+(\\.\\d+)?% (ROI|win[- ]rate|cash[- ]rate)",
         "probability of (winning|cashing)"
       ],
-      "timeout_s": 90
+      "timeout_s": 90,
+      "expected_artifacts": [
+        {
+          "path": "${WORK}/brief.json",
+          "must_exist": false
+        }
+      ]
     }
   ]
 }

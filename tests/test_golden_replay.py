@@ -449,6 +449,16 @@ class GoldenProductionReplayTests(unittest.TestCase):
                              projection_rows=[dict(r) for r in rows],
                              portfolio_controls_override=PRODUCTION_CERT_OVERRIDE,
                              approve=False, **common)
+            # R28(1): the same grid at approve=False with NO override, which is
+            # the sequence the item is about -- checkpoint-green at review,
+            # proven-infeasible at approve. The plan verdict now has to name it.
+            pure_plan_root = Path(tmp) / "runs_pure_plan"
+            pure_plan = run_slate(runs_root=pure_plan_root,
+                                  projection_rows=[dict(r) for r in rows],
+                                  approve=False, **common)
+            cls.pure_plan_root_exists = pure_plan_root.exists()
+            cls.pure_plan_joint = pure_plan.get("joint_allocation") or {}
+            cls.cert_plan_joint = plan.get("joint_allocation") or {}
             cert = run_slate(runs_root=Path(tmp) / "runs_cert",
                              projection_rows=[dict(r) for r in rows],
                              portfolio_controls_override=PRODUCTION_CERT_OVERRIDE,
@@ -509,14 +519,28 @@ class GoldenProductionReplayTests(unittest.TestCase):
             self.assertTrue(value, f"{gate} is not true on the certified scenario")
 
     def test_pure_production_postures_verdict_is_pinned(self) -> None:
+        """The frozen refusal is a property of THIS BANK, not of this grid.
+
+        Read carefully before quoting this baseline as a claim about the engine.
+        R28 was written around "today's engine cannot certify the archived
+        18-entry, three-contest grid", which was measured here and is true only
+        of the 30-candidate sliced bank this replay freezes. Through the build
+        path's larger auto-bank the same grid CERTIFIES (build_slate, clean
+        tree, 3 of 3 runs, ~26s, 2026-07-29; eval 0 pins it at exit 0). Both
+        facts are real and they do not conflict: the caps bind against a small
+        bank and clear against a big one, which is exactly why R28(1) made the
+        approve=False checkpoint solve the bank it actually has instead of
+        inferring feasibility from pool arithmetic.
+        """
         baseline = self._baseline()
         self.assertEqual(
             {"passed": self.pure_result["passed"], "errors": self.pure_result["errors"]},
             baseline["pure_verdict"],
-            "the PURE production-postures verdict moved: either the thin-slate "
-            "cap interaction was fixed (celebrate, then re-freeze deliberately "
-            "with the backlog item closed) or caps/floors/allocator behavior "
-            "drifted (investigate before touching the baseline).")
+            "the PURE production-postures verdict moved: either caps/floors/"
+            "allocator behavior drifted, or the sliced bank this replay builds "
+            "changed size (investigate before touching the baseline). Note this "
+            "pins the sliced-bank verdict only; the auto-bank path certifies "
+            "this same grid, which is not a contradiction.")
 
     def test_aggregates_match_baseline(self) -> None:
         baseline = self._baseline()
@@ -533,6 +557,52 @@ class GoldenProductionReplayTests(unittest.TestCase):
             "production-replay ASSIGNMENT drifted: entry-to-lineup mapping "
             "changed for an unchanged input slate while aggregates may still "
             "match; this is the selection/allocation layer moving on its own.")
+
+    # ------------------------------------------------------------------
+    # R28(1): the checkpoint predicts the build, or says it did not check
+    # ------------------------------------------------------------------
+
+    def test_plan_verdict_and_build_verdict_agree_on_the_pure_grid(self) -> None:
+        """The item's headline case, pinned as an agreement rather than a value.
+
+        Before R28(1) this grid was checkpoint-green and approve-infeasible.
+        The plan solves the build's own candidates here, so agreement is exact
+        and any divergence is a real regression, not fixture noise.
+        """
+        joint = self.pure_plan_joint
+        self.assertEqual(joint.get("verdict"), "proven_infeasible",
+                         f"the plan no longer predicts the PURE grid's refusal: {joint}")
+        self.assertFalse(self.pure_result["passed"],
+                         "the PURE build passed while the plan predicted refusal")
+        self.assertEqual(
+            joint.get("errors"), self.pure_result["errors"],
+            "the plan's proven-infeasible text drifted from the error the build "
+            "actually raises; the checkpoint is only worth its budget while the "
+            "two are the same sentence.")
+
+    def test_plan_verdict_and_build_verdict_agree_on_the_certified_grid(self) -> None:
+        joint = self.cert_plan_joint
+        self.assertEqual(joint.get("verdict"), "would_certify",
+                         f"the plan no longer predicts the certified grid: {joint}")
+        self.assertEqual(joint.get("errors"), [])
+        self.assertTrue(self.cert_gates["allocation_certified"],
+                        "the build did not certify allocation while the plan said it would")
+
+    def test_the_plan_solve_is_exact_and_names_itself_so(self) -> None:
+        """Both scenarios hand in candidates_override, so the plan solves the
+        build's own bank and must not claim more or less than that."""
+        for label, joint in (("pure", self.pure_plan_joint), ("cert", self.cert_plan_joint)):
+            with self.subTest(scenario=label):
+                self.assertTrue(joint.get("exact_for_this_build"), joint)
+                self.assertEqual(joint.get("bank_source"), "candidates_override", joint)
+                self.assertTrue(joint.get("summary"), "a verdict with no summary is silence")
+
+    def test_approve_false_still_creates_no_run_directory(self) -> None:
+        """The plan solve is speculative and must stay side-effect free; a run
+        directory at approve=False would make a review indistinguishable from a
+        build in runs/."""
+        self.assertFalse(self.pure_plan_root_exists,
+                         "approve=False created a runs root")
 
 
 if __name__ == "__main__":

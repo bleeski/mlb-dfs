@@ -1455,8 +1455,25 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "set to at least the named floors. This raises diversity caps to "
                 "match the slate, not a strategy or player-pool change."
             )
-        print(json.dumps(payload, indent=1))
-        return 3, {}
+        # R28(5): the refusal writes the brief too. This used to return an empty
+        # brief, so `--brief` produced no file on the one path where the reader
+        # most needs one, and a session that captured only the brief learned
+        # nothing about why the build refused. The payload already carries
+        # failed_gates and pool_blockers from R27; returning it as the brief is
+        # the whole fix. main() prints it, so there is no second print here.
+        payload["contest_type"] = "classic"
+        payload["date"] = args.date
+        payload["entries"] = n_entries
+        payload["run_id"] = result.get("run_id")
+        payload["gates"] = {
+            "workflow_valid": result.get("workflow_valid"),
+            "selection_certified": result.get("selection_certified"),
+            "allocation_certified": result.get("allocation_certified"),
+        }
+        payload["pool_blockers_soft"] = soft
+        payload["pool_blockers_overridden"] = (
+            hard if (hard and args.ignore_pool_blockers) else [])
+        return 3, payload
 
     delivered = result.get("delivered_path") or result.get("output_path")
     checks = verify_classic(salary, Path(delivered))
@@ -2058,6 +2075,9 @@ def main() -> int:
                          "and the F4 matchup factor. For reproducing an old build; "
                          "not for live slates.")
     ap.set_defaults(enrichment=True)
+    ap.add_argument("--past-slate-replay", action="store_true",
+                    help="build a slate whose first lock has already passed "
+                         "(replays and evals only; a live build never needs it)")
     ap.add_argument("--feed-max-age-minutes", type=float, default=90.0,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "
@@ -2073,8 +2093,49 @@ def main() -> int:
         print(json.dumps({"status": "missing_inputs"}, indent=1))
         return 4
 
+    # R28(4): the front-door dependency check, before staging and before any
+    # engine import that could raise on the way past. A missing solver used to
+    # surface as an unhandled RuntimeError at the first solve, after staging and
+    # after the whole pool build, which is the most expensive place to learn a
+    # one-line fact. This is the same check tools/audit.py runs, called here so
+    # the build refuses in the same second it starts.
+    from tools.audit import check_dependencies
+    deps = check_dependencies(REPO)
+    if not deps["passed"]:
+        print(json.dumps({
+            "status": "missing_dependencies",
+            "missing": deps["missing"],
+            "scipy_milp_available": deps["scipy_milp_available"],
+            "remedy": deps["remedy"],
+            "note": ("no solver, no build. Nothing was staged and no run "
+                     "directory was created."),
+        }, indent=1))
+        return 4
+
     args.date = args.date or slate_date_from_salary(salary)
     contest = detect_contest_type(salary, entries)
+    signature = slate_signature(salary)
+
+    # R28(3): a slate whose first lock has already passed is a replay or an eval,
+    # never a live build, and the build path used to say nothing at all about the
+    # clock. Saying nothing is the failure: a past-lock build that certifies looks
+    # exactly like a live one on disk. The flag is the whole remedy, because the
+    # only legitimate callers know which they are.
+    if signature.get("first_lock") and not args.past_slate_replay:
+        first_lock = dt.datetime.fromisoformat(signature["first_lock"])
+        now = dt.datetime.now(dt.timezone.utc)
+        if first_lock <= now:
+            passed_h = (now - first_lock).total_seconds() / 3600.0
+            print(json.dumps({
+                "status": "past_slate_locks_passed",
+                "first_lock": signature["first_lock"],
+                "hours_past_first_lock": round(passed_h, 1),
+                "note": ("this slate's first lock passed "
+                         f"{round(passed_h, 1)}h ago, so no lineup built here can "
+                         "be entered. Pass --past-slate-replay to build it anyway "
+                         "(replays and evals); nothing was staged."),
+            }, indent=1))
+            return 4
 
     slate_dir = REPO / "data" / "slates" / args.date
     slate_dir.mkdir(parents=True, exist_ok=True)
@@ -2091,7 +2152,6 @@ def main() -> int:
     # draftgroup from another on the same date. Compare game sets and move the
     # prior draftgroup's staged inputs, brief, and delivered file aside rather
     # than overwriting them.
-    signature = slate_signature(salary)
     prior_salary = slate_dir / f"DKSalaries{suffix}.csv"
     out_dir = REPO / "outputs" / args.date
     if prior_salary.exists():

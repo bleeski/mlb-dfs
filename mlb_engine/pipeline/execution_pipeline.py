@@ -4,6 +4,28 @@ VERSION is the authoritative version constant for this module.
 Initial builds and late swaps share one immutable, hash-bound production path.
 The exact final DKEntries file is re-read to derive all post-export gates.
 
+v1.15 changes (R28):
+- ``run_slate(approve=False)`` gains a plan-mode joint-allocation verdict.
+  ``_plan_joint_allocation`` builds a bank through the sliced path into a
+  TEMPORARY cache (never the shared per-slate cache) and solves the same
+  ``select_and_assign_entries`` MILP the build solves, then reports
+  ``would_certify``, ``proven_infeasible`` carrying the build's exact error
+  text, or ``unchecked`` naming the budget it ran out of. It never reports
+  silence, which was the defect: ``_slate_feasibility``'s auto-floors are
+  POOL-keyed and cannot see an interaction that lives in the BANK, so the
+  checkpoint passed plans the build then proved jointly infeasible.
+  ``plan_solve_budget_s`` sets the budget (default ``PLAN_SOLVE_BUDGET_S``);
+  0 disables the solve and says so. approve=False still creates no run
+  directory and writes nothing outside the temporary cache; approve=True is
+  unchanged.
+- The verdict names its own exactness. With ``candidates_override`` the plan
+  solves the build's own candidates and ``exact_for_this_build`` is True; on
+  the auto-bank path the plan's sliced bank is not the build's
+  ``build_diverse_candidate_bank`` bank and the summary says so.
+- An allocator time limit at plan time is reported as ``unchecked``, never as
+  ``proven_infeasible``: that distinction is the allocator's own contract and
+  collapsing it would be the mislabel the item exists to remove.
+
 v1.9 changes:
 - Percentage exposure caps join the feasibility floors. ``_slate_feasibility``
   now derives the minimum feasible ``max_player_exposure_pct``,
@@ -115,6 +137,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
@@ -139,7 +162,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.14"
+VERSION = "v1.15"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -1901,6 +1924,184 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
     return report
 
 
+# Default plan-solve budget in seconds. Sized against the evidence in R28: the
+# sliced path exhausts a two-game pool's 64 (SP pair, stack team) jobs in about
+# a second, and a full slate's job list is roughly an order of magnitude larger.
+# The budget is stated in the verdict either way, because "unchecked" is only
+# honest when the reader can see what it was unchecked against.
+PLAN_SOLVE_BUDGET_S = 25.0
+
+
+def _plan_joint_allocation(
+    projections: Any,
+    entry_requirements: Sequence[Mapping[str, Any]],
+    controls: Mapping[str, Any],
+    *,
+    budget_s: float,
+    candidates_override: Optional[Sequence[Mapping[str, Any]]] = None,
+    excluded_player_ids: Optional[Sequence[str]] = None,
+    requested_n: Optional[int] = None,
+    contest_shapes: Optional[Sequence[str]] = None,
+    solver_time_limit_s: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Solve the build's joint allocation at approve=False and report the verdict.
+
+    R28(1). ``_slate_feasibility``'s auto-floors are POOL-keyed, so they cannot
+    see an interaction that lives in the BANK. The archived 06-03 grid is the
+    proof: the floors visibly fired, the checkpoint passed the plan, and the
+    approve=True build then returned "no single control is arithmetically
+    binding against this bank, so the interaction of the active controls is".
+    Pool arithmetic can never predict that, so the checkpoint stops trying to
+    and solves the same MILP the build solves instead.
+
+    The verdict is one of three, and one of them is always emitted:
+
+    ``would_certify``    the joint allocation solved on this bank. This is the
+                         allocation leg only (``selection_certified`` and
+                         ``allocation_certified``); ``workflow_valid`` is
+                         derived post-export from the written file and is not
+                         evaluated here. Never a claim about the slate.
+    ``proven_infeasible``the allocator refused, carrying the exact error text
+                         the build would raise.
+    ``unchecked``        the budget did not cover the work, naming the budget.
+
+    Silence is not on the list, which is the whole point of the item.
+
+    The bank is built through the sliced path into a TEMPORARY cache, never the
+    shared per-slate cache: this solve is speculative, its conditions signature
+    is the plan's, and writing it where a build would read it would let a plan
+    seed a build's bank. When ``candidates_override`` is supplied the plan
+    solves the build's own candidates and the verdict is exact; on the auto-bank
+    path the plan's sliced bank is not the build's ``build_diverse_candidate_bank``
+    bank, and the verdict says so rather than implying an identity it does not
+    have.
+
+    Deterministic and side-effect free: no run directory, no shared-cache write.
+    """
+    verdict: Dict[str, Any] = {
+        "available": False,
+        "verdict": "unchecked",
+        "budget_s": float(budget_s),
+        "bank_source": None,
+        "candidate_count": None,
+        "errors": [],
+        "summary": "",
+        "exact_for_this_build": None,
+    }
+    entries = [dict(e) for e in (entry_requirements or [])]
+    if not entries:
+        verdict.update({
+            "available": True, "verdict": "would_certify", "bank_source": "none",
+            "candidate_count": 0, "exact_for_this_build": True,
+            "summary": "no entries requested; the joint allocation is trivially satisfiable",
+        })
+        return verdict
+    if budget_s <= 0:
+        verdict["summary"] = (
+            f"unchecked: plan solve disabled (budget {float(budget_s):g}s). The bank "
+            f"interaction stays unchecked until approve=True."
+        )
+        return verdict
+
+    try:
+        import tempfile as _tempfile
+        from pathlib import Path as _Path
+
+        started = time.monotonic()
+        if candidates_override is not None:
+            candidates = [dict(c) for c in candidates_override]
+            verdict["bank_source"] = "candidates_override"
+            verdict["exact_for_this_build"] = True
+            bank_note = "the build's own candidates"
+        else:
+            from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+
+            excl = [str(x) for x in (excluded_player_ids or [])]
+            bank_projections = projections
+            if excl and hasattr(projections, "columns"):
+                bank_projections = projections.copy()
+                if "Excluded" not in bank_projections.columns:
+                    bank_projections["Excluded"] = False
+                mask = bank_projections["Player_ID"].astype(str).isin(set(excl))
+                bank_projections.loc[mask, "Excluded"] = True
+            with _tempfile.TemporaryDirectory(prefix="plan_bank_") as tmp:
+                cache = BankCache(_Path(tmp) / "plan_bank.json")
+                report = extend_bank(
+                    cache, bank_projections, time_budget_s=float(budget_s),
+                    excludes=excl or None, solver_time_limit_s=solver_time_limit_s,
+                )
+                if not report.get("job_list_exhausted"):
+                    built = len(cache.candidates)
+                    verdict["bank_source"] = "sliced_plan_bank"
+                    verdict["candidate_count"] = built
+                    verdict["summary"] = (
+                        f"unchecked: budget exceeded. The sliced plan bank did not exhaust "
+                        f"its job list inside {float(budget_s):g}s ({built} candidates built); "
+                        f"solving a partial bank would report an infeasibility that is the "
+                        f"clock, not the controls. Raise the plan budget or accept that the "
+                        f"bank interaction is unchecked until approve=True."
+                    )
+                    return verdict
+                candidates = cache.as_candidates(
+                    bank_projections,
+                    requested_n=int(requested_n or max(len(entries), 1)),
+                    contest_shapes=list(contest_shapes) if contest_shapes else None,
+                )
+            verdict["bank_source"] = "sliced_plan_bank"
+            verdict["exact_for_this_build"] = False
+            bank_note = (
+                "a sliced plan bank, which is not the build's "
+                "build_diverse_candidate_bank bank"
+            )
+
+        verdict["candidate_count"] = len(candidates)
+        allocation = select_and_assign_entries(candidates, entries, dict(controls))
+        elapsed = time.monotonic() - started
+        verdict["elapsed_s"] = round(elapsed, 2)
+        solver_report = allocation.get("allocation_solver_report") or {}
+        verdict["allocation_solver_report"] = solver_report
+
+        if allocation.get("passed"):
+            verdict.update({
+                "available": True, "verdict": "would_certify",
+                "summary": (
+                    f"would certify: the joint allocation solved on {bank_note} "
+                    f"({len(candidates)} candidates, {len(entries)} entries) under the "
+                    f"resolved controls. Allocation leg only; workflow_valid is derived "
+                    f"post-export and is not evaluated in plan mode."
+                ),
+            })
+            return verdict
+
+        errors = [str(e) for e in (allocation.get("errors") or [])]
+        # A time limit inside the allocator is the clock, not the controls, and
+        # the allocator already says so in its own words. Reporting it as
+        # proven-infeasible would be the exact mislabel this item exists to kill.
+        timed_out = str(solver_report.get("status") or "") == "time_limit"
+        if timed_out:
+            verdict["errors"] = errors
+            verdict["summary"] = (
+                f"unchecked: budget exceeded. The joint MILP hit its own time limit on "
+                f"{bank_note}; this is the clock, not a proven infeasibility."
+            )
+            return verdict
+        verdict.update({
+            "available": True, "verdict": "proven_infeasible", "errors": errors,
+            "summary": (
+                f"proven infeasible at plan time on {bank_note}: "
+                + (errors[0] if errors else "the allocator refused without an error line")
+            ),
+        })
+        return verdict
+    except Exception as exc:  # noqa: BLE001 - the checkpoint may never block on this
+        verdict["errors"] = [f"{type(exc).__name__}: {exc}"]
+        verdict["summary"] = (
+            f"unchecked: the plan solve raised {type(exc).__name__}: {exc}. The bank "
+            f"interaction stays unchecked until approve=True."
+        )
+        return verdict
+
+
 def _assemble_projection_frame(
     salary_csv: str | Path,
     projection_rows: Any,
@@ -2445,6 +2646,7 @@ def run_slate(
     metadata: Optional[Dict[str, Any]] = None,
     bank_time_budget_s: Optional[float] = None,
     solver_time_limit_s: Optional[float] = None,
+    plan_solve_budget_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -2732,7 +2934,34 @@ def run_slate(
                 "errors": contest_identity_blockers, **base_payload}
 
     if not approve:
+        # R28(1): the plan-mode joint-allocation verdict. Everything above this
+        # line is pool arithmetic, and pool arithmetic provably cannot see an
+        # interaction that lives in the bank, so the checkpoint solves the same
+        # MILP the build will solve and reports what it found. Placed after the
+        # schema gate so a blocked plan never pays for a solve, and inside the
+        # not-approve branch so approve=True is byte-identical to pre-v1.15.
+        shape_counts_plan: Dict[str, int] = {}
+        for req in entry_requirements:
+            shape_counts_plan[req["contest_shape"]] = shape_counts_plan.get(req["contest_shape"], 0) + 1
+        joint = _plan_joint_allocation(
+            projections, entry_requirements, controls,
+            budget_s=(PLAN_SOLVE_BUDGET_S if plan_solve_budget_s is None
+                      else float(plan_solve_budget_s)),
+            candidates_override=candidates_override,
+            excluded_player_ids=[str(x) for x in (excluded_player_ids or [])],
+            requested_n=int(requested_n or max(len(entry_requirements), 1)),
+            contest_shapes=sorted(shape_counts_plan) or None,
+            solver_time_limit_s=solver_time_limit_s,
+        )
+        checkpoint["joint_allocation"] = joint
+        if joint.get("verdict") != "would_certify":
+            existing = list(checkpoint.get("warnings") or [])
+            checkpoint["warnings"] = existing + [f"joint_allocation: {joint['summary']}"]
+        # A plan that predicts refusal still returns passed=True: this is the
+        # review checkpoint, not a gate, and its job is to say what the build
+        # would do, not to pre-empt the operator's decision to run it.
         return {"passed": True, "status": "plan_pending_approval", "approved": False,
+                "joint_allocation": joint,
                 "note": "review the checkpoint_plan and re-run with approve=True to build", **base_payload}
 
     if candidates_override is not None:

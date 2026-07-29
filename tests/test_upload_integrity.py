@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -394,19 +395,37 @@ class PreflightManifestBindingTests(unittest.TestCase):
         self.dir = Path(self.tmp.name)
         self.salary = self.dir / "DKSalaries.csv"
         self.lineup = write_classic_salary(self.salary)
-        # A DELIVERED file lives under the repo's outputs/. Use a real
-        # subdirectory there so is_delivered_file resolves the way it will in
-        # production, and clean it up.
-        self.outputs = REPO / "outputs" / "_test_r3"
+        # A DELIVERED file lives under the repo's outputs/, and is_delivered_file
+        # resolves against REPO/outputs specifically, so the fixture cannot move
+        # to a tmpdir without testing a different code path than production.
+        #
+        # The directory name is unique per test rather than a fixed "_test_r3".
+        # Isolation used to rest on tearDown deleting the directory, and a mount
+        # without the delete grant (the Cowork sandbox is one) refuses the
+        # unlink: the leftover upload_manifest.json then satisfied the very
+        # check test_a_delivered_file_with_no_manifest_is_a_hard_failure exists
+        # to prove fails, so the suite went green-then-red across runs for an
+        # environment reason with no engine cause. A unique name makes each test
+        # hermetic whether or not the delete lands.
+        self.outputs = REPO / "outputs" / f"_test_r3_{uuid.uuid4().hex[:12]}"
         self.outputs.mkdir(parents=True, exist_ok=True)
         self.entries = self.outputs / "DKEntries.csv"
         write_entries(self.entries, CLASSIC_HEADER,
                       [classic_entry("900", "5", self.lineup)])
 
     def tearDown(self):
+        # Fail open on a refused delete, the same call R23's archive move makes:
+        # housekeeping that cannot run is not a test result. outputs/ is
+        # gitignored, so an undeletable leftover is litter, never tracked state.
         for path in sorted(self.outputs.glob("*")):
-            path.unlink()
-        self.outputs.rmdir()
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        try:
+            self.outputs.rmdir()
+        except OSError:
+            pass
         self.tmp.cleanup()
 
     def _run(self, *extra):
