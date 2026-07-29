@@ -817,6 +817,58 @@ actually observed, which for a satellite is the ticket count awarded.
 A further 188 satellite entries and $43.30 in fees matched no family above (Grass
 Swing Slam, Playoff Puck Drop) and won nothing.
 
+### 3.15 R10's gate, counted (2026-07-29)
+
+First measurement of R10's gate depth, possible only after `paid_places` was parked
+for all 100 archived contests earlier the same day. These are counts of the archive,
+not a claim that any model works.
+
+| | contests | distinct slate dates | own entries |
+|---|---|---|---|
+| archived, all | 100 | 14 | 307 |
+| archived satellites | 82 | — | — |
+| **`paid_places == 1` cell** | **77** | **12** | **286** (across 75) |
+| archived non-satellite | 18 | 9 | 21 |
+
+**R10 asks for roughly eight archetype-conditioned slates. The `paid_places == 1`
+satellite cell holds twelve.** That depth has existed for weeks and was invisible,
+because nothing wrote `paid_places` into the archive until 2026-07-29 (3.13). The
+earlier reading, that the archive offered "one deep cell and fourteen shallow ones"
+and the gate therefore stayed shut, treated archetype breadth as the requirement. That
+framing is superseded: the archive is a faithful sample of a portfolio that is 4,201
+of 4,879 MLB entries satellite, so the deep cell is the relevant cell.
+
+**R10 is orthogonal to the satellite question, not downstream of it.** This is the
+correction worth keeping. R10 was carried as gated behind R13, and R13 is now
+undecidable (3.14: the satellite leg is partially measured by Ben's decision, and the
+non-satellite line is 18 archived contests and 21 entries). But R10 is ownership and
+duplication, and for a one-paid WTA satellite at a 118-median field, clearing the cut
+line unduplicated is the mechanism rather than a marginal gain, which R10's own
+justification already states. Reducing duplication on those builds does not require
+knowing whether the satellite leg is +EV on cash after promotions. **R10 is therefore
+the only major board item that waits on no parked measurement and no open decision.**
+
+The grading substrate is already in place: `own_lineups_duplicated_by_field` is
+populated for all 97 mined contests.
+
+Two limits, both real:
+
+1. **"Archetype" is undefined at this depth and the definition decides everything.**
+   The cell is one payout shape but not one contest: 8 contest families (Fantasy
+   Football Millionaire 29, Pocket Cup 24, Best Ball $25 Millionaire 12, Relay Throw 6,
+   FBWC 2, Knuckleball 2, Shootaround 1, other 1) and 25 distinct field sizes spanning
+   15 to 297. Twelve slates is real depth at the payout-shape level; conditioning
+   further on family and field bucket thins it quickly. Pin the definition before
+   fitting anything.
+2. **Meeting the slate count is not meeting R10's bar.** R10 requires the fitted prior
+   to beat flat-12 across the gate count before any production column flips. That bar
+   is untouched by this measurement.
+
+**Deliberately not recorded here:** whether R10's gate should be re-scoped from "N
+archetype-conditioned slates" generally to "N slates in the satellite archetype."
+That is Ben's dated decision, it changes what "per archetype" means in the fit, and
+an ARCHIVE session counting rows is not the place it gets made.
+
 ## 4. CALIBRATION CONTENT (INERT until the Section 0 gate opens)
 
 Populate these per slate from the archive. None of it moves a projection today.

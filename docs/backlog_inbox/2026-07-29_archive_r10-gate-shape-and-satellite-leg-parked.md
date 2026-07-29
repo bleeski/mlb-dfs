@@ -24,11 +24,30 @@ cell count suggests, scoped to the satellite archetype alone.
 
 The question for Ben, not for me: **should R10's gate be re-scoped to "N slates in
 the satellite archetype" rather than "N archetype-conditioned slates" generally?**
-If yes, count the distinct slate dates inside the `paid_places == 1` cell before
-committing; contest depth and slate depth are not the same and the 76 span only 10
-dates. If no, R10 stays shut until the contest mix changes, and that is a portfolio
+If no, R10 stays shut until the contest mix changes, and that is a portfolio
 decision rather than a modeling one. Do not start fitting priors until this is
 settled, because the answer changes what "per archetype" means in the fit.
+
+**The count this note asked for was run before the session closed** (ledger 3.15,
+updated here in place): the `paid_places == 1` cell holds **77 contests across 12
+distinct slate dates with 286 of Ben's own entries.** Contest depth and slate depth
+are not the same and I was right to insist on the distinction, but both clear the
+bar: R10 asks for roughly eight and the cell has twelve. So the re-scope question is
+no longer "is there enough depth", it is only "is payout shape the right conditioning
+variable." If yes, R10 is unblocked today.
+
+**R10 is also orthogonal to the parked satellite question, which I had wrong
+earlier.** It was carried as gated behind R13. It is not. Reducing duplication on a
+one-paid WTA satellite at a 118-median field does not require knowing whether the
+satellite leg is +EV on cash after promotions, and R10's own justification already
+says clearing the cut line unduplicated is the mechanism for exactly these contests.
+That makes R10 the only major board item waiting on no parked measurement and no open
+decision. `own_lineups_duplicated_by_field` is populated for all 97 mined contests,
+so the grading substrate exists.
+
+Carry forward the two limits: "archetype" is undefined at this depth (8 contest
+families, 25 distinct field sizes from 15 to 297), and meeting the slate count is not
+meeting R10's bar, which is beating flat-12 before any production column flips.
 
 ## 2. The satellite leg is parked as PARTIALLY MEASURED; do not grade R13 on it
 

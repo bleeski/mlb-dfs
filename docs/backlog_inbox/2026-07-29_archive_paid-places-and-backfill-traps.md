@@ -25,13 +25,25 @@ re-mine does not need 100 command lines. Done when a mined record carries
 `paid_places` and `posture_allocator` stops returning UNRESOLVED on an archived
 contest.
 
-**Do not treat this as R10 unblocked.** With the values in hand the R10 gate is
-now *measurable* rather than unmeasurable, and measured it reads: 76 backfilled
-contests fall in 15 distinct (paid_places, field-bucket) archetype cells, and 58
-of the 76 sit in one cell (`paid_places == 1`, satellite). Every other cell holds
-1 to 3 contests. R10 asks for "roughly eight archetype-conditioned slates"; the
-archive supplies one deep cell and fourteen shallow ones. The gate stays shut,
-for a better-stated reason. Full numbers in ledger 3.13.
+**Superseded later the same session; corrected in place rather than filed as a
+second note that could be applied out of order.** This paragraph originally read
+"do not treat this as R10 unblocked", on the grounds that 58 of 76 contests sat in
+one archetype cell and the archive therefore offered no breadth. That reasoning
+treated breadth as the requirement, and it is wrong: the archive is a faithful
+sample of a portfolio that is 4,201 of 4,879 MLB entries satellite, so the deep
+cell is the relevant cell.
+
+Counted properly (ledger 3.15): the `paid_places == 1` satellite cell holds **77
+contests across 12 distinct slate dates with 286 of Ben's own entries.** R10 asks
+for roughly eight archetype-conditioned slates. **The gate is met at the
+payout-shape level and has been for weeks**, invisibly, because nothing wrote
+`paid_places` into the archive until today. Item 1 above is still worth doing, but
+it is no longer what gates R10.
+
+Two limits carried forward: "archetype" is undefined at this depth (8 contest
+families, 25 distinct field sizes from 15 to 297, so conditioning on family and
+field bucket thins it fast), and meeting the slate count is not meeting R10's bar,
+which is that the fitted prior beats flat-12 before any production column flips.
 
 ## 2. `--entry-fee` / `--winnings` silently no-op without `--my-entry-ids` (P1, S)
 
