@@ -139,7 +139,7 @@ import json
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence
 
 import pandas as pd
 
@@ -306,6 +306,9 @@ def execute_portfolio(
     # manifest cannot serialise. They belong in diagnostics.json only.
     bank_diagnostics: Optional[Mapping[str, Any]] = None,
     bank_warnings: Optional[Sequence[str]] = None,
+    # R29(2): hold the promotion until the caller has decided the run is a
+    # delivery. See :func:`promote_deferred_run`.
+    defer_promotion: bool = False,
 ) -> Dict[str, Any]:
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
@@ -474,6 +477,30 @@ def execute_portfolio(
             "errors": [f"failed post-export gate: {x}" for x in certification["failed_post_export_gates"]],
             "diagnostics_path": str(diagnostic_path), "workflow_valid": False,
         }
+    if defer_promotion:
+        # R29(2): certification and delivery are two different facts, and the
+        # pointer is a claim about delivery. A caller that can still refuse the
+        # file after this point (late_swap.py's downgrade check) must promote
+        # afterwards, or the pointer names a run nothing was mirrored from and
+        # the next swap dies on a parent mismatch that reads like a
+        # multi-session collision. The run stays mutable and valid.
+        return {
+            "passed": True,
+            "run_id": run["run_id"],
+            "run_dir": str(run_dir),
+            "output_path": str(final_export),
+            "assignments_path": str(assignment_path),
+            "projections_path": str(projection_path),
+            "diagnostics_path": str(diagnostic_path),
+            "bank_coverage": bank_coverage,
+            "workflow_valid": True,
+            "selection_certified": certification["selection_certified"],
+            "allocation_certified": certification["allocation_certified"],
+            "errors": [],
+            "promotion_deferred": True,
+            "promoted": False,
+            "pointer_sha_at_create": pointer_sha_at_create,
+        }
     promotion = promote_run(run_dir, expected_pointer_sha256=pointer_sha_at_create)
     return {
         "passed": bool(promotion["passed"]),
@@ -489,6 +516,38 @@ def execute_portfolio(
         "allocation_certified": certification["allocation_certified"],
         "errors": promotion.get("errors", []),
     }
+
+
+def promote_deferred_run(result: MutableMapping[str, Any]) -> Dict[str, Any]:
+    """Complete a promotion held back by ``defer_promotion=True``.
+
+    R29(2). Call this only once the run's file is a delivery, which for
+    ``late_swap.py`` means after the accept-downgrade decision resolves and the
+    mirror to ``outputs/`` has been written. It carries the compare half of
+    R20(c)'s compare-and-swap forward from run creation, so a session that
+    promoted while this one was deciding still produces a loud refusal rather
+    than a lost update.
+
+    ``result`` is updated in place so a caller that already returned it keeps
+    one dict as the record. A result that was never deferred is returned
+    unchanged, which makes this safe to call unconditionally.
+    """
+    if not result.get("promotion_deferred"):
+        return dict(result)
+    promotion = promote_run(
+        result["run_dir"],
+        expected_pointer_sha256=result.get("pointer_sha_at_create"),
+    )
+    result["promoted"] = bool(promotion["passed"])
+    result["promotion_deferred"] = False
+    if not promotion["passed"]:
+        # The file stays where it is and stays certified. What failed is the
+        # claim that it is the latest delivery, and that is the caller's to
+        # report; a refusal here never rewrites the artifact.
+        result["errors"] = list(result.get("errors") or []) + list(
+            promotion.get("errors") or [])
+        result["pointer_conflict"] = bool(promotion.get("pointer_conflict"))
+    return dict(result)
 
 
 def run_initial_build(**kwargs: Any) -> Dict[str, Any]:

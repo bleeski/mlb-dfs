@@ -18,6 +18,11 @@ handing the allocator unscored rosters; it checks the disk feed's date and age;
 and it scores the incumbent lineup against the chosen one and refuses a
 downgrade without ``--accept-downgrade``.
 
+R29(2): the latest-run pointer is promoted after the mirror to ``outputs/``,
+not at certification time. A refused run leaves the pointer naming the last
+genuinely delivered portfolio, so the next swap resolves its parent correctly
+and needs no ``--allow-parent-mismatch``.
+
 Usage:
     python tools/late_swap.py --date 2026-07-22 \
         --parent-entries runs/<run_id>/final/DKEntries.csv \
@@ -64,7 +69,7 @@ from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signatur
 from mlb_engine.entries.upload_manifest import record_delivery  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _resolve_contest_postures, _slate_tag,
-    run_late_swap, unresolved_contest_blockers,
+    promote_deferred_run, run_late_swap, unresolved_contest_blockers,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -479,6 +484,10 @@ def main() -> int:
                         "lineup_gate_passed": bool(status.get("confirmed_teams")),
                         },
         portfolio_controls=controls,
+        # R29(2): the downgrade check below can still refuse this file, and a
+        # refused run must not leave the latest-run pointer naming it. Promotion
+        # happens after the mirror, at the bottom of this function.
+        defer_promotion=True,
     )
     print("gates assumed by late swap (not checked): "
           + ", ".join(LATE_SWAP_ASSUMED_GATES), file=sys.stderr)
@@ -526,9 +535,10 @@ def main() -> int:
         for line in downgraded:
             print(f"  {line}", file=sys.stderr)
         print(f"the run record is at {result.get('run_dir')}; nothing was "
-              f"mirrored to outputs/. Re-run with --accept-downgrade to take it "
-              f"anyway (a forced swap off a scratch is a legitimate downgrade).",
-              file=sys.stderr)
+              f"mirrored to outputs/ and the latest-run pointer still names the "
+              f"last delivered run, so the next swap needs no override. Re-run "
+              f"with --accept-downgrade to take it anyway (a forced swap off a "
+              f"scratch is a legitimate downgrade).", file=sys.stderr)
         return 3
     if downgraded:
         print("downgrade accepted by --accept-downgrade: " + "; ".join(downgraded),
@@ -549,6 +559,25 @@ def main() -> int:
     tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_bytes(out.read_bytes())
     os.replace(tmp, dest)
+
+    # R29(2): the promotion held back at run_late_swap lands here, once this
+    # file is genuinely a delivery. Promoting at certification time meant a
+    # downgrade-refused run still owned the pointer with nothing in outputs/,
+    # and the next swap then failed on a parent mismatch that reads like a
+    # multi-session collision. The documented workaround was
+    # --allow-parent-mismatch on every later call, which is switching off the
+    # R20(c) protection because a bug taught the operator to distrust it.
+    result = promote_deferred_run(result)
+    if not result.get("promoted"):
+        print("PROMOTION REFUSED after the file was written:", file=sys.stderr)
+        for err in result.get("errors") or []:
+            print(f"  {err}", file=sys.stderr)
+        print(f"{dest} exists but the latest-run pointer was not moved, so this "
+              f"file is not the recorded delivery and default preflight will "
+              f"hard-fail it. Another session promoted while this swap was "
+              f"solving; decide which portfolio is the delivery before "
+              f"uploading anything.", file=sys.stderr)
+        return 3
     print(f"gates: workflow_valid={result.get('workflow_valid')} "
           f"selection={result.get('selection_certified')} "
           f"allocation={result.get('allocation_certified')}")

@@ -29,7 +29,7 @@ from mlb_engine.entries.dk_entries_manager import (
     validate_dk_entries_file, validate_template_preservation,
     validate_upload_ready_gates,
 )
-from mlb_engine.pipeline.execution_pipeline import run_initial_build, run_late_swap, run_slate, normalize_posture
+from mlb_engine.pipeline.execution_pipeline import promote_deferred_run, run_initial_build, run_late_swap, run_slate, normalize_posture
 from mlb_engine.intake import platoon_order_adapter as poa
 
 from mlb_engine.swap.late_swap_manager import (
@@ -5994,6 +5994,134 @@ class PromotePointerCasTests(unittest.TestCase):
             self.assertTrue(promote_run(a["run_dir"])["passed"])
             self.assertTrue(promote_run(b["run_dir"])["passed"],
                             "the manual-recovery path must keep working")
+
+
+class DeferredPromotionTests(unittest.TestCase):
+    """R29(2): the pointer is a claim about delivery, so it moves at delivery.
+
+    Teeth: a downgrade-refused swap mirrored nothing to outputs/ and still
+    promoted runs/latest_valid_run.json to itself. The next swap then failed on
+    a parent mismatch that reads like a multi-session collision, and the
+    documented way around it was --allow-parent-mismatch on every later call,
+    which is exactly the R20(c) protection being switched off because a bug
+    taught the operator to distrust it.
+    """
+
+    def _gates(self):
+        return {
+            "salary_gate_passed": True, "entry_grid_gate_passed": True,
+            "lineup_gate_passed": True, "pitcher_audit_gate_passed": True,
+            "weather_gate_passed": True, "odds_gate_passed": True,
+            "projection_schema_gate_passed": True, "optimizer_gate_passed": True,
+        }
+
+    def _build(self, root, *, defer):
+        salary = root / "salary.csv"
+        ids = write_salary(salary)
+        entries = root / "DKEntries.csv"
+        write_entries(entries)
+        r1, r2 = legal_rosters(ids)
+        return run_initial_build(
+            runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+            projections=projection_frame(ids),
+            candidates=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+            entry_requirements=[
+                {"entry_id": "5001", "contest_id": "900",
+                 "contest_name": "Test WTA", "contest_shape": "large_wta"},
+                {"entry_id": "5002", "contest_id": "900",
+                 "contest_name": "Test WTA", "contest_shape": "large_wta"},
+            ],
+            workflow_gates=self._gates(),
+            portfolio_controls={"max_player_exposure_pct": 1.0,
+                                "max_pitcher_exposure_pct": 1.0,
+                                "max_primary_stack_exposure_pct": 1.0,
+                                "max_sp_pair_repetition": 2,
+                                "max_shared_players": 9},
+            defer_promotion=defer,
+        )
+
+    def test_a_deferred_run_certifies_without_touching_the_pointer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = self._build(root, defer=True)
+            self.assertTrue(result["passed"], result.get("errors"))
+            self.assertTrue(result["workflow_valid"])
+            self.assertTrue(Path(result["output_path"]).exists(),
+                            "the certified file is still written")
+            self.assertTrue(result["promotion_deferred"])
+            self.assertFalse(result["promoted"])
+            self.assertFalse((root / "runs" / "latest_valid_run.json").exists(),
+                             "a run nothing was delivered from must not own the "
+                             "pointer")
+
+    def test_completing_the_promotion_moves_the_pointer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = self._build(root, defer=True)
+            done = promote_deferred_run(result)
+            self.assertTrue(done["promoted"], done.get("errors"))
+            self.assertFalse(done["promotion_deferred"])
+            pointer = json.loads(
+                (root / "runs" / "latest_valid_run.json").read_text(encoding="utf-8"))
+            self.assertEqual(pointer["run_id"], result["run_id"])
+
+    def test_the_compare_and_swap_survives_the_deferral(self):
+        """R20(c) must not be weakened by the longer window: a session that
+        promoted while this one was deciding still wins, loudly."""
+        from mlb_engine.pipeline.build_state_manager import (
+            create_run, promote_run, update_run_certification)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            deferred = self._build(root, defer=True)
+            other = create_run(root / "runs", "initial_build")
+            update_run_certification(other["run_dir"], {
+                "workflow_valid": True, "selection_certified": True,
+                "allocation_certified": True})
+            self.assertTrue(promote_run(other["run_dir"])["passed"])
+            refused = promote_deferred_run(deferred)
+            self.assertFalse(refused["promoted"])
+            self.assertTrue(refused["pointer_conflict"])
+            manifest = json.loads(
+                (Path(deferred["run_dir"]) / "manifest.json").read_text(
+                    encoding="utf-8"))
+            self.assertNotEqual(manifest["status"], "promoted")
+            pointer = json.loads(
+                (root / "runs" / "latest_valid_run.json").read_text(encoding="utf-8"))
+            self.assertEqual(pointer["run_id"], other["run_id"],
+                             "the refusal must not overwrite the winner")
+
+    def test_the_default_still_promotes_inline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = self._build(root, defer=False)
+            self.assertTrue(result["passed"], result.get("errors"))
+            self.assertFalse(result.get("promotion_deferred"))
+            self.assertTrue((root / "runs" / "latest_valid_run.json").exists())
+
+    def test_completing_a_run_that_was_never_deferred_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = self._build(root, defer=False)
+            before = (root / "runs" / "latest_valid_run.json").read_text(
+                encoding="utf-8")
+            promote_deferred_run(result)
+            self.assertEqual(
+                (root / "runs" / "latest_valid_run.json").read_text(encoding="utf-8"),
+                before, "calling this unconditionally must be safe")
+
+    def test_late_swap_defers_and_promotes_only_after_the_mirror(self):
+        """The ordering is the fix. A refusal between the two is what used to
+        leave the pointer naming an undelivered run."""
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertIn("defer_promotion=True", text)
+        mirror = text.index("os.replace(tmp, dest)")
+        promote = text.index("promote_deferred_run(result)")
+        refusal = text.index("late swap refused: these entries score below")
+        self.assertLess(mirror, promote,
+                        "promotion must follow the mirror to outputs/")
+        self.assertLess(refusal, promote,
+                        "promotion must follow the accept-downgrade decision")
 
 
 class InputsUnmovedTests(unittest.TestCase):
