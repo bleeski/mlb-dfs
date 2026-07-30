@@ -741,10 +741,22 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_player_exposure_pct": 0.45, "max_pitcher_exposure_pct": 0.43,
             "max_primary_stack_exposure_pct": 0.35, "max_sp_pair_repetition": 2,
             "max_shared_players": 5,
+            # R34, 2026-07-30. Ships at 0.0, which is today's behaviour exactly.
+            # The archive (138 contests, 43,045 Classic field entries) shows
+            # 5-2-1 is the only shape whose within-contest top-decile lift
+            # excludes zero, +3.1pp [+1.2, +5.1], and that we built 0.0% of it
+            # against a field at 25.1%. That is an observed outcome and a
+            # deterministic descriptive statistic, never a win rate or an ROI
+            # claim, and it does not license turning this on by itself. Raise it
+            # deliberately per slate via portfolio_controls_override and read
+            # the relaxation counts in the brief.
+            "min_five_stack_share_pct": 0.0,
+            "five_stack_min_size": 5,
         },
         "note": "cut-line and first-place objectives both want independent "
                 "shots; section 8 caps, floored up by _slate_feasibility when "
-                "a thin slate cannot carry them",
+                "a thin slate cannot carry them; five-stack quota off by "
+                "default (R34)",
     },
     "small_gpp": {
         "construction": "multi",
@@ -1695,6 +1707,13 @@ def _merged_controls_for_build(
     merged: Dict[str, Any] = {}
     pct_keys = ("max_player_exposure_pct", "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct")
     rep_keys = ("max_sp_pair_repetition", "max_shared_players")
+    # R34. Floor keys merge by MIN like the ceilings, but for the opposite
+    # reason. A ceiling merges to the tightest because one portfolio must
+    # satisfy every contest's ceiling. A floor merges to the LEAST demanding
+    # because the same portfolio must be legal for the contest that never asked
+    # for the floor, and forcing a 5-stack quota onto a posture that did not
+    # request it is a strategy change for that contest, made invisibly.
+    floor_keys = ("min_five_stack_share_pct",)
     for info in posture_by_contest.values():
         controls = STRATEGY_DEFAULTS.get(info["posture"], STRATEGY_DEFAULTS["large_gpp"])["controls"]
         for key in pct_keys:
@@ -1703,11 +1722,35 @@ def _merged_controls_for_build(
         for key in rep_keys:
             if key in controls:
                 merged[key] = min(merged.get(key, controls[key]), int(controls[key]))
+        for key in ("five_stack_min_size",):
+            if key in controls:
+                merged[key] = min(merged.get(key, controls[key]), int(controls[key]))
+    # R34, the floor merge, done after the ceiling loop because it needs to know
+    # whether EVERY posture declared it. Silence is not zero-with-an-opinion, it
+    # is no opinion, and a portfolio that serves a silent contest must not carry
+    # a quota that contest never asked for. So one silent posture retires the
+    # floor for the whole merge; among postures that do declare it, the least
+    # demanding wins for the same reason.
+    for key in floor_keys:
+        declared = [
+            STRATEGY_DEFAULTS.get(i["posture"], STRATEGY_DEFAULTS["large_gpp"])["controls"]
+            for i in posture_by_contest.values()
+        ]
+        vals = [float(c[key] or 0.0) for c in declared if key in c]
+        if not vals:
+            continue          # nobody asked: the key stays absent entirely
+        merged[key] = min(vals) if len(vals) == len(declared) else 0.0
+
     for key, floor_val in (feasibility_floors or {}).items():
         if floor_val is None or key not in merged:
             # v1.9: a floor may only relax an existing cap, never add one.
             continue
-        if key in pct_keys:
+        if key in floor_keys:
+            # R34: relaxing a LOWER bound means lowering it. Applying the
+            # ceiling rule here would raise the quota on exactly the thin slate
+            # that could not carry it, which is the failure inverted.
+            merged[key] = max(0.0, min(float(merged[key]), float(floor_val)))
+        elif key in pct_keys:
             merged[key] = min(1.0, max(float(merged[key]), float(floor_val)))
         else:
             merged[key] = max(int(merged[key]), int(floor_val))
@@ -1744,6 +1787,18 @@ def feasibility_floors_from(feasibility_inputs: Mapping[str, Any]) -> Dict[str, 
     ):
         if feasibility_inputs.get(floor_key):
             floors[control_key] = feasibility_inputs[floor_key]
+    # R34: the preventive rung for the five-stack quota. A slate with few
+    # stackable teams cannot carry both a 5-stack quota and the primary-stack
+    # EXPOSURE cap that limits how many entries may share one team, because the
+    # quota needs qualifying entries and the cap forbids them piling onto one
+    # team. The two multiply: with S stackable teams and an exposure cap c, at
+    # most S * c of the bank can be five-stacks. Cap the quota there rather than
+    # letting the joint MILP discover it as a bare infeasibility.
+    stackable = feasibility_inputs.get("stackable_team_count")
+    if stackable:
+        exposure = float(feasibility_inputs.get("floor_stack_exposure_pct") or 0.0) or 0.35
+        ceiling = max(0.0, min(1.0, float(stackable) * exposure))
+        floors["min_five_stack_share_pct"] = ceiling
     return floors
 
 

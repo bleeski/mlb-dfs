@@ -6746,5 +6746,149 @@ class EnvLockTests(unittest.TestCase):
                       "the audit remedy names the probe")
 
 
+class PrimaryStackSizeFloorTests(unittest.TestCase):
+    """R34: the primary-stack SIZE control.
+
+    Everything asserted here is engine behaviour. The archive evidence that
+    motivated the control is an observed outcome and a deterministic
+    descriptive statistic; no test here asserts that a shape wins, because the
+    engine cannot know that and neither can the archive.
+    """
+
+    @staticmethod
+    def _lineup(primary_count, primary="NYY", filler="BOS"):
+        rows = []
+        pos = ["OF", "1B", "2B", "3B", "SS", "C", "OF", "OF"]
+        for i in range(8):
+            rows.append({
+                "Player": f"h{i}", "Player_ID": str(i + 1),
+                "Team": primary if i < primary_count else filler,
+                "Position": pos[i],
+            })
+        rows.append({"Player": "p1", "Player_ID": "9", "Team": "SEA", "Position": "P"})
+        rows.append({"Player": "p2", "Player_ID": "10", "Team": "TEX", "Position": "P"})
+        return pd.DataFrame(rows)
+
+    def test_size_helper_counts_the_primary_stack(self):
+        self.assertEqual(opt.candidate_primary_stack_size(self._lineup(5)), 5)
+        self.assertEqual(opt.candidate_primary_stack_size(self._lineup(4)), 4)
+        self.assertEqual(opt.candidate_primary_stack(self._lineup(5)), "NYY")
+
+    def test_stackless_lineup_reports_zero_not_none(self):
+        # eight different teams: no team reaches PRIMARY_STACK_MIN_HITTERS
+        df = pd.DataFrame([
+            {"Player": f"h{i}", "Player_ID": str(i + 1), "Team": f"T{i}",
+             "Position": ["OF", "1B", "2B", "3B", "SS", "C", "OF", "OF"][i]}
+            for i in range(8)
+        ] + [
+            {"Player": "p1", "Player_ID": "9", "Team": "SEA", "Position": "P"},
+            {"Player": "p2", "Player_ID": "10", "Team": "TEX", "Position": "P"},
+        ])
+        self.assertEqual(opt.candidate_primary_stack(df), "")
+        self.assertEqual(opt.candidate_primary_stack_size(df), 0)
+
+    def test_allocator_reads_size_and_defaults_to_zero_on_a_stale_bank(self):
+        from mlb_engine.allocate.contest_allocator import _candidate_primary_stack_size as size
+        self.assertEqual(size({"primary_stack_size": 5}), 5)
+        self.assertEqual(size({"contest_fit": {"primary_stack_size": 4}}), 4)
+        # a candidate built before the field existed must NOT count toward a
+        # floor it may not meet
+        self.assertEqual(size({"primary_stack": "NYY"}), 0)
+        self.assertEqual(size({"primary_stack_size": "junk"}), 0)
+
+    def test_floor_selects_the_five_stack_over_the_higher_scoring_four(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ids = write_salary(Path(tmp) / "salary.csv")
+            r1, r2 = legal_rosters(ids)
+            four = candidate("four", r1, 100); four["primary_stack_size"] = 4
+            five = candidate("five", r2, 1, "CCC"); five["primary_stack_size"] = 5
+            entries = [{"entry_id": "1", "contest_id": "x", "contest_shape": "large_wta"}]
+            # off: the objective wins and the 4-stack is taken
+            off = select_and_assign_entries([four, five], entries, {"max_shared_players": 9})
+            self.assertTrue(off["passed"])
+            self.assertEqual(off["assignments"][0]["candidate_id"], "four")
+            # on: the floor binds even though the 5-stack scores 99 points worse
+            on = select_and_assign_entries(
+                [four, five], entries,
+                {"max_shared_players": 9, "min_five_stack_share_pct": 1.0},
+            )
+            self.assertTrue(on["passed"])
+            self.assertEqual(on["assignments"][0]["candidate_id"], "five")
+            self.assertEqual(on["assignments"][0]["primary_stack_size"], 5)
+
+    def test_floor_names_the_constraint_when_no_candidate_qualifies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ids = write_salary(Path(tmp) / "salary.csv")
+            r1, r2 = legal_rosters(ids)
+            a = candidate("a", r1, 100); a["primary_stack_size"] = 4
+            b = candidate("b", r2, 99, "CCC"); b["primary_stack_size"] = 4
+            res = select_and_assign_entries(
+                [a, b],
+                [{"entry_id": "1", "contest_id": "x", "contest_shape": "large_wta"}],
+                {"max_shared_players": 9, "min_five_stack_share_pct": 1.0},
+            )
+            self.assertFalse(res["passed"])
+            self.assertFalse(res["selection_certified"])
+            joined = " ".join(res["errors"])
+            self.assertIn("min_five_stack_share_pct", joined)
+            self.assertIn("0 such candidates", joined)
+            self.assertIn("never trim the pool", joined)
+
+    def test_posture_default_is_off_so_behaviour_is_unchanged(self):
+        for posture, spec in epi.STRATEGY_DEFAULTS.items():
+            share = spec["controls"].get("min_five_stack_share_pct", 0.0)
+            self.assertEqual(
+                float(share or 0.0), 0.0,
+                f"{posture} ships the five-stack quota on; R34 ships it off",
+            )
+
+    def test_floor_merges_to_the_least_demanding_posture(self):
+        merged = epi._merged_controls_for_build(
+            {"a": {"posture": "wta_satellite"}, "b": {"posture": "large_gpp"}}, None)
+        # wta_satellite declares the key at 0.0; large_gpp does not declare it,
+        # so the merge takes the least demanding value it saw
+        self.assertEqual(merged.get("min_five_stack_share_pct", 0.0), 0.0)
+        # a floor present on one posture only still merges down, never up
+        with unittest.mock.patch.dict(
+            epi.STRATEGY_DEFAULTS["wta_satellite"]["controls"],
+            {"min_five_stack_share_pct": 0.6}, clear=False,
+        ):
+            both = epi._merged_controls_for_build(
+                {"a": {"posture": "wta_satellite"}, "b": {"posture": "large_gpp"}}, None)
+            self.assertEqual(both.get("min_five_stack_share_pct", 0.0), 0.0)
+            alone = epi._merged_controls_for_build({"a": {"posture": "wta_satellite"}}, None)
+            self.assertAlmostEqual(alone["min_five_stack_share_pct"], 0.6)
+
+    def test_feasibility_relaxes_the_quota_downward_not_upward(self):
+        with unittest.mock.patch.dict(
+            epi.STRATEGY_DEFAULTS["wta_satellite"]["controls"],
+            {"min_five_stack_share_pct": 0.6}, clear=False,
+        ):
+            floors = {"min_five_stack_share_pct": 0.2}
+            out = epi._merged_controls_for_build(
+                {"a": {"posture": "wta_satellite"}}, None, feasibility_floors=floors)
+            self.assertAlmostEqual(out["min_five_stack_share_pct"], 0.2,
+                                   msg="a thin slate must lower the quota, not raise it")
+
+    def test_feasibility_caps_the_quota_by_stackable_teams_times_exposure(self):
+        floors = epi.feasibility_floors_from({
+            "available": True, "stackable_team_count": 2,
+            "floor_stack_exposure_pct": 0.35,
+        })
+        # two stackable teams at a 35% team cap cannot put more than 70% of the
+        # bank into five-stacks
+        self.assertAlmostEqual(floors["min_five_stack_share_pct"], 0.70)
+        wide = epi.feasibility_floors_from({
+            "available": True, "stackable_team_count": 6,
+            "floor_stack_exposure_pct": 0.35,
+        })
+        self.assertEqual(wide["min_five_stack_share_pct"], 1.0)
+
+    def test_bank_build_keeps_the_old_hardcoded_floor_as_its_default(self):
+        sig = inspect.signature(opt.build_diverse_candidate_bank)
+        self.assertEqual(sig.parameters["bank_stack_min_size"].default, 4)
+        self.assertEqual(sig.parameters["bank_secondary_size"].default, 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

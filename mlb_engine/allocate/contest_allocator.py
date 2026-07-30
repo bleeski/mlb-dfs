@@ -531,6 +531,26 @@ def _candidate_primary_stack(candidate: Dict[str, Any]) -> str:
     return "" if value == "NONE" else value
 
 
+def _candidate_primary_stack_size(candidate: Dict[str, Any]) -> int:
+    """Hitter count on the candidate's primary stack, 0 when it has none.
+
+    R34. Reads the ``primary_stack_size`` the optimizer now emits alongside
+    ``primary_stack``. A candidate built before that field existed reports 0,
+    which reads as "no five-stack" and therefore cannot satisfy a size floor.
+    That is the safe direction: an unknown size never counts toward a floor it
+    may not meet, so a stale bank makes the floor infeasible and visible rather
+    than silently satisfied.
+    """
+    cf = candidate.get("contest_fit") or {}
+    raw = candidate.get("primary_stack_size")
+    if raw is None:
+        raw = cf.get("primary_stack_size")
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return 0
+
+
 # ---------------------------------------------------------------------------
 # v1.11 (F13) allocator solver semantics
 #
@@ -1581,6 +1601,7 @@ def select_and_assign_entries(
     pitcher_sets = [set(_candidate_pitcher_ids(c) or rosters[i][:2]) for i, c in enumerate(candidates)]
     sp_pairs = [tuple(sorted(x)) for x in pitcher_sets]
     stacks = [_candidate_primary_stack(c) for c in candidates]
+    stack_sizes = [_candidate_primary_stack_size(c) for c in candidates]  # R34
     candidate_ids = [_candidate_id(c, i) for i, c in enumerate(candidates)]
     compatible = [[full_compatible[e][k] for k in kept_idx] for e in range(E)]
 
@@ -1650,6 +1671,32 @@ def select_and_assign_entries(
     if pair_cap is not None:
         for pair in sorted(set(sp_pairs)):
             add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if sp_pairs[k] == pair}, -np.inf, int(pair_cap))
+
+    # R34: primary-stack SIZE floor. Every other control here is a ceiling, so
+    # this is the first row in the joint solve with a lower bound, and the
+    # asymmetry matters: a ceiling can always be met by selecting less, a floor
+    # cannot be met by selecting at all if the bank has too few qualifying
+    # candidates. _slate_feasibility floors the share before it reaches here,
+    # and the relaxation ladder owns what happens when it still does not fit.
+    five_share = controls.get("min_five_stack_share_pct")
+    if five_share:
+        min_size = int(controls.get("five_stack_min_size") or 5)
+        need = int(math.floor(E * min(1.0, max(0.0, float(five_share))) + 1e-9))
+        qualifying = [k for k in range(K) if stack_sizes[k] >= min_size]
+        if need > 0:
+            if not qualifying:
+                return {
+                    "passed": False, "assignments": [], "selection_certified": False,
+                    "allocation_certified": False,
+                    "allocation_method": "scipy_milp_entry_level",
+                    "errors": [
+                        f"min_five_stack_share_pct {five_share} requires {need} of {E} "
+                        f"entries at primary stack size >= {min_size}, and the bank "
+                        f"contains 0 such candidates. Raise bank_stack_min_size on the "
+                        f"bank build or lower the share; never trim the pool to fit."
+                    ],
+                }
+            add({x_idx(e, k): 1.0 for e in range(E) for k in qualifying}, float(need), np.inf)
 
     game_caps = dict(controls.get("max_game_exposure_pct_by_game") or {})
     if game_caps:
@@ -1806,6 +1853,7 @@ def select_and_assign_entries(
             "lineup_signature": "|".join(signatures[k]),
             "contest_fit_score": round(raw_scores[(e, k)], 4),
             "primary_stack": stacks[k],
+            "primary_stack_size": stack_sizes[k],  # R34
             "sp_ids": list(sp_pairs[k]),
         })
     reuse_counts = Counter(a["candidate_id"] for a in assignments)

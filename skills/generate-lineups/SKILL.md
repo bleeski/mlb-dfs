@@ -616,7 +616,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 546 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 556 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

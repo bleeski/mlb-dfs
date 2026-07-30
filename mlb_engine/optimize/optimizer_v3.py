@@ -1041,6 +1041,20 @@ def candidate_primary_stack(lineup_df):
     return '' if str(stack).strip().upper() in ('', 'NONE') else str(stack)
 
 
+def candidate_primary_stack_size(lineup_df):
+    """Hitter count on the primary stack team, or 0 for a stackless lineup.
+
+    R34. The allocator could read which TEAM a candidate stacks but never how
+    MANY hitters that stack carried, so a size-conditioned portfolio control
+    had nothing to constrain. Pairs with ``candidate_primary_stack``: same
+    tie-break, same empty-means-none convention, expressed as a count.
+    """
+    stack = candidate_primary_stack(lineup_df)
+    if not stack:
+        return 0
+    return int(_hitter_team_counts(lineup_df).get(stack, 0))
+
+
 def _identify_secondary_stack(lineup_df, primary_stack):
     """Returns team abbreviation or 'NONE' per Bucket Rule for Unit 3.
     Threshold: ≥ SECONDARY_STACK_MIN_HITTERS. Tie-break: alphabetical.
@@ -3611,6 +3625,10 @@ def build_candidate_lineup_bank(
         # concentration it exists to prevent was only discovered at the export
         # gate, after the whole build had been spent.
         enriched['primary_stack'] = candidate_primary_stack(record['lineup'])
+        # R34: the size travels with the team. Without it the allocator's
+        # stack-size floor has to re-derive the count from a roster it does not
+        # carry team labels for.
+        enriched['primary_stack_size'] = candidate_primary_stack_size(record['lineup'])
         enriched['du_signature'] = sig
         scored.append(enriched)
 
@@ -3686,9 +3704,17 @@ def build_diverse_candidate_bank(
     max_sp_pair_repetition=None,
     time_budget_s=None,
     solver_time_limit_s=None,
+    bank_stack_min_size=4,
+    bank_secondary_size=0,
     **bank_kwargs
 ):
     """Coverage-guaranteed wrapper over build_candidate_lineup_bank (v3.18).
+
+    R34: ``bank_stack_min_size`` and ``bank_secondary_size`` shape what the
+    forced-augmentation pass generates. The defaults, 4 and 0, are exactly the
+    hardcoded values this function carried before, so a caller that passes
+    neither gets the previous bank. Raising the floor to 5 with a secondary of
+    2 is what produces 5-2-1 candidates; nothing else in the solve does.
 
     build_candidate_lineup_bank spreads its bank with overlap-repulsion and stack-
     core uniqueness. On thin slates that heuristic saturates: the generator halts
@@ -3825,7 +3851,27 @@ def build_diverse_candidate_bank(
         attempts['n'] += 1
         kwargs = dict(single_lineup_kwargs)
         kwargs['locks'] = stable_union(kwargs.get('locks'), pair)  # F19
-        kwargs['stack_constraints'] = {'team': team, 'min_size': 4, 'max_size': 5}
+        # R34. This was a hardcoded min_size of 4 and it was the whole reason
+        # the bank was a 4-stack bank: nothing else in the solve forces a stack
+        # size, and a mean-maximizing MILP declines the fifth bat of a stack
+        # every time because it projects below the best isolated bat. The
+        # caller now names the floor; 4 stays the default, so a caller that
+        # passes nothing gets exactly the previous behaviour.
+        kwargs['stack_constraints'] = {
+            'team': team,
+            'min_size': int(bank_stack_min_size),
+            'max_size': MAX_HITTERS_PER_TEAM,
+        }
+        if bank_secondary_size:
+            # The secondary cluster is the "2" in 5-2-1. It was never requested,
+            # so whatever second cluster a candidate had was incidental.
+            secondary = next((t for t in stack_teams if t != team), '')
+            if secondary:
+                kwargs['bringback_constraint'] = {
+                    'bringback_team': secondary,
+                    'min': int(bank_secondary_size),
+                    'max': int(bank_secondary_size),
+                }
         kwargs['time_limit_s'] = resolve_solver_time_limit(
             solver_time_limit_s, _budget_left()
         )
@@ -3878,6 +3924,7 @@ def build_diverse_candidate_bank(
         enriched['player_ids'] = _lineup_player_ids(ldf)
         enriched['sp_ids'] = _get_ordered_sp_ids(ldf)
         enriched['primary_stack'] = candidate_primary_stack(ldf)  # F15
+        enriched['primary_stack_size'] = candidate_primary_stack_size(ldf)  # R34
         enriched['du_signature'] = sig
         existing.append(record)
         existing_sigs.append(sig)
