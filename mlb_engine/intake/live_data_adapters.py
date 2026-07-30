@@ -1221,12 +1221,27 @@ def _skill_game_to_raw_event(game: Mapping[str, Any]) -> Dict[str, Any]:
     """
     home = game.get("home_team")
     away = game.get("away_team")
+    books_raw = game.get("books")
+    if books_raw is None:
+        books_raw = {}
+    if not isinstance(books_raw, Mapping):
+        # Every guard here exists because the caller catches ValueError only, and
+        # a hand-edited or half-written odds file must degrade to a stated shape
+        # error rather than an AttributeError traceback out of a live build.
+        raise ValueError(
+            f"a 'games' entry's 'books' is {type(books_raw).__name__}, expected an "
+            f"object keyed by bookmaker")
     bookmakers: List[Dict[str, Any]] = []
-    for book_key, book in sorted((game.get("books") or {}).items()):
+    for book_key, book in sorted(books_raw.items(), key=lambda kv: str(kv[0])):
         if not isinstance(book, Mapping):
             continue
         markets: List[Dict[str, Any]] = []
         moneyline = book.get("moneyline") or {}
+        if not isinstance(moneyline, Mapping):
+            raise ValueError(
+                f"book {str(book_key)!r} has a 'moneyline' of "
+                f"{type(moneyline).__name__}, expected an object with home/away "
+                f"prices")
         if moneyline:
             outcomes = [{"name": name, "price": moneyline.get(side)}
                         for side, name in (("home", home), ("away", away))
@@ -1234,6 +1249,11 @@ def _skill_game_to_raw_event(game: Mapping[str, Any]) -> Dict[str, Any]:
             if outcomes:
                 markets.append({"key": "h2h", "outcomes": outcomes})
         spread = book.get("spread") or {}
+        if not isinstance(spread, Mapping):
+            raise ValueError(
+                f"book {str(book_key)!r} has a 'spread' of "
+                f"{type(spread).__name__}, expected an object with "
+                f"home_line/home_price/away_line/away_price")
         if spread:
             outcomes = [{"name": name, "price": spread.get(f"{side}_price"),
                          "point": spread.get(f"{side}_line")}
@@ -1242,6 +1262,11 @@ def _skill_game_to_raw_event(game: Mapping[str, Any]) -> Dict[str, Any]:
             if outcomes:
                 markets.append({"key": "spreads", "outcomes": outcomes})
         total = book.get("total") or {}
+        if not isinstance(total, Mapping):
+            raise ValueError(
+                f"book {str(book_key)!r} has a 'total' of "
+                f"{type(total).__name__}, expected an object with "
+                f"line/over/under")
         if total:
             outcomes = [{"name": label, "price": total.get(field),
                          "point": total.get("line")}
@@ -1286,8 +1311,21 @@ def normalize_odds_payload(payload: Any) -> Tuple[List[Mapping[str, Any]], str]:
                 return list(value), f"wrapped:{key}"
         games = payload.get("games")
         if isinstance(games, list):
-            return ([_skill_game_to_raw_event(g) for g in games
-                     if isinstance(g, Mapping)], "mlb_game_odds_games")
+            try:
+                events = [_skill_game_to_raw_event(g) for g in games
+                          if isinstance(g, Mapping)]
+            except ValueError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                # The contract of this function is that it raises ValueError and
+                # nothing else, because build_slate's Classic path catches only
+                # that and an escaping AttributeError is a traceback out of a
+                # live build. Anything unforeseen becomes a shape error naming
+                # what happened.
+                raise ValueError(
+                    f"a 'games' entry could not be converted "
+                    f"({type(exc).__name__}: {exc})") from exc
+            return events, "mlb_game_odds_games"
         raise ValueError(
             "odds payload is a dict with keys "
             f"{sorted(str(k) for k in payload)} and none of them holds an "

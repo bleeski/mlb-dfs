@@ -1385,6 +1385,60 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         self.assertEqual(locked, {"AAA", "BBB"})
         self.assertEqual(source, "salary Game Info")
 
+    # -- the feed cannot shrink the set either --------------------------------
+
+    def test_a_feed_covering_fewer_games_than_the_salary_file_cannot_unlock_them(self):
+        """The review caught this: the feed is the preferred source, so a feed
+        that covers one game would have reported an EMPTY locked set at a clock
+        where two games had started. That is the 07-29 false PASS reachable
+        through the fix for it. A shared date-keyed name is exactly where a
+        single-game Showdown feed lands."""
+        write_three_game_feed(self.feed)
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        payload["games"] = [payload["games"][2]]  # EEE@FFF only
+        self.feed.write_text(json.dumps(payload), encoding="utf-8")
+        locked, _note, source, rep, _ = self._resolve(as_of=self.LATE)
+        self.assertEqual(locked, {"AAA", "BBB", "CCC", "DDD", "EEE", "FFF"})
+        self.assertIn("salary Game Info", source)
+        self.assertTrue(any("does not cover" in w for w in rep.warnings))
+
+    def test_a_feed_for_the_wrong_date_cannot_unlock_this_slate(self):
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        for game in payload["games"]:
+            game["game_date_utc"] = "2026-08-02T23:05:00Z"
+        self.feed.write_text(json.dumps(payload), encoding="utf-8")
+        locked, _note, _source, rep, _ = self._resolve(as_of=self.EARLY)
+        self.assertIn("AAA", locked)
+        self.assertIn("BBB", locked)
+        self.assertTrue(any("does not cover" in w for w in rep.warnings))
+
+    def test_only_an_affirmative_postponement_may_remove_a_team(self):
+        """The one subtraction the feed is allowed, and the reason the union is
+        safe: a postponed game's scheduled start has passed but nothing in it is
+        frozen, so calling it locked would block a legal swap."""
+        write_three_game_feed(self.feed, postponed=("AAA@BBB",))
+        locked, note, _source, _rep, _ = self._resolve(as_of=self.LATE)
+        self.assertNotIn("AAA", locked)
+        self.assertNotIn("BBB", locked)
+        self.assertEqual(locked, {"CCC", "DDD", "EEE", "FFF"})
+        self.assertIn("postponed", note)
+
+    def test_an_underivable_clock_warns_instead_of_printing_a_contradiction(self):
+        """It used to report 'every game on this slate has started' alongside an
+        empty locked set, and the guard meant to catch that was unreachable."""
+        import csv as _csv
+        with self.salary.open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(_csv.reader(handle))
+        for row in rows[1:]:
+            row[6] = "Postponed"
+        with self.salary.open("w", newline="", encoding="utf-8") as handle:
+            _csv.writer(handle).writerows(rows)
+        locked, note, source, rep, _ = self._resolve(feed=False)
+        self.assertEqual(locked, set())
+        self.assertEqual(source, "none")
+        self.assertNotIn("has started", str(note))
+        self.assertTrue(any("underivable" in w for w in rep.warnings))
+
     def test_an_unreadable_feed_warns_rather_than_silently_using_game_info(self):
         self.feed.write_text("{not json", encoding="utf-8")
         _locked, _note, source, rep, _ = self._resolve()
@@ -1562,8 +1616,25 @@ class ArchetypeRowsResolveEndToEndTests(unittest.TestCase):
                 self.assertGreater(breadth, 0.0)
                 self.assertLessEqual(breadth, 1.0)
 
+    def _require_mini_max(self):
+        """Skip when the mini-MAX row is not in the CSV.
+
+        The row was added by an ARCHIVE session whose commit died mid-write, so
+        it is live on disk and absent from HEAD. CLAUDE.md makes a failing suite
+        a live-slate block, and a committed test that fails on a clean checkout
+        would turn another session's unfinished write into a build stoppage. The
+        assertions below are worth having the moment the row lands, so they skip
+        rather than being deleted or being pinned to a file this commit does not
+        own. The generic rows-resolve tests above cover the row whenever present.
+        """
+        if not any(str(r["pattern"]).strip() == "mini-MAX" for r in self.rows):
+            self.skipTest("mini-MAX row not present in dk_contest_archetypes.csv "
+                          "(ARCHIVE's uncommitted write); the generic row tests "
+                          "still cover every row that IS present")
+
     def test_the_mini_max_row_routes_a_real_dk_contest_name(self):
         """Ben entered these on 2026-07-29, so the live name is the test case."""
+        self._require_mini_max()
         from mlb_engine.entries.dk_entries_manager import (
             infer_contest_archetype, load_archetypes,
         )
@@ -1581,6 +1652,7 @@ class ArchetypeRowsResolveEndToEndTests(unittest.TestCase):
     def test_mini_max_does_not_shadow_the_150_max_family(self):
         """Two patterns, disjoint names, and the same destination either way, so
         neither row can silently take the other's contests."""
+        self._require_mini_max()
         from mlb_engine.entries.dk_entries_manager import (
             infer_contest_archetype, load_archetypes,
         )

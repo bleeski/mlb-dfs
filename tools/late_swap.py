@@ -69,9 +69,9 @@ from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.entries.upload_manifest import record_delivery  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
-    _assemble_projection_frame, _merged_controls_for_build,
-    _resolve_contest_postures, _slate_tag, promote_deferred_run, run_late_swap,
-    unresolved_contest_blockers,
+    _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
+    _resolve_contest_postures, _slate_tag, feasibility_floors_from,
+    promote_deferred_run, run_late_swap, unresolved_contest_blockers,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -99,13 +99,14 @@ LATE_SWAP_ASSUMED_GATES = [
     "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
 ]
 # R29(3): the flat PORTFOLIO_CONTROLS dict that used to live here is deleted, not
-# retained as a fallback. It applied one set of caps to every contest shape and
-# its max_sp_pair_repetition of 1 was stricter than every posture in
+# retained as a fallback. It applied one set of caps to every contest shape, and
+# its max_sp_pair_repetition of 1 was tighter than every multi-entry posture in
 # STRATEGY_DEFAULTS, so a portfolio that was legal when built failed this
 # script's caps before the swap did any work. Controls come from
-# resolve_swap_controls, which reads the postures in the file being refined; a
-# default that can disagree with the build is a second source of truth for the
-# same number, and keeping one around to fall back to is how it comes back.
+# resolve_swap_controls, which reads the postures in the file being refined and
+# floors them the way the build does; a default that can disagree with the build
+# is a second source of truth for the same number, and keeping one around to fall
+# back to is how it comes back.
 
 
 def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
@@ -122,21 +123,38 @@ def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
     return f"DKEntries_lateswap_{tag}_{suffix}.csv"
 
 
-def resolve_swap_controls(postures, override, solver_budget) -> dict:
+def resolve_swap_controls(postures, override, solver_budget,
+                          requirements=None, projections=None,
+                          excluded_player_ids=None) -> dict:
     """Merged portfolio controls for the swap, with the joint solve bounded (R25).
 
     R29(3): these used to be one flat dict applied to every contest, and its
-    ``max_sp_pair_repetition: 1`` was stricter than any posture in
-    STRATEGY_DEFAULTS (2 or 3). A swap is certified against the WHOLE delivered
-    portfolio, not just the authorized entries, so a portfolio that was legal
-    when built failed this script's own caps before the swap did any work. On
-    2026-07-29 that cost the first twenty minutes of a correction chain and a
-    dozen calls spent growing a bank that was never the problem.
+    ``max_sp_pair_repetition: 1`` was tighter than every MULTI-ENTRY posture in
+    STRATEGY_DEFAULTS (``small_gpp`` and ``wta_satellite`` 2, ``large_gpp`` and
+    ``mme`` 3). A swap is certified against the WHOLE delivered portfolio, not
+    just the authorized entries, so a portfolio that was legal when built failed
+    this script's own caps before the swap did any work. On 2026-07-29 that cost
+    the first twenty minutes of a correction chain and a dozen calls spent
+    growing a bank that was never the problem.
 
-    They are now derived from the same posture-based STRATEGY_DEFAULTS the build
-    used, through the same ``_merged_controls_for_build``: tightest cap wins
-    across the contests actually present in this file. A swap therefore inherits
-    the caps of the build it refines instead of asserting its own.
+    They are now derived exactly as the build derives them: the same
+    ``_merged_controls_for_build`` (tightest cap wins across the contests present
+    in this file) floored by the same ``_slate_feasibility``. Both halves matter.
+    Without the floors the swap re-derives the UNFLOORED caps, which on a thin
+    slate are tighter than the ones the build shipped, and the untouched entries
+    violate them: the same failure arriving through the automatic path instead of
+    the operator's. Pass ``requirements`` and ``projections`` to get the floors;
+    omit them and the merge is unfloored, which is correct only when there is no
+    frame to measure.
+
+    Two postures are not a relaxation of the old dict and it is worth saying so
+    plainly rather than letting the docstring overclaim. ``single_entry`` keeps
+    ``max_sp_pair_repetition: 1``, which is right: one entry cannot repeat a
+    pair. ``cash`` carries NO controls, so a cash-only swap enforces none, and
+    that matches the build exactly -- which is the point of this change. A
+    portfolio-level cap on a posture the engine calls a weak architectural fit is
+    a number nobody chose; inheriting the build's silence is honest, and the
+    pre-solve line prints the empty set so it is visible rather than assumed.
 
     The entry-level joint MILP reads its time limit from
     ``controls['time_limit']`` (contest_allocator, default 30s). That was
@@ -146,7 +164,12 @@ def resolve_swap_controls(postures, override, solver_budget) -> dict:
     --controls-override time_limit still wins, because an operator who passed
     JSON meant it.
     """
-    controls = dict(_merged_controls_for_build(postures, None))
+    floors: dict = {}
+    if requirements is not None and projections is not None:
+        floors = feasibility_floors_from(_slate_feasibility(
+            postures, requirements, projections, excluded_player_ids))
+    controls = dict(_merged_controls_for_build(
+        postures, None, feasibility_floors=floors))
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
@@ -558,15 +581,19 @@ def main() -> int:
                           "candidate_scoring": payload_report}, indent=1))
         return 0
 
-    controls = resolve_swap_controls(postures, args.controls_override,
-                                     args.solver_budget)
+    controls = resolve_swap_controls(
+        postures, args.controls_override, args.solver_budget,
+        requirements=requirements, projections=projections)
     # R29(3): print them. A cap that is invisible until it fails is a cap the
     # operator debugs by guessing, and last night that guess was "the bank is
-    # thin" for twenty minutes.
-    print("portfolio controls (inherited from the postures in this file, "
-          "tightest cap wins): "
-          + ", ".join(f"{k}={v}" for k, v in sorted(controls.items())
-                      if k != "time_limit"))
+    # thin" for twenty minutes. An empty set prints as such, because a swap that
+    # enforces nothing (a cash-only portfolio) has to say so rather than look
+    # like a line that failed to render.
+    shown = ", ".join(f"{k}={v}" for k, v in sorted(controls.items())
+                      if k != "time_limit")
+    print("portfolio controls (derived from this file's postures and floored by "
+          "slate feasibility, exactly as the build derives them): "
+          + (shown or "none for these postures"))
     if args.controls_override:
         print(f"controls overridden by --controls-override: "
               f"{sorted(args.controls_override)}")

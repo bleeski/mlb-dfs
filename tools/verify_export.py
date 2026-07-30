@@ -97,15 +97,22 @@ def derive_locked_teams(
     now_dt = now or datetime.now(timezone.utc)
     locked: set[str] = set()
     first_open: Optional[datetime] = None
+    parsed_any = False
     for row in salary.values():
         team = str(row.get("TeamAbbrev") or "").strip().upper()
         start = parse_game_info_datetime(row.get("Game Info"))
         if not team or start is None:
             continue
+        parsed_any = True
         if start <= now_dt:
             locked.add(team)
         elif first_open is None or start < first_open:
             first_open = start
+    if not parsed_any:
+        # An empty note is the signal the caller uses to say lock state is
+        # underivable. "every game has started" against an empty locked set is a
+        # self-contradiction, and it used to print exactly that.
+        return set(), ""
     note = (f"next lock {first_open.strftime('%Y-%m-%d %H:%M ET')}"
             if first_open else "every game on this slate has started")
     return locked, note
@@ -140,15 +147,20 @@ def derive_locked_teams_from_feed(
     feed_path: Path,
     salary_path: Path,
     now: Optional[datetime] = None,
-) -> Optional[tuple[set[str], str]]:
-    """Locked teams from the lineups feed's own clock, or None if unusable.
+) -> Optional[tuple[set[str], str, set[str]]]:
+    """(locked, note, not_locked) from the feed's clock, or None if unusable.
 
     This is the same source ``late_swap.py`` uses internally
     (``build_status_map_from_lineups_feed`` + a wall clock), so the tool that
     performs a swap and the tool that verifies it now read lock state off one
-    fact rather than two. Games the feed reports postponed, cancelled, or
-    suspended are excluded: their scheduled start has passed but no lineup in
-    them is frozen, and treating them as locked would block a legal swap.
+    fact rather than two.
+
+    ``not_locked`` is the teams in games the feed reports postponed, cancelled or
+    suspended. Their scheduled start has passed but no lineup in them is frozen,
+    so treating them as locked would block a legal swap. It is returned
+    separately rather than just omitted, because the caller unions this result
+    with the salary file's clock and needs to know which absences are an
+    affirmative "not locked" and which are merely games this feed does not cover.
 
     The engine import is lazy and its failure is not fatal, because this tool
     must still run when the engine does not.
@@ -168,9 +180,12 @@ def derive_locked_teams_from_feed(
     now_dt = now or datetime.now(timezone.utc)
     excluded = set(status.get("excluded_game_ids") or [])
     locked: set[str] = set()
+    not_locked: set[str] = set()
     first_open: Optional[datetime] = None
     for game_id, lock_iso in (status.get("lock_time_by_game_id") or {}).items():
+        teams = {t for t in str(game_id).split("@") if t}
         if game_id in excluded:
+            not_locked |= teams
             continue
         try:
             lock_time = datetime.fromisoformat(str(lock_iso))
@@ -178,18 +193,17 @@ def derive_locked_teams_from_feed(
             continue
         if lock_time.tzinfo is None:
             lock_time = lock_time.replace(tzinfo=timezone.utc)
-        teams = [t for t in str(game_id).split("@") if t]
         if lock_time <= now_dt:
-            locked.update(teams)
+            locked |= teams
         elif first_open is None or lock_time < first_open:
             first_open = lock_time
     if not status.get("lock_time_by_game_id"):
         return None
     note = (f"next lock {first_open.astimezone(timezone.utc).strftime('%H:%M UTC')}"
-            if first_open else "every game on this slate has started")
+            if first_open else "every game the feed covers has started")
     if excluded:
         note += f"; not locked (postponed/suspended): {', '.join(sorted(excluded))}"
-    return locked, note
+    return locked, note, not_locked
 
 
 def resolve_locked_teams(
@@ -207,23 +221,47 @@ def resolve_locked_teams(
     not; that asymmetry is the whole fix, because the failure mode is always a
     list that is missing a team, never one with a team too many.
     """
-    derived: set[str] = set()
-    note = "no clock source available"
-    source = "none"
+    # The salary file is the coverage floor: it lists every player on the slate,
+    # so its Game Info column can always answer "has this team's game started".
+    # The feed is more accurate but not guaranteed to be complete -- a
+    # single-game Showdown feed can land at the same shared name a Classic slate
+    # reads, and one for the wrong date parses cleanly. So the two are UNIONED,
+    # and the only thing the feed is allowed to REMOVE is a game it explicitly
+    # reports postponed, cancelled or suspended, which is the one fact Game Info
+    # cannot carry. A source that can only add, plus one that can only subtract
+    # on an affirmative signal, is the same asymmetry --locked-teams gets below,
+    # for the same reason: the failure that ships a bad file is always a locked
+    # team missing from the set.
+    from_clock, clock_note = derive_locked_teams(salary, now)
+    derived = set(from_clock)
+    note = clock_note or ""
+    source = "salary Game Info"
     if feed_path is not None:
         from_feed = derive_locked_teams_from_feed(feed_path, salary_path, now)
-        if from_feed is not None:
-            derived, note = from_feed
-            source = f"lineups feed {feed_path.name}"
-    if source == "none":
-        derived, note = derive_locked_teams(salary, now)
-        note = note or ""
-        source = "salary Game Info"
-        if feed_path is not None:
+        if from_feed is None:
             rep.warn(f"lineups feed at {feed_path} was unusable (unreadable, no "
                      f"games, or the engine is not importable); locked teams "
-                     f"fell back to the salary Game Info column, which cannot "
+                     f"come from the salary Game Info column alone, which cannot "
                      f"see a postponement")
+        else:
+            feed_locked, feed_note, not_locked = from_feed
+            missing = sorted(derived - feed_locked - not_locked)
+            derived |= feed_locked
+            derived -= not_locked
+            source = f"lineups feed {feed_path.name} + salary Game Info"
+            note = feed_note
+            if missing:
+                rep.warn(f"the lineups feed does not cover {missing}, whose "
+                         f"scheduled start has passed per the salary file; they "
+                         f"stay locked. A feed that covers fewer games than the "
+                         f"salary file is the wrong feed for this slate (a "
+                         f"single-game Showdown feed at the shared name, or the "
+                         f"wrong date)")
+    if not derived and not str(note).strip():
+        rep.warn("no lineups feed and no parsable Game Info: lock state is "
+                 "underivable, so a slot touching a started game cannot be "
+                 "detected. Pass --lineups.")
+        source = "none"
 
     if supplied is None:
         return derived, note, source

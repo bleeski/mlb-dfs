@@ -504,6 +504,55 @@ class OddsPayloadShapeTests(unittest.TestCase):
         parsed = self.lda.parse_the_odds_api_totals(events)
         self.assertEqual(parsed["odds_by_game_id"], {})
 
+    def test_a_malformed_games_entry_raises_ValueError_and_nothing_else(self):
+        """The caller on the Classic path catches ValueError only, so anything
+        else escaping here is a traceback out of a live build. Every one of
+        these raised AttributeError or TypeError before the guards."""
+        cases = {
+            "books is a list": {"books": []},
+            "books is a string": {"books": "draftkings"},
+            "moneyline is a string": {"books": {"dk": {"moneyline": "-144"}}},
+            "moneyline is a list": {"books": {"dk": {"moneyline": [-144, 122]}}},
+            "spread is a number": {"books": {"dk": {"spread": 1.5}}},
+            "total is a string": {"books": {"dk": {"total": "7.5"}}},
+        }
+        for label, overrides in cases.items():
+            payload = _skill_games_payload()
+            payload["games"][0].update(overrides)
+            with self.subTest(label):
+                with self.assertRaises(ValueError):
+                    self.lda.normalize_odds_payload(payload)
+
+    def test_a_games_entry_missing_teams_degrades_rather_than_raising(self):
+        """Absent is not malformed. A game with no team names converts to an
+        event the parser simply cannot map, which it already reports."""
+        payload = _skill_games_payload()
+        payload["games"][0].pop("home_team")
+        payload["games"][0].pop("away_team")
+        events, _ = self.lda.normalize_odds_payload(payload)
+        parsed = self.lda.parse_the_odds_api_totals(events)
+        self.assertEqual(parsed["odds_by_game_id"], {})
+
+    def test_an_empty_or_absent_books_object_is_not_an_error(self):
+        for value in ({}, None):
+            payload = _skill_games_payload()
+            payload["games"][0]["books"] = value
+            events, _ = self.lda.normalize_odds_payload(payload)
+            self.assertEqual(events[0]["bookmakers"], [])
+
+    def test_mixed_type_book_keys_sort_deterministically_rather_than_raising(self):
+        """A non-string book key is odd but harmless, and sorting tuples of mixed
+        types raises TypeError, which the caller does not catch. Sort on str."""
+        payload = _skill_games_payload()
+        payload["games"][0]["books"] = {
+            "draftkings": {"moneyline": {"home": -144, "away": 122},
+                           "total": {"line": 7.5, "over": -105, "under": -115}},
+            7: {"total": {"line": 8.0, "over": -110, "under": -110}},
+        }
+        events, _ = self.lda.normalize_odds_payload(payload)
+        self.assertEqual([b["key"] for b in events[0]["bookmakers"]],
+                         ["7", "draftkings"])
+
     def test_spreads_survive_the_round_trip(self):
         events, _ = self.lda.normalize_odds_payload(_skill_games_payload())
         dk = next(b for b in events[0]["bookmakers"] if b["key"] == "draftkings")

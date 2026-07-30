@@ -35,6 +35,12 @@ data/slates/*.json
 # audit stdout capture
 /audit_out.log
 audit_out.log
+# Every session that redirects an audit picks its own name; the two above only
+# covered one. A stray audit log in the repo root reads as foreign dirt at the
+# next session's start and costs someone a paragraph deciding whose it is.
+_audit.log
+*_audit.log
+audit*.log
 
 # zero-byte DK exports quarantined by the pull step; they are failed pulls, not
 # evidence, and the contest stays on the awaiting list until a real pull lands

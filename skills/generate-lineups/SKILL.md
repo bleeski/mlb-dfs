@@ -282,13 +282,18 @@ repo behavior, so no engine change fixes it.
 `build_slate.py`'s own auto-fetch resolves `THE_ODDS_API_KEY` from the environment
 or `REPO/.env`, so a build needs no export. The standalone `mlb-game-odds` skill
 still reads only two `/mnt/...` paths and the env var, none of which is this
-repo's `.env`, so when you call that skill directly, export first:
+repo's `.env`, so when you call that skill directly, put the key in the
+environment without putting it on a command line (a `grep | cut` pipeline leaves
+it in shell history and in `ps`, and the guardrail says never echo a key):
 
 ```bash
-export THE_ODDS_API_KEY=$(grep THE_ODDS_API_KEY <repo>/.env | cut -d= -f2- | tr -d '\r\n"')
+python -c "import sys; sys.path.insert(0,'<repo>'); from mlb_engine.repo_env import load_repo_dotenv as l; print(','.join(l()))"
+# then, in the SAME call, run the fetch under env -S or via os.environ in one script
 ```
 
-Passing its output to `--odds` works with or without `--raw`: the default
+Simpler in practice: prefer the build's own auto-fetch, or pass `--odds` a file
+you already have. Passing the skill's output to `--odds` works with or without
+`--raw`: the default
 `games`-keyed schema is recognised as of 2026-07-29. If an odds file is not
 understood, the build now says which keys it found instead of reporting the game
 as having no moneyline.
@@ -564,7 +569,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 24 modules, 498 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 24 modules, 510 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

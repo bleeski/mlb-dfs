@@ -28,7 +28,7 @@ LAYOUT_VERSION = "v3.0.0-pre"
 # untracked while build_slate imported it unconditionally.
 AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   "tests.test_upload_integrity", "tests.test_golden_replay")
-EXPECTED_TEST_COUNT = 498  # core 355 + showdown 45 + upload_integrity 89 + golden 9
+EXPECTED_TEST_COUNT = 510  # core 359 + showdown 49 + upload_integrity 93 + golden 9
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",

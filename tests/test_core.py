@@ -6170,16 +6170,38 @@ class SwapControlsInheritanceTests(unittest.TestCase):
         self.assertEqual(ls.resolve_swap_controls(postures, None, None),
                          epi._merged_controls_for_build(postures, None))
 
-    def test_the_old_flat_cap_of_one_is_gone(self):
-        ls = self._late_swap()
+    def test_the_old_flat_cap_of_one_is_gone_for_every_multi_entry_posture(self):
         for posture in ("large_gpp", "mme", "small_gpp", "wta_satellite"):
-            derived = ls.resolve_swap_controls(self._postures(posture), None, None)
+            derived = self._late_swap().resolve_swap_controls(
+                self._postures(posture), None, None)
             self.assertGreaterEqual(
                 derived["max_sp_pair_repetition"], 2,
-                "1 was stricter than any posture the build could have used")
+                "1 was tighter than any multi-entry posture the build could use")
         text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
             encoding="utf-8")
         self.assertNotIn('"max_sp_pair_repetition": 1', text)
+
+    def test_single_entry_keeps_a_pair_cap_of_one_and_that_is_correct(self):
+        """The counterexample to a careless reading of the fix. single_entry's
+        cap of 1 is not the deleted flat default coming back: one entry cannot
+        repeat an SP pair, and it is what the build uses for that posture too."""
+        derived = self._late_swap().resolve_swap_controls(
+            self._postures("single_entry"), None, None)
+        self.assertEqual(derived["max_sp_pair_repetition"], 1)
+        self.assertEqual(derived,
+                         dict(epi.STRATEGY_DEFAULTS["single_entry"]["controls"]))
+
+    def test_a_cash_only_file_enforces_nothing_and_matches_the_build(self):
+        """The other counterexample. cash carries no controls, so a cash-only
+        swap enforces none. That is inheritance working, not a cap going
+        missing, and the pre-solve line prints it rather than looking blank."""
+        derived = self._late_swap().resolve_swap_controls(
+            self._postures("cash"), None, None)
+        self.assertEqual(derived, {})
+        self.assertEqual(epi.STRATEGY_DEFAULTS["cash"]["controls"], {})
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertIn("none for these postures", text)
 
     def test_tightest_cap_wins_across_the_contests_present(self):
         ls = self._late_swap()
@@ -6203,6 +6225,44 @@ class SwapControlsInheritanceTests(unittest.TestCase):
         ls = self._late_swap()
         self.assertEqual(ls.resolve_swap_controls(self._postures("cash"), None, None),
                          epi._merged_controls_for_build(self._postures("cash"), None))
+
+    def test_the_swap_applies_the_same_feasibility_floors_the_build_applies(self):
+        """The half that was missing. run_slate floors the merged caps by
+        _slate_feasibility BEFORE the override; a swap that skipped the floors
+        re-derived tighter caps than the build shipped on a thin slate, which is
+        the same failure this item exists to close, arriving automatically
+        instead of through the operator."""
+        ls = self._late_swap()
+        postures = self._postures("wta_satellite", "large_gpp")
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            ids = write_salary(salary)
+            projections = projection_frame(ids)
+            requirements = [
+                {"entry_id": str(5000 + i), "contest_id": str(900 + (i % 2)),
+                 "contest_name": "T", "contest_shape": "large_wta"}
+                for i in range(18)
+            ]
+            floors = epi.feasibility_floors_from(epi._slate_feasibility(
+                postures, requirements, projections, None))
+            expected = epi._merged_controls_for_build(
+                postures, None, feasibility_floors=floors)
+            derived = ls.resolve_swap_controls(
+                postures, None, None,
+                requirements=requirements, projections=projections)
+        self.assertEqual(derived, expected)
+        unfloored = epi._merged_controls_for_build(postures, None)
+        self.assertTrue(
+            floors, "the fixture must actually trip a floor or this proves nothing")
+        self.assertNotEqual(
+            derived, unfloored,
+            "with floors active the floored result must differ from the raw merge")
+
+    def test_omitting_the_frame_leaves_the_merge_unfloored_rather_than_guessing(self):
+        ls = self._late_swap()
+        postures = self._postures("large_gpp")
+        self.assertEqual(ls.resolve_swap_controls(postures, None, None),
+                         epi._merged_controls_for_build(postures, None))
 
 
 class SwapFailureClassificationTests(unittest.TestCase):
@@ -6250,8 +6310,11 @@ class SwapFailureClassificationTests(unittest.TestCase):
     def test_the_controls_in_effect_are_printed_before_the_solve(self):
         text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
             encoding="utf-8")
-        self.assertIn("portfolio controls (inherited from the postures in this file",
-                      text)
+        self.assertIn("portfolio controls (derived from this file's postures", text)
+        # The print has to sit BEFORE the solve or it is a post-mortem, not a
+        # diagnostic. The source order is the only thing that guarantees it.
+        self.assertLess(text.index("portfolio controls (derived"),
+                        text.index("result = run_late_swap("))
 
 
 class SwapInputOverrideTests(unittest.TestCase):
@@ -6306,7 +6369,11 @@ class SwapInputOverrideTests(unittest.TestCase):
                 capture_output=True, text=True, cwd=str(repo))
             self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
             self.assertIn(str(bogus), result.stderr)
-            self.assertNotIn("data/slates/2099-01-02/DKSalaries.csv", result.stderr)
+            # os.sep-agnostic: the same assertion has to hold on Ben's Windows
+            # box, where the staged path prints with backslashes, or it passes
+            # vacuously there and the negative half proves nothing.
+            normalised = result.stderr.replace("\\", "/")
+            self.assertNotIn("data/slates/2099-01-02/DKSalaries.csv", normalised)
 
     def test_the_shared_staging_path_is_flagged_as_shared(self):
         text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(

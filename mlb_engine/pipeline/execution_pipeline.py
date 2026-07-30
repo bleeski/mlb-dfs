@@ -547,6 +547,12 @@ def promote_deferred_run(result: MutableMapping[str, Any]) -> Dict[str, Any]:
         result["errors"] = list(result.get("errors") or []) + list(
             promotion.get("errors") or [])
         result["pointer_conflict"] = bool(promotion.get("pointer_conflict"))
+        # `passed` and `workflow_valid` mean the same thing here as on the inline
+        # path, where a refused promotion sets both False. A caller that reads
+        # the idiomatic `if not result["passed"]` must not read a pointer
+        # conflict as success just because this run deferred.
+        result["passed"] = False
+        result["workflow_valid"] = False
     return dict(result)
 
 
@@ -1709,6 +1715,38 @@ def _merged_controls_for_build(
     return merged
 
 
+def feasibility_floors_from(feasibility_inputs: Mapping[str, Any]) -> Dict[str, Any]:
+    """``_slate_feasibility`` output -> the ``feasibility_floors`` mapping.
+
+    v1.9: pct exposure caps join the repetition floors, retiring the last
+    recurring manual relaxation (ledger 3.3). Applied only to keys the posture
+    merge produced; an explicit override still wins.
+
+    R29(3), second pass: extracted from ``run_slate`` so ``late_swap.py`` can
+    apply the SAME floors the build applied. Without this the swap re-derived the
+    UNFLOORED caps, which on a thin slate are tighter than the ones the build
+    shipped, and the untouched entries violated them -- the identical failure
+    R29(3) set out to close, arriving through the automatic path instead of the
+    operator's. One implementation, because two would diverge and the weaker one
+    would report success.
+    """
+    floors: Dict[str, Any] = {}
+    if not feasibility_inputs.get("available"):
+        return floors
+    if feasibility_inputs.get("floor_sp_pair_repetition"):
+        floors["max_sp_pair_repetition"] = feasibility_inputs["floor_sp_pair_repetition"]
+    if feasibility_inputs.get("floor_shared_players"):
+        floors["max_shared_players"] = feasibility_inputs["floor_shared_players"]
+    for floor_key, control_key in (
+        ("floor_player_exposure_pct", "max_player_exposure_pct"),
+        ("floor_pitcher_exposure_pct", "max_pitcher_exposure_pct"),
+        ("floor_stack_exposure_pct", "max_primary_stack_exposure_pct"),
+    ):
+        if feasibility_inputs.get(floor_key):
+            floors[control_key] = feasibility_inputs[floor_key]
+    return floors
+
+
 # Stack-size the pipeline can force per posture, used only to floor decorrelation
 # controls to a feasible minimum. These mirror the stack_plan sizes in
 # STRATEGY_DEFAULTS and are never win-rate or ROI claims.
@@ -2821,22 +2859,7 @@ def run_slate(
         posture_by_contest, entry_requirements, projections, excluded_player_ids
     )
     merged_default = _merged_controls_for_build(posture_by_contest, None)
-    floors: Dict[str, Any] = {}
-    if feasibility_inputs.get("available"):
-        if feasibility_inputs.get("floor_sp_pair_repetition"):
-            floors["max_sp_pair_repetition"] = feasibility_inputs["floor_sp_pair_repetition"]
-        if feasibility_inputs.get("floor_shared_players"):
-            floors["max_shared_players"] = feasibility_inputs["floor_shared_players"]
-        # v1.9: pct exposure caps join the floors, retiring the last recurring
-        # manual relaxation (ledger 3.3). Applied only to keys the posture merge
-        # produced; an explicit override still wins.
-        for floor_key, control_key in (
-            ("floor_player_exposure_pct", "max_player_exposure_pct"),
-            ("floor_pitcher_exposure_pct", "max_pitcher_exposure_pct"),
-            ("floor_stack_exposure_pct", "max_primary_stack_exposure_pct"),
-        ):
-            if feasibility_inputs.get(floor_key):
-                floors[control_key] = feasibility_inputs[floor_key]
+    floors = feasibility_floors_from(feasibility_inputs)
     controls = _merged_controls_for_build(
         posture_by_contest, portfolio_controls_override, feasibility_floors=floors
     )
