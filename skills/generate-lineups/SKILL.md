@@ -181,6 +181,50 @@ The script now ages a disk-cached feed itself: anything older than
 `--feed-max-age-minutes` (default 90) is refetched, and the brief records which
 feed was used and how old it was.
 
+## When Ben pastes lineups, that paste is the source (R32)
+
+If the prompt contains a copy/paste from https://www.mlb.com/starting-lineups,
+**do not fetch lineups.** The paste is ground truth for every team in it. Write it
+to a file and convert it:
+
+```bash
+python <repo>/tools/lineups_from_paste.py \
+  --salary data/slates/<date>/DKSalaries.csv \
+  --paste data/slates/<date>/pasted_lineups.txt \
+  --out data/slates/<date>/lineups_feed.json
+```
+
+The output is an ordinary feed, so `build_slate.py --lineups` and
+`late_swap.py --lineups` take it unchanged. Every side carries
+`source: operator_paste`.
+
+Three things to know before you run it.
+
+**It exits 2 and writes nothing when a name will not resolve.** mlb.com
+abbreviates first names (`J Peña`), so matching is on first initial plus surname
+plus team, and two same-initial teammates are ambiguous. On the first real paste
+this hit SEA's `W Wilson`, which matched both `Will Wilson` (IL) and
+`Weston Wilson`. The blocker prints each candidate's DK Status, which is usually
+the deciding fact. State the answer and re-run:
+
+```bash
+  --resolve "W Wilson=Weston Wilson"
+```
+
+Do not work around a blocker by editing the paste. A half-resolved lineup reaches
+the build looking like a posted partial, which is the pool reduction the contract
+forbids.
+
+**Fall back only for what the paste does not cover.** If some games are still TBD,
+fetch a feed for those and pass it as `--merge-feed <api_feed.json>`. A pasted
+side is never overwritten; the merge report says which games and sides came from
+the API, and prints `Zero lineup fetches` when the paste covered everything.
+
+**A fully pasted slate needs no platoon reference and no handedness lookup.**
+Handedness is in the paste as `(R)/(L)/(S)`, and with no TBD teams the platoon
+reference is never read, so the 7-day staleness warning has nothing to gate.
+That is the fast path: one conversion call, then build.
+
 ## Running inside the Cowork sandbox
 
 Cowork's bash gives you one 45-second window per call, and that window includes
@@ -569,7 +613,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 24 modules, 510 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 536 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

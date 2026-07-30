@@ -38,6 +38,14 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    Hitters are the confirmed nine per posted lineup plus the platoon-projected
    nine per TBD team; pitchers are feed probables plus explicit declarations.
    Every other salary row is absent, not excluded.
+   **A lineup Ben pastes is the primary source and is never re-fetched (R32).**
+   `tools/lineups_from_paste.py` turns an mlb.com/starting-lineups paste into an
+   ordinary `lineups_feed.json` tagged `source: operator_paste` per side; the
+   API feed is fallback for uncovered sides only, via `--merge-feed`. A pasted
+   name that is ambiguous or unresolvable is a blocker and NO feed is written,
+   because a half-resolved lineup arrives downstream looking like a posted
+   partial. A fully pasted slate reads no platoon reference, so item 2's
+   staleness rule has nothing to gate.
 2. The platoon reference ages against the SLATE, not its own collected_date.
    Past 7 days with a TBD team filled from it is a pool blocker at the
    engine default (`stale_platoon_policy='block'`); build_slate.py and
@@ -56,7 +64,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  24 modules  510 tests`. The module count comes off the
+   `PASS  v2.26.0  25 modules  536 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
