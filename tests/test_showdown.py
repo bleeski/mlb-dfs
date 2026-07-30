@@ -11,6 +11,7 @@ import collections
 import math
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import pandas as pd
@@ -395,6 +396,209 @@ class ShowdownThesisLadderTests(unittest.TestCase):
                           & (self.df["Batting_Order"].isna()))].reset_index(drop=True)
         self.assertEqual(st.describe_slate(no_sp)["bullpen_teams"], ["CHC"])
         self.assertIn("bullpen_game", st.build_thesis_ladder(no_sp, 18)["allocation"])
+
+
+# --------------------------------------------------------------------------
+# R29(5): the odds fetch reported "no moneyline matched" on a priced game
+# --------------------------------------------------------------------------
+
+def _skill_games_payload():
+    """The mlb-game-odds skill's DEFAULT output shape (no --raw).
+
+    TEX@TB from 2026-07-29, the build that reported no moneyline while the
+    market had it TB -144 / TEX +122 the whole time.
+    """
+    return {
+        "fetched_at": "2026-07-29T22:00:00Z",
+        "date": "2026-07-29",
+        "sport": "baseball_mlb",
+        "games": [{
+            "event_id": "abc123",
+            "commence_time_utc": "2026-07-29T22:40:00Z",
+            "commence_time_et": "2026-07-29T18:40:00-04:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Texas Rangers",
+            "books": {
+                "draftkings": {
+                    "last_update": "2026-07-29T21:59:00Z",
+                    "moneyline": {"home": -144, "away": 122},
+                    "spread": {"home_line": -1.5, "home_price": 130,
+                               "away_line": 1.5, "away_price": -155},
+                    "total": {"line": 7.5, "over": -105, "under": -115},
+                },
+                "fanduel": {
+                    "last_update": "2026-07-29T21:58:00Z",
+                    "moneyline": {"home": -142, "away": 120},
+                    "total": {"line": 7.5, "over": -104, "under": -116},
+                },
+            },
+        }],
+        "quota": {"remaining": 480},
+    }
+
+
+class OddsPayloadShapeTests(unittest.TestCase):
+    """R29(5b): every shape this project produces feeds one parser.
+
+    Teeth: load_odds_packet recognised a bare list plus odds_raw_totals / raw /
+    events / odds, and the skill's default output is keyed ``games``. It fell
+    through silently and the caller reported the same "no moneyline matched this
+    game's teams" that an unposted market produces, so a 50/50 thesis allocation
+    looked like missing data instead of a parsing bug.
+    """
+
+    def setUp(self):
+        from mlb_engine.intake import live_data_adapters as lda
+        self.lda = lda
+
+    def test_the_skill_default_games_schema_is_recognised(self):
+        events, shape = self.lda.normalize_odds_payload(_skill_games_payload())
+        self.assertEqual(shape, "mlb_game_odds_games")
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["home_team"], "Tampa Bay Rays")
+
+    def test_the_games_schema_parses_to_the_same_moneyline_the_market_had(self):
+        events, _ = self.lda.normalize_odds_payload(_skill_games_payload())
+        parsed = self.lda.parse_the_odds_api_totals(events)
+        entry = parsed["odds_by_game_id"]["TEX@TB"]
+        self.assertEqual(entry["total"], 7.5)
+        # Median across DK -144 and FD -142; TEX median of 122 and 120.
+        self.assertEqual(entry["moneyline"]["TB"], -143.0)
+        self.assertEqual(entry["moneyline"]["TEX"], 121.0)
+
+    def test_the_raw_flag_output_still_parses_identically(self):
+        """--raw wraps the API's own events under 'raw'. Both routes must agree,
+        or one of them is a second answer to the same question."""
+        payload = _skill_games_payload()
+        converted, _ = self.lda.normalize_odds_payload(payload)
+        wrapped, shape = self.lda.normalize_odds_payload({"raw": converted})
+        self.assertEqual(shape, "wrapped:raw")
+        self.assertEqual(
+            self.lda.parse_the_odds_api_totals(converted)["odds_by_game_id"],
+            self.lda.parse_the_odds_api_totals(wrapped)["odds_by_game_id"])
+
+    def test_a_bare_events_list_and_every_wrapper_key_still_work(self):
+        events, _ = self.lda.normalize_odds_payload(_skill_games_payload())
+        self.assertEqual(self.lda.normalize_odds_payload(events)[1],
+                         "raw_events_list")
+        for key in ("odds_raw_totals", "raw", "events", "odds"):
+            self.assertEqual(
+                self.lda.normalize_odds_payload({key: events})[1], f"wrapped:{key}")
+
+    def test_an_unrecognised_shape_raises_naming_what_it_found(self):
+        with self.assertRaises(ValueError) as caught:
+            self.lda.normalize_odds_payload({"lines": [], "fetched_at": "x"})
+        message = str(caught.exception)
+        self.assertIn("lines", message)
+        self.assertIn("games", message)
+        self.assertNotIn("no moneyline", message)
+
+    def test_a_game_with_no_total_market_keeps_its_moneyline_out_of_the_packet(self):
+        """Documented, not desired: parse_the_odds_api_totals drops an event with
+        no totals market, moneyline included. The converter must not paper over
+        that, because the packet's contract is keyed on the total."""
+        payload = _skill_games_payload()
+        for book in payload["games"][0]["books"].values():
+            book.pop("total", None)
+        events, _ = self.lda.normalize_odds_payload(payload)
+        parsed = self.lda.parse_the_odds_api_totals(events)
+        self.assertEqual(parsed["odds_by_game_id"], {})
+
+    def test_spreads_survive_the_round_trip(self):
+        events, _ = self.lda.normalize_odds_payload(_skill_games_payload())
+        dk = next(b for b in events[0]["bookmakers"] if b["key"] == "draftkings")
+        spreads = next(m for m in dk["markets"] if m["key"] == "spreads")
+        by_name = {o["name"]: o for o in spreads["outcomes"]}
+        self.assertEqual(by_name["Tampa Bay Rays"]["point"], -1.5)
+        self.assertEqual(by_name["Texas Rangers"]["price"], -155)
+
+
+class OddsKeyResolutionTests(unittest.TestCase):
+    """R29(5a): the key resolves from REPO/.env, not the environment alone."""
+
+    def setUp(self):
+        from mlb_engine import repo_env
+        self.repo_env = repo_env
+
+    def test_the_environment_wins_when_it_is_set(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / ".env"
+            env_file.write_text("THE_ODDS_API_KEY=from_file\n", encoding="utf-8")
+            with unittest.mock.patch.dict(
+                    os.environ, {"THE_ODDS_API_KEY": "from_env"}, clear=False):
+                self.assertEqual(
+                    self.repo_env.resolve_odds_api_key(env_file), "from_env")
+
+    def test_the_repo_dotenv_is_the_fallback(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / ".env"
+            env_file.write_text(
+                '# a comment\n\nTHE_ODDS_API_KEY="from_file"\nOTHER=x\n',
+                encoding="utf-8")
+            environ = dict(os.environ)
+            environ.pop("THE_ODDS_API_KEY", None)
+            with unittest.mock.patch.dict(os.environ, environ, clear=True):
+                self.assertEqual(
+                    self.repo_env.resolve_odds_api_key(env_file), "from_file")
+
+    def test_an_empty_environment_value_does_not_mask_the_file(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / ".env"
+            env_file.write_text("THE_ODDS_API_KEY=real\n", encoding="utf-8")
+            with unittest.mock.patch.dict(
+                    os.environ, {"THE_ODDS_API_KEY": "   "}, clear=False):
+                self.assertEqual(
+                    self.repo_env.resolve_odds_api_key(env_file), "real")
+
+    def test_a_missing_file_resolves_to_none_rather_than_raising(self):
+        import os
+        environ = dict(os.environ)
+        environ.pop("THE_ODDS_API_KEY", None)
+        with unittest.mock.patch.dict(os.environ, environ, clear=True):
+            self.assertIsNone(
+                self.repo_env.resolve_odds_api_key(Path("/nonexistent/.env")))
+
+    def test_loading_returns_names_never_values(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / ".env"
+            env_file.write_text("A_SECRET_NAME=supersecret\n", encoding="utf-8")
+            environ = dict(os.environ)
+            environ.pop("A_SECRET_NAME", None)
+            with unittest.mock.patch.dict(os.environ, environ, clear=True):
+                loaded = self.repo_env.load_repo_dotenv(env_file)
+            self.assertEqual(loaded, ["A_SECRET_NAME"])
+            self.assertNotIn("supersecret", repr(loaded))
+
+    def test_the_repo_env_is_where_the_key_lives_and_both_tools_use_it(self):
+        bundle = (REPO / "tools" / "fetch_slate_bundle.py").read_text(encoding="utf-8")
+        build = (REPO / "skills" / "generate-lineups" / "scripts"
+                 / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn("from mlb_engine.repo_env import load_repo_dotenv", bundle)
+        self.assertIn("resolve_odds_api_key", build)
+        self.assertNotIn('os.environ.get("THE_ODDS_API_KEY")', build,
+                         "the environment-only read is what made the key invisible")
+
+
+class OddsFailureMessageTests(unittest.TestCase):
+    """R29(5): four different causes used to produce one sentence."""
+
+    def test_the_generic_unmatched_message_is_gone(self):
+        build = (REPO / "skills" / "generate-lineups" / "scripts"
+                 / "build_slate.py").read_text(encoding="utf-8")
+        self.assertNotIn('warning="no moneyline matched this game\'s teams; entries "',
+                         build)
+        self.assertIn("no moneyline for this game ({reason})", build)
+
+    def test_each_cause_names_itself(self):
+        build = (REPO / "skills" / "generate-lineups" / "scripts"
+                 / "build_slate.py").read_text(encoding="utf-8")
+        for phrase in ("odds file shape not recognised", "REPO/.env",
+                       "resolved to zero games", "none had a moneyline"):
+            self.assertIn(phrase, build)
 
 
 if __name__ == "__main__":

@@ -1458,5 +1458,145 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         self.assertNotIn("overrides the Game Info derivation", text)
 
 
+class ArchetypeRowsResolveEndToEndTests(unittest.TestCase):
+    """R29(6): every LIVE archetype row must resolve to a real shape and profile.
+
+    Teeth: R1(a) fixed _posture_to_shape("mme") returning the payout token
+    mme_top_heavy instead of the contest shape mme_gpp. The two vocabularies look
+    alike and sit in adjacent columns, so the confusion is one careless row away
+    from returning. Rows are curated by hand, mid-slate, against a DK lobby, and
+    the failure would be a contest routed on a shape that is not in the closed
+    set. This walks the file on disk, so a row added after this test was written
+    is covered by it.
+    """
+
+    def setUp(self):
+        from mlb_engine.contest_shapes import (
+            CONTEST_SHAPE_SET, OBJECTIVE_CLASS_BY_SHAPE,
+            objective_class_for_payout_token,
+        )
+        from mlb_engine.pipeline.execution_pipeline import (
+            STRATEGY_DEFAULTS, normalize_posture, resolve_contest_shape,
+        )
+        self.shapes = CONTEST_SHAPE_SET
+        self.objective_by_shape = OBJECTIVE_CLASS_BY_SHAPE
+        self.objective_for_token = objective_class_for_payout_token
+        self.strategy = STRATEGY_DEFAULTS
+        self.normalize = normalize_posture
+        self.resolve = resolve_contest_shape
+        path = REPO / "data" / "reference" / "dk_contest_archetypes.csv"
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            self.rows = list(csv.DictReader(handle))
+
+    def _int(self, value):
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    def test_the_file_is_readable_and_not_empty(self):
+        self.assertGreater(len(self.rows), 6)
+        self.assertIn("payout_shape_default", self.rows[0])
+
+    def test_the_token_shape_name_collision_is_exactly_the_one_known_case(self):
+        """The R1(a) confusion is possible because the two vocabularies overlap:
+        'portfolio_gpp' is both a payout token and a contest shape. That one
+        overlap is longstanding and is not a defect on its own. It is pinned so a
+        NEW collision has to be looked at rather than inherited, because a token
+        that reads like a shape is what let a shape resolver return a token."""
+        collisions = {str(r["payout_shape_default"]).strip() for r in self.rows
+                      if str(r["payout_shape_default"]).strip() in self.shapes}
+        self.assertEqual(
+            collisions, {"portfolio_gpp", "single_entry_gpp"},
+            "a payout token that is also a contest-shape name is the ambiguity "
+            "R1(a) came out of; if this set grew, decide deliberately rather "
+            "than widening the pin")
+
+    def test_every_payout_token_is_one_the_engine_recognises(self):
+        for row in self.rows:
+            token = str(row["payout_shape_default"]).strip()
+            with self.subTest(pattern=row["pattern"], token=token):
+                self.assertIsNotNone(
+                    self.objective_for_token(token),
+                    f"{token!r} implies no objective, so a curated "
+                    f"objective_class cannot be cross-checked against it")
+
+    def test_every_row_resolves_to_a_posture_a_profile_and_a_real_shape(self):
+        from mlb_engine.optimize.optimizer_v3 import resolve_contest_shape_profile
+        for row in self.rows:
+            inferred = {
+                "inferred_type": row["inferred_type"],
+                "payout_shape_default": row["payout_shape_default"],
+                "inferred_max_entries": self._int(row["inferred_max_entries"]),
+                "ticket_count": self._int(row.get("ticket_count")),
+            }
+            posture = self.normalize(inferred["inferred_type"],
+                                     inferred["payout_shape_default"],
+                                     inferred["inferred_max_entries"])
+            shape = self.resolve(posture, inferred)
+            with self.subTest(pattern=row["pattern"]):
+                self.assertIn(posture, self.strategy)
+                self.assertIn(shape, self.shapes)
+                profile = resolve_contest_shape_profile(
+                    mode="gpp", requested_n=20, contest_shape=shape)
+                self.assertEqual(profile["contest_shape"], shape)
+                self.assertEqual(profile["mode_family"],
+                                 self.objective_by_shape[shape])
+
+    def test_a_curated_objective_class_agrees_with_its_payout_token(self):
+        for row in self.rows:
+            curated = str(row.get("objective_class") or "").strip()
+            if not curated:
+                continue
+            implied = self.objective_for_token(row["payout_shape_default"])
+            with self.subTest(pattern=row["pattern"]):
+                self.assertEqual(curated, implied)
+
+    def test_payout_breadth_is_a_fraction_when_present(self):
+        for row in self.rows:
+            raw = str(row.get("payout_breadth") or "").strip()
+            if not raw:
+                continue
+            with self.subTest(pattern=row["pattern"]):
+                breadth = float(raw)
+                self.assertGreater(breadth, 0.0)
+                self.assertLessEqual(breadth, 1.0)
+
+    def test_the_mini_max_row_routes_a_real_dk_contest_name(self):
+        """Ben entered these on 2026-07-29, so the live name is the test case."""
+        from mlb_engine.entries.dk_entries_manager import (
+            infer_contest_archetype, load_archetypes,
+        )
+        archetypes = load_archetypes(None)
+        inferred = infer_contest_archetype(
+            "MLB $15K mini-MAX [150 Entry Max]", 15.0, archetypes)
+        self.assertEqual(inferred["matched_pattern"], "mini-MAX")
+        self.assertEqual(inferred["payout_shape_default"], "mme_top_heavy")
+        posture = self.normalize(inferred["inferred_type"],
+                                 inferred["payout_shape_default"],
+                                 inferred["inferred_max_entries"])
+        self.assertEqual(posture, "mme")
+        self.assertEqual(self.resolve(posture, inferred), "mme_gpp")
+
+    def test_mini_max_does_not_shadow_the_150_max_family(self):
+        """Two patterns, disjoint names, and the same destination either way, so
+        neither row can silently take the other's contests."""
+        from mlb_engine.entries.dk_entries_manager import (
+            infer_contest_archetype, load_archetypes,
+        )
+        archetypes = load_archetypes(None)
+        hyphenated = infer_contest_archetype(
+            "MLB $0.25 Slugger [150-Max]", 0.25, archetypes)
+        self.assertEqual(hyphenated["matched_pattern"], "150-Max")
+        self.assertNotIn("mini-MAX", hyphenated["competing_patterns"])
+        for name, fee in (("MLB $15K mini-MAX [150 Entry Max]", 15.0),
+                          ("MLB $0.25 Slugger [150-Max]", 0.25)):
+            inferred = infer_contest_archetype(name, fee, archetypes)
+            posture = self.normalize(inferred["inferred_type"],
+                                     inferred["payout_shape_default"],
+                                     inferred["inferred_max_entries"])
+            self.assertEqual(self.resolve(posture, inferred), "mme_gpp", name)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

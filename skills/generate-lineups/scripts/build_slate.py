@@ -555,46 +555,53 @@ def resolve_reference_data(args) -> dict:
 def load_odds_packet(args, salary_csv=None) -> tuple[dict, dict]:
     """Return ({game_id: odds entry}, note) for the slate, or ({}, note).
 
-    Accepts an --odds file in either shape the project produces: a raw
-    the-odds-api events list, an mlb-game-odds payload wrapping one, or a
-    slate_bundle carrying ``odds_raw_totals``. Falls back to fetching when
-    THE_ODDS_API_KEY is set. The key is read from the environment, never
-    printed, and scrubbed from any error text.
+    Accepts an --odds file in every shape the project produces: a raw
+    the-odds-api events list, a payload wrapping one under ``odds_raw_totals``,
+    ``raw``, ``events`` or ``odds``, or the mlb-game-odds skill's DEFAULT
+    ``games`` schema. Falls back to fetching when THE_ODDS_API_KEY resolves.
+    The key is read from the environment or the repo ``.env``, never printed,
+    and scrubbed from any error text.
 
     ``salary_csv`` resolves doubleheader legs (F18); omit it and the earliest
     leg wins instead of the last one parsed.
-    """
-    import os
 
+    R29(5). Two bugs stacked here and both were silent. The key was read from
+    ``os.environ`` alone, which is unset in a Cowork bash call, so the auto-fetch
+    reported "unset" with the real key in ``REPO/.env``. And the recognised
+    wrapper keys did not include ``games``, so the skill's no-flag output fell
+    through to "no recognizable events list". Either way the caller reported the
+    same generic "no moneyline matched this game's teams" the absence of a
+    posted market produces, and the thesis ladder allocated an even split
+    against a market that had priced the game all along.
+    """
     from mlb_engine.intake.live_data_adapters import (
-        parse_the_odds_api_totals, salary_game_times,
+        normalize_odds_payload, parse_the_odds_api_totals, salary_game_times,
     )
+    from mlb_engine.repo_env import resolve_odds_api_key
 
     raw = None
     source = None
+    shape = None
     path = getattr(args, "odds", None)
     if path and Path(path).exists():
         try:
             payload = json.loads(Path(path).read_text(encoding="utf-8"))
         except Exception as exc:
             return {}, {"source": str(path), "warning": f"unreadable odds file: {exc}"}
-        if isinstance(payload, list):
-            raw = payload
-        elif isinstance(payload, dict):
-            for key in ("odds_raw_totals", "raw", "events", "odds"):
-                if isinstance(payload.get(key), list):
-                    raw = payload[key]
-                    break
         source = str(path)
-        if raw is None:
-            return {}, {"source": source,
-                        "warning": "odds file carried no recognizable events list"}
+        try:
+            raw, shape = normalize_odds_payload(payload)
+        except ValueError as exc:
+            # Shape-specific, and never the same sentence as an absent market.
+            return {}, {"source": source, "matched": False,
+                        "warning": f"odds file shape not recognised: {exc}"}
 
     if raw is None:
-        key = os.environ.get("THE_ODDS_API_KEY")
+        key = resolve_odds_api_key()
         if not key:
             return {}, {"source": None,
-                        "warning": "no --odds file and THE_ODDS_API_KEY unset; "
+                        "warning": "no --odds file and THE_ODDS_API_KEY resolves "
+                                   "from neither the environment nor REPO/.env; "
                                    "F1 stays neutral for this build"}
         import urllib.parse
         query = urllib.parse.urlencode({
@@ -628,7 +635,14 @@ def load_odds_packet(args, salary_csv=None) -> tuple[dict, dict]:
     odds = parsed.get("odds_by_game_id") or {}
     with_ml = sum(1 for v in odds.values() if (v or {}).get("moneyline"))
     note = {"source": source, "games": len(odds), "games_with_moneyline": with_ml,
+            "payload_shape": shape or "fetched_raw_events",
             "leg_resolution": "salary_start_time" if slate_times else "earliest_leg"}
+    if raw and not odds:
+        # A payload that parsed to nothing is a different fact from an absent
+        # payload, and it used to reach the caller as the same message.
+        note["warning"] = (
+            f"the odds payload carried {len(raw)} event(s) but none mapped to a "
+            f"game on this slate; check the date and the team names")
     if leg_note:
         note["leg_resolution_note"] = leg_note
     dropped = parsed.get("doubleheader_legs_dropped") or []
@@ -1600,9 +1614,21 @@ def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict]:
         ml = (entry or {}).get("moneyline") or {}
         if all(t in ml for t in teams) and teams:
             return {t: float(ml[t]) for t in teams}, dict(note, matched=True)
+    # R29(5): say WHY there is no moneyline. This one sentence used to cover a
+    # missing key, an unrecognised payload shape, a parsed-but-unmatched slate
+    # and a market that genuinely is not posted, and only the last of those is
+    # a reason to accept an even split without investigating.
+    if note.get("warning"):
+        reason = f"upstream: {note['warning']}"
+    elif not odds:
+        reason = ("the odds payload resolved to zero games, so no market "
+                  "reached this build")
+    else:
+        reason = (f"{len(odds)} game(s) carried odds but none had a moneyline "
+                  f"for both of {teams}; check the slate's team codes")
     return {}, dict(note or {}, matched=False,
-                    warning="no moneyline matched this game's teams; entries "
-                            "split evenly between the two sides")
+                    warning=f"no moneyline for this game ({reason}); entries "
+                            f"split evenly between the two sides")
 
 
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:

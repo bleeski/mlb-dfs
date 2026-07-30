@@ -1199,6 +1199,104 @@ def fetch_the_odds_api_totals(
     }}
 
 
+# Top-level keys under which this project's tools wrap a raw the-odds-api
+# events list. Ordered; the first list found wins.
+_ODDS_WRAPPER_KEYS = ("odds_raw_totals", "raw", "events", "odds")
+
+# The mlb-game-odds skill's DEFAULT output is not a raw events list: it is
+# already flattened per book. Reversing that flattening is exact for the three
+# markets the skill records, so both shapes can feed one parser rather than the
+# default output being a documented footgun.
+_SKILL_BOOK_MARKETS = ("h2h", "spreads", "totals")
+
+
+def _skill_game_to_raw_event(game: Mapping[str, Any]) -> Dict[str, Any]:
+    """One mlb-game-odds ``games`` entry -> one raw the-odds-api event.
+
+    The skill's ``parse_event`` flattens ``bookmakers[].markets[].outcomes[]``
+    into ``books[<book>].{moneyline,spread,total}``; this rebuilds the outcome
+    lists it was built from. Team names are carried through unchanged, because
+    the skill preserves the API's own ``home_team``/``away_team`` strings and
+    those are what ``team_name_to_dk_abbrev`` expects.
+    """
+    home = game.get("home_team")
+    away = game.get("away_team")
+    bookmakers: List[Dict[str, Any]] = []
+    for book_key, book in sorted((game.get("books") or {}).items()):
+        if not isinstance(book, Mapping):
+            continue
+        markets: List[Dict[str, Any]] = []
+        moneyline = book.get("moneyline") or {}
+        if moneyline:
+            outcomes = [{"name": name, "price": moneyline.get(side)}
+                        for side, name in (("home", home), ("away", away))
+                        if moneyline.get(side) is not None and name]
+            if outcomes:
+                markets.append({"key": "h2h", "outcomes": outcomes})
+        spread = book.get("spread") or {}
+        if spread:
+            outcomes = [{"name": name, "price": spread.get(f"{side}_price"),
+                         "point": spread.get(f"{side}_line")}
+                        for side, name in (("home", home), ("away", away))
+                        if spread.get(f"{side}_price") is not None and name]
+            if outcomes:
+                markets.append({"key": "spreads", "outcomes": outcomes})
+        total = book.get("total") or {}
+        if total:
+            outcomes = [{"name": label, "price": total.get(field),
+                         "point": total.get("line")}
+                        for label, field in (("Over", "over"), ("Under", "under"))
+                        if total.get(field) is not None]
+            if outcomes:
+                markets.append({"key": "totals", "outcomes": outcomes})
+        if markets:
+            bookmakers.append({"key": str(book_key).lower(),
+                               "last_update": book.get("last_update"),
+                               "markets": markets})
+    return {
+        "id": game.get("event_id"),
+        "commence_time": game.get("commence_time_utc"),
+        "home_team": home,
+        "away_team": away,
+        "bookmakers": bookmakers,
+    }
+
+
+def normalize_odds_payload(payload: Any) -> Tuple[List[Mapping[str, Any]], str]:
+    """Any odds payload this project produces -> (raw events list, shape name).
+
+    R29(5b). ``load_odds_packet`` recognised a bare list and four wrapper keys,
+    none of which is ``games``, which is what the mlb-game-odds skill emits
+    without ``--raw``. The default output therefore fell through to "no
+    recognizable events list", and the caller reported the same generic "no
+    moneyline matched this game's teams" it reports when a game genuinely has no
+    odds posted. A silent fall-through to a neutral 50/50 allocation is a
+    correctness gap wearing a missing-data costume.
+
+    Raises ValueError naming the shape it actually found. That error is the
+    point: an unrecognised payload must never be indistinguishable from an
+    absent market.
+    """
+    if isinstance(payload, list):
+        return list(payload), "raw_events_list"
+    if isinstance(payload, Mapping):
+        for key in _ODDS_WRAPPER_KEYS:
+            value = payload.get(key)
+            if isinstance(value, list):
+                return list(value), f"wrapped:{key}"
+        games = payload.get("games")
+        if isinstance(games, list):
+            return ([_skill_game_to_raw_event(g) for g in games
+                     if isinstance(g, Mapping)], "mlb_game_odds_games")
+        raise ValueError(
+            "odds payload is a dict with keys "
+            f"{sorted(str(k) for k in payload)} and none of them holds an "
+            f"events list. Expected a bare the-odds-api events list, one of "
+            f"{list(_ODDS_WRAPPER_KEYS)}, or mlb-game-odds' 'games' schema")
+    raise ValueError(
+        f"odds payload is {type(payload).__name__}, not a list or a dict")
+
+
 def parse_the_odds_api_totals(
     raw: Sequence[Mapping[str, Any]],
     fetched_at: Optional[str] = None,

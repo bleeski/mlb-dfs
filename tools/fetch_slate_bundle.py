@@ -67,24 +67,23 @@ DOTENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 
 
 def _load_dotenv(path: Path) -> None:
-    """Minimal stdlib-only .env loader, matching this script's no-dependency
-    design (see module docstring). Sets os.environ[KEY] = VALUE for each
-    KEY=VALUE line in the file; blank lines and lines starting with # are
-    skipped. Never overrides a variable already present in the real
-    environment, so an explicit `export` always wins over the file. Never
-    logs the file's contents.
+    """Populate os.environ from a .env file. Delegates to mlb_engine.repo_env.
+
+    R29(5a): this loader used to be implemented here and nowhere else, so this
+    script found the key and build_slate.py's odds auto-fetch did not. One rule
+    with one implementation; the semantics are unchanged (an explicit export
+    always wins over the file, and nothing here logs the file's contents).
+
+    ``mlb_engine.repo_env`` is stdlib-only, so importing it keeps this script's
+    no-dependency design intact: it still runs with neither pandas nor scipy
+    installed, which is the state in which fetching a bundle matters most.
     """
-    if not path.exists():
-        return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
+    repo = str(Path(__file__).resolve().parents[1])
+    if repo not in sys.path:
+        sys.path.insert(0, repo)
+    from mlb_engine.repo_env import load_repo_dotenv
+
+    load_repo_dotenv(path)
 
 
 _load_dotenv(DOTENV_PATH)
