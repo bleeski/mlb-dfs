@@ -258,6 +258,41 @@ exactly like "no matches"; scope greps to specific files before concluding a
 symbol is absent. When you pipe a command into `head`, `$?` is head's exit code,
 not the command's; capture to a file and check the real status.
 
+**Capture stdout and stderr to SEPARATE files when a command exits non-zero.**
+This is not a style preference, it cost most of an hour on 2026-07-29. Several
+`late_swap.py` calls returned exit 3 with a `2>&1` log that ended abruptly right
+after `joint solve next: ...` and no error text at all, despite `python -u`. The
+real failure (`no compatible candidate for Entry ID ...`, and later the
+informative `SP pair ... count 2>1`) only appeared once the two streams went to
+separate files. The process really had exited 3 and really had printed the reason;
+the merged stream did not show it inside the window it was captured in. A silent
+exit therefore looks identical to "still building the bank", and the session
+re-ran the same command with the same budget several times expecting different
+output. So:
+
+```bash
+timeout 33 python -u <cmd> > outputs/<date>/_x.out 2> outputs/<date>/_x.err
+echo "exit=$?"; tail -30 outputs/<date>/_x.err
+```
+
+Read the `.err` file first on any non-zero exit. This is a sandbox quirk, not
+repo behavior, so no engine change fixes it.
+
+**Odds fetches need the key resolved, and the default output shape now works.**
+`build_slate.py`'s own auto-fetch resolves `THE_ODDS_API_KEY` from the environment
+or `REPO/.env`, so a build needs no export. The standalone `mlb-game-odds` skill
+still reads only two `/mnt/...` paths and the env var, none of which is this
+repo's `.env`, so when you call that skill directly, export first:
+
+```bash
+export THE_ODDS_API_KEY=$(grep THE_ODDS_API_KEY <repo>/.env | cut -d= -f2- | tr -d '\r\n"')
+```
+
+Passing its output to `--odds` works with or without `--raw`: the default
+`games`-keyed schema is recognised as of 2026-07-29. If an odds file is not
+understood, the build now says which keys it found instead of reporting the game
+as having no moneyline.
+
 **Dependencies do not persist across sessions.** The preflight at the top of this
 file is the whole answer, and it is never the step you skip to save time. A
 sandbox that looks identical to yesterday's still has no scipy today.
@@ -468,16 +503,36 @@ will reject it.
 ```bash
 python <repo>/tools/late_swap.py --date <date> \
   --parent-entries runs/<run_id>/final/DKEntries.csv \
+  --salary runs/<run_id>/inputs/DKSalaries.csv \
   --budget 30
 ```
 
 Add `--entry-ids` to authorize specific entries only. Add `--dry-run` to see what
 is pinned and how many candidates exist before committing.
 
+**Pass `--salary` at the run's own snapshot whenever another session might be
+building this date.** Without it the swap reads
+`data/slates/<date>/DKSalaries.csv`, which is keyed on date alone and is therefore
+shared: on 2026-07-29 a concurrent Showdown build overwrote it mid-swap and every
+entry failed with "embedded player pool overlaps the salary file at 0.0%". The
+run's `inputs/` snapshot cannot be clobbered, and `--salary` is read-only. The
+tool prints which path it resolved and flags the shared one. Same reasoning for
+`--lineups`.
+
 Two rules the engine enforces and you should understand, because they explain
 most "no compatible candidate" errors: a locked slot cannot move, and a game that
 has locked admits **no new players at all**, even into slots that are still open.
 So an entry holding one locked Yankee cannot pick up a different Yankee.
+
+**A failed swap now tells you which of the two problems you have.** A portfolio
+control naming itself (`binding control: max_sp_pair_repetition=3`) means the caps
+are the problem and `--controls-override` is the lever; "no compatible candidate"
+now says explicitly that it is NOT a control, so the bank or the pins are the
+problem and `--budget` is the lever. Do not grow the bank against a control
+failure: on 2026-07-29 that mistake cost twenty minutes because the two failures
+printed the same sentence. The swap also inherits the parent build's posture-based
+caps now, so you should not need `--controls-override` at all unless the parent
+build itself used one.
 
 Details in `references/late_swap.md`.
 
@@ -509,7 +564,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 23 modules, 437 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 24 modules, 498 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of
@@ -546,9 +601,17 @@ persons, two games, five hitters per team, hitter versus rostered SP, Showdown
 both-teams and recomputed captain price) and adds the swap-specific ones:
 contest-identity diff against the parent, per-entry slot churn, no player
 introduced from a game that has already started, and no replacement of a player
-whose game has started. Locked teams derive from the salary file's Game Info;
-`--locked-teams` overrides that derivation rather than enabling it. Exit 2 on any
-failure.
+whose game has started. Exit 2 on any failure.
+
+**Run it again for each file in a correction chain, and do not pass
+`--locked-teams` at all.** Locked teams are derived on every invocation from the
+lineups feed's own clock (falling back to the salary file's Game Info), and the
+report prints the clock and the source it used. `--locked-teams` ADDS to that set
+and can no longer replace it. This is not a preference: on 2026-07-29 a list
+passed once at 7:23 PM ET was still in use at 8:02, three games locked underneath
+it, this tool printed PASS, and DraftKings rejected 7 of 16 entries. If you see
+`STALE --locked-teams` in the output, drop the flag. Pass `--as-of` only to test
+the derivation against a fixed clock.
 
 ## Commands for Ben
 
