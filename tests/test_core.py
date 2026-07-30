@@ -5803,16 +5803,21 @@ class LateSwapDeliveryNameTests(unittest.TestCase):
         self.assertEqual(self.mod.lateswap_dest_name("", ""),
                          "DKEntries_lateswap_untagged_norun.csv")
 
+    # R29(3): the first argument is the file's resolved postures, not a flat
+    # defaults dict. The flat dict was the bug; see
+    # SwapControlsInheritanceTests.
+    POSTURES = {"900": {"posture": "large_gpp", "contest_shape": "large_wta",
+                        "posture_source": "test"}}
+
     def test_solver_budget_bounds_the_joint_solve(self):
         """R25: the joint MILP's time limit becomes a first-class flag."""
-        controls = self.mod.resolve_swap_controls(
-            {"max_shared_players": 7}, None, 15)
+        controls = self.mod.resolve_swap_controls(self.POSTURES, None, 15)
         self.assertEqual(controls["time_limit"], 15.0)
-        self.assertEqual(controls["max_shared_players"], 7)
+        self.assertEqual(controls["max_shared_players"], 6)
 
     def test_an_explicit_controls_override_still_wins(self):
         controls = self.mod.resolve_swap_controls(
-            {"max_shared_players": 7}, {"time_limit": 25}, 15)
+            self.POSTURES, {"time_limit": 25}, 15)
         self.assertEqual(controls["time_limit"], 25)
 
 
@@ -6122,6 +6127,131 @@ class DeferredPromotionTests(unittest.TestCase):
                         "promotion must follow the mirror to outputs/")
         self.assertLess(refusal, promote,
                         "promotion must follow the accept-downgrade decision")
+
+
+class SwapControlsInheritanceTests(unittest.TestCase):
+    """R29(3): a swap inherits the caps of the build it refines.
+
+    Teeth: late_swap.py carried one flat dict with max_sp_pair_repetition of 1,
+    stricter than every posture in STRATEGY_DEFAULTS (2 or 3). The first swap
+    attempt on an already-certified portfolio failed nearly every entry, the
+    message was a bare "no compatible candidate", and the session spent twenty
+    minutes growing a bank that was never the problem.
+    """
+
+    @staticmethod
+    def _late_swap():
+        import importlib
+        import sys as _sys
+        tools = str(Path(__file__).resolve().parents[1] / "tools")
+        if tools not in _sys.path:
+            _sys.path.insert(0, tools)
+        return importlib.import_module("late_swap")
+
+    @staticmethod
+    def _postures(*postures):
+        return {str(900 + i): {"posture": p, "contest_shape": "large_wta",
+                               "posture_source": "test"}
+                for i, p in enumerate(postures)}
+
+    def test_a_single_posture_yields_exactly_that_postures_controls(self):
+        ls = self._late_swap()
+        for posture, spec in epi.STRATEGY_DEFAULTS.items():
+            if not spec["controls"]:
+                continue
+            derived = ls.resolve_swap_controls(self._postures(posture), None, None)
+            self.assertEqual(derived, dict(spec["controls"]),
+                             f"{posture}: the swap must not assert its own caps")
+
+    def test_the_derivation_is_the_builds_own_function(self):
+        """Not a parallel implementation: the same call, so they cannot drift."""
+        ls = self._late_swap()
+        postures = self._postures("large_gpp", "mme", "wta_satellite")
+        self.assertEqual(ls.resolve_swap_controls(postures, None, None),
+                         epi._merged_controls_for_build(postures, None))
+
+    def test_the_old_flat_cap_of_one_is_gone(self):
+        ls = self._late_swap()
+        for posture in ("large_gpp", "mme", "small_gpp", "wta_satellite"):
+            derived = ls.resolve_swap_controls(self._postures(posture), None, None)
+            self.assertGreaterEqual(
+                derived["max_sp_pair_repetition"], 2,
+                "1 was stricter than any posture the build could have used")
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertNotIn('"max_sp_pair_repetition": 1', text)
+
+    def test_tightest_cap_wins_across_the_contests_present(self):
+        ls = self._late_swap()
+        derived = ls.resolve_swap_controls(
+            self._postures("large_gpp", "mme"), None, None)
+        self.assertEqual(derived["max_player_exposure_pct"], 0.35)
+        self.assertEqual(derived["max_sp_pair_repetition"], 3)
+
+    def test_an_explicit_override_still_wins(self):
+        ls = self._late_swap()
+        derived = ls.resolve_swap_controls(
+            self._postures("large_gpp"), {"max_sp_pair_repetition": 5}, 12)
+        self.assertEqual(derived["max_sp_pair_repetition"], 5)
+        self.assertEqual(derived["time_limit"], 12.0)
+        explicit = ls.resolve_swap_controls(
+            self._postures("large_gpp"), {"time_limit": 3}, 12)
+        self.assertEqual(explicit["time_limit"], 3,
+                         "an operator who passed JSON meant it (R25)")
+
+    def test_a_cash_only_file_matches_the_build_rather_than_inventing_caps(self):
+        ls = self._late_swap()
+        self.assertEqual(ls.resolve_swap_controls(self._postures("cash"), None, None),
+                         epi._merged_controls_for_build(self._postures("cash"), None))
+
+
+class SwapFailureClassificationTests(unittest.TestCase):
+    """R29(3), second half: a control mismatch and a thin bank must never read
+    the same. Both messages now classify themselves."""
+
+    @staticmethod
+    def _classify(errors, controls=None):
+        return SwapControlsInheritanceTests._late_swap().classify_swap_failure(
+            errors, controls or {"max_sp_pair_repetition": 3,
+                                "max_player_exposure_pct": 0.4})
+
+    def test_a_control_violation_names_the_control_and_its_value(self):
+        lines = self._classify(["SP pair 43703590/43709134 count 2>1"])
+        self.assertIn("binding control: max_sp_pair_repetition=3", lines[0])
+        self.assertIn("--controls-override", lines[0])
+
+    def test_every_control_prefix_is_mapped(self):
+        cases = {
+            "player 123 count 4>3": "max_player_exposure_pct",
+            "pitcher 123 count 4>3": "max_pitcher_exposure_pct",
+            "primary stack AAA count 4>3": "max_primary_stack_exposure_pct",
+            "SP pair 1/2 count 4>3": "max_sp_pair_repetition",
+        }
+        for err, control in cases.items():
+            self.assertIn(f"binding control: {control}",
+                          self._classify([err])[0], err)
+
+    def test_no_compatible_candidate_says_it_is_not_a_control(self):
+        lines = self._classify(["no compatible candidate for Entry ID 5202734526"])
+        self.assertIn("not a portfolio control", lines[0])
+        self.assertIn("--budget", lines[0])
+        self.assertNotIn("binding control", lines[0])
+
+    def test_the_two_failure_classes_do_not_read_alike(self):
+        control = self._classify(["SP pair 1/2 count 2>1"])[0]
+        bank = self._classify(["no compatible candidate for Entry ID 900"])[0]
+        self.assertNotEqual(control, bank)
+        self.assertNotIn("grow the bank", control.lower())
+
+    def test_an_unrecognised_error_is_passed_through_unannotated(self):
+        lines = self._classify(["something else entirely"])
+        self.assertEqual(lines, ["  something else entirely"])
+
+    def test_the_controls_in_effect_are_printed_before_the_solve(self):
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertIn("portfolio controls (inherited from the postures in this file",
+                      text)
 
 
 class InputsUnmovedTests(unittest.TestCase):

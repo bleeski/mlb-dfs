@@ -68,8 +68,9 @@ from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.entries.upload_manifest import record_delivery  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
-    _assemble_projection_frame, _resolve_contest_postures, _slate_tag,
-    promote_deferred_run, run_late_swap, unresolved_contest_blockers,
+    _assemble_projection_frame, _merged_controls_for_build,
+    _resolve_contest_postures, _slate_tag, promote_deferred_run, run_late_swap,
+    unresolved_contest_blockers,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -96,11 +97,14 @@ WORKFLOW_GATES = {
 LATE_SWAP_ASSUMED_GATES = [
     "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
 ]
-PORTFOLIO_CONTROLS = {
-    "max_player_exposure_pct": 0.6, "max_pitcher_exposure_pct": 0.7,
-    "max_primary_stack_exposure_pct": 0.6, "max_sp_pair_repetition": 1,
-    "max_shared_players": 7,
-}
+# R29(3): the flat PORTFOLIO_CONTROLS dict that used to live here is deleted, not
+# retained as a fallback. It applied one set of caps to every contest shape and
+# its max_sp_pair_repetition of 1 was stricter than every posture in
+# STRATEGY_DEFAULTS, so a portfolio that was legal when built failed this
+# script's caps before the swap did any work. Controls come from
+# resolve_swap_controls, which reads the postures in the file being refined; a
+# default that can disagree with the build is a second source of truth for the
+# same number, and keeping one around to fall back to is how it comes back.
 
 
 def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
@@ -117,8 +121,21 @@ def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
     return f"DKEntries_lateswap_{tag}_{suffix}.csv"
 
 
-def resolve_swap_controls(defaults, override, solver_budget) -> dict:
+def resolve_swap_controls(postures, override, solver_budget) -> dict:
     """Merged portfolio controls for the swap, with the joint solve bounded (R25).
+
+    R29(3): these used to be one flat dict applied to every contest, and its
+    ``max_sp_pair_repetition: 1`` was stricter than any posture in
+    STRATEGY_DEFAULTS (2 or 3). A swap is certified against the WHOLE delivered
+    portfolio, not just the authorized entries, so a portfolio that was legal
+    when built failed this script's own caps before the swap did any work. On
+    2026-07-29 that cost the first twenty minutes of a correction chain and a
+    dozen calls spent growing a bank that was never the problem.
+
+    They are now derived from the same posture-based STRATEGY_DEFAULTS the build
+    used, through the same ``_merged_controls_for_build``: tightest cap wins
+    across the contests actually present in this file. A swap therefore inherits
+    the caps of the build it refines instead of asserting its own.
 
     The entry-level joint MILP reads its time limit from
     ``controls['time_limit']`` (contest_allocator, default 30s). That was
@@ -128,11 +145,53 @@ def resolve_swap_controls(defaults, override, solver_budget) -> dict:
     --controls-override time_limit still wins, because an operator who passed
     JSON meant it.
     """
-    controls = dict(defaults)
+    controls = dict(_merged_controls_for_build(postures, None))
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
     return controls
+
+
+# Every portfolio-control violation the entries validator can report, mapped to
+# the control that produced it. R29(3): a swap that fails on one of these has a
+# controls problem, and a swap that fails on "no compatible candidate" has a
+# bank or pins problem. They used to be indistinguishable in the output, so the
+# session chased the wrong one; each now names itself.
+_CONTROL_BY_ERROR_PREFIX = (
+    ("player ", "max_player_exposure_pct"),
+    ("pitcher ", "max_pitcher_exposure_pct"),
+    ("primary stack ", "max_primary_stack_exposure_pct"),
+    ("SP pair ", "max_sp_pair_repetition"),
+)
+
+
+def classify_swap_failure(errors, controls) -> list[str]:
+    """Annotate each failure with the control that is binding, or say it is not one.
+
+    Returns the lines to print. A portfolio-control violation names the control
+    and the value in effect, so the fix (--controls-override, or the parent
+    build's own value) is readable off the failure. Anything that is per-entry
+    candidate compatibility says so explicitly, so it is never mistaken for a
+    cap and never sends a session off to grow a bank that is already big enough.
+    """
+    lines: list[str] = []
+    for err in errors or []:
+        text = str(err)
+        control = next((name for prefix, name in _CONTROL_BY_ERROR_PREFIX
+                        if text.startswith(prefix)), None)
+        if control:
+            value = controls.get(control, "unset")
+            lines.append(f"  {text}  [binding control: {control}={value}; the "
+                         f"parent build may have used a looser value, pass it "
+                         f"with --controls-override]")
+        elif "no compatible candidate" in text:
+            lines.append(f"  {text}  [not a portfolio control: this entry's "
+                         f"pins and excluded_new_teams admit none of the bank's "
+                         f"candidates. Grow the bank with --budget, or check "
+                         f"that the entry's locked slots are what you expect]")
+        else:
+            lines.append(f"  {text}")
+    return lines
 
 
 def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
@@ -287,14 +346,14 @@ def main() -> int:
                          "accepting the fallback posture. Recorded on stderr.")
     ap.add_argument("--controls-override", dest="controls_override", type=json.loads,
                     default=None,
-                    help="JSON dict merged over the default PORTFOLIO_CONTROLS. A "
-                         "swap is certified against the WHOLE delivered portfolio, "
-                         "not just the authorized entries, so if the parent build "
-                         "used looser controls (e.g. build_slate.py's own "
-                         "--controls-override on a small slate) the untouched "
-                         "entries can violate this script's stricter defaults "
-                         "before the swap even runs. Pass the same values the "
-                         "parent build used.")
+                    help="JSON dict merged over the controls derived from this "
+                         "file's own contest postures. A swap is certified "
+                         "against the WHOLE delivered portfolio, not just the "
+                         "authorized entries, so the untouched entries have to "
+                         "satisfy these caps too. The derivation now matches the "
+                         "build's, so this is only needed when the parent build "
+                         "itself passed --controls-override (e.g. a thin slate) "
+                         "and the run's own looser values have to be restated.")
     args = ap.parse_args()
 
     slate = REPO / "data" / "slates" / args.date
@@ -454,8 +513,18 @@ def main() -> int:
                           "candidate_scoring": payload_report}, indent=1))
         return 0
 
-    controls = resolve_swap_controls(PORTFOLIO_CONTROLS, args.controls_override,
+    controls = resolve_swap_controls(postures, args.controls_override,
                                      args.solver_budget)
+    # R29(3): print them. A cap that is invisible until it fails is a cap the
+    # operator debugs by guessing, and last night that guess was "the bank is
+    # thin" for twenty minutes.
+    print("portfolio controls (inherited from the postures in this file, "
+          "tightest cap wins): "
+          + ", ".join(f"{k}={v}" for k, v in sorted(controls.items())
+                      if k != "time_limit"))
+    if args.controls_override:
+        print(f"controls overridden by --controls-override: "
+              f"{sorted(args.controls_override)}")
     print(f"joint solve next: {len(requirements)} entries, {len(candidates)} "
           f"candidates, time_limit {controls.get('time_limit', 30)}s (the swap "
           f"re-certifies the whole portfolio, so this stage runs over every "
@@ -494,8 +563,8 @@ def main() -> int:
 
     if not result.get("passed"):
         print("late swap did not pass:", file=sys.stderr)
-        for err in result.get("errors") or []:
-            print(f"  {err}", file=sys.stderr)
+        for line in classify_swap_failure(result.get("errors"), controls):
+            print(line, file=sys.stderr)
         return 3
 
     out = Path(result["output_path"])
