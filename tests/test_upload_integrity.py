@@ -1242,5 +1242,221 @@ class FixedTmpNameRegressionTests(unittest.TestCase):
         self.assertIn("uuid.uuid4().hex", net)
 
 
+# --------------------------------------------------------------------------
+# R29: verify_export's lock derivation cannot go stale mid-use
+# --------------------------------------------------------------------------
+
+THREE_GAMES = (
+    ("AAA@BBB 07/25/2026 07:05PM ET", ("AAA", "BBB"), "2026-07-25T23:05:00Z"),
+    ("CCC@DDD 07/25/2026 07:10PM ET", ("CCC", "DDD"), "2026-07-25T23:10:00Z"),
+    ("EEE@FFF 07/25/2026 07:40PM ET", ("EEE", "FFF"), "2026-07-25T23:40:00Z"),
+)
+
+
+def write_three_game_salary(path: Path) -> dict:
+    """Three games, two full teams each. Returns {f"{team} {surname}": pid}.
+
+    Two games is not enough to test a swap that introduces a player: with both
+    P slots filled and only two games, every unrostered team is an opposing
+    team to a rostered SP, so any newly introduced hitter breaks the
+    hitter-versus-rostered-SP rule and the lock failure cannot be isolated from
+    a legality failure.
+    """
+    rows = [SALARY_HEADER]
+    ids: dict = {}
+    pid = 2000
+    for game, teams, _utc in THREE_GAMES:
+        for team in teams:
+            for i, (pos, roster) in enumerate(SLOT_SPEC):
+                pid += 1
+                name = f"{team} {SURNAMES[i]}"
+                ids[name] = str(pid)
+                rows.append(_salary_row(pid, name, team, game, pos, roster, 4000,
+                                        "", "SP" if roster == "P" else str(i)))
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    return ids
+
+
+def write_three_game_feed(path: Path, postponed=()) -> Path:
+    """A lineups feed for the same three games, start times matching the salary."""
+    games = []
+    for pk, (_game, (away, home), utc) in enumerate(THREE_GAMES, start=1):
+        game_id = f"{away}@{home}"
+        games.append({
+            "game_pk": pk, "game_date_utc": utc, "venue": "Test Park",
+            "status": "Postponed" if game_id in postponed else "Pre-Game",
+            "away": {"team_abbrev": away, "lineup_status": "tbd",
+                     "lineup": [], "probable_pitcher": None},
+            "home": {"team_abbrev": home, "lineup_status": "tbd",
+                     "lineup": [], "probable_pitcher": None},
+        })
+    path.write_text(json.dumps({
+        "date": "2026-07-25", "fetched_at": "2026-07-25T22:00:00Z", "games": games,
+    }), encoding="utf-8")
+    return path
+
+
+def run_verify(*args) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(REPO / "tools" / "verify_export.py"), *args],
+        capture_output=True, text=True)
+
+
+class VerifyExportLockDerivationTests(unittest.TestCase):
+    """R29: --locked-teams was the only source of truth and it went stale.
+
+    Teeth: on 2026-07-29 a swap chain ran 7:23-8:02 PM ET against a
+    --locked-teams list passed once at 7:23. Two more games locked underneath
+    it, this tool printed PASS, and DraftKings rejected 7 of 16 entries. Every
+    test here fails if the derivation stops running, or if a supplied list is
+    allowed to shrink the derived set again.
+    """
+
+    EARLY = "2026-07-25T23:07:00+00:00"   # AAA@BBB started, the other two have not
+    LATE = "2026-07-25T23:45:00+00:00"    # all three started
+    PREGAME = "2026-07-25T23:20:00+00:00"  # EEE@FFF still open
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.feed = write_three_game_feed(self.dir / "lineups_feed.json")
+        # AAA SP + CCC SP + five AAA hitters + three EEE outfielders. The
+        # rostered SPs' opponents are BBB and DDD, and EEE faces FFF's
+        # unrostered SP, so this is legal on every Classic rule.
+        self.parent_lineup = [
+            self.ids["AAA Aster"], self.ids["CCC Aster"],
+            self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+            self.ids["AAA Ellis"], self.ids["AAA Frost"],
+            self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"],
+        ]
+        self.parent = self.dir / "parent.csv"
+        write_entries(self.parent, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.parent_lineup)])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _child_swapping_in_fff(self) -> Path:
+        """Replace one EEE outfielder with an FFF outfielder: still legal, and
+        the introduced player's game is the one that locks last."""
+        lineup = list(self.parent_lineup)
+        lineup[9] = self.ids["FFF Ives"]
+        child = self.dir / "child.csv"
+        write_entries(child, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+        return child
+
+    def _resolve(self, supplied=None, as_of=None, feed=True):
+        sys.path.insert(0, str(REPO / "tools"))
+        from datetime import datetime
+        import verify_export as ve
+        from tools.preflight_upload import Report, load_entries, load_salary
+        rep = Report()
+        _, _, entries, _, _ = load_entries(self.parent)
+        locked, note, source = ve.resolve_locked_teams(
+            supplied, load_salary(self.salary), self.salary,
+            self.feed if feed else None,
+            datetime.fromisoformat(as_of or self.EARLY), rep)
+        return locked, note, source, rep, entries
+
+    # -- the derivation itself ------------------------------------------------
+
+    def test_locked_teams_come_from_the_feed_clock_with_no_flag_passed(self):
+        locked, _note, source, rep, _ = self._resolve()
+        self.assertEqual(locked, {"AAA", "BBB"})
+        self.assertIn("lineups feed", source)
+        self.assertEqual(rep.warnings, [])
+
+    def test_the_derivation_moves_with_the_clock(self):
+        self.assertEqual(self._resolve(as_of=self.LATE)[0],
+                         {"AAA", "BBB", "CCC", "DDD", "EEE", "FFF"})
+        self.assertEqual(self._resolve(as_of="2026-07-25T22:00:00+00:00")[0], set())
+
+    def test_a_postponed_game_is_not_locked_even_after_its_scheduled_start(self):
+        write_three_game_feed(self.feed, postponed=("AAA@BBB",))
+        locked, note, _source, _rep, _ = self._resolve(as_of=self.LATE)
+        self.assertEqual(locked, {"CCC", "DDD", "EEE", "FFF"})
+        self.assertIn("postponed", note)
+
+    def test_no_feed_falls_back_to_game_info_and_says_so(self):
+        locked, _note, source, _rep, _ = self._resolve(feed=False)
+        self.assertEqual(locked, {"AAA", "BBB"})
+        self.assertEqual(source, "salary Game Info")
+
+    def test_an_unreadable_feed_warns_rather_than_silently_using_game_info(self):
+        self.feed.write_text("{not json", encoding="utf-8")
+        _locked, _note, source, rep, _ = self._resolve()
+        self.assertEqual(source, "salary Game Info")
+        self.assertTrue(any("cannot see a postponement" in w for w in rep.warnings))
+
+    # -- a supplied list adds, never shrinks ---------------------------------
+
+    def test_a_stale_supplied_list_cannot_shrink_the_derived_set(self):
+        locked, _note, _source, rep, _ = self._resolve(supplied="CCC")
+        self.assertEqual(locked, {"AAA", "BBB", "CCC"})
+        self.assertTrue(any("STALE --locked-teams" in w for w in rep.warnings))
+        self.assertTrue(any("'AAA'" in w and "'BBB'" in w for w in rep.warnings))
+
+    def test_a_supplied_list_may_still_add_a_team_the_clock_calls_open(self):
+        locked, _note, _source, rep, _ = self._resolve(supplied="AAA,BBB,EEE")
+        self.assertEqual(locked, {"AAA", "BBB", "EEE"})
+        self.assertEqual(rep.warnings, [])
+
+    def test_a_complete_supplied_list_is_not_reported_stale(self):
+        _locked, _note, _source, rep, _ = self._resolve(supplied="AAA,BBB")
+        self.assertEqual(rep.warnings, [])
+
+    # -- end to end: tonight's rejection, reproduced -------------------------
+
+    def test_a_player_introduced_from_a_since_locked_game_fails(self):
+        """The 2026-07-29 rejection. The operator's list was passed while only
+        the early games had started and never re-derived; by the time this file
+        was written, EEE@FFF had locked too."""
+        child = self._child_swapping_in_fff()
+        result = run_verify("--entries", str(child), "--salary", str(self.salary),
+                            "--parent", str(self.parent), "--lineups", str(self.feed),
+                            "--locked-teams", "AAA,BBB,CCC,DDD", "--as-of", self.LATE)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("already-started game", result.stdout)
+        self.assertIn("STALE --locked-teams", result.stdout)
+
+    def test_the_same_file_passes_while_that_game_is_still_open(self):
+        """The clock, not a blanket refusal, is what decides. Same file, same
+        stale list, an hour earlier: the swap is legal and this must pass."""
+        child = self._child_swapping_in_fff()
+        result = run_verify("--entries", str(child), "--salary", str(self.salary),
+                            "--parent", str(self.parent), "--lineups", str(self.feed),
+                            "--locked-teams", "AAA,BBB,CCC,DDD", "--as-of", self.PREGAME)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("already-started game", result.stdout)
+
+    def test_the_report_names_the_clock_and_the_source_it_read(self):
+        result = run_verify("--entries", str(self.parent), "--salary", str(self.salary),
+                            "--parent", str(self.parent), "--lineups", str(self.feed),
+                            "--as-of", self.EARLY, "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        info = json.loads(result.stdout)["info"]
+        self.assertEqual(info["locked_teams"], ["AAA", "BBB"])
+        self.assertEqual(info["lock_as_of"], self.EARLY)
+        self.assertIn("lineups feed", info["lock_source"])
+        self.assertTrue(str(info["lineups_feed"]).endswith("lineups_feed.json"))
+
+    def test_the_feed_is_auto_resolved_from_beside_the_salary_file(self):
+        result = run_verify("--entries", str(self.parent), "--salary", str(self.salary),
+                            "--as-of", self.EARLY, "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        info = json.loads(result.stdout)["info"]
+        self.assertIn("lineups feed", info["lock_source"])
+        self.assertIn("staged beside the salary file", info["feed_autoresolve"])
+
+    def test_locked_teams_no_longer_documented_as_an_override_of_the_derivation(self):
+        """The docstring is the contract an operator reads under deadline."""
+        text = (REPO / "tools" / "verify_export.py").read_text(encoding="utf-8")
+        self.assertIn("ADDS to the derived set, never shrinks it", text)
+        self.assertNotIn("overrides the Game Info derivation", text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

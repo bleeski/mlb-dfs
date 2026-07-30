@@ -35,12 +35,24 @@ Usage:
         [--salary DKSalaries.csv]          # defaults to the promoted run snapshot
         [--parent runs/<id>/final/DKEntries.csv]
         [--manifest outputs/<date>/upload_manifest.json]
-        [--locked-teams PIT,NYY]           # overrides the Game Info derivation
-        [--now 2026-07-25T18:40:00-04:00]  # for testing the lock derivation
+        [--lineups data/slates/<date>/lineups_feed.json]  # auto-resolved
+        [--locked-teams PIT,NYY]           # ADDS to the derived set, never shrinks it
+        [--as-of 2026-07-25T18:40:00-04:00]  # wall clock used for the lock derivation
         [--json]
 
 Exit 0 clean, 2 on any failure (matching preflight_upload), 3 on a usage or IO
 error. This is a file check. It never uploads anything.
+
+R29: the lock derivation is wall-clock, and re-derived on every invocation. It
+used to be that ``--locked-teams``, when supplied, REPLACED the derivation. On
+2026-07-29 a swap chain ran 7:23-8:02 PM ET against a list passed once at 7:23;
+two more games locked underneath it, this tool passed the file, and DraftKings
+rejected 7 of 16 entries. A verification tool that can go stale mid-use does
+not verify. So the derivation always runs, ``--locked-teams`` is unioned in
+rather than substituted, and a supplied list that omits a team the clock says
+has started is reported as stale. The lineups feed is preferred over the salary
+file's Game Info column because the feed knows a postponed game has not locked
+and Game Info only knows when it was scheduled.
 """
 from __future__ import annotations
 
@@ -52,12 +64,17 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# The repo root too, so the lazy engine import in derive_locked_teams_from_feed
+# resolves when this tool is run as a script. Without it the feed derivation
+# fails as an ImportError and silently degrades to the Game Info fallback,
+# which is the weaker source and cannot see a postponement.
+sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
 
 from preflight_upload import (  # noqa: E402
     EntryRow, Report, advisory, check_legality, check_manifest,
     check_pool_membership, check_row_shape, check_status, load_entries,
     load_salary, parse_embedded_pool, parse_game_info_datetime,
-    resolve_salary_from_promoted_run, sha256_of,
+    resolve_feed_for_slate, resolve_salary_from_promoted_run, sha256_of,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -73,6 +90,9 @@ def derive_locked_teams(
     tool opt-in, at the moment the operator is least likely to remember it. DK's
     Game Info column already carries the start time; derive from it and let the
     flag override rather than enable.
+
+    This is the fallback source. It cannot tell a postponed game from a game in
+    progress, because the salary CSV only records when the game was scheduled.
     """
     now_dt = now or datetime.now(timezone.utc)
     locked: set[str] = set()
@@ -89,6 +109,137 @@ def derive_locked_teams(
     note = (f"next lock {first_open.strftime('%Y-%m-%d %H:%M ET')}"
             if first_open else "every game on this slate has started")
     return locked, note
+
+
+def resolve_lineups_feed(
+    explicit: Optional[str],
+    salary_path: Path,
+    entries: Sequence[EntryRow],
+    salary: Dict[str, Dict[str, str]],
+    rep: Report,
+) -> Optional[Path]:
+    """Where the lineups feed for this slate lives, or None.
+
+    An explicit path wins. Otherwise a feed staged beside the salary file is
+    preferred, because that pairing is what a build actually wrote. Failing
+    that, the slate-date resolution is preflight's ``resolve_feed_for_slate``,
+    imported rather than restated: it already picks the freshest feed for the
+    date and already refuses when a file spans two slate dates, and two
+    implementations of one rule is this project's named no-op failure class.
+    """
+    if explicit:
+        return Path(explicit)
+    sibling = salary_path.parent / "lineups_feed.json"
+    if sibling.exists():
+        rep.info["feed_autoresolve"] = f"staged beside the salary file: {sibling.name}"
+        return sibling
+    return resolve_feed_for_slate(entries, salary, rep)
+
+
+def derive_locked_teams_from_feed(
+    feed_path: Path,
+    salary_path: Path,
+    now: Optional[datetime] = None,
+) -> Optional[tuple[set[str], str]]:
+    """Locked teams from the lineups feed's own clock, or None if unusable.
+
+    This is the same source ``late_swap.py`` uses internally
+    (``build_status_map_from_lineups_feed`` + a wall clock), so the tool that
+    performs a swap and the tool that verifies it now read lock state off one
+    fact rather than two. Games the feed reports postponed, cancelled, or
+    suspended are excluded: their scheduled start has passed but no lineup in
+    them is frozen, and treating them as locked would block a legal swap.
+
+    The engine import is lazy and its failure is not fatal, because this tool
+    must still run when the engine does not.
+    """
+    try:
+        from mlb_engine.intake.live_data_adapters import (  # noqa: E402
+            build_status_map_from_lineups_feed,
+        )
+    except ImportError:
+        return None
+    try:
+        feed = json.loads(feed_path.read_text(encoding="utf-8"))
+        status = build_status_map_from_lineups_feed(feed, str(salary_path))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+    now_dt = now or datetime.now(timezone.utc)
+    excluded = set(status.get("excluded_game_ids") or [])
+    locked: set[str] = set()
+    first_open: Optional[datetime] = None
+    for game_id, lock_iso in (status.get("lock_time_by_game_id") or {}).items():
+        if game_id in excluded:
+            continue
+        try:
+            lock_time = datetime.fromisoformat(str(lock_iso))
+        except ValueError:
+            continue
+        if lock_time.tzinfo is None:
+            lock_time = lock_time.replace(tzinfo=timezone.utc)
+        teams = [t for t in str(game_id).split("@") if t]
+        if lock_time <= now_dt:
+            locked.update(teams)
+        elif first_open is None or lock_time < first_open:
+            first_open = lock_time
+    if not status.get("lock_time_by_game_id"):
+        return None
+    note = (f"next lock {first_open.astimezone(timezone.utc).strftime('%H:%M UTC')}"
+            if first_open else "every game on this slate has started")
+    if excluded:
+        note += f"; not locked (postponed/suspended): {', '.join(sorted(excluded))}"
+    return locked, note
+
+
+def resolve_locked_teams(
+    supplied: Optional[str],
+    salary: Dict[str, Dict[str, str]],
+    salary_path: Path,
+    feed_path: Optional[Path],
+    now: Optional[datetime],
+    rep: Report,
+) -> tuple[set[str], str, str]:
+    """The locked set, its note, and which source produced it.
+
+    A supplied ``--locked-teams`` is a union, never a substitution. Anything the
+    clock says has started stays locked whether the operator remembered it or
+    not; that asymmetry is the whole fix, because the failure mode is always a
+    list that is missing a team, never one with a team too many.
+    """
+    derived: set[str] = set()
+    note = "no clock source available"
+    source = "none"
+    if feed_path is not None:
+        from_feed = derive_locked_teams_from_feed(feed_path, salary_path, now)
+        if from_feed is not None:
+            derived, note = from_feed
+            source = f"lineups feed {feed_path.name}"
+    if source == "none":
+        derived, note = derive_locked_teams(salary, now)
+        note = note or ""
+        source = "salary Game Info"
+        if feed_path is not None:
+            rep.warn(f"lineups feed at {feed_path} was unusable (unreadable, no "
+                     f"games, or the engine is not importable); locked teams "
+                     f"fell back to the salary Game Info column, which cannot "
+                     f"see a postponement")
+
+    if supplied is None:
+        return derived, note, source
+
+    operator = {t.strip().upper() for t in supplied.split(",") if t.strip()}
+    stale = sorted(derived - operator)
+    if stale:
+        rep.warn(f"STALE --locked-teams: {sorted(operator)} omits {stale}, whose "
+                 f"game the {source} says has already started. The derived set "
+                 f"is used anyway; a hand-passed list goes stale while a swap "
+                 f"chain runs, which is how 7 of 16 entries were rejected on "
+                 f"2026-07-29")
+    extra = sorted(operator - derived)
+    if extra:
+        rep.info["locked_teams_operator_only"] = extra
+    return operator | derived, f"{source} + operator", source
 
 
 def check_parent_slots(
@@ -154,9 +305,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--manifest", help="outputs/<date>/upload_manifest.json")
     ap.add_argument("--expect-entries", type=int)
     ap.add_argument("--expect-contest-type", choices=["classic", "showdown"])
+    ap.add_argument("--lineups",
+                    help="lineups feed JSON; auto-resolved from the salary file's "
+                         "directory or data/slates/<date>/ when omitted")
     ap.add_argument("--locked-teams",
-                    help="override the Game Info derivation; comma-separated")
-    ap.add_argument("--now", help="ISO timestamp used to decide which games have started")
+                    help="teams to treat as locked IN ADDITION to the wall-clock "
+                         "derivation; comma-separated. It cannot shrink the "
+                         "derived set, because a hand-passed list goes stale")
+    ap.add_argument("--as-of", dest="as_of",
+                    help="ISO timestamp used to decide which games have started; "
+                         "defaults to now")
+    ap.add_argument("--now", dest="as_of",
+                    help="deprecated alias for --as-of")
     ap.add_argument("--min-pool-overlap", type=float, default=0.95)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true",
@@ -181,10 +341,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         salary = load_salary(salary_path)
 
         now = None
-        if args.now:
-            now = datetime.fromisoformat(args.now)
+        if args.as_of:
+            now = datetime.fromisoformat(args.as_of)
             if now.tzinfo is None:
                 now = now.replace(tzinfo=timezone.utc)
+        feed_path = resolve_lineups_feed(
+            args.lineups, salary_path, entries, salary, rep)
+        if args.lineups and not feed_path.exists():
+            raise ValueError(f"--lineups {feed_path} does not exist")
     except (OSError, ValueError) as exc:
         print(f"ERROR  {exc}", file=sys.stderr)
         return 3
@@ -207,13 +371,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.manifest:
         check_manifest(entries_path, entries, Path(args.manifest), rep)
 
-    if args.locked_teams is not None:
-        locked = {t.strip().upper() for t in args.locked_teams.split(",") if t.strip()}
-        lock_note = "operator-supplied"
-    else:
-        locked, lock_note = derive_locked_teams(salary, now)
+    locked, lock_note, lock_source = resolve_locked_teams(
+        args.locked_teams, salary, salary_path, feed_path, now, rep)
     rep.info["locked_teams"] = sorted(locked)
     rep.info["lock_note"] = lock_note
+    rep.info["lock_source"] = lock_source
+    rep.info["lock_as_of"] = (now or datetime.now(timezone.utc)).isoformat()
+    rep.info["lineups_feed"] = str(feed_path) if feed_path else None
+    if lock_source == "none":
+        rep.warn("no lineups feed and no parsable Game Info: lock state is "
+                 "underivable, so a slot touching a started game cannot be "
+                 "detected. Pass --lineups.")
 
     parent_detail: Dict[str, Dict[str, object]] = {}
     if args.parent:
@@ -247,6 +415,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"sha256={rep.info['entries_sha256'][:12]}")
         print(f"  salary: {salary_path}"
               + (f"  [{rep.info['salary_source']}]" if rep.info.get("salary_source") else ""))
+        print(f"  lock clock: as of {rep.info['lock_as_of']} via {lock_source}")
         print(f"  locked teams ({lock_note}): "
               + (", ".join(sorted(locked)) if locked else "none"))
         for d in details:
