@@ -26,6 +26,7 @@ and needs no ``--allow-parent-mismatch``.
 Usage:
     python tools/late_swap.py --date 2026-07-22 \
         --parent-entries runs/<run_id>/final/DKEntries.csv \
+        [--salary runs/<run_id>/inputs/DKSalaries.csv] \
         [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
         [--entry-ids 123,456] [--dry-run] \
         [--postures <contest_id>=cash,...] [--accept-downgrade]
@@ -258,6 +259,21 @@ def _score_roster(projections, roster_ids, shape: str) -> float | None:
     return float(value) if value is not None else None
 
 
+def resolve_swap_inputs(explicit_salary, explicit_lineups, slate_dir) -> tuple[Path, Path]:
+    """(salary, lineups feed) for this swap: an explicit path always wins.
+
+    R29(4). Both defaults are the shared, date-keyed staged names, which any
+    concurrent build for the same date may overwrite while this swap is running.
+    Resolution lives in one function so the salary path and the feed path cannot
+    acquire different rules, and so "the explicit path wins" is a fact a test can
+    assert without running a swap.
+    """
+    slate = Path(slate_dir)
+    salary = Path(explicit_salary) if explicit_salary else slate / "DKSalaries.csv"
+    feed = Path(explicit_lineups) if explicit_lineups else slate / "lineups_feed.json"
+    return salary, feed
+
+
 def _feed_age_report(feed: dict, slate_date: str, now: dt.datetime) -> tuple[list[str], list[str]]:
     """(blockers, warnings) about the age and identity of the disk feed."""
     blockers: list[str] = []
@@ -320,6 +336,20 @@ def main() -> int:
                          "reads the shared data/slates/<date>/lineups_feed.json "
                          "cache, which is as old as whatever wrote it and is also "
                          "read and written by concurrent builds.")
+    ap.add_argument("--salary",
+                    help="DKSalaries.csv for THIS swap, read-only. Without it the "
+                         "swap reads data/slates/<date>/DKSalaries.csv, which is "
+                         "keyed on date alone and is therefore shared, mutable, "
+                         "and clobberable by a concurrent build for the same date. "
+                         "build_slate.py preserves a tagged copy "
+                         "(DKSalaries_<tag>.csv) for exactly this; point at it and "
+                         "the swap stops depending on the staged name.")
+    # No --entries-source. Every entries read on this path already comes from
+    # --parent-entries (geometry, the reserved grid, the embedded pool, the
+    # rosters, and the run's own current_entries_csv), so there is no staged
+    # entries file to route around: the operator already points that one
+    # wherever they like. A second entries path would let the reserved grid
+    # disagree with the file being refined, and nothing checks that.
     ap.add_argument("--entry-ids", help="comma-separated Entry IDs to authorize; "
                                         "default authorizes every reserved entry")
     ap.add_argument("--dry-run", action="store_true",
@@ -357,16 +387,31 @@ def main() -> int:
     args = ap.parse_args()
 
     slate = REPO / "data" / "slates" / args.date
-    salary = slate / "DKSalaries.csv"
-    # R25: the feed path was hardcoded to the shared per-slate cache, which is
-    # as old as whatever wrote it; a swap blocked on hours-old TBD teams that
+    # R29(4): the salary path was hardcoded to the shared, date-keyed staged
+    # name. On 2026-07-29 a concurrent Showdown build for the same date
+    # overwrote it mid-swap, and every entry then failed with "embedded player
+    # pool overlaps the salary file at 0.0%". With no flag to point elsewhere,
+    # the only route around it was swapping staged files in and out around each
+    # of the ~19 remaining calls. Once a run has tagged inputs, a swap should
+    # never have to depend on the mutable staging path.
+    #
+    # R25: the feed path was hardcoded to the same shared per-slate cache, which
+    # is as old as whatever wrote it; a swap blocked on hours-old TBD teams that
     # had long since posted. --lineups supplies a fresh feed without touching
     # the shared file other concurrent sessions read and write.
-    feed_path = Path(args.lineups) if args.lineups else slate / "lineups_feed.json"
+    salary, feed_path = resolve_swap_inputs(args.salary, args.lineups, slate)
     for path in (salary, feed_path, Path(args.parent_entries)):
         if not path.exists():
             print(f"missing input: {path}", file=sys.stderr)
             return 4
+    for label, path, flag in (("salary", salary, "--salary"),
+                              ("lineups feed", feed_path, "--lineups")):
+        shared = path.resolve() == (slate / path.name).resolve()
+        print(f"{label}: {path}"
+              + ("  [SHARED staging path: a concurrent build for this date can "
+                 f"overwrite it mid-swap; pass {flag} at a tagged copy to be "
+                 "immune]" if shared else "  [explicit, not the shared staging "
+                                          "path]"))
 
     # This is the tool that runs closest to lock and the one most likely to hit
     # a clobbered staged name. data/slates/<date>/ is keyed on date alone, so a

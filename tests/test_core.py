@@ -6254,6 +6254,75 @@ class SwapFailureClassificationTests(unittest.TestCase):
                       text)
 
 
+class SwapInputOverrideTests(unittest.TestCase):
+    """R29(4): a swap must not depend on the shared, date-keyed staging path.
+
+    Teeth: on 2026-07-29 a concurrent Showdown build for the same date
+    overwrote data/slates/<date>/DKSalaries.csv mid-swap. Every entry then
+    failed with "embedded player pool overlaps the salary file at 0.0%", and
+    with no flag to point elsewhere the only route around it was swapping staged
+    files in and out around each of the ~19 remaining calls.
+    """
+
+    def setUp(self):
+        self.ls = SwapControlsInheritanceTests._late_swap()
+
+    def test_the_staged_names_are_still_the_defaults(self):
+        salary, feed = self.ls.resolve_swap_inputs(None, None, Path("/slates/d"))
+        self.assertEqual(salary, Path("/slates/d/DKSalaries.csv"))
+        self.assertEqual(feed, Path("/slates/d/lineups_feed.json"))
+
+    def test_an_explicit_salary_wins_and_the_staged_file_is_not_consulted(self):
+        salary, feed = self.ls.resolve_swap_inputs(
+            "/runs/abc/inputs/DKSalaries.csv", None, Path("/slates/d"))
+        self.assertEqual(salary, Path("/runs/abc/inputs/DKSalaries.csv"))
+        self.assertEqual(feed, Path("/slates/d/lineups_feed.json"),
+                         "the feed default is independent of the salary override")
+
+    def test_both_overrides_are_independent(self):
+        salary, feed = self.ls.resolve_swap_inputs(
+            "/tagged/DKSalaries_1910_8g.csv", "/fresh/lineups_feed.json",
+            Path("/slates/d"))
+        self.assertEqual(salary, Path("/tagged/DKSalaries_1910_8g.csv"))
+        self.assertEqual(feed, Path("/fresh/lineups_feed.json"))
+
+    def test_the_hardcoded_salary_path_is_gone(self):
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertNotIn('salary = slate / "DKSalaries.csv"', text)
+        self.assertIn("resolve_swap_inputs(args.salary, args.lineups, slate)", text)
+
+    def test_the_explicit_path_is_the_one_the_cli_actually_checks(self):
+        """Exit 4 names the path it looked for, which is how a test sees which
+        path the run resolved without running a swap."""
+        import subprocess
+        repo = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            bogus = Path(tmp) / "tagged" / "DKSalaries_1910_8g.csv"
+            result = subprocess.run(
+                [__import__("sys").executable, str(repo / "tools" / "late_swap.py"),
+                 "--date", "2099-01-02", "--parent-entries", str(Path(tmp) / "p.csv"),
+                 "--salary", str(bogus)],
+                capture_output=True, text=True, cwd=str(repo))
+            self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+            self.assertIn(str(bogus), result.stderr)
+            self.assertNotIn("data/slates/2099-01-02/DKSalaries.csv", result.stderr)
+
+    def test_the_shared_staging_path_is_flagged_as_shared(self):
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertIn("SHARED staging path", text)
+
+    def test_no_second_entries_path_was_introduced(self):
+        """Deliberate: every entries read already comes from --parent-entries, so
+        a second entries path would only let the reserved grid disagree with the
+        file being refined, and nothing checks that."""
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertNotIn('"--entries-source"', text.replace("# ", ""))
+        self.assertIn("No --entries-source", text)
+
+
 class InputsUnmovedTests(unittest.TestCase):
     """R20(b): a staged source clobbered mid-build (the 2026-07-23 incident)
     blocks promotion by name instead of certifying against a vanished world."""
