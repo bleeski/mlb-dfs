@@ -99,6 +99,14 @@ ROSTER_START_COL = 4
 OUT_STATUSES = frozenset({"IL", "O", "OUT", "NA", "IL10", "IL15", "IL60", "PUP", "SUSP"})
 WARN_STATUSES = frozenset({"DTD", "GTD", "Q"})
 
+# R34: mirrors ``mlb_engine.entries.upload_manifest.STATUS_VALUES`` on purpose,
+# for the same reason parse_game_info_datetime is mirrored: this tool imports
+# nothing from the engine so it still runs when the engine does not, which is
+# exactly the state in which a pre-upload check matters most. The two are pinned
+# in sync by a test, because a silently-diverged copy is worse than an import.
+STATUS_VALUES = ("candidate", "upload_ready", "blocked", "acknowledged",
+                 "superseded")
+
 CLASSIC_MAX_HITTERS_PER_TEAM = 5
 CLASSIC_MIN_GAMES = 2
 CAPTAIN_MULTIPLIER = 1.5
@@ -579,7 +587,19 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        rep.warn(f"manifest unreadable ({exc}); contest-assignment cross-check skipped")
+        # R35: an ABSENT manifest for a delivered file already hard-fails below,
+        # so warning on a CORRUPT one had the provenance gate exactly backwards:
+        # the weaker evidence state passed. Corruption is also the state in which
+        # a later delivery can silently overwrite the history, so it blocks.
+        if delivered:
+            rep.fail(f"manifest at {manifest_path} is unreadable ({exc}); a "
+                     f"delivered file whose provenance record cannot be read has "
+                     f"no verifiable provenance, and a corrupt manifest is the "
+                     f"one state in which the next delivery erases the history. "
+                     f"Quarantine the file and re-record the delivery")
+        else:
+            rep.warn(f"manifest unreadable ({exc}); contest-assignment "
+                     f"cross-check skipped")
         return
     records = manifest if isinstance(manifest, list) else manifest.get("deliveries", [])
     digest = sha256_of(entries_path)
@@ -601,6 +621,18 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
             rep.fail(message) if delivered else rep.warn(message)
         return
     rep.info["manifest_run_id"] = match.get("run_id")
+    # R34: the verdict needs this. A file whose own record says it was not
+    # certified must not be handed the 'upload_ready' label by a byte checker.
+    rep.info["recorded_certification"] = match.get("certification")
+    rep.info["recorded_status"] = match.get("status")
+    # R34: the status vocabulary is closed and was never enforced, so the
+    # Showdown path wrote 'delivered' and it read as current everywhere that
+    # filters on '!= superseded'.
+    recorded_status = str(match.get("status") or "").strip()
+    if recorded_status and recorded_status not in STATUS_VALUES:
+        rep.fail(f"manifest records status {recorded_status!r}, which is not one "
+                 f"of {list(STATUS_VALUES)}; an unknown status reads as current "
+                 f"everywhere that only filters out 'superseded'")
     recorded_entries = match.get("entries")
     if isinstance(recorded_entries, int) and recorded_entries != len(entries):
         rep.fail(f"manifest records {recorded_entries} entries, file holds "
@@ -962,8 +994,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"ERROR  {exc}", file=sys.stderr)
         return 3
 
+    # R34: 'upload_ready' is reserved for a certified export (CLAUDE.md), and this
+    # tool checks bytes, not certification. It never read the manifest's
+    # `certification` field, so a review-grade Showdown file that is mechanically
+    # clean was stamped 'upload_ready' over `certification: review_grade`. That
+    # already happened twice on 2026-07-29. Passing every byte-level check is not
+    # certification and must not be labelled as it.
+    certification = str(report["info"].get("recorded_certification") or "").strip()
     if not report["failures"]:
-        verdict, code = "upload_ready", 0
+        if certification and certification != "certified":
+            verdict, code = "review_ready", 0
+            report["verdict_note"] = (
+                f"every file-level check passed, but the manifest records "
+                f"certification={certification!r}, so this is NOT upload_ready: "
+                f"that label is reserved for a run where workflow_valid, "
+                f"selection_certified and allocation_certified all passed. "
+                f"Showdown ships review-grade by design.")
+        else:
+            verdict, code = "upload_ready", 0
     elif args.force:
         verdict, code = "acknowledged", 4
     else:

@@ -1512,6 +1512,104 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         self.assertNotIn("overrides the Game Info derivation", text)
 
 
+class UploadReadyIsReservedTests(unittest.TestCase):
+    """R34/R35: the promotion label and the provenance gate, both of which lied.
+
+    Teeth, and this one already happened: two Showdown records in
+    outputs/2026-07-29/upload_manifest.json read `status: upload_ready` beside
+    `certification: review_grade`, which is the exact label CLAUDE.md reserves
+    for a run where all three certification gates passed. A third read
+    `status: delivered`, which is not in the closed status set at all and so read
+    as CURRENT everywhere that only filters out 'superseded'.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+        self.manifest = self.dir / "upload_manifest.json"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write_manifest(self, status="candidate", certification="certified"):
+        import hashlib
+        digest = hashlib.sha256(self.entries.read_bytes()).hexdigest()
+        self.manifest.write_text(json.dumps({
+            "version": "1", "date": "2026-07-25", "deliveries": [{
+                "delivered_file": str(self.entries), "sha256": digest,
+                "contest_type": "classic", "contest_ids": ["5"], "entries": 1,
+                "status": status, "certification": certification,
+            }]}), encoding="utf-8")
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries), "--salary",
+                             str(self.salary), "--manifest", str(self.manifest),
+                             *extra)
+
+    def test_a_certified_record_still_reaches_upload_ready(self):
+        self._write_manifest(certification="certified")
+        payload = json.loads(self._run("--json").stdout)
+        self.assertEqual(payload["verdict"], "upload_ready")
+
+    def test_a_review_grade_record_cannot_reach_upload_ready(self):
+        self._write_manifest(certification="review_grade")
+        result = self._run("--json")
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0,
+                         "a clean review-grade file is still a usable artifact")
+        self.assertEqual(payload["verdict"], "review_ready")
+        self.assertNotEqual(payload["verdict"], "upload_ready")
+        self.assertIn("reserved", payload["verdict_note"])
+
+    def test_an_unknown_status_in_the_record_is_a_hard_failure(self):
+        self._write_manifest(status="delivered")
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("not one of", result.stdout)
+
+    def test_record_delivery_refuses_a_status_outside_the_closed_set(self):
+        from mlb_engine.entries.upload_manifest import record_delivery
+        with self.assertRaises(ValueError) as caught:
+            record_delivery(date="2026-07-25", delivered_file=self.entries,
+                            contest_type="showdown", slate_tag="t",
+                            status="delivered", certification="review_grade")
+        self.assertIn("delivered", str(caught.exception))
+
+    def test_the_two_status_vocabularies_are_pinned_in_sync(self):
+        """preflight imports nothing from the engine by contract, so the set is
+        mirrored. A silently diverged copy is worse than an import."""
+        from mlb_engine.entries.upload_manifest import STATUS_VALUES as engine_set
+        from tools.preflight_upload import STATUS_VALUES as tool_set
+        self.assertEqual(tuple(engine_set), tuple(tool_set))
+
+    def test_a_corrupt_manifest_blocks_a_delivered_file(self):
+        """R35: an ABSENT manifest already hard-failed a delivered file, so
+        warning on a CORRUPT one had the provenance gate backwards -- the weaker
+        evidence state passed."""
+        from tools.preflight_upload import Report, check_manifest, load_entries
+        self.manifest.write_text("{not json", encoding="utf-8")
+        _, _, entries, _, _ = load_entries(self.entries)
+        rep = Report()
+        check_manifest(self.entries, entries, self.manifest, rep, delivered=True)
+        self.assertTrue(any("unreadable" in f for f in rep.failures))
+        self.assertEqual(rep.warnings, [])
+
+    def test_a_corrupt_manifest_only_warns_for_a_file_outside_outputs(self):
+        """A scratch file being checked ad hoc is not a provenance claim."""
+        from tools.preflight_upload import Report, check_manifest, load_entries
+        self.manifest.write_text("{not json", encoding="utf-8")
+        _, _, entries, _, _ = load_entries(self.entries)
+        rep = Report()
+        check_manifest(self.entries, entries, self.manifest, rep, delivered=False)
+        self.assertEqual(rep.failures, [])
+        self.assertTrue(any("unreadable" in w for w in rep.warnings))
+
+
 class ArchetypeRowsResolveEndToEndTests(unittest.TestCase):
     """R29(6): every LIVE archetype row must resolve to a real shape and profile.
 

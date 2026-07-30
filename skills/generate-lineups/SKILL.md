@@ -1,12 +1,14 @@
 ---
 name: generate-lineups
-description: Build a certified DraftKings MLB DFS lineup portfolio from an uploaded DKSalaries CSV and DKEntries CSV, for both Classic and Showdown. Use this whenever Ben uploads DK files and asks to generate, build, make, or optimize lineups, wants a portfolio or entries for a slate, says "generate lineups", "build my lineups", "run the slate", "optimize for tonight", or asks to late-swap or refine lineups he already uploaded. Trigger even when he does not name the contest type or the engine, and even if he only says something like "here are my files, go" with a salary and entries CSV attached, since the files themselves determine everything else. This is the MLB DFS build path; it is not the mlb-lineups skill, which only fetches probable pitchers and batting orders.
+description: Build a DraftKings MLB DFS lineup portfolio from an uploaded DKSalaries CSV and DKEntries CSV. Classic builds are certified; Showdown builds are review-grade and are never upload-ready. Use this whenever Ben uploads DK files and asks to generate, build, make, or optimize lineups, wants a portfolio or entries for a slate, says "generate lineups", "build my lineups", "run the slate", "optimize for tonight", or asks to late-swap or refine lineups he already uploaded. Trigger even when he does not name the contest type or the engine, and even if he only says something like "here are my files, go" with a salary and entries CSV attached, since the files themselves determine everything else. This is the MLB DFS build path; it is not the mlb-lineups skill, which only fetches probable pitchers and batting orders.
 ---
 
 # Generate lineups
 
-Turn an uploaded DKSalaries CSV plus DKEntries CSV into a certified, upload-ready
-file, then hand Ben the file and a short brief.
+Turn an uploaded DKSalaries CSV plus DKEntries CSV into a file plus a short brief.
+A Classic build can reach certified and upload-ready. A Showdown build is
+**review-grade** and never upload-ready: it does not pass through the three
+certification gates. Do not let the two collapse into one sentence anywhere.
 
 The engine lives in the `mlb-dfs` repo and does the real work. Your job is to
 route to it correctly, notice when something looks wrong, and report honestly.
@@ -539,9 +541,10 @@ one outcome not on offer. Every relaxation is counted in `diversity` and
 portfolio as clean. Override either through `--controls-override`.
 
 Both defaults live in `mlb_engine/optimize/showdown.py`. The Showdown suite is
-`tests/test_showdown.py`, which `tools/audit.py` does NOT run: the audit gate
-counts `tests.test_core` only. Run `python -m unittest tests.test_showdown`
-yourself after touching anything in this section.
+`tests/test_showdown.py`, and `tools/audit.py` DOES gate it, along with
+`test_core`, `test_upload_integrity`, `test_golden_replay` and
+`test_paste_lineups`. (This paragraph claimed the opposite until 2026-07-30; the
+audit has gated four suites since 07-28 and five since 07-30.)
 
 ## Late swap
 
@@ -613,7 +616,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 536 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 546 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

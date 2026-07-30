@@ -1736,7 +1736,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             slate_tag=slate_tag_suffix(salary).lstrip("_"),
             contest_ids=sorted({r["contest_id"] for r in rows}),
             contest_names=sorted({r.get("contest_name", "") for r in rows}),
-            entries=len(assignments), run_id=None, status="delivered",
+            # R34: was status="delivered", which is not in STATUS_VALUES and so
+            # read as current everywhere that only filters out 'superseded'.
+            # 'candidate' is the honest status for a review-grade Showdown file:
+            # it has not been through the three certification gates, so it is a
+            # candidate and preflight must not promote it past that.
+            entries=len(assignments), run_id=None, status="candidate",
             certification="review_grade",
             notes="Showdown ships review-grade; it does not pass the three "
                   "certification gates. See CLAUDE.md.",

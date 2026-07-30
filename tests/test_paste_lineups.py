@@ -104,6 +104,39 @@ class PasteStructureTests(unittest.TestCase):
         self.assertIsNone(self.games[2].gameday_id)
         self.assertEqual(len(self.games[2].home_lineup), 9)
 
+    def test_the_seven_remapped_team_codes_normalize_to_dk(self):
+        """R33: DK and MLB disagree on seven clubs. The header used to be taken
+        verbatim, so a paste rendering CHW/AZ/WSN/TBR/KCR/SDP/SFG produced a
+        game_id that matched nothing in the salary file and the whole game was
+        SKIPPED -- a Classic slate quietly short one game. The first real paste
+        contained none of the seven, which is why the original tests passed."""
+        from mlb_engine.intake.paste_lineups import _dk_team
+        cases = {("CHW", "White Sox"): "CWS", ("AZ", "Diamondbacks"): "ARI",
+                 ("WSN", "Nationals"): "WSH", ("TBR", "Rays"): "TB",
+                 ("KCR", "Royals"): "KC", ("SDP", "Padres"): "SD",
+                 ("SFG", "Giants"): "SF"}
+        for (code, club), expected in cases.items():
+            warnings = []
+            with self.subTest(code=code):
+                self.assertEqual(_dk_team(code, club, warnings), expected)
+                self.assertEqual(warnings, [])
+
+    def test_the_club_link_is_a_real_second_read_not_an_inert_one(self):
+        """The club nickname is the independent check on the header code. It was
+        captured but unusable, because the name map held only full names, so
+        every nickname resolved to None and the cross-check never fired."""
+        from mlb_engine.intake.live_data_adapters import team_name_to_dk_abbrev
+        for club, expected in (("Astros", "HOU"), ("Dodgers", "LAD"),
+                               ("White Sox", "CWS"), ("Cubs", "CHC"),
+                               ("Angels", "LAA"), ("Athletics", "ATH")):
+            self.assertEqual(team_name_to_dk_abbrev(club), expected, club)
+
+    def test_a_header_that_disagrees_with_the_club_link_warns_and_trusts_the_link(self):
+        from mlb_engine.intake.paste_lineups import _dk_team
+        warnings = []
+        self.assertEqual(_dk_team("XYZ", "Dodgers", warnings), "LAD")
+        self.assertTrue(any("club link" in w for w in warnings))
+
     def test_stat_lines_and_records_are_not_mistaken_for_players(self):
         names = [p.display_name for g in self.games
                  for p in g.away_lineup + g.home_lineup]
@@ -195,7 +228,16 @@ class PasteResolutionTests(unittest.TestCase):
         self.assertTrue(any("wrong slate" in w for w in out["report"]["warnings"]))
 
     def test_a_game_not_on_this_slate_is_skipped_never_merged(self):
-        text = _text().replace("HOU Lineup", "NYY Lineup").replace("LAA Lineup", "CWS Lineup")
+        # Both the header AND the club link have to move: since R33 the club link
+        # is the authoritative read, so changing only the header describes a
+        # self-contradictory paste (which is now caught as such) rather than an
+        # off-slate game.
+        text = (_text()
+                .replace("HOU Lineup", "NYY Lineup").replace("LAA Lineup", "CWS Lineup")
+                .replace("[Astros](https://www.mlb.com/astros)",
+                         "[Yankees](https://www.mlb.com/yankees)")
+                .replace("[Angels](https://www.mlb.com/angels)",
+                         "[White Sox](https://www.mlb.com/whitesox)"))
         out = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
         self.assertTrue(any("absent from the salary file" in w
                             for w in out["report"]["warnings"]))

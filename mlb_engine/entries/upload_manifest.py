@@ -35,6 +35,28 @@ VERSION = "1.1"
 # to 'upload_ready', and only for the exact bytes it hashed.
 STATUS_VALUES = ("candidate", "upload_ready", "blocked", "acknowledged", "superseded")
 
+
+def _valid_status(status: object) -> str:
+    """R34: the closed status set, actually closed.
+
+    ``STATUS_VALUES`` was documentation only. Nothing validated against it, so
+    the Showdown path recorded ``status='delivered'`` and it read as CURRENT
+    everywhere that filters on ``!= 'superseded'`` -- including
+    ``current_deliveries``, which answers "which file do I upload".
+
+    Raises rather than coercing. Both callers already wrap ``record_delivery`` in
+    a try/except that degrades to "MANIFEST NOT RECORDED", which default
+    preflight then hard-fails, so an invalid status fails closed instead of
+    entering the record as a status nobody can interpret.
+    """
+    text = str(status or "").strip()
+    if text not in STATUS_VALUES:
+        raise ValueError(
+            f"status {text!r} is not one of {list(STATUS_VALUES)}; a status "
+            f"outside the closed set reads as current everywhere that only "
+            f"filters out 'superseded'")
+    return text
+
 MANIFEST_NAME = "upload_manifest.json"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -120,7 +142,7 @@ def record_delivery(
         # the exact bytes it checked; a later delivery for the same slate marks
         # this one 'superseded'. "Which file do I upload, and did it pass" is now
         # one read of one file instead of a memory of what a terminal printed.
-        "status": status,
+        "status": _valid_status(status),
         "certification": certification,
         # 'enriched' or 'proxy'. A portfolio built on proxy projections is a
         # different artifact from one built on the enrichment stack.

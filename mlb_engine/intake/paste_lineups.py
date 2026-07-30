@@ -276,6 +276,41 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
     return games, warnings
 
 
+def _dk_team(code: str, club: str, warnings: List[str]) -> str:
+    """A paste's team code as DK spells it, cross-checked against the club name.
+
+    R33. The paste's ``<TEAM> Lineup`` header was previously used verbatim as the
+    DK abbreviation. ``DK_ABBREV_REMAP`` exists precisely because the two
+    vocabularies disagree on seven clubs -- AZ/ARI, WSN/WSH, TBR/TB, CHW/CWS,
+    KCR/KC, SDP/SD, SFG/SF -- so a paste rendering any of those produced a
+    ``game_id`` that matched nothing in the salary file, and the game was
+    SKIPPED with a warning. On a Classic slate that silently drops a whole game
+    from the pool and the build proceeds without it. The first real paste
+    happened to contain none of the seven, which is exactly why the tests passed.
+
+    The club name is the second, independent read of the same fact ('Astros' ->
+    HOU), so a header typo or an unrecognised code is caught rather than trusted.
+    They are cross-checked and the CLUB name wins, because it is the unambiguous
+    one: it comes from the team's own page link, not from a three-letter code
+    whose vocabulary is the thing in question.
+    """
+    from mlb_engine.intake.live_data_adapters import (
+        team_name_to_dk_abbrev, to_dk_abbrev,
+    )
+
+    from_code = to_dk_abbrev(code)
+    from_club = team_name_to_dk_abbrev(club) if club else None
+    if from_club and from_code and from_club != from_code:
+        warnings.append(
+            f"header says {code!r} (reads as {from_code}) but the club link says "
+            f"{club!r} (reads as {from_club}); using {from_club} from the club "
+            f"link, which is the unambiguous one")
+        return from_club
+    if from_club and not from_code:
+        return from_club
+    return from_code
+
+
 def _assign(game: PastedGame, headers: Sequence[str],
             blocks: Sequence[List[PastedPlayer]],
             pitchers: Sequence[PastedPitcher]) -> None:
@@ -288,9 +323,9 @@ def _assign(game: PastedGame, headers: Sequence[str],
     stack the wrong side and every gate would pass.
     """
     if len(headers) >= 1:
-        game.away_team = headers[0]
+        game.away_team = _dk_team(headers[0], game.away_club, game.warnings)
     if len(headers) >= 2:
-        game.home_team = headers[1]
+        game.home_team = _dk_team(headers[1], game.home_club, game.warnings)
     if len(headers) != 2:
         game.warnings.append(
             f"expected 2 '<TEAM> Lineup' headers, found {len(headers)} "

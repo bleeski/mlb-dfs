@@ -64,12 +64,12 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  25 modules  536 tests`. The module count comes off the
+   `PASS  v2.26.0  25 modules  546 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
-   audit gates test_core, test_showdown, test_upload_integrity, and
-   test_golden_replay.
+   audit gates test_core, test_showdown, test_upload_integrity,
+   test_golden_replay, and test_paste_lineups.
 3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
    before any build. Exit 3 means the bank does not fit: pass `time_budget_s`
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.

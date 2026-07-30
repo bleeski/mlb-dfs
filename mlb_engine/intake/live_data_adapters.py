@@ -115,6 +115,19 @@ MLB_TEAM_NAME_TO_DK = {
     "st louis cardinals": "STL", "st. louis cardinals": "STL",
     "tampa bay rays": "TB", "texas rangers": "TEX",
     "toronto blue jays": "TOR", "washington nationals": "WSH",
+    # R33: the club NICKNAME alone, which is what mlb.com/starting-lineups
+    # renders in its matchup links ("[Astros](...)@[Angels](...)"). Every MLB
+    # nickname is unique, so these add no ambiguity, and they are what lets a
+    # pasted '<TEAM> Lineup' header be cross-checked against a second,
+    # independent read of the same fact instead of being trusted alone.
+    "diamondbacks": "ARI", "d-backs": "ARI", "braves": "ATL",
+    "orioles": "BAL", "red sox": "BOS", "cubs": "CHC", "white sox": "CWS",
+    "reds": "CIN", "guardians": "CLE", "rockies": "COL", "tigers": "DET",
+    "astros": "HOU", "royals": "KC", "angels": "LAA", "dodgers": "LAD",
+    "marlins": "MIA", "brewers": "MIL", "twins": "MIN", "mets": "NYM",
+    "yankees": "NYY", "phillies": "PHI", "pirates": "PIT", "padres": "SD",
+    "giants": "SF", "mariners": "SEA", "cardinals": "STL", "rays": "TB",
+    "rangers": "TEX", "blue jays": "TOR", "nationals": "WSH",
 }
 
 
