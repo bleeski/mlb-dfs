@@ -71,6 +71,23 @@
    "observations": 1,
    "paid_places": 350
   },
+  "mlb $15k mini-max [150 entry max]|1.00": {
+   "breadth": 0.2297,
+   "entry_fee": 1.0,
+   "field_size": 17835,
+   "history": [
+    {
+     "date": "2026-07-29",
+     "field_size": 17835,
+     "paid_places": 4097,
+     "seats": null
+    }
+   ],
+   "last_seen": "2026-07-29",
+   "name": "MLB $15K mini-MAX [150 Entry Max]",
+   "observations": 1,
+   "paid_places": 4097
+  },
   "mlb satellite to $15 relay throw (early)|na": {
    "entry_fee": null,
    "field_size": 150,
