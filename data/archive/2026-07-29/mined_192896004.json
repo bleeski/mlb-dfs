@@ -1,0 +1,2537 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192896004",
+ "slate_date": "2026-07-29",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 59,
+  "entries_complete_lineups": 57,
+  "roster_size": 10,
+  "entries_unparsed": 2,
+  "winning_points": 122.4,
+  "winning_entry_id": "5202100700",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 57,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 57
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2200,
+  "at_cap_entries": 35,
+  "at_cap_share_pct": 61.4,
+  "salary_left_histogram": {
+   "701-1500": 4,
+   "1-100": 15,
+   "<= 0": 20,
+   "301-700": 11,
+   "> 1500": 2,
+   "101-300": 5
+  },
+  "max_stack_histogram": {
+   "2": 4,
+   "3": 11,
+   "4": 15,
+   "5": 27
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Jesus Luzardo",
+     "Tarik Skubal"
+    ],
+    "count": 23,
+    "field_share_pct": 40.4
+   },
+   {
+    "pair": [
+     "Jared Jones",
+     "Tarik Skubal"
+    ],
+    "count": 6,
+    "field_share_pct": 10.5
+   },
+   {
+    "pair": [
+     "Jared Jones",
+     "Jesus Luzardo"
+    ],
+    "count": 6,
+    "field_share_pct": 10.5
+   },
+   {
+    "pair": [
+     "Eduardo Rodriguez",
+     "Tarik Skubal"
+    ],
+    "count": 4,
+    "field_share_pct": 7.0
+   },
+   {
+    "pair": [
+     "Jesus Luzardo",
+     "Trey Yesavage"
+    ],
+    "count": 4,
+    "field_share_pct": 7.0
+   },
+   {
+    "pair": [
+     "Tarik Skubal",
+     "Trey Yesavage"
+    ],
+    "count": 3,
+    "field_share_pct": 5.3
+   },
+   {
+    "pair": [
+     "Tarik Skubal",
+     "Trevor Rogers"
+    ],
+    "count": 2,
+    "field_share_pct": 3.5
+   },
+   {
+    "pair": [
+     "Eduardo Rodriguez",
+     "Jared Jones"
+    ],
+    "count": 1,
+    "field_share_pct": 1.8
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Tarik Skubal",
+    "pct_drafted": 67.8
+   },
+   {
+    "player": "Jesus Luzardo",
+    "pct_drafted": 59.32
+   },
+   {
+    "player": "Bryce Harper",
+    "pct_drafted": 38.98
+   },
+   {
+    "player": "Brandon Marsh",
+    "pct_drafted": 30.51
+   },
+   {
+    "player": "Bryson Stott",
+    "pct_drafted": 27.12
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 1.7,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0339,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 570,
+  "roster_slots_expected": 570,
+  "recomputed_total_pct": 966.1,
+  "dk_table_total_pct": 962.5,
+  "dk_table_deficit_pts": 3.6,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 3.6 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5202100700",
+   "username": "Wanna_Square_Up1567",
+   "points": 122.4,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "bryce harper",
+    "daulton varsho",
+    "kazuma okamoto",
+    "nathan lukes",
+    "otto lopez",
+    "tarik skubal",
+    "trey yesavage",
+    "xavier edwards",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5202158472",
+   "username": "tothetop85",
+   "points": 114.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Jared Jones"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 13.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "dillon dingler",
+    "eduardo rodriguez",
+    "esteury ruiz",
+    "james wood",
+    "jared jones",
+    "mauricio dubon",
+    "ozzie albies",
+    "spencer torkelson",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5202177733",
+   "username": "Aoteoroa",
+   "points": 110.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "brandon marsh",
+    "bryson stott",
+    "ernie clement",
+    "george springer",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "spencer torkelson",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5202183264",
+   "username": "meyers2305",
+   "points": 108.4,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 22.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "eduardo rodriguez",
+    "eli white",
+    "gleyber torres",
+    "heriberto hernandez",
+    "j t realmuto",
+    "tarik skubal",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5202309776",
+   "username": "OnPoint41",
+   "points": 108.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "davis schneider",
+    "drake baldwin",
+    "eduardo rodriguez",
+    "kazuma okamoto",
+    "matt olson",
+    "nathan lukes",
+    "ronald acuna",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5202377124",
+   "username": "buckstar",
+   "points": 107.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 29.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "alejandro kirk",
+    "bryce harper",
+    "bryson stott",
+    "daulton varsho",
+    "davis schneider",
+    "george springer",
+    "jesus luzardo",
+    "tarik skubal",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5202285296",
+   "username": "howardwi",
+   "points": 106.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 21.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryan de la cruz",
+    "bryce harper",
+    "corbin carroll",
+    "hao yu lee",
+    "liam hicks",
+    "matt vierling",
+    "tarik skubal",
+    "trea turner",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5202253237",
+   "username": "r2phantom",
+   "points": 106.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "bryson stott",
+    "daulton varsho",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "luis garcia",
+    "nathan lukes",
+    "tarik skubal",
+    "trea turner",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5202251058",
+   "username": "tjwwow21",
+   "points": 103.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jared Jones",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 17.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "bryan reynolds",
+    "daylen lile",
+    "henry davis",
+    "jared jones",
+    "kazuma okamoto",
+    "kevin mcgonigle",
+    "nick gonzales",
+    "spencer torkelson",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5202202771",
+   "username": "DJ32153",
+   "points": 102.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 25.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "corbin carroll",
+    "j t realmuto",
+    "jesus luzardo",
+    "marcell ozuna",
+    "nathan lukes",
+    "spencer torkelson",
+    "tarik skubal",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5202182936",
+   "username": "Chriscarv",
+   "points": 101.25,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "davis schneider",
+    "george springer",
+    "j t realmuto",
+    "jesus luzardo",
+    "tarik skubal",
+    "trea turner",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5202174260",
+   "username": "whoisjohngalt420",
+   "points": 100.65,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryce harper",
+    "bryson stott",
+    "daulton varsho",
+    "ernie clement",
+    "george springer",
+    "j t realmuto",
+    "jesus luzardo",
+    "taylor ward",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5202315666",
+   "username": "seth1374",
+   "points": 99.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "bryan de la cruz",
+    "bryce harper",
+    "bryson stott",
+    "daulton varsho",
+    "ernie clement",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "nathan lukes",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5202173840",
+   "username": "WiLDM4Ch1NE",
+   "points": 96.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 13.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "brian navarreto",
+    "daylen lile",
+    "eduardo rodriguez",
+    "james wood",
+    "jorbit vivas",
+    "kyle stowers",
+    "otto lopez",
+    "tarik skubal",
+    "tyrone taylor",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5202366321",
+   "username": "jokerdpo",
+   "points": 96.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "daulton varsho",
+    "edmundo sosa",
+    "francisco lindor",
+    "j t realmuto",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5202347001",
+   "username": "Nbot11",
+   "points": 95.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sean Manaea",
+    "Trevor Rogers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 7.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "cj abrams",
+    "esteury ruiz",
+    "harry ford",
+    "heriberto hernandez",
+    "james wood",
+    "luis garcia",
+    "sean manaea",
+    "trevor rogers",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5202286450",
+   "username": "jc000000",
+   "points": 94.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 16.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "corbin carroll",
+    "eduardo rodriguez",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jared triolo",
+    "jesus luzardo",
+    "ketel marte",
+    "max kepler",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5202066212",
+   "username": "primeness",
+   "points": 93.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 23.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "austin riley",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "eduardo valencia",
+    "javier baez",
+    "matt vierling",
+    "ronald acuna",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5201945985",
+   "username": "TheBabz",
+   "points": 92.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 14.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "eduardo rodriguez",
+    "eduardo valencia",
+    "george springer",
+    "geraldo perdomo",
+    "kazuma okamoto",
+    "ketel marte",
+    "ronald acuna",
+    "tim tawa",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5202290468",
+   "username": "DMATH",
+   "points": 91.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Trevor Rogers"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 19.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "austin riley",
+    "brandon marsh",
+    "francisco lindor",
+    "george springer",
+    "heriberto hernandez",
+    "ildemaro vargas",
+    "matt olson",
+    "tarik skubal",
+    "trevor rogers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5202265525",
+   "username": "ggriggcubsfan",
+   "points": 90.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Jared Jones",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "daulton varsho",
+    "jared jones",
+    "jared triolo",
+    "joey bart",
+    "kyle schwarber",
+    "nick gonzales",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5202342539",
+   "username": "moldova",
+   "points": 89.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jared Jones",
+    "Trevor Rogers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 8.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "heriberto hernandez",
+    "james wood",
+    "jared jones",
+    "javier sanoja",
+    "liam hicks",
+    "nasim nunez",
+    "otto lopez",
+    "pete alonso",
+    "taylor ward",
+    "trevor rogers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5202058576",
+   "username": "Jackie2424",
+   "points": 89.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 21.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "brett baty",
+    "carson benge",
+    "eduardo valencia",
+    "francisco lindor",
+    "jesus luzardo",
+    "matt olson",
+    "nick gonzales",
+    "tarik skubal",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "24",
+   "entry_id": "5202328714",
+   "username": "sportsfan14",
+   "points": 88.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jared Jones",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 16.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "brett baty",
+    "esmerlyn valdez",
+    "francisco alvarez",
+    "francisco lindor",
+    "jared jones",
+    "matt olson",
+    "ozzie albies",
+    "tarik skubal",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "25",
+   "entry_id": "5202280461",
+   "username": "hcnpower",
+   "points": 88.65,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Trey Yesavage"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 17.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryan de la cruz",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jesus luzardo",
+    "ketel marte",
+    "nolan arenado",
+    "spencer torkelson",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5202093909",
+   "username": "JRaab",
+   "points": 88.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "hao yu lee",
+    "jorge polanco",
+    "tarik skubal",
+    "tim tawa",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5202165572",
+   "username": "Extraqtt",
+   "points": 88.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 29.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "bryce harper",
+    "daulton varsho",
+    "francisco lindor",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "nathan lukes",
+    "nick gonzales",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5202282535",
+   "username": "Jdemshock1",
+   "points": 88.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce harper",
+    "corbin carroll",
+    "davis schneider",
+    "hao yu lee",
+    "j t realmuto",
+    "jesus luzardo",
+    "jorge polanco",
+    "max kepler",
+    "tarik skubal",
+    "trea turner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5202262247",
+   "username": "brown1975",
+   "points": 87.25,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "bo bichette",
+    "carson benge",
+    "eduardo valencia",
+    "francisco lindor",
+    "gleyber torres",
+    "jared young",
+    "javier baez",
+    "jesus luzardo",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5202349261",
+   "username": "redyodagirl",
+   "points": 86.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jared Jones",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 19.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce harper",
+    "daulton varsho",
+    "dillon dingler",
+    "edmundo sosa",
+    "hao yu lee",
+    "jared jones",
+    "kevin mcgonigle",
+    "matt vierling",
+    "riley greene",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5202331699",
+   "username": "louka001",
+   "points": 86.4,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 17.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian encarnacion strand",
+    "eduardo rodriguez",
+    "eduardo valencia",
+    "geraldo perdomo",
+    "hao yu lee",
+    "ildemaro vargas",
+    "james wood",
+    "max kepler",
+    "tarik skubal",
+    "taylor ward"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "32",
+   "entry_id": "5202227402",
+   "username": "flintmonster",
+   "points": 85.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryson stott",
+    "eduardo valencia",
+    "jacob young",
+    "james wood",
+    "javier baez",
+    "jesus luzardo",
+    "kevin mcgonigle",
+    "tarik skubal",
+    "tim tawa"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "32",
+   "entry_id": "5202268709",
+   "username": "LBDTitan",
+   "points": 85.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 27.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "daulton varsho",
+    "francisco lindor",
+    "george springer",
+    "hao yu lee",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "luis garcia",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "34",
+   "entry_id": "5202167348",
+   "username": "SDOD1",
+   "points": 84.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "brandon marsh",
+    "bryson stott",
+    "ernie clement",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "nathan lukes",
+    "ryan ohearn",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "34",
+   "entry_id": "5202237340",
+   "username": "mwear",
+   "points": 84.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "bryce harper",
+    "davis schneider",
+    "dillon dingler",
+    "gleyber torres",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "nathan lukes",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5202340483",
+   "username": "bleeski",
+   "points": 83.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Trey Yesavage"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "bryan reynolds",
+    "bryce harper",
+    "bryson stott",
+    "esmerlyn valdez",
+    "francisco lindor",
+    "george springer",
+    "j t realmuto",
+    "jesus luzardo",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5202157704",
+   "username": "TheBossinMyWorld",
+   "points": 82.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "edmundo sosa",
+    "ernie clement",
+    "j t realmuto",
+    "jesus luzardo",
+    "nathan lukes",
+    "tarik skubal",
+    "trea turner",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "38",
+   "entry_id": "5202360000",
+   "username": "clags22",
+   "points": 81.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Trevor Rogers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryce harper",
+    "gabriel moreno",
+    "jesus luzardo",
+    "ketel marte",
+    "max kepler",
+    "nolan arenado",
+    "tim tawa",
+    "trea turner",
+    "trevor rogers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5202010908",
+   "username": "csurunnerccr",
+   "points": 79.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 20.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "hao yu lee",
+    "javier baez",
+    "jesus luzardo",
+    "jorge polanco",
+    "matt olson",
+    "matt vierling",
+    "mauricio dubon",
+    "michael harris",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "40",
+   "entry_id": "5202330468",
+   "username": "PensDangleSniper94",
+   "points": 78.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Jared Jones",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 17.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "carson benge",
+    "esmerlyn valdez",
+    "francisco lindor",
+    "harry ford",
+    "jared jones",
+    "jared young",
+    "nick gonzales",
+    "ozzie albies",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5202180490",
+   "username": "chex43",
+   "points": 78.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 21.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan reynolds",
+    "eduardo valencia",
+    "esmerlyn valdez",
+    "gleyber torres",
+    "javier baez",
+    "jesus luzardo",
+    "marcell ozuna",
+    "nick gonzales",
+    "spencer torkelson",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5202379241",
+   "username": "ar12gbp",
+   "points": 78.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 21.69,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin riley",
+    "cj abrams",
+    "daulton varsho",
+    "davis schneider",
+    "eli white",
+    "jesus luzardo",
+    "joey bart",
+    "matt olson",
+    "nathan lukes",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "43",
+   "entry_id": "5202040050",
+   "username": "fan21",
+   "points": 77.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-1-1-1-1-1-1",
+   "chalk_score": 21.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "brandon lowe",
+    "bryan de la cruz",
+    "eduardo valencia",
+    "geraldo perdomo",
+    "jacob young",
+    "jesus luzardo",
+    "jorge polanco",
+    "matt olson",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "44",
+   "entry_id": "5202360457",
+   "username": "schnib",
+   "points": 76.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jared Jones",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 24.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "bryce harper",
+    "cj abrams",
+    "eduardo valencia",
+    "hao yu lee",
+    "james wood",
+    "jared jones",
+    "javier baez",
+    "jesus luzardo"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5201962021",
+   "username": "pgk8",
+   "points": 75.9,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Jared Jones",
+    "Tarik Skubal"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 19.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "andres gimenez",
+    "daulton varsho",
+    "james wood",
+    "jared jones",
+    "jorbit vivas",
+    "luis garcia",
+    "nasim nunez",
+    "tarik skubal",
+    "yohendrick pinango"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "46",
+   "entry_id": "5202370274",
+   "username": "cb777",
+   "points": 75.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "brandon marsh",
+    "bryce harper",
+    "bryson stott",
+    "daylen lile",
+    "francisco lindor",
+    "j t realmuto",
+    "jesus luzardo",
+    "justin crawford",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5202255318",
+   "username": "Bobby216",
+   "points": 75.15,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jared Jones",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 20.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "eduardo valencia",
+    "esmerlyn valdez",
+    "francisco lindor",
+    "jared jones",
+    "jesus luzardo",
+    "kazuma okamoto",
+    "mauricio dubon",
+    "ozzie albies",
+    "ronald acuna",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "48",
+   "entry_id": "5202212086",
+   "username": "ANewLife",
+   "points": 75.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Jared Jones"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 13.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "alejandro kirk",
+    "eli white",
+    "geraldo perdomo",
+    "jared jones",
+    "kazuma okamoto",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "49",
+   "entry_id": "5202185050",
+   "username": "drunkonpappy",
+   "points": 74.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Zack Littell"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 17.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "cj abrams",
+    "daylen lile",
+    "eduardo valencia",
+    "hao yu lee",
+    "heriberto hernandez",
+    "james wood",
+    "luis garcia",
+    "tarik skubal",
+    "zack littell"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "50",
+   "entry_id": "5202226093",
+   "username": "wittwerjoe",
+   "points": 73.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryson stott",
+    "daylen lile",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jesus luzardo",
+    "max kepler",
+    "nolan arenado",
+    "tarik skubal",
+    "tim tawa"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "51",
+   "entry_id": "5202189687",
+   "username": "sparks127",
+   "points": 68.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tarik Skubal",
+    "Trevor Rogers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 19.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec bohm",
+    "brandon marsh",
+    "daylen lile",
+    "harry ford",
+    "luis garcia",
+    "marcell ozuna",
+    "nick gonzales",
+    "tarik skubal",
+    "trea turner",
+    "trevor rogers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "52",
+   "entry_id": "5202374019",
+   "username": "peterjpacheco",
+   "points": 64.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Tarik Skubal"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 24.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon marsh",
+    "bryan de la cruz",
+    "bryson stott",
+    "christian encarnacion strand",
+    "eduardo valencia",
+    "esmerlyn valdez",
+    "jesus luzardo",
+    "otto lopez",
+    "ryan ohearn",
+    "tarik skubal"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5202201980",
+   "username": "marwalk82",
+   "points": 61.15,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jared Jones",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 17.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "geraldo perdomo",
+    "hao yu lee",
+    "harry ford",
+    "heriberto hernandez",
+    "jared jones",
+    "javier sanoja",
+    "jesus luzardo",
+    "ronald acuna",
+    "ryan ohearn"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "54",
+   "entry_id": "5202373955",
+   "username": "Paulo21613",
+   "points": 59.15,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Jared Jones",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 12.88,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian encarnacion strand",
+    "davis schneider",
+    "drake baldwin",
+    "gunnar henderson",
+    "jared jones",
+    "jeremiah jackson",
+    "jesus luzardo",
+    "pete alonso",
+    "ronald acuna",
+    "tyler oneill"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "55",
+   "entry_id": "5202344144",
+   "username": "thedocd",
+   "points": 57.15,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Jared Jones",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 23.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "brandon marsh",
+    "bryan de la cruz",
+    "bryce harper",
+    "eduardo valencia",
+    "jared jones",
+    "javier baez",
+    "jesus luzardo",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "56",
+   "entry_id": "5202313281",
+   "username": "salatso22",
+   "points": 55.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jared Jones",
+    "Jesus Luzardo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 17.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "daylen lile",
+    "francisco lindor",
+    "harry ford",
+    "jacob young",
+    "james wood",
+    "jared jones",
+    "jesus luzardo",
+    "jorge polanco",
+    "luis garcia"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5202366804",
+   "username": "ouroboros0",
+   "points": 54.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jesus Luzardo",
+    "Trey Yesavage"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-1-1-1-1-1",
+   "chalk_score": 21.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "brandon lowe",
+    "brandon marsh",
+    "bryan de la cruz",
+    "bryce harper",
+    "dillon dingler",
+    "geraldo perdomo",
+    "jesus luzardo",
+    "nathan lukes",
+    "trey yesavage"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Tarik Skubal",
+   "player_norm": "tarik skubal",
+   "roster_position": "P",
+   "pct_drafted": 67.8,
+   "fpts": 18.0
+  },
+  {
+   "player": "Jesus Luzardo",
+   "player_norm": "jesus luzardo",
+   "roster_position": "P",
+   "pct_drafted": 59.32,
+   "fpts": 6.25
+  },
+  {
+   "player": "Bryce Harper",
+   "player_norm": "bryce harper",
+   "roster_position": "1B",
+   "pct_drafted": 38.98,
+   "fpts": 12.0
+  },
+  {
+   "player": "Brandon Marsh",
+   "player_norm": "brandon marsh",
+   "roster_position": "OF",
+   "pct_drafted": 30.51,
+   "fpts": 3.0
+  },
+  {
+   "player": "Bryson Stott",
+   "player_norm": "bryson stott",
+   "roster_position": "2B",
+   "pct_drafted": 27.12,
+   "fpts": 15.0
+  },
+  {
+   "player": "Jared Jones",
+   "player_norm": "jared jones",
+   "roster_position": "P",
+   "pct_drafted": 25.42,
+   "fpts": 13.9
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "3B",
+   "pct_drafted": 23.73,
+   "fpts": 19.0
+  },
+  {
+   "player": "Eduardo Valencia",
+   "player_norm": "eduardo valencia",
+   "roster_position": "C",
+   "pct_drafted": 22.03,
+   "fpts": 4.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "OF",
+   "pct_drafted": 20.34,
+   "fpts": 10.0
+  },
+  {
+   "player": "Francisco Lindor",
+   "player_norm": "francisco lindor",
+   "roster_position": "SS",
+   "pct_drafted": 20.34,
+   "fpts": 4.0
+  },
+  {
+   "player": "Alejandro Kirk",
+   "player_norm": "alejandro kirk",
+   "roster_position": "C",
+   "pct_drafted": 18.64,
+   "fpts": 6.0
+  },
+  {
+   "player": "Yohendrick Pinango",
+   "player_norm": "yohendrick pinango",
+   "roster_position": "OF",
+   "pct_drafted": 18.64,
+   "fpts": 6.0
+  },
+  {
+   "player": "Nathan Lukes",
+   "player_norm": "nathan lukes",
+   "roster_position": "OF",
+   "pct_drafted": 18.64,
+   "fpts": 4.0
+  },
+  {
+   "player": "Trea Turner",
+   "player_norm": "trea turner",
+   "roster_position": "SS",
+   "pct_drafted": 18.64,
+   "fpts": 17.0
+  },
+  {
+   "player": "Alec Bohm",
+   "player_norm": "alec bohm",
+   "roster_position": "3B",
+   "pct_drafted": 18.64,
+   "fpts": 5.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "SS",
+   "pct_drafted": 16.95,
+   "fpts": 0.0
+  },
+  {
+   "player": "James Wood",
+   "player_norm": "james wood",
+   "roster_position": "OF",
+   "pct_drafted": 16.95,
+   "fpts": 12.0
+  },
+  {
+   "player": "Hao-Yu Lee",
+   "player_norm": "hao yu lee",
+   "roster_position": "2B",
+   "pct_drafted": 16.95,
+   "fpts": 2.0
+  },
+  {
+   "player": "J.T. Realmuto",
+   "player_norm": "j t realmuto",
+   "roster_position": "C",
+   "pct_drafted": 15.25,
+   "fpts": 4.0
+  },
+  {
+   "player": "Trey Yesavage",
+   "player_norm": "trey yesavage",
+   "roster_position": "P",
+   "pct_drafted": 13.56,
+   "fpts": 21.4
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "OF",
+   "pct_drafted": 13.56,
+   "fpts": 2.0
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "OF",
+   "pct_drafted": 13.56,
+   "fpts": 12.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "OF",
+   "pct_drafted": 13.56,
+   "fpts": 9.0
+  },
+  {
+   "player": "Matt Olson",
+   "player_norm": "matt olson",
+   "roster_position": "1B",
+   "pct_drafted": 13.56,
+   "fpts": 16.0
+  },
+  {
+   "player": "Eduardo Rodriguez",
+   "player_norm": "eduardo rodriguez",
+   "roster_position": "P",
+   "pct_drafted": 11.86,
+   "fpts": 22.4
+  },
+  {
+   "player": "Luis Garcia Jr.",
+   "player_norm": "luis garcia",
+   "roster_position": "1B",
+   "pct_drafted": 11.86,
+   "fpts": 5.0
+  },
+  {
+   "player": "Bryan De La Cruz",
+   "player_norm": "bryan de la cruz",
+   "roster_position": "OF",
+   "pct_drafted": 11.86,
+   "fpts": 2.0
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 11.86,
+   "fpts": 21.0
+  },
+  {
+   "player": "Daylen Lile",
+   "player_norm": "daylen lile",
+   "roster_position": "OF",
+   "pct_drafted": 11.86,
+   "fpts": 3.0
+  },
+  {
+   "player": "A.J. Ewing",
+   "player_norm": "a j ewing",
+   "roster_position": "OF",
+   "pct_drafted": 10.17,
+   "fpts": 19.0
+  },
+  {
+   "player": "Austin Riley",
+   "player_norm": "austin riley",
+   "roster_position": "3B",
+   "pct_drafted": 10.17,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ozzie Albies",
+   "player_norm": "ozzie albies",
+   "roster_position": "2B",
+   "pct_drafted": 10.17,
+   "fpts": 0.0
+  },
+  {
+   "player": "Esmerlyn Valdez",
+   "player_norm": "esmerlyn valdez",
+   "roster_position": "OF",
+   "pct_drafted": 10.17,
+   "fpts": 2.0
+  },
+  {
+   "player": "Heriberto Hernandez",
+   "player_norm": "heriberto hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 10.17,
+   "fpts": 16.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 8.47,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "C",
+   "pct_drafted": 8.47,
+   "fpts": 20.0
+  },
+  {
+   "player": "Davis Schneider",
+   "player_norm": "davis schneider",
+   "roster_position": "OF",
+   "pct_drafted": 8.47,
+   "fpts": 9.0
+  },
+  {
+   "player": "Trevor Rogers",
+   "player_norm": "trevor rogers",
+   "roster_position": "P",
+   "pct_drafted": 8.47,
+   "fpts": 12.7
+  },
+  {
+   "player": "Harry Ford",
+   "player_norm": "harry ford",
+   "roster_position": "C",
+   "pct_drafted": 8.47,
+   "fpts": 2.0
+  },
+  {
+   "player": "Max Kepler",
+   "player_norm": "max kepler",
+   "roster_position": "OF",
+   "pct_drafted": 8.47,
+   "fpts": 8.0
+  },
+  {
+   "player": "Ketel Marte",
+   "player_norm": "ketel marte",
+   "roster_position": "2B",
+   "pct_drafted": 6.78,
+   "fpts": 3.0
+  },
+  {
+   "player": "Matt Vierling",
+   "player_norm": "matt vierling",
+   "roster_position": "OF",
+   "pct_drafted": 6.78,
+   "fpts": 15.0
+  },
+  {
+   "player": "Jorge Polanco",
+   "player_norm": "jorge polanco",
+   "roster_position": "3B",
+   "pct_drafted": 6.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Javier Baez",
+   "player_norm": "javier baez",
+   "roster_position": "SS",
+   "pct_drafted": 6.78,
+   "fpts": 14.0
+  },
+  {
+   "player": "Nick Gonzales",
+   "player_norm": "nick gonzales",
+   "roster_position": "2B",
+   "pct_drafted": 6.78,
+   "fpts": 3.0
+  },
+  {
+   "player": "Otto Lopez",
+   "player_norm": "otto lopez",
+   "roster_position": "SS",
+   "pct_drafted": 6.78,
+   "fpts": 12.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "SS",
+   "pct_drafted": 6.78,
+   "fpts": 7.0
+  },
+  {
+   "player": "Gleyber Torres",
+   "player_norm": "gleyber torres",
+   "roster_position": "2B",
+   "pct_drafted": 6.78,
+   "fpts": 5.0
+  },
+  {
+   "player": "CJ Abrams",
+   "player_norm": "cj abrams",
+   "roster_position": "SS",
+   "pct_drafted": 6.78,
+   "fpts": 4.0
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "1B",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andres Gimenez",
+   "player_norm": "andres gimenez",
+   "roster_position": "SS",
+   "pct_drafted": 5.08,
+   "fpts": 2.0
+  },
+  {
+   "player": "Mauricio Dubon",
+   "player_norm": "mauricio dubon",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jacob Young",
+   "player_norm": "jacob young",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 9.0
+  },
+  {
+   "player": "Carson Benge",
+   "player_norm": "carson benge",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 10.0
+  },
+  {
+   "player": "Tyrone Taylor",
+   "player_norm": "tyrone taylor",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 4.0
+  },
+  {
+   "player": "Xavier Edwards",
+   "player_norm": "xavier edwards",
+   "roster_position": "2B",
+   "pct_drafted": 5.08,
+   "fpts": 14.0
+  },
+  {
+   "player": "Ryan O'Hearn",
+   "player_norm": "ryan ohearn",
+   "roster_position": "1B",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Taylor Ward",
+   "player_norm": "taylor ward",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 11.0
+  },
+  {
+   "player": "Bryan Reynolds",
+   "player_norm": "bryan reynolds",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 5.0
+  },
+  {
+   "player": "Nick Gonzales",
+   "player_norm": "nick gonzales",
+   "roster_position": "3B",
+   "pct_drafted": 5.08,
+   "fpts": 3.0
+  },
+  {
+   "player": "Marcell Ozuna",
+   "player_norm": "marcell ozuna",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Eli White",
+   "player_norm": "eli white",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 6.0
+  },
+  {
+   "player": "Brady House",
+   "player_norm": "brady house",
+   "roster_position": "3B",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nolan Arenado",
+   "player_norm": "nolan arenado",
+   "roster_position": "3B",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "SS",
+   "pct_drafted": 5.08,
+   "fpts": 2.0
+  },
+  {
+   "player": "Javier Baez",
+   "player_norm": "javier baez",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 14.0
+  },
+  {
+   "player": "Christian Encarnacion-Strand",
+   "player_norm": "christian encarnacion strand",
+   "roster_position": "3B",
+   "pct_drafted": 5.08,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "2B",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jorbit Vivas",
+   "player_norm": "jorbit vivas",
+   "roster_position": "3B",
+   "pct_drafted": 3.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Brandon Lowe",
+   "player_norm": "brandon lowe",
+   "roster_position": "2B",
+   "pct_drafted": 3.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Brett Baty",
+   "player_norm": "brett baty",
+   "roster_position": "3B",
+   "pct_drafted": 3.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "AJ Smith-Shawver",
+   "player_norm": "aj smith shawver",
+   "roster_position": "P",
+   "pct_drafted": 3.39,
+   "fpts": 10.15
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Edmundo Sosa",
+   "player_norm": "edmundo sosa",
+   "roster_position": "3B",
+   "pct_drafted": 3.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Esteury Ruiz",
+   "player_norm": "esteury ruiz",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 17.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 3.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jared Young",
+   "player_norm": "jared young",
+   "roster_position": "1B",
+   "pct_drafted": 3.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Joey Bart",
+   "player_norm": "joey bart",
+   "roster_position": "C",
+   "pct_drafted": 3.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "C",
+   "pct_drafted": 3.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Tyler O'Neill",
+   "player_norm": "tyler oneill",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "C",
+   "pct_drafted": 3.39,
+   "fpts": 10.0
+  },
+  {
+   "player": "Davis Schneider",
+   "player_norm": "davis schneider",
+   "roster_position": "2B",
+   "pct_drafted": 3.39,
+   "fpts": 9.0
+  },
+  {
+   "player": "Pete Alonso",
+   "player_norm": "pete alonso",
+   "roster_position": "1B",
+   "pct_drafted": 3.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "2B",
+   "pct_drafted": 1.69,
+   "fpts": 7.0
+  },
+  {
+   "player": "Kyle Stowers",
+   "player_norm": "kyle stowers",
+   "roster_position": "1B",
+   "pct_drafted": 1.69,
+   "fpts": 4.0
+  },
+  {
+   "player": "Brian Navarreto",
+   "player_norm": "brian navarreto",
+   "roster_position": "C",
+   "pct_drafted": 1.69,
+   "fpts": 4.0
+  },
+  {
+   "player": "Zack Littell",
+   "player_norm": "zack littell",
+   "roster_position": "P",
+   "pct_drafted": 1.69,
+   "fpts": 10.3
+  },
+  {
+   "player": "Henry Davis",
+   "player_norm": "henry davis",
+   "roster_position": "C",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Bo Bichette",
+   "player_norm": "bo bichette",
+   "roster_position": "3B",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Schwarber",
+   "player_norm": "kyle schwarber",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jared Triolo",
+   "player_norm": "jared triolo",
+   "roster_position": "SS",
+   "pct_drafted": 1.69,
+   "fpts": 11.0
+  },
+  {
+   "player": "Ildemaro Vargas",
+   "player_norm": "ildemaro vargas",
+   "roster_position": "2B",
+   "pct_drafted": 1.69,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jorge Polanco",
+   "player_norm": "jorge polanco",
+   "roster_position": "2B",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Francisco Alvarez",
+   "player_norm": "francisco alvarez",
+   "roster_position": "C",
+   "pct_drafted": 1.69,
+   "fpts": 7.0
+  },
+  {
+   "player": "Sean Manaea",
+   "player_norm": "sean manaea",
+   "roster_position": "P",
+   "pct_drafted": 1.69,
+   "fpts": 12.7
+  },
+  {
+   "player": "Riley Greene",
+   "player_norm": "riley greene",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 6.0
+  },
+  {
+   "player": "Edmundo Sosa",
+   "player_norm": "edmundo sosa",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 5.0
+  },
+  {
+   "player": "Justin Crawford",
+   "player_norm": "justin crawford",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 10.0
+  },
+  {
+   "player": "Gunnar Henderson",
+   "player_norm": "gunnar henderson",
+   "roster_position": "SS",
+   "pct_drafted": 1.69,
+   "fpts": 9.0
+  },
+  {
+   "player": "Jeremiah Jackson",
+   "player_norm": "jeremiah jackson",
+   "roster_position": "2B",
+   "pct_drafted": 1.69,
+   "fpts": 4.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 59,
+  "best_rank": 36,
+  "worst_rank": 36,
+  "best_finish_percentile": 40.68,
+  "median_finish_percentile": 40.68,
+  "best_points": 83.65,
+  "winning_points": 122.4,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

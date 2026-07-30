@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  23 modules  437 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. **Sandbox caveat (measured 2026-07-29):** with scipy present the four suites cost about 55s wall (test_core 30s, golden 20s), which exceeds a 45s Cowork tool call. Run suite-by-suite instead (`python -m unittest tests.test_core`, then `tests.test_showdown tests.test_upload_integrity`, then `tests.test_golden_replay`, then `python tools/audit.py --terse` for pins and inventory); the counts sum to 437 (330 + 98 + 9) and nothing about what the audit checks changes. Install deps first if `--terse` reports missing scipy: `python tools/env_probe.py` prints the exact pinned command. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  25 modules  546 tests`. If the audit fails on pins or inventory only while `python -m unittest tests.test_core` passes in full, proceed and flag; never repair infrastructure mid-slate. **Sandbox caveat (measured 2026-07-29):** with scipy present the four suites cost about 55s wall (test_core 30s, golden 20s), which exceeds a 45s Cowork tool call. Run suite-by-suite instead (`python -m unittest tests.test_core` 359, then `tests.test_showdown` 49, then `tests.test_upload_integrity` 100, then `tests.test_golden_replay` 9, then `tests.test_paste_lineups` 29 — a fifth gated suite as of 2026-07-30 — then `python tools/audit.py --terse` for pins and inventory); the counts sum to 546 (359 + 49 + 100 + 9 + 29) and nothing about what the audit checks changes. Install deps first if `--terse` reports missing scipy: `python tools/env_probe.py` prints the exact pinned command. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw). This applies to late swap too as of 2026-07-27 (F16): `tools/late_swap.py --postures <id>=<posture>` resolves identity the way the build does and blocks on a contest that matches no archetype, where it used to stamp every entry `large_wta`.
@@ -1016,6 +1016,463 @@ lineup-derived ownership as authoritative when `recomputed_total_pct` is exactly
 assumes DK's table is ground truth and in small fields it is not. Affected:
 192707481, 192707520, 192707521, 192707612, 192744091, 192746313, 192747269,
 192747982, 192748828, 192784673, 192784674, 192842358, 192851120, 192853093.
+
+## A-027 — 2026-07-29 — 12 contests, 5 slates (1210_5g, 1910_8g Classic; 1310_1g_sd, 1840_1g_sd Showdown)
+
+Contests 192895619, 192895628, 192895945, 192895951, 192896002, 192896004, 192896006, 192896201, 192896202, 192896204, 192896205, 192896237.
+
+Mined 2026-07-30 by ARCHIVE from the standings inbox. Salary basis resolved per contest from the upload manifest's `slate_tag`, not by `--auto-salary` alone: on 2026-07-28 `DKSalaries_1910_9g.csv` and `DKSalaries_1910_10g.csv` differ in content but both join at 100%, so auto-resolution correctly declined and would have dropped the whole slate to the `standings_only` tier. The manifest records what actually shipped to each contest and is the authoritative disambiguator. Salary bases used: tag:DKSalaries_1210_5g.csv, tag:DKSalaries_1910_8g.csv, tag:DKSalaries_showdown_1310_1g_sd.csv, tag:DKSalaries_showdown_1840_1g_sd.csv.
+
+Entry fee was supplied at mining time from the `Entry Fee` column of the delivered DKEntries file, which is the per-contest source the standings export does not carry. Winnings were NOT captured: the contest-page trio was not recorded, so every contest in this group has a fee but a null winnings and therefore no net line. Observed outcomes only; never a graded prediction.
+
+Ownership recompute: 10 of these 37 contests report `ownership_recompute_ok: false`. Every one of them also reports `parse_structural_ok: true` with `roster_slots_observed == roster_slots_expected` and a lineup recompute totalling exactly 100 x roster_size, which is the small-field condition already recorded above A-013: DK's `%Drafted` table sums short because DK omits position rows for multi-position players. Lineup-derived ownership is authoritative for these contests.
+
+#### Full-field decomposition — contest 192895619 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 14.0 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 71 (71 complete lineups); winning score 151.15; multi-entry contest: True.
+- Duplication: 70 distinct lineups; 2.8% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 69, 2: 1}.
+- Salary usage: 43.7% of entries within $100 of the cap. Salary-left bins: {'<= 0': 16, '101-300': 27, '701-1500': 3, '301-700': 9, '1-100': 15, '> 1500': 1}.
+- Max-stack histogram: {1: 1, 2: 4, 3: 6, 4: 23, 5: 37}.
+- SP-pair field share (top): Cam Schlittler/Chris Sale 14.1%, Chris Sale/Joe Ryan 9.9%, Brady Singer/Cam Schlittler 7.0%, Chris Sale/Joey Cantillo 5.6%.
+- **Self vs field**: 2 own entries; best rank 15/71 (80.28th pct), median 52.82th pct; best 123.3 pts against a winning 151.15; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Cam Schlittler 50.7%, Chris Sale 46.48%, Jeremy Pena 30.99%, Yordan Alvarez 29.58%, Jahmai Jones 29.58%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 11.27 pts; parse OK; DK %Drafted table short 14.0 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192895628 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 118 (116 complete lineups); winning score 156.15; multi-entry contest: True.
+- Duplication: 116 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 116}.
+- Salary usage: 47.4% of entries within $100 of the cap. Salary-left bins: {'101-300': 32, '301-700': 20, '> 1500': 4, '<= 0': 26, '701-1500': 5, '1-100': 29}.
+- Max-stack histogram: {1: 1, 2: 10, 3: 8, 4: 23, 5: 74}.
+- SP-pair field share (top): Cam Schlittler/Chris Sale 26.7%, Cam Schlittler/Joey Cantillo 7.8%, Brady Singer/Chris Sale 5.2%, Cam Schlittler/Matthew Boyd 5.2%.
+- **Self vs field**: 3 own entries; best rank 7/118 (94.92th pct), median 32.2th pct; best 140.15 pts against a winning 156.15; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Chris Sale 55.08%, Cam Schlittler 51.69%, Jahmai Jones 35.59%, Yordan Alvarez 30.51%, Romy Gonzalez 27.97%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.84 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192895945 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 14.0 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 71 (69 complete lineups); winning score 113.7; multi-entry contest: True.
+- Duplication: 69 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 69}.
+- Salary usage: 50.7% of entries within $100 of the cap. Salary-left bins: {'<= 0': 23, '101-300': 17, '301-700': 9, '701-1500': 5, '1-100': 12, '> 1500': 3}.
+- Max-stack histogram: {2: 9, 3: 10, 4: 17, 5: 33}.
+- SP-pair field share (top): Jesus Luzardo/Tarik Skubal 37.7%, Tarik Skubal/Trey Yesavage 10.1%, Sean Manaea/Tarik Skubal 8.7%, Eduardo Rodriguez/Tarik Skubal 7.2%.
+- **Self vs field**: 2 own entries; best rank 13/71 (83.1th pct), median 43.66th pct; best 103.4 pts against a winning 113.7; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Tarik Skubal 76.06%, Jesus Luzardo 53.52%, Bryce Harper 30.99%, Daulton Varsho 26.76%, George Springer 25.35%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 5.64 pts; parse OK; DK %Drafted table short 14.0 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192895951 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 9.4 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 118 (118 complete lineups); winning score 138.4; multi-entry contest: True.
+- Duplication: 117 distinct lineups; 1.7% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 116, 2: 1}.
+- Salary usage: 50.8% of entries within $100 of the cap. Salary-left bins: {'<= 0': 33, '101-300': 29, '1-100': 27, '301-700': 22, '701-1500': 6, '> 1500': 1}.
+- Max-stack histogram: {2: 7, 3: 16, 4: 32, 5: 63}.
+- SP-pair field share (top): Jesus Luzardo/Tarik Skubal 40.7%, Jared Jones/Tarik Skubal 9.3%, Tarik Skubal/Zack Littell 6.8%, Jared Jones/Jesus Luzardo 5.9%.
+- **Self vs field**: 3 own entries; best rank 5/118 (96.61th pct), median 42.37th pct; best 109.65 pts against a winning 138.4; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Tarik Skubal 74.58%, Jesus Luzardo 56.78%, Kazuma Okamoto 27.97%, Bryce Harper 27.12%, Bryson Stott 26.27%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 5.93 pts; parse OK; DK %Drafted table short 9.4 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192896002 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 3.7 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 59 (57 complete lineups); winning score 119.4; multi-entry contest: False.
+- Duplication: 57 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 57}.
+- Salary usage: 52.6% of entries within $100 of the cap. Salary-left bins: {'> 1500': 6, '301-700': 10, '<= 0': 16, '1-100': 14, '101-300': 7, '701-1500': 4}.
+- Max-stack histogram: {2: 3, 3: 12, 4: 11, 5: 31}.
+- SP-pair field share (top): Jesus Luzardo/Tarik Skubal 36.8%, Jared Jones/Tarik Skubal 7.0%, Jared Jones/Jesus Luzardo 7.0%, Eduardo Rodriguez/Tarik Skubal 5.3%.
+- **Self vs field**: 1 own entries; best rank 2/59 (98.31th pct), median 98.31th pct; best 116.8 pts against a winning 119.4; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Tarik Skubal 62.71%, Jesus Luzardo 55.93%, Bryce Harper 30.51%, Kazuma Okamoto 25.42%, Brandon Marsh 22.03%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 3.39 pts; parse OK; DK %Drafted table short 3.7 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192896004 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 3.6 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 59 (57 complete lineups); winning score 122.4; multi-entry contest: False.
+- Duplication: 57 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 57}.
+- Salary usage: 61.4% of entries within $100 of the cap. Salary-left bins: {'701-1500': 4, '1-100': 15, '<= 0': 20, '301-700': 11, '> 1500': 2, '101-300': 5}.
+- Max-stack histogram: {2: 4, 3: 11, 4: 15, 5: 27}.
+- SP-pair field share (top): Jesus Luzardo/Tarik Skubal 40.4%, Jared Jones/Tarik Skubal 10.5%, Jared Jones/Jesus Luzardo 10.5%, Eduardo Rodriguez/Tarik Skubal 7.0%.
+- **Self vs field**: 1 own entries; best rank 36/59 (40.68th pct), median 40.68th pct; best 83.65 pts against a winning 122.4; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Tarik Skubal 67.8%, Jesus Luzardo 59.32%, Bryce Harper 38.98%, Brandon Marsh 30.51%, Bryson Stott 27.12%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 1.7 pts; parse OK; DK %Drafted table short 3.6 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192896006 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 5.1 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 118 (117 complete lineups); winning score 143.8; multi-entry contest: True.
+- Duplication: 114 distinct lineups; 5.1% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 111, 2: 3}.
+- Salary usage: 40.2% of entries within $100 of the cap. Salary-left bins: {'301-700': 24, '101-300': 28, '1-100': 21, '701-1500': 16, '<= 0': 26, '> 1500': 2}.
+- Max-stack histogram: {2: 13, 3: 27, 4: 21, 5: 56}.
+- SP-pair field share (top): Jesus Luzardo/Tarik Skubal 30.8%, Jared Jones/Tarik Skubal 15.4%, Tarik Skubal/Trey Yesavage 7.7%, Jesus Luzardo/Trey Yesavage 6.8%.
+- **Self vs field**: 1 own entries; best rank 7/118 (94.92th pct), median 94.92th pct; best 116.8 pts against a winning 143.8; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Tarik Skubal 69.49%, Jesus Luzardo 52.54%, Bryce Harper 31.36%, Kazuma Okamoto 25.42%, Bryson Stott 25.42%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 5.09 pts; parse OK; DK %Drafted table short 5.1 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192896201 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 237 (235 complete lineups); winning score 73.85; multi-entry contest: True.
+- Duplication: 194 distinct lineups; 26.4% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 173, 2: 14, 3: 3, 4: 1, 7: 3}.
+- Salary usage: 37.0% of entries within $100 of the cap. Salary-left bins: {'101-300': 41, '701-1500': 40, '1-100': 37, '301-700': 50, '<= 0': 50, '> 1500': 17}.
+- Max-stack histogram: {3: 67, 4: 84, 5: 84}.
+- **Self vs field**: 7 own entries; best rank 10/237 (96.2th pct), median 54.43th pct; best 62.05 pts against a winning 73.85; 2 own lineup(s) duplicated by the field (max 4 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): AJ Smith-Shawver 45.57%, Sean Manaea 45.15%, Ronald Acuna Jr. 44.3%, Jorge Polanco 35.86%, Eli White 35.02%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.42 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192896202 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 6 distinct players); DK's %Drafted table sums 19.0 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 237 (230 complete lineups); winning score 70.7; multi-entry contest: True.
+- Duplication: 204 distinct lineups; 18.3% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 188, 2: 14, 7: 2}.
+- Salary usage: 33.9% of entries within $100 of the cap. Salary-left bins: {'701-1500': 46, '301-700': 43, '101-300': 46, '1-100': 35, '> 1500': 17, '<= 0': 43}.
+- Max-stack histogram: {3: 66, 4: 98, 5: 66}.
+- **Self vs field**: 7 own entries; best rank 4/237 (98.73th pct), median 82.7th pct; best 62.05 pts against a winning 70.7; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Ronald Acuna Jr. 42.2%, Francisco Lindor 37.55%, Mauricio Dubon 34.18%, AJ Smith-Shawver 34.18%, A.J. Ewing 34.17%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 18.98 pts; parse OK; DK %Drafted table short 19.0 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192896204 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 61.5; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 26.1% of entries within $100 of the cap. Salary-left bins: {'301-700': 6, '1-100': 2, '701-1500': 5, '> 1500': 2, '<= 0': 4, '101-300': 4}.
+- Max-stack histogram: {3: 3, 4: 12, 5: 8}.
+- **Self vs field**: 1 own entries; best rank 22/23 (8.7th pct), median 8.7th pct; best 22.0 pts against a winning 61.5; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Ronald Acuna Jr. 60.87%, Jorge Polanco 56.52%, Mauricio Dubon 43.48%, A.J. Ewing 39.13%, Francisco Lindor 39.13%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192896205 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 70.05; multi-entry contest: False.
+- Duplication: 21 distinct lineups; 13.0% of entries sat in a duplicated lineup; max copies 3; the winning lineup had 1 copy. Copies histogram: {1: 20, 3: 1}.
+- Salary usage: 34.8% of entries within $100 of the cap. Salary-left bins: {'701-1500': 6, '101-300': 3, '1-100': 7, '<= 0': 1, '> 1500': 1, '301-700': 5}.
+- Max-stack histogram: {3: 3, 4: 11, 5: 9}.
+- **Self vs field**: 1 own entries; best rank 22/23 (8.7th pct), median 8.7th pct; best 30.225 pts against a winning 70.05; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Ronald Acuna Jr. 52.18%, Jared Young 52.17%, AJ Smith-Shawver 52.17%, Jorge Polanco 43.48%, Sean Manaea 43.48%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192896237 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 196 (196 complete lineups); winning score 93.399994; multi-entry contest: True.
+- Duplication: 153 distinct lineups; 35.2% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 3 copies. Copies histogram: {1: 127, 2: 18, 3: 5, 4: 1, 7: 2}.
+- Salary usage: 27.6% of entries within $100 of the cap. Salary-left bins: {'<= 0': 27, '301-700': 51, '1-100': 27, '101-300': 46, '701-1500': 39, '> 1500': 6}.
+- Max-stack histogram: {3: 53, 4: 72, 5: 71}.
+- **Self vs field**: 7 own entries; best rank 44/196 (78.06th pct), median 40.31th pct; best 65.05 pts against a winning 93.399994; 2 own lineup(s) duplicated by the field (max 2 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): MacKenzie Gore 57.65%, Ian Seymour 45.92%, Junior Caminero 43.87%, Ezequiel Duran 42.86%, Wyatt Langford 36.73%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+
+## A-028 — 2026-07-28 — 25 contests, 4 slates (1840_5g, 1910_9g, 2138_5g Classic; 2210_1g_sd Showdown)
+
+Contests 192846378, 192846711, 192846990, 192846994, 192847009, 192847679, 192847713, 192878956, 192884081, 192884161, 192884434, 192887057, 192889002, 192889325, 192889342, 192889422, 192890029, 192890173, 192890703, 192891870, 192891874, 192894664, 192899735, 192900602, 192901361.
+
+Mined 2026-07-30 by ARCHIVE from the standings inbox. Salary basis resolved per contest from the upload manifest's `slate_tag`, not by `--auto-salary` alone: on 2026-07-28 `DKSalaries_1910_9g.csv` and `DKSalaries_1910_10g.csv` differ in content but both join at 100%, so auto-resolution correctly declined and would have dropped the whole slate to the `standings_only` tier. The manifest records what actually shipped to each contest and is the authoritative disambiguator. Salary bases used: auto, auto:slatedir, tag:1910_9g, tag:DKSalaries_1840_5g.csv, tag:DKSalaries_1910_9g.csv.
+
+Entry fee was supplied at mining time from the `Entry Fee` column of the delivered DKEntries file, which is the per-contest source the standings export does not carry. Winnings were NOT captured: the contest-page trio was not recorded, so every contest in this group has a fee but a null winnings and therefore no net line. Observed outcomes only; never a graded prediction.
+
+Ownership recompute: 10 of these 37 contests report `ownership_recompute_ok: false`. Every one of them also reports `parse_structural_ok: true` with `roster_slots_observed == roster_slots_expected` and a lineup recompute totalling exactly 100 x roster_size, which is the small-field condition already recorded above A-013: DK's `%Drafted` table sums short because DK omits position rows for multi-position players. Lineup-derived ownership is authoritative for these contests.
+
+#### Full-field decomposition — contest 192846378 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 118 (118 complete lineups); winning score 153.25; multi-entry contest: True.
+- Duplication: 118 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 118}.
+- Salary usage: 54.2% of entries within $100 of the cap. Salary-left bins: {'101-300': 27, '301-700': 19, '<= 0': 40, '1-100': 24, '701-1500': 7, 'unknown': 1}.
+- Max-stack histogram: {1: 1, 2: 9, 3: 17, 4: 29, 5: 62}.
+- SP-pair field share (top): Gavin Williams/Justin Wrobleski 7.6%, Gavin Williams/Taj Bradley 6.8%, Justin Wrobleski/Taj Bradley 6.8%, Gavin Williams/Michael King 5.1%.
+- **Self vs field**: 3 own entries; best rank 30/118 (75.42th pct), median 35.59th pct; best 113.2 pts against a winning 153.25; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 36.44%, Justin Wrobleski 31.36%, Jake Cronenworth 31.36%, Jackson Merrill 23.73%, Taj Bradley 22.88%.
+- Diagnostics: salary join 99.2% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192846711 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 118 (118 complete lineups); winning score 147.6; multi-entry contest: True.
+- Duplication: 117 distinct lineups; 1.7% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 116, 2: 1}.
+- Salary usage: 46.6% of entries within $100 of the cap. Salary-left bins: {'101-300': 32, '1-100': 30, '301-700': 20, '701-1500': 10, '<= 0': 25, '> 1500': 1}.
+- Max-stack histogram: {2: 9, 3: 26, 4: 30, 5: 53}.
+- SP-pair field share (top): Logan Henderson/Michael King 13.6%, Michael King/Reid Detmers 7.6%, Justin Wrobleski/Peter Lambert 7.6%, Jake Bennett/Michael King 6.8%.
+- **Self vs field**: 3 own entries; best rank 12/118 (90.68th pct), median 68.64th pct; best 125.55 pts against a winning 147.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Michael King 43.22%, Justin Wrobleski 38.98%, Jahmai Jones 36.44%, Logan Henderson 33.9%, Manny Machado 30.51%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192846990 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 237 (232 complete lineups); winning score 118.0; multi-entry contest: True.
+- Duplication: 189 distinct lineups; 28.0% of entries sat in a duplicated lineup; max copies 7; the winning lineup had 1 copy. Copies histogram: {1: 167, 2: 15, 3: 3, 5: 1, 7: 3}.
+- Salary usage: 40.5% of entries within $100 of the cap. Salary-left bins: {'1-100': 83, '101-300': 50, '<= 0': 11, '301-700': 45, '701-1500': 22, '> 1500': 21}.
+- Max-stack histogram: {3: 81, 4: 92, 5: 59}.
+- **Self vs field**: 7 own entries; best rank 35/237 (85.65th pct), median 73.0th pct; best 92.0 pts against a winning 118.0; 1 own lineup(s) duplicated by the field (max 5 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Justin Wrobleski 62.02%, Rob Refsnyder 41.77%, Shohei Ohtani 38.82%, Teoscar Hernandez 36.71%, Cole Young 34.18%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192846994 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 54 (53 complete lineups); winning score 119.05; multi-entry contest: False.
+- Duplication: 51 distinct lineups; 7.5% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 2 copies. Copies histogram: {1: 49, 2: 2}.
+- Salary usage: 35.8% of entries within $100 of the cap. Salary-left bins: {'1-100': 13, '301-700': 13, '701-1500': 7, '<= 0': 6, '101-300': 13, '> 1500': 1}.
+- Max-stack histogram: {3: 16, 4: 23, 5: 14}.
+- **Self vs field**: 1 own entries; best rank 28/54 (50.0th pct), median 50.0th pct; best 67.0 pts against a winning 119.05; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Justin Wrobleski 53.7%, Rob Refsnyder 42.59%, Freddie Freeman 42.59%, Shohei Ohtani 40.74%, Teoscar Hernandez 37.04%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192847009 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 237 (233 complete lineups); winning score 169.35; multi-entry contest: True.
+- Duplication: 227 distinct lineups; 3.4% of entries sat in a duplicated lineup; max copies 5; the winning lineup had 1 copy. Copies histogram: {1: 225, 3: 1, 5: 1}.
+- Salary usage: 38.6% of entries within $100 of the cap. Salary-left bins: {'301-700': 41, '701-1500': 27, '101-300': 54, '<= 0': 49, '1-100': 41, '> 1500': 21}.
+- Max-stack histogram: {2: 51, 3: 54, 4: 56, 5: 72}.
+- SP-pair field share (top): Sandy Alcantara/Troy Melton 9.9%, Cade Cavalli/Troy Melton 8.6%, Griffin Jax/Troy Melton 6.4%, Griffin Jax/Shane Bieber 6.0%.
+- **Self vs field**: 7 own entries; best rank 22/237 (91.14th pct), median 14.77th pct; best 129.55 pts against a winning 169.35; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Troy Melton 35.44%, Cade Cavalli 29.96%, James Wood 29.11%, Griffin Jax 28.69%, Sandy Alcantara 26.16%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.85 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192847679 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 1189 (1188 complete lineups); winning score 166.15; multi-entry contest: False.
+- Duplication: 1145 distinct lineups; 5.3% of entries sat in a duplicated lineup; max copies 8; the winning lineup had 1 copy. Copies histogram: {1: 1125, 2: 12, 3: 2, 4: 3, 6: 1, 7: 1, 8: 1}.
+- Salary usage: 57.7% of entries within $100 of the cap. Salary-left bins: {'301-700': 176, '1-100': 245, '<= 0': 440, '101-300': 265, '701-1500': 53, '> 1500': 7, 'unknown': 2}.
+- Max-stack histogram: {1: 24, 2: 249, 3: 235, 4: 261, 5: 419}.
+- SP-pair field share (top): Gavin Williams/Taj Bradley 8.7%, Gavin Williams/Justin Wrobleski 8.7%, Gavin Williams/Michael King 8.1%, Justin Wrobleski/Taj Bradley 5.7%.
+- **Self vs field**: 1 own entries; best rank 1154/1189 (3.03th pct), median 3.03th pct; best 56.35 pts against a winning 166.15; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 43.15%, Jake Cronenworth 31.79%, Jackson Merrill 29.35%, Justin Wrobleski 28.85%, Taj Bradley 27.33%.
+- Diagnostics: salary join 99.8% of complete entries fully joined; ownership recompute max diff 0.51 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192847713 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 11890 (11826 complete lineups); winning score 191.6; multi-entry contest: True.
+- Duplication: 10539 distinct lineups; 15.2% of entries sat in a duplicated lineup; max copies 152; the winning lineup had 1 copy. Copies histogram: {1: 10030, 2: 368, 3: 64, 4: 22, 5: 28, 6: 11, 7: 1, 8: 2, 9: 2, 10: 2, 11: 1, 14: 1, 23: 1, 31: 1, 34: 1, 39: 1, 59: 1, 150: 1, 152: 1}.
+- Salary usage: 43.8% of entries within $100 of the cap. Salary-left bins: {'<= 0': 2948, '301-700': 2191, '701-1500': 1178, '101-300': 2661, '1-100': 2235, '> 1500': 613}.
+- Max-stack histogram: {1: 33, 2: 1336, 3: 1865, 4: 2475, 5: 6117}.
+- SP-pair field share (top): Justin Wrobleski/Reid Detmers 7.9%, Justin Wrobleski/Michael King 7.8%, Michael King/Reid Detmers 7.6%, Logan Henderson/Michael King 5.9%.
+- **Self vs field**: 1 own entries; best rank 8719/11890 (26.68th pct), median 26.68th pct; best 84.05 pts against a winning 191.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Justin Wrobleski 37.74%, Michael King 36.84%, Shohei Ohtani 30.7%, Reid Detmers 29.76%, Romy Gonzalez 29.11%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192878956 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 10.6 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 59 (59 complete lineups); winning score 146.6; multi-entry contest: False.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 57.6% of entries within $100 of the cap. Salary-left bins: {'301-700': 7, '<= 0': 16, '101-300': 13, '1-100': 18, '701-1500': 5}.
+- Max-stack histogram: {2: 4, 3: 9, 4: 15, 5: 31}.
+- SP-pair field share (top): Gavin Williams/Reid Detmers 5.1%, Gavin Williams/Michael King 5.1%, Gerrit Cole/Michael King 5.1%, Landen Roupp/Reid Detmers 5.1%.
+- **Self vs field**: 1 own entries; best rank 56/59 (6.78th pct), median 6.78th pct; best 56.35 pts against a winning 146.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 28.81%, Michael King 27.12%, Romy Gonzalez 27.11%, Kody Clemens 27.11%, Luis Rengifo 25.42%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 10.17 pts; parse OK; DK %Drafted table short 10.6 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192884081 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 47 (47 complete lineups); winning score 164.25; multi-entry contest: False.
+- Duplication: 47 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 47}.
+- Salary usage: 55.3% of entries within $100 of the cap. Salary-left bins: {'1-100': 13, '301-700': 4, '101-300': 15, '<= 0': 13, '> 1500': 2}.
+- Max-stack histogram: {2: 5, 3: 6, 4: 16, 5: 20}.
+- SP-pair field share (top): Gavin Williams/Justin Wrobleski 8.5%, Gavin Williams/Taj Bradley 6.4%, Gavin Williams/Reid Detmers 6.4%, Gavin Williams/Michael King 6.4%.
+- **Self vs field**: 1 own entries; best rank 3/47 (95.74th pct), median 95.74th pct; best 132.6 pts against a winning 164.25; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 38.3%, Justin Wrobleski 29.79%, Luis Rengifo 27.66%, Kody Clemens 25.53%, Jackson Merrill 25.53%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192884161 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 59 (59 complete lineups); winning score 146.6; multi-entry contest: False.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 45.8% of entries within $100 of the cap. Salary-left bins: {'301-700': 12, '<= 0': 19, '701-1500': 8, '101-300': 11, '1-100': 8, '> 1500': 1}.
+- Max-stack histogram: {2: 8, 3: 10, 4: 15, 5: 26}.
+- SP-pair field share (top): Gavin Williams/Michael King 10.2%, Michael King/Taj Bradley 10.2%, Gavin Williams/Gerrit Cole 8.5%, Gavin Williams/Taj Bradley 6.8%.
+- **Self vs field**: 1 own entries; best rank 40/59 (33.9th pct), median 33.9th pct; best 84.25 pts against a winning 146.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 45.76%, Jake Cronenworth 32.2%, Michael King 30.51%, Taj Bradley 28.81%, Jackson Merrill 25.42%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192884434 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 59 (59 complete lineups); winning score 163.2; multi-entry contest: False.
+- Duplication: 59 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 59}.
+- Salary usage: 49.2% of entries within $100 of the cap. Salary-left bins: {'1-100': 13, '101-300': 13, '301-700': 16, '<= 0': 16, '701-1500': 1}.
+- Max-stack histogram: {2: 7, 3: 9, 4: 16, 5: 27}.
+- SP-pair field share (top): Gavin Williams/Taj Bradley 8.5%, Gavin Williams/Reid Detmers 6.8%, Gavin Williams/Justin Wrobleski 6.8%, Michael King/Taj Bradley 5.1%.
+- **Self vs field**: 1 own entries; best rank 45/59 (25.42th pct), median 25.42th pct; best 77.95 pts against a winning 163.2; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 35.59%, Jake Cronenworth 30.51%, Kody Clemens 30.51%, Taj Bradley 28.81%, Shohei Ohtani 27.12%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192887057 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 172.5; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 39.1% of entries within $100 of the cap. Salary-left bins: {'301-700': 4, '101-300': 8, '<= 0': 8, '701-1500': 1, '> 1500': 1, '1-100': 1}.
+- Max-stack histogram: {2: 4, 3: 2, 4: 10, 5: 7}.
+- SP-pair field share (top): Cade Cavalli/Troy Melton 26.1%, Griffin Jax/Troy Melton 13.0%, Sandy Alcantara/Troy Melton 8.7%, Aaron Nola/Griffin Jax 8.7%.
+- **Self vs field**: 1 own entries; best rank 22/23 (8.7th pct), median 8.7th pct; best 61.1 pts against a winning 172.5; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Troy Melton 60.87%, Cade Cavalli 39.13%, Wyatt Langford 39.13%, Griffin Jax 34.78%, Dillon Dingler 30.43%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192889002 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 4.4 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 118 (118 complete lineups); winning score 148.6; multi-entry contest: True.
+- Duplication: 117 distinct lineups; 1.7% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 116, 2: 1}.
+- Salary usage: 54.2% of entries within $100 of the cap. Salary-left bins: {'301-700': 18, '101-300': 28, '<= 0': 35, '701-1500': 6, '1-100': 29, '> 1500': 2}.
+- Max-stack histogram: {1: 3, 2: 11, 3: 12, 4: 26, 5: 66}.
+- SP-pair field share (top): Gavin Williams/Michael King 11.9%, Gavin Williams/Taj Bradley 10.2%, Gavin Williams/Reid Detmers 7.6%, Gavin Williams/Justin Wrobleski 6.8%.
+- **Self vs field**: 3 own entries; best rank 15/118 (88.14th pct), median 6.78th pct; best 132.6 pts against a winning 148.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 50.85%, Jake Cronenworth 27.97%, Michael King 27.12%, Taj Bradley 27.12%, Ceddanne Rafaela 24.58%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 3.39 pts; parse OK; DK %Drafted table short 4.4 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192889325 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 118 (118 complete lineups); winning score 165.65; multi-entry contest: True.
+- Duplication: 117 distinct lineups; 1.7% of entries sat in a duplicated lineup; max copies 2; the winning lineup had 1 copy. Copies histogram: {1: 116, 2: 1}.
+- Salary usage: 51.7% of entries within $100 of the cap. Salary-left bins: {'101-300': 21, '301-700': 24, '<= 0': 41, '> 1500': 3, '1-100': 20, '701-1500': 9}.
+- Max-stack histogram: {1: 2, 2: 9, 3: 13, 4: 29, 5: 65}.
+- SP-pair field share (top): Gavin Williams/Taj Bradley 10.2%, Gavin Williams/Justin Wrobleski 9.3%, Gavin Williams/Reid Detmers 8.5%, Gavin Williams/Michael King 6.8%.
+- **Self vs field**: 3 own entries; best rank 84/118 (29.66th pct), median 7.63th pct; best 77.95 pts against a winning 165.65; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 50.0%, Romy Gonzalez 27.97%, Willson Contreras 27.12%, Taj Bradley 24.58%, Jake Cronenworth 23.73%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.84 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192889342 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 146.7; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 43.5% of entries within $100 of the cap. Salary-left bins: {'101-300': 10, '301-700': 2, '<= 0': 5, '1-100': 5, '701-1500': 1}.
+- Max-stack histogram: {2: 3, 3: 1, 4: 9, 5: 10}.
+- SP-pair field share (top): Gavin Williams/Michael King 21.7%, Gavin Williams/Taj Bradley 8.7%, Gavin Williams/Landen Roupp 8.7%, Gavin Williams/Justin Wrobleski 8.7%.
+- **Self vs field**: 1 own entries; best rank 4/23 (86.96th pct), median 86.96th pct; best 125.25 pts against a winning 146.7; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 56.52%, Jake Cronenworth 43.48%, Wilyer Abreu 34.78%, Jackson Merrill 34.78%, Michael King 30.43%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192889422 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 146.6; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 60.9% of entries within $100 of the cap. Salary-left bins: {'301-700': 5, '<= 0': 5, '1-100': 9, '101-300': 4}.
+- Max-stack histogram: {1: 1, 2: 1, 3: 2, 4: 5, 5: 14}.
+- SP-pair field share (top): Gavin Williams/Justin Wrobleski 17.4%, Gavin Williams/Reid Detmers 8.7%, Gavin Williams/Taj Bradley 8.7%, Justin Wrobleski/Reid Detmers 8.7%.
+- **Self vs field**: 1 own entries; best rank 21/23 (13.04th pct), median 13.04th pct; best 55.75 pts against a winning 146.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 39.13%, Justin Wrobleski 39.13%, Reid Detmers 30.43%, Pete Crow-Armstrong 30.43%, Brayan Rocchio 26.09%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192890029 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 146.6; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 56.5% of entries within $100 of the cap. Salary-left bins: {'301-700': 4, '<= 0': 8, '101-300': 4, '1-100': 5, '701-1500': 2}.
+- Max-stack histogram: {2: 2, 3: 2, 4: 8, 5: 11}.
+- SP-pair field share (top): Gavin Williams/Gerrit Cole 13.0%, Gavin Williams/Reid Detmers 8.7%, Gavin Williams/Taj Bradley 8.7%, Justin Wrobleski/Logan Henderson 8.7%.
+- **Self vs field**: 1 own entries; best rank 22/23 (8.7th pct), median 8.7th pct; best 55.75 pts against a winning 146.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 43.48%, Gerrit Cole 30.43%, Jose Ramirez 30.43%, Jackson Merrill 30.43%, Romy Gonzalez 30.43%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192890173 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 146.6; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 43.5% of entries within $100 of the cap. Salary-left bins: {'301-700': 3, '<= 0': 6, '1-100': 4, '701-1500': 3, '101-300': 6, '> 1500': 1}.
+- Max-stack histogram: {2: 1, 3: 3, 4: 7, 5: 12}.
+- SP-pair field share (top): Gavin Williams/Reid Detmers 13.0%, Gavin Williams/Taj Bradley 8.7%, Gavin Williams/Justin Wrobleski 8.7%, Colin Rea/Gage Jump 4.3%.
+- **Self vs field**: 1 own entries; best rank 23/23 (4.35th pct), median 4.35th pct; best 40.7 pts against a winning 146.6; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Gavin Williams 47.83%, Romy Gonzalez 34.78%, Shohei Ohtani 30.43%, Pete Crow-Armstrong 26.09%, Willson Contreras 26.09%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192890703 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 31 (31 complete lineups); winning score 155.9; multi-entry contest: False.
+- Duplication: 31 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 31}.
+- Salary usage: 54.8% of entries within $100 of the cap. Salary-left bins: {'101-300': 9, '1-100': 8, '<= 0': 9, '301-700': 2, '701-1500': 2, '> 1500': 1}.
+- Max-stack histogram: {2: 6, 3: 12, 4: 10, 5: 3}.
+- SP-pair field share (top): Griffin Jax/Troy Melton 19.4%, Sandy Alcantara/Troy Melton 12.9%, Cade Cavalli/Troy Melton 12.9%, Griffin Jax/Sandy Alcantara 9.7%.
+- **Self vs field**: 1 own entries; best rank 16/31 (51.61th pct), median 51.61th pct; best 97.15 pts against a winning 155.9; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Troy Melton 51.61%, Griffin Jax 41.94%, Sandy Alcantara 38.71%, Corbin Carroll 38.71%, Alec Bohm 38.71%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192891870 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 5.8 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest.
+
+- Entries 52 (51 complete lineups); winning score 183.45; multi-entry contest: False.
+- Duplication: 51 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 51}.
+- Salary usage: 45.1% of entries within $100 of the cap. Salary-left bins: {'101-300': 13, '<= 0': 12, '301-700': 9, '1-100': 11, '701-1500': 6}.
+- Max-stack histogram: {2: 8, 3: 17, 4: 11, 5: 15}.
+- SP-pair field share (top): Griffin Jax/Troy Melton 17.6%, Cade Cavalli/Troy Melton 9.8%, Sandy Alcantara/Troy Melton 7.8%, Bubba Chandler/Cade Cavalli 7.8%.
+- **Self vs field**: 1 own entries; best rank 34/52 (36.54th pct), median 36.54th pct; best 96.25 pts against a winning 183.45; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Troy Melton 48.08%, Brandon Lowe 36.54%, Griffin Jax 34.62%, Corbin Carroll 26.92%, Esmerlyn Valdez 25.0%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 3.84 pts; parse OK; DK %Drafted table short 5.8 pts (DK omits multi-position rows; lineup-derived ownership used).
+#### Full-field decomposition — contest 192891874 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (22 complete lineups); winning score 164.7; multi-entry contest: False.
+- Duplication: 22 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 22}.
+- Salary usage: 45.5% of entries within $100 of the cap. Salary-left bins: {'701-1500': 3, '101-300': 3, '301-700': 5, '1-100': 6, '<= 0': 4, '> 1500': 1}.
+- Max-stack histogram: {2: 7, 3: 4, 4: 2, 5: 9}.
+- SP-pair field share (top): Griffin Jax/Troy Melton 22.7%, Aaron Nola/Troy Melton 9.1%, Griffin Jax/Sandy Alcantara 9.1%, Griffin Jax/Shane Bieber 9.1%.
+- **Self vs field**: 1 own entries; best rank 12/23 (52.17th pct), median 52.17th pct; best 96.25 pts against a winning 164.7; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Griffin Jax 52.17%, Troy Melton 43.48%, Dillon Dingler 39.13%, Bryce Harper 34.78%, Yandy Diaz 30.43%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192894664 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 127.05; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 34.8% of entries within $100 of the cap. Salary-left bins: {'1-100': 5, '301-700': 7, '101-300': 2, '<= 0': 3, '701-1500': 4, '> 1500': 2}.
+- Max-stack histogram: {3: 8, 4: 12, 5: 3}.
+- **Self vs field**: 1 own entries; best rank 15/23 (39.13th pct), median 39.13th pct; best 59.15 pts against a winning 127.05; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Justin Wrobleski 73.91%, Rob Refsnyder 52.17%, Kyle Tucker 43.48%, Cole Young 39.13%, Shohei Ohtani 34.78%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192899735 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 147.55; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 52.2% of entries within $100 of the cap. Salary-left bins: {'<= 0': 6, '301-700': 4, '701-1500': 5, '101-300': 2, '1-100': 6}.
+- Max-stack histogram: {1: 1, 2: 3, 3: 6, 4: 6, 5: 7}.
+- SP-pair field share (top): Michael King/Reid Detmers 17.4%, Justin Wrobleski/Logan Henderson 13.0%, Jake Bennett/Michael King 8.7%, Justin Wrobleski/Landen Roupp 8.7%.
+- **Self vs field**: 1 own entries; best rank 13/23 (47.83th pct), median 47.83th pct; best 92.95 pts against a winning 147.55; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Jeremy Pena 43.48%, Michael King 39.13%, Romy Gonzalez 34.78%, Jake Cronenworth 30.43%, Jahmai Jones 30.43%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192900602 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 594 (584 complete lineups); winning score 133.7; multi-entry contest: True.
+- Duplication: 421 distinct lineups; 42.8% of entries sat in a duplicated lineup; max copies 17; the winning lineup had 1 copy. Copies histogram: {1: 334, 2: 55, 3: 18, 4: 7, 5: 3, 6: 1, 9: 1, 11: 1, 17: 1}.
+- Salary usage: 39.9% of entries within $100 of the cap. Salary-left bins: {'<= 0': 50, '101-300': 169, '1-100': 183, '301-700': 113, '> 1500': 16, '701-1500': 53}.
+- Max-stack histogram: {3: 191, 4: 301, 5: 92}.
+- **Self vs field**: 1 own entries; best rank 443/594 (25.59th pct), median 25.59th pct; best 57.0 pts against a winning 133.7; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Justin Wrobleski 72.56%, Rob Refsnyder 60.1%, Freddie Freeman 38.55%, Cole Young 36.87%, Shohei Ohtani 34.68%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.01 pts; parse OK; DK %Drafted agrees.
+#### Full-field decomposition — contest 192901361 (field_miner 0.5-review; coverage full; deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied)
+
+- Verification: parse structurally sound; DK %Drafted agrees with the lineup recompute
+
+- Entries 23 (23 complete lineups); winning score 155.55; multi-entry contest: False.
+- Duplication: 23 distinct lineups; 0.0% of entries sat in a duplicated lineup; max copies 1; the winning lineup had 1 copy. Copies histogram: {1: 23}.
+- Salary usage: 39.1% of entries within $100 of the cap. Salary-left bins: {'1-100': 4, '<= 0': 5, '101-300': 7, '701-1500': 1, '301-700': 5, '> 1500': 1}.
+- Max-stack histogram: {2: 1, 3: 7, 4: 6, 5: 9}.
+- SP-pair field share (top): Justin Wrobleski/Michael King 17.4%, Justin Wrobleski/Landen Roupp 13.0%, Justin Wrobleski/Logan Henderson 13.0%, Michael King/Reid Detmers 8.7%.
+- **Self vs field**: 1 own entries; best rank 4/23 (86.96th pct), median 86.96th pct; best 134.55 pts against a winning 155.55; 0 own lineup(s) duplicated by the field (max 1 copies); fees and winnings not supplied, so no net line for this contest. Observed outcomes, never a graded prediction.
+- Chalk (top-5 %Drafted): Jake Cronenworth 56.52%, Michael King 47.83%, Justin Wrobleski 47.83%, Shohei Ohtani 39.13%, Ceddanne Rafaela 34.78%.
+- Diagnostics: salary join 100.0% of complete entries fully joined; ownership recompute max diff 0.0 pts; parse OK; DK %Drafted agrees.
 
 ## A-013 — 2026-07-27 — 5 contests, Showdown (2145_1g_sd)
 
