@@ -11,20 +11,23 @@ suites run individually and green:
 
 | suite | count |
 |---|---|
-| `tests.test_core` | 369 |
+| `tests.test_core` | 375 |
 | `tests.test_showdown` | 49 |
 | `tests.test_upload_integrity` | 100 |
 | `tests.test_golden_replay` | 9 |
 | `tests.test_paste_lineups` | 56 |
-| **total** | **583** |
+| **total** | **589** |
 
 `tools/audit.py` and `CLAUDE.md` both said 556 before this session and both are
-now re-pinned to 583. The Quick Card was the only surface still on 546/359: it
-missed R34's ten `PrimaryStackSizeFloorTests` and now this session's 27. Since
+now re-pinned to 589. The Quick Card was the only surface still on 546/359: it
+missed R34's ten `PrimaryStackSizeFloorTests` and now this session's 33. Since
 the Quick Card is the mandated session-start read, a stale count there is the
 one that actually reaches a session.
 
-Suggested replacement for the count clause: **583 (369 + 49 + 100 + 9 + 56)**.
+Suggested replacement for the count clause: **589 (375 + 49 + 100 + 9 + 56)**.
+
+This number moved twice within the session that wrote this fragment, 583 then
+589, which is the argument for merging it promptly rather than sitting on it.
 
 The sandbox caveat in that item is still accurate and worth keeping, with one
 correction: `test_core` alone no longer reliably fits a 45s call either. Split it

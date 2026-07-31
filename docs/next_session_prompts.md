@@ -103,7 +103,7 @@ Four things are pending and they are all yours.
 
 There is also a DEV fragment waiting for you at
 ledger/inbox/2026-07-31_DEV_paste-placeholder-quick-card.md. It corrects the
-Quick Card's test count, which is stale at 546/359 and should read 583, and
+Quick Card's test count, which is stale at 546/359 and should read 589, and
 proposes one new invariant about positional placeholders. Merge it and delete
 the fragment.
 
