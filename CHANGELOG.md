@@ -14,8 +14,50 @@ record by dropping a fragment in `docs/backlog_inbox/`.
 **Unit.** The R-number already used in commit subjects and the backlog. An entry
 says what moved and why it moved; the diff says how.
 
+**Decided vs shipped.** A `Decided` entry records a call that has been made and
+not yet built, because the reasoning is the part that gets lost and a decision
+is a fact with a date. It names who decided and links the backlog item that
+carries the work. When it ships it gets a normal entry; the `Decided` entry
+stays where it is rather than being edited into the past.
+
 **Truthful labels.** Entries describe deterministic behavior. Nothing here is a
 performance claim.
+
+---
+
+## 2026-07-31 — Decided, not yet shipped
+
+### Decided: remove the `reuse_penalty` term rather than invert it
+Ben, on DEV's recommendation. Backlog R36 Finding 11.
+
+`reuse_penalty` has always rewarded reuse. `milp` minimises, the used-candidate
+indicator carries a positive coefficient, and minimising a cost per DISTINCT
+candidate prefers fewer distinct lineups. The name says the opposite.
+
+Removal over inversion because the term is redundant by construction: it is only
+live when `max_shared_players` is set, so it duplicates a hard cap with a soft
+nudge at a different scale. Nothing was tuned against its stated behaviour, and
+no rationale for penalising reuse beyond the hard cap was ever written down.
+
+One inherited claim withdrawn: inversion is not structurally unsafe. `y_k` is
+pinned bidirectionally, so a sign flip would behave. It is unwarranted, not
+broken. Blast radius is also smaller than previously stated, since the
+coefficient is 0.02 against scores normalised to [-100, 0], so only near-ties
+move. Expect the golden replay to shift on some fixtures.
+
+### Decided: R10's gate conditions on the satellite archetype, and R10 is unblocked
+Ben, on DEV's recommendation. Backlog R10.
+
+The gate reads "N slates in the satellite archetype", not "N
+archetype-conditioned slates" generally. Satellites are 4,201 of 4,879 of Ben's
+MLB entries, the item's own justification is the satellite case, and CLAUDE.md
+already forbids pooling ownership across archetype and field size, so
+conditioning was already the house rule.
+
+Scope is the safeguard, not breadth: the prior is fit and shipped for satellites
+only, every other archetype stays on flat-12, the fit cell is (family, field-size
+bucket), and thin buckets stay unmodeled rather than pooled. The bar is
+unchanged, beat flat-12 in that cell before any production column flips.
 
 ---
 
