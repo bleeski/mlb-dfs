@@ -78,7 +78,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  25 modules  583 tests`. The module count comes off the
+   `PASS  v2.26.0  25 modules  589 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
@@ -151,7 +151,12 @@ Roles; Ben's first message assigns one:
   data/reference/. Runs only outside live build windows.
 - DEV: writes mlb_engine/, tools/, tests/, docs/, skills/. Never edits
   engine paths while any slate beacon is lit: builds re-import modules
-  between steps, so a mid-slate edit changes a running build.
+  between steps, so a mid-slate edit changes a running build. A DEV change
+  is not shipped until CHANGELOG.md carries its entry, in the same commit
+  as the change. Enforced by `audit.changelog_debt`, which warns at the
+  next session's start when commits touching mlb_engine/ or tools/ outrun
+  the changelog; it cannot see the session now running, so the discipline
+  is still yours and the warning is only the backstop.
 Unassigned: building lineups is always permitted, claims present or not;
 light the beacon and go. Ledger, inbox, engine, and contract surfaces
 still need their role and its mutex; outside a build, when in doubt, ask

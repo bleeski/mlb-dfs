@@ -25,6 +25,37 @@ performance claim.
 
 ---
 
+## 2026-07-31 (later) — the changelog rule gets an enforcing path
+
+### Added
+- `audit.changelog_debt`. Counts commits touching `mlb_engine/` or `tools/`
+  since `CHANGELOG.md` was last written and reports them as a WARNING on the
+  audit's PASS line, using the same bracket mechanism as the stale test pin.
+  Six tests, each against a throwaway git repo.
+
+### Changed
+- CLAUDE.md's DEV role now says a change is not shipped until the changelog
+  carries its entry, in the same commit, and names the code that enforces it.
+
+### Why
+Ben asked whether new sessions would know to update this file. They would not
+have. It existed in exactly one line, inside a pointer list, with nothing
+checking it. The 07-25 review already named documented-but-unenforced as a
+proven failure class in this repo and adopted the rule that any MUST either
+cites its enforcing path or is rewritten as guidance, so a changelog rule
+resting on one sentence was that failure class with the ink still wet.
+
+The check is a warning and never an error, and it reads committed history, so
+it surfaces the previous session's omission at the next session's start. It
+cannot see the session currently running. That is the honest limit: this
+narrows the gap, it does not close it. It degrades to silence without git,
+outside a work tree, or before a `CHANGELOG.md` exists, because an audit that
+fails on its own bookkeeping is worse than one that stays quiet.
+
+Tests 583 → 589.
+
+---
+
 ## 2026-07-31 — Decided, not yet shipped
 
 ### Decided: remove the `reuse_penalty` term rather than invert it

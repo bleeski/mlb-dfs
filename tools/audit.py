@@ -18,7 +18,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 VERSION = "v3.3"
 PROJECT_VERSION = "v2.26.0"
@@ -33,7 +33,7 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 583  # core 369 + showdown 49 + upload 100 + golden 9 + paste 56
+EXPECTED_TEST_COUNT = 589  # core 375 + showdown 49 + upload 100 + golden 9 + paste 56
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -234,6 +234,15 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
                 f"in tools/audit.py after the slate.")
     checks["tests"] = test_result
 
+    debt = changelog_debt(root)
+    checks["changelog"] = debt
+    if debt["available"] and debt["unrecorded_commits"]:
+        count = debt["unrecorded_commits"]
+        warnings.append(
+            f"{count} commit(s) touched {'/'.join(CHANGELOG_TRACKED_PATHS)} since "
+            f"CHANGELOG.md was last written; a change is not shipped until its "
+            f"entry exists. Newest: {debt['commits'][0]}")
+
     return {
         "project_version": PROJECT_VERSION,
         "layout_version": LAYOUT_VERSION,
@@ -244,6 +253,52 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
         "checks": checks,
         "summary": "Audit passed" if not errors else "Audit failed",
     }
+
+
+CHANGELOG_TRACKED_PATHS = ("mlb_engine", "tools")
+
+
+def changelog_debt(root: Path) -> Dict[str, Any]:
+    """Commits that changed engine code since CHANGELOG.md was last written.
+
+    CLAUDE.md says a DEV change is not shipped until the changelog carries its
+    entry. A rule that only a document states is the failure class the 07-25
+    review named: documented, unenforced, and quietly false within a week. This
+    is the enforcing path that sentence cites.
+
+    It is a WARNING and never an error. It is measured against committed
+    history, so it surfaces the PREVIOUS session's omission at this session's
+    start, which is the honest thing it can see. It cannot know whether the
+    session now running intends to write its entry.
+
+    Degrades to silence without git, outside a work tree, or on a repo with no
+    CHANGELOG.md yet. An audit that fails because of its own bookkeeping is
+    worse than one that stays quiet.
+    """
+    out: Dict[str, Any] = {"available": False, "unrecorded_commits": 0, "commits": []}
+    if not (root / "CHANGELOG.md").exists():
+        return out
+
+    def _git(*args: str) -> Optional[str]:
+        try:
+            done = subprocess.run(("git", "-C", str(root)) + args,
+                                  capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return done.stdout.strip() if done.returncode == 0 else None
+
+    last_changelog = _git("log", "-1", "--format=%H", "--", "CHANGELOG.md")
+    if not last_changelog:
+        return out
+    listed = _git("log", "--format=%h %s", f"{last_changelog}..HEAD",
+                  "--", *CHANGELOG_TRACKED_PATHS)
+    if listed is None:
+        return out
+    commits = [line for line in listed.splitlines() if line.strip()]
+    out["available"] = True
+    out["unrecorded_commits"] = len(commits)
+    out["commits"] = commits
+    return out
 
 
 def engine_module_count(root: Path) -> int:

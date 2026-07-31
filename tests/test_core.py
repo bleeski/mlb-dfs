@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import inspect
 import json
+import os
+import subprocess
 import tempfile
 import types
 import unittest
@@ -6659,6 +6661,104 @@ class SolverIndependentBehaviorTests(unittest.TestCase):
             # availability, so it is deliberately not asserted here: under
             # full-suite ordering earlier solves have already succeeded and
             # the line truthfully says so.
+
+
+class ChangelogDebtTests(unittest.TestCase):
+    """The changelog rule has an enforcing path, so it is a MUST and not a hope.
+
+    CLAUDE.md says a DEV change is not shipped until CHANGELOG.md carries its
+    entry. The 07-25 review named documented-but-unenforced as a proven failure
+    class in this repo, which is the whole reason this check exists rather than
+    a third sentence asking nicely.
+
+    Every test here builds a throwaway git repo. Nothing touches the real one.
+    """
+
+    def _audit(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "audit.py"
+        spec = importlib.util.spec_from_file_location("audit_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _repo(self, tmp):
+        root = Path(tmp)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+        def git(*args):
+            subprocess.run(("git", "-C", str(root)) + args, check=True,
+                           capture_output=True, env=env)
+
+        subprocess.run(("git", "init", "-q", str(root)), check=True,
+                       capture_output=True)
+        (root / "mlb_engine").mkdir()
+        (root / "tools").mkdir()
+        (root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+        (root / "mlb_engine" / "a.py").write_text("x = 1\n", encoding="utf-8")
+        git("add", "CHANGELOG.md", "mlb_engine/a.py")
+        git("commit", "-q", "-m", "initial, changelog and code together")
+        return root, git
+
+    def test_code_and_changelog_in_one_commit_is_clean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, git = self._repo(tmp)
+            (root / "mlb_engine" / "a.py").write_text("x = 2\n", encoding="utf-8")
+            (root / "CHANGELOG.md").write_text("# Changelog\n\n- did a thing\n",
+                                               encoding="utf-8")
+            git("add", "mlb_engine/a.py", "CHANGELOG.md")
+            git("commit", "-q", "-m", "R99: a thing, recorded")
+            debt = self._audit().changelog_debt(root)
+            self.assertTrue(debt["available"])
+            self.assertEqual(debt["unrecorded_commits"], 0)
+
+    def test_engine_commits_without_a_changelog_entry_are_counted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, git = self._repo(tmp)
+            for n in (2, 3):
+                (root / "mlb_engine" / "a.py").write_text(f"x = {n}\n",
+                                                          encoding="utf-8")
+                git("add", "mlb_engine/a.py")
+                git("commit", "-q", "-m", f"R99: unrecorded change {n}")
+            debt = self._audit().changelog_debt(root)
+            self.assertEqual(debt["unrecorded_commits"], 2)
+            self.assertTrue(debt["commits"][0].endswith("unrecorded change 3"),
+                            "the newest is named first, so the warning is useful")
+
+    def test_a_docs_only_commit_is_not_debt(self):
+        # The rule is about engine and tool changes. A prose commit that owes
+        # the changelog nothing must not nag every session that follows it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root, git = self._repo(tmp)
+            (root / "NOTES.md").write_text("notes\n", encoding="utf-8")
+            git("add", "NOTES.md")
+            git("commit", "-q", "-m", "docs: notes")
+            self.assertEqual(self._audit().changelog_debt(root)["unrecorded_commits"], 0)
+
+    def test_it_degrades_to_silence_without_a_changelog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _git = self._repo(tmp)
+            (root / "CHANGELOG.md").unlink()
+            debt = self._audit().changelog_debt(root)
+            self.assertFalse(debt["available"])
+            self.assertEqual(debt["unrecorded_commits"], 0)
+
+    def test_it_degrades_to_silence_outside_a_work_tree(self):
+        # An audit that fails on its own bookkeeping is worse than a quiet one.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+            debt = self._audit().changelog_debt(root)
+            self.assertFalse(debt["available"])
+
+    def test_the_claudemd_rule_cites_its_enforcing_path(self):
+        text = (Path(__file__).resolve().parent.parent / "CLAUDE.md").read_text(
+            encoding="utf-8")
+        self.assertIn("CHANGELOG.md carries its entry", text)
+        self.assertIn("changelog_debt", text,
+                      "a MUST in CLAUDE.md names the code that enforces it, or "
+                      "it is guidance wearing a MUST's clothes")
 
 
 class EnvLockTests(unittest.TestCase):
