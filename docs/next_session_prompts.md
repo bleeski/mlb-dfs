@@ -16,8 +16,8 @@ is in the backlog under R36; do not re-litigate the decision, but do tell me if
 implementing it surfaces a fact that should change it.
 
 Session start per CLAUDE.md, with five things specific to this tree.
-First, the audit expects PASS v2.26.0 25 modules 583 tests across five gated
-suites: test_core 369, test_showdown 49, test_upload_integrity 100,
+First, the audit expects PASS v2.26.0 25 modules 589 tests across five gated
+suites: test_core 375, test_showdown 49, test_upload_integrity 100,
 test_golden_replay 9, test_paste_lineups 56.
 Second, test_core does NOT fit a 45s Cowork call as a single run. Split it by
 test class into roughly four groups and run those.
