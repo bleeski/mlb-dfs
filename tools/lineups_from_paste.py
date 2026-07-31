@@ -22,9 +22,13 @@ Usage:
         [--resolve "W Wilson=Weston Wilson"]   # settle an ambiguous name
         [--json]
 
-Exit 0 clean, 2 on any blocker (an unresolved or ambiguous name), 3 on IO. A
-blocker never writes the feed: a half-resolved lineup is the pool reduction
-CLAUDE.md forbids, and it would arrive looking like a posted partial.
+Exit 0 clean, 2 on any blocker, 3 on IO. A blocker never writes the feed: a
+half-resolved lineup is the pool reduction CLAUDE.md forbids, and it would
+arrive looking like a posted partial. Three things block. A name that is
+AMBIGUOUS or UNMATCHED, always. A side or a slate where too much of the paste is
+ABSENT FROM THE DK POOL, because in bulk that is one wrong-pairing fact rather
+than N call-ups; one absent name on its own is reported and shipped, since DK
+owns eligibility. Nothing else.
 
 Nothing here fetches anything, and nothing here corrects the paste against a
 real-world roster. If the paste and the salary file disagree about a player's
@@ -161,6 +165,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for row in report["partial_teams"]:
             print(f"PARTIAL  {row['team']} {row['hitters_posted']}/9 "
                   f"({row['reason']}) -- projected, not confirmed")
+        for row in report.get("dk_declared_probables") or []:
+            print(f"DK STARTING  {row['team']}: {row['name']} -- the paste left "
+                  f"this side's probable unnamed and DK's Starting column names "
+                  f"him; no handedness, so the platoon view falls back")
         for row in report["unrostered_starters"]:
             print(f"NOT IN DK POOL  {row['team']} slot {row['order']}: "
                   f"{row['pasted_name']} -- {row['note']}")
@@ -179,9 +187,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"BLOCKER  {text_line}", file=sys.stderr)
 
     if report["blockers"]:
-        print(f"\nrefused: {len(report['blockers'])} unresolved name(s); no feed "
-              f"written. A half-resolved lineup would arrive downstream looking "
-              f"like a posted partial, which is the pool reduction the contract "
+        print(f"\nrefused: {len(report['blockers'])} blocker(s); no feed written. "
+              f"A half-resolved lineup would arrive downstream looking like a "
+              f"posted partial, which is the pool reduction the contract "
               f"forbids.", file=sys.stderr)
         return 2
 

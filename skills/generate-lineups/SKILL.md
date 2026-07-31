@@ -200,7 +200,7 @@ The output is an ordinary feed, so `build_slate.py --lineups` and
 `late_swap.py --lineups` take it unchanged. Every side carries
 `source: operator_paste`.
 
-Three things to know before you run it.
+Five things to know before you run it.
 
 **It exits 2 and writes nothing when a name will not resolve.** mlb.com
 abbreviates first names (`J Peña`), so matching is on first initial plus surname
@@ -216,6 +216,28 @@ the deciding fact. State the answer and re-run:
 Do not work around a blocker by editing the paste. A half-resolved lineup reaches
 the build looking like a posted partial, which is the pool reduction the contract
 forbids.
+
+**`NOT IN DK POOL` on its own is not a blocker (R32 round 2).** A name that
+resolves but has no salary row means DK never listed him, and DK owns
+eligibility, so he is unrosterable regardless. The side ships one hitter short,
+labelled `partial`, and the slot is named in `unrostered_starters`. In bulk it
+DOES block, because it stops being N facts: past half of one posted side, or a
+quarter of the whole paste with at least six, the paste and the salary file are
+not the same slate. If that fires, check the pairing before anything else.
+
+**Paste every game, including the ones nobody has posted.** An unposted side
+renders `1. TBD` and an unannounced probable renders a bare `TBD`. Both are
+positional facts the parser needs: they hold the empty slot so the counts line up
+and each lineup goes to the side that posted it. Trimming them out is what makes
+a half-posted game ambiguous, and the tool will then refuse the game rather than
+guess. Paste the page as it comes.
+
+**A side the paste leaves unnamed gets its probable from DK.** The salary file's
+`Starting` column (SP/P) is a first-class source, printed as `DK STARTING`. On
+2026-07-30 DK declared Robbie Ray for SF while mlb.com and the StatsAPI both
+still showed TBD, so the CSV was ahead of both feeds. The paste wins where both
+name someone and the disagreement is reported. A DK-derived probable carries no
+handedness, so the opposing platoon view falls back to its default.
 
 **Fall back only for what the paste does not cover.** If some games are still TBD,
 fetch a feed for those and pass it as `--merge-feed <api_feed.json>`. A pasted
@@ -616,7 +638,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 556 tests
+python tools/audit.py --run-tests --terse    # expect PASS, 25 modules, 583 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

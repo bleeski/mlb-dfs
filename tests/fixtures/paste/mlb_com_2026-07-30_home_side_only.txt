@@ -1,0 +1,63 @@
+PROVENANCE, read before trusting this file.
+Two real games from the real 2026-07-30 1910_6g slate, in the render mlb.com
+produces when only the HOME side has posted. Every token below is verbatim from
+that slate's own artifacts: the club lines, records, clocks, venues, pitcher
+lines and team headers are copied from data/slates/2026-07-30/paste_1910_6g_v2.txt,
+and the CIN and SD batting orders are copied from
+data/slates/2026-07-30/paste_home_sides.txt, which is Ben's second paste of the
+same slate taken after those two home sides posted.
+What is RECONSTRUCTED rather than captured is the interleaving: paste_home_sides
+was hand-reordered during the build so the posted club led, which made both
+game_ids read backwards against the salary file. This file restores mlb.com's
+away-then-home order around the same real content, per the render documented in
+docs/backlog_inbox 2026-07-30. It is labelled reconstructed because it is, and
+because calling it a capture would be the kind of claim this project does not make.
+Pirates@Reds
+(55-54)
+7:10 PM
+Great American Ball Park
+(50-57)
+Yohan Ramírez
+RHP
+6-3, 3.21 ERA, 62 SO
+Rhett Lowder
+RHP
+3-7, 5.61 ERA, 65 SO
+PIT Lineup
+CIN Lineup
+
+1. TBD
+
+1. E De La Cruz (S) SS
+2. S Stewart (R) 1B
+3. J Bleday (L) LF
+4. T Stephenson (R) C
+5. N Lowe (L) DH
+6. E Suárez (R) 3B
+7. D Myers (R) CF
+8. N Marte (R) RF
+9. M McLain (R) 2B
+
+Giants@Padres
+(46-62)
+9:40 PM
+Petco Park
+(55-53)
+TBD
+JP Sears
+LHP
+3-3, 3.86 ERA, 23 SO
+SF Lineup
+SD Lineup
+
+1. TBD
+
+1. F Tatis Jr. (R) RF
+2. L Rengifo (S) DH
+3. M Machado (R) 3B
+4. T France (R) 1B
+5. J Merrill (L) CF
+6. L Campusano (R) C
+7. X Bogaerts (R) SS
+8. J Cronenworth (L) 2B
+9. J Bowen (R) LF

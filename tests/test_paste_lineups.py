@@ -407,5 +407,283 @@ class PasteWinsOverTheApiFeedTests(unittest.TestCase):
             self.assertNotIn("urlopen", called, f"{path.name} opens a URL")
 
 
+PLAINTEXT = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-30_1910_6g_plaintext.txt"
+HOME_ONLY = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-30_home_side_only.txt"
+SALARY_0730 = REPO / "data" / "slates" / "2026-07-30" / "DKSalaries_1910_6g.csv"
+
+
+def _side(feed, game_id, side):
+    away, home = game_id.split("@")
+    for game in feed["games"]:
+        if (game["away"]["team_abbrev"], game["home"]["team_abbrev"]) == (away, home):
+            return game[side]
+    raise AssertionError(f"{game_id} not in feed")
+
+
+class SinglePostedSideAlignmentTests(unittest.TestCase):
+    """R32 round 2, the P0: a half-posted game must not swap the sides.
+
+    The fixture is two real 2026-07-30 games rendered the way mlb.com renders a
+    game whose HOME side has posted and whose away side has not. Pre-fix, on this
+    exact input, Elly De La Cruz's CIN nine attached to PIT and Tatis's SD nine
+    attached to SF, with no error and a warning that stated the wrong thing
+    confidently. The existing fixture could never catch it: every side in it
+    posted, which is why 29 tests passed over this bug.
+    """
+
+    def setUp(self):
+        self.text = HOME_ONLY.read_text(encoding="utf-8")
+        self.games, self.warnings = parse_paste(self.text)
+
+    def test_the_posted_nine_goes_to_the_home_team_that_posted_it(self):
+        pit_cin = next(g for g in self.games if g.game_id == "PIT@CIN")
+        self.assertEqual([p.display_name for p in pit_cin.home_lineup][:1],
+                         ["E De La Cruz"])
+        self.assertEqual(len(pit_cin.home_lineup), 9)
+        self.assertEqual(pit_cin.away_lineup, [],
+                         "the away side posted nothing; a nine here is the "
+                         "wrong-team bug back")
+
+    def test_the_second_half_posted_game_lands_the_same_way(self):
+        sf_sd = next(g for g in self.games if g.game_id == "SF@SD")
+        self.assertEqual([p.display_name for p in sf_sd.home_lineup][:1],
+                         ["F Tatis Jr."])
+        self.assertEqual(sf_sd.away_lineup, [])
+
+    def test_a_bare_tbd_holds_the_pitcher_slot_too(self):
+        # The same shift, one field over: with SF's probable unannounced, the one
+        # named arm used to slide into the away slot and become SF's.
+        sf_sd = next(g for g in self.games if g.game_id == "SF@SD")
+        self.assertIsNone(sf_sd.away_pitcher)
+        self.assertIsNotNone(sf_sd.home_pitcher)
+        self.assertEqual(sf_sd.home_pitcher.display_name, "JP Sears")
+
+    def test_both_probables_still_attach_when_both_are_named(self):
+        pit_cin = next(g for g in self.games if g.game_id == "PIT@CIN")
+        self.assertEqual(pit_cin.away_pitcher.display_name, "Yohan Ramírez")
+        self.assertEqual(pit_cin.home_pitcher.display_name, "Rhett Lowder")
+
+    def test_a_half_posted_game_raises_no_warning_at_all(self):
+        self.assertEqual(self.warnings, [],
+                         "a placeholder is the page working normally, not a "
+                         "shape worth warning about")
+
+    def test_the_venue_survives_a_plain_text_pitcher_line(self):
+        venues = {g.game_id: g.venue for g in self.games}
+        self.assertEqual(venues["PIT@CIN"], "Great American Ball Park")
+        self.assertEqual(venues["SF@SD"], "Petco Park")
+
+    def test_a_repeated_placeholder_does_not_open_a_third_block(self):
+        text = self.text.replace("1. TBD", "1. TBD\n2. TBD", 1)
+        games, _ = parse_paste(text)
+        pit_cin = next(g for g in games if g.game_id == "PIT@CIN")
+        self.assertEqual(len(pit_cin.home_lineup), 9)
+        self.assertEqual(pit_cin.away_lineup, [])
+
+    def test_a_missing_placeholder_refuses_instead_of_guessing(self):
+        # If the page ever stops rendering '1. TBD', the count no longer matches
+        # and the old code's guess is what put the nine on the wrong team. The
+        # rule is now 0 or exactly 2, the same rule the headers already had.
+        text = self.text.replace("\n1. TBD\n", "\n", 1)
+        games, warnings = parse_paste(text)
+        pit_cin = next(g for g in games if g.game_id == "PIT@CIN")
+        self.assertEqual(pit_cin.away_lineup, [])
+        self.assertEqual(pit_cin.home_lineup, [])
+        self.assertTrue(any("no lineup is attached to either side" in w
+                            for w in warnings), warnings)
+
+    def test_one_pitcher_line_for_two_headers_refuses(self):
+        text = self.text.replace("TBD\nJP Sears", "JP Sears", 1)
+        games, warnings = parse_paste(text)
+        sf_sd = next(g for g in games if g.game_id == "SF@SD")
+        self.assertIsNone(sf_sd.away_pitcher, "an unpaired arm must not be "
+                                              "assumed to be the away side")
+        self.assertIsNone(sf_sd.home_pitcher)
+        self.assertTrue(any("neither is attached" in w for w in warnings), warnings)
+
+    def test_end_to_end_the_confirmed_team_is_the_one_that_posted(self):
+        report = resolve_paste_to_feed(self.text, str(SALARY_0730))
+        feed = report["feed"]
+        self.assertEqual(sorted(report["report"]["confirmed_teams"]), ["CIN", "SD"])
+        self.assertEqual(_side(feed, "PIT@CIN", "home")["lineup_status"], "confirmed")
+        self.assertEqual(_side(feed, "PIT@CIN", "away")["lineup_status"], "tbd")
+        self.assertEqual(_side(feed, "PIT@CIN", "home")["lineup"][0]["name"],
+                         "Elly De La Cruz")
+
+    def test_the_real_slate_paste_stops_misreporting_its_single_block(self):
+        # BOS@ATH on the real 1910_6g paste: BOS posted, ATH rendered '1. TBD'.
+        # It was right pre-fix only because the posted side happened to be the
+        # away one, and it carried a warning that has no reason to exist.
+        games, warnings = parse_paste(PLAINTEXT.read_text(encoding="utf-8"))
+        bos_ath = next(g for g in games if g.game_id == "BOS@ATH")
+        self.assertEqual(len(bos_ath.away_lineup), 9)
+        self.assertEqual(bos_ath.home_lineup, [])
+        self.assertFalse([w for w in warnings if "only one lineup block" in w])
+
+
+class LinkFreePitcherResolutionTests(unittest.TestCase):
+    """R32 round 2, the P1: a plain-text paste must resolve its probables.
+
+    The fixture is Ben's real 2026-07-30 paste, which arrived with zero markdown
+    links. The pitcher path required the MLBAM id that only a link carries, so
+    this exact file resolved every hitter and no pitcher at all, and the build
+    took five hard pool blockers for starters the paste plainly named.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = PLAINTEXT.read_text(encoding="utf-8")
+        cls.result = resolve_paste_to_feed(cls.text, str(SALARY_0730))
+        cls.feed, cls.report = cls.result["feed"], cls.result["report"]
+
+    def test_the_fixture_really_is_link_free(self):
+        self.assertNotIn("](http", self.text,
+                         "this fixture exists to prove the id is not required")
+
+    def test_every_side_on_the_slate_gets_a_probable(self):
+        missing = [f"{g['away']['team_abbrev']}@{g['home']['team_abbrev']} {side}"
+                   for g in self.feed["games"] for side in ("away", "home")
+                   if not (g[side].get("probable_pitcher") or {}).get("name")]
+        self.assertEqual(missing, [], "these are the five pool blockers the "
+                                      "1910_6g build took")
+
+    def test_a_pasted_pitcher_resolves_to_the_dk_canonical_name(self):
+        self.assertEqual(_side(self.feed, "BOS@ATH", "away")["probable_pitcher"]["name"],
+                         "Sonny Gray")
+
+    def test_a_pasted_pitcher_keeps_its_handedness(self):
+        sears = _side(self.feed, "SF@SD", "home")["probable_pitcher"]
+        self.assertEqual(sears["hand"], "L")
+        self.assertEqual(sears["source"], "operator_paste")
+
+    def test_the_venue_is_not_swallowed_as_a_pitcher_name(self):
+        venues = {g.game_id: g.venue for g in parse_paste(self.text)[0]}
+        self.assertEqual(venues["BOS@ATH"], "Sutter Health Park")
+        self.assertEqual(venues["PIT@CIN"], "Great American Ball Park")
+
+    def test_the_linked_paste_still_resolves_its_pitchers(self):
+        # The regression guard: the id path must survive the name path landing.
+        result = resolve_paste_to_feed(
+            PASTE.read_text(encoding="utf-8"), str(SALARY),
+            resolve_overrides={"W Wilson": "Weston Wilson"})
+        hou = _side(result["feed"], "HOU@LAA", "away")["probable_pitcher"]
+        self.assertEqual(hou["name"], "Hayden Wesneski")
+        self.assertEqual(hou["id"], "669713", "the MLBAM id still comes off the link")
+
+
+class DkStartingColumnTests(unittest.TestCase):
+    """R32 round 2: DK's Starting column is a probable source, not a patch.
+
+    On 2026-07-30 DK declared Robbie Ray for SF while mlb.com and the StatsAPI
+    both still showed SF as TBD. The CSV was ahead of both feeds, and CLAUDE.md
+    already makes it authoritative.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = resolve_paste_to_feed(
+            PLAINTEXT.read_text(encoding="utf-8"), str(SALARY_0730))
+
+    def test_dk_fills_a_side_the_paste_left_unnamed(self):
+        sf = _side(self.result["feed"], "SF@SD", "away")["probable_pitcher"]
+        self.assertEqual(sf["name"], "Robbie Ray")
+        self.assertEqual(sf["source"], "dk_starting_column")
+
+    def test_the_fill_is_reported_rather_than_silent(self):
+        rows = self.result["report"]["dk_declared_probables"]
+        self.assertEqual([(r["team"], r["name"]) for r in rows],
+                         [("SF", "Robbie Ray")])
+
+    def test_a_dk_derived_probable_states_no_handedness(self):
+        # The salary file has none. An invented hand would feed the platoon view
+        # a fact nobody stated; extract_opp_throws_from_lineups skips a blank.
+        sf = _side(self.result["feed"], "SF@SD", "away")["probable_pitcher"]
+        self.assertEqual(sf["hand"], "")
+
+    def test_the_paste_wins_and_the_disagreement_is_reported(self):
+        text = PLAINTEXT.read_text(encoding="utf-8").replace(
+            "Sonny Gray", "Garrett Crochet", 1)
+        report = resolve_paste_to_feed(text, str(SALARY_0730))
+        bos = _side(report["feed"], "BOS@ATH", "away")["probable_pitcher"]
+        self.assertEqual(bos["name"], "Garrett Crochet")
+        self.assertEqual(bos["source"], "operator_paste")
+        self.assertTrue(any("the paste is the primary source per R32" in w
+                            for w in report["report"]["warnings"]),
+                        report["report"]["warnings"])
+
+
+class AbsentFromDkPoolPolicyTests(unittest.TestCase):
+    """R32 round 2, the P2: one absent name is a call-up, eighteen is a mistake.
+
+    The code shipped absent-from-DK as reported-not-fatal and the docs said an
+    unresolvable name blocks with no feed written. Both are defensible per name;
+    neither survives 18 of them, which is one wrong-pairing signal.
+    """
+
+    def _misfiled(self):
+        """The real CIN nine attributed to PIT: what the P0 bug produced."""
+        raw = HOME_ONLY.read_text(encoding="utf-8")
+        return raw.replace("CIN Lineup\n\n1. TBD\n\n1. E De La Cruz",
+                           "CIN Lineup\n\n1. E De La Cruz").replace(
+            "9. M McLain (R) 2B", "9. M McLain (R) 2B\n\n1. TBD")
+
+    def test_one_absent_name_is_reported_and_ships(self):
+        text = PLAINTEXT.read_text(encoding="utf-8").replace(
+            "2. C Rafaela (R) CF", "2. Q Nonesuch (R) CF", 1)
+        report = resolve_paste_to_feed(text, str(SALARY_0730))["report"]
+        self.assertEqual(report["blockers"], [],
+                         "DK owns eligibility; one name it never listed is not "
+                         "a reason to refuse the whole paste")
+        self.assertEqual(
+            [r["pasted_name"] for r in report["unrostered_starters"]],
+            ["Q Nonesuch"])
+
+    def test_a_side_past_half_absent_blocks(self):
+        report = resolve_paste_to_feed(self._misfiled(), str(SALARY_0730))["report"]
+        self.assertTrue(any("PIT: 9 of 9 pasted starters" in b
+                            for b in report["blockers"]), report["blockers"])
+
+    def test_the_slate_threshold_blocks_on_its_own_terms(self):
+        report = resolve_paste_to_feed(self._misfiled(), str(SALARY_0730))["report"]
+        self.assertTrue(report["unrostered_policy"]["slate_threshold_tripped"])
+        self.assertTrue(any("across the whole paste" in b
+                            for b in report["blockers"]), report["blockers"])
+
+    def test_the_policy_and_its_thresholds_are_in_the_report(self):
+        report = resolve_paste_to_feed(
+            PLAINTEXT.read_text(encoding="utf-8"), str(SALARY_0730))["report"]
+        policy = report["unrostered_policy"]
+        self.assertEqual(policy["hitters_absent_from_dk"], 0)
+        self.assertEqual(policy["side_ratio"], 0.5)
+        self.assertEqual(policy["slate_floor"], 6)
+        self.assertFalse(policy["slate_threshold_tripped"])
+
+    def test_the_tool_writes_no_feed_when_a_threshold_trips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            paste = Path(tmp) / "misfiled.txt"
+            paste.write_text(self._misfiled(), encoding="utf-8")
+            out = Path(tmp) / "feed.json"
+            result = subprocess.run(
+                [sys.executable, str(REPO / "tools" / "lineups_from_paste.py"),
+                 "--salary", str(SALARY_0730), "--paste", str(paste),
+                 "--out", str(out)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertFalse(out.exists(), "a blocker never writes the feed")
+            self.assertIn("BLOCKER", result.stderr)
+
+    def test_a_clean_paste_still_writes_its_feed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "feed.json"
+            result = subprocess.run(
+                [sys.executable, str(REPO / "tools" / "lineups_from_paste.py"),
+                 "--salary", str(SALARY_0730), "--paste", str(PLAINTEXT),
+                 "--out", str(out)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(out.exists())
+            self.assertIn("DK STARTING  SF: Robbie Ray", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

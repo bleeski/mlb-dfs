@@ -65,14 +65,21 @@ Measured against Ben's 2026-07-29 paste and that slate's DKSalaries.csv: 27 of 2
 hitters resolved uniquely, including a Dodgers roster carrying both Teoscar and
 Kike Hernandez, which the first initial separates.
 
-Failure is loud, never quiet, and the two failure kinds are kept apart:
+Failure is loud, never quiet, and the failure kinds are kept apart:
 
   - AMBIGUOUS or UNMATCHED name -> a blocker. The pool must not silently thin,
     and a nickname or a same-initial teammate is exactly how it would.
-  - Resolved but ABSENT FROM THE DK POOL -> reported, not fatal. DK's file is
-    authoritative for eligibility (CLAUDE.md), so a starter DK did not list is
-    unrosterable no matter what this module says. The team stays confirmed and
-    the slot is named in ``unrostered_starters``.
+  - Resolved but ABSENT FROM THE DK POOL, in ones -> reported, not fatal. DK's
+    file is authoritative for eligibility (CLAUDE.md), so a starter DK did not
+    list is unrosterable no matter what this module says. The team stays
+    confirmed and the slot is named in ``unrostered_starters``.
+  - Resolved but ABSENT FROM THE DK POOL, in bulk -> a blocker. R32 round 2.
+    Eighteen of these arrived on one 2026-07-30 build and the feed was still
+    written, because each was judged on its own. They are not eighteen facts.
+    Past half of one posted side, or ``SLATE_ABSENT_BLOCK_RATIO`` of the whole
+    paste with at least ``SLATE_ABSENT_BLOCK_FLOOR`` of them, the reading is one
+    fact: the paste and the salary file are not the same slate. A genuine
+    call-up stays non-fatal; a wrong pairing stops.
 
 Nothing here fetches anything. Nothing here corrects the paste against a
 real-world roster, per the authority rule: if the paste and the salary file
@@ -83,6 +90,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from mlb_engine.intake.slate_intake_manager import normalize_name
@@ -99,8 +107,20 @@ _HAND = re.compile(r"^(?P<hand>[RL])HP\s*$")
 _RECORD = re.compile(r"^\(\d{1,3}-\d{1,3}\)$")
 _CLOCK = re.compile(r"^(?P<h>\d{1,2}):(?P<m>\d{2})\s*(?P<ap>[AP]M)?\s*(?:ET)?$", re.I)
 _STATLINE = re.compile(r"\bERA\b|\bSO\b")
+# R32 round 2. "1. TBD" under a header, and a bare "TBD" where a probable's name
+# would go, are POSITIVE information that the side is unposted. Both hold a slot.
+_TBD_SLOT = re.compile(r"^(?P<order>\d{1,2})\.\s*TBD\.?\s*$", re.I)
+_BARE_TBD = re.compile(r"^TBD\.?$", re.I)
 
 HITTER_POSITIONS = {"C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "OF", "DH"}
+
+# Resolved-but-absent-from-DK is non-fatal per name and fatal in bulk; see
+# ``resolve_paste_to_feed``. Past half of one posted side, or a quarter of the
+# whole paste, the honest reading is one wrong-pairing fact rather than N
+# independent call-ups.
+SIDE_ABSENT_BLOCK_RATIO = 0.5
+SLATE_ABSENT_BLOCK_RATIO = 0.25
+SLATE_ABSENT_BLOCK_FLOOR = 6
 
 
 @dataclass
@@ -171,6 +191,15 @@ def _club_names(line: str) -> Optional[Tuple[str, str]]:
     return away, home
 
 
+def _looks_like_name(text: str) -> bool:
+    """A bare line that could be a venue or a person's name, not decoration."""
+    if not text or len(text) > 60:
+        return False
+    if text.endswith(":"):
+        return False
+    return any(ch.isalpha() for ch in text)
+
+
 def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
     """The mlb.com starting-lineups paste -> (games, warnings).
 
@@ -180,24 +209,52 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
     resetting to 1. Anything unrecognised is ignored and counted, so a page whose
     decoration changes degrades to "fewer teams than expected" rather than to a
     wrong answer.
+
+    R32 round 2 changed two things, both the same idea. A placeholder is
+    POSITIONAL INFORMATION and has to occupy its slot:
+
+    - ``1. TBD`` under a header opens an EMPTY block, so a game with one posted
+      side yields two blocks and positional assignment works as designed. It
+      previously matched nothing, so the posted nine became ``block[0]`` and was
+      handed to ``headers[0]``, the away team. See ``_assign``.
+    - A bare ``TBD`` where a probable's name would go appends ``None`` to the
+      pitcher list. The same shift otherwise moved the one announced starter into
+      the away slot, which is the away/home swap again, one field over.
+
+    And the probable's name no longer has to arrive as a markdown link. A pasted
+    line is held as ``pending_name`` and promoted to a pitcher by the ``RHP``/
+    ``LHP`` line that follows it; the venue is whatever bare line was displaced
+    without ever being promoted. Requiring the link meant a plain-text paste
+    resolved every hitter and zero pitchers, because the id lives only in the URL.
     """
     games: List[PastedGame] = []
     warnings: List[str] = []
     current: Optional[PastedGame] = None
     headers: List[str] = []
     blocks: List[List[PastedPlayer]] = []
-    pitchers: List[PastedPitcher] = []
-    pending_pitcher: Optional[Tuple[str, Optional[str]]] = None
+    # A None entry is an unannounced side holding its position in the ordering.
+    pitchers: List[Optional[PastedPitcher]] = []
+    pending_name: Optional[Tuple[str, Optional[str]]] = None
     seen_clock = False
 
+    def _flush_pending() -> None:
+        """The held line was never promoted to a pitcher, so it was the venue."""
+        nonlocal pending_name
+        if pending_name is None:
+            return
+        if current is not None and seen_clock and not current.venue:
+            current.venue = pending_name[0]
+        pending_name = None
+
     def _close() -> None:
-        nonlocal current, headers, blocks, pitchers, pending_pitcher, seen_clock
+        nonlocal current, headers, blocks, pitchers, seen_clock
         if current is None:
             return
+        _flush_pending()
         _assign(current, headers, blocks, pitchers)
         games.append(current)
         current, headers, blocks, pitchers = None, [], [], []
-        pending_pitcher, seen_clock = None, False
+        seen_clock = False
 
     for raw in str(text or "").splitlines():
         line = raw.strip()
@@ -220,6 +277,7 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
 
         header = _TEAM_HEADER.match(line)
         if header:
+            _flush_pending()
             headers.append(header.group("team").upper())
             continue
 
@@ -227,6 +285,7 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
 
         hitter = _HITTER.match(stripped)
         if hitter and hitter.group("pos") in HITTER_POSITIONS:
+            _flush_pending()
             order = int(hitter.group("order"))
             if order == 1 or not blocks:
                 blocks.append([])
@@ -239,12 +298,22 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
             ))
             continue
 
+        # "1. TBD": the side is unposted and SAYS SO. One empty block per side,
+        # so a second placeholder row ("2. TBD") is absorbed rather than opening
+        # another block.
+        slot_tbd = _TBD_SLOT.match(stripped)
+        if slot_tbd:
+            _flush_pending()
+            if int(slot_tbd.group("order")) == 1 or not blocks:
+                blocks.append([])
+            continue
+
         hand = _HAND.match(stripped)
-        if hand and pending_pitcher is not None:
-            pitchers.append(PastedPitcher(display_name=pending_pitcher[0],
-                                          mlbam_id=pending_pitcher[1],
+        if hand and pending_name is not None:
+            pitchers.append(PastedPitcher(display_name=pending_name[0],
+                                          mlbam_id=pending_name[1],
                                           hand=hand.group("hand").upper()))
-            pending_pitcher = None
+            pending_name = None
             continue
 
         if _RECORD.match(stripped):
@@ -257,14 +326,17 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
             seen_clock = True
             continue
 
-        # A player link with no recognised role yet is a probable pitcher; the
-        # RHP/LHP line that follows confirms it. A bare line after the clock and
-        # before any pitcher is the venue.
-        if ids and not blocks:
-            pending_pitcher = (stripped, ids[0])
+        # A bare TBD in the probable's place: no name, but the slot is real.
+        if _BARE_TBD.match(stripped) and seen_clock and not blocks:
+            _flush_pending()
+            pitchers.append(None)
             continue
-        if seen_clock and not current.venue and not blocks and not ids:
-            current.venue = stripped
+
+        # Otherwise hold the line. The RHP/LHP line that may follow promotes it
+        # to a probable pitcher; anything else displaces it into the venue.
+        if seen_clock and not blocks and _looks_like_name(stripped):
+            _flush_pending()
+            pending_name = (stripped, ids[0] if ids else None)
             continue
 
     _close()
@@ -313,7 +385,7 @@ def _dk_team(code: str, club: str, warnings: List[str]) -> str:
 
 def _assign(game: PastedGame, headers: Sequence[str],
             blocks: Sequence[List[PastedPlayer]],
-            pitchers: Sequence[PastedPitcher]) -> None:
+            pitchers: Sequence[Optional[PastedPitcher]]) -> None:
     """Attach headers, blocks and pitchers to a game, or refuse to guess.
 
     This is the paired-header trap. Both ``HOU Lineup`` and ``LAA Lineup`` appear
@@ -321,6 +393,20 @@ def _assign(game: PastedGame, headers: Sequence[str],
     else. Any other shape leaves the lineups EMPTY with a warning, because a
     lineup attached to the wrong team is worse than no lineup: the build would
     stack the wrong side and every gate would pass.
+
+    R32 round 2. Positional assignment is only sound when the count matches, and
+    a count of ONE used to be handled by guessing rather than refusing: the lone
+    block went to ``headers[0]`` and the lone pitcher went to the away slot. On a
+    game where only the HOME side had posted, that is the home nine attached to
+    the away team, silently, with every gate green. It failed safe on the
+    2026-07-30 slate only because none of the nine pasted CIN names matched a PIT
+    salary row; two same-division teams sharing a surname would have resolved.
+
+    So the rule is now the same for both sequences and it is the rule the module
+    docstring always claimed: the count is 0 or exactly 2, or nothing is
+    attached. ``1. TBD`` and a bare ``TBD`` are what make 2 the normal count for
+    a half-posted game, and DK's ``Starting`` column backfills a refused
+    probable, so refusing costs a warning rather than a build.
     """
     if len(headers) >= 1:
         game.away_team = _dk_team(headers[0], game.away_club, game.warnings)
@@ -332,27 +418,26 @@ def _assign(game: PastedGame, headers: Sequence[str],
             f"{list(headers)}; no lineup is attached to either side rather than "
             f"risk attaching one to the wrong team")
         return
-    if len(blocks) > 2:
-        game.warnings.append(
-            f"found {len(blocks)} lineup blocks for 2 teams; refusing to guess "
-            f"which belong to {headers[0]} and {headers[1]}")
-        return
-    if len(blocks) >= 1:
+
+    if len(blocks) == 2:
         game.away_lineup = list(blocks[0])
-    if len(blocks) >= 2:
         game.home_lineup = list(blocks[1])
-    if len(blocks) == 1:
+    elif len(blocks) != 0:
         game.warnings.append(
-            f"only one lineup block; attached to {headers[0]} (listed first, the "
-            f"away side) and {headers[1]} is left TBD")
-    if len(pitchers) >= 1:
+            f"found {len(blocks)} lineup block(s) for the 2 headers "
+            f"{headers[0]}/{headers[1]}; no lineup is attached to either side "
+            f"rather than risk attaching one to the wrong team. An unposted side "
+            f"normally renders '1. TBD', which counts as its own empty block")
+
+    if len(pitchers) == 2:
         game.away_pitcher = pitchers[0]
-    if len(pitchers) >= 2:
         game.home_pitcher = pitchers[1]
-    if len(pitchers) not in (0, 2):
+    elif len(pitchers) != 0:
         game.warnings.append(
-            f"found {len(pitchers)} probable pitcher(s); the first is taken as "
-            f"the away side")
+            f"found {len(pitchers)} probable pitcher line(s) for the 2 headers "
+            f"{headers[0]}/{headers[1]}; neither is attached rather than risk "
+            f"attaching one to the wrong side. An unannounced side normally "
+            f"renders a bare 'TBD', which holds its slot")
 
 
 # ---------------------------------------------------------------------------
@@ -424,6 +509,69 @@ def _resolve_one(display_name: str, team: str,
                   f"a confirmed lineup")
 
 
+DK_STARTING_TOKENS = frozenset({"SP", "P"})
+
+
+def _dk_declared_starters(salary_players: Sequence[Any]) -> Dict[str, List[Any]]:
+    """team -> the arms DK flagged as starting in the salary file's ``Starting``.
+
+    R32 round 2 promotes this to a first-class probable source rather than a
+    thing to patch in by hand afterwards. On 2026-07-30 DK declared Robbie Ray as
+    the SF starter while mlb.com and the StatsAPI both still showed SF as TBD, so
+    the CSV was AHEAD of both feeds, and CLAUDE.md already makes it authoritative.
+    A build that has the column and still raises "no probable or declared
+    starter" is refusing to read a fact it was handed.
+    """
+    out: Dict[str, List[Any]] = {}
+    for player in salary_players:
+        if "P" not in set(getattr(player, "positions", ()) or ()):
+            continue
+        if str(getattr(player, "starting", "") or "").strip().upper() not in DK_STARTING_TOKENS:
+            continue
+        out.setdefault(str(getattr(player, "team", "")).upper(), []).append(player)
+    return out
+
+
+def _apply_dk_starting(probable: Optional[Dict[str, Any]], team: str, game_id: str,
+                       dk_starters: Mapping[str, List[Any]],
+                       dk_probables: List[Dict[str, str]],
+                       warnings: List[str]) -> Optional[Dict[str, Any]]:
+    """Fill a missing probable from DK, or report a disagreement with the paste.
+
+    The paste WINS when both name someone, per R32: the paste is the primary
+    source and the salary file's authority in CLAUDE.md covers identity, salary,
+    team and eligibility, not who is on the mound. A disagreement is therefore
+    reported and never repaired, the same way a team disagreement already is.
+
+    The DK-derived probable carries no handedness, because the salary file has
+    none. ``extract_opp_throws_from_lineups`` skips a hand outside ('R','L'), so
+    the platoon view for the opposing side falls back to its default rather than
+    keying off a hand nobody stated.
+    """
+    declared = list(dk_starters.get(team.upper(), []))
+    if probable is not None:
+        if declared and normalize_name(str(probable.get("name") or "")) not in {
+                normalize_name(row.name) for row in declared}:
+            warnings.append(
+                f"{game_id}: the paste names {probable.get('name')!r} as {team}'s "
+                f"probable and DK's Starting column names "
+                f"{sorted(row.name for row in declared)}; the paste is the primary "
+                f"source per R32, so it wins and this is reported, never corrected")
+        return probable
+    if not declared:
+        return None
+    if len(declared) > 1:
+        warnings.append(
+            f"{game_id}: DK's Starting column flags {len(declared)} {team} arms "
+            f"{sorted(row.name for row in declared)}; no probable is taken from it "
+            f"rather than pick one")
+        return None
+    row = declared[0]
+    dk_probables.append({"team": team, "game_id": game_id, "name": row.name})
+    return {"id": None, "name": row.name, "hand": "",
+            "dk_player_id": row.player_id, "source": "dk_starting_column"}
+
+
 def resolve_paste_to_feed(
     text: str,
     salary_csv: str,
@@ -456,13 +604,16 @@ def resolve_paste_to_feed(
         team_of.setdefault(normalize_name(player.name), str(player.team).upper())
     start_by_game = salary_game_times(str(salary_csv))
     salary_game_ids = set(start_by_game)
+    dk_starters = _dk_declared_starters(salary_players)
 
     blockers: List[str] = []
     unrostered: List[Dict[str, str]] = []
     feed_games: List[Dict[str, Any]] = []
     confirmed: List[str] = []
     partial: List[Dict[str, Any]] = []
+    dk_probables: List[Dict[str, str]] = []
     resolved_count = 0
+    hitters_pasted = 0
 
     for game in games:
         if not game.away_team or not game.home_team:
@@ -488,6 +639,8 @@ def resolve_paste_to_feed(
         ):
             rows: List[Dict[str, Any]] = []
             side_blocked = False
+            side_absent = 0
+            hitters_pasted += len(lineup)
             for player in sorted(lineup, key=lambda p: p.order):
                 matched, blocker = _resolve_one(
                     player.display_name, team, hitter_index, overrides)
@@ -496,6 +649,7 @@ def resolve_paste_to_feed(
                     side_blocked = True
                     continue
                 if matched is None:
+                    side_absent += 1
                     unrostered.append({
                         "team": team, "order": str(player.order),
                         "pasted_name": player.display_name,
@@ -521,6 +675,14 @@ def resolve_paste_to_feed(
                 })
                 resolved_count += 1
 
+            if lineup and side_absent > len(lineup) * SIDE_ABSENT_BLOCK_RATIO:
+                blockers.append(
+                    f"{game_id} {team}: {side_absent} of {len(lineup)} pasted "
+                    f"starters have no row in the DK salary file. One is a "
+                    f"call-up and is not fatal; past half a posted side it is one "
+                    f"fact and not {side_absent} of them, and the fact is that "
+                    f"this paste and this salary file are not the same game")
+
             probable = None
             if pitcher is not None:
                 matched, blocker = _resolve_one(
@@ -537,8 +699,14 @@ def resolve_paste_to_feed(
                 else:
                     probable = {"id": pitcher.mlbam_id, "name": matched.name,
                                 "hand": pitcher.hand,
-                                "dk_player_id": matched.player_id}
+                                "dk_player_id": matched.player_id,
+                                "source": "operator_paste"}
                     resolved_count += 1
+
+            probable = _apply_dk_starting(
+                probable, team, game_id, dk_starters, dk_probables, warnings)
+            if probable is not None and probable.get("source") == "dk_starting_column":
+                resolved_count += 1
 
             # Ben's call: a short block is PARTIAL, which the status builder reads
             # as projected and reports in partial_lineup_teams. Calling nine-minus-
@@ -574,6 +742,18 @@ def resolve_paste_to_feed(
             "source": "operator_paste",
         })
 
+    slate_absent = sum(1 for row in unrostered if row["order"] != "SP")
+    slate_tripped = (hitters_pasted
+                     and slate_absent >= SLATE_ABSENT_BLOCK_FLOOR
+                     and slate_absent > hitters_pasted * SLATE_ABSENT_BLOCK_RATIO)
+    if slate_tripped:
+        blockers.append(
+            f"{slate_absent} of {hitters_pasted} pasted starters across the whole "
+            f"paste have no row in the DK salary file. That is a wrong-slate or "
+            f"wrong-salary-file signal read once, not {slate_absent} independent "
+            f"call-ups; check that the paste and "
+            f"{Path(str(salary_csv)).name} describe the same slate")
+
     slate_dates = {str(v.date()) for v in start_by_game.values()}
     feed = {
         "date": sorted(slate_dates)[0] if slate_dates else None,
@@ -590,6 +770,18 @@ def resolve_paste_to_feed(
         "confirmed_teams": sorted(confirmed),
         "partial_teams": partial,
         "unrostered_starters": unrostered,
+        "dk_declared_probables": dk_probables,
+        "unrostered_policy": {
+            "hitters_pasted": hitters_pasted,
+            "hitters_absent_from_dk": slate_absent,
+            "side_ratio": SIDE_ABSENT_BLOCK_RATIO,
+            "slate_ratio": SLATE_ABSENT_BLOCK_RATIO,
+            "slate_floor": SLATE_ABSENT_BLOCK_FLOOR,
+            "slate_threshold_tripped": bool(slate_tripped),
+            "rule": "absent from the DK pool is reported per name and never "
+                    "fatal on its own; it blocks when it exceeds half of one "
+                    "posted side, or the slate ratio and floor together",
+        },
         "blockers": blockers,
         "warnings": warnings,
     }

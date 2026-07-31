@@ -31,6 +31,9 @@ This file carries the contracts and the gotchas. Each procedure lives once:
 - Any tool's flags: `python tools/<tool>.py --help`
 - What to build next: docs/2026-07-27_backlog_v2.md, the single live backlog.
   Do not write a new review document.
+- What already changed and why: CHANGELOG.md, newest first, DEV writes it.
+  One entry per shipped change, keyed to its R-number. Slate outcomes go to the
+  ledger and per-build records to that run's brief; neither goes here.
 
 ## Build contract
 The steps are in SKILL.md. These five hold whatever path a build takes:
@@ -42,10 +45,21 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    `tools/lineups_from_paste.py` turns an mlb.com/starting-lineups paste into an
    ordinary `lineups_feed.json` tagged `source: operator_paste` per side; the
    API feed is fallback for uncovered sides only, via `--merge-feed`. A pasted
-   name that is ambiguous or unresolvable is a blocker and NO feed is written,
+   name that is AMBIGUOUS or UNMATCHED is a blocker and NO feed is written,
    because a half-resolved lineup arrives downstream looking like a posted
-   partial. A fully pasted slate reads no platoon reference, so item 2's
-   staleness rule has nothing to gate.
+   partial. A name that resolves but is ABSENT FROM THE DK POOL is a different
+   fact and is not fatal on its own: DK owns eligibility, so a starter DK did
+   not list is unrosterable anyway and the slot is named in
+   `unrostered_starters`. In bulk it does block, because it stops being N facts
+   and becomes one: past half of one posted side, or `SLATE_ABSENT_BLOCK_RATIO`
+   of the paste with at least `SLATE_ABSENT_BLOCK_FLOOR`, the paste and the
+   salary file are not the same slate (R32 round 2). A `1. TBD` line and a bare
+   `TBD` in a probable's place are POSITIONAL FACTS, each holding an empty slot
+   so the counts match; blocks and pitchers attach at a count of 0 or exactly 2
+   and are otherwise refused, never guessed. DK's `Starting` column (SP/P) is a
+   first-class probable source, and the paste wins where both name someone.
+   A fully pasted slate reads no platoon reference, so item 2's staleness rule
+   has nothing to gate.
 2. The platoon reference ages against the SLATE, not its own collected_date.
    Past 7 days with a TBD team filled from it is a pool blocker at the
    engine default (`stale_platoon_policy='block'`); build_slate.py and
@@ -64,7 +78,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  25 modules  556 tests`. The module count comes off the
+   `PASS  v2.26.0  25 modules  583 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
