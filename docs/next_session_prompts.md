@@ -16,9 +16,10 @@ is in the backlog under R36; do not re-litigate the decision, but do tell me if
 implementing it surfaces a fact that should change it.
 
 Session start per CLAUDE.md, with five things specific to this tree.
-First, the audit expects PASS v2.26.0 25 modules 589 tests across five gated
-suites: test_core 375, test_showdown 49, test_upload_integrity 100,
-test_golden_replay 9, test_paste_lineups 56.
+First, the audit expects PASS v2.26.0 25 modules 591 tests across five gated
+suites: test_core 377, test_showdown 49, test_upload_integrity 100,
+test_golden_replay 9, test_paste_lineups 56. (Corrected 2026-08-01; if this
+drifts again, EXPECTED_TEST_COUNT in tools/audit.py is the source of truth.)
 Second, test_core does NOT fit a 45s Cowork call as a single run. Split it by
 test class into roughly four groups and run those.
 Third, scipy. The .pylibs/ directory on the mount is BROKEN and will fail with
@@ -101,11 +102,12 @@ Four things are pending and they are all yours.
 4. PENDING_MINE_2026-07-28.md is a dead file whose own header says to delete it.
    Delete it.
 
-There is also a DEV fragment waiting for you at
-ledger/inbox/2026-07-31_DEV_paste-placeholder-quick-card.md. It corrects the
-Quick Card's test count, which is stale at 546/359 and should read 589, and
-proposes one new invariant about positional placeholders. Merge it and delete
-the fragment.
+There are two DEV fragments waiting for you.
+ledger/inbox/2026-07-31_DEV_paste-placeholder-quick-card.md corrects the
+Quick Card's test count and proposes one new invariant about positional
+placeholders; its count (589) is itself one generation behind, and
+ledger/inbox/2026-08-01_DEV_quick-card-count-591.md supersedes it on the
+count question (591). Merge both and delete the fragments.
 
 One thing worth knowing before you fit anything: R10's gate was decided on
 2026-07-31 and now conditions on the satellite archetype, so the archive you are

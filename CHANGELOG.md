@@ -25,6 +25,54 @@ performance claim.
 
 ---
 
+## 2026-08-01 — R41/R42: adjudication of the 2026-08-01 external critique pair (docs only)
+
+### Changed
+
+- **Adjudicated two new external critiques** against the tree at 48b4e7e, per
+  the R36 method (every new line cite verified before ruling). Both archived:
+  `docs/2026-08-01_critique_greenfield_spec.md` and
+  `docs/2026-08-01_critique_gemini.md`.
+- **The Gemini document: rejected, nine of nine.** It did not read the tree.
+  It attributes roster construction to the LLM (`optimizer_v3` +
+  `scipy.optimize.milp` has been the source of truth throughout), proposes the
+  PuLP migration already on the do-not-build list, gets the DK Classic roster
+  size wrong (says 8; it is 10), and proposes automated DK scraping plus
+  automated lineup upload, which the DK wall and the money wall forbid
+  categorically. Its two non-violating ideas already exist as R9 and R10.
+- **The greenfield spec: read the tree, high quality, mostly prior art.** Of
+  its 30 flaws, roughly 20 map to standing dispositions — R36's accepted
+  findings, the R9/R10/R12/R13 gates, and the do-not-build list — and its
+  Phase 0 independently re-derives the current what-next ordering. Its
+  compliance stance (no DK automation, manual upload boundary) confirms
+  existing policy. Newly accepted and filed:
+  - **R41** — bring Showdown under the three certification gates (F-15).
+    Filing also closes a contract drift: CLAUDE.md promised this backlog item
+    and it never existed.
+  - **R42** — `env_probe --install` disk-headroom check and reclaim path
+    (F-22 narrow); bit this session live (sandbox ENOSPC, audit unrunnable).
+  - **R36 extensions in place:** F11's removal ships with a coefficient
+    snapshot and near-tie behavioral test (F-07); F1m's staleness constant
+    becomes time-to-lock policy (F-11); F6m adds corrupt-manifest-is-not-empty
+    (`read_manifest`, `upload_manifest.py:85-93`, verified) and
+    `salary_sha256` in delivery records (F-14 plus the recordable sliver of
+    F-25); Finding 7 ships with the exactly-50% coverage boundary test (A-29).
+  - **R10 extension:** the satellite prior is graded on duplication
+    distribution, not ownership error alone (A-12).
+  - **Do-not-build additions, dated:** no greenfield rebuild program while
+    R13 is undecided; no DB state machine, HMAC manifests, CP-SAT migration,
+    evidence-policy engine, or async acquisition service. Reasons in the
+    backlog section.
+- **Rejected with a factual correction:** F-24/F-29's "no prediction ledger"
+  is partially false — every run persists `final/projections.csv` immutably;
+  the missing piece is a player-actuals grading harness, which inherits
+  Finding 15's disposition as a named dependency of R13.
+- **Doc-drift fixes riding this commit:** `docs/next_session_prompts.md` test
+  pin 589 → 591 (core 375 → 377; `EXPECTED_TEST_COUNT` in `tools/audit.py` is
+  the source of truth). The Quick Card's stale 546 goes through ARCHIVE via
+  `ledger/inbox/2026-08-01_DEV_quick-card-count-591.md`, because the ledger is
+  not DEV's to edit.
+
 ## 2026-08-01 — the backlog/changelog contract: every change carries its entry; completed items migrate
 
 ### Changed
