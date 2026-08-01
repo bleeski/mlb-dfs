@@ -970,23 +970,154 @@ class BankCoverageTests(unittest.TestCase):
             self.assertIsNone(empty["passed"])
 
 
+def _shaped_candidate(cid, roster, by_shape, primary="AAA"):
+    """A candidate whose score is pinned per contest shape.
+
+    `_candidate_shape_score` reads `contest_fit_by_shape[shape]` ahead of every
+    proxy, so this is the only way to set the two entries' scores independently
+    and put two candidates a known distance apart.
+    """
+    best = max(by_shape.values())
+    return {
+        "candidate_id": cid, "lineup_ids": roster, "player_ids": roster,
+        "sp_ids": roster[:2], "primary_stack": primary,
+        "objective": best, "contest_fit_score": best,
+        "contest_fit_by_shape": dict(by_shape),
+    }
 
 
+class JointObjectiveNoReuseTermTests(unittest.TestCase):
+    """R36 Finding 11. The joint objective carries no reuse term.
 
+    `reuse_penalty * 0.01` used to sit on the used-candidate indicators as a
+    POSITIVE minimization cost, so it rewarded concentration rather than
+    penalising it. These tests pin the vector it left behind and the behaviour
+    the term used to distort.
+    """
 
+    SHAPES = ("large_wta", "mid_wta")
 
+    def _entries(self, count):
+        return [
+            {"entry_id": str(i + 1), "contest_id": f"c{i + 1}",
+             "contest_shape": self.SHAPES[i % len(self.SHAPES)]}
+            for i in range(count)
+        ]
 
+    def _near_tie_bank(self, delta):
+        """Two candidates each better for one shape by `delta`, plus an anchor.
 
+        The anchor holds the normalization range at a full 0-100 span, which is
+        what makes `delta` a distance on that scale rather than on the raw
+        scores. Rosters are disjoint, so no overlap row fires and reuse stays
+        legal on the constraints.
+        """
+        a = [f"a{i}" for i in range(10)]
+        b = [f"b{i}" for i in range(10)]
+        c = [f"c{i}" for i in range(10)]
+        return [
+            _shaped_candidate("A", a, {"large_wta": 100.0, "mid_wta": 100.0 - delta}, "AAA"),
+            _shaped_candidate("B", b, {"large_wta": 100.0 - delta, "mid_wta": 100.0}, "BBB"),
+            _shaped_candidate("ANCHOR", c, {"large_wta": 0.0, "mid_wta": 0.0}, "CCC"),
+        ]
 
+    def _capture_objective(self, candidates, entries, controls):
+        """Snapshot the `c` vector handed to `milp`, and solve for real."""
+        import numpy as np
+        import scipy.optimize as so
+        real_milp = so.milp
+        seen = {}
 
+        def spy(*args, **kwargs):
+            seen["c"] = np.array(kwargs["c"], dtype=float)
+            return real_milp(*args, **kwargs)
 
+        with unittest.mock.patch.object(so, "milp", spy):
+            result = select_and_assign_entries(candidates, entries, controls)
+        self.assertIn("c", seen, "milp was never reached")
+        return seen["c"], result
 
+    def test_objective_names_signs_and_bounds_every_term(self):
+        candidates = self._near_tie_bank(0.01)
+        entries = self._entries(2)
+        E, K = len(entries), len(candidates)
+        objective, result = self._capture_objective(
+            candidates, entries, {"max_shared_players": 4})
+        self.assertTrue(result["passed"], result.get("errors"))
 
+        # Two variable blocks and no others: E*K assignment vars, then K
+        # used-candidate indicators because max_shared_players is set.
+        self.assertEqual(objective.size, E * K + K)
 
+        # The y block is the R36 F11 pin. Every indicator coefficient is
+        # exactly zero; y_k exists only to carry the hard overlap rows.
+        y_block = objective[E * K:]
+        self.assertEqual(y_block.size, K)
+        self.assertTrue((y_block == 0.0).all(), list(y_block))
 
+        # The x block is bounded and signed: negated shape scores normalized
+        # onto [-100, 0], so nothing in the whole vector is ever positive.
+        x_block = objective[:E * K]
+        self.assertLessEqual(float(x_block.max()), 0.0)
+        self.assertGreaterEqual(float(x_block.min()), -100.0)
+        self.assertLessEqual(float(objective.max()), 0.0)
+        for e in range(E):
+            row = x_block[e * K:(e + 1) * K]
+            self.assertAlmostEqual(float(row.min()), -100.0, places=9)
+            self.assertAlmostEqual(float(row.max()), 0.0, places=9)
 
+    def test_no_indicator_block_without_max_shared_players(self):
+        candidates = self._near_tie_bank(0.01)
+        entries = self._entries(2)
+        objective, result = self._capture_objective(candidates, entries, {})
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(objective.size, len(entries) * len(candidates))
 
+    def test_near_tie_entries_do_not_collapse_onto_one_reused_lineup(self):
+        """The behavioural half. Two candidates 0.01 apart on a 100-point scale
+        sit inside the removed term's 0.02 tiebreaker band. Each is the better
+        fit for one of the two entries by that margin, and the entries are in
+        different contests so reuse is legal on the constraints. Taking both is
+        worth -200.00 and reusing either one is worth -199.99, so the distinct
+        pair is the unique optimum. Under the old term reuse won: it saved 0.02
+        by keeping one indicator down and gave up only 0.01 of fit.
+        """
+        candidates = self._near_tie_bank(0.01)
+        entries = self._entries(2)
+        result = select_and_assign_entries(
+            candidates, entries, {"max_shared_players": 4})
+        self.assertTrue(result["passed"], result.get("errors"))
+        chosen = [row["candidate_id"] for row in result["assignments"]]
+        self.assertEqual(sorted(chosen), ["A", "B"], chosen)
+        self.assertFalse(
+            any(row["reused_across_contests"] for row in result["assignments"]))
+        by_entry = {row["entry_id"]: row["candidate_id"] for row in result["assignments"]}
+        self.assertEqual(by_entry["1"], "A")
+        self.assertEqual(by_entry["2"], "B")
 
+    def test_reuse_penalty_control_is_named_and_changes_nothing(self):
+        """The key is no longer a joint control. It is reported, not obeyed, and
+        not fatal: the checkpoint renders an allocator refusal as
+        `proven_infeasible`, and a dead control key is not an infeasible
+        constraint system.
+        """
+        candidates = self._near_tie_bank(0.01)
+        entries = self._entries(2)
+        clean_obj, clean = self._capture_objective(
+            candidates, entries, {"max_shared_players": 4})
+        stale_obj, stale = self._capture_objective(
+            candidates, entries, {"max_shared_players": 4, "reuse_penalty": 2.0})
+
+        self.assertTrue(stale["passed"], stale.get("errors"))
+        self.assertTrue((clean_obj == stale_obj).all())
+        self.assertEqual(
+            [row["candidate_id"] for row in clean["assignments"]],
+            [row["candidate_id"] for row in stale["assignments"]],
+        )
+        self.assertEqual(clean.get("warnings"), [])
+        named = [w for w in stale["warnings"] if "reuse_penalty" in w]
+        self.assertEqual(len(named), 1, stale["warnings"])
+        self.assertIn("IGNORED", named[0])
 
 
 class TestXwobaBaselineCorrection(unittest.TestCase):

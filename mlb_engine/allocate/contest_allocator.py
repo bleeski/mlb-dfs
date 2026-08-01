@@ -1622,9 +1622,32 @@ def select_and_assign_entries(
             raw_scores[(e, k)] = score
             normalized = 50.0 if hi <= lo else 100.0 * (score - lo) / (hi - lo)
             objective[x_idx(e, k)] = -normalized
-    reuse_penalty = float(controls.get("reuse_penalty", 2.0))
-    if use_y:
-        objective[y_offset:] = reuse_penalty * 0.01
+    # R36 F11: the joint objective carries NO reuse term. Every nonzero
+    # coefficient is an x term and every x term is a negated shape score in
+    # [-100, 0]; the y block stays at 0.0. The removed
+    # `objective[y_offset:] = reuse_penalty * 0.01` put a POSITIVE cost on each
+    # DISTINCT used candidate under minimization, so it rewarded concentration,
+    # the opposite of the parameter's name. It was also redundant: `use_y` is
+    # true only when `max_shared_players` is set, so the soft nudge was live
+    # only where the hard overlap cap already enforced diversity. y_k exists to
+    # carry the overlap rows (:1721-1730) and nothing else. Diversity is
+    # governed by max_shared_players and max_candidate_reuse alone.
+    control_warnings: List[str] = []
+    if "reuse_penalty" in controls:
+        # Not fatal, and deliberately not an error dict: the checkpoint reports
+        # an allocator refusal as `proven_infeasible`, and a dead control key is
+        # not an infeasible constraint system. Naming it here keeps it out of
+        # silence without mislabeling it. `reuse_penalty` survives only as the
+        # correctly-signed excess-variable coefficient on the legacy
+        # `assign_lineups_to_contests` path (:797-800), where it is a function
+        # parameter and not a controls key.
+        control_warnings.append(
+            "reuse_penalty was supplied and is IGNORED: it is not a "
+            "joint-allocator control. The term it used to set rewarded reuse "
+            "rather than penalising it (R36 Finding 11) and is removed. "
+            "Overlap diversity is set by max_shared_players and "
+            "max_candidate_reuse."
+        )
 
     rows: List[Dict[int, float]] = []
     lbs: List[float] = []
@@ -1868,7 +1891,7 @@ def select_and_assign_entries(
         "allocation_solver_status": solver_status,
         "allocation_solver_report": solver_report,
         "allocation_optimality": solver_report["optimality"],
-        "warnings": (
+        "warnings": control_warnings + (
             [f"allocation accepted from a time-limited incumbent at gap "
              f"{'unknown' if mip_gap is None else format(float(mip_gap), '.4f')}; "
              f"every constraint verified, optimality not proven"]

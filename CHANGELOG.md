@@ -25,6 +25,99 @@ performance claim.
 
 ---
 
+## 2026-08-01 — R36 Finding 11: the joint allocator's reuse term is removed
+
+### Changed
+
+- **`objective[y_offset:] = reuse_penalty * 0.01` is deleted from
+  `select_and_assign_entries`** (`mlb_engine/allocate/contest_allocator.py:1625`).
+  The joint objective now carries assignment terms only: every nonzero
+  coefficient is a negated shape score on `[-100, 0]`, and the `y` block stays
+  at `0.0`. `y_k` itself remains, because it carries the hard
+  `max_shared_players` overlap rows (`:1743-1752`), and it now carries nothing
+  else. Cross-lineup diversity is `max_shared_players` and `max_candidate_reuse`
+  alone, both hard rows, which is the point: two controls at different scales
+  governing one property was the redundancy.
+- **The `reuse_penalty` controls key is named and ignored, not obeyed and not
+  fatal.** This was the open sub-decision and the reasoning belongs on the
+  record. Silently accepting a dead control is worse than the original bug,
+  because the next reader assumes it works. Rejecting it through the allocator's
+  error dict was rejected on a truthful-labels ground: `_plan_joint_allocation`
+  renders any allocator refusal as `proven_infeasible`, and a dead control key
+  is not an infeasible constraint system, so that route either mislabels the
+  verdict or forces a fourth verdict category into the checkpoint for a control
+  whose only effect was a defect. Raising was rejected because it can stop a
+  build at T-5 over an input that changes no coefficient. So the key is reported
+  in the allocator's `warnings`, which persist in
+  `runs/<run_id>/final/diagnostics.json`, and the build proceeds. Nothing in the
+  tree sets the key today, verified by grep across `mlb_engine`, `tools`,
+  `tests`, `data` and the contest library.
+- **`docs/MLB_Classic_Integration_Contract.md` no longer advertises
+  `reuse_penalty` as a `portfolio_controls` key**, and says where the name does
+  still live: as a keyword parameter on the legacy `assign_lineups_to_contests`
+  (`:732`, applied at `:797-800`), where it weights an EXCESS variable and is
+  correctly signed. The key was not dead everywhere, and the contract now says
+  which of the two things it is. `MLB_Classic.md` and `SKILL.md` never described
+  the parameter and needed no correction.
+- **Two tests the file never had**, both verified against the old code by
+  restoring the term and watching them fail:
+  `JointObjectiveNoReuseTermTests` in `tests/test_core.py`. The coefficient
+  snapshot spies on the `c` vector handed to `milp` and pins the block sizes,
+  the `[-100, 0]` bound, the absence of any positive coefficient anywhere, and
+  the all-zero `y` block; with the old term restored it failed on
+  `[0.02, 0.02, 0.02]`. The behavioural test puts two candidates `0.01` apart on
+  the 100-point scale, each the better fit for one of two entries in different
+  contests, so the distinct pair is the unique optimum by `0.01`; with the old
+  term restored it returned `['B', 'B']`, the collapse onto one reused lineup,
+  exactly as predicted. A third test pins the ignored-control warning and that
+  the objective vector is bit-identical with and without the key.
+- **Test count re-pinned 591 to 595** in `tools/audit.py`, `CLAUDE.md` and
+  `skills/generate-lineups/SKILL.md` (core 377 to 381).
+- **`tests/golden/golden_replay_production_2026-06-03.json` re-pinned, one key
+  only.** `assignments` was replaced; `aggregates`, `meta` and `pure_verdict`
+  are byte-identical, and the diff is a balanced 178/178 inside the assignments
+  block.
+
+### What the golden diff actually shows
+
+The prediction was near-tie churn on some fixtures. The headline number looks
+much worse than that and the detail confirms the prediction, so both facts are
+recorded here.
+
+17 of 18 entries changed their assigned lineup. The portfolio-wide multiset of
+`lineup_signature` is IDENTICAL: zero lineups added, zero removed, the same 18
+rosters entered. `test_aggregates_match_baseline` passed untouched, so bank
+composition, the exposure summary and the SP-pair distribution did not move.
+Per contest, exactly two lineups traded places between contests `191020573` and
+`191020574`, one BOS-stack and one BAL-stack; contest `191047506` is unchanged.
+Every other apparent move is one of two non-facts: an Entry ID permutation
+within a single contest, which the portfolio does not distinguish, or
+`bank21` to `bank0`, which are duplicate signatures under different bank indices
+and therefore the same roster.
+
+So the answer to "cleanup or portfolio change" is cleanup. Two of eighteen
+entries changed which contest they sit in, which is the only thing the removed
+term could ever have biased, since `y_k` is a portfolio-wide indicator and the
+coupling it created was cross-contest by construction.
+
+One observation worth keeping, because it cost this session real time.
+`test_assignment_matches_baseline` pins entry-to-lineup mapping, and Entry ID
+assignment within a contest is a free permutation the solver has no reason to
+hold stable once any coefficient changes. The test therefore reports a
+17-of-18 diff for a 2-of-18 change. That is a property of the golden's
+granularity, not of the engine. Not filed as an item; raised for Ben.
+
+### The adjudication and the decision, migrated verbatim from R36 Finding 11
+
+Migrated out of `docs/2026-07-27_backlog_v2.md` in this commit, per the
+2026-08-01 backlog/changelog contract. Tense and line numbers are as written at
+the time; the shipped state is the section above. The separate
+`2026-07-31 — Decided, not yet shipped` entry stays where it is.
+
+- **Finding 11 (P1, XS, but it reranks lineups so it is Ben's call).** `reuse_penalty` genuinely rewards reuse. `scipy.optimize.milp` minimises; the used-candidate indicator `y_k` gets a POSITIVE coefficient (`reuse_penalty * 0.01`, default 2.0), and the linking rows make `y_k` mean "candidate k is used by at least one entry". Minimising a positive cost per DISTINCT used candidate prefers fewer distinct lineups, which is the opposite of the parameter's name. The legacy `assign_lineups_to_contests` puts the same penalty on an EXCESS variable and is correctly signed. **This was already accepted in `docs/2026-07-19_red_team_response.md` and then lost — it never reached a backlog item.** That is the more troubling fact. Not flipped tonight because changing it reranks every multi-contest portfolio, which makes it a strategy change needing a dated decision, per the same rule that parked the satellite `ticket_count` rows. Recommendation: remove the term rather than invert it, since no bankroll rationale for cross-contest reuse has ever been written down.
+
+- **DECIDED 2026-07-31 by Ben, on DEV's recommendation: REMOVE the term. Not shipped yet; it is the first item of the next DEV session.** The reasoning was re-derived rather than inherited, and one inherited claim was wrong and is withdrawn. **Withdrawn:** that inversion would be structurally unsafe. `y_k` is pinned bidirectionally at `contest_allocator.py:1724-1725`, so it cannot float free and a sign flip would in fact behave. Inversion is safe; it is just not warranted. **The actual case for removal.** The term is redundant by construction: `use_y` is true only when `max_shared_players` is set, so the soft nudge is live only when the hard overlap cap is already enforcing diversity, and two controls at different scales governing one property is how a portfolio stops being explainable. Nothing was ever tuned against its stated behaviour, since it never had that behaviour, so there is no calibration to preserve. And no rationale has been written down for penalising reuse BEYOND the hard cap either, so with no stated case in either direction the honest default is no term. **The blast radius is smaller than "reranks every multi-contest portfolio" implies, and that is worth stating before the work starts:** the coefficient is `reuse_penalty * 0.01` = 0.02 against x coefficients normalised to [-100, 0], so it is a tiebreaker that only moves a selection when two candidates sit within 0.02 of each other on a 100-point range. Expect the golden replay to move on some fixtures and not others; goldens are re-pinned deliberately, with the diff read, never regenerated blind. **Addition (2026-08-01, GF spec F-07):** the removal commit ships with two tests the file never had — an objective-coefficient snapshot on the joint MILP (every term named, signed, bounded) and a near-tie behavioral test proving two candidates inside the old 0.02 tiebreaker band no longer collapse onto one reused lineup.
+
 ## 2026-08-01 — R41/R42: adjudication of the 2026-08-01 external critique pair (docs only)
 
 ### Changed

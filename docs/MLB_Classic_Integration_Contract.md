@@ -116,11 +116,19 @@ Entry ID. `contest_shape` comes from the resolved posture.
 
 `max_player_exposure_pct, max_pitcher_exposure_pct,
 max_primary_stack_exposure_pct, max_sp_pair_repetition, max_shared_players,
-max_candidate_reuse, reuse_penalty`. Percentage caps convert to a per-player
+max_candidate_reuse`. Percentage caps convert to a per-player
 count of `floor(pct * entry_count)`; on small banks tight caps can make the
 joint MILP infeasible, so loosen and surface the relaxation. `_merged_controls`
 takes the tightest cap across contests, then applies
 `portfolio_controls_override`.
+
+`reuse_penalty` is NOT on that list and has not been a joint control since R36
+Finding 11. Supplying it is not fatal and changes no coefficient; the allocator
+names it in `warnings` and ignores it. Reuse is governed by
+`max_candidate_reuse` and cross-lineup overlap by `max_shared_players`, both
+hard rows. The name survives only as a keyword parameter on the legacy
+`assign_lineups_to_contests`, where it weights an EXCESS variable and is
+correctly signed.
 
 ## DK roster slot order
 
