@@ -33,7 +33,7 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 589  # core 375 + showdown 49 + upload 100 + golden 9 + paste 56
+EXPECTED_TEST_COUNT = 591  # core 377 + showdown 49 + upload 100 + golden 9 + paste 56
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -239,7 +239,8 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     if debt["available"] and debt["unrecorded_commits"]:
         count = debt["unrecorded_commits"]
         warnings.append(
-            f"{count} commit(s) touched {'/'.join(CHANGELOG_TRACKED_PATHS)} since "
+            f"{count} commit(s) touched the DEV write set "
+            f"({', '.join(CHANGELOG_TRACKED_PATHS)}; inbox fragments exempt) since "
             f"CHANGELOG.md was last written; a change is not shipped until its "
             f"entry exists. Newest: {debt['commits'][0]}")
 
@@ -255,7 +256,14 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     }
 
 
-CHANGELOG_TRACKED_PATHS = ("mlb_engine", "tools")
+# The full DEV write set. Ben's 2026-08-01 rule: EVERY change — code or
+# otherwise, CLAUDE.md included — carries a CHANGELOG.md entry in the same
+# commit, so both Ben and any later session know when it changed and why.
+# The two inbox dirs are exempt: fragments are inputs addressed to an owning
+# role, not shipped changes; the owning role's merge commit is the change.
+CHANGELOG_TRACKED_PATHS = ("mlb_engine", "tools", "tests", "skills", "docs",
+                           "CLAUDE.md")
+CHANGELOG_EXEMPT_PATHSPECS = (":(exclude)docs/backlog_inbox",)
 
 
 def changelog_debt(root: Path) -> Dict[str, Any]:
@@ -291,7 +299,7 @@ def changelog_debt(root: Path) -> Dict[str, Any]:
     if not last_changelog:
         return out
     listed = _git("log", "--format=%h %s", f"{last_changelog}..HEAD",
-                  "--", *CHANGELOG_TRACKED_PATHS)
+                  "--", *CHANGELOG_TRACKED_PATHS, *CHANGELOG_EXEMPT_PATHSPECS)
     if listed is None:
         return out
     commits = [line for line in listed.splitlines() if line.strip()]

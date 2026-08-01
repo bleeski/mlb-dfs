@@ -19,7 +19,7 @@ probability claim.
    analysis's "138 contests" counted it twice (moved no conclusion; field 31,
    under every threshold). Deduped money cross-foot reconciles to 3.13
    exactly: 97 contests, −$21.46.
-4. **Quick Card item 1 still pins 546 tests.** Current true count 589
+4. **Quick Card item 1 still pins 546 tests.** Current true count 591 (moved by this same session: changelog_debt widening added tests)
    (audit PASS v2.26.0, 25 modules, verified suite-by-suite this session);
    the 556→583 fragment in this inbox is itself one hop stale.
 5. **Candidate ledger lines from the review** (ARCHIVE to grade and place;

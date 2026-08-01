@@ -30,10 +30,16 @@ This file carries the contracts and the gotchas. Each procedure lives once:
 - Showdown mechanics: skills/generate-lineups/references/showdown.md
 - Any tool's flags: `python tools/<tool>.py --help`
 - What to build next: docs/2026-07-27_backlog_v2.md, the single live backlog.
-  Do not write a new review document.
+  OPEN work only; its "What do we tackle next" section is the answer every
+  session gives to that question. Do not write a new review document.
 - What already changed and why: CHANGELOG.md, newest first, DEV writes it.
-  One entry per shipped change, keyed to its R-number. Slate outcomes go to the
-  ledger and per-build records to that run's brief; neither goes here.
+  One entry per shipped change with its rationale, keyed to its R-number, and
+  the scope is EVERY change in the DEV write set — engine, tools, tests,
+  skills, docs, this file. A completed backlog item's entry MIGRATES from the
+  backlog into the changelog in the completing commit (Ben, 2026-08-01);
+  history from before that date sits under "Imported record" at the bottom.
+  Slate outcomes go to the ledger and per-build records to that run's brief;
+  neither goes here.
 
 ## Build contract
 The steps are in SKILL.md. These five hold whatever path a build takes:
@@ -78,7 +84,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  25 modules  589 tests`. The module count comes off the
+   `PASS  v2.26.0  25 modules  591 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
@@ -153,10 +159,12 @@ Roles; Ben's first message assigns one:
   engine paths while any slate beacon is lit: builds re-import modules
   between steps, so a mid-slate edit changes a running build. A DEV change
   is not shipped until CHANGELOG.md carries its entry, in the same commit
-  as the change. Enforced by `audit.changelog_debt`, which warns at the
-  next session's start when commits touching mlb_engine/ or tools/ outrun
-  the changelog; it cannot see the session now running, so the discipline
-  is still yours and the warning is only the backstop.
+  as the change — and "change" means the whole write set, docs and this
+  file included, not code alone. Enforced by `audit.changelog_debt`, which
+  warns at the next session's start when commits touching the DEV write
+  set (inbox fragments exempt) outrun the changelog; it cannot see the
+  session now running, so the discipline is still yours and the warning is
+  only the backstop.
 Unassigned: building lineups is always permitted, claims present or not;
 light the beacon and go. Ledger, inbox, engine, and contract surfaces
 still need their role and its mutex; outside a build, when in doubt, ask

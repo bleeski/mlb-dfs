@@ -6726,14 +6726,44 @@ class ChangelogDebtTests(unittest.TestCase):
             self.assertTrue(debt["commits"][0].endswith("unrecorded change 3"),
                             "the newest is named first, so the warning is useful")
 
-    def test_a_docs_only_commit_is_not_debt(self):
-        # The rule is about engine and tool changes. A prose commit that owes
-        # the changelog nothing must not nag every session that follows it.
+    def test_a_root_prose_commit_outside_the_write_set_is_not_debt(self):
+        # The rule covers the DEV write set. A root-level prose file outside
+        # it owes the changelog nothing and must not nag later sessions.
         with tempfile.TemporaryDirectory() as tmp:
             root, git = self._repo(tmp)
             (root / "NOTES.md").write_text("notes\n", encoding="utf-8")
             git("add", "NOTES.md")
-            git("commit", "-q", "-m", "docs: notes")
+            git("commit", "-q", "-m", "notes: scratch")
+            self.assertEqual(self._audit().changelog_debt(root)["unrecorded_commits"], 0)
+
+    def test_docs_skills_and_claudemd_commits_are_debt(self):
+        # Ben's 2026-08-01 rule: every change, code or otherwise, carries its
+        # changelog entry. CLAUDE.md, docs/, and skills/ are changes too.
+        with tempfile.TemporaryDirectory() as tmp:
+            root, git = self._repo(tmp)
+            (root / "docs").mkdir()
+            (root / "skills").mkdir()
+            (root / "docs" / "plan.md").write_text("p\n", encoding="utf-8")
+            git("add", "docs/plan.md")
+            git("commit", "-q", "-m", "R99: docs change, unrecorded")
+            (root / "skills" / "s.md").write_text("s\n", encoding="utf-8")
+            git("add", "skills/s.md")
+            git("commit", "-q", "-m", "R99: skill change, unrecorded")
+            (root / "CLAUDE.md").write_text("c\n", encoding="utf-8")
+            git("add", "CLAUDE.md")
+            git("commit", "-q", "-m", "R99: contract change, unrecorded")
+            self.assertEqual(self._audit().changelog_debt(root)["unrecorded_commits"], 3)
+
+    def test_backlog_inbox_fragments_are_exempt(self):
+        # Fragments are inputs addressed to an owning role, not shipped
+        # changes; the owner's merge commit is the change the log records.
+        with tempfile.TemporaryDirectory() as tmp:
+            root, git = self._repo(tmp)
+            (root / "docs" / "backlog_inbox").mkdir(parents=True)
+            (root / "docs" / "backlog_inbox" / "f.md").write_text("f\n",
+                                                                  encoding="utf-8")
+            git("add", "docs/backlog_inbox/f.md")
+            git("commit", "-q", "-m", "fragment: for DEV")
             self.assertEqual(self._audit().changelog_debt(root)["unrecorded_commits"], 0)
 
     def test_it_degrades_to_silence_without_a_changelog(self):
