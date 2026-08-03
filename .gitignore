@@ -50,6 +50,22 @@ data/standings/failed_pulls/
 # CONTESTS_AWAITING_STANDINGS.md, which is tracked
 data/standings/PENDING_MINE_*.md
 
+# vendored interpreter state: a local scipy install and its wheel cache, plus the
+# scratch dir. Environment, never history. `export PYTHONPATH=$PWD/.pylibs` is what
+# makes scipy.optimize.milp importable without a network install (2026-08-03).
+.pylibs/
+.wheels/
+.tmp/
+
+# raw DK zips whose CSV is already mined into data/archive/. The extracted CSV is
+# the durable record and it is tracked; the zip is the same bytes a second time.
+# Moved here rather than deleted because the sandbox cannot delete (2026-08-03).
+data/standings/processed_zips/
+
+# files a session finished with and could not delete: the sandbox denies rm on the
+# mount. Ben empties this folder; nothing here is history and nothing reads it.
+_to_delete/
+
 # multi-session claims: live state, never history (keep the dir itself)
 claims/*
 !claims/.gitkeep
