@@ -25,6 +25,43 @@ performance claim.
 
 ---
 
+## 2026-08-04 — backlog merge: R37 regraded, R46–R50 filed, seven fragments consumed, `paste_cache/` gitignored
+
+### Changed
+
+- **R37's decision input is regraded before the decision is made.** The
+  A-030..A-034 mine (94 contests; working in ledger 3.17 and
+  `ledger/2026-08-04_field_shape_ownership_analysis.md`) moved the shape
+  evidence: the 5-2-1 top-decile lift decayed from +3.1pp to +0.2pp on the new
+  tranche while the shape's field share rose five points, the win-line
+  concentration did not repeat, and the repeatable results are the negative
+  families (<=3-primary in every slice, now firm-as-observation; 4-2-x
+  negative combined). R37's queue line and entry now read floor-first
+  (eliminate the confirmed-negative families via `primary_stack_min_size`)
+  with the 5-family push second, sized per posture, plus a thin-slate
+  feasibility-versus-choice diagnostic before the floor is sized. Rationale:
+  confirming a target off the 07-30 numbers alone would chase a shape the
+  field already crowded into. Dated notes also appended to R10 (priors
+  extended; R48 as grading target), R30 (paid-line urgency; R49 extends (c)),
+  and R40 (two live rank-1 cases to check profile routing against).
+- **Five items filed from seven consumed `docs/backlog_inbox/` fragments**
+  (two BUILD 2026-08-03, three ARCHIVE 2026-08-03/04, two ARCHIVE 2026-08-04
+  operational): R46 — a confirmed-lineup contradiction reached a certified,
+  nearly-uploaded file past every gate (P1; R36 Finding 2's failure mode,
+  reproduced); R47 — late_swap gives both-pitchers-locked entries zero
+  targeted candidates, plus an unexplained candidate-scoring count; R48 —
+  the miner should emit the per-contest leverage table the 3.17 measurement
+  had to derive bespoke; R49 — manifest-first salary resolution
+  (`runs/<run_id>/inputs/DKSalaries.csv`) and the false "DKEntries embeds the
+  salary block" recovery-path claim; R50 — the miner block's "fees and
+  winnings not supplied" wording when only winnings are missing. Consumed
+  fragments moved to `_to_delete/`; deletions recorded in this commit.
+- **`.gitignore`: `data/reference/paste_cache/` added.** A BUILD byproduct
+  cache (paste raw + derived feed) was tripping every ARCHIVE session's
+  `claim.py dirt` gate as foreign dirt inside the write set. Shipped directly
+  from the fragment rather than filed — one line, no behavior change
+  (fragment `2026-08-04_ARCHIVE_paste-cache-dirt-gate.md`, consumed).
+
 ## 2026-08-04 — R42(a): `env_probe.py` and `audit.py` check `.pylibs` before touching pip
 
 ### Fixed

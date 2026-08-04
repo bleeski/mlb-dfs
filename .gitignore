@@ -69,3 +69,6 @@ _to_delete/
 # multi-session claims: live state, never history (keep the dir itself)
 claims/*
 !claims/.gitkeep
+
+# BUILD byproduct cache (lineups_from_paste); untracked by design (R-merge 2026-08-04)
+data/reference/paste_cache/
