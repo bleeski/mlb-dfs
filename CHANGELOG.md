@@ -90,7 +90,10 @@ performance claim.
 - **R42(b)**, the genuine-miss install path (headroom check, named shortfall,
   reclaim, `TMPDIR`-to-persistent-mount, `wheel_fetch.py` version pinning),
   stays open and lower-priority now that (a) makes it a rare path instead of
-  a common one. See the backlog entry for the full sequencing.
+  a common one. `docs/2026-07-27_backlog_v2.md`'s R42 entry is rewritten to
+  R42(b) only and points back here for (a)'s history; the shipped "check
+  `.pylibs` first" item is removed from "what do we tackle next" (it was
+  briefly #1 there, in the prior commit below, while still open).
 - **A second solver (PuLP or otherwise) was asked about live and is not
   built.** Two prior external critiques proposed one; both were already
   rejected on factual grounds (see `docs/2026-07-27_backlog_v2.md`, "Do not
@@ -99,6 +102,64 @@ performance claim.
   solver would face the identical `$HOME`-is-full wall on its own install,
   since this repo has never used PuLP and it is not pre-vendored the way
   scipy now demonstrably needs to be and is.
+
+## 2026-08-04 — R42/R45: consolidate three same-day scipy-sandbox fragments into R42; file R45 (docs only)
+
+Ben, live: "this is the second time a lineup failed to generate... document
+what happened and how we fix it... add this to the backlog." This is that
+documentation and filing step; the fix itself is the separate, newer entry
+above (commits are `b9bf147` here, `62415fb` above — same session, backlog
+first, code second, same order CLAUDE.md's contract expects).
+
+### Changed
+
+- **R42** (`env_probe`/`audit.py` call the sandbox cold while a working
+  `scipy` sits in `.pylibs`): rewritten from a single 2026-08-01 filing into
+  four consolidated data points, priority raised P2 -> P1, and given a
+  sequenced three-part fix. Two fragments merged and deleted in this commit:
+  `docs/backlog_inbox/2026-08-03_ARCHIVE_env-probe-misses-vendored-scipy.md`
+  (proactive diagnosis, ~16:10, filed before either live incident below) and
+  `docs/backlog_inbox/2026-08-03_build_sdari-sd-sandbox-handoff.md` (this
+  session's own SD@ARI Showdown incident, ~20:59-21:15). A third fragment,
+  `docs/backlog_inbox/2026-08-03_build_scipy-install-blocked-a-live-slate.md`
+  (a 3-game night slate, LAD@CHC/SF@TEX/TOR@HOU, that most likely lost two
+  games unbuilt to the same wall an hour before this session's own), was
+  read and folded in but was never committed by the session that wrote it,
+  so its deletion here carries no separate git record — its content is fully
+  captured in R42's rewritten "What" all the same.
+- **"What do we tackle next" reordered**: the not-yet-shipped `.pylibs`-check
+  fix placed at #1, ahead of R37, on the argument that it is S-effort,
+  touches no surface R37/R41 need, and has now cost a live build twice in
+  one day. (Shipped a few minutes later the same session; see the entry
+  above, which also removes this ordering line.)
+- **R42(b)** demoted to the opportunistic tier once (a) is filed, since a
+  populated `.pylibs` was expected to make it the rare path rather than the
+  common one — confirmed true once (a) actually shipped, above.
+
+### Added
+
+- **R45** (`tools/lineups_from_paste.py` can't resolve a Showdown salary
+  file): filed new, P2. `POSITION_FIELD_CANDIDATES` prefers `Roster Position`
+  (CPT/UTIL) over `Position` when a Showdown file has both, so every
+  player's parsed position set comes back empty and the pitcher index is
+  silently empty for everyone; separately, `_resolve_one` doesn't dedupe a
+  Showdown player's CPT/UTIL row pair, so every hitter reads as ambiguous
+  too. Pool construction is unaffected (`showdown.py` reads `Position`/
+  `Starting` straight off the CSV), so this degrades paste-derived enrichment
+  quality on the margin, not a build. Live workaround (filter the salary CSV
+  to `Roster Position == 'UTIL'` before it reaches the paste tool, patch
+  pitcher hand/id into the output feed by hand) is recorded in the R45 entry
+  for whoever picks it up.
+
+### Rejected (again)
+
+- **A PuLP or other solver fallback**, asked live after the SD@ARI incident.
+  Two prior external critiques already proposed this and were rejected on
+  factual grounds before tonight (see "Do not build" and the 2026-08-01
+  entry). Recorded here first, before the code fix existed, on the same
+  reasoning repeated in the entry above once the fix shipped: every incident
+  on this thread is an installation failure, and the solver itself was never
+  reached in any of them.
 
 ## 2026-08-03 — R43: the standings-pull scan is a tool now, not a fourth hand-written pass
 
