@@ -1496,9 +1496,47 @@ def _entry_candidate_compatible(candidate: Dict[str, Any], requirement: Dict[str
     team_by_player = {str(k): str(v).upper() for k, v in (requirement.get("player_team_by_id") or {}).items()}
     if excluded_new_teams:
         for pid in roster:
-            if team_by_player.get(pid) in excluded_new_teams and pid not in required_players:
+            if pid in required_players:
+                continue
+            team = team_by_player.get(pid)
+            # R72(i): fail closed on an UNMAPPED pid. `team_by_player.get(pid)`
+            # returns None for a player the map does not cover and
+            # `None in excluded_new_teams` is False, so this test used to pass
+            # every uncovered player through -- per-player fail-open, while F15's
+            # sibling guard below fails closed on the same class of missing input
+            # and only when the map is empty ENTIRELY. Partial coverage is the
+            # real case: a game missing from the lineups feed leaves its
+            # platoon-filled players with no PlayerLineupStatus, hence absent from
+            # player_team_by_id, and its team absent from locked_teams. Once a
+            # game has locked, "I cannot tell which team this player is on" must
+            # not resolve to "admit him".
+            if team is None or team in excluded_new_teams:
                 return False
     return True
+
+
+def uncovered_locked_team_players(
+    candidates: Sequence[Dict[str, Any]],
+    requirement: Dict[str, Any],
+) -> List[str]:
+    """Roster pids this entry's team map cannot classify, once a game has locked.
+
+    R72(i)'s other half. With the fail-closed test above, an uncovered pid drops
+    its candidate silently, and a starved entry would surface as the generic "no
+    compatible candidate for Entry ID X" -- which reads as a strategy dead end
+    rather than the missing input it is. This names the cause.
+    """
+    if not requirement.get("excluded_new_teams"):
+        return []
+    team_by_player = {str(k) for k in (requirement.get("player_team_by_id") or {})}
+    required = {str(x) for x in requirement.get("locked_player_ids", [])}
+    uncovered = {
+        pid
+        for candidate in candidates
+        for pid in _candidate_ordered_roster(candidate)
+        if pid and pid not in team_by_player and pid not in required
+    }
+    return sorted(uncovered)
 
 
 def select_and_assign_entries(
@@ -1572,10 +1610,30 @@ def select_and_assign_entries(
     ]
     incompatible_entries = [entry_ids[e] for e in range(E) if not any(full_compatible[e])]
     if incompatible_entries:
+        # R72(i): say WHY where the cause is a missing input rather than a
+        # strategy dead end. An entry whose game has locked and whose team map
+        # does not cover the bank's players now starves by design (fail closed),
+        # and without this the operator reads it as "the bank admits nothing".
+        errors = []
+        for e in range(E):
+            if any(full_compatible[e]):
+                continue
+            message = f"no compatible candidate for Entry ID {entry_ids[e]}"
+            uncovered = uncovered_locked_team_players(candidates, entries[e])
+            if uncovered:
+                message += (
+                    f"; {len(uncovered)} bank player(s) are absent from this "
+                    f"entry's player_team_by_id while excluded_new_teams is set "
+                    f"({', '.join(uncovered[:8])}"
+                    f"{' ...' if len(uncovered) > 8 else ''}), so their locked-game "
+                    f"membership is undecidable and they are excluded rather than "
+                    f"admitted. Refresh the lineups feed so every game is covered"
+                )
+            errors.append(message)
         return {
             "passed": False, "assignments": [], "selection_certified": False,
             "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
-            "errors": [f"no compatible candidate for Entry ID {x}" for x in incompatible_entries],
+            "errors": errors,
         }
 
     # F13: the pairwise overlap block is K-squared. An unfiltered bank is what

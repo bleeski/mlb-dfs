@@ -25,6 +25,97 @@ performance claim.
 
 ---
 
+## 2026-08-04 — R46 + R72: the export gates re-derive slate truth, and the locked-game exclusion fails closed
+
+### Fixed
+
+- **R46 — the confirmed-lineup contradiction check now exists in
+  `verify_export`, and an unconfirmed team is named instead of skipped in
+  silence (P1).** The 2026-08-03 incident was reproduced from the retained
+  artifacts before anything was changed, and the reproduction corrected the
+  filed diagnosis in a way worth recording: preflight's `check_feed` was never
+  missing and is strict by default. Run against the build-time feed
+  (`lineups_feed.json`, ARI `lineup_status: tbd`, 0 players) the delivered file
+  exits 0. Run against the feed from 29 minutes later
+  (`lineups_feed_v2.json`, ARI confirmed) the same file exits 2 and names Tyler
+  Locklear in both entries — and the swapped file exits 0. Preflight's feed
+  auto-resolution picks the fresher file on its own, so a re-run before upload
+  would have caught it. The check was correct; its INPUT was stale, and nothing
+  said so.
+  So two things changed, neither of them the check's logic. First, `check_feed`
+  is imported into `verify_export` — the tool whose entire subject is a file
+  changed close to lock had no confirmed-lineup check at all, against the same
+  feed it already resolves for the lock derivation. It now reproduces the
+  failure on the delivered file and passes the swapped one, which was R46's
+  stated done-when. Second, a rostered team with no confirmed lineup in the feed
+  is reported by name with its slot count (`feed_unconfirmed_teams`), because
+  that branch was pure silence and the silence is the whole incident: on the
+  build-time feed it now prints `ARI (6 slots), CHC (2 slots), COL (3 slots),
+  HOU (31 slots), TB (4 slots)` — the slots the all-clear did not cover.
+  It stays SOFT deliberately. An unposted team before lock is normal, R27 ships
+  on warn by design, and hard-failing here would block legal builds; the fix is
+  to make the coverage gap loud and name what to re-check, not to invent a
+  blocker. `--feed-lenient` reaches verify_export too, matching preflight.
+- **R72(i) — the locked-game exclusion fails closed on an unmapped player
+  (P2).** `_entry_candidate_compatible` tested
+  `team_by_player.get(pid) in excluded_new_teams`; `.get` returns None for a
+  player the map does not cover and `None in excluded_new_teams` is False, so
+  every uncovered player walked through the one test that keeps a locked game
+  closed. F15's sibling guard fails closed only when the map is empty
+  ENTIRELY, and partial coverage is the real case: a game absent from the
+  lineups feed leaves its platoon-filled players with no `PlayerLineupStatus`,
+  hence absent from `player_team_by_id`, and its team absent from
+  `locked_teams`. Once a game has locked, "I cannot tell which team this player
+  is on" must not resolve to "admit him". Locked players stay admissible on
+  their own locked team, as before.
+  Because failing closed can now starve an entry, the generic "no compatible
+  candidate for Entry ID X" grew the cause: a new
+  `uncovered_locked_team_players` names the bank players the entry's team map
+  cannot classify and the error says to refresh the feed. A missing input that
+  reads as a strategy dead end is how this class stays unfixed.
+- **R72(ii) — the parent, and the manifest, stop being opt-in (P2).** The
+  locked-game membership check lives inside `check_parent_slots`, which ran only
+  `if args.parent`, so a refinement verified without that flag had nothing
+  re-checking whether a changed entry introduced a player from a started game.
+  `verify_export` now resolves the parent from the manifest's supersession chain
+  (the superseded record names its successor in `superseded_by`, so the parent of
+  a file is the record pointing at it) and finds the manifest next to the entries
+  file, as preflight already did. Verified on the 2026-08-03 pair: with no
+  `--parent` and no `--manifest`, the swap file resolves
+  `parent_source: manifest supersession chain`, the locked-game check runs
+  (`new_from_locked_games: 0`) and the two swapped entries report 6 changed slots
+  each. Before, that run printed "2 team(s) have already started and no --parent
+  was given; locked-slot preservation is unverified" and skipped it.
+  **What was NOT built, deliberately:** R72 filed this as "add the independent
+  locked-game gate (`lock_time_by_game_id` + `as_of`)". A gate with no parent has
+  no baseline, so it cannot tell a newly introduced player from one entered
+  before lock — it would either pass everything or block every legal late-swap
+  upload of a locked team's frozen slots. The parent IS the baseline; making it
+  resolve without a flag is what closes the gap the item describes.
+  `validate_late_swap_delta` was left alone for the same reason.
+
+### Tests
+
+- Ten new tests; the pin moves 609 → 619. A new `VerifyExportSlateTruthTests`
+  (8) covers R46 and R72(ii): a seated player contradicting a confirmed lineup
+  fails, the same file passes once the posted nine holds him, `--feed-lenient`
+  downgrades it, an unconfirmed team is named with its slot count in both the
+  text and `feed_unconfirmed_teams`, a confirmed team stops appearing as
+  uncovered, the parent resolves from the supersession chain, a player from a
+  locked game is caught with no `--parent` flag, and the manifest is found beside
+  the entries file. The feed fixture helper grew a `confirmed=` parameter — the
+  old all-`tbd` feed exercised none of this.
+- Two in `tests/test_core.EntryAndAllocationTests` for R72(i): a candidate
+  carrying an unclassifiable pid loses to the fully covered one and
+  `_entry_candidate_compatible` rejects it directly, and a starved entry names
+  the uncovered players and says to refresh the feed.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  619 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-04 — R51 + R52: both upload gates stop returning a false clean
 
 ### Fixed

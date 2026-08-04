@@ -847,6 +847,7 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
             if str(block.get("lineup_status") or "").lower() == "confirmed":
                 confirmed_teams.add(team)
     absent: List[str] = []
+    unconfirmed: Dict[str, int] = {}
     for e in entries:
         for pid in e.cells:
             row = salary.get(pid)
@@ -854,12 +855,31 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                 continue
             team = str(row.get("TeamAbbrev") or "").upper()
             if team not in confirmed_teams:
+                # R46: this branch was pure silence, and that silence is the
+                # 2026-08-03 incident. ARI had not posted at build time, so the
+                # feed said tbd, so every ARI slot skipped this check without a
+                # word -- and a platoon-projected bench player (Tyler Locklear)
+                # rode two certified entries to the edge of upload. Nothing on
+                # disk could have caught it at that minute; what was missing is
+                # the statement that the check did not cover those slots. It
+                # stays SOFT: a genuinely unposted team pre-lock is normal, R27
+                # ships on warn by design, and hard-failing here would block
+                # legal builds. It is now loud, and it names what to re-check.
+                unconfirmed[team] = unconfirmed.get(team, 0) + 1
                 continue
             if _norm_name(row.get("Name")) not in posted.get(team, set()):
                 absent.append(f"{e.entry_id}: {row.get('Name')} ({team}) is not in "
                               f"{team}'s confirmed lineup or probables")
     uniq = sorted(set(absent))
     rep.info["feed_absent"] = uniq
+    rep.info["feed_unconfirmed_teams"] = dict(sorted(unconfirmed.items()))
+    if unconfirmed:
+        rep.warn(f"{len(unconfirmed)} rostered team(s) have no confirmed lineup in "
+                 f"this feed, so their slots were NOT cross-checked: "
+                 + ", ".join(f"{t} ({n} slot{'s' if n > 1 else ''})"
+                             for t, n in sorted(unconfirmed.items()))
+                 + ". Re-paste and re-run this check once they post; a "
+                   "platoon-projected bench player is invisible until then")
     if uniq:
         message = (f"{len(uniq)} rostered player(s) absent from a confirmed posted "
                    f"lineup: " + "; ".join(uniq[:10]))

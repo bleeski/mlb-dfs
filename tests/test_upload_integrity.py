@@ -1318,18 +1318,33 @@ def write_three_game_salary(path: Path) -> dict:
     return ids
 
 
-def write_three_game_feed(path: Path, postponed=()) -> Path:
-    """A lineups feed for the same three games, start times matching the salary."""
+def write_three_game_feed(path: Path, postponed=(), confirmed=None) -> Path:
+    """A lineups feed for the same three games, start times matching the salary.
+
+    ``confirmed`` is {team: [player names]}; those sides read ``confirmed`` with
+    that posted lineup and every other side stays ``tbd``. R46's check only fires
+    against a CONFIRMED side, so a feed of all-tbd sides exercises nothing.
+    """
+    posted = {k.upper(): list(v) for k, v in (confirmed or {}).items()}
+
+    def side(team):
+        names = posted.get(team.upper())
+        if names is None:
+            return {"team_abbrev": team, "lineup_status": "tbd",
+                    "lineup": [], "probable_pitcher": None}
+        return {"team_abbrev": team, "lineup_status": "confirmed",
+                "lineup": [{"name": n, "batting_order": i + 1}
+                           for i, n in enumerate(names)],
+                "probable_pitcher": None}
+
     games = []
     for pk, (_game, (away, home), utc) in enumerate(THREE_GAMES, start=1):
         game_id = f"{away}@{home}"
         games.append({
             "game_pk": pk, "game_date_utc": utc, "venue": "Test Park",
             "status": "Postponed" if game_id in postponed else "Pre-Game",
-            "away": {"team_abbrev": away, "lineup_status": "tbd",
-                     "lineup": [], "probable_pitcher": None},
-            "home": {"team_abbrev": home, "lineup_status": "tbd",
-                     "lineup": [], "probable_pitcher": None},
+            "away": side(away),
+            "home": side(home),
         })
     path.write_text(json.dumps({
         "date": "2026-07-25", "fetched_at": "2026-07-25T22:00:00Z", "games": games,
@@ -1341,6 +1356,11 @@ def run_verify(*args) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(REPO / "tools" / "verify_export.py"), *args],
         capture_output=True, text=True)
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 class VerifyExportLockDerivationTests(unittest.TestCase):
@@ -1550,6 +1570,155 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         text = (REPO / "tools" / "verify_export.py").read_text(encoding="utf-8")
         self.assertIn("ADDS to the derived set, never shrinks it", text)
         self.assertNotIn("overrides the Game Info derivation", text)
+
+
+class VerifyExportSlateTruthTests(unittest.TestCase):
+    """R46 + R72(ii): the swap verifier re-derives slate truth from its inputs.
+
+    R46's teeth are a live incident. On the 2026-08-03 1905_7g slate ARI had not
+    posted at build time, so the pool filled from a 35-day-stale platoon
+    projection (warn-and-ship per R27, which is not in question) and seated Tyler
+    Locklear -- a bench player -- in two delivered entries. Real lineups posted
+    before lock with Tim Tawa at 1B. workflow_valid, selection_certified,
+    allocation_certified and preflight all passed, because preflight's
+    confirmed-lineup check existed but its feed still said ARI was tbd, and
+    verify_export had no such check at all. Ben caught it by eye.
+
+    Two distinct fixes are pinned here: the check now exists in verify_export
+    (imported from preflight, not reimplemented), and a team with no confirmed
+    lineup is reported by name instead of being skipped in silence.
+
+    R72(ii): the locked-game membership check lived inside check_parent_slots,
+    which ran only when --parent was passed. The parent now resolves from the
+    manifest's supersession chain, because this tool's own header says a check
+    that runs only when the operator remembers a flag is a check that does not run.
+    """
+
+    AS_OF = "2026-07-25T22:30:00+00:00"     # before every game in the fixture
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.lineup = [
+            self.ids["AAA Aster"], self.ids["CCC Aster"],
+            self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+            self.ids["AAA Ellis"], self.ids["AAA Frost"],
+            self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"],
+        ]
+        self.entries = self.dir / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+        # AAA's posted nine holds every rostered AAA name EXCEPT Frost, who is
+        # this fixture's Locklear: seated off a projection, benched in reality.
+        self.aaa_posted = ["AAA Aster", "AAA Boone", "AAA Crane", "AAA Dunne",
+                           "AAA Ellis", "AAA Gable", "AAA Hollis", "AAA Ives",
+                           "AAA Jarrow"]
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _feed(self, confirmed) -> Path:
+        return write_three_game_feed(self.dir / "lineups_feed.json",
+                                     confirmed=confirmed)
+
+    def _verify(self, *extra, feed: Path):
+        return run_verify("--entries", str(self.entries), "--salary", str(self.salary),
+                          "--lineups", str(feed), "--as-of", self.AS_OF, *extra)
+
+    def test_a_seated_player_contradicting_a_confirmed_lineup_fails(self):
+        result = self._verify(feed=self._feed({"AAA": self.aaa_posted}))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+        self.assertIn("AAA Frost", result.stdout)
+
+    def test_the_same_file_passes_once_the_posted_lineup_holds_him(self):
+        posted = ["AAA Frost"] + self.aaa_posted[:8]
+        result = self._verify(feed=self._feed({"AAA": posted}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("PASS", result.stdout)
+
+    def test_feed_lenient_downgrades_the_contradiction_to_a_warning(self):
+        result = self._verify("--feed-lenient", feed=self._feed({"AAA": self.aaa_posted}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("WARN", result.stdout)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_an_unconfirmed_team_is_named_rather_than_skipped_in_silence(self):
+        """The 2026-08-03 blind spot itself. No team posted, so the check cleared
+        nothing -- and said nothing. It stays SOFT: an unposted team pre-lock is
+        normal and R27 ships on warn, so this reports rather than blocks."""
+        result = self._verify(feed=self._feed({}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("no confirmed lineup in this feed", result.stdout)
+        for team, slots in (("AAA", 6), ("CCC", 1), ("EEE", 3)):
+            self.assertIn(f"{team} ({slots} slot", result.stdout)
+        payload = json.loads(self._verify("--json", feed=self._feed({})).stdout)
+        self.assertEqual(payload["info"]["feed_unconfirmed_teams"],
+                         {"AAA": 6, "CCC": 1, "EEE": 3})
+
+    def test_a_confirmed_team_no_longer_appears_as_uncovered(self):
+        payload = json.loads(self._verify(
+            "--json", feed=self._feed({"AAA": ["AAA Frost"] + self.aaa_posted[:8]})
+        ).stdout)
+        self.assertNotIn("AAA", payload["info"]["feed_unconfirmed_teams"])
+        self.assertEqual(payload["info"]["feed_absent"], [])
+
+    # -- R72(ii): the parent stops being opt-in -------------------------------
+
+    def _manifest_chain(self, parent_path: Path, child_path: Path) -> Path:
+        """A two-record manifest where the parent names the child as successor,
+        exactly as upload_manifest writes it on a late swap."""
+        manifest = self.dir / "upload_manifest.json"
+        manifest.write_text(json.dumps({"version": "1.1", "date": "2026-07-25",
+            "deliveries": [
+                {"delivered_file": str(parent_path), "sha256": _sha256(parent_path),
+                 "contest_type": "classic", "entries": 1, "status": "superseded",
+                 "certification": "certified",
+                 "superseded_by": str(child_path)},
+                {"delivered_file": str(child_path), "sha256": _sha256(child_path),
+                 "contest_type": "classic", "entries": 1, "status": "upload_ready",
+                 "certification": "certified"},
+            ]}), encoding="utf-8")
+        return manifest
+
+    def test_the_parent_resolves_from_the_manifest_supersession_chain(self):
+        parent = self.dir / "parent.csv"
+        write_entries(parent, CLASSIC_HEADER, [classic_entry("900", "5", self.lineup)])
+        manifest = self._manifest_chain(parent, self.entries)
+        payload = json.loads(run_verify(
+            "--entries", str(self.entries), "--salary", str(self.salary),
+            "--manifest", str(manifest), "--as-of", self.AS_OF, "--json").stdout)
+        self.assertEqual(payload["info"]["parent_file"], str(parent))
+        self.assertIn("supersession chain", payload["info"]["parent_source"])
+
+    def test_a_player_from_a_locked_game_is_caught_with_no_parent_flag(self):
+        """The R72(ii) gap: this file introduces FFF Ives after FFF@EEE locked.
+        With the parent reachable only via --parent, nothing checked it."""
+        parent = self.dir / "parent.csv"
+        write_entries(parent, CLASSIC_HEADER, [classic_entry("900", "5", self.lineup)])
+        swapped = list(self.lineup)
+        swapped[9] = self.ids["FFF Ives"]
+        write_entries(self.entries, CLASSIC_HEADER, [classic_entry("900", "5", swapped)])
+        manifest = self._manifest_chain(parent, self.entries)
+        result = run_verify("--entries", str(self.entries), "--salary", str(self.salary),
+                            "--manifest", str(manifest),
+                            "--as-of", "2026-07-25T23:45:00+00:00", "--json")
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertTrue(any("already-started game" in f for f in payload["failures"]),
+                        payload["failures"])
+
+    def test_the_manifest_is_found_next_to_the_entries_file(self):
+        parent = self.dir / "parent.csv"
+        write_entries(parent, CLASSIC_HEADER, [classic_entry("900", "5", self.lineup)])
+        self._manifest_chain(parent, self.entries)
+        payload = json.loads(run_verify(
+            "--entries", str(self.entries), "--salary", str(self.salary),
+            "--as-of", self.AS_OF, "--json").stdout)
+        self.assertIn("next to the entries file", payload["info"]["manifest_source"])
+        self.assertEqual(payload["info"]["parent_file"], str(parent))
 
 
 class BothFileCheckersShareOneExitContractTests(unittest.TestCase):

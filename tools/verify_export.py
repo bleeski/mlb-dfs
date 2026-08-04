@@ -16,11 +16,25 @@ against the file it refines:
     set derived from the salary file's Game Info rather than a hand-passed flag
   - per-entry slot-change counts
 
+The parent is resolved from the manifest's supersession chain when --parent is
+omitted, and the manifest is found next to the entries file when --manifest is
+omitted (R72(ii)). Both were opt-in, and the two checks above are exactly the
+ones that ran only if the operator remembered the flag at T-5.
+
 Everything else (row accounting, duplicate Entry IDs, header geometry, blank and
 partially-filled rows, DK Status, embedded-pool overlap, cap, slot eligibility,
 duplicate persons, two-game minimum, five-hitters-per-team, hitter-versus-
-rostered-SP, Showdown both-teams and recomputed captain price) comes from
-preflight and is reported the same way.
+rostered-SP, Showdown both-teams and recomputed captain price, and the
+confirmed-lineup contradiction check) comes from preflight and is reported the
+same way.
+
+R46: that last one was missing here until 2026-08-04, which is the wrong tool to
+be missing it -- a file this tool verifies is by definition one changed close to
+lock. On 2026-08-03 a bench player seated off a 35-day-stale platoon projection
+(ARI had not posted at build time) rode two certified entries to the edge of
+upload; preflight held the check but read a feed that still said tbd, and this
+tool had no such check at all. The feed it already resolves for the lock
+derivation is the same input the check needs.
 
 What this tool used to do wrong, and no longer does: it skipped every row shorter
 than the expected width, so a truncated file printed PASS with two of sixteen rows
@@ -33,9 +47,10 @@ locked-teams check was a no-op unless the operator remembered a flag.
 Usage:
     python tools/verify_export.py --entries DKEntries.csv
         [--salary DKSalaries.csv]          # defaults to the promoted run snapshot
-        [--parent runs/<id>/final/DKEntries.csv]
-        [--manifest outputs/<date>/upload_manifest.json]
+        [--parent runs/<id>/final/DKEntries.csv]   # auto-resolved from the manifest
+        [--manifest outputs/<date>/upload_manifest.json]  # found beside --entries
         [--lineups data/slates/<date>/lineups_feed.json]  # auto-resolved
+        [--feed-lenient]                   # confirmed-lineup contradiction warns
         [--locked-teams PIT,NYY]           # ADDS to the derived set, never shrinks it
         [--as-of 2026-07-25T18:40:00-04:00]  # wall clock used for the lock derivation
         [--json]
@@ -75,7 +90,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
 
 from preflight_upload import (  # noqa: E402
-    EntryRow, Report, advisory, check_legality, check_manifest,
+    EntryRow, Report, advisory, check_feed, check_legality, check_manifest,
     check_pool_membership, check_row_shape, check_status, load_entries,
     load_salary, parse_embedded_pool, parse_game_info_datetime,
     resolve_feed_for_slate, resolve_salary_from_promoted_run, sha256_of,
@@ -285,6 +300,53 @@ def resolve_locked_teams(
     return operator | derived, f"{source} + operator", source
 
 
+def resolve_parent_from_manifest(entries_path: Path, manifest_path: Optional[Path],
+                                 rep: Report) -> Optional[Path]:
+    """The delivery this file refines, read off the manifest's supersession chain.
+
+    R72(ii). The locked-game membership check lives inside ``check_parent_slots``,
+    which runs only ``if args.parent`` -- so on a refinement verified without that
+    flag, nothing re-checked whether a changed entry introduced a player from a
+    game that had already started. This tool already refuses to let its two most
+    consequential inputs be opt-in (``--locked-teams`` is unioned rather than
+    substituted per R29, and the feed auto-resolves) for one reason, stated in the
+    module header: a check that runs only when the operator remembers a flag is a
+    check that does not run at T-5. The parent was the last opt-in input.
+
+    The chain is structured, not parsed from prose: the superseded record names
+    its successor in ``superseded_by``, so the parent of THIS file is the record
+    that points at it. (The child's own ``notes`` string also mentions a parent
+    run path, but a notes field is not a contract and is not read here.) An
+    explicit ``--parent`` always wins; this only fills the gap.
+    """
+    if manifest_path is None:
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None                      # check_manifest reports unreadable records
+    records = manifest if isinstance(manifest, list) else manifest.get("deliveries", [])
+    name = entries_path.name
+    for rec in records:
+        successor = str(rec.get("superseded_by") or "").strip()
+        if not successor or Path(successor).name != name:
+            continue
+        for candidate in (REPO_ROOT / str(rec.get("delivered_file") or ""),
+                          REPO_ROOT / "runs" / str(rec.get("run_id") or "")
+                          / "final" / "DKEntries.csv"):
+            if candidate.exists():
+                rep.info["parent_source"] = (
+                    f"manifest supersession chain ({name} supersedes "
+                    f"{Path(str(rec.get('delivered_file') or '')).name})")
+                return candidate
+        rep.warn(f"the manifest says this file supersedes "
+                 f"{rec.get('delivered_file')}, but that file is not on disk and "
+                 f"neither is the run snapshot for {rec.get('run_id')}; "
+                 f"locked-slot preservation is unverified")
+        return None
+    return None
+
+
 def check_parent_slots(
     entries: Sequence[EntryRow],
     parent: Sequence[EntryRow],
@@ -344,8 +406,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--entries", required=True)
     ap.add_argument("--salary", help="defaults to the promoted run's inputs snapshot")
-    ap.add_argument("--parent", help="prior delivered file, to diff against")
-    ap.add_argument("--manifest", help="outputs/<date>/upload_manifest.json")
+    ap.add_argument("--parent", help="prior delivered file, to diff against; "
+                                     "auto-resolved from the manifest's "
+                                     "supersession chain when omitted")
+    ap.add_argument("--manifest", help="outputs/<date>/upload_manifest.json; "
+                                       "found next to the entries file when omitted")
+    ap.add_argument("--feed-lenient", action="store_true",
+                    help="a rostered player absent from a confirmed posted lineup "
+                         "warns instead of failing (R4/R46 default is to fail)")
     ap.add_argument("--expect-entries", type=int)
     ap.add_argument("--expect-contest-type", choices=["classic", "showdown"])
     ap.add_argument("--lineups",
@@ -406,14 +474,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         rep.fail(f"declared contest type '{args.expect_contest_type}' but the "
                  f"file's header geometry is {contest}")
 
+    # The manifest sits next to the delivered file; preflight already finds it
+    # without being told and this tool required the flag. Same reason as the
+    # parent below: an opt-in input is not an input at T-5.
+    manifest_path = Path(args.manifest) if args.manifest else None
+    if manifest_path is None:
+        sibling = entries_path.resolve().parent / "upload_manifest.json"
+        if sibling.exists():
+            manifest_path = sibling
+            rep.info["manifest_source"] = "found next to the entries file"
+    rep.info["manifest_file"] = str(manifest_path) if manifest_path else None
+
     # Everything preflight checks, checked identically here.
     check_row_shape(entries, entry_id_rows, len(slots), rep, args.expect_entries)
     check_pool_membership(entries, salary, parse_embedded_pool(raw_rows),
                           args.min_pool_overlap, rep)
     check_status(entries, salary, rep)
     details = check_legality(contest, slots, entries, salary, rep)
-    if args.manifest:
-        check_manifest(entries_path, entries, Path(args.manifest), rep)
+    if manifest_path is not None:
+        check_manifest(entries_path, entries, manifest_path, rep)
 
     locked, lock_note, lock_source = resolve_locked_teams(
         args.locked_teams, salary, salary_path, feed_path, now, rep)
@@ -427,10 +506,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                  "underivable, so a slot touching a started game cannot be "
                  "detected. Pass --lineups.")
 
+    # R46: the confirmed-lineup contradiction check, imported rather than
+    # reimplemented. It existed in preflight only, so a swap verified with this
+    # tool -- the tool whose whole subject is a file changed close to lock -- never
+    # cross-checked a seated player against a team's posted lineup. Same feed this
+    # tool already resolves for the lock derivation.
+    if feed_path is not None and feed_path.exists():
+        check_feed(entries, salary, feed_path, not args.feed_lenient, rep)
+    elif feed_path is not None:
+        rep.warn(f"feed {feed_path} does not exist; posted-lineup cross-check skipped")
+
+    parent_path = Path(args.parent) if args.parent else None
+    if parent_path is None:
+        parent_path = resolve_parent_from_manifest(entries_path, manifest_path, rep)
+    rep.info["parent_file"] = str(parent_path) if parent_path else None
+
     parent_detail: Dict[str, Dict[str, object]] = {}
-    if args.parent:
+    if parent_path is not None:
         try:
-            _, _, parent_entries, _, _ = load_entries(Path(args.parent))
+            _, _, parent_entries, _, _ = load_entries(parent_path)
         except (OSError, ValueError) as exc:
             rep.fail(f"parent unreadable ({exc}); this file cannot be verified as a swap")
             parent_entries = []
@@ -439,7 +533,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                                locked, rep)
     elif locked:
         rep.warn(f"{len(locked)} team(s) have already started and no --parent was "
-                 f"given; locked-slot preservation is unverified")
+                 f"given or resolvable from the manifest; locked-slot preservation "
+                 f"is unverified")
 
     for d in details:
         d.update(parent_detail.get(str(d.get("entry_id")), {}))

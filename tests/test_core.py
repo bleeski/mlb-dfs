@@ -23,8 +23,9 @@ from mlb_engine.pipeline.build_state_manager import (
     slate_context_refresh_plan, update_run_certification,
 )
 from mlb_engine.allocate.contest_allocator import (
-    ContestCard, contest_cards_from_reserved_grid, resolve_candidate_bank_plan,
-    resolve_phase0_mode, select_and_assign_entries, select_and_assign_portfolio,
+    ContestCard, _entry_candidate_compatible, contest_cards_from_reserved_grid,
+    resolve_candidate_bank_plan, resolve_phase0_mode, select_and_assign_entries,
+    select_and_assign_portfolio, uncovered_locked_team_players,
 )
 from mlb_engine.entries.dk_entries_manager import (
     ROSTER_SLOTS, parse_dk_entry_rows, reconcile_entries_against_assignments,
@@ -322,6 +323,74 @@ class EntryAndAllocationTests(unittest.TestCase):
         )
         self.assertTrue(result["passed"])
         self.assertEqual(result["assignments"][0]["candidate_id"], "good")
+
+    def test_a_pid_the_team_map_does_not_cover_is_excluded_not_admitted(self):
+        """R72(i): per-player fail-open on the locked-game exclusion.
+
+        `team_by_player.get(pid) in excluded_new_teams` is False for an UNMAPPED
+        pid, because .get returns None, so every player the map did not cover
+        walked through the one test that keeps a locked game closed. Partial
+        coverage is the real case: a game absent from the lineups feed leaves its
+        platoon-filled players with no PlayerLineupStatus, hence absent from
+        player_team_by_id, and its team absent from locked_teams. F15's sibling
+        guard only fails closed when the map is empty ENTIRELY, so this shape ran
+        straight through it.
+        """
+        roster_bad = ["L", "P2", "C1", "B1", "B2", "B3", "B4", "B5", "B6", "X"]
+        roster_good = ["L", "P2", "C1", "B1", "B2", "B3", "B4", "B5", "B6", "B7"]
+        # X is the uncovered pid: present in a candidate, absent from the map.
+        team_map = {pid: "CCC" for pid in set(roster_bad + roster_good)}
+        team_map.update({"L": "AAA"})
+        del team_map["X"]
+        requirement = {
+            "entry_id": "1", "contest_id": "x", "contest_shape": "large_wta",
+            "locked_slot_assignments": {"P1": "L"}, "locked_player_ids": ["L"],
+            "excluded_new_teams": ["AAA"], "player_team_by_id": team_map,
+        }
+        result = select_and_assign_entries(
+            [candidate("bad", roster_bad, 100), candidate("good", roster_good, 99)],
+            [dict(requirement)],
+        )
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(result["assignments"][0]["candidate_id"], "good",
+                         "the candidate carrying an unclassifiable pid must not "
+                         "outrank the one that is fully covered")
+        # The locked player himself stays admissible on his own locked team.
+        self.assertTrue(_entry_candidate_compatible(
+            candidate("good", roster_good, 99), dict(requirement)))
+        self.assertFalse(_entry_candidate_compatible(
+            candidate("bad", roster_bad, 100), dict(requirement)))
+
+    def test_a_starved_entry_names_the_uncovered_players_as_the_cause(self):
+        """R72(i)'s other half: fail-closed must not starve an entry silently.
+
+        With every candidate carrying an uncovered pid, the entry has no
+        compatible candidate — correct, but "no compatible candidate for Entry ID
+        1" reads as a strategy dead end rather than the stale feed it is."""
+        roster = ["L", "P2", "C1", "B1", "B2", "B3", "B4", "B5", "B6", "X"]
+        team_map = {pid: "CCC" for pid in roster}
+        team_map.update({"L": "AAA"})
+        del team_map["X"]
+        requirement = {
+            "entry_id": "1", "contest_id": "x", "contest_shape": "large_wta",
+            "locked_slot_assignments": {"P1": "L"}, "locked_player_ids": ["L"],
+            "excluded_new_teams": ["AAA"], "player_team_by_id": team_map,
+        }
+        result = select_and_assign_entries([candidate("only", roster, 100)],
+                                           [dict(requirement)])
+        self.assertFalse(result["passed"])
+        message = result["errors"][0]
+        self.assertIn("no compatible candidate for Entry ID 1", message)
+        self.assertIn("player_team_by_id", message)
+        self.assertIn("X", message)
+        self.assertIn("Refresh the lineups feed", message)
+        self.assertEqual(
+            uncovered_locked_team_players([candidate("only", roster, 100)], requirement),
+            ["X"])
+        # No excluded_new_teams means no locked game, so nothing is uncovered.
+        self.assertEqual(uncovered_locked_team_players(
+            [candidate("only", roster, 100)],
+            {k: v for k, v in requirement.items() if k != "excluded_new_teams"}), [])
 
     def test_exact_entry_reconciliation_catches_swapped_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
