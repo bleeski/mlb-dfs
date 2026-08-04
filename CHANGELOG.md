@@ -25,6 +25,77 @@ performance claim.
 
 ---
 
+## 2026-08-04 — full-project audit: R51–R91 filed, the session-start gate replicated off-machine, the backlog reconciled and reordered
+
+### Verified
+
+- **The audit macro was replicated in a clean cloud container for the first
+  time.** On the pinned stack (numpy 2.2.6 / pandas 2.3.3 / scipy 1.15.3,
+  Python 3.11): `PASS  v2.26.0  25 modules  602 tests` — the tree is sound on
+  the tested stack, off this machine. Getting there measured the gap R62 now
+  files: a tracked-files-only checkout runs 583 of 602 with 8 errors and 3
+  failures (gitignored `data/slates/2026-07-25/-29/-30` files are
+  load-bearing for 11 tests, and 29 more paste tests silently skip), and
+  golden replay skips entirely without `data/archive/2026-06-03`, at which
+  point the audit's own stale-pin advice is to lower the pin.
+- **The floors break the guard tests.** The same suite on a floor-satisfying
+  stack (numpy 2.4.4 / pandas 3.0.2 / scipy 1.17.1) fails 4 tests in
+  `ExcludedColumnCoercionTests` — pandas-3 strict setitem versus the
+  fixtures' `"False"`-into-bool writes — so the class guarding the
+  forbidden-pool-reduction rule errors before asserting anything (R78).
+- **Backlog reconciliation: nothing on the open board has silently shipped.**
+  Checked in code before reordering: R17 (strip intact at
+  `contest_library.py:116`), R30(a) (no `--paid-places` anywhere in
+  field_miner), R31 (both false signals intact at `claim.py:115,121`), R36
+  Finding 10 (prefilter unchanged — and the starvation is now reproduced,
+  note appended), R38 (`graded` denominator still at `net_to_date.py:85`),
+  R39 (no captain preservation in `players_norm`), R44 (no mined-skip in
+  extract_inbox_zips), R45 (both Showdown-paste breaks intact), R46 (no
+  confirmed-lineup check in verify_export). No entry migrates out of the
+  backlog; the open list was accurate.
+- **One prior record corrected by observation:** the delivery manifest's
+  `strategy_state` has read "clean" structurally on the production sliced
+  path since R3(c) wired it — `manifest_strategy_state` reads a
+  `relaxations` key the `candidates_override` path deliberately strips and
+  build_slate's cache record never carries. Filed as R64; the R3(c) entry
+  below stands as written for the self-built path.
+
+### Added
+
+- **R51–R80 filed in Section 1 and R81–R91 in Section 2 of the backlog** —
+  thirty-one items from six independent whole-tree review passes (intake;
+  solver; pipeline/projections; allocation/entries/swap/field;
+  showdown/safety tools; tests/skill/docs; plus a cross-cutting hygiene
+  sweep), every finding verified against this tree before filing per R36's
+  practice, reproductions run in the pinned container venv. The two P0s are
+  the upload gates themselves: preflight's row-accounting hard check is
+  structurally dead code and the tool passes a zero-parsed-entries file as
+  `upload_ready` (R51), and `verify_export --force` exits 0 with hard
+  failures present, against its own header and R2's rationale (R52). The P1
+  families: certification and record honesty (R53 vacuous lineup gate, R64
+  strategy_state/projection_tier); solver correctness (R55 dtype no-ops that
+  poison the bank cache, R56 suppression-as-constraint, R57 xwOBA Base
+  clobber); intake calendar and leg integrity (R58 doubleheaders, R59
+  merge_feeds keying, R60 partial sides, R65 ET gating); late-swap
+  subset-vs-whole-file (R61); the audit gate's own evidence (R62); the
+  approve=False contradiction (R63); and Showdown counted-relaxation honesty
+  (R54). Dated notes appended to R17 (missing type precedence, reproduced),
+  R31 (new part (c): `WRITE_SETS["DEV"]` omits CHANGELOG.md), R36 Finding 10
+  (starvation reproduced live), and R46 (build together with R72's
+  locked-game gate). Two reviewer claims did not survive verification and
+  were not filed: a dangling-docs-paths claim that was an artifact of the
+  audit's partial snapshot (`docs/legacy/` exists), and a lock-vs-runtime
+  claim refiled in corrected, evidence-honest form as R78(b). Items not
+  reproduced live are labeled PLAUSIBLE inline (R66c, R67, R72, R74b).
+- **"What do we tackle next" reordered**, reasons stated inline: the
+  upload-gate P0 pair leads; R46+R72 second (one verify_export pass, two
+  slate-truth checks); certification/record honesty third; then R37's
+  decision, the solver trio, the intake calendar family, the miner batch
+  (now carrying R74), R10, R61, R62, R63, and R40. The do-not-build list
+  gains one paragraph: no module-split program off line counts alone — the
+  accepted forms are cross-pin tests, single-helper consolidations, and the
+  documented roster_contracts rewire, under the golden gate.
+
 ## 2026-08-04 — backlog merge: R37 regraded, R46–R50 filed, seven fragments consumed, `paste_cache/` gitignored
 
 ### Changed
