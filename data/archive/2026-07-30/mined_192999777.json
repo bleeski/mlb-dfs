@@ -1,0 +1,757 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192999777",
+ "slate_date": "2026-07-30",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 86.8,
+  "winning_entry_id": "5203893824",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 6,
+  "at_cap_share_pct": 26.1,
+  "salary_left_histogram": {
+   "301-700": 7,
+   "701-1500": 2,
+   "101-300": 7,
+   "1-100": 5,
+   "<= 0": 1,
+   "> 1500": 1
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 14,
+   "5": 4
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Roki Sasaki",
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Dominic Canzone",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Randy Arozarena",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Cole Young",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Freddie Freeman",
+    "pct_drafted": 39.13
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5203893824",
+   "username": "shadowknows",
+   "points": 86.8,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "dalton rushing",
+    "kike hernandez",
+    "mookie betts",
+    "roki sasaki",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5203873531",
+   "username": "Yzerboy",
+   "points": 80.58,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "dominic canzone",
+    "josh naylor",
+    "randy arozarena",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5203880404",
+   "username": "bleeski",
+   "points": 77.58,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "dalton rushing",
+    "dominic canzone",
+    "josh naylor",
+    "randy arozarena"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5203886207",
+   "username": "Raiderfanatic2195",
+   "points": 74.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "dalton rushing",
+    "josh naylor",
+    "kike hernandez",
+    "roki sasaki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5203863168",
+   "username": "William328",
+   "points": 69.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "colt emerson",
+    "dominic canzone",
+    "kike hernandez",
+    "roki sasaki",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5203906999",
+   "username": "Darkmen715",
+   "points": 69.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "julio rodriguez",
+    "mookie betts",
+    "randy arozarena",
+    "roki sasaki",
+    "tommy edman",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5203909857",
+   "username": "rynstien",
+   "points": 68.8,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole young",
+    "freddie freeman",
+    "julio rodriguez",
+    "kike hernandez",
+    "roki sasaki",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5203891246",
+   "username": "MrPointman",
+   "points": 68.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "luke raley",
+    "randy arozarena",
+    "roki sasaki",
+    "tommy edman",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5203903724",
+   "username": "CPiddy23",
+   "points": 68.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "freddie freeman",
+    "josh naylor",
+    "mookie betts",
+    "randy arozarena",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5203901631",
+   "username": "polllcat",
+   "points": 67.7,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "freddie freeman",
+    "kyle tucker",
+    "randy arozarena",
+    "roki sasaki",
+    "tommy edman",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5203909463",
+   "username": "qbjjj",
+   "points": 66.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "dominic canzone",
+    "julio rodriguez",
+    "roki sasaki",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5203903308",
+   "username": "Alancey",
+   "points": 65.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "colt emerson",
+    "freddie freeman",
+    "roki sasaki",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5203910657",
+   "username": "KRISTIAN0007",
+   "points": 64.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cole young",
+    "dominic canzone",
+    "mookie betts",
+    "roki sasaki",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5203899404",
+   "username": "ti29349",
+   "points": 58.05,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "dominic canzone",
+    "kyle tucker",
+    "max muncy",
+    "randy arozarena"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5203909861",
+   "username": "hamburgler420",
+   "points": 55.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 30.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "freddie freeman",
+    "julio rodriguez",
+    "kyle tucker",
+    "randy arozarena",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5203910658",
+   "username": "DiabolicLamb",
+   "points": 50.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cal raleigh",
+    "dominic canzone",
+    "josh naylor",
+    "kike hernandez",
+    "roki sasaki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5203876225",
+   "username": "howardwi",
+   "points": 47.8,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "colt emerson",
+    "freddie freeman",
+    "max muncy",
+    "roki sasaki",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5203892442",
+   "username": "Rioslugger008",
+   "points": 46.8,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "dominic canzone",
+    "freddie freeman",
+    "kike hernandez",
+    "luke raley",
+    "roki sasaki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5203896243",
+   "username": "1johnnyrotten2",
+   "points": 45.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "dominic canzone",
+    "josh naylor",
+    "kike hernandez",
+    "max muncy",
+    "roki sasaki",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5203911103",
+   "username": "YB920",
+   "points": 45.5,
+   "salary_used": 42800,
+   "salary_left": 7200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt emerson",
+    "dominic canzone",
+    "kike hernandez",
+    "mookie betts",
+    "randy arozarena",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5203905613",
+   "username": "jbhintz",
+   "points": 42.0,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 28.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cal raleigh",
+    "cole young",
+    "freddie freeman",
+    "max muncy",
+    "mookie betts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5203910389",
+   "username": "gbuckner60",
+   "points": 42.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "dominic canzone",
+    "kyle tucker",
+    "max muncy",
+    "randy arozarena",
+    "tommy edman"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5203903701",
+   "username": "Wootforwiley",
+   "points": 37.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole young",
+    "freddie freeman",
+    "julio rodriguez",
+    "luke raley",
+    "max muncy",
+    "roki sasaki"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Roki Sasaki",
+   "player_norm": "roki sasaki",
+   "roster_position": "UTIL",
+   "pct_drafted": 65.22,
+   "fpts": 21.2
+  },
+  {
+   "player": "Dominic Canzone",
+   "player_norm": "dominic canzone",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 4.0
+  },
+  {
+   "player": "Randy Arozarena",
+   "player_norm": "randy arozarena",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 17.0
+  },
+  {
+   "player": "Cole Young",
+   "player_norm": "cole young",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 13.0
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Bryan Woo",
+   "player_norm": "bryan woo",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 13.05
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 4.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 8.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 12.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 21.0
+  },
+  {
+   "player": "Josh Naylor",
+   "player_norm": "josh naylor",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 6.0
+  },
+  {
+   "player": "Weston Wilson",
+   "player_norm": "weston wilson",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 5.0
+  },
+  {
+   "player": "Julio Rodriguez",
+   "player_norm": "julio rodriguez",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 9.0
+  },
+  {
+   "player": "Colt Emerson",
+   "player_norm": "colt emerson",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dalton Rushing",
+   "player_norm": "dalton rushing",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 18.0
+  },
+  {
+   "player": "Cal Raleigh",
+   "player_norm": "cal raleigh",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 4.0
+  },
+  {
+   "player": "Luke Raley",
+   "player_norm": "luke raley",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 3,
+  "worst_rank": 3,
+  "best_finish_percentile": 91.3,
+  "median_finish_percentile": 91.3,
+  "best_points": 77.58,
+  "winning_points": 86.8,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

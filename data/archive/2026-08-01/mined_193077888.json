@@ -1,0 +1,1257 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193077888",
+ "slate_date": "2026-08-01",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 127.65,
+  "winning_entry_id": "5205450952",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2100,
+  "at_cap_entries": 8,
+  "at_cap_share_pct": 34.8,
+  "salary_left_histogram": {
+   "101-300": 4,
+   "701-1500": 4,
+   "1-100": 4,
+   "<= 0": 4,
+   "301-700": 6,
+   "> 1500": 1
+  },
+  "max_stack_histogram": {
+   "2": 1,
+   "3": 2,
+   "4": 7,
+   "5": 13
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Drew Rasmussen",
+     "Logan Gilbert"
+    ],
+    "count": 7,
+    "field_share_pct": 30.4
+   },
+   {
+    "pair": [
+     "Connor Prielipp",
+     "Drew Rasmussen"
+    ],
+    "count": 5,
+    "field_share_pct": 21.7
+   },
+   {
+    "pair": [
+     "Kevin Gausman",
+     "Logan Gilbert"
+    ],
+    "count": 3,
+    "field_share_pct": 13.0
+   },
+   {
+    "pair": [
+     "Drew Rasmussen",
+     "Kevin Gausman"
+    ],
+    "count": 2,
+    "field_share_pct": 8.7
+   },
+   {
+    "pair": [
+     "Drew Rasmussen",
+     "Quinn Mathews"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Connor Prielipp",
+     "Kevin Gausman"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Connor Prielipp",
+     "Logan Gilbert"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Logan Gilbert",
+     "Quinn Mathews"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Drew Rasmussen",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Logan Gilbert",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Kazuma Okamoto",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Connor Prielipp",
+    "pct_drafted": 34.78
+   },
+   {
+    "player": "Junior Caminero",
+    "pct_drafted": 34.78
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 230,
+  "roster_slots_expected": 230,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5205450952",
+   "username": "Nbot11",
+   "points": 127.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "drew rasmussen",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "javier sanoja",
+    "kazuma okamoto",
+    "kyle stowers",
+    "logan gilbert",
+    "randy arozarena",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5205546844",
+   "username": "grantgoupil",
+   "points": 122.9,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Logan Gilbert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 18.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "esteury ruiz",
+    "griffin conine",
+    "javier sanoja",
+    "kevin gausman",
+    "liam hicks",
+    "logan gilbert",
+    "luis urias",
+    "munetaka murakami",
+    "otto lopez",
+    "sam antonacci"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5205539927",
+   "username": "Rhombus87",
+   "points": 110.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Kevin Gausman"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole young",
+    "colt emerson",
+    "dominic canzone",
+    "drew rasmussen",
+    "julio rodriguez",
+    "kazuma okamoto",
+    "kevin gausman",
+    "randy arozarena",
+    "royce lewis",
+    "ryan jeffers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5205504795",
+   "username": "bleeski",
+   "points": 103.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Kevin Gausman"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson benge",
+    "drew rasmussen",
+    "heriberto hernandez",
+    "julio rodriguez",
+    "kazuma okamoto",
+    "kevin gausman",
+    "liam hicks",
+    "otto lopez",
+    "vladimir guerrero",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5205544798",
+   "username": "peterjpacheco",
+   "points": 102.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "drew rasmussen",
+    "george springer",
+    "jordan walker",
+    "kazuma okamoto",
+    "logan gilbert",
+    "luis urias",
+    "masyn winn",
+    "nick fortes",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5205523706",
+   "username": "salatso22",
+   "points": 98.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Drew Rasmussen"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 28.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "connor prielipp",
+    "drew rasmussen",
+    "esteury ruiz",
+    "griffin conine",
+    "junior caminero",
+    "otto lopez",
+    "ryan jeffers",
+    "ryan vilade",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5205558886",
+   "username": "falstaff64",
+   "points": 98.7,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Drew Rasmussen"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 30.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "carson benge",
+    "connor prielipp",
+    "drew rasmussen",
+    "george springer",
+    "kazuma okamoto",
+    "liam hicks",
+    "otto lopez",
+    "vladimir guerrero",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5205478654",
+   "username": "sirleged7777",
+   "points": 96.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Drew Rasmussen"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor prielipp",
+    "drew rasmussen",
+    "javier sanoja",
+    "jonny deluca",
+    "junior caminero",
+    "liam hicks",
+    "ryan vilade",
+    "victor mesa",
+    "xavier edwards",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5205524314",
+   "username": "A_playa_named_gus",
+   "points": 96.65,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 26.09,
+   "n_cheap": 1,
+   "players_norm": [
+    "drew rasmussen",
+    "ernie clement",
+    "george springer",
+    "jimmy crooks",
+    "jordan walker",
+    "kazuma okamoto",
+    "lars nootbaar",
+    "logan gilbert",
+    "luis urias",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5205492495",
+   "username": "meyers2305",
+   "points": 96.35,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Quinn Mathews"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "bo bichette",
+    "carson benge",
+    "drew rasmussen",
+    "francisco lindor",
+    "jared young",
+    "julio rodriguez",
+    "marcus semien",
+    "quinn mathews",
+    "randy arozarena",
+    "ryan jeffers"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5205554955",
+   "username": "ggriggcubsfan",
+   "points": 89.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 30.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "cal raleigh",
+    "carson benge",
+    "cole young",
+    "drew rasmussen",
+    "ernie clement",
+    "george springer",
+    "jared young",
+    "kazuma okamoto",
+    "logan gilbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5205476912",
+   "username": "Wanna_Square_Up1567",
+   "points": 88.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.7,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben williamson",
+    "chandler simpson",
+    "drew rasmussen",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "jimmy crooks",
+    "junior caminero",
+    "logan gilbert",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5205536715",
+   "username": "Mige1",
+   "points": 88.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "bo bichette",
+    "carson benge",
+    "drew rasmussen",
+    "francisco lindor",
+    "heriberto hernandez",
+    "jared young",
+    "liam hicks",
+    "logan gilbert",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5205534070",
+   "username": "cb777",
+   "points": 85.95,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Kevin Gausman"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 16.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "brooks lee",
+    "colson montgomery",
+    "connor prielipp",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "kevin gausman",
+    "kody clemens",
+    "royce lewis",
+    "ryan jeffers",
+    "trevor larnach"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5205478764",
+   "username": "pgk8",
+   "points": 84.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Drew Rasmussen"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "ben williamson",
+    "chandler simpson",
+    "connor prielipp",
+    "drew rasmussen",
+    "ivan herrera",
+    "jonny deluca",
+    "junior caminero",
+    "masyn winn",
+    "victor mesa"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5205473692",
+   "username": "BigFish2",
+   "points": 82.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Logan Gilbert"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 27.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson benge",
+    "cole young",
+    "dominic canzone",
+    "francisco lindor",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "logan gilbert",
+    "nick fortes",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5205540800",
+   "username": "rockybrown26",
+   "points": 82.65,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Logan Gilbert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "drew rasmussen",
+    "francisco lindor",
+    "jared young",
+    "jonny deluca",
+    "logan gilbert",
+    "luis torrens",
+    "marcus semien",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5205551742",
+   "username": "Chili77",
+   "points": 80.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Logan Gilbert"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "connor prielipp",
+    "daulton varsho",
+    "ernie clement",
+    "francisco lindor",
+    "george springer",
+    "junior caminero",
+    "logan gilbert",
+    "ryan vilade",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5205457106",
+   "username": "tmoney88",
+   "points": 75.7,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Drew Rasmussen"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 28.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "connor prielipp",
+    "drew rasmussen",
+    "heriberto hernandez",
+    "ivan herrera",
+    "junior caminero",
+    "royce lewis",
+    "taylor walls",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5205476131",
+   "username": "hchawk89",
+   "points": 67.0,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Logan Gilbert",
+    "Quinn Mathews"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 18.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "ivan herrera",
+    "jared young",
+    "jj wetherholt",
+    "jordan walker",
+    "julio rodriguez",
+    "logan gilbert",
+    "masyn winn",
+    "quinn mathews",
+    "ryan vilade"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5205435470",
+   "username": "y2kFrog",
+   "points": 64.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Drew Rasmussen",
+    "Zac Thornton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 24.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "cole young",
+    "colt emerson",
+    "dominic canzone",
+    "drew rasmussen",
+    "junior caminero",
+    "ryan vilade",
+    "victor mesa",
+    "yandy diaz",
+    "zac thornton"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5205531302",
+   "username": "TrueNorth79",
+   "points": 62.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Connor Prielipp",
+    "Quinn Mathews"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 22.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor prielipp",
+    "ivan herrera",
+    "jonny deluca",
+    "junior caminero",
+    "kody clemens",
+    "otto lopez",
+    "quinn mathews",
+    "royce lewis",
+    "ryan vilade",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5205412618",
+   "username": "HypeBigelow",
+   "points": 54.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Logan Gilbert"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 26.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "cal raleigh",
+    "carson benge",
+    "dominic canzone",
+    "francisco lindor",
+    "jared young",
+    "kazuma okamoto",
+    "kevin gausman",
+    "kody clemens",
+    "logan gilbert"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Drew Rasmussen",
+   "player_norm": "drew rasmussen",
+   "roster_position": "P",
+   "pct_drafted": 69.57,
+   "fpts": 34.5
+  },
+  {
+   "player": "Logan Gilbert",
+   "player_norm": "logan gilbert",
+   "roster_position": "P",
+   "pct_drafted": 52.17,
+   "fpts": 18.15
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "3B",
+   "pct_drafted": 39.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Prielipp",
+   "player_norm": "connor prielipp",
+   "roster_position": "P",
+   "pct_drafted": 34.78,
+   "fpts": 11.2
+  },
+  {
+   "player": "Junior Caminero",
+   "player_norm": "junior caminero",
+   "roster_position": "3B",
+   "pct_drafted": 34.78,
+   "fpts": 2.0
+  },
+  {
+   "player": "Yandy Diaz",
+   "player_norm": "yandy diaz",
+   "roster_position": "1B",
+   "pct_drafted": 30.43,
+   "fpts": 6.0
+  },
+  {
+   "player": "Carson Benge",
+   "player_norm": "carson benge",
+   "roster_position": "OF",
+   "pct_drafted": 30.43,
+   "fpts": 3.0
+  },
+  {
+   "player": "Kevin Gausman",
+   "player_norm": "kevin gausman",
+   "roster_position": "P",
+   "pct_drafted": 26.09,
+   "fpts": 16.75
+  },
+  {
+   "player": "Francisco Lindor",
+   "player_norm": "francisco lindor",
+   "roster_position": "SS",
+   "pct_drafted": 26.09,
+   "fpts": 6.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 14.0
+  },
+  {
+   "player": "Chandler Simpson",
+   "player_norm": "chandler simpson",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 3.0
+  },
+  {
+   "player": "Xavier Edwards",
+   "player_norm": "xavier edwards",
+   "roster_position": "2B",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Heriberto Hernandez",
+   "player_norm": "heriberto hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ryan Vilade",
+   "player_norm": "ryan vilade",
+   "roster_position": "1B",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jared Young",
+   "player_norm": "jared young",
+   "roster_position": "1B",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Otto Lopez",
+   "player_norm": "otto lopez",
+   "roster_position": "SS",
+   "pct_drafted": 21.74,
+   "fpts": 11.0
+  },
+  {
+   "player": "Vladimir Guerrero Jr.",
+   "player_norm": "vladimir guerrero",
+   "roster_position": "1B",
+   "pct_drafted": 21.74,
+   "fpts": 8.0
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "C",
+   "pct_drafted": 21.74,
+   "fpts": 14.0
+  },
+  {
+   "player": "Victor Mesa Jr.",
+   "player_norm": "victor mesa",
+   "roster_position": "OF",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Esteury Ruiz",
+   "player_norm": "esteury ruiz",
+   "roster_position": "OF",
+   "pct_drafted": 21.74,
+   "fpts": 15.0
+  },
+  {
+   "player": "Ryan Jeffers",
+   "player_norm": "ryan jeffers",
+   "roster_position": "C",
+   "pct_drafted": 17.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Julio Rodriguez",
+   "player_norm": "julio rodriguez",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 9.0
+  },
+  {
+   "player": "Ivan Herrera",
+   "player_norm": "ivan herrera",
+   "roster_position": "C",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jonny DeLuca",
+   "player_norm": "jonny deluca",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 10.0
+  },
+  {
+   "player": "Cal Raleigh",
+   "player_norm": "cal raleigh",
+   "roster_position": "C",
+   "pct_drafted": 17.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "A.J. Ewing",
+   "player_norm": "a j ewing",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Royce Lewis",
+   "player_norm": "royce lewis",
+   "roster_position": "1B",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Dominic Canzone",
+   "player_norm": "dominic canzone",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 4.0
+  },
+  {
+   "player": "Cole Young",
+   "player_norm": "cole young",
+   "roster_position": "2B",
+   "pct_drafted": 17.39,
+   "fpts": 10.0
+  },
+  {
+   "player": "Quinn Mathews",
+   "player_norm": "quinn mathews",
+   "roster_position": "P",
+   "pct_drafted": 13.04,
+   "fpts": 7.85
+  },
+  {
+   "player": "Jordan Walker",
+   "player_norm": "jordan walker",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 6.0
+  },
+  {
+   "player": "Kody Clemens",
+   "player_norm": "kody clemens",
+   "roster_position": "2B",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "Randy Arozarena",
+   "player_norm": "randy arozarena",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 25.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "2B",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Masyn Winn",
+   "player_norm": "masyn winn",
+   "roster_position": "SS",
+   "pct_drafted": 13.04,
+   "fpts": 9.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 13.04,
+   "fpts": 19.0
+  },
+  {
+   "player": "Luis Urias",
+   "player_norm": "luis urias",
+   "roster_position": "2B",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Bo Bichette",
+   "player_norm": "bo bichette",
+   "roster_position": "3B",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ben Williamson",
+   "player_norm": "ben williamson",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Griffin Conine",
+   "player_norm": "griffin conine",
+   "roster_position": "OF",
+   "pct_drafted": 8.7,
+   "fpts": 19.0
+  },
+  {
+   "player": "Marcus Semien",
+   "player_norm": "marcus semien",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Taylor Walls",
+   "player_norm": "taylor walls",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Colt Emerson",
+   "player_norm": "colt emerson",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nick Fortes",
+   "player_norm": "nick fortes",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jimmy Crooks",
+   "player_norm": "jimmy crooks",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Zac Thornton",
+   "player_norm": "zac thornton",
+   "roster_position": "P",
+   "pct_drafted": 4.35,
+   "fpts": 2.5
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "JJ Wetherholt",
+   "player_norm": "jj wetherholt",
+   "roster_position": "2B",
+   "pct_drafted": 4.35,
+   "fpts": 2.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 2.0
+  },
+  {
+   "player": "Alec Burleson",
+   "player_norm": "alec burleson",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 8.0
+  },
+  {
+   "player": "Brooks Lee",
+   "player_norm": "brooks lee",
+   "roster_position": "3B",
+   "pct_drafted": 4.35,
+   "fpts": 10.0
+  },
+  {
+   "player": "Trevor Larnach",
+   "player_norm": "trevor larnach",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 16.0
+  },
+  {
+   "player": "Kyle Stowers",
+   "player_norm": "kyle stowers",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 7.0
+  },
+  {
+   "player": "Alejandro Kirk",
+   "player_norm": "alejandro kirk",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 11.0
+  },
+  {
+   "player": "Lars Nootbaar",
+   "player_norm": "lars nootbaar",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 5.0
+  },
+  {
+   "player": "Blaze Jordan",
+   "player_norm": "blaze jordan",
+   "roster_position": "3B",
+   "pct_drafted": 4.35,
+   "fpts": 8.0
+  },
+  {
+   "player": "Luis Torrens",
+   "player_norm": "luis torrens",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 4,
+  "worst_rank": 4,
+  "best_finish_percentile": 86.96,
+  "median_finish_percentile": 86.96,
+  "best_points": 103.25,
+  "winning_points": 127.65,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

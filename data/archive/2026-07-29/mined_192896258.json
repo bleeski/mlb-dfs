@@ -1,0 +1,772 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192896258",
+ "slate_date": "2026-07-29",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 68.73,
+  "winning_entry_id": "5202539394",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 22,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 8.7,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 21,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 3,
+  "at_cap_share_pct": 13.0,
+  "salary_left_histogram": {
+   "301-700": 5,
+   "101-300": 6,
+   "1-100": 2,
+   "701-1500": 5,
+   "<= 0": 1,
+   "> 1500": 4
+  },
+  "max_stack_histogram": {
+   "3": 4,
+   "4": 10,
+   "5": 9
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Matthew Boyd",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Michael Busch",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Michael Conforto",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Dustin May",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Blaze Jordan",
+    "pct_drafted": 39.13
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5202539394",
+   "username": "mythicalrhymer01",
+   "points": 68.73,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dustin may",
+    "ivan herrera",
+    "jose fermin",
+    "masyn winn",
+    "matthew boyd"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5201822289",
+   "username": "aramisj22",
+   "points": 64.73,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dustin may",
+    "jordan walker",
+    "matthew boyd",
+    "michael conforto",
+    "pedro pages"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5202227809",
+   "username": "ulbreaker",
+   "points": 62.78,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dustin may",
+    "ian happ",
+    "matthew boyd",
+    "michael conforto",
+    "pedro ramirez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5202804412",
+   "username": "L053R666",
+   "points": 62.73,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dustin may",
+    "jordan walker",
+    "matthew boyd",
+    "pedro pages",
+    "pedro ramirez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5202828023",
+   "username": "Celticsnc",
+   "points": 60.73,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dustin may",
+    "jordan walker",
+    "jose fermin",
+    "matthew boyd",
+    "pedro pages"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5202647741",
+   "username": "Diesel",
+   "points": 59.73,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dustin may",
+    "ian happ",
+    "matthew boyd",
+    "michael conforto",
+    "pedro ramirez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5202810874",
+   "username": "RFinch_Kings",
+   "points": 59.55,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "matthew boyd",
+    "michael conforto",
+    "nathan church",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5202253250",
+   "username": "jarradkern",
+   "points": 57.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "ivan herrera",
+    "michael busch",
+    "nathan church",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5202453932",
+   "username": "briguy13",
+   "points": 54.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "ivan herrera",
+    "jj wetherholt",
+    "matthew boyd",
+    "michael busch",
+    "michael conforto",
+    "pedro ramirez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5202788132",
+   "username": "jointpuffs",
+   "points": 54.33,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "dansby swanson",
+    "matthew boyd",
+    "nathan church",
+    "pedro ramirez",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5202844428",
+   "username": "gene64",
+   "points": 53.33,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "ian happ",
+    "matthew boyd",
+    "michael busch",
+    "miguel amaya",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5202533692",
+   "username": "bkukor",
+   "points": 51.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dansby swanson",
+    "dustin may",
+    "jj wetherholt",
+    "jose fermin",
+    "matthew boyd"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5202170146",
+   "username": "whoisjohngalt420",
+   "points": 48.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "ivan herrera",
+    "jordan walker",
+    "michael busch",
+    "michael conforto",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5202724445",
+   "username": "ti29349",
+   "points": 47.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "dustin may",
+    "masyn winn",
+    "matthew boyd",
+    "michael busch",
+    "michael conforto",
+    "pedro ramirez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5202041991",
+   "username": "Stolle76",
+   "points": 45.0,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "jj wetherholt",
+    "jordan walker",
+    "masyn winn",
+    "michael conforto",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5202064839",
+   "username": "corruption79",
+   "points": 45.0,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "dustin may",
+    "jose fermin",
+    "matthew boyd",
+    "michael busch",
+    "michael conforto",
+    "nelson velazquez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5202851474",
+   "username": "griswaldnarddawg",
+   "points": 40.05,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "masyn winn",
+    "matthew boyd",
+    "miguel amaya",
+    "pedro ramirez",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5202723731",
+   "username": "Lucky870Buddy",
+   "points": 40.0,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "alex bregman",
+    "jordan walker",
+    "jose fermin",
+    "michael conforto",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5202745281",
+   "username": "bleeski",
+   "points": 38.0,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "dansby swanson",
+    "ian happ",
+    "michael busch",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5202854714",
+   "username": "peterbelitz",
+   "points": 34.5,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 28.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "alex bregman",
+    "ivan herrera",
+    "masyn winn",
+    "michael busch",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5202819687",
+   "username": "USMBrad14",
+   "points": 30.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "dansby swanson",
+    "ian happ",
+    "jose fermin",
+    "matthew boyd",
+    "michael busch"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5202608942",
+   "username": "MIKEMETAL",
+   "points": 29.05,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "ian happ",
+    "masyn winn",
+    "matthew boyd",
+    "michael busch",
+    "nico hoerner"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5202808126",
+   "username": "GuitarBet1",
+   "points": 25.5,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 28.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "alex bregman",
+    "masyn winn",
+    "michael busch",
+    "miguel amaya",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Matthew Boyd",
+   "player_norm": "matthew boyd",
+   "roster_position": "UTIL",
+   "pct_drafted": 69.57,
+   "fpts": 21.55
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 0.0
+  },
+  {
+   "player": "Michael Conforto",
+   "player_norm": "michael conforto",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 6.0
+  },
+  {
+   "player": "Dustin May",
+   "player_norm": "dustin may",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 15.45
+  },
+  {
+   "player": "Blaze Jordan",
+   "player_norm": "blaze jordan",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 5.0
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 16.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 5.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 4.0
+  },
+  {
+   "player": "Masyn Winn",
+   "player_norm": "masyn winn",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jordan Walker",
+   "player_norm": "jordan walker",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 7.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dansby Swanson",
+   "player_norm": "dansby swanson",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jose Fermin",
+   "player_norm": "jose fermin",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 2.0
+  },
+  {
+   "player": "Ivan Herrera",
+   "player_norm": "ivan herrera",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 17.0
+  },
+  {
+   "player": "JJ Wetherholt",
+   "player_norm": "jj wetherholt",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 4.0
+  },
+  {
+   "player": "Alec Burleson",
+   "player_norm": "alec burleson",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Miguel Amaya",
+   "player_norm": "miguel amaya",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nathan Church",
+   "player_norm": "nathan church",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 4.0
+  },
+  {
+   "player": "Pedro Pages",
+   "player_norm": "pedro pages",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nelson Velazquez",
+   "player_norm": "nelson velazquez",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 19,
+  "worst_rank": 19,
+  "best_finish_percentile": 21.74,
+  "median_finish_percentile": 21.74,
+  "best_points": 38.0,
+  "winning_points": 68.73,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

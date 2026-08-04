@@ -1,0 +1,1060 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192937440",
+ "slate_date": "2026-07-30",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 38,
+  "entries_complete_lineups": 36,
+  "roster_size": 6,
+  "entries_unparsed": 2,
+  "winning_points": 61.95,
+  "winning_entry_id": "5203467573",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 28,
+  "entries_in_duplicated_lineups": 12,
+  "share_duplicated_pct": 33.3,
+  "max_copies": 5,
+  "copies_histogram": {
+   "1": 24,
+   "2": 2,
+   "3": 1,
+   "5": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 18,
+  "at_cap_share_pct": 50.0,
+  "salary_left_histogram": {
+   "1-100": 2,
+   "<= 0": 16,
+   "301-700": 5,
+   "101-300": 7,
+   "> 1500": 4,
+   "701-1500": 2
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 11,
+   "5": 20
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Shane McClanahan",
+    "pct_drafted": 73.68
+   },
+   {
+    "player": "Yandy Diaz",
+    "pct_drafted": 60.53
+   },
+   {
+    "player": "Junior Caminero",
+    "pct_drafted": 52.63
+   },
+   {
+    "player": "Cedric Mullins",
+    "pct_drafted": 50.0
+   },
+   {
+    "player": "Wyatt Langford",
+    "pct_drafted": 39.47
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0526,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 216,
+  "roster_slots_expected": 216,
+  "recomputed_total_pct": 568.4,
+  "dk_table_total_pct": 568.4,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5203467573",
+   "username": "BAlmeida402",
+   "points": 61.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "cedric mullins",
+    "jonny deluca",
+    "junior caminero",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5203171322",
+   "username": "josephje",
+   "points": 53.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "cedric mullins",
+    "ezequiel duran",
+    "justin foscue",
+    "shane mcclanahan",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5203105955",
+   "username": "jbhintz",
+   "points": 51.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro osuna",
+    "cedric mullins",
+    "junior caminero",
+    "nicky lopez",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5203467746",
+   "username": "Rallycap",
+   "points": 50.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 45.18,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "cedric mullins",
+    "ezequiel duran",
+    "shane mcclanahan",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5203257462",
+   "username": "jep4576",
+   "points": 45.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "hunter feduccia",
+    "jake burger",
+    "jonathan aranda",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5203327907",
+   "username": "ar12gbp",
+   "points": 45.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "hunter feduccia",
+    "jake burger",
+    "jonathan aranda",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5203421810",
+   "username": "CyclopeanCyborg",
+   "points": 45.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "hunter feduccia",
+    "jake burger",
+    "jonathan aranda",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5202732388",
+   "username": "aramisj22",
+   "points": 45.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.09,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "jonathan aranda",
+    "jonny deluca",
+    "junior caminero",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5203373916",
+   "username": "CashMoneyClassic",
+   "points": 45.0,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "cedric mullins",
+    "junior caminero",
+    "taylor walls",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5203343725",
+   "username": "buckstar",
+   "points": 43.43,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "ezequiel duran",
+    "jake burger",
+    "shane mcclanahan",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5203138190",
+   "username": "Aoteoroa",
+   "points": 42.43,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "nicky lopez",
+    "shane mcclanahan",
+    "taylor walls",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5203464068",
+   "username": "MichaelLex2020",
+   "points": 41.65,
+   "salary_used": 30500,
+   "salary_left": 19500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 23.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro osuna",
+    "cam cauley",
+    "cedric mullins",
+    "cole winn",
+    "ezequiel duran",
+    "nicky lopez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5203067083",
+   "username": "TheBabz",
+   "points": 41.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "ezequiel duran",
+    "jonathan aranda",
+    "junior caminero",
+    "victor mesa",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5203111845",
+   "username": "BoomerTesch",
+   "points": 39.5,
+   "salary_used": 42700,
+   "salary_left": 7300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "alejandro osuna",
+    "austin wynns",
+    "jonathan aranda",
+    "victor mesa",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5203150205",
+   "username": "jgorms3322",
+   "points": 39.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 49.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "cedric mullins",
+    "junior caminero",
+    "shane mcclanahan",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5203347953",
+   "username": "Extraqtt",
+   "points": 39.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 49.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "cedric mullins",
+    "junior caminero",
+    "shane mcclanahan",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5203398899",
+   "username": "H-Rex",
+   "points": 39.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 49.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "cedric mullins",
+    "junior caminero",
+    "shane mcclanahan",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5203419236",
+   "username": "137666",
+   "points": 39.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 49.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "cedric mullins",
+    "junior caminero",
+    "shane mcclanahan",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5203433681",
+   "username": "FrozenFromundaCheese",
+   "points": 38.43,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben williamson",
+    "hunter feduccia",
+    "jonathan aranda",
+    "shane mcclanahan",
+    "victor mesa",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5203400119",
+   "username": "DJ32153",
+   "points": 37.43,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "cam cauley",
+    "ezequiel duran",
+    "jake burger",
+    "shane mcclanahan",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5203411119",
+   "username": "howardwi",
+   "points": 37.43,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "cam cauley",
+    "ezequiel duran",
+    "jake burger",
+    "shane mcclanahan",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5203449266",
+   "username": "Alancey",
+   "points": 36.98,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro osuna",
+    "hunter feduccia",
+    "junior caminero",
+    "justin foscue",
+    "marco gonzales",
+    "shane mcclanahan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5203001507",
+   "username": "corruption79",
+   "points": 35.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "hunter feduccia",
+    "junior caminero",
+    "shane mcclanahan",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5203399364",
+   "username": "jc000000",
+   "points": 35.95,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 49.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "cedric mullins",
+    "junior caminero",
+    "shane mcclanahan",
+    "taylor walls",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5203456558",
+   "username": "Harmiles",
+   "points": 35.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "hunter feduccia",
+    "junior caminero",
+    "shane mcclanahan",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5203440709",
+   "username": "DanDePo",
+   "points": 35.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.35,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "ben williamson",
+    "cedric mullins",
+    "jonathan aranda",
+    "junior caminero",
+    "shane mcclanahan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5203457305",
+   "username": "grantgoupil",
+   "points": 35.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben williamson",
+    "ezequiel duran",
+    "shane mcclanahan",
+    "taylor walls",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "28",
+   "entry_id": "5203464083",
+   "username": "wetter187",
+   "points": 35.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "ezequiel duran",
+    "jake burger",
+    "jonathan aranda",
+    "junior caminero",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5203422788",
+   "username": "beccapatt",
+   "points": 33.98,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "hunter feduccia",
+    "jonathan aranda",
+    "marco gonzales",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5203447318",
+   "username": "wittwerjoe",
+   "points": 32.95,
+   "salary_used": 46400,
+   "salary_left": 3600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 32.89,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jake burger",
+    "shane mcclanahan",
+    "wyatt langford"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5203446469",
+   "username": "bleeski",
+   "points": 31.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole winn",
+    "hunter feduccia",
+    "jonathan aranda",
+    "junior caminero",
+    "shane mcclanahan",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "32",
+   "entry_id": "5202922440",
+   "username": "jazzyj0619",
+   "points": 29.97,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben williamson",
+    "hunter feduccia",
+    "junior caminero",
+    "marco gonzales",
+    "shane mcclanahan",
+    "taylor walls"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5203276490",
+   "username": "whoisjohngalt420",
+   "points": 28.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "jonathan aranda",
+    "junior caminero",
+    "taylor walls",
+    "victor mesa",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5203467104",
+   "username": "Racso1969",
+   "points": 28.5,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben williamson",
+    "jonathan aranda",
+    "junior caminero",
+    "nicky lopez",
+    "wyatt langford",
+    "yandy diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5203351947",
+   "username": "noturningback",
+   "points": 26.43,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam cauley",
+    "ezequiel duran",
+    "hunter feduccia",
+    "jake burger",
+    "nathan eovaldi",
+    "shane mcclanahan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5203457778",
+   "username": "MrPointman",
+   "points": 22.63,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "cole winn",
+    "junior caminero",
+    "marco gonzales",
+    "shane mcclanahan",
+    "victor mesa"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Shane McClanahan",
+   "player_norm": "shane mcclanahan",
+   "roster_position": "UTIL",
+   "pct_drafted": 73.68,
+   "fpts": 8.95
+  },
+  {
+   "player": "Yandy Diaz",
+   "player_norm": "yandy diaz",
+   "roster_position": "UTIL",
+   "pct_drafted": 60.53,
+   "fpts": 8.0
+  },
+  {
+   "player": "Junior Caminero",
+   "player_norm": "junior caminero",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.63,
+   "fpts": 2.0
+  },
+  {
+   "player": "Cedric Mullins",
+   "player_norm": "cedric mullins",
+   "roster_position": "UTIL",
+   "pct_drafted": 50.0,
+   "fpts": 14.0
+  },
+  {
+   "player": "Wyatt Langford",
+   "player_norm": "wyatt langford",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.47,
+   "fpts": 9.0
+  },
+  {
+   "player": "Jonathan Aranda",
+   "player_norm": "jonathan aranda",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.21,
+   "fpts": 3.0
+  },
+  {
+   "player": "Cam Cauley",
+   "player_norm": "cam cauley",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "UTIL",
+   "pct_drafted": 28.95,
+   "fpts": 6.0
+  },
+  {
+   "player": "Taylor Walls",
+   "player_norm": "taylor walls",
+   "roster_position": "UTIL",
+   "pct_drafted": 28.95,
+   "fpts": 2.0
+  },
+  {
+   "player": "Hunter Feduccia",
+   "player_norm": "hunter feduccia",
+   "roster_position": "UTIL",
+   "pct_drafted": 28.95,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jake Burger",
+   "player_norm": "jake burger",
+   "roster_position": "UTIL",
+   "pct_drafted": 23.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Victor Mesa Jr.",
+   "player_norm": "victor mesa",
+   "roster_position": "UTIL",
+   "pct_drafted": 18.42,
+   "fpts": 3.0
+  },
+  {
+   "player": "Austin Wynns",
+   "player_norm": "austin wynns",
+   "roster_position": "UTIL",
+   "pct_drafted": 18.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brandon Nimmo",
+   "player_norm": "brandon nimmo",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.16,
+   "fpts": 9.0
+  },
+  {
+   "player": "Ben Williamson",
+   "player_norm": "ben williamson",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.16,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nicky Lopez",
+   "player_norm": "nicky lopez",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.53,
+   "fpts": 2.0
+  },
+  {
+   "player": "Alejandro Osuna",
+   "player_norm": "alejandro osuna",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.53,
+   "fpts": 12.0
+  },
+  {
+   "player": "Marco Gonzales",
+   "player_norm": "marco gonzales",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.53,
+   "fpts": 2.55
+  },
+  {
+   "player": "Cole Winn",
+   "player_norm": "cole winn",
+   "roster_position": "UTIL",
+   "pct_drafted": 7.89,
+   "fpts": 1.65
+  },
+  {
+   "player": "Jonny DeLuca",
+   "player_norm": "jonny deluca",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.26,
+   "fpts": 22.0
+  },
+  {
+   "player": "Justin Foscue",
+   "player_norm": "justin foscue",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.26,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nathan Eovaldi",
+   "player_norm": "nathan eovaldi",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.63,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 38,
+  "best_rank": 31,
+  "worst_rank": 31,
+  "best_finish_percentile": 21.05,
+  "median_finish_percentile": 21.05,
+  "best_points": 31.6,
+  "winning_points": 61.95,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

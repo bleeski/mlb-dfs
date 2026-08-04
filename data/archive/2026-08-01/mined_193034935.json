@@ -1,0 +1,5732 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193034935",
+ "slate_date": "2026-08-01",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 180,
+  "entries_complete_lineups": 180,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 157.7,
+  "winning_entry_id": "5205699604",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 168,
+  "entries_in_duplicated_lineups": 24,
+  "share_duplicated_pct": 13.3,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 156,
+   "2": 12
+  },
+  "winner_copies": 2
+ },
+ "construction": {
+  "cheap_salary_threshold": 2200,
+  "at_cap_entries": 51,
+  "at_cap_share_pct": 28.3,
+  "salary_left_histogram": {
+   "101-300": 32,
+   "301-700": 37,
+   "> 1500": 34,
+   "1-100": 23,
+   "701-1500": 26,
+   "<= 0": 28
+  },
+  "max_stack_histogram": {
+   "2": 2,
+   "3": 32,
+   "4": 54,
+   "5": 92
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Tyler Mahle",
+     "Walker Buehler"
+    ],
+    "count": 62,
+    "field_share_pct": 34.4
+   },
+   {
+    "pair": [
+     "Luinder Avila",
+     "Walker Buehler"
+    ],
+    "count": 30,
+    "field_share_pct": 16.7
+   },
+   {
+    "pair": [
+     "Luinder Avila",
+     "Tyler Mahle"
+    ],
+    "count": 28,
+    "field_share_pct": 15.6
+   },
+   {
+    "pair": [
+     "Ryan Feltner",
+     "Tyler Mahle"
+    ],
+    "count": 24,
+    "field_share_pct": 13.3
+   },
+   {
+    "pair": [
+     "Ryan Feltner",
+     "Walker Buehler"
+    ],
+    "count": 21,
+    "field_share_pct": 11.7
+   },
+   {
+    "pair": [
+     "Luinder Avila",
+     "Ryan Feltner"
+    ],
+    "count": 15,
+    "field_share_pct": 8.3
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Tyler Mahle",
+    "pct_drafted": 63.33
+   },
+   {
+    "player": "Walker Buehler",
+    "pct_drafted": 62.78
+   },
+   {
+    "player": "Fernando Tatis Jr.",
+    "pct_drafted": 47.78
+   },
+   {
+    "player": "Hunter Goodman",
+    "pct_drafted": 42.22
+   },
+   {
+    "player": "Jac Caglianone",
+    "pct_drafted": 42.22
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1800,
+  "roster_slots_expected": 1800,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5205699604",
+   "username": "sportsfan14",
+   "points": 157.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "1",
+   "entry_id": "5205838936",
+   "username": "d9144",
+   "points": 157.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5205117907",
+   "username": "Stree",
+   "points": 152.7,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5205844846",
+   "username": "BAlmeida402",
+   "points": 151.7,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "john rave",
+    "kyle karros",
+    "lane thomas",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5205819955",
+   "username": "Paulo21613",
+   "points": 150.7,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5205151727",
+   "username": "troubledsoe",
+   "points": 149.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 38.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "fernando tatis",
+    "hunter goodman",
+    "jac caglianone",
+    "kyle karros",
+    "ryan feltner",
+    "salvador perez",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5205151729",
+   "username": "troubledsoe",
+   "points": 149.05,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "mickey moniak",
+    "ryan feltner",
+    "salvador perez",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5205540185",
+   "username": "slophound",
+   "points": 147.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 38.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "jake mccarthy",
+    "luis rengifo",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5205699607",
+   "username": "sportsfan14",
+   "points": 146.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "john rave",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5205844651",
+   "username": "doinky1",
+   "points": 145.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jake cronenworth",
+    "jake mccarthy",
+    "mickey moniak",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5205806882",
+   "username": "Raiderfanatic2195",
+   "points": 143.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "michael massey",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5205844843",
+   "username": "BAlmeida402",
+   "points": 143.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "michael massey",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5205808877",
+   "username": "Rhombus87",
+   "points": 143.04999,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "heliot ramos",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5205166183",
+   "username": "gocal1224",
+   "points": 142.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jake cronenworth",
+    "jake mccarthy",
+    "mickey moniak",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5205844845",
+   "username": "BAlmeida402",
+   "points": 142.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 37.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jake mccarthy",
+    "john rave",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5205198792",
+   "username": "aarond23",
+   "points": 141.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jake mccarthy",
+    "john rave",
+    "michael massey",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5205838765",
+   "username": "Rallycap",
+   "points": 141.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5205151731",
+   "username": "troubledsoe",
+   "points": 141.05,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "kyle karros",
+    "lane thomas",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "tyler tolbert",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5205246067",
+   "username": "Dave2zone",
+   "points": 140.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "luis arraez",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5205589835",
+   "username": "psereda",
+   "points": 137.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "john rave",
+    "kyle karros",
+    "michael massey",
+    "mickey moniak",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5205699605",
+   "username": "sportsfan14",
+   "points": 136.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 39.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "salvador perez",
+    "tyler freeman",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5205806883",
+   "username": "Raiderfanatic2195",
+   "points": 136.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jake mccarthy",
+    "jung hoo lee",
+    "luis arraez",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5205844847",
+   "username": "BAlmeida402",
+   "points": 135.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "brenton doyle",
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "michael massey",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "24",
+   "entry_id": "5205151733",
+   "username": "troubledsoe",
+   "points": 135.05,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "kyle karros",
+    "lane thomas",
+    "ryan feltner",
+    "salvador perez",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "25",
+   "entry_id": "5205784503",
+   "username": "bleeski",
+   "points": 132.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jackson merrill",
+    "jake mccarthy",
+    "manny machado",
+    "ryan feltner",
+    "tj rumfield",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5205620233",
+   "username": "umrebel3092",
+   "points": 131.7,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "isaac collins",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5205790122",
+   "username": "137666",
+   "points": 131.05,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "heliot ramos",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "28",
+   "entry_id": "5205699608",
+   "username": "sportsfan14",
+   "points": 130.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "28",
+   "entry_id": "5205822076",
+   "username": "sellputs",
+   "points": 130.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5205642722",
+   "username": "auweglman",
+   "points": 129.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jackson merrill",
+    "jake mccarthy",
+    "luis rengifo",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5205808879",
+   "username": "Rhombus87",
+   "points": 129.85,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jackson merrill",
+    "kyle karros",
+    "mickey moniak",
+    "ryan feltner",
+    "ty france",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "32",
+   "entry_id": "5205838932",
+   "username": "d9144",
+   "points": 129.05,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "luis arraez",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5205336899",
+   "username": "wondertwins17",
+   "points": 127.7,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "jac caglianone",
+    "kyle karros",
+    "mickey moniak",
+    "salvador perez",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5205699609",
+   "username": "sportsfan14",
+   "points": 127.7,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "isaac collins",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5205731120",
+   "username": "vavo27",
+   "points": 127.05,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "heliot ramos",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler freeman",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5205739990",
+   "username": "vavo27",
+   "points": 127.05,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "heliot ramos",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler freeman",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5205091343",
+   "username": "starplay",
+   "points": 126.85,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "fernando tatis",
+    "hunter goodman",
+    "jackson merrill",
+    "kyle karros",
+    "ryan feltner",
+    "ty france",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "38",
+   "entry_id": "5205010483",
+   "username": "minrobertson210",
+   "points": 125.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "fernando tatis",
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5205716271",
+   "username": "boys4",
+   "points": 124.899994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5205804473",
+   "username": "boys4",
+   "points": 124.899994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5205655633",
+   "username": "auweglman",
+   "points": 124.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jackson merrill",
+    "manny machado",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler freeman",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5205659821",
+   "username": "Bmk1",
+   "points": 124.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "kyle karros",
+    "mickey moniak",
+    "ryan feltner",
+    "ty france",
+    "tyler freeman",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5205784504",
+   "username": "bleeski",
+   "points": 124.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jackson merrill",
+    "jake mccarthy",
+    "manny machado",
+    "ryan feltner",
+    "ty france",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5205838934",
+   "username": "d9144",
+   "points": 124.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jackson merrill",
+    "jake mccarthy",
+    "kyle karros",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler freeman",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "45",
+   "entry_id": "5205802404",
+   "username": "peterjpacheco",
+   "points": 124.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 37.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "cole carrigg",
+    "jac caglianone",
+    "jake mccarthy",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "46",
+   "entry_id": "5205699610",
+   "username": "sportsfan14",
+   "points": 123.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5205819950",
+   "username": "Paulo21613",
+   "points": 123.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "47",
+   "entry_id": "5205838937",
+   "username": "d9144",
+   "points": 123.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "49",
+   "entry_id": "5205198790",
+   "username": "aarond23",
+   "points": 122.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 40.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "luinder avila",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "50",
+   "entry_id": "5205051600",
+   "username": "adonis112",
+   "points": 122.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "mickey moniak",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "51",
+   "entry_id": "5205787476",
+   "username": "SivaMB",
+   "points": 121.7,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "daniel susac",
+    "jac caglianone",
+    "kyle karros",
+    "mickey moniak",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "51",
+   "entry_id": "5205800802",
+   "username": "boys4",
+   "points": 121.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "jake mccarthy",
+    "lane thomas",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "53",
+   "entry_id": "5205793791",
+   "username": "Daneog2333",
+   "points": 121.05,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 33.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "heliot ramos",
+    "hunter goodman",
+    "jackson merrill",
+    "lane thomas",
+    "luis arraez",
+    "manny machado",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "54",
+   "entry_id": "5205820145",
+   "username": "ReginaRaptor",
+   "points": 120.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "cole carrigg",
+    "jac caglianone",
+    "kyle karros",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "55",
+   "entry_id": "5205806880",
+   "username": "Raiderfanatic2195",
+   "points": 119.85,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jackson merrill",
+    "jake cronenworth",
+    "jake mccarthy",
+    "kyle karros",
+    "ryan feltner",
+    "ty france",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "56",
+   "entry_id": "5205844848",
+   "username": "BAlmeida402",
+   "points": 119.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jake mccarthy",
+    "john rave",
+    "lane thomas",
+    "michael massey",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5205784501",
+   "username": "bleeski",
+   "points": 119.05,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "mickey moniak",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "57",
+   "entry_id": "5205784505",
+   "username": "bleeski",
+   "points": 119.05,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "cole carrigg",
+    "heliot ramos",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "59",
+   "entry_id": "5205806885",
+   "username": "Raiderfanatic2195",
+   "points": 118.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "mickey moniak",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "60",
+   "entry_id": "5205819953",
+   "username": "Paulo21613",
+   "points": 117.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "fernando tatis",
+    "hunter goodman",
+    "jake cronenworth",
+    "kyle karros",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "61",
+   "entry_id": "5205151728",
+   "username": "troubledsoe",
+   "points": 117.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "kyle karros",
+    "lane thomas",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "61",
+   "entry_id": "5205792735",
+   "username": "davidlobo4",
+   "points": 117.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 37.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "brenton doyle",
+    "carter jensen",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "michael massey",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "63",
+   "entry_id": "5205844844",
+   "username": "BAlmeida402",
+   "points": 116.7,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "jake mccarthy",
+    "john rave",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "salvador perez",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5205010480",
+   "username": "minrobertson210",
+   "points": 114.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 37.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jake mccarthy",
+    "john rave",
+    "nick loftin",
+    "rafael devers",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5205646898",
+   "username": "nomoemoney",
+   "points": 114.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "jake cronenworth",
+    "kyle karros",
+    "salvador perez",
+    "tyler mahle",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "64",
+   "entry_id": "5205844842",
+   "username": "BAlmeida402",
+   "points": 114.7,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jake mccarthy",
+    "john rave",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "67",
+   "entry_id": "5205802405",
+   "username": "peterjpacheco",
+   "points": 113.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 33.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "jung hoo lee",
+    "luis arraez",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "67",
+   "entry_id": "5205802650",
+   "username": "jc000000",
+   "points": 113.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 40.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "jake cronenworth",
+    "jake mccarthy",
+    "kyle karros",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "67",
+   "entry_id": "5205808880",
+   "username": "Rhombus87",
+   "points": 113.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "70",
+   "entry_id": "5205198789",
+   "username": "aarond23",
+   "points": 113.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 30.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "heliot ramos",
+    "hunter goodman",
+    "jackson merrill",
+    "luis rengifo",
+    "manny machado",
+    "michael massey",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "71",
+   "entry_id": "5205774031",
+   "username": "claytankgunner",
+   "points": 112.75,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 33.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "nick loftin",
+    "salvador perez",
+    "tyler mahle",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "72",
+   "entry_id": "5205818364",
+   "username": "ds1974",
+   "points": 112.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "jake mccarthy",
+    "manny machado",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "73",
+   "entry_id": "5205246065",
+   "username": "Dave2zone",
+   "points": 111.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 35.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "isaac collins",
+    "jac caglianone",
+    "luinder avila",
+    "luis arraez",
+    "mickey moniak",
+    "ty france",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "73",
+   "entry_id": "5205802407",
+   "username": "peterjpacheco",
+   "points": 111.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "salvador perez",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "75",
+   "entry_id": "5205805619",
+   "username": "Daneog2333",
+   "points": 110.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "isaac collins",
+    "jung hoo lee",
+    "kyle karros",
+    "luis arraez",
+    "rafael devers",
+    "tyler mahle",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "76",
+   "entry_id": "5205444346",
+   "username": "pack88",
+   "points": 109.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 36.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "cole carrigg",
+    "jac caglianone",
+    "jake cronenworth",
+    "jake mccarthy",
+    "luis rengifo",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "76",
+   "entry_id": "5205444357",
+   "username": "pack88",
+   "points": 109.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 36.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "cole carrigg",
+    "jac caglianone",
+    "jake cronenworth",
+    "jake mccarthy",
+    "luis rengifo",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "78",
+   "entry_id": "5205010481",
+   "username": "minrobertson210",
+   "points": 108.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 39.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "isaac collins",
+    "kyle karros",
+    "mickey moniak",
+    "rafael devers",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "79",
+   "entry_id": "5205069891",
+   "username": "Stolle76",
+   "points": 108.049995,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 36.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jac caglianone",
+    "luis rengifo",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "salvador perez",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "80",
+   "entry_id": "5205829187",
+   "username": "ds1974",
+   "points": 106.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "luinder avila",
+    "michael massey",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "81",
+   "entry_id": "5205198791",
+   "username": "aarond23",
+   "points": 106.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 37.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "freddy fermin",
+    "jac caglianone",
+    "kyle karros",
+    "michael massey",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "81",
+   "entry_id": "5205800259",
+   "username": "steeljt69",
+   "points": 106.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "fernando tatis",
+    "hunter goodman",
+    "jake cronenworth",
+    "jase bowen",
+    "manny machado",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "83",
+   "entry_id": "5205580451",
+   "username": "flintmonster",
+   "points": 105.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 37.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "kyle karros",
+    "luinder avila",
+    "luis arraez",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "84",
+   "entry_id": "5205655122",
+   "username": "auweglman",
+   "points": 104.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 32.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "heliot ramos",
+    "hunter goodman",
+    "jake cronenworth",
+    "manny machado",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "85",
+   "entry_id": "5205716834",
+   "username": "boys4",
+   "points": 103.899994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 32.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "nick loftin",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "85",
+   "entry_id": "5205800908",
+   "username": "boys4",
+   "points": 103.899994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 32.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "hunter goodman",
+    "jac caglianone",
+    "jake mccarthy",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "nick loftin",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5205377948",
+   "username": "Dicskstone32",
+   "points": 103.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brenton doyle",
+    "carter jensen",
+    "cole carrigg",
+    "jac caglianone",
+    "michael massey",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "87",
+   "entry_id": "5205713173",
+   "username": "croemisch",
+   "points": 103.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 37.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "jake mccarthy",
+    "jung hoo lee",
+    "manny machado",
+    "mickey moniak",
+    "salvador perez",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "89",
+   "entry_id": "5205802408",
+   "username": "peterjpacheco",
+   "points": 100.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "jake mccarthy",
+    "lane thomas",
+    "luis arraez",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5204763428",
+   "username": "TheBabz",
+   "points": 99.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jake cronenworth",
+    "jase bowen",
+    "manny machado",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "90",
+   "entry_id": "5205808882",
+   "username": "Rhombus87",
+   "points": 99.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jake cronenworth",
+    "jase bowen",
+    "manny machado",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "92",
+   "entry_id": "5205198787",
+   "username": "aarond23",
+   "points": 99.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brenton doyle",
+    "daniel susac",
+    "jake mccarthy",
+    "manny machado",
+    "mickey moniak",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "92",
+   "entry_id": "5205833134",
+   "username": "qbjjj",
+   "points": 99.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 38.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jac caglianone",
+    "kyle karros",
+    "mickey moniak",
+    "salvador perez",
+    "ty france",
+    "tyler freeman",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "92",
+   "entry_id": "5205838935",
+   "username": "d9144",
+   "points": 99.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "isaac collins",
+    "john rave",
+    "michael massey",
+    "mickey moniak",
+    "nick loftin",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "95",
+   "entry_id": "5205699606",
+   "username": "sportsfan14",
+   "points": 97.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jake mccarthy",
+    "kyle karros",
+    "lane thomas",
+    "michael massey",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "96",
+   "entry_id": "5205203367",
+   "username": "bbehnke20",
+   "points": 96.899994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "luis rengifo",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "96",
+   "entry_id": "5205801441",
+   "username": "Daneog2333",
+   "points": 96.899994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "luis rengifo",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "98",
+   "entry_id": "5205198788",
+   "username": "aarond23",
+   "points": 96.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 36.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "lane thomas",
+    "luinder avila",
+    "manny machado",
+    "mickey moniak",
+    "salvador perez",
+    "tyler mahle",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "99",
+   "entry_id": "5205660664",
+   "username": "stevek814",
+   "points": 96.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "jac caglianone",
+    "manny machado",
+    "salvador perez",
+    "sung mun song",
+    "tyler mahle",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "100",
+   "entry_id": "5205010479",
+   "username": "minrobertson210",
+   "points": 95.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "isaac collins",
+    "jac caglianone",
+    "luinder avila",
+    "luis arraez",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "101",
+   "entry_id": "5205833608",
+   "username": "wilpower33",
+   "points": 94.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "john rave",
+    "luinder avila",
+    "manny machado",
+    "mickey moniak",
+    "rafael devers",
+    "salvador perez",
+    "tyler mahle",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "102",
+   "entry_id": "5205774036",
+   "username": "claytankgunner",
+   "points": 92.899994,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 32.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "jake cronenworth",
+    "jake mccarthy",
+    "luinder avila",
+    "manny machado",
+    "rafael devers",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "103",
+   "entry_id": "5205774035",
+   "username": "claytankgunner",
+   "points": 92.75,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 32.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "carter jensen",
+    "jac caglianone",
+    "john rave",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "104",
+   "entry_id": "5205822089",
+   "username": "sphere3d",
+   "points": 92.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "jac caglianone",
+    "jackson merrill",
+    "luis arraez",
+    "manny machado",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "salvador perez",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "105",
+   "entry_id": "5205800903",
+   "username": "Daneog2333",
+   "points": 90.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "fernando tatis",
+    "hunter goodman",
+    "jake mccarthy",
+    "lane thomas",
+    "luis arraez",
+    "luis rengifo",
+    "ryan feltner",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "106",
+   "entry_id": "5205155361",
+   "username": "millhouse68",
+   "points": 90.7,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "fernando tatis",
+    "jake mccarthy",
+    "kyle karros",
+    "luke maile",
+    "rafael devers",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5205657254",
+   "username": "auweglman",
+   "points": 90.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 33.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "daniel susac",
+    "fernando tatis",
+    "manny machado",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "107",
+   "entry_id": "5205656806",
+   "username": "auweglman",
+   "points": 90.049995,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 33.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jake mccarthy",
+    "luis campusano",
+    "luis rengifo",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "109",
+   "entry_id": "5205203364",
+   "username": "bbehnke20",
+   "points": 89.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jake cronenworth",
+    "manny machado",
+    "ryan feltner",
+    "ty france",
+    "tyler tolbert",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "110",
+   "entry_id": "5205171788",
+   "username": "donj9903",
+   "points": 89.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "jackson merrill",
+    "luis arraez",
+    "luis rengifo",
+    "mickey moniak",
+    "salvador perez",
+    "tj rumfield",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "111",
+   "entry_id": "5205795276",
+   "username": "tchu125",
+   "points": 88.85,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "freddy fermin",
+    "jackson merrill",
+    "luis rengifo",
+    "mickey moniak",
+    "ryan feltner",
+    "tj rumfield",
+    "tyler freeman",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "111",
+   "entry_id": "5205811520",
+   "username": "amdaws818",
+   "points": 88.85,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "jac caglianone",
+    "jake mccarthy",
+    "luis rengifo",
+    "mickey moniak",
+    "ryan feltner",
+    "salvador perez",
+    "tyler freeman",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "113",
+   "entry_id": "5205203368",
+   "username": "bbehnke20",
+   "points": 87.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "fernando tatis",
+    "hunter goodman",
+    "jung hoo lee",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "ty france",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "114",
+   "entry_id": "5205825306",
+   "username": "teleStraightShooter",
+   "points": 87.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "luis rengifo",
+    "manny machado",
+    "mickey moniak",
+    "ty france",
+    "tyler mahle",
+    "tyler tolbert",
+    "walker buehler",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "115",
+   "entry_id": "5205774033",
+   "username": "claytankgunner",
+   "points": 86.899994,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jake cronenworth",
+    "jung hoo lee",
+    "luinder avila",
+    "luis rengifo",
+    "manny machado",
+    "rafael devers",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "116",
+   "entry_id": "5205837925",
+   "username": "beerNsurf",
+   "points": 86.7,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "daniel susac",
+    "fernando tatis",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "tj rumfield",
+    "tyler mahle",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "117",
+   "entry_id": "5205128733",
+   "username": "whoisjohngalt420",
+   "points": 86.05,
+   "salary_used": 46100,
+   "salary_left": 3900,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "daniel susac",
+    "heliot ramos",
+    "jake mccarthy",
+    "kyle karros",
+    "luis arraez",
+    "mickey moniak",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "118",
+   "entry_id": "5205246066",
+   "username": "Dave2zone",
+   "points": 85.899994,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "heliot ramos",
+    "jac caglianone",
+    "luinder avila",
+    "manny machado",
+    "rafael devers",
+    "ryan feltner",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "119",
+   "entry_id": "5205761450",
+   "username": "koolflows",
+   "points": 85.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "brenton doyle",
+    "carter jensen",
+    "fernando tatis",
+    "luis rengifo",
+    "mickey moniak",
+    "ryan feltner",
+    "ty france",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "120",
+   "entry_id": "5205203370",
+   "username": "bbehnke20",
+   "points": 85.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "luis rengifo",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "120",
+   "entry_id": "5205806881",
+   "username": "Raiderfanatic2195",
+   "points": 85.75,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "heliot ramos",
+    "isaac collins",
+    "jac caglianone",
+    "luinder avila",
+    "luis arraez",
+    "nick loftin",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "122",
+   "entry_id": "5205815041",
+   "username": "TwistPalace",
+   "points": 85.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 34.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "hunter goodman",
+    "jake mccarthy",
+    "jung hoo lee",
+    "luinder avila",
+    "luis arraez",
+    "luis rengifo",
+    "tj rumfield",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5205128729",
+   "username": "whoisjohngalt420",
+   "points": 84.75,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "heliot ramos",
+    "isaac collins",
+    "john rave",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "rafael devers",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "123",
+   "entry_id": "5205835116",
+   "username": "Harmiles",
+   "points": 84.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "heliot ramos",
+    "jung hoo lee",
+    "luinder avila",
+    "michael massey",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert",
+    "willi castro"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "125",
+   "entry_id": "5205817646",
+   "username": "ds1974",
+   "points": 84.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 33.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "daniel susac",
+    "fernando tatis",
+    "jackson merrill",
+    "manny machado",
+    "ty france",
+    "tyler mahle",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "126",
+   "entry_id": "5205412354",
+   "username": "jorgeluissr",
+   "points": 83.85,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "manny machado",
+    "rafael devers",
+    "ryan feltner",
+    "tyler freeman",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "127",
+   "entry_id": "5205010482",
+   "username": "minrobertson210",
+   "points": 83.75,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 32.11,
+   "n_cheap": 1,
+   "players_norm": [
+    "carter jensen",
+    "christian koss",
+    "isaac collins",
+    "jac caglianone",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "ty france",
+    "tyler mahle",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "127",
+   "entry_id": "5205804401",
+   "username": "Daneog2333",
+   "points": 83.75,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "heliot ramos",
+    "isaac collins",
+    "jac caglianone",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "rafael devers",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "129",
+   "entry_id": "5205203366",
+   "username": "bbehnke20",
+   "points": 82.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "heliot ramos",
+    "hunter goodman",
+    "jung hoo lee",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "mickey moniak",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "130",
+   "entry_id": "5205793523",
+   "username": "Daneog2333",
+   "points": 82.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "jac caglianone",
+    "jake mccarthy",
+    "luis arraez",
+    "luis rengifo",
+    "ty france",
+    "tyler mahle",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "131",
+   "entry_id": "5204968929",
+   "username": "bjbsnoop",
+   "points": 81.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jac caglianone",
+    "luis rengifo",
+    "manny machado",
+    "salvador perez",
+    "ty france",
+    "tyler freeman",
+    "tyler mahle",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "132",
+   "entry_id": "5205819954",
+   "username": "Paulo21613",
+   "points": 79.75,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "carter jensen",
+    "isaac collins",
+    "jac caglianone",
+    "jung hoo lee",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "132",
+   "entry_id": "5205835567",
+   "username": "Patter17",
+   "points": 79.75,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 32.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "jake mccarthy",
+    "luinder avila",
+    "luis rengifo",
+    "salvador perez",
+    "ty france",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "134",
+   "entry_id": "5205806879",
+   "username": "Raiderfanatic2195",
+   "points": 79.55,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "jake cronenworth",
+    "john rave",
+    "lane thomas",
+    "luinder avila",
+    "manny machado",
+    "ty france",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "135",
+   "entry_id": "5205151732",
+   "username": "troubledsoe",
+   "points": 78.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "john rave",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "tyler freeman",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "136",
+   "entry_id": "5205774034",
+   "username": "claytankgunner",
+   "points": 77.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "136",
+   "entry_id": "5205825202",
+   "username": "Flipper9",
+   "points": 77.899994,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jung hoo lee",
+    "luinder avila",
+    "luis arraez",
+    "rafael devers",
+    "ryan feltner",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "138",
+   "entry_id": "5205795201",
+   "username": "WARPATH72",
+   "points": 77.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "jac caglianone",
+    "jake cronenworth",
+    "manny machado",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "139",
+   "entry_id": "5205804184",
+   "username": "signoj2",
+   "points": 77.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "luinder avila",
+    "luis rengifo",
+    "manny machado",
+    "ty france",
+    "walker buehler",
+    "willi castro",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "140",
+   "entry_id": "5205128732",
+   "username": "whoisjohngalt420",
+   "points": 76.75,
+   "salary_used": 45600,
+   "salary_left": 4400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "heliot ramos",
+    "jac caglianone",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "nick loftin",
+    "salvador perez",
+    "tyler mahle",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "141",
+   "entry_id": "5205838938",
+   "username": "d9144",
+   "points": 75.899994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "heliot ramos",
+    "hunter goodman",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "rafael devers",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "142",
+   "entry_id": "5205780662",
+   "username": "bleeski",
+   "points": 75.75,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "heliot ramos",
+    "jac caglianone",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "nick loftin",
+    "salvador perez",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "143",
+   "entry_id": "5205808878",
+   "username": "Rhombus87",
+   "points": 74.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "isaac collins",
+    "jac caglianone",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "144",
+   "entry_id": "5205808881",
+   "username": "Rhombus87",
+   "points": 73.75,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "jac caglianone",
+    "jung hoo lee",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "nick loftin",
+    "rafael devers",
+    "salvador perez",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "145",
+   "entry_id": "5205805045",
+   "username": "Daneog2333",
+   "points": 72.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jake mccarthy",
+    "luinder avila",
+    "luis rengifo",
+    "michael massey",
+    "nick loftin",
+    "tj rumfield",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "145",
+   "entry_id": "5205806884",
+   "username": "Raiderfanatic2195",
+   "points": 72.55,
+   "salary_used": 46600,
+   "salary_left": 3400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "isaac collins",
+    "john rave",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "salvador perez",
+    "ty france",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "147",
+   "entry_id": "5205010477",
+   "username": "minrobertson210",
+   "points": 71.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jake mccarthy",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "nick loftin",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "147",
+   "entry_id": "5205128728",
+   "username": "whoisjohngalt420",
+   "points": 71.75,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 29.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "jung hoo lee",
+    "lane thomas",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "149",
+   "entry_id": "5205784502",
+   "username": "bleeski",
+   "points": 71.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jackson merrill",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "150",
+   "entry_id": "5205128727",
+   "username": "whoisjohngalt420",
+   "points": 70.75,
+   "salary_used": 44800,
+   "salary_left": 5200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "carter jensen",
+    "christian koss",
+    "isaac collins",
+    "john rave",
+    "lane thomas",
+    "luinder avila",
+    "michael massey",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "150",
+   "entry_id": "5205128731",
+   "username": "whoisjohngalt420",
+   "points": 70.75,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "isaac collins",
+    "lane thomas",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "rafael devers",
+    "tyler mahle",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5205151730",
+   "username": "troubledsoe",
+   "points": 70.55,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "isaac collins",
+    "jac caglianone",
+    "luinder avila",
+    "luis rengifo",
+    "michael massey",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5205784506",
+   "username": "bleeski",
+   "points": 70.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5205801997",
+   "username": "FourthnGoal",
+   "points": 70.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "152",
+   "entry_id": "5205834251",
+   "username": "Sabali00",
+   "points": 70.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jac caglianone",
+    "john rave",
+    "luinder avila",
+    "manny machado",
+    "michael massey",
+    "salvador perez",
+    "ty france",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "156",
+   "entry_id": "5205726470",
+   "username": "jojohemp",
+   "points": 69.899994,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 32.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jake mccarthy",
+    "luinder avila",
+    "manny machado",
+    "mickey moniak",
+    "ryan feltner",
+    "salvador perez",
+    "tyler freeman",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "157",
+   "entry_id": "5205808883",
+   "username": "Rhombus87",
+   "points": 69.55,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "jac caglianone",
+    "jackson merrill",
+    "lane thomas",
+    "luinder avila",
+    "michael massey",
+    "nick loftin",
+    "ty france",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "157",
+   "entry_id": "5205819951",
+   "username": "Paulo21613",
+   "points": 69.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "isaac collins",
+    "john rave",
+    "luinder avila",
+    "manny machado",
+    "michael massey",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "159",
+   "entry_id": "5205819952",
+   "username": "Paulo21613",
+   "points": 68.899994,
+   "salary_used": 45200,
+   "salary_left": 4800,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "freddy fermin",
+    "heliot ramos",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "luis rengifo",
+    "rafael devers",
+    "ryan feltner",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "160",
+   "entry_id": "5205136577",
+   "username": "stevmortc",
+   "points": 68.85,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 34.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "jake mccarthy",
+    "luis arraez",
+    "manny machado",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "salvador perez",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "161",
+   "entry_id": "5205203369",
+   "username": "bbehnke20",
+   "points": 68.05,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Feltner",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "jung hoo lee",
+    "luis arraez",
+    "manny machado",
+    "mickey moniak",
+    "rafael devers",
+    "ryan feltner",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "162",
+   "entry_id": "5205721823",
+   "username": "2gethe2one221",
+   "points": 67.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Tyler Mahle",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 35.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jackson merrill",
+    "lane thomas",
+    "luis arraez",
+    "luis rengifo",
+    "rafael devers",
+    "salvador perez",
+    "tyler mahle",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "163",
+   "entry_id": "5205790121",
+   "username": "137666",
+   "points": 67.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jake cronenworth",
+    "lane thomas",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "163",
+   "entry_id": "5205808545",
+   "username": "ggb777",
+   "points": 67.55,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "isaac collins",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "163",
+   "entry_id": "5205838933",
+   "username": "d9144",
+   "points": 67.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jake cronenworth",
+    "lane thomas",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "166",
+   "entry_id": "5205774037",
+   "username": "claytankgunner",
+   "points": 66.55,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 33.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "freddy fermin",
+    "jackson merrill",
+    "lane thomas",
+    "luinder avila",
+    "manny machado",
+    "michael massey",
+    "salvador perez",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "167",
+   "entry_id": "5205819949",
+   "username": "Paulo21613",
+   "points": 65.75,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.5,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "heliot ramos",
+    "jac caglianone",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "rafael devers",
+    "salvador perez",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "168",
+   "entry_id": "5205788845",
+   "username": "wigginsosu07",
+   "points": 64.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jac caglianone",
+    "jake cronenworth",
+    "lane thomas",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "168",
+   "entry_id": "5205808520",
+   "username": "ggb777",
+   "points": 64.55,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "isaac collins",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "ty france",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "170",
+   "entry_id": "5205198793",
+   "username": "aarond23",
+   "points": 63.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "carter jensen",
+    "fernando tatis",
+    "heliot ramos",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "171",
+   "entry_id": "5205203365",
+   "username": "bbehnke20",
+   "points": 62.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jackson merrill",
+    "luinder avila",
+    "michael massey",
+    "mickey moniak",
+    "nick loftin",
+    "salvador perez",
+    "ty france",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5205010478",
+   "username": "minrobertson210",
+   "points": 61.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "carter jensen",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "jake mccarthy",
+    "luinder avila",
+    "manny machado",
+    "tyler tolbert",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5205756243",
+   "username": "othe11o",
+   "points": 61.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "cole carrigg",
+    "fernando tatis",
+    "lane thomas",
+    "luinder avila",
+    "michael massey",
+    "ty france",
+    "walker buehler",
+    "willi castro",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "172",
+   "entry_id": "5205802406",
+   "username": "peterjpacheco",
+   "points": 61.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 35.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "rafael devers",
+    "tyler tolbert",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "175",
+   "entry_id": "5205241506",
+   "username": "howardwi",
+   "points": 60.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "cole carrigg",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "salvador perez",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "176",
+   "entry_id": "5205774032",
+   "username": "claytankgunner",
+   "points": 59.75,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Luinder Avila",
+    "Tyler Mahle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "drew gilbert",
+    "heliot ramos",
+    "lane thomas",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "rafael devers",
+    "tyler mahle",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "177",
+   "entry_id": "5205788637",
+   "username": "fourtywatt",
+   "points": 58.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.33,
+   "n_cheap": 1,
+   "players_norm": [
+    "carter jensen",
+    "christian koss",
+    "fernando tatis",
+    "jac caglianone",
+    "jake mccarthy",
+    "luinder avila",
+    "manny machado",
+    "ty france",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "178",
+   "entry_id": "5205833691",
+   "username": "rwenzelow",
+   "points": 54.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 34.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "luinder avila",
+    "manny machado",
+    "mickey moniak",
+    "salvador perez",
+    "ty france",
+    "walker buehler",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "179",
+   "entry_id": "5205128730",
+   "username": "whoisjohngalt420",
+   "points": 48.9,
+   "salary_used": 45500,
+   "salary_left": 4500,
+   "sp_pair": [
+    "Luinder Avila",
+    "Ryan Feltner"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "daniel susac",
+    "drew gilbert",
+    "fernando tatis",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "ryan feltner",
+    "willy adames"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "180",
+   "entry_id": "5205844446",
+   "username": "ongbok",
+   "points": 44.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Luinder Avila",
+    "Walker Buehler"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "fernando tatis",
+    "jackson merrill",
+    "luinder avila",
+    "luis arraez",
+    "manny machado",
+    "mickey moniak",
+    "ty france",
+    "walker buehler",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Tyler Mahle",
+   "player_norm": "tyler mahle",
+   "roster_position": "P",
+   "pct_drafted": 63.33,
+   "fpts": 15.95
+  },
+  {
+   "player": "Walker Buehler",
+   "player_norm": "walker buehler",
+   "roster_position": "P",
+   "pct_drafted": 62.78,
+   "fpts": -0.25
+  },
+  {
+   "player": "Fernando Tatis Jr.",
+   "player_norm": "fernando tatis",
+   "roster_position": "OF",
+   "pct_drafted": 47.78,
+   "fpts": 2.0
+  },
+  {
+   "player": "Hunter Goodman",
+   "player_norm": "hunter goodman",
+   "roster_position": "C",
+   "pct_drafted": 42.22,
+   "fpts": 40.0
+  },
+  {
+   "player": "Jac Caglianone",
+   "player_norm": "jac caglianone",
+   "roster_position": "OF",
+   "pct_drafted": 42.22,
+   "fpts": 16.0
+  },
+  {
+   "player": "Luinder Avila",
+   "player_norm": "luinder avila",
+   "roster_position": "P",
+   "pct_drafted": 40.56,
+   "fpts": -6.2
+  },
+  {
+   "player": "Tyler Tolbert",
+   "player_norm": "tyler tolbert",
+   "roster_position": "SS",
+   "pct_drafted": 38.89,
+   "fpts": 15.0
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "OF",
+   "pct_drafted": 38.33,
+   "fpts": 12.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "OF",
+   "pct_drafted": 37.78,
+   "fpts": 5.0
+  },
+  {
+   "player": "Willy Adames",
+   "player_norm": "willy adames",
+   "roster_position": "SS",
+   "pct_drafted": 37.78,
+   "fpts": 8.0
+  },
+  {
+   "player": "Carter Jensen",
+   "player_norm": "carter jensen",
+   "roster_position": "C",
+   "pct_drafted": 33.89,
+   "fpts": 12.0
+  },
+  {
+   "player": "Ryan Feltner",
+   "player_norm": "ryan feltner",
+   "roster_position": "P",
+   "pct_drafted": 33.33,
+   "fpts": 10.1
+  },
+  {
+   "player": "Kyle Karros",
+   "player_norm": "kyle karros",
+   "roster_position": "3B",
+   "pct_drafted": 33.33,
+   "fpts": 16.0
+  },
+  {
+   "player": "Manny Machado",
+   "player_norm": "manny machado",
+   "roster_position": "3B",
+   "pct_drafted": 31.11,
+   "fpts": 4.0
+  },
+  {
+   "player": "TJ Rumfield",
+   "player_norm": "tj rumfield",
+   "roster_position": "1B",
+   "pct_drafted": 29.44,
+   "fpts": 19.0
+  },
+  {
+   "player": "Lane Thomas",
+   "player_norm": "lane thomas",
+   "roster_position": "OF",
+   "pct_drafted": 27.78,
+   "fpts": 3.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "2B",
+   "pct_drafted": 25.56,
+   "fpts": 21.0
+  },
+  {
+   "player": "Luis Arraez",
+   "player_norm": "luis arraez",
+   "roster_position": "2B",
+   "pct_drafted": 25.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Michael Massey",
+   "player_norm": "michael massey",
+   "roster_position": "2B",
+   "pct_drafted": 24.44,
+   "fpts": 5.0
+  },
+  {
+   "player": "Xander Bogaerts",
+   "player_norm": "xander bogaerts",
+   "roster_position": "SS",
+   "pct_drafted": 22.78,
+   "fpts": 12.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "1B",
+   "pct_drafted": 22.78,
+   "fpts": 10.0
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "1B",
+   "pct_drafted": 22.78,
+   "fpts": 14.0
+  },
+  {
+   "player": "Jackson Merrill",
+   "player_norm": "jackson merrill",
+   "roster_position": "OF",
+   "pct_drafted": 20.0,
+   "fpts": 9.0
+  },
+  {
+   "player": "Cole Carrigg",
+   "player_norm": "cole carrigg",
+   "roster_position": "OF",
+   "pct_drafted": 18.33,
+   "fpts": 6.0
+  },
+  {
+   "player": "Isaac Collins",
+   "player_norm": "isaac collins",
+   "roster_position": "OF",
+   "pct_drafted": 17.78,
+   "fpts": 10.0
+  },
+  {
+   "player": "Jake Cronenworth",
+   "player_norm": "jake cronenworth",
+   "roster_position": "2B",
+   "pct_drafted": 17.22,
+   "fpts": 8.0
+  },
+  {
+   "player": "Heliot Ramos",
+   "player_norm": "heliot ramos",
+   "roster_position": "OF",
+   "pct_drafted": 16.67,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ty France",
+   "player_norm": "ty france",
+   "roster_position": "1B",
+   "pct_drafted": 15.0,
+   "fpts": 11.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "3B",
+   "pct_drafted": 14.44,
+   "fpts": 8.0
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "C",
+   "pct_drafted": 12.22,
+   "fpts": 14.0
+  },
+  {
+   "player": "Luis Rengifo",
+   "player_norm": "luis rengifo",
+   "roster_position": "3B",
+   "pct_drafted": 11.11,
+   "fpts": 6.0
+  },
+  {
+   "player": "John Rave",
+   "player_norm": "john rave",
+   "roster_position": "OF",
+   "pct_drafted": 10.56,
+   "fpts": 17.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "1B",
+   "pct_drafted": 10.0,
+   "fpts": 6.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "3B",
+   "pct_drafted": 8.33,
+   "fpts": 21.0
+  },
+  {
+   "player": "Daniel Susac",
+   "player_norm": "daniel susac",
+   "roster_position": "C",
+   "pct_drafted": 8.33,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jung Hoo Lee",
+   "player_norm": "jung hoo lee",
+   "roster_position": "OF",
+   "pct_drafted": 7.78,
+   "fpts": 5.0
+  },
+  {
+   "player": "Tyler Freeman",
+   "player_norm": "tyler freeman",
+   "roster_position": "2B",
+   "pct_drafted": 5.56,
+   "fpts": 5.0
+  },
+  {
+   "player": "Luis Rengifo",
+   "player_norm": "luis rengifo",
+   "roster_position": "OF",
+   "pct_drafted": 3.33,
+   "fpts": 6.0
+  },
+  {
+   "player": "Tyler Tolbert",
+   "player_norm": "tyler tolbert",
+   "roster_position": "OF",
+   "pct_drafted": 3.33,
+   "fpts": 15.0
+  },
+  {
+   "player": "Brenton Doyle",
+   "player_norm": "brenton doyle",
+   "roster_position": "OF",
+   "pct_drafted": 2.78,
+   "fpts": 7.0
+  },
+  {
+   "player": "Christian Koss",
+   "player_norm": "christian koss",
+   "roster_position": "2B",
+   "pct_drafted": 2.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Freddy Fermin",
+   "player_norm": "freddy fermin",
+   "roster_position": "C",
+   "pct_drafted": 2.22,
+   "fpts": 21.0
+  },
+  {
+   "player": "Jase Bowen",
+   "player_norm": "jase bowen",
+   "roster_position": "OF",
+   "pct_drafted": 1.67,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Koss",
+   "player_norm": "christian koss",
+   "roster_position": "3B",
+   "pct_drafted": 1.67,
+   "fpts": 0.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "OF",
+   "pct_drafted": 1.67,
+   "fpts": 8.0
+  },
+  {
+   "player": "Tyler Freeman",
+   "player_norm": "tyler freeman",
+   "roster_position": "OF",
+   "pct_drafted": 1.67,
+   "fpts": 5.0
+  },
+  {
+   "player": "Luke Maile",
+   "player_norm": "luke maile",
+   "roster_position": "C",
+   "pct_drafted": 0.56,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "OF",
+   "pct_drafted": 0.56,
+   "fpts": 8.0
+  },
+  {
+   "player": "Luis Campusano",
+   "player_norm": "luis campusano",
+   "roster_position": "C",
+   "pct_drafted": 0.56,
+   "fpts": 0.0
+  },
+  {
+   "player": "Sung-Mun Song",
+   "player_norm": "sung mun song",
+   "roster_position": "SS",
+   "pct_drafted": 0.56,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 180,
+  "best_rank": 25,
+  "worst_rank": 152,
+  "best_finish_percentile": 86.67,
+  "median_finish_percentile": 68.89,
+  "best_points": 132.85,
+  "winning_points": 157.7,
+  "own_lineups_duplicated_by_field": 1,
+  "max_copies_of_an_own_lineup": 2,
+  "entry_fee": 0.01,
+  "fees_total": 0.07,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

@@ -1,0 +1,2160 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "192935802",
+ "slate_date": "2026-07-29",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 41,
+  "entries_complete_lineups": 41,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 143.3,
+  "winning_entry_id": "5202658775",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 41,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 41
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2200,
+  "at_cap_entries": 26,
+  "at_cap_share_pct": 63.4,
+  "salary_left_histogram": {
+   "<= 0": 14,
+   "101-300": 8,
+   "1-100": 12,
+   "701-1500": 4,
+   "301-700": 3
+  },
+  "max_stack_histogram": {
+   "1": 1,
+   "2": 4,
+   "3": 2,
+   "4": 11,
+   "5": 23
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Chris Sale"
+    ],
+    "count": 5,
+    "field_share_pct": 12.2
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Joe Ryan"
+    ],
+    "count": 3,
+    "field_share_pct": 7.3
+   },
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Dustin May"
+    ],
+    "count": 3,
+    "field_share_pct": 7.3
+   },
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Joe Ryan"
+    ],
+    "count": 3,
+    "field_share_pct": 7.3
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Joey Cantillo"
+    ],
+    "count": 2,
+    "field_share_pct": 4.9
+   },
+   {
+    "pair": [
+     "Cam Schlittler",
+     "Joey Cantillo"
+    ],
+    "count": 2,
+    "field_share_pct": 4.9
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Hayden Wesneski"
+    ],
+    "count": 2,
+    "field_share_pct": 4.9
+   },
+   {
+    "pair": [
+     "Joe Ryan",
+     "Joey Cantillo"
+    ],
+    "count": 2,
+    "field_share_pct": 4.9
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Cam Schlittler",
+    "pct_drafted": 39.02
+   },
+   {
+    "player": "Jahmai Jones",
+    "pct_drafted": 39.02
+   },
+   {
+    "player": "Chris Sale",
+    "pct_drafted": 39.02
+   },
+   {
+    "player": "Caleb Durbin",
+    "pct_drafted": 31.71
+   },
+   {
+    "player": "Romy Gonzalez",
+    "pct_drafted": 31.71
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [
+   "jose fermin",
+   "max muncy"
+  ],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 410,
+  "roster_slots_expected": 410,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.1,
+  "dk_table_deficit_pts": -0.1,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5202658775",
+   "username": "falstaff64",
+   "points": 143.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Joey Cantillo"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "jahmai jones",
+    "jeremy pena",
+    "joey cantillo",
+    "jose altuve",
+    "romy gonzalez",
+    "seiya suzuki",
+    "wilyer abreu",
+    "yainer diaz"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5202647075",
+   "username": "JRaab",
+   "points": 134.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Matthew Boyd"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 20.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "chris sale",
+    "jahmai jones",
+    "jeremy pena",
+    "matthew boyd",
+    "pedro ramirez",
+    "romy gonzalez",
+    "weston wilson",
+    "willson contreras",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5202665384",
+   "username": "xmalachi",
+   "points": 128.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.34,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jahmai jones",
+    "joe ryan",
+    "jonah heim",
+    "romy gonzalez",
+    "tommy white",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5202791822",
+   "username": "Kgoneau",
+   "points": 127.15,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Chris Sale"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.37,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "cal raleigh",
+    "caleb durbin",
+    "cam schlittler",
+    "ceddanne rafaela",
+    "chris sale",
+    "jahmai jones",
+    "josh bell",
+    "julio rodriguez",
+    "romy gonzalez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5202734873",
+   "username": "bleeski",
+   "points": 126.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Joey Cantillo"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 16.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "chase delauter",
+    "chris sale",
+    "jeremy pena",
+    "joey cantillo",
+    "jose ramirez",
+    "josh bell",
+    "mike trout",
+    "patrick bailey",
+    "steven kwan",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5202732882",
+   "username": "TheBossinMyWorld",
+   "points": 122.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Chris Sale"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 16.1,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "cam schlittler",
+    "chris sale",
+    "ian happ",
+    "jahmai jones",
+    "michael busch",
+    "miguel amaya",
+    "pedro ramirez",
+    "seiya suzuki",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5202833647",
+   "username": "Bay101",
+   "points": 122.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Chris Sale"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "caleb durbin",
+    "cam schlittler",
+    "ceddanne rafaela",
+    "chris sale",
+    "jacob wilson",
+    "jahmai jones",
+    "jonah heim",
+    "romy gonzalez",
+    "tommy white",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5202692195",
+   "username": "tmoney88",
+   "points": 121.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Dustin May"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.54,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "cam schlittler",
+    "dalton rushing",
+    "dustin may",
+    "jahmai jones",
+    "kyle tucker",
+    "nick sogard",
+    "shohei ohtani",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5202823320",
+   "username": "grantgoupil",
+   "points": 119.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Dustin May"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 12.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "dominic canzone",
+    "drake baldwin",
+    "dustin may",
+    "gabriel arias",
+    "kyle manzardo",
+    "randy arozarena",
+    "steven kwan",
+    "travis bazzana",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5202711700",
+   "username": "ppppzl",
+   "points": 119.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Chris Sale"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 20.98,
+   "n_cheap": 2,
+   "players_norm": [
+    "cam schlittler",
+    "chris sale",
+    "christian walker",
+    "connor wong",
+    "dane myers",
+    "edwin arroyo",
+    "isaac paredes",
+    "jahmai jones",
+    "jeremy pena",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5202658117",
+   "username": "pgk8",
+   "points": 112.85,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Joey Cantillo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 16.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "ceddanne rafaela",
+    "joey cantillo",
+    "jose ramirez",
+    "kody clemens",
+    "kyle manzardo",
+    "patrick bailey",
+    "petey halpin",
+    "steven kwan",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5202799393",
+   "username": "imadeit110",
+   "points": 111.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Joey Cantillo"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 22.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "brayan rocchio",
+    "cam schlittler",
+    "ceddanne rafaela",
+    "chase delauter",
+    "jahmai jones",
+    "joey cantillo",
+    "jose ramirez",
+    "patrick bailey",
+    "romy gonzalez",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5202769293",
+   "username": "meyers2305",
+   "points": 111.6,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Jacob Lopez",
+    "Joey Cantillo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 12.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "christian walker",
+    "henry bolte",
+    "isaac paredes",
+    "jacob lopez",
+    "jeremy pena",
+    "joey cantillo",
+    "shohei ohtani",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5202826874",
+   "username": "eaglezzz",
+   "points": 111.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Matthew Boyd"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.92,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam schlittler",
+    "ceddanne rafaela",
+    "jacob wilson",
+    "jahmai jones",
+    "jonah heim",
+    "matthew boyd",
+    "tommy white",
+    "travis bazzana",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5202698396",
+   "username": "zonaque",
+   "points": 108.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "brayan rocchio",
+    "chase delauter",
+    "chris sale",
+    "connor wong",
+    "jahmai jones",
+    "joe ryan",
+    "jose ramirez",
+    "romy gonzalez",
+    "steven kwan",
+    "travis bazzana"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5202736241",
+   "username": "Rhombus87",
+   "points": 107.3,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Dustin May"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 21.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "caleb durbin",
+    "cam schlittler",
+    "dustin may",
+    "jacob wilson",
+    "jahmai jones",
+    "jonah heim",
+    "shohei ohtani",
+    "tommy white",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5202777009",
+   "username": "chex43",
+   "points": 106.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 14.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "henry bolte",
+    "jo adell",
+    "joe ryan",
+    "jonah heim",
+    "mike trout",
+    "nolan schanuel",
+    "tommy white",
+    "vaughn grissom",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5202846277",
+   "username": "Mabs9900",
+   "points": 104.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Chris Sale"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 16.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam schlittler",
+    "chris sale",
+    "dane myers",
+    "jacob wilson",
+    "jonah heim",
+    "nick kurtz",
+    "royce lewis",
+    "tommy white",
+    "tyler soderstrom",
+    "weston wilson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5202742008",
+   "username": "salatso22",
+   "points": 101.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam schlittler",
+    "cam smith",
+    "ceddanne rafaela",
+    "christian walker",
+    "connor wong",
+    "isaac paredes",
+    "jahmai jones",
+    "jeremy pena",
+    "joe ryan",
+    "jose altuve"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5202838966",
+   "username": "Vanz5",
+   "points": 101.05,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Hayden Wesneski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "brayan rocchio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chase delauter",
+    "chris sale",
+    "hayden wesneski",
+    "romy gonzalez",
+    "tyler stephenson",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5202666017",
+   "username": "happyrip",
+   "points": 100.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Davis Martin",
+    "Matthew Boyd"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 14.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "caleb durbin",
+    "dalton rushing",
+    "davis martin",
+    "jahmai jones",
+    "jose altuve",
+    "kyle tucker",
+    "matthew boyd",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5202844836",
+   "username": "jmehta17",
+   "points": 99.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Hayden Wesneski"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 14.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "chase delauter",
+    "chris sale",
+    "elly de la cruz",
+    "hayden wesneski",
+    "ivan johnson",
+    "jose ramirez",
+    "sal stewart",
+    "steven kwan",
+    "travis bazzana",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5202731512",
+   "username": "london5506",
+   "points": 96.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Brady Singer",
+    "Cam Schlittler"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-1-1-1-1-1-1",
+   "chalk_score": 14.63,
+   "n_cheap": 2,
+   "players_norm": [
+    "brady singer",
+    "caleb durbin",
+    "cam schlittler",
+    "dominic canzone",
+    "edwin arroyo",
+    "ryan kreidler",
+    "shohei ohtani",
+    "tyler heineman",
+    "willson contreras",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "24",
+   "entry_id": "5202717456",
+   "username": "Wanna_Square_Up1567",
+   "points": 95.6,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Christian Scott",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "ceddanne rafaela",
+    "christian scott",
+    "connor wong",
+    "jahmai jones",
+    "jeremy pena",
+    "joe ryan",
+    "jose ramirez",
+    "romy gonzalez",
+    "steven kwan",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "25",
+   "entry_id": "5202754828",
+   "username": "A_playa_named_gus",
+   "points": 92.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Dustin May"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "ceddanne rafaela",
+    "chris sale",
+    "dustin may",
+    "elly de la cruz",
+    "eugenio suarez",
+    "jahmai jones",
+    "jarren duran",
+    "romy gonzalez",
+    "tyler stephenson",
+    "willson contreras"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "26",
+   "entry_id": "5202714679",
+   "username": "brown1975",
+   "points": 92.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 13.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "alan roden",
+    "andruw monasterio",
+    "brooks lee",
+    "cam schlittler",
+    "dominic canzone",
+    "joe ryan",
+    "jonah heim",
+    "josh bell",
+    "kody clemens",
+    "trevor larnach"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "27",
+   "entry_id": "5202739613",
+   "username": "cp00123",
+   "points": 91.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Joe Ryan",
+    "Matthew Boyd"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-1-1-1-1-1-1",
+   "chalk_score": 11.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "drake baldwin",
+    "jacob wilson",
+    "joe ryan",
+    "josh bell",
+    "matthew boyd",
+    "michael conforto",
+    "ozzie albies",
+    "sal stewart",
+    "spencer jones",
+    "steven kwan"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "28",
+   "entry_id": "5202765640",
+   "username": "DMATH",
+   "points": 91.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-1-1-1-1-1",
+   "chalk_score": 12.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "cal raleigh",
+    "chris sale",
+    "jordan walker",
+    "mike trout",
+    "nolan schanuel",
+    "randy dobnak",
+    "ryan mcmahon",
+    "wilyer abreu",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "29",
+   "entry_id": "5202691628",
+   "username": "meitbe2014",
+   "points": 90.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Hayden Wesneski",
+    "Matthew Boyd"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 12.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "cole young",
+    "hayden wesneski",
+    "isaac paredes",
+    "jeremy pena",
+    "jonah heim",
+    "julio rodriguez",
+    "matthew boyd",
+    "randy arozarena",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "30",
+   "entry_id": "5202704458",
+   "username": "gwbrown1956",
+   "points": 89.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Eric Lauer",
+    "Matthew Boyd"
+   ],
+   "max_stack": 1,
+   "stack_pattern": "1-1-1-1-1-1-1-1",
+   "chalk_score": 9.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "eric lauer",
+    "ivan herrera",
+    "jacob wilson",
+    "jasson dominguez",
+    "josh lowe",
+    "matthew boyd",
+    "max muncy",
+    "sal stewart",
+    "travis bazzana",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "31",
+   "entry_id": "5202683796",
+   "username": "whoisjohngalt420",
+   "points": 86.7,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Joe Ryan",
+    "Joey Cantillo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 13.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "brayan rocchio",
+    "brooks lee",
+    "chase delauter",
+    "joe ryan",
+    "joey cantillo",
+    "kody clemens",
+    "kyle manzardo",
+    "patrick bailey",
+    "travis bazzana",
+    "trevor larnach"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "32",
+   "entry_id": "5202774875",
+   "username": "hoosierpack",
+   "points": 85.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Joe Ryan"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 16.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "caleb durbin",
+    "cam schlittler",
+    "chase delauter",
+    "henry bolte",
+    "joe ryan",
+    "patrick bailey",
+    "paul goldschmidt",
+    "randy arozarena",
+    "royce lewis"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5202681038",
+   "username": "bizz2020",
+   "points": 84.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Eric Lauer",
+    "Patrick Sandoval"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 6.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "dalton rushing",
+    "eric lauer",
+    "freddie freeman",
+    "kody clemens",
+    "masyn winn",
+    "max muncy",
+    "patrick sandoval",
+    "royce lewis",
+    "shohei ohtani",
+    "wade meckler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "33",
+   "entry_id": "5202711500",
+   "username": "seth1374",
+   "points": 84.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cam Schlittler",
+    "Davis Martin"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 10.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "cam schlittler",
+    "dane myers",
+    "dansby swanson",
+    "davis martin",
+    "michael busch",
+    "noelvi marte",
+    "pete crow armstrong",
+    "royce lewis",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "35",
+   "entry_id": "5202704144",
+   "username": "gschleg42",
+   "points": 80.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Christian Scott",
+    "Randy Dobnak"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 8.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "christian scott",
+    "francisco alvarez",
+    "julio rodriguez",
+    "mookie betts",
+    "nick kurtz",
+    "randy dobnak",
+    "romy gonzalez",
+    "sal stewart",
+    "tyler soderstrom"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "36",
+   "entry_id": "5202677760",
+   "username": "mwear",
+   "points": 76.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Brady Singer",
+    "Matthew Boyd"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 11.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady singer",
+    "cal raleigh",
+    "christian walker",
+    "jeremy pena",
+    "jose altuve",
+    "julio rodriguez",
+    "matthew boyd",
+    "max muncy",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "37",
+   "entry_id": "5202831550",
+   "username": "cb777",
+   "points": 75.3,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Davis Martin",
+    "Joey Cantillo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 20.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "davis martin",
+    "joey cantillo",
+    "kody clemens",
+    "romy gonzalez",
+    "travis bazzana",
+    "wilyer abreu",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "38",
+   "entry_id": "5202836856",
+   "username": "relevanthought",
+   "points": 73.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Joe Ryan",
+    "Joey Cantillo"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "joe ryan",
+    "joey cantillo",
+    "mike trout",
+    "nolan schanuel",
+    "romy gonzalez",
+    "wilyer abreu",
+    "zach neto"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "39",
+   "entry_id": "5202790805",
+   "username": "memphizen",
+   "points": 69.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Davis Martin",
+    "Joe Ryan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 8.54,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "brian serven",
+    "dane myers",
+    "dansby swanson",
+    "davis martin",
+    "edwin arroyo",
+    "joe ryan",
+    "michael busch",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "40",
+   "entry_id": "5202824475",
+   "username": "peterjpacheco",
+   "points": 67.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Jacob Lopez"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 7.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "bo bichette",
+    "carson benge",
+    "chris sale",
+    "francisco alvarez",
+    "francisco lindor",
+    "jacob lopez",
+    "luis robert",
+    "matt olson",
+    "michael harris",
+    "ozzie albies"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "41",
+   "entry_id": "5202790655",
+   "username": "sportsfan14",
+   "points": 53.2,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Dustin May",
+    "Hayden Wesneski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 9.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "caleb durbin",
+    "dustin may",
+    "francisco lindor",
+    "hayden wesneski",
+    "matt olson",
+    "michael harris",
+    "mike yastrzemski",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Cam Schlittler",
+   "player_norm": "cam schlittler",
+   "roster_position": "P",
+   "pct_drafted": 39.02,
+   "fpts": 25.85
+  },
+  {
+   "player": "Jahmai Jones",
+   "player_norm": "jahmai jones",
+   "roster_position": "OF",
+   "pct_drafted": 39.02,
+   "fpts": 16.0
+  },
+  {
+   "player": "Chris Sale",
+   "player_norm": "chris sale",
+   "roster_position": "P",
+   "pct_drafted": 39.02,
+   "fpts": 34.3
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 31.71,
+   "fpts": 13.0
+  },
+  {
+   "player": "Romy Gonzalez",
+   "player_norm": "romy gonzalez",
+   "roster_position": "1B",
+   "pct_drafted": 31.71,
+   "fpts": 2.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 29.27,
+   "fpts": 8.0
+  },
+  {
+   "player": "Joe Ryan",
+   "player_norm": "joe ryan",
+   "roster_position": "P",
+   "pct_drafted": 26.83,
+   "fpts": 8.7
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 21.95,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jeremy Pena",
+   "player_norm": "jeremy pena",
+   "roster_position": "SS",
+   "pct_drafted": 21.95,
+   "fpts": 14.0
+  },
+  {
+   "player": "Joey Cantillo",
+   "player_norm": "joey cantillo",
+   "roster_position": "P",
+   "pct_drafted": 19.51,
+   "fpts": 22.0
+  },
+  {
+   "player": "Yordan Alvarez",
+   "player_norm": "yordan alvarez",
+   "roster_position": "OF",
+   "pct_drafted": 19.51,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "C",
+   "pct_drafted": 19.51,
+   "fpts": 20.0
+  },
+  {
+   "player": "Matthew Boyd",
+   "player_norm": "matthew boyd",
+   "roster_position": "P",
+   "pct_drafted": 17.07,
+   "fpts": 21.55
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "1B",
+   "pct_drafted": 17.07,
+   "fpts": 7.0
+  },
+  {
+   "player": "Travis Bazzana",
+   "player_norm": "travis bazzana",
+   "roster_position": "2B",
+   "pct_drafted": 17.07,
+   "fpts": 10.0
+  },
+  {
+   "player": "Chase DeLauter",
+   "player_norm": "chase delauter",
+   "roster_position": "OF",
+   "pct_drafted": 17.07,
+   "fpts": 14.0
+  },
+  {
+   "player": "Steven Kwan",
+   "player_norm": "steven kwan",
+   "roster_position": "OF",
+   "pct_drafted": 17.07,
+   "fpts": 10.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "1B",
+   "pct_drafted": 14.63,
+   "fpts": 14.0
+  },
+  {
+   "player": "Jose Ramirez",
+   "player_norm": "jose ramirez",
+   "roster_position": "3B",
+   "pct_drafted": 14.63,
+   "fpts": 8.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "SS",
+   "pct_drafted": 14.63,
+   "fpts": 4.0
+  },
+  {
+   "player": "Jacob Wilson",
+   "player_norm": "jacob wilson",
+   "roster_position": "SS",
+   "pct_drafted": 14.63,
+   "fpts": 3.0
+  },
+  {
+   "player": "Tommy White",
+   "player_norm": "tommy white",
+   "roster_position": "1B",
+   "pct_drafted": 14.63,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 14.63,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dustin May",
+   "player_norm": "dustin may",
+   "roster_position": "P",
+   "pct_drafted": 12.2,
+   "fpts": 15.45
+  },
+  {
+   "player": "Kody Clemens",
+   "player_norm": "kody clemens",
+   "roster_position": "2B",
+   "pct_drafted": 12.2,
+   "fpts": 3.0
+  },
+  {
+   "player": "Cal Raleigh",
+   "player_norm": "cal raleigh",
+   "roster_position": "C",
+   "pct_drafted": 12.2,
+   "fpts": 2.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "SS",
+   "pct_drafted": 12.2,
+   "fpts": 24.0
+  },
+  {
+   "player": "Patrick Bailey",
+   "player_norm": "patrick bailey",
+   "roster_position": "C",
+   "pct_drafted": 12.2,
+   "fpts": 4.0
+  },
+  {
+   "player": "Davis Martin",
+   "player_norm": "davis martin",
+   "roster_position": "P",
+   "pct_drafted": 9.76,
+   "fpts": 13.3
+  },
+  {
+   "player": "Hayden Wesneski",
+   "player_norm": "hayden wesneski",
+   "roster_position": "P",
+   "pct_drafted": 9.76,
+   "fpts": 12.75
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "OF",
+   "pct_drafted": 9.76,
+   "fpts": 7.0
+  },
+  {
+   "player": "Sal Stewart",
+   "player_norm": "sal stewart",
+   "roster_position": "1B",
+   "pct_drafted": 9.76,
+   "fpts": 3.0
+  },
+  {
+   "player": "Julio Rodriguez",
+   "player_norm": "julio rodriguez",
+   "roster_position": "OF",
+   "pct_drafted": 9.76,
+   "fpts": 0.0
+  },
+  {
+   "player": "Isaac Paredes",
+   "player_norm": "isaac paredes",
+   "roster_position": "3B",
+   "pct_drafted": 9.76,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jose Altuve",
+   "player_norm": "jose altuve",
+   "roster_position": "2B",
+   "pct_drafted": 9.76,
+   "fpts": 8.0
+  },
+  {
+   "player": "Brayan Rocchio",
+   "player_norm": "brayan rocchio",
+   "roster_position": "SS",
+   "pct_drafted": 9.76,
+   "fpts": 5.0
+  },
+  {
+   "player": "Christian Walker",
+   "player_norm": "christian walker",
+   "roster_position": "1B",
+   "pct_drafted": 9.76,
+   "fpts": 7.0
+  },
+  {
+   "player": "Royce Lewis",
+   "player_norm": "royce lewis",
+   "roster_position": "2B",
+   "pct_drafted": 9.76,
+   "fpts": 3.0
+  },
+  {
+   "player": "Josh Bell",
+   "player_norm": "josh bell",
+   "roster_position": "1B",
+   "pct_drafted": 9.76,
+   "fpts": 2.0
+  },
+  {
+   "player": "Alika Williams",
+   "player_norm": "alika williams",
+   "roster_position": "2B",
+   "pct_drafted": 9.76,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Stephenson",
+   "player_norm": "tyler stephenson",
+   "roster_position": "C",
+   "pct_drafted": 9.76,
+   "fpts": 5.0
+  },
+  {
+   "player": "Dane Myers",
+   "player_norm": "dane myers",
+   "roster_position": "OF",
+   "pct_drafted": 9.76,
+   "fpts": 9.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "3B",
+   "pct_drafted": 7.32,
+   "fpts": 3.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "OF",
+   "pct_drafted": 7.32,
+   "fpts": 7.0
+  },
+  {
+   "player": "Randy Arozarena",
+   "player_norm": "randy arozarena",
+   "roster_position": "OF",
+   "pct_drafted": 7.32,
+   "fpts": 5.0
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "1B",
+   "pct_drafted": 7.32,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dalton Rushing",
+   "player_norm": "dalton rushing",
+   "roster_position": "C",
+   "pct_drafted": 7.32,
+   "fpts": 5.0
+  },
+  {
+   "player": "Yainer Diaz",
+   "player_norm": "yainer diaz",
+   "roster_position": "C",
+   "pct_drafted": 7.32,
+   "fpts": 27.0
+  },
+  {
+   "player": "Dominic Canzone",
+   "player_norm": "dominic canzone",
+   "roster_position": "OF",
+   "pct_drafted": 7.32,
+   "fpts": 9.0
+  },
+  {
+   "player": "Henry Bolte",
+   "player_norm": "henry bolte",
+   "roster_position": "OF",
+   "pct_drafted": 7.32,
+   "fpts": 2.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "2B",
+   "pct_drafted": 7.32,
+   "fpts": 11.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "1B",
+   "pct_drafted": 7.32,
+   "fpts": 9.0
+  },
+  {
+   "player": "Kyle Manzardo",
+   "player_norm": "kyle manzardo",
+   "roster_position": "1B",
+   "pct_drafted": 7.32,
+   "fpts": 20.0
+  },
+  {
+   "player": "Edwin Arroyo",
+   "player_norm": "edwin arroyo",
+   "roster_position": "2B",
+   "pct_drafted": 7.32,
+   "fpts": 8.0
+  },
+  {
+   "player": "Ozzie Albies",
+   "player_norm": "ozzie albies",
+   "roster_position": "2B",
+   "pct_drafted": 7.32,
+   "fpts": 5.0
+  },
+  {
+   "player": "Randy Dobnak",
+   "player_norm": "randy dobnak",
+   "roster_position": "P",
+   "pct_drafted": 4.88,
+   "fpts": 24.75
+  },
+  {
+   "player": "Eric Lauer",
+   "player_norm": "eric lauer",
+   "roster_position": "P",
+   "pct_drafted": 4.88,
+   "fpts": 23.7
+  },
+  {
+   "player": "Jacob Lopez",
+   "player_norm": "jacob lopez",
+   "roster_position": "P",
+   "pct_drafted": 4.88,
+   "fpts": 20.6
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "OF",
+   "pct_drafted": 4.88,
+   "fpts": 16.0
+  },
+  {
+   "player": "Elly De La Cruz",
+   "player_norm": "elly de la cruz",
+   "roster_position": "SS",
+   "pct_drafted": 4.88,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nick Kurtz",
+   "player_norm": "nick kurtz",
+   "roster_position": "1B",
+   "pct_drafted": 4.88,
+   "fpts": 2.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "SS",
+   "pct_drafted": 4.88,
+   "fpts": 5.0
+  },
+  {
+   "player": "Tyler Soderstrom",
+   "player_norm": "tyler soderstrom",
+   "roster_position": "OF",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "OF",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "3B",
+   "pct_drafted": 4.88,
+   "fpts": 5.0
+  },
+  {
+   "player": "Trevor Larnach",
+   "player_norm": "trevor larnach",
+   "roster_position": "OF",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brooks Lee",
+   "player_norm": "brooks lee",
+   "roster_position": "3B",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dansby Swanson",
+   "player_norm": "dansby swanson",
+   "roster_position": "SS",
+   "pct_drafted": 4.88,
+   "fpts": 2.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "3B",
+   "pct_drafted": 4.88,
+   "fpts": 4.0
+  },
+  {
+   "player": "Weston Wilson",
+   "player_norm": "weston wilson",
+   "roster_position": "OF",
+   "pct_drafted": 4.88,
+   "fpts": 7.0
+  },
+  {
+   "player": "Brady Singer",
+   "player_norm": "brady singer",
+   "roster_position": "P",
+   "pct_drafted": 4.88,
+   "fpts": 9.75
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "C",
+   "pct_drafted": 4.88,
+   "fpts": 6.0
+  },
+  {
+   "player": "Matt Olson",
+   "player_norm": "matt olson",
+   "roster_position": "1B",
+   "pct_drafted": 4.88,
+   "fpts": 5.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "OF",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Francisco Lindor",
+   "player_norm": "francisco lindor",
+   "roster_position": "SS",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Francisco Alvarez",
+   "player_norm": "francisco alvarez",
+   "roster_position": "C",
+   "pct_drafted": 4.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Scott",
+   "player_norm": "christian scott",
+   "roster_position": "P",
+   "pct_drafted": 4.88,
+   "fpts": 21.9
+  },
+  {
+   "player": "Patrick Sandoval",
+   "player_norm": "patrick sandoval",
+   "roster_position": "P",
+   "pct_drafted": 2.44,
+   "fpts": 16.45
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "1B",
+   "pct_drafted": 2.44,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jordan Walker",
+   "player_norm": "jordan walker",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 7.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 22.0
+  },
+  {
+   "player": "Ivan Herrera",
+   "player_norm": "ivan herrera",
+   "roster_position": "C",
+   "pct_drafted": 2.44,
+   "fpts": 17.0
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 5.0
+  },
+  {
+   "player": "Paul Goldschmidt",
+   "player_norm": "paul goldschmidt",
+   "roster_position": "1B",
+   "pct_drafted": 2.44,
+   "fpts": 10.0
+  },
+  {
+   "player": "Jo Adell",
+   "player_norm": "jo adell",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 10.0
+  },
+  {
+   "player": "Eugenio Suarez",
+   "player_norm": "eugenio suarez",
+   "roster_position": "3B",
+   "pct_drafted": 2.44,
+   "fpts": 3.0
+  },
+  {
+   "player": "Masyn Winn",
+   "player_norm": "masyn winn",
+   "roster_position": "SS",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jasson Dominguez",
+   "player_norm": "jasson dominguez",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 4.0
+  },
+  {
+   "player": "Cole Young",
+   "player_norm": "cole young",
+   "roster_position": "2B",
+   "pct_drafted": 2.44,
+   "fpts": 10.0
+  },
+  {
+   "player": "Taylor Trammell",
+   "player_norm": "taylor trammell",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 9.0
+  },
+  {
+   "player": "Michael Conforto",
+   "player_norm": "michael conforto",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 6.0
+  },
+  {
+   "player": "Miguel Amaya",
+   "player_norm": "miguel amaya",
+   "roster_position": "C",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Noelvi Marte",
+   "player_norm": "noelvi marte",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ryan Kreidler",
+   "player_norm": "ryan kreidler",
+   "roster_position": "SS",
+   "pct_drafted": 2.44,
+   "fpts": 5.0
+  },
+  {
+   "player": "Cam Smith",
+   "player_norm": "cam smith",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 11.0
+  },
+  {
+   "player": "Spencer Jones",
+   "player_norm": "spencer jones",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 26.0
+  },
+  {
+   "player": "Gabriel Arias",
+   "player_norm": "gabriel arias",
+   "roster_position": "3B",
+   "pct_drafted": 2.44,
+   "fpts": 14.0
+  },
+  {
+   "player": "Wade Meckler",
+   "player_norm": "wade meckler",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 8.0
+  },
+  {
+   "player": "Josh Lowe",
+   "player_norm": "josh lowe",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 2.0
+  },
+  {
+   "player": "Brian Serven",
+   "player_norm": "brian serven",
+   "roster_position": "C",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ryan McMahon",
+   "player_norm": "ryan mcmahon",
+   "roster_position": "3B",
+   "pct_drafted": 2.44,
+   "fpts": 3.0
+  },
+  {
+   "player": "Petey Halpin",
+   "player_norm": "petey halpin",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 8.0
+  },
+  {
+   "player": "Alan Roden",
+   "player_norm": "alan roden",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Heineman",
+   "player_norm": "tyler heineman",
+   "roster_position": "C",
+   "pct_drafted": 2.44,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ivan Johnson",
+   "player_norm": "ivan johnson",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "2B",
+   "pct_drafted": 2.44,
+   "fpts": 8.0
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Bo Bichette",
+   "player_norm": "bo bichette",
+   "roster_position": "3B",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Carson Benge",
+   "player_norm": "carson benge",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 3.0
+  },
+  {
+   "player": "Luis Robert Jr.",
+   "player_norm": "luis robert",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mike Yastrzemski",
+   "player_norm": "mike yastrzemski",
+   "roster_position": "OF",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 41,
+  "best_rank": 5,
+  "worst_rank": 5,
+  "best_finish_percentile": 90.24,
+  "median_finish_percentile": 90.24,
+  "best_points": 126.3,
+  "winning_points": 143.3,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

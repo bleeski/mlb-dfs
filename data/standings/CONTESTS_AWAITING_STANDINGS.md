@@ -10,125 +10,19 @@ drop it in `data/standings/inbox/`. A zero-byte export is a failed pull, not a
 pulled file. The inbox is flat; the miner reads Classic vs Showdown off the
 lineup cells and resolves the salary file itself (`--auto-salary`).
 
-## Status as of 2026-08-04: 95 contests open across 5 slate dates
+## Status as of 2026-08-04: 1 contest open across 1 slate date
 
 Prioritize oldest first. The 2026-07-25 ledger note found DK's export ages out
 some days after a contest settles, so the oldest rows below are the ones closest
 to going empty; the newest date has the most runway left.
 
-**2026-07-28** (1 contest):
+**2026-07-29** (1 contest):
 
-- [MLB Satellite to $15 Relay Throw](https://www.draftkings.com/contest/exportfullstandingscsv/192892126) — `192892126`
-
-**2026-07-29** (41 contests):
-
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192896238) — `192896238`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192896240) — `192896240`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192896242) — `192896242`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192896255) — `192896255`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192896256) — `192896256`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192896258) — `192896258`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192896259) — `192896259`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192896260) — `192896260`
-- [MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192896273) — `192896273`
-- [MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192896274) — `192896274`
 - [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192896278) — `192896278`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192896291) — `192896291`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192896292) — `192896292`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192896296) — `192896296`
-- [MLB $15K mini-MAX [150 Entry Max]](https://www.draftkings.com/contest/exportfullstandingscsv/192897439) — `192897439`
-- [MLB Showdown $1K Solo Shot (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192897471) — `192897471`
-- [MLB Showdown $1.5K Solo Shot [20 Entry Max] (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192897496) — `192897496`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192921685) — `192921685`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192921728) — `192921728`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192921742) — `192921742`
-- [MLB $1.25K Solo Shot (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192921966) — `192921966`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192922983) — `192922983`
-- [MLB Showdown $30 Quarter Jukebox [Just $0.25!] (ATL @ NYM)](https://www.draftkings.com/contest/exportfullstandingscsv/192923620) — `192923620`
-- [MLB Showdown $150 Solo Shot (ATL @ NYM)](https://www.draftkings.com/contest/exportfullstandingscsv/192924379) — `192924379`
-- [MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]](https://www.draftkings.com/contest/exportfullstandingscsv/192932671) — `192932671`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192933802) — `192933802`
-- [MLB Showdown $20 Quarter Jukebox [Just $0.25!] (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192934735) — `192934735`
-- [MLB Showdown $250 Solo Shot (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192935418) — `192935418`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192935801) — `192935801`
-- [MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]](https://www.draftkings.com/contest/exportfullstandingscsv/192935802) — `192935802`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192936209) — `192936209`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192936649) — `192936649`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192938854) — `192938854`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192938900) — `192938900`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192939787) — `192939787`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192939862) — `192939862`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192943882) — `192943882`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192947686) — `192947686`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192948724) — `192948724`
-- [MLB $250 Solo Shot (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192948814) — `192948814`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192949357) — `192949357`
-
-**2026-07-30** (32 contests):
-
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192937435) — `192937435`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192937436) — `192937436`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192937438) — `192937438`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192937440) — `192937440`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192937454) — `192937454`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192937456) — `192937456`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192937459) — `192937459`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192937461) — `192937461`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192937463) — `192937463`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192937533) — `192937533`
-- [MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192937534) — `192937534`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192937538) — `192937538`
-- [MLB Satellite to $15 Relay Throw](https://www.draftkings.com/contest/exportfullstandingscsv/192938622) — `192938622`
-- [MLB Satellite to $15 Relay Throw](https://www.draftkings.com/contest/exportfullstandingscsv/192938623) — `192938623`
-- [MLB Satellite to NFL Best Ball $25 Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192938629) — `192938629`
-- [MLB $15K mini-MAX [150 Entry Max]](https://www.draftkings.com/contest/exportfullstandingscsv/192944793) — `192944793`
-- [MLB $500 Daily Dollar [Single Entry] (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192944831) — `192944831`
-- [MLB Showdown $350 Solo Shot (TEX @ TB)](https://www.draftkings.com/contest/exportfullstandingscsv/192972500) — `192972500`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192972876) — `192972876`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192972999) — `192972999`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192973000) — `192973000`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/192973047) — `192973047`
-- [MLB Showdown $200 Solo Shot (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192976860) — `192976860`
-- [MLB Showdown $20 Quarter Jukebox [Just $0.25!] (CHC @ STL)](https://www.draftkings.com/contest/exportfullstandingscsv/192977444) — `192977444`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192979294) — `192979294`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/192979424) — `192979424`
-- [MLB $400 Solo Shot (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192994189) — `192994189`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192996806) — `192996806`
-- [MLB Showdown $300 Solo Shot (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192997189) — `192997189`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192997656) — `192997656`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192998674) — `192998674`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SEA @ LAD)](https://www.draftkings.com/contest/exportfullstandingscsv/192999777) — `192999777`
-
-**2026-08-01** (17 contests):
-
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ TOR)](https://www.draftkings.com/contest/exportfullstandingscsv/193034903) — `193034903`
-- [MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ TOR)](https://www.draftkings.com/contest/exportfullstandingscsv/193034904) — `193034904`
-- [MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/193034935) — `193034935`
-- [MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/193034936) — `193034936`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/193034938) — `193034938`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/193034939) — `193034939`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/193034940) — `193034940`
-- [MLB $2.5K Solo Shot (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193035787) — `193035787`
-- [MLB $1K Solo Shot (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/193035792) — `193035792`
-- [MLB $6K mini-MAX [150 Entry Max] (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193035795) — `193035795`
-- [MLB Showdown $250 Solo Shot (STL @ TOR)](https://www.draftkings.com/contest/exportfullstandingscsv/193076001) — `193076001`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193077888) — `193077888`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193078052) — `193078052`
-- [MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [5x]](https://www.draftkings.com/contest/exportfullstandingscsv/193091132) — `193091132`
-- [MLB Satellite to NFL Best Ball $25 Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/193095032) — `193095032`
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/193096516) — `193096516`
-- [MLB $350 Solo Shot](https://www.draftkings.com/contest/exportfullstandingscsv/193096806) — `193096806`
-
-**2026-08-03** (4 contests):
-
-- [MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]](https://www.draftkings.com/contest/exportfullstandingscsv/193194330) — `193194330`
-- [MLB Satellite to $15 Relay Throw](https://www.draftkings.com/contest/exportfullstandingscsv/193204000) — `193204000`
-- [MLB Satellite to NFL Best Ball $25 Millionaire](https://www.draftkings.com/contest/exportfullstandingscsv/193204824) — `193204824`
-- [MLB $750 Solo Shot](https://www.draftkings.com/contest/exportfullstandingscsv/193205103) — `193205103`
 
 ## Not on this list — do not pull
 
-- **Archived** (145 contests) — already mined into `data/archive/`;
+- **Archived** (239 contests) — already mined into `data/archive/`;
   see the ledger's A-NNN entries for the per-contest mapping.
 - **Non-DK IDs on filled entry rows** — filtered out because a real contest ID is
   9 digits; these would otherwise emit a dead export URL:

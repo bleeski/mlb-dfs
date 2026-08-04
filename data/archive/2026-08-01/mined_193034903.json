@@ -1,0 +1,750 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193034903",
+ "slate_date": "2026-08-01",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 22,
+  "roster_size": 6,
+  "entries_unparsed": 1,
+  "winning_points": 66.98,
+  "winning_entry_id": "5205542812",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 21,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 9.1,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 20,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 7,
+  "at_cap_share_pct": 31.8,
+  "salary_left_histogram": {
+   "701-1500": 4,
+   "<= 0": 6,
+   "301-700": 6,
+   "101-300": 3,
+   "> 1500": 2,
+   "1-100": 1
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 7,
+   "5": 10
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Kevin Gausman",
+    "pct_drafted": 60.87
+   },
+   {
+    "player": "Kazuma Okamoto",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Luis Urias",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "George Springer",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Quinn Mathews",
+    "pct_drafted": 39.13
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0435,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 132,
+  "roster_slots_expected": 132,
+  "recomputed_total_pct": 573.9,
+  "dk_table_total_pct": 573.9,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5205542812",
+   "username": "grantgoupil",
+   "points": 66.98,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "davis schneider",
+    "george springer",
+    "kevin gausman",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5205506421",
+   "username": "SportsJoker12",
+   "points": 61.25,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "george springer",
+    "jordan walker",
+    "kevin gausman",
+    "myles straw",
+    "nathan church"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5205519010",
+   "username": "LALA420",
+   "points": 61.13,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "blaze jordan",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "lars nootbaar"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5205539153",
+   "username": "randomjank",
+   "points": 60.98,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "davis schneider",
+    "ernie clement",
+    "george springer",
+    "kevin gausman",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5205558022",
+   "username": "SadatGnosis",
+   "points": 60.98,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "alejandro kirk",
+    "davis schneider",
+    "kevin gausman",
+    "luis urias",
+    "quinn mathews",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5204953281",
+   "username": "ulbreaker",
+   "points": 55.98,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "davis schneider",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5205109539",
+   "username": "Stree",
+   "points": 55.98,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "davis schneider",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5205525143",
+   "username": "jarradkern",
+   "points": 54.98,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "kevin gausman",
+    "lars nootbaar",
+    "luis urias",
+    "masyn winn",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5205497440",
+   "username": "BigFish2",
+   "points": 52.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "alejandro kirk",
+    "george springer",
+    "jimmy crooks",
+    "kazuma okamoto",
+    "kevin gausman",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5205530827",
+   "username": "DUI-Guy",
+   "points": 50.98,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "ernie clement",
+    "kazuma okamoto",
+    "kevin gausman",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5205558447",
+   "username": "Mytoyoweta1966",
+   "points": 50.13,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "jordan walker",
+    "kazuma okamoto",
+    "kevin gausman",
+    "luis urias",
+    "masyn winn"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5205263852",
+   "username": "Diesel",
+   "points": 47.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 22.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "ivan herrera",
+    "jordan walker",
+    "masyn winn",
+    "myles straw",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5205021520",
+   "username": "RFinch_Kings",
+   "points": 46.75,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "lars nootbaar",
+    "luis urias",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5205505605",
+   "username": "crf_333",
+   "points": 46.5,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "george springer",
+    "ivan herrera",
+    "kazuma okamoto",
+    "luis urias",
+    "masyn winn"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5204949190",
+   "username": "aramisj22",
+   "points": 45.53,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "jimmy crooks",
+    "jordan walker",
+    "kevin gausman",
+    "lars nootbaar",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5205382499",
+   "username": "sdray199",
+   "points": 44.13,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 23.91,
+   "n_cheap": 1,
+   "players_norm": [
+    "andres gimenez",
+    "daulton varsho",
+    "jesus sanchez",
+    "jj wetherholt",
+    "kevin gausman",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5205505130",
+   "username": "bleeski",
+   "points": 39.78,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "blaze jordan",
+    "ivan herrera",
+    "jj wetherholt",
+    "jordan walker",
+    "luis urias",
+    "quinn mathews"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5205405063",
+   "username": "Lucky870Buddy",
+   "points": 37.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 26.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "ernie clement",
+    "jj wetherholt",
+    "jordan walker",
+    "masyn winn",
+    "nathan church",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5205434554",
+   "username": "wittwerjoe",
+   "points": 37.0,
+   "salary_used": 46100,
+   "salary_left": 3900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "alec burleson",
+    "daulton varsho",
+    "ernie clement",
+    "george springer",
+    "kazuma okamoto",
+    "myles straw"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5205100082",
+   "username": "jep4576",
+   "points": 33.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "ernie clement",
+    "george springer",
+    "jj wetherholt",
+    "kazuma okamoto",
+    "lars nootbaar",
+    "masyn winn"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5205063070",
+   "username": "Stolle76",
+   "points": 27.5,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "ernie clement",
+    "jordan walker",
+    "kazuma okamoto",
+    "lars nootbaar",
+    "nathan church",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5205401120",
+   "username": "Bears133",
+   "points": 24.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "davis schneider",
+    "jj wetherholt",
+    "jordan walker",
+    "kazuma okamoto",
+    "lars nootbaar",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Kevin Gausman",
+   "player_norm": "kevin gausman",
+   "roster_position": "UTIL",
+   "pct_drafted": 60.87,
+   "fpts": 16.75
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.17,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Urias",
+   "player_norm": "luis urias",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.17,
+   "fpts": 5.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 14.0
+  },
+  {
+   "player": "Quinn Mathews",
+   "player_norm": "quinn mathews",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 7.85
+  },
+  {
+   "player": "Jordan Walker",
+   "player_norm": "jordan walker",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 6.0
+  },
+  {
+   "player": "Vladimir Guerrero Jr.",
+   "player_norm": "vladimir guerrero",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 8.0
+  },
+  {
+   "player": "Lars Nootbaar",
+   "player_norm": "lars nootbaar",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 5.0
+  },
+  {
+   "player": "Masyn Winn",
+   "player_norm": "masyn winn",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 9.0
+  },
+  {
+   "player": "Davis Schneider",
+   "player_norm": "davis schneider",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 4.0
+  },
+  {
+   "player": "JJ Wetherholt",
+   "player_norm": "jj wetherholt",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 2.0
+  },
+  {
+   "player": "Alejandro Kirk",
+   "player_norm": "alejandro kirk",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 11.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Alec Burleson",
+   "player_norm": "alec burleson",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 8.0
+  },
+  {
+   "player": "Ivan Herrera",
+   "player_norm": "ivan herrera",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 7.0
+  },
+  {
+   "player": "Nathan Church",
+   "player_norm": "nathan church",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Myles Straw",
+   "player_norm": "myles straw",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Blaze Jordan",
+   "player_norm": "blaze jordan",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jimmy Crooks",
+   "player_norm": "jimmy crooks",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Andres Gimenez",
+   "player_norm": "andres gimenez",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 4.0
+  },
+  {
+   "player": "Jesus Sanchez",
+   "player_norm": "jesus sanchez",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 17,
+  "worst_rank": 17,
+  "best_finish_percentile": 30.43,
+  "median_finish_percentile": 30.43,
+  "best_points": 39.78,
+  "winning_points": 66.98,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}
