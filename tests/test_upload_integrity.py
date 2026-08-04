@@ -563,6 +563,183 @@ class PreflightManifestBindingTests(unittest.TestCase):
         self.assertEqual(relaxed["state"], "relaxed")
         self.assertEqual(relaxed["counts"], {"overlap_steps": 2})
 
+    def test_a_record_with_no_relaxation_evidence_is_unknown_not_clean(self):
+        """R64(a): the sliced path is the PRODUCTION path and it records no
+        `relaxations` key at all -- run_slate strips bank_diag to candidate_count
+        under candidates_override, and build_slate's own bank_diagnostics never
+        carried one. So the delivery record read "clean" structurally, whatever
+        happened upstream, and CLAUDE.md's "clean when the relaxation counts are
+        zero" is read at T-5 off exactly this field."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        sliced = epi.manifest_strategy_state(
+            {"bank_diagnostics": {"candidate_count": 1007}})
+        self.assertEqual(sliced["state"], "unknown")
+        self.assertEqual(sliced["evidence"], "absent")
+        self.assertEqual(epi.manifest_strategy_state({})["state"], "unknown")
+        # An empty relaxations block IS evidence: it says nothing was relaxed.
+        self.assertEqual(
+            epi.manifest_strategy_state(
+                {"bank_diagnostics": {"relaxations": {}}})["evidence"], "recorded")
+
+    def test_strategy_state_reads_every_place_relaxations_are_recorded(self):
+        """R64(a): one key was read; three hold the evidence. `candidate_bank`
+        keeps the unstripped diagnostics, Showdown counts its two relaxations at
+        the top level rather than under `relaxations` (R54), and bank_warnings is
+        where the sliced path's failed cache jobs land."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        via_candidate_bank = epi.manifest_strategy_state(
+            {"bank_diagnostics": {"candidate_count": 12},
+             "candidate_bank": {"relaxations": {"overlap_steps": 3}}})
+        self.assertEqual(via_candidate_bank["state"], "relaxed")
+        self.assertEqual(via_candidate_bank["counts"], {"overlap_steps": 3})
+
+        showdown = epi.manifest_strategy_state(
+            {"bank_diagnostics": {"relaxed_slots": 2, "overlap_relaxed_slots": 1}})
+        self.assertEqual(showdown["state"], "relaxed")
+        self.assertEqual(showdown["counts"],
+                         {"relaxed_slots": 2, "overlap_relaxed_slots": 1})
+
+        # A relaxation WARNING with no counts is still a relaxed portfolio.
+        warned = epi.manifest_strategy_state(
+            {"bank_diagnostics": {"relaxations": {"warnings": ["overlap relaxed"]}}})
+        self.assertEqual(warned["state"], "relaxed")
+
+        # bank_warnings travels as evidence but does not drive the verdict:
+        # reduced search effort is not a relaxed control, and conflating them
+        # would trade one false label for another.
+        sliced = epi.manifest_strategy_state(
+            {"bank_diagnostics": {"relaxations": {}},
+             "bank_warnings": ["slice was not a full search"]})
+        self.assertEqual(sliced["state"], "clean")
+        self.assertEqual(sliced["bank_warnings"], ["slice was not a full search"])
+
+    def test_savant_enriched_blocks_read_as_enriched(self):
+        """R64(b): `_applied` required a `requested` key that only f1/f4/f5 carry.
+        The Savant-fed blocks report considered/matched or an `applied` flag, so
+        every one of them returned None and a fully enriched build recorded
+        projection_tier='proxy'. Reproduced in the audit."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        xwoba = {"projection_enrichment": {"xwoba": {
+            "applied": True, "considered": 180, "matched": 151, "match_rate": 0.84}}}
+        self.assertEqual(epi.manifest_projection_tier(xwoba), "enriched")
+        ceiling = {"projection_enrichment": {"ceiling": {
+            "matched": 120, "unmatched": 60, "match_rate": 0.67}}}
+        self.assertEqual(epi.manifest_projection_tier(ceiling), "enriched")
+        guard = {"projection_enrichment": {"value_guard": {
+            "applied": True, "clipped_count": 3}}}
+        self.assertEqual(epi.manifest_projection_tier(guard), "enriched")
+        # A block that ran and reached nothing is not enrichment, and an
+        # opted-out guard is not a failure either -- both stay proxy.
+        self.assertEqual(epi.manifest_projection_tier(
+            {"projection_enrichment": {"ceiling": {"matched": 0, "unmatched": 180}}}),
+            "proxy")
+        self.assertEqual(epi.manifest_projection_tier(
+            {"projection_enrichment": {"value_guard": {"applied": False}}}), "proxy")
+        self.assertIsNone(epi._applied({"matched": 0, "unmatched": 0}))
+
+
+class LineupGateEvidenceTests(unittest.TestCase):
+    """R53: the workflow lineup gate passed vacuously with fabricated evidence.
+
+    `_derive_workflow_gates`' pool-report-absent branch read `elif
+    projected_order:` -- and `projected_order` is the four-key SUMMARY dict
+    run_slate always builds, truthy even at `requested: 0, applied_count: 0`. So
+    every call without a pool_report certified lineup_gate_passed=True and wrote
+    "4 players carry a batting order" -- the len of a dict's KEYS -- into the
+    immutable diagnostics, while the designed None-blocks branch was unreachable.
+
+    This is the F4 class reopened: on 2026-07-22 a 23-team build with 0/9 lineups
+    posted read certified. build_slate.py supplies a pool_report so the primary
+    path was covered, which is exactly why the fabricated-evidence leg would have
+    stayed invisible until someone built through the API.
+    """
+
+    def _gates(self, projections=None, pool_report=None, order_by_team=None):
+        from mlb_engine.pipeline import execution_pipeline as epi
+        summary = {"requested": 0, "applied_count": 0, "applied_player_ids": [],
+                   "note": "no projected order supplied"}
+        if order_by_team is None:
+            order_by_team = epi.batting_orders_by_team(projections)
+        return epi._derive_workflow_gates(
+            schema={"passed": True, "summary": "ok"},
+            entry_requirements=[{"entry_id": "1", "contest_id": "5"}],
+            posture_by_contest={"5": {"posture": "large_gpp"}},
+            projected_order=summary,
+            pitcher_roles=None,
+            projection_enrichment={},
+            pool_report=pool_report,
+            order_by_team=order_by_team,
+        )
+
+    def test_an_empty_order_build_blocks_instead_of_certifying(self):
+        import pandas as pd
+
+        frame = pd.DataFrame([
+            {"Player_ID": "1", "Team": "AAA", "Batting_Order": None},
+            {"Player_ID": "2", "Team": "BBB", "Batting_Order": ""},
+        ])
+        gates, why = self._gates(projections=frame)
+        self.assertIsNone(gates["lineup_gate_passed"],
+                          "no orders and no pool report must block, not pass")
+        self.assertIn("nothing states that the lineups", why["lineup_gate_passed"])
+        # The old fabrication must not reappear in any form.
+        self.assertNotIn("4 players carry a batting order", why["lineup_gate_passed"])
+
+    def test_a_frame_with_no_batting_order_column_at_all_blocks(self):
+        import pandas as pd
+
+        gates, _ = self._gates(projections=pd.DataFrame(
+            [{"Player_ID": "1", "Team": "AAA"}]))
+        self.assertIsNone(gates["lineup_gate_passed"])
+        self.assertIsNone(self._gates(projections=None)[0]["lineup_gate_passed"])
+
+    def test_the_evidence_states_real_per_team_counts(self):
+        import pandas as pd
+
+        rows = ([{"Player_ID": f"a{i}", "Team": "AAA", "Batting_Order": i + 1}
+                 for i in range(9)]
+                + [{"Player_ID": f"b{i}", "Team": "BBB", "Batting_Order": i + 1}
+                   for i in range(9)]
+                + [{"Player_ID": "p1", "Team": "AAA", "Batting_Order": None}])
+        gates, why = self._gates(projections=pd.DataFrame(rows))
+        self.assertTrue(gates["lineup_gate_passed"])
+        self.assertIn("AAA 9", why["lineup_gate_passed"])
+        self.assertIn("BBB 9", why["lineup_gate_passed"])
+
+    def test_a_team_under_nine_orders_fails_the_gate(self):
+        import pandas as pd
+
+        rows = ([{"Player_ID": f"a{i}", "Team": "AAA", "Batting_Order": i + 1}
+                 for i in range(9)]
+                + [{"Player_ID": f"b{i}", "Team": "BBB", "Batting_Order": i + 1}
+                   for i in range(4)])
+        gates, why = self._gates(projections=pd.DataFrame(rows))
+        self.assertFalse(gates["lineup_gate_passed"])
+        self.assertIn("Under nine: BBB", why["lineup_gate_passed"])
+
+    def test_a_supplied_pool_report_still_wins(self):
+        gates, why = self._gates(
+            pool_report={"blockers": [], "teams": {"AAA": {"hitters": 9}}},
+            order_by_team={"AAA": 3})
+        self.assertTrue(gates["lineup_gate_passed"])
+        self.assertIn("pool report", why["lineup_gate_passed"])
+
+    def test_the_counter_ignores_pitchers_and_non_numeric_cells(self):
+        import pandas as pd
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        frame = pd.DataFrame([
+            {"Player_ID": "1", "Team": "aaa", "Batting_Order": 1},
+            {"Player_ID": "2", "Team": "AAA", "Batting_Order": "2"},
+            {"Player_ID": "3", "Team": "AAA", "Batting_Order": 0},
+            {"Player_ID": "4", "Team": "AAA", "Batting_Order": "TBD"},
+            {"Player_ID": "5", "Team": "AAA", "Batting_Order": float("nan")},
+        ])
+        self.assertEqual(epi.batting_orders_by_team(frame), {"AAA": 2})
+
 
 class PreflightFeedDefaultTests(unittest.TestCase):
     """R4: the strongest check stops being opt-in twice.

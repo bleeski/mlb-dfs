@@ -286,8 +286,17 @@ class GoldenReplayTests(unittest.TestCase):
                 # them (F4). Assuming them explicitly keeps the replay's subject
                 # the certified byte output rather than the gate axis, and the
                 # assumption is recorded in the run's diagnostics.
+                #
+                # lineup_gate_passed joined them on 2026-08-04 (R53). This is an
+                # emergency_proxy replay: the rows carry Player_ID and Base only,
+                # so no row carries a batting order and no pool_report is passed.
+                # The gate used to read the truthiness of a summary dict that is
+                # always truthy and certified anyway, with "4 players carry a
+                # batting order" as its recorded evidence. It now reports no
+                # evidence, and no evidence blocks -- so the replay has to state
+                # the assumption like the other three.
                 assume_gates=["odds_gate_passed", "weather_gate_passed",
-                              "pitcher_audit_gate_passed"],
+                              "pitcher_audit_gate_passed", "lineup_gate_passed"],
             )
 
             self.assertTrue(result["passed"], result.get("errors"))
@@ -439,8 +448,12 @@ class GoldenProductionReplayTests(unittest.TestCase):
                 projection_mode="emergency_proxy",
                 contest_postures=PRODUCTION_POSTURES,
                 candidates_override=candidates,
+                # lineup_gate_passed: same reason as GoldenReplayTests above --
+                # emergency_proxy rows carry no batting order, so R53's gate has
+                # nothing to verify and says so instead of certifying vacuously.
                 assume_gates=["odds_gate_passed", "weather_gate_passed",
-                              "pitcher_audit_gate_passed"], **enr)
+                              "pitcher_audit_gate_passed",
+                              "lineup_gate_passed"], **enr)
 
             pure = run_slate(runs_root=Path(tmp) / "runs_pure",
                              projection_rows=[dict(r) for r in rows],

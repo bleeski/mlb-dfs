@@ -25,6 +25,85 @@ performance claim.
 
 ---
 
+## 2026-08-04 — R53 + R64: the certification gate and the delivery record stop attesting to things they never checked
+
+### Fixed
+
+- **R53 — the workflow lineup gate no longer passes vacuously on fabricated
+  evidence (P1).** `_derive_workflow_gates`' pool-report-absent branch read
+  `elif projected_order:`, and `projected_order` is the four-key SUMMARY dict
+  `run_slate` always builds — truthy even at `requested: 0, applied_count: 0`. So
+  every call without a `pool_report` certified `lineup_gate_passed=True` and wrote
+  `"4 players carry a batting order"` into the immutable diagnostics: the len of a
+  dict's KEYS, not a count of players. The designed None-blocks branch was
+  unreachable. This is the F4 class — the 07-22 "certified with 0/9 lineups
+  posted" incident — reopened on the API leg of the sanctioned front door;
+  `build_slate.py` supplies a pool_report, which is exactly why the
+  fabricated-evidence leg stayed invisible.
+  The gate now reads real per-team counts of rows carrying a batting order, taken
+  off the assembled projection frame by a new `batting_orders_by_team`. An empty
+  frame yields an empty map, falls through to None, and blocks. The evidence
+  string states the actual counts per team and flags any team under nine, and it
+  says plainly what it still cannot know: a team with zero orders does not appear
+  in the map at all, and without a pool report nothing distinguishes "excluded on
+  purpose" from "missing". Pitchers carry no order and are absent by
+  construction; zero, blank, `TBD` and NaN cells do not count.
+  **Three fixtures were certifying on this hole and now declare the assumption.**
+  `RunSlateFrontDoorTests.UNEVIDENCED` and both golden replays are
+  emergency-proxy builds — rows carry `Player_ID` and `Base` only, no batting
+  orders, no pool report — so they add `lineup_gate_passed` to `assume_gates`,
+  which is the sanctioned, recorded escape hatch and the mechanism they were
+  silently outside of. That is the fix working on its first contact with the
+  suite, not a test being bent around it: three end-to-end builds were reading
+  certified with no lineup evidence of any kind.
+- **R64(a) — a delivery record with no relaxation evidence reads "unknown", not
+  "clean" (P1).** `manifest_strategy_state` read one key,
+  `bank_diagnostics["relaxations"]`. It is real on the self-built-bank path and
+  absent on the production sliced one: `run_slate` strips `bank_diag` to
+  `candidate_count` when `candidates_override` is supplied (the caller's record
+  wins) and build_slate's own `bank_diagnostics` never carried a `relaxations`
+  key. Missing evidence therefore printed `"clean"`, and CLAUDE.md's "a portfolio
+  is clean when the relaxation counts are zero" is read at T-5 off exactly this
+  field. Now the union of the places relaxations are actually recorded is read —
+  both diagnostics holders, the `relaxations` block in each, and the top-level
+  `*relax*` counters Showdown keeps there instead (R54's `relaxed_slots` /
+  `overlap_relaxed_slots`) — and absence of evidence is `"unknown"` with an
+  explicit `evidence: absent`. An empty `relaxations` block still means clean,
+  because that is a report saying nothing was relaxed. `bank_warnings`, where the
+  sliced path's failed cache jobs and slice-not-full-search notes land, travels on
+  the record as evidence without driving the verdict: reduced search effort is not
+  a relaxed control, and conflating them would trade one false label for another.
+- **R64(b) — a Savant-enriched build no longer records
+  `projection_tier="proxy"` (P1).** `_applied` required a `requested` key that
+  only `f1`/`f4`/`f5` and `projected_order` carry. The Savant-fed blocks report
+  their own shapes — `xwoba` an explicit `applied` flag over considered/matched,
+  `ceiling` and `pitcher_ceiling` matched/unmatched, `value_guard` an `applied`
+  flag with `clipped_count` — so every one returned None and the tier fell through
+  to `proxy` on a fully enriched build. `_applied` now reads all three shapes, in
+  precedence order, and still distinguishes the three states that matter: reached
+  rows, ran and reached nothing, never requested. An `applied: True` block that
+  matched zero players counts as reaching nothing.
+
+### Tests
+
+- Nine new tests; the pin moves 619 → 628. A new `LineupGateEvidenceTests` (6)
+  covers R53: an all-empty-order frame blocks with None, a frame with no
+  `Batting_Order` column at all blocks, `projections=None` blocks, the evidence
+  states real per-team counts, a team under nine fails the gate, a supplied
+  pool_report still wins, and the counter ignores pitchers, zeros, `TBD` and NaN.
+  One assertion pins the old fabricated string out of the evidence for good.
+  Three in `UploadReadyIsReservedTests` for R64: the sliced-path record reads
+  `unknown` with `evidence: absent`, strategy_state reads `candidate_bank` and
+  Showdown's top-level counters and treats a warnings-only block as relaxed while
+  `bank_warnings` stays non-verdict-driving, and each Savant block shape reads as
+  enriched while a zero-match block and an opted-out guard stay proxy.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  628 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-04 — R46 + R72: the export gates re-derive slate truth, and the locked-game exclusion fails closed
 
 ### Fixed

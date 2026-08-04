@@ -921,10 +921,30 @@ def _applied(block: Any) -> Optional[bool]:
     """
     if not isinstance(block, Mapping):
         return None
-    requested = int(block.get("requested") or 0)
-    if requested <= 0:
-        return None
-    return int(block.get("applied_count") or 0) > 0
+    if "requested" in block:
+        requested = int(block.get("requested") or 0)
+        if requested <= 0:
+            return None
+        return int(block.get("applied_count") or 0) > 0
+    # R64(b): only f1/f4/f5 and projected_order carry requested/applied_count.
+    # The Savant-fed blocks report their own shapes -- xwoba an explicit `applied`
+    # flag over considered/matched, ceiling and pitcher_ceiling matched/unmatched,
+    # value_guard an `applied` flag with clipped_count -- so requiring `requested`
+    # returned None for every one of them, and `manifest_projection_tier`
+    # recorded a fully Savant-enriched build as projection_tier="proxy".
+    if "applied" in block:
+        applied = bool(block.get("applied"))
+        if not applied:
+            return False
+        # An `applied: True` block that matched nothing reached no rows.
+        if "matched" in block:
+            return int(block.get("matched") or 0) > 0
+        return True
+    if "matched" in block:
+        if not (int(block.get("matched") or 0) + int(block.get("unmatched") or 0)):
+            return None
+        return int(block.get("matched") or 0) > 0
+    return None
 
 
 def _derive_workflow_gates(
@@ -936,6 +956,7 @@ def _derive_workflow_gates(
     pitcher_roles: Optional[Mapping[str, str]],
     projection_enrichment: Mapping[str, Any],
     pool_report: Optional[Mapping[str, Any]] = None,
+    order_by_team: Optional[Mapping[str, int]] = None,
 ) -> Tuple[Dict[str, Optional[bool]], Dict[str, str]]:
     """Derive the six pre-export gates from evidence already on hand.
 
@@ -977,11 +998,26 @@ def _derive_workflow_gates(
             f"{len(thin)} team(s) under nine hitters"
             + (f" ({', '.join(thin)})" if thin else "")
         )
-    elif projected_order:
-        gates["lineup_gate_passed"] = True
+    elif order_by_team:
+        # R53: this branch read `elif projected_order:` -- and `projected_order` is
+        # the four-key SUMMARY dict run_slate always builds, truthy even at
+        # `requested: 0, applied_count: 0`. So every pool-report-absent call
+        # certified lineup_gate_passed=True and wrote the evidence string
+        # "4 players carry a batting order" (the len of a dict's KEYS) into the
+        # immutable diagnostics, while the designed None-blocks branch below was
+        # unreachable. That is the F4 class -- the 07-22 "certified with 0/9
+        # lineups posted" incident -- reopened on the API leg of the sanctioned
+        # front door. The evidence is now per-team counts off the assembled frame,
+        # so an empty frame falls through to None and blocks.
+        partial = sorted(t for t, n in order_by_team.items() if 0 < n < 9)
+        gates["lineup_gate_passed"] = not partial
+        covered = ", ".join(f"{t} {n}" for t, n in sorted(order_by_team.items()))
         why["lineup_gate_passed"] = (
-            f"{len(projected_order)} players carry a batting order; no pool "
-            f"report was supplied, so team completeness is unverified"
+            f"no pool report supplied; batting orders on the assembled frame by "
+            f"team: {covered}"
+            + (f". Under nine: {', '.join(partial)}" if partial else "")
+            + ". A team absent here carries no order at all and cannot be "
+              "distinguished from one excluded on purpose without a pool report"
         )
     else:
         gates["lineup_gate_passed"] = None
@@ -1014,6 +1050,40 @@ def _derive_workflow_gates(
 
 ALLOWED_PITCHER_ROLES_FOR_GATE = frozenset(
     {"verified_starter", "declared_probable_sp", "viable_bulk_or_alt_sp"})
+
+
+def batting_orders_by_team(projections: Any) -> Dict[str, int]:
+    """Per-team count of rows carrying a batting order, off the assembled frame.
+
+    R53. The lineup gate's pool-report-absent branch needs evidence it can be
+    wrong about. `projected_order`, the summary dict it used to read, is truthy on
+    every build and its len() is the number of its own keys, so the gate could
+    only ever pass and its evidence string was a fabrication. This is countable,
+    per team, and empty when the frame holds no orders at all -- which is what
+    lets the gate fall through to None and block.
+
+    Pitchers carry no batting order and are absent by construction. A team with
+    zero ordered rows does not appear: without a pool report there is nothing here
+    that distinguishes "excluded on purpose" from "missing", and the gate says so
+    rather than guessing.
+    """
+    out: Dict[str, int] = {}
+    if projections is None or not hasattr(projections, "columns"):
+        return out
+    if "Batting_Order" not in projections.columns or "Team" not in projections.columns:
+        return out
+    for team, order in zip(projections["Team"].tolist(),
+                           projections["Batting_Order"].tolist()):
+        if order is None or str(order).strip() in ("", "None", "nan"):
+            continue
+        try:
+            if int(float(order)) <= 0:
+                continue
+        except (TypeError, ValueError):
+            continue
+        key = str(team).upper()
+        out[key] = out.get(key, 0) + 1
+    return dict(sorted(out.items()))
 
 
 def _enrichment_note(label: str, block: Any) -> str:
@@ -3016,6 +3086,7 @@ def run_slate(
         pitcher_roles=pitcher_roles,
         projection_enrichment=projection_enrichment,
         pool_report=(source_metadata or {}).get("pool_report"),
+        order_by_team=batting_orders_by_team(projections),
     )
     gate_defaults = {
         **derived_gates,
@@ -3346,13 +3417,66 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
 
     R3(c). A relaxed portfolio and a clean one are different artifacts and the
     difference lived in prose in the brief. It belongs on the record.
+
+    R64(a). This read one key, ``bank_diagnostics["relaxations"]``, which is real
+    on the self-built-bank path and absent on the production sliced one:
+    ``run_slate`` strips ``bank_diag`` to ``candidate_count`` when
+    ``candidates_override`` is supplied (the caller's record wins) and
+    build_slate's own ``bank_diagnostics`` carries no ``relaxations`` key at all.
+    Missing evidence therefore read as ``"clean"`` -- and CLAUDE.md's "a portfolio
+    is clean when the relaxation counts are zero" is read at T-5 off exactly this
+    field. A record that structurally cannot say "relaxed" destroys the evidence
+    the rule depends on.
+
+    Two changes. The union of the places relaxations are actually recorded is
+    read: both diagnostics holders, the ``relaxations`` block inside each, and the
+    top-level ``*relax*`` counters Showdown keeps there instead (R54's
+    ``relaxed_slots`` / ``overlap_relaxed_slots``). And absence of evidence is now
+    ``"unknown"``, not ``"clean"``: this function cannot certify a portfolio it has
+    no report for. ``bank_warnings`` -- where the sliced path's failed cache jobs
+    and slice-not-full-search notes land -- travels on the record as evidence
+    without driving the verdict, because reduced search effort is not a relaxed
+    control and conflating them would trade one false label for another.
     """
-    relaxations = ((result.get("bank_diagnostics") or {}).get("relaxations") or {})
-    counts = {k: v for k, v in relaxations.items()
-              if isinstance(v, int) and k != "note" and v}
-    warnings = list(relaxations.get("warnings") or [])
-    state = "relaxed" if (counts or warnings) else "clean"
-    return {"state": state, "counts": counts, "warnings": warnings[:10]}
+    counts: Dict[str, int] = {}
+    relax_warnings: List[str] = []
+    saw_evidence = False
+    for holder_key in ("bank_diagnostics", "candidate_bank"):
+        holder = result.get(holder_key)
+        if not isinstance(holder, Mapping):
+            continue
+        block = holder.get("relaxations")
+        if isinstance(block, Mapping):
+            saw_evidence = True
+            for key, value in block.items():
+                if key in ("note", "warnings") or isinstance(value, bool):
+                    continue
+                if isinstance(value, int) and value:
+                    counts[key] = max(counts.get(key, 0), value)
+            relax_warnings.extend(str(w) for w in (block.get("warnings") or []))
+        showdown = {k: v for k, v in holder.items()
+                    if isinstance(v, int) and not isinstance(v, bool)
+                    and "relax" in k.lower()}
+        if showdown:
+            saw_evidence = True
+            for key, value in showdown.items():
+                if value:
+                    counts[key] = max(counts.get(key, 0), value)
+    seen: set = set()
+    relax_warnings = [w for w in relax_warnings if not (w in seen or seen.add(w))]
+    if counts or relax_warnings:
+        state = "relaxed"
+    elif saw_evidence:
+        state = "clean"
+    else:
+        state = "unknown"
+    return {
+        "state": state,
+        "counts": counts,
+        "warnings": relax_warnings[:10],
+        "evidence": "recorded" if saw_evidence else "absent",
+        "bank_warnings": [str(w) for w in (result.get("bank_warnings") or [])][:10],
+    }
 
 
 def _record_upload_manifest(slate_date: str, dest: Path, result: Mapping[str, Any],

@@ -1286,10 +1286,20 @@ class RunSlateFrontDoorTests(unittest.TestCase):
             # no expensive build happened
             self.assertFalse((root / "runs").exists())
 
-    # The six gates this fixture cannot evidence: it supplies no odds map, no
-    # weather map, and no pitcher_roles. Before F4 they defaulted to True and the
-    # certification read clean; now they are absent, and absent blocks.
-    UNEVIDENCED = ["odds_gate_passed", "weather_gate_passed", "pitcher_audit_gate_passed"]
+    # The gates this fixture cannot evidence: it supplies no odds map, no
+    # weather map, no pitcher_roles, and (R53) no batting orders or pool report.
+    # Before F4 the first three defaulted to True and the certification read
+    # clean; now they are absent, and absent blocks.
+    #
+    # lineup_gate_passed joined the list on 2026-08-04. `projection_frame` has no
+    # Batting_Order column and this call passes no pool_report, so nothing here
+    # states that the lineups behind the build were reviewed. It nevertheless
+    # certified until R53, because the gate read the truthiness of a summary dict
+    # that is always truthy. A fixture that cannot evidence a gate has to say so
+    # out loud through assume_gates, which is recorded on the artifact -- that is
+    # the whole mechanism, and this test was silently outside it.
+    UNEVIDENCED = ["odds_gate_passed", "weather_gate_passed",
+                   "pitcher_audit_gate_passed", "lineup_gate_passed"]
 
     def test_approved_promotes_with_overrides(self):
         with tempfile.TemporaryDirectory() as tmp:
