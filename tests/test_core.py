@@ -7007,6 +7007,140 @@ class EnvLockTests(unittest.TestCase):
                       "the audit remedy names the probe")
 
 
+class VendoredPylibsTests(unittest.TestCase):
+    """R42(a): env_probe.py and audit.py must use a working `.pylibs` before
+    either declares scipy missing or reaches for pip. Filed 2026-08-01,
+    re-confirmed live twice more on 2026-08-03 -- one build that most likely
+    locked two games unbuilt, one saved only by a 26-minute-to-lock handoff.
+    Pure filesystem/sys.path logic throughout; no real scipy or pip touched,
+    except the one integration test that checks this repo's own vendored copy
+    (skipped if the checkout does not have one)."""
+
+    @staticmethod
+    def _env_probe():
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        try:
+            import env_probe
+        finally:
+            sys.path.pop(0)
+        return env_probe
+
+    @staticmethod
+    def _audit():
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        try:
+            import audit
+        finally:
+            sys.path.pop(0)
+        return audit
+
+    def test_absent_pylibs_is_none(self):
+        ep = self._env_probe()
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(ep.vendored_pylibs(Path(tmp)))
+
+    def test_empty_pylibs_dir_is_none(self):
+        # An empty directory is not a vendored install; treat it the same as
+        # absent rather than reporting a false warm.
+        ep = self._env_probe()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / ".pylibs").mkdir()
+            self.assertIsNone(ep.vendored_pylibs(Path(tmp)))
+
+    def test_populated_pylibs_is_found(self):
+        ep = self._env_probe()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pylibs = root / ".pylibs"
+            pylibs.mkdir()
+            (pylibs / "placeholder").write_text("x", encoding="utf-8")
+            self.assertEqual(ep.vendored_pylibs(root), pylibs)
+
+    def test_ensure_on_path_inserts_it_and_makes_it_importable(self):
+        ep = self._env_probe()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pylibs = root / ".pylibs"
+            pylibs.mkdir()
+            (pylibs / "totally_fake_r42_module.py").write_text(
+                "MARKER = 'vendored'\n", encoding="utf-8")
+            import sys as _sys
+            before = list(_sys.path)
+            try:
+                found = ep.ensure_vendored_on_path(root)
+                self.assertEqual(found, pylibs)
+                self.assertIn(str(pylibs), _sys.path)
+                import totally_fake_r42_module as fake  # noqa: F401
+                self.assertEqual(fake.MARKER, "vendored")
+            finally:
+                _sys.path[:] = before
+                _sys.modules.pop("totally_fake_r42_module", None)
+
+    def test_ensure_on_path_is_idempotent(self):
+        ep = self._env_probe()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pylibs = root / ".pylibs"
+            pylibs.mkdir()
+            (pylibs / "placeholder").write_text("x", encoding="utf-8")
+            import sys as _sys
+            before = list(_sys.path)
+            try:
+                ep.ensure_vendored_on_path(root)
+                ep.ensure_vendored_on_path(root)
+                self.assertEqual(
+                    _sys.path.count(str(pylibs)), 1,
+                    "calling twice must not duplicate the sys.path entry")
+            finally:
+                _sys.path[:] = before
+
+    def test_check_dependencies_reports_the_real_vendored_path(self):
+        # Integration point with audit.py, against this checkout's own real
+        # .pylibs -- a fake stand-in cannot exercise the actual scipy import.
+        audit = self._audit()
+        root = Path(__file__).resolve().parent.parent
+        if not (root / ".pylibs" / "scipy").is_dir():
+            self.skipTest("no vendored .pylibs/scipy in this checkout")
+        deps = audit.check_dependencies(root)
+        self.assertEqual(deps["vendored_pylibs"], str(root / ".pylibs"))
+        self.assertTrue(deps["passed"],
+                        "a populated .pylibs must be enough to pass with "
+                        "zero installs")
+
+    def test_run_tests_subprocess_gets_the_vendored_pythonpath(self):
+        """sys.path mutations in this process do not cross a subprocess
+        boundary, so the test-runner subprocess `--run-tests` spawns needs
+        `.pylibs` on its own PYTHONPATH explicitly -- otherwise a warm
+        dependency check can be followed by a test run that cannot import
+        scipy at all, which is worse than an honest cold report."""
+        audit = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "tests").mkdir()
+            (root / "tests" / "test_core.py").write_text("", encoding="utf-8")
+            fake_deps = {
+                "required": [], "missing": [], "scipy_milp_available": True,
+                "passed": True, "vendored_pylibs": "/fake/.pylibs",
+                "remedy": None,
+            }
+            fake_result = subprocess.CompletedProcess(
+                args=["fake"], returncode=0,
+                stdout="Ran 0 tests in 0.0s\n\nOK\n", stderr="")
+            with unittest.mock.patch.object(
+                    audit, "check_dependencies", return_value=fake_deps), \
+                unittest.mock.patch.object(
+                    audit.subprocess, "run", return_value=fake_result) as spy:
+                audit.run_audit(root, run_tests=True)
+            self.assertTrue(spy.called)
+            env_used = spy.call_args.kwargs.get("env") or {}
+            self.assertIn(
+                "/fake/.pylibs", env_used.get("PYTHONPATH", ""),
+                "the test subprocess must inherit the vendored path "
+                "check_dependencies found, not just this process's sys.path")
+
+
 class PrimaryStackSizeFloorTests(unittest.TestCase):
     """R34: the primary-stack SIZE control.
 

@@ -25,6 +25,81 @@ performance claim.
 
 ---
 
+## 2026-08-04 — R42(a): `env_probe.py` and `audit.py` check `.pylibs` before touching pip
+
+### Fixed
+
+- **The dependency probe now uses a vendored `scipy`/`numpy`/`pandas` before
+  ever recommending, or running, an install.** Filed 2026-08-01 as R42 on one
+  incident (sandbox overlay full, `env_probe --install` died with `[Errno 28]
+  No space left on device`, no headroom check, no reclaim path). Recurred
+  twice more on 2026-08-03: an ARCHIVE session proactively diagnosed the real
+  gap mid-afternoon (`.pylibs/scipy` already sits in the repo, complete, from
+  a 2026-07-30 session, but `env_probe.py`/`audit.py` only ever checked the
+  interpreter's default import path); a 3-game night slate most likely lost
+  two games unbuilt to three failed install attempts across 17 of a 20-minute
+  window; a Showdown build an hour later hit the identical wall and was saved
+  only by a 26-minute-to-lock handoff to Ben's local machine. All three
+  same-day incidents, plus the original, are installation failures in an
+  ephemeral sandbox — `scipy.optimize.milp` itself was never reached in any
+  of them. Full incident detail: `docs/2026-07-27_backlog_v2.md`, R42.
+- **`tools/env_probe.py`** (v1.0 -> v1.1): new `vendored_pylibs(root)` finds
+  `<root>/.pylibs` when it holds at least one entry; new
+  `ensure_vendored_on_path(root)` puts it at the front of `sys.path` (vendored
+  wins over ambient site-packages, the same resolution-authority argument
+  that already makes the lock file win over PyPI's latest) and returns what
+  it found. `main()` calls this before evaluating warmth, so a populated
+  `.pylibs` makes the probe warm with zero installs and prints which path it
+  used; a genuine miss still falls through to the locked install path
+  unchanged.
+- **`tools/audit.py`** (v3.3 -> v3.4): `check_dependencies` imports
+  `env_probe` and calls the same `ensure_vendored_on_path` before its
+  `importlib` checks, and records the path used (or `None`) as
+  `vendored_pylibs` in its returned dict. Separately, and easy to miss: the
+  `--run-tests` test-runner subprocess does not inherit this process's
+  `sys.path`, only environment variables, so `run_audit` now threads
+  `deps["vendored_pylibs"]` into that subprocess's `PYTHONPATH` explicitly —
+  without this, a clean dependency PASS could still be followed by a test run
+  that cannot import `scipy` at all.
+
+### Added
+
+- **`tests.test_core.VendoredPylibsTests`** (7 tests): pure filesystem checks
+  for `vendored_pylibs`/`ensure_vendored_on_path` (absent, empty, populated,
+  idempotent insertion, real import through the inserted path), one
+  integration check against this checkout's own `.pylibs` (skipped if a
+  checkout has none), and one mocked check that the `--run-tests` subprocess
+  actually receives the vendored `PYTHONPATH`. `EXPECTED_TEST_COUNT`: 595 ->
+  602 (`core 381 -> 388`, others unchanged). Synced the three docs that quote
+  the count: `CLAUDE.md`, the ledger Quick Card, `skills/generate-lineups/SKILL.md`.
+
+### Verified
+
+- All 602 tests pass. The sandbox that produced this fix could not run
+  `audit.py --run-tests` as one command (same slow-mount pattern R42 itself
+  describes — confirmed unrelated to this change: `tests.test_showdown` +
+  `test_upload_integrity` + `test_golden_replay` + `test_paste_lineups` (214)
+  and `test_core` chunked by class (66 classes, 388) each ran clean within a
+  single call at least once, just never all 602 in the same subprocess
+  inside one 45s window. `python tools/audit.py --run-tests --terse` on a
+  normal machine is the one-command confirmation this entry could not
+  produce directly.
+
+### Not done here
+
+- **R42(b)**, the genuine-miss install path (headroom check, named shortfall,
+  reclaim, `TMPDIR`-to-persistent-mount, `wheel_fetch.py` version pinning),
+  stays open and lower-priority now that (a) makes it a rare path instead of
+  a common one. See the backlog entry for the full sequencing.
+- **A second solver (PuLP or otherwise) was asked about live and is not
+  built.** Two prior external critiques proposed one; both were already
+  rejected on factual grounds (see `docs/2026-07-27_backlog_v2.md`, "Do not
+  build," and the 2026-08-01 changelog entry). Nothing in this incident
+  changes that: every occurrence was an installation failure, and a second
+  solver would face the identical `$HOME`-is-full wall on its own install,
+  since this repo has never used PuLP and it is not pre-vendored the way
+  scipy now demonstrably needs to be and is.
+
 ## 2026-08-03 — R43: the standings-pull scan is a tool now, not a fourth hand-written pass
 
 ### Added

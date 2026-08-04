@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-VERSION = "v3.3"
+VERSION = "v3.4"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
 # Every suite the audit gates. test_core alone left the Showdown suite and the
@@ -33,7 +33,7 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 595  # core 381 + showdown 49 + upload 100 + golden 9 + paste 56
+EXPECTED_TEST_COUNT = 602  # core 388 + showdown 49 + upload 100 + golden 9 + paste 56
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -87,8 +87,20 @@ def check_dependencies(root: Path) -> Dict[str, Any]:
     absent in a fresh environment and surfaced at T-35 on a live slate as a bare
     'scipy.optimize.milp unavailable', with the install competing for the same
     minutes as the build. Checking first turns that into a one-line fix.
+
+    R42(a), 2026-08-03: that "one-line fix" was itself the problem three times
+    the same day -- it names `python tools/env_probe.py --install`, which
+    reliably fails ENOSPC in this sandbox, while a working copy already sits
+    at `<root>/.pylibs`. Check there first, same as env_probe.py does, before
+    importlib ever gets a chance to fail.
     """
     import importlib
+
+    tools_dir = Path(__file__).resolve().parent
+    if str(tools_dir) not in sys.path:
+        sys.path.insert(0, str(tools_dir))
+    import env_probe
+    vendored = env_probe.ensure_vendored_on_path(root)
 
     req = root / "requirements.txt"
     wanted = []
@@ -113,6 +125,7 @@ def check_dependencies(root: Path) -> Dict[str, Any]:
         "missing": missing,
         "scipy_milp_available": milp_ok,
         "passed": not missing and milp_ok,
+        "vendored_pylibs": str(vendored) if vendored is not None else None,
         "remedy": ("python tools/env_probe.py --install"
                    if missing or not milp_ok else None),
     }
@@ -202,6 +215,14 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
         # a randomized hash seed cannot tell a fixed ordering from a lucky one.
         test_env = dict(os.environ)
         test_env["PYTHONHASHSEED"] = "0"
+        # R42(a): sys.path mutations in this process (check_dependencies just
+        # made one, if .pylibs is in play) do not reach a subprocess -- only
+        # env vars do. Without this, --run-tests could fail on import errors
+        # right after --terse alone reported a clean dependency PASS.
+        if deps.get("vendored_pylibs"):
+            existing_pp = test_env.get("PYTHONPATH", "")
+            test_env["PYTHONPATH"] = deps["vendored_pylibs"] + (
+                os.pathsep + existing_pp if existing_pp else "")
         proc = subprocess.run(
             [sys.executable, "-m", "unittest", *suites],
             cwd=str(root), text=True, capture_output=True, env=test_env,
