@@ -25,6 +25,86 @@ performance claim.
 
 ---
 
+## 2026-08-04 — R51 + R52: both upload gates stop returning a false clean
+
+### Fixed
+
+- **R51 — `preflight_upload` no longer passes a zero-parsed-entries file as
+  `upload_ready` (P0).** `load_entries` incremented `entry_id_rows` and appended
+  to `entries` inside the same `if not entry_id.isdigit(): continue` branch, so
+  the two counters were equal by construction and hard check 5's row accounting
+  was structurally dead code. A file whose Entry ID column an Excel or pandas
+  round-trip had reformatted (`4.71059E+09`, `4710591235.0` — blank reserved rows
+  float the column) therefore parsed to ZERO entries, the four other hard checks
+  each iterated an empty list, and the tool printed `PASS  0 classic entries, all
+  hard checks clean`, exit 0, verdict `upload_ready`. A header-only file passed
+  the same way. Both reproduced on the documented ad-hoc path (`--no-manifest`)
+  before the fix and both exit 2 after it.
+  Two changes: a row now counts as an Entry-ID row when it STATES an entry —
+  anything in the Entry ID cell, or a filled roster window — whether or not the
+  ID still parses as digits, so the counters can actually disagree and a float
+  round-trip reads as `2 Entry ID rows on disk, 0 parsed`; and zero parsed
+  entries is itself a hard failure, because every other check iterates that list
+  and an empty parse ran them all over nothing. The new counter was verified
+  against three real DK exports (2026-07-25 classic, 2026-07-29 classic, the
+  Showdown fixture): DK writes its player pool to the RIGHT of the roster window,
+  so pool rows carry neither signal and the new counter matches the old one
+  exactly on a healthy file. That is the regression risk in this fix and it is
+  now pinned by test — a counter that read those rows would fail row accounting
+  on every real export. The docstring claim that "row accounting can catch what
+  parsing tolerates" is true for the first time.
+  `verify_export` imports `load_entries` and `check_row_shape`, so it inherited
+  both fixes without a second implementation.
+  **The third item on R51's filed Fix line was deliberately not built.**
+  "Default `--expect-entries` from the manifest's `entries` when a manifest
+  resolves" is already implemented, at `preflight_upload.check_manifest:636`,
+  for the only case in which the manifest's count is trustworthy — a record
+  matching these bytes by sha256. Wiring it a second time through
+  `--expect-entries` would fire a second FAIL line stating the same fact, which
+  is the two-implementations-of-one-rule smell this repo names as a defect class
+  (R34). Truncation of a *delivered* file is caught upstream of the count
+  anyway: dropped rows change the sha256, and a name-matched record with a
+  different digest already hard-fails as "the file changed after it was
+  recorded". No coverage was given up.
+- **R52 — `verify_export --force` exits 4, not 0 (P0).** `verify_export.py:477`
+  returned 2 only `if rep.failures and not args.force` and then fell through to
+  `return 0`, so a forced run with hard failures present reported clean to the
+  one signal automation trusts — against the module's own header ("Exit 0 clean,
+  2 on any failure, matching preflight_upload") and against R2's whole rationale
+  on preflight, where `--force` prints the failures and exits 4 precisely so the
+  operator is unblocked without the caller being misinformed. The late-swap
+  verification path reads that code. The exit-code contract is now one shared
+  function, `preflight_upload.verdict_exit_code`, imported by `verify_export`
+  alongside the nine helpers it already took, because two copies of one rule
+  diverge and the weaker one reports success — which is exactly how this
+  happened. Only the verdict LABEL stays local to preflight. Three stale
+  statements of the old contract went with it: the module header, the `--force`
+  help text (which read "print failures and exit 0"), and the `FORCED` epilogue,
+  now `ACKNOWLEDGED ... Exit 4.` matching preflight's wording.
+
+### Tests
+
+- Seven new tests in `tests/test_upload_integrity.py`; the pin moves 602 → 609
+  (`tools/audit.py`, `CLAUDE.md` session-start line, `SKILL.md` audit line).
+  R51: the float-formatted Entry ID fixture and the header-only fixture each
+  exit 2, the float case also asserting the row-accounting counters disagree;
+  plus the embedded-pool guard described above.
+  R52: a new `BothFileCheckersShareOneExitContractTests` pins the two tools
+  EQUAL rather than pinning `verify_export` to 4 on its own — the defect was a
+  divergence, so pinning the pair is what stops either tool drifting alone. It
+  covers forced failures (4, 4), unforced failures (2, 2) and a clean file
+  (0, 0) forced or not, asserts both tools reached the *same* hard failure so an
+  equal pair cannot come from two unrelated verdicts, asserts the two tools hold
+  the identical function object, and fails if the old fall-through branch or the
+  old help text returns to the file.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  609 tests` on the pinned container stack after the
+  change.
+
+---
+
 ## 2026-08-04 — full-project audit: R51–R91 filed, the session-start gate replicated off-machine, the backlog reconciled and reordered
 
 ### Verified

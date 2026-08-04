@@ -24,10 +24,13 @@ Hard checks (exit 2):
   4. per-lineup DK legality (cap, slot eligibility, no duplicate person,
      Classic: 2+ games and at most 5 hitters per team and no hitter opposing a
      rostered SP; Showdown: both teams and a recomputed 1.5x captain salary)
-  5. row accounting: every Entry ID row parsed, all Entry IDs unique, and the
-     row count matches --expect-entries or the manifest when either is given
-     (truncation is self-consistent on its face; it is only detectable against
-     an external statement of how many entries the file should hold)
+  5. row accounting: at least one entry parsed, every Entry ID row parsed, all
+     Entry IDs unique, and the row count matches --expect-entries or the manifest
+     when either is given (truncation is self-consistent on its face; it is only
+     detectable against an external statement of how many entries the file
+     should hold). A file that parses to ZERO entries fails here: every other
+     hard check iterates the parsed entries, so an empty parse used to run them
+     all over nothing and print PASS (R51).
 
 Resolved on their own when not passed, because a check that runs only when the
 operator remembers a flag is a check that does not run at T-5:
@@ -268,6 +271,20 @@ def load_entries(path: Path) -> Tuple[str, Tuple[str, ...], List[EntryRow], List
     width, so a truncated file printed PASS. Here a short row is still parsed
     (missing cells read blank) and the count of Entry-ID-bearing rows is
     returned separately, so row accounting can catch what parsing tolerates.
+
+    R51: that separation only works if the two counters can actually disagree.
+    They could not. Both were incremented inside the same
+    ``if not entry_id.isdigit(): continue`` branch, so ``entry_id_rows`` was
+    ``len(entries)`` by construction and hard check 5 was dead code. A row now
+    counts as an Entry-ID row when it STATES an entry -- anything in the Entry ID
+    cell, or a filled roster window -- whether or not the ID still parses as
+    digits. That is what makes an Excel or pandas float round-trip
+    ('4.71059E+09', '4710591235.0') visible as rows-lost instead of parsing to
+    zero entries and printing PASS. Verified against three real DK exports
+    (2026-07-25 classic, 2026-07-29 classic, the Showdown fixture): the embedded
+    player pool sits to the RIGHT of the roster window, so its rows carry
+    neither signal and the new counter matches the old one exactly on a healthy
+    file.
     """
     with path.open(encoding="utf-8-sig", newline="") as fh:
         rows = list(csv.reader(fh))
@@ -280,10 +297,12 @@ def load_entries(path: Path) -> Tuple[str, Tuple[str, ...], List[EntryRow], List
     entry_id_rows = 0
     for line_no, raw in enumerate(rows[1:], start=2):
         entry_id = _cell(raw, 0)
+        row = EntryRow(line_no, raw, width)
+        if entry_id or row.filled:
+            entry_id_rows += 1
         if not entry_id.isdigit():
             continue
-        entry_id_rows += 1
-        entries.append(EntryRow(line_no, raw, width))
+        entries.append(row)
     return contest, slots, entries, rows, entry_id_rows
 
 
@@ -350,9 +369,40 @@ class Report:
         self.warnings.append(message)
 
 
+def verdict_exit_code(failures: Sequence[str], force: bool) -> int:
+    """The one exit-code contract both file checkers answer to.
+
+    R2 settled this on preflight: ``--force`` must never return the single signal
+    automation trusts, so a forced run with hard failures present exits 4
+    (acknowledged, not clean) rather than 0. R52 found ``verify_export`` had never
+    adopted it -- it returned 2 only when ``--force`` was absent and otherwise
+    fell through to ``return 0``, so the late-swap verification path read a forced
+    run as clean and the two checkers disagreed on the only contract a caller can
+    see. One function now, imported by both, because two implementations of one
+    rule is this project's named no-op failure class.
+    """
+    if not failures:
+        return 0
+    return 4 if force else 2
+
+
 def check_row_shape(entries: Sequence[EntryRow], entry_id_rows: int, width: int,
                     rep: Report, expect_entries: Optional[int] = None) -> None:
     """Hard check 1 and 5: geometry per row, and row accounting."""
+    # R51: every other hard check iterates `entries`. On an empty parse they all
+    # ran over an empty list and the tool printed "all hard checks clean", exit 0,
+    # verdict upload_ready -- a false PASS at the money boundary. A file with no
+    # parseable entry is never uploadable, whatever else is true of it.
+    if not entries:
+        if entry_id_rows:
+            rep.fail(f"no parseable entries: {entry_id_rows} row(s) state an entry "
+                     f"but none carries a numeric Entry ID. An Excel or pandas "
+                     f"round-trip reformats that column ('4.71059E+09', "
+                     f"'4710591235.0'); re-export the file rather than repairing "
+                     f"the cells by hand")
+        else:
+            rep.fail("no parseable entries: this file holds a header and no entry "
+                     "rows at all. There is nothing to upload")
     if entry_id_rows != len(entries):
         rep.fail(f"row accounting: {entry_id_rows} Entry ID rows on disk, "
                  f"{len(entries)} parsed")
@@ -1001,9 +1051,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # already happened twice on 2026-07-29. Passing every byte-level check is not
     # certification and must not be labelled as it.
     certification = str(report["info"].get("recorded_certification") or "").strip()
+    # R52: the exit code comes from the shared contract; only the LABEL is local.
+    code = verdict_exit_code(report["failures"], args.force)
     if not report["failures"]:
         if certification and certification != "certified":
-            verdict, code = "review_ready", 0
+            verdict = "review_ready"
             report["verdict_note"] = (
                 f"every file-level check passed, but the manifest records "
                 f"certification={certification!r}, so this is NOT upload_ready: "
@@ -1011,11 +1063,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 f"selection_certified and allocation_certified all passed. "
                 f"Showdown ships review-grade by design.")
         else:
-            verdict, code = "upload_ready", 0
+            verdict = "upload_ready"
     elif args.force:
-        verdict, code = "acknowledged", 4
+        verdict = "acknowledged"
     else:
-        verdict, code = "blocked", 2
+        verdict = "blocked"
     report["verdict"] = verdict
     manifest_file = report["info"].get("manifest_file")
     if manifest_file:

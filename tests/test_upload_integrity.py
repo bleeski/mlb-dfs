@@ -351,6 +351,46 @@ class PreflightToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("truncated write", result.stdout)
 
+    def test_float_formatted_entry_ids_fail_instead_of_passing_as_zero_entries(self):
+        """R51: an Excel or pandas round-trip reformats the Entry ID column to
+        '4.71059E+09'. Every ID then failed .isdigit(), the file parsed to zero
+        entries, all four other hard checks iterated an empty list, and the tool
+        printed 'PASS 0 classic entries, all hard checks clean' with verdict
+        upload_ready. That is the false-PASS class at the money boundary."""
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("4.71059E+09", "5", self.lineup),
+                       classic_entry("4710591235.0", "5", self.lineup)])
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("no parseable entries", result.stdout)
+        # Root cause: the two row-accounting counters were incremented in the
+        # same branch, so hard check 5 was unreachable. They must disagree here.
+        self.assertIn("2 Entry ID rows on disk, 0 parsed", result.stdout)
+        payload = json.loads(self._run("--json").stdout)
+        self.assertEqual(payload["verdict"], "blocked")
+        self.assertFalse(payload["passed"])
+
+    def test_a_header_only_file_fails(self):
+        """R51: 'nothing to upload' is not 'nothing wrong'. This passed too."""
+        write_entries(self.entries, CLASSIC_HEADER, [])
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("no parseable entries", result.stdout)
+        self.assertIn("header and no entry rows", result.stdout)
+
+    def test_the_embedded_player_pool_never_counts_as_entry_rows(self):
+        """The regression risk in R51's counter. DK writes a full player pool to
+        the RIGHT of the roster window in the same file -- 195 rows against 14
+        entries in this fixture. A counter that read those rows would fail row
+        accounting on every real export, so the fix counts only the Entry ID cell
+        and the roster window."""
+        import preflight_upload
+        fixture = REPO / "tests" / "fixtures" / "showdown" / "DKEntries_showdown_MIN_CHC.csv"
+        _, _, entries, raw_rows, entry_id_rows = preflight_upload.load_entries(fixture)
+        self.assertGreater(len(raw_rows), len(entries) * 5)
+        self.assertTrue(preflight_upload.parse_embedded_pool(raw_rows))
+        self.assertEqual(entry_id_rows, len(entries))
+
     def test_force_never_blocks_shipping_but_never_reports_clean(self):
         """R2: --force used to exit 0, which is the one signal automation
         trusts. A wrapper could not tell "upload-ready" from "the clock beat the
@@ -1510,6 +1550,84 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         text = (REPO / "tools" / "verify_export.py").read_text(encoding="utf-8")
         self.assertIn("ADDS to the derived set, never shrinks it", text)
         self.assertNotIn("overrides the Game Info derivation", text)
+
+
+class BothFileCheckersShareOneExitContractTests(unittest.TestCase):
+    """R52: the two upload gates disagreed on the only contract a caller sees.
+
+    verify_export returned 2 only ``if rep.failures and not args.force``, then
+    fell through to ``return 0`` -- so a forced run with hard failures present
+    reported clean, against its own module header and against R2's whole
+    rationale on preflight. The late-swap verification path reads that code.
+    This pins the two tools EQUAL rather than pinning verify_export to 4 on its
+    own, because the defect was a divergence: pin the pair and neither tool can
+    drift without the other.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        lineup = write_classic_salary(self.salary)
+        self.clean = self.dir / "clean.csv"
+        write_entries(self.clean, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+        # One hard failure both tools implement identically: the same person in
+        # two slots. It comes from check_legality, which verify_export imports.
+        broken = list(lineup)
+        broken[1] = broken[0]
+        self.broken = self.dir / "broken.csv"
+        write_entries(self.broken, CLASSIC_HEADER, [classic_entry("900", "5", broken)])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    NEEDLE = "the same person occupies two slots"
+
+    def _both(self, entries: Path, *extra) -> tuple[int, int]:
+        """Run both tools on one file. Asserts each tool reached the SAME hard
+        failure, so an equal pair of exit codes cannot come from two tools
+        failing (or passing) for unrelated reasons."""
+        common = ("--entries", str(entries), "--salary", str(self.salary))
+        pre = run_preflight(*common, "--no-manifest", *extra)
+        ver = run_verify(*common, *extra)
+        for tool, result in (("preflight", pre), ("verify_export", ver)):
+            if entries == self.broken:
+                self.assertIn(self.NEEDLE, result.stdout, f"{tool}: {result.stdout}")
+            else:
+                self.assertNotIn(self.NEEDLE, result.stdout, f"{tool}: {result.stdout}")
+        return pre.returncode, ver.returncode
+
+    def test_forced_failures_exit_4_in_both_tools(self):
+        pre, ver = self._both(self.broken, "--force")
+        self.assertEqual((pre, ver), (4, 4),
+                         f"preflight={pre} verify_export={ver}; --force must never "
+                         f"return 0, the one signal automation trusts")
+
+    def test_unforced_failures_exit_2_in_both_tools(self):
+        pre, ver = self._both(self.broken)
+        self.assertEqual((pre, ver), (2, 2))
+
+    def test_a_clean_file_exits_0_in_both_tools_forced_or_not(self):
+        """--force must not invent a failure either: 0 still means clean."""
+        self.assertEqual(self._both(self.clean), (0, 0))
+        self.assertEqual(self._both(self.clean, "--force"), (0, 0))
+
+    def test_one_shared_implementation_of_the_exit_contract(self):
+        """The fix is a shared function, not a copied branch. Two copies of one
+        rule is this project's named no-op class: they diverge and the weaker one
+        reports success, which is exactly how R52 happened."""
+        import preflight_upload
+        import verify_export
+
+        self.assertIs(verify_export.verdict_exit_code,
+                      preflight_upload.verdict_exit_code)
+        for failures, force, expected in (([], False, 0), ([], True, 0),
+                                          (["x"], False, 2), (["x"], True, 4)):
+            self.assertEqual(
+                preflight_upload.verdict_exit_code(failures, force), expected)
+        text = (REPO / "tools" / "verify_export.py").read_text(encoding="utf-8")
+        self.assertNotIn("if rep.failures and not args.force", text)
+        self.assertNotIn("exit 0\"", text)
 
 
 class UploadReadyIsReservedTests(unittest.TestCase):

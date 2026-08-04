@@ -40,8 +40,12 @@ Usage:
         [--as-of 2026-07-25T18:40:00-04:00]  # wall clock used for the lock derivation
         [--json]
 
-Exit 0 clean, 2 on any failure (matching preflight_upload), 3 on a usage or IO
-error. This is a file check. It never uploads anything.
+Exit 0 clean, 2 on any failure, 3 on a usage or IO error, 4 acknowledged
+(--force printed the failures and did not block). The codes and the rule behind
+them are preflight_upload's, imported rather than restated: --force never returns
+0, because exit 0 is the one signal automation trusts (R2, extended here by R52 --
+this tool used to fall through to `return 0` on a forced run and read as clean).
+This is a file check. It never uploads anything.
 
 R29: the lock derivation is wall-clock, and re-derived on every invocation. It
 used to be that ``--locked-teams``, when supplied, REPLACED the derivation. On
@@ -75,6 +79,7 @@ from preflight_upload import (  # noqa: E402
     check_pool_membership, check_row_shape, check_status, load_entries,
     load_salary, parse_embedded_pool, parse_game_info_datetime,
     resolve_feed_for_slate, resolve_salary_from_promoted_run, sha256_of,
+    verdict_exit_code,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -358,7 +363,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--min-pool-overlap", type=float, default=0.95)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true",
-                    help="print failures and exit 0")
+                    help="print failures and exit 4 (acknowledged, not clean); "
+                         "never exits 0 with failures present")
     args = ap.parse_args(argv)
 
     rep = Report()
@@ -472,11 +478,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not rep.failures:
             print(f"PASS  {len(entries)} {contest} entries, all checks clean")
         elif args.force:
-            print(f"\nFORCED  {len(rep.failures)} failure(s) overridden by --force")
+            print(f"\nACKNOWLEDGED  {len(rep.failures)} failure(s) overridden by "
+                  f"--force; this file is not blocked and it is not clean. Exit 4.")
 
-    if rep.failures and not args.force:
-        return 2
-    return 0
+    return verdict_exit_code(rep.failures, args.force)
 
 
 if __name__ == "__main__":
