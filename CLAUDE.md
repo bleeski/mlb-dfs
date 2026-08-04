@@ -27,6 +27,9 @@ it against real-world rosters.
 This file carries the contracts and the gotchas. Each procedure lives once:
 - Per-slate loop, start to upload: skills/generate-lineups/SKILL.md
 - Post-slate archival: docs/cowork_archival_runbook.md
+- What's missing from the standings inbox: skills/mlb-standings-pull-checklist/SKILL.md,
+  which wraps `python tools/awaiting_standings.py scan`. Regenerated, never
+  hand-maintained.
 - Showdown mechanics: skills/generate-lineups/references/showdown.md
 - Any tool's flags: `python tools/<tool>.py --help`
 - What to build next: docs/2026-07-27_backlog_v2.md, the single live backlog.

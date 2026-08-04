@@ -25,6 +25,54 @@ performance claim.
 
 ---
 
+## 2026-08-03 — R43: the standings-pull scan is a tool now, not a fourth hand-written pass
+
+### Added
+
+- **`tools/awaiting_standings.py`** (`scan` / `mark-unrecoverable` /
+  `mark-placeholder`). Three sessions (2026-07-28, 08-02, 08-03) each
+  hand-wrote the same scan — every Contest ID on a filled entry row in
+  `outputs/*/DKEntries*.csv`, minus what's archived, minus what's already in
+  the inbox — because nothing in `tools/` ran it. Filed as item 2 of
+  `docs/backlog_inbox/2026-08-03_ARCHIVE_inbox-refill-and-scan-tooling.md`;
+  this closes it. `scan` writes both
+  `data/standings/CONTESTS_AWAITING_STANDINGS.md` and a clickable
+  `data/standings/standings_pulls_<date>.html`; the HTML's export links check
+  their own row's box on click, so working the list is one click per contest.
+- **`data/standings/recorded_exceptions.json`** replaces the hand-maintained
+  "do not pull" prose at the bottom of `CONTESTS_AWAITING_STANDINGS.md` with
+  a file the tool reads and `mark-unrecoverable` / `mark-placeholder` append
+  to. Seeded with the 9 contests already recorded dead (2026-06 tranche plus
+  the 2026-07-28 zero-byte four) and the one known placeholder (`199000001`,
+  synthetic entry ID, not a real DK contest).
+- **`skills/mlb-standings-pull-checklist/SKILL.md`**, the Cowork-facing
+  wrapper: take the inbox claim, run `scan`, present the HTML. Registered to
+  Ben's skill profile the same session so it actually triggers.
+
+### Fixed
+
+- **The scan now filters to 9-digit Contest IDs.** The 08-03 hand-written
+  pass found that accepting any non-empty value picks up non-DK placeholders
+  on manual/test entry rows (`0` for a hand-built Showdown entry, `900` for a
+  test fixture) and emits a dead `exportfullstandingscsv/0` link. The tool
+  filters on the pattern instead of hardcoding the two values seen so far,
+  and reports whatever it filtered out by name so a future one gets noticed
+  instead of silently dropped.
+- **The pull list now sorts oldest slate date first, matching its own
+  instructions.** Every hand-written version said "prioritize oldest first"
+  (DK's export is understood to age out some days after a contest settles,
+  so the oldest unpulled contests are nearest that cliff) while still
+  rendering newest-first. The tool sorts the section order to match the
+  prose.
+
+### Filed
+
+- **R44** — `extract_inbox_zips.py` re-extracts contests already archived,
+  refilling the inbox forever. Item 1 of the same fragment; not fixed here,
+  filed in `docs/2026-07-27_backlog_v2.md`.
+
+---
+
 ## 2026-08-01 — R36 Finding 11: the joint allocator's reuse term is removed
 
 ### Changed

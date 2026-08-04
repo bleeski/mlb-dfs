@@ -1,0 +1,56 @@
+{
+  "unrecoverable": [
+    {
+      "contest_id": "191489664",
+      "reason": "2026-06 tranche: landed at 0 bytes in the inbox on 2026-07-19, re-pulled twice on 2026-07-24, still 0 bytes both times",
+      "recorded": "2026-07-25"
+    },
+    {
+      "contest_id": "191513240",
+      "reason": "2026-06 tranche: landed at 0 bytes in the inbox on 2026-07-19, re-pulled twice on 2026-07-24, still 0 bytes both times",
+      "recorded": "2026-07-25"
+    },
+    {
+      "contest_id": "191520890",
+      "reason": "2026-06 tranche: landed at 0 bytes in the inbox on 2026-07-19, re-pulled twice on 2026-07-24, still 0 bytes both times",
+      "recorded": "2026-07-25"
+    },
+    {
+      "contest_id": "191521489",
+      "reason": "2026-06 tranche: landed at 0 bytes in the inbox on 2026-07-19, re-pulled twice on 2026-07-24, still 0 bytes both times",
+      "recorded": "2026-07-25"
+    },
+    {
+      "contest_id": "191542451",
+      "reason": "2026-06 tranche: landed at 0 bytes in the inbox on 2026-07-19, re-pulled twice on 2026-07-24, still 0 bytes both times",
+      "recorded": "2026-07-25"
+    },
+    {
+      "contest_id": "191047506",
+      "reason": "zero-byte on the 2026-07-28 pull",
+      "recorded": "2026-07-28"
+    },
+    {
+      "contest_id": "192345441",
+      "reason": "zero-byte on the 2026-07-28 pull",
+      "recorded": "2026-07-28"
+    },
+    {
+      "contest_id": "192419758",
+      "reason": "zero-byte on the 2026-07-28 pull",
+      "recorded": "2026-07-28"
+    },
+    {
+      "contest_id": "192420813",
+      "reason": "zero-byte on the 2026-07-28 pull",
+      "recorded": "2026-07-28"
+    }
+  ],
+  "placeholder": [
+    {
+      "contest_id": "199000001",
+      "name": "MLB $100K Relay Throw [$25K to 1st]",
+      "reason": "synthetic entry ID 9900000001 in DKEntries_1210_4g.csv / DKEntries_apex_relay.csv, not a real DK contest ID; if Relay Throw was actually entered the real ID has to come from DK's entry history"
+    }
+  ]
+}
