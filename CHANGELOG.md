@@ -25,6 +25,55 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R74: three silent failures at the archival tooling's edges
+
+### Fixed
+
+- **R74(a) — a mine with no contest identity is refused, not placeholdered
+  (P2).** `update_registry` resolved its dedupe key as
+  `mined["contest_id"] or meta.get("winning_entry_id", "unknown")`, and
+  `.get(key, default)` never returns the default when the key EXISTS as None —
+  which is exactly what a mine with no winner produces. So the key came out None,
+  `contests_mined` accumulated JSON nulls, and a SECOND identityless mine was
+  silently skipped as already-mined because None was already in the list. A
+  registry entry with no contest identity records nothing and cannot be deduped
+  against anything, so it now raises naming `--contest-id` as the fix rather than
+  folding in under a placeholder. A winner's entry id still identifies a mine that
+  has no contest id, which is the case the fallback was written for.
+- **R74(b) — the inbox contest-ID regex is anchored (P2).** `re.compile(r"(\d{9})")`
+  used with `.search` matched the first nine digits of any longer run, so an entry
+  id or a timestamp in a filename could yield a real entered contest ID and mark it
+  pulled. That is the one direction `awaiting_standings` exists to prevent: a
+  contest wrongly marked pulled is a contest nobody goes back for.
+  `(?<!\d)(\d{9})(?!\d)` requires the run to be exactly nine digits.
+- **R74(c) — `scan_entered` reads filled rows only, as its docstring always
+  said (P2).** It harvested a Contest ID off every row that had one, including the
+  blank reserved rows a DKEntries template carries, which enrolled never-entered
+  contests into the pull list. A filled row now needs both a digit Entry ID and at
+  least one non-empty roster cell. Two signals rather than one because either alone
+  is weak, and a file with no recognizable roster columns falls back to the Entry ID
+  alone so an unexpected DK template degrades to the previous behavior instead of
+  silently emptying the pull list.
+
+### Tests
+
+- Six new tests in a new `MinerEdgeIntegrityTests`; the pin moves 699 → 705. The
+  registry refusal, a winner id still identifying a mine, and two identityless
+  mines being unable to collide because neither is accepted; the anchored regex
+  against a real nine-digit id, three longer runs, and an id embedded in a longer
+  name; a template carrying one entered row and two reserved ones (including the
+  entry-id-but-no-roster shape) enrolling only the entered contest; and the
+  unrecognized-header fallback.
+- Mutation-checked three ways, one per part: restoring `.get(key, "unknown")` fails
+  the refusal and collision tests, unanchoring the regex fails all three long-run
+  cases, and harvesting every row again fails both scan tests.
+
+### Verified
+
+- `PASS  v2.26.0  26 modules  705 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R30(b) + R50: the two ends of the same lie about fees
 
 ### Fixed

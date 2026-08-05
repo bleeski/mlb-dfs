@@ -1087,7 +1087,20 @@ def update_registry(registry_path: Optional[str], mined: Dict[str, Any]) -> Dict
     reg.setdefault("_label", "opponent-recurrence registry; observed field behavior; "
                              "record-only, never a prediction")
     users = reg.setdefault("users", {})
-    cid = mined["contest_id"] or mined.get("meta", {}).get("winning_entry_id", "unknown")
+    # R74(a): `.get(key, "unknown")` never defaults when the key EXISTS as None,
+    # which is exactly what a mine with no winner produces. So `cid` came out
+    # None, `contests_mined` accumulated JSON nulls, and a second no-id mine was
+    # silently skipped as already-mined because None was already in the list. A
+    # registry entry with no contest identity is not a record of anything, so it
+    # is refused rather than folded in under a placeholder.
+    cid = mined.get("contest_id") or (mined.get("meta") or {}).get("winning_entry_id") or ""
+    cid = str(cid).strip()
+    if not cid:
+        raise ValueError(
+            "refusing to update the registry for a mine with no contest identity: "
+            "contest_id is empty and the standings carry no winning entry id, so "
+            "this mine cannot be deduped against any other. Pass --contest-id."
+        )
     mined_contests = reg.setdefault("contests_mined", [])
     if cid in mined_contests:
         # Already folded in. Recompute the derived averages and return, so a

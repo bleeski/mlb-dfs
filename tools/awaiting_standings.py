@@ -77,7 +77,42 @@ REPO = Path(__file__).resolve().parents[1]
 # contest DK will ever serve an export for.
 CID_RE = re.compile(r"^\d{9}$")
 MINED_JSON_RE = re.compile(r"^mined_(\d+)\.json$")
-INBOX_ID_RE = re.compile(r"(\d{9})")
+# R74(b): ANCHORED. `.search(r"(\d{9})")` matched the first 9 digits of any
+# longer run, so an entry id or a timestamp in a filename could yield a real
+# entered contest id and silently mark it pulled -- the one direction this
+# tool exists to prevent. The lookarounds require the run to be exactly 9
+# digits long.
+INBOX_ID_RE = re.compile(r"(?<!\d)(\d{9})(?!\d)")
+
+
+# The DK Classic roster headers, lowercased. A reserved row carries the contest
+# columns and leaves these empty, which is what makes it reserved (R74c).
+_ROSTER_HEADERS = frozenset({
+    "p", "c", "1b", "2b", "3b", "ss", "of", "cpt", "util",
+})
+
+
+def _row_is_filled(
+    row: list[str],
+    entry_i: int | None,
+    roster_i: list[int],
+) -> bool:
+    """True when this DKEntries row is an ENTERED entry rather than a reserved one.
+
+    R74(c). Two independent signals, both required, because either alone is weak:
+    a digit Entry ID (DK assigns one per reserved slot, so a blank here is a row
+    the template made and nothing filled), and at least one roster cell carrying
+    something. A file with no recognizable roster columns falls back to the Entry
+    ID alone rather than rejecting every row, so an unexpected header shape
+    degrades to the old behavior instead of emptying the pull list.
+    """
+    if entry_i is not None:
+        value = row[entry_i].strip() if len(row) > entry_i else ""
+        if not value.isdigit():
+            return False
+    if not roster_i:
+        return entry_i is not None
+    return any((row[i].strip() for i in roster_i if len(row) > i))
 
 
 def _today(date_override: str | None = None) -> str:
@@ -119,11 +154,23 @@ def scan_entered(outputs_dir: Path) -> tuple[dict[str, dict], dict[str, dict]]:
                         continue
                     cid_i = lowered.index("contest id")
                     name_i = lowered.index("contest name") if "contest name" in lowered else None
+                    entry_i = (lowered.index("entry id")
+                               if "entry id" in lowered else None)
+                    # R74(c): the docstring says "every Contest ID on a FILLED
+                    # entry row", and the loop read every row with a Contest ID
+                    # cell -- including the blank reserved rows a DKEntries
+                    # template carries, which enrolled never-entered contests
+                    # into the pull list. A filled row has a digit Entry ID and
+                    # at least one roster cell with something in it.
+                    roster_i = [i for i, h in enumerate(lowered)
+                                if h in _ROSTER_HEADERS]
                     for row in reader:
                         if len(row) <= cid_i:
                             continue
                         raw = row[cid_i].strip()
                         if not raw:
+                            continue
+                        if not _row_is_filled(row, entry_i, roster_i):
                             continue
                         name = row[name_i].strip() if name_i is not None and len(row) > name_i else ""
                         target = entered if CID_RE.match(raw) else invalid

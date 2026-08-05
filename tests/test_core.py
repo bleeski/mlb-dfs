@@ -7165,6 +7165,121 @@ class MinerMoneyHonestyTests(unittest.TestCase):
         self.assertIn("1 own entry inside the paid line", text)
 
 
+class MinerEdgeIntegrityTests(unittest.TestCase):
+    """R74. Three ways the archival tooling failed silently at its edges."""
+
+    def test_a_mine_with_no_contest_identity_is_refused_not_placeholdered(self):
+        """R74(a). `.get(key, "unknown")` never defaults when the key EXISTS as
+        None, which is what a mine with no winner produces. cid came out None,
+        contests_mined accumulated JSON nulls, and a SECOND no-id mine was
+        silently skipped as already-mined because None was already in the list."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = str(Path(tmp) / "reg.json")
+            mined = {"contest_id": "", "meta": {"winning_entry_id": None},
+                     "entries": [], "diagnostics": {}}
+            with self.assertRaisesRegex(ValueError, "no contest identity"):
+                fm.update_registry(registry, mined)
+            self.assertFalse(Path(registry).exists(),
+                             "a refused update must not create a registry")
+
+    def test_a_winner_entry_id_still_identifies_a_mine_with_no_contest_id(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = str(Path(tmp) / "reg.json")
+            mined = {"contest_id": "", "meta": {"winning_entry_id": "88881111"},
+                     "entries": [], "diagnostics": {}}
+            reg = fm.update_registry(registry, mined)
+            self.assertEqual(reg["contests_mined"], ["88881111"])
+            self.assertNotIn(None, reg["contests_mined"])
+
+    def test_two_identityless_mines_cannot_collide_because_neither_is_accepted(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = str(Path(tmp) / "reg.json")
+            fm.update_registry(registry, {"contest_id": "111111111", "meta": {},
+                                          "entries": [], "diagnostics": {}})
+            for _ in range(2):
+                with self.assertRaises(ValueError):
+                    fm.update_registry(registry, {"contest_id": None, "meta": {},
+                                                  "entries": [], "diagnostics": {}})
+            reg = json.loads(Path(registry).read_text(encoding="utf-8"))
+            self.assertEqual(reg["contests_mined"], ["111111111"])
+
+    # -- R74(b): the inbox contest-ID regex --------------------------------
+
+    def test_the_inbox_id_regex_is_anchored(self):
+        """R74(b). Unanchored, the first 9 digits of a longer run (an entry id, a
+        timestamp) could yield a real entered contest id and mark it pulled --
+        the one direction this tool exists to prevent."""
+        sys.path.insert(0, str(REPO / "tools"))
+        import awaiting_standings as aw
+
+        self.assertEqual(aw.INBOX_ID_RE.search("contest-standings-192892126").group(1),
+                         "192892126")
+        # a 10+ digit run is an entry id or a timestamp, not a contest id
+        for text in ("1928921260", "01928921261", "20260805123456"):
+            with self.subTest(text=text):
+                self.assertIsNone(aw.INBOX_ID_RE.search(text),
+                                  f"{text} yielded a contest id")
+        # embedded in a longer name but still exactly nine digits
+        self.assertEqual(aw.INBOX_ID_RE.search("x_192892126_y").group(1), "192892126")
+
+    # -- R74(c): blank reserved rows ---------------------------------------
+
+    def _entries_csv(self, path, rows):
+        header = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+                  "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            writer.writerows(rows)
+
+    def test_a_blank_reserved_row_does_not_enroll_its_contest(self):
+        """R74(c). scan_entered's own docstring says "every Contest ID on a FILLED
+        entry row"; it read every row with a Contest ID cell, so the reserved rows
+        a DKEntries template carries enrolled never-entered contests."""
+        sys.path.insert(0, str(REPO / "tools"))
+        import awaiting_standings as aw
+        with tempfile.TemporaryDirectory() as tmp:
+            outputs = Path(tmp) / "outputs" / "2026-08-05"
+            outputs.mkdir(parents=True)
+            self._entries_csv(outputs / "DKEntries.csv", [
+                # a real entered row: entry id plus a roster
+                ["5157463016", "Entered Contest", "111111111", "$0.25"]
+                + [f"P{i}" for i in range(10)],
+                # a reserved row: contest columns filled, roster empty
+                ["", "Reserved Contest", "222222222", "$0.25"] + [""] * 10,
+                # and one DK sometimes writes with an entry id but no roster
+                ["5157463017", "Reserved With Id", "333333333", "$0.25"] + [""] * 10,
+            ])
+            entered, invalid = aw.scan_entered(Path(tmp) / "outputs")
+            self.assertIn("111111111", entered)
+            self.assertNotIn("222222222", entered)
+            self.assertNotIn("222222222", invalid)
+            self.assertNotIn("333333333", entered,
+                             "an entry id with an empty roster is still reserved")
+
+    def test_an_unrecognized_header_shape_degrades_instead_of_emptying(self):
+        # A file with no roster columns falls back to the Entry ID alone rather
+        # than rejecting every row, so an unexpected DK template does not silently
+        # empty the pull list.
+        sys.path.insert(0, str(REPO / "tools"))
+        import awaiting_standings as aw
+        with tempfile.TemporaryDirectory() as tmp:
+            outputs = Path(tmp) / "outputs" / "2026-08-05"
+            outputs.mkdir(parents=True)
+            path = outputs / "DKEntries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Entry ID", "Contest Name", "Contest ID", "Entry Fee"])
+                writer.writerow(["5157463016", "Entered", "111111111", "$0.25"])
+                writer.writerow(["", "Reserved", "222222222", "$0.25"])
+            entered, _invalid = aw.scan_entered(Path(tmp) / "outputs")
+            self.assertIn("111111111", entered)
+            self.assertNotIn("222222222", entered)
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""
