@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import inspect
+import datetime as dtmod
 import json
 import os
 import subprocess
@@ -11,6 +12,7 @@ import unittest
 import unittest.mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -3297,12 +3299,255 @@ class BuildSlatePoolTests(unittest.TestCase):
                                  for b in report["blockers"]), report["blockers"])
 
 
+class EasternCalendarAuthorityTests(unittest.TestCase):
+    """R65. Baseball's day is an ET day; this container's day is a UTC day.
+
+    Three callers computed slate dates from `date.today()` or a hardcoded UTC-4,
+    so between 8pm ET and midnight ET they were answering about a different
+    calendar day than the one the schedule runs on. `repo_env` is now the single
+    authority and takes an injected instant so the boundary is pinnable.
+    """
+
+    ET = ZoneInfo("America/New_York")
+
+    def setUp(self):
+        from mlb_engine import repo_env
+        self.env = repo_env
+
+    def test_the_8pm_et_rollover_is_the_case_that_broke(self):
+        # 00:15 UTC on Aug 6 is 8:15pm ET on Aug 5: a live build for TONIGHT's
+        # slate, at the hour the container's calendar has already moved on.
+        now = datetime(2026, 8, 6, 0, 15, tzinfo=timezone.utc)
+        self.assertEqual(now.date().isoformat(), "2026-08-06")  # what today() said
+        self.assertEqual(self.env.today_et(now), "2026-08-05")
+        self.assertEqual(self.env.et_day_offsets(now=now), ("2026-08-05", "2026-08-06"))
+
+    def test_est_months_are_utc_minus_five(self):
+        # The retired approximation was a hardcoded UTC-4 commented "EDT covers
+        # the MLB season". Any instant in the 04:00-05:00 UTC window returned
+        # tomorrow's ET date in EST months, which is when archive work runs.
+        now = datetime(2026, 12, 1, 4, 30, tzinfo=timezone.utc)
+        self.assertEqual((now - timedelta(hours=4)).date().isoformat(), "2026-12-01")
+        self.assertEqual(self.env.today_et(now), "2026-11-30")
+        self.assertEqual(self.env.now_et(now).utcoffset(), timedelta(hours=-5))
+
+    def test_offsets_come_from_one_reading(self):
+        # Two date.today() calls can straddle midnight and return a
+        # non-adjacent pair. One reading cannot, at any instant.
+        for hour in (3, 4, 5, 23):
+            with self.subTest(hour=hour):
+                now = datetime(2026, 8, 6, hour, 59, 59, tzinfo=timezone.utc)
+                today, tomorrow = self.env.et_day_offsets(now=now)
+                self.assertEqual(
+                    (datetime.strptime(tomorrow, "%Y-%m-%d")
+                     - datetime.strptime(today, "%Y-%m-%d")), timedelta(days=1))
+
+    def test_a_naive_datetime_is_refused_not_guessed(self):
+        with self.assertRaisesRegex(ValueError, "timezone-aware"):
+            self.env.now_et(datetime(2026, 8, 6, 0, 15))
+
+    def test_fetch_slate_bundle_defaults_through_the_authority(self):
+        from tools.fetch_slate_bundle import _today_et
+        self.assertEqual(_today_et(), self.env.today_et())
+
+
+class RotoWireParseFloorTests(unittest.TestCase):
+    """R65, second half. A regex parser over live third-party HTML fails EMPTY.
+
+    An empty platoon file is worse than no file: the next build merges it, counts
+    zero lineups, and reports a successful fetch. The floor refuses to emit one.
+    """
+
+    def setUp(self):
+        from tools import fetch_rotowire_lineups as frl
+        self.frl = frl
+
+    def test_regex_drift_on_a_real_page_is_refused(self):
+        # Substantial HTML, zero game containers: the split/anchor regexes no
+        # longer match the page. Unambiguous, and independent of whether any
+        # lineup has posted.
+        report = {"page_bytes": 480_000, "blocks": 0, "games": 0,
+                  "teams_with_order": 0, "teams_without_order": 0}
+        # Assert on wording unique to the drift branch. Both branches can fire on
+        # this input (0 games implies 0 orders), so what is being pinned is WHICH
+        # diagnosis the operator gets -- "the layout moved" sends them to the
+        # regexes, "nothing to merge" sends them to the slate.
+        with self.assertRaisesRegex(self.frl.RotoWireParseFloor, "layout moved"):
+            self.frl.check_parse_floor(report)
+        with self.assertRaisesRegex(self.frl.RotoWireParseFloor, "480000 bytes"):
+            self.frl.check_parse_floor(report)
+
+    def test_games_found_but_nothing_to_merge_is_refused(self):
+        report = {"page_bytes": 480_000, "blocks": 15, "games": 15,
+                  "teams_with_order": 0, "teams_without_order": 30}
+        with self.assertRaisesRegex(self.frl.RotoWireParseFloor, "nothing to merge"):
+            self.frl.check_parse_floor(report)
+
+    def test_an_early_fetch_before_lineups_post_is_not_a_failure(self):
+        # 9am ET on a full slate: the game containers are up, two clubs have
+        # posted. This is the case an absolute >=24-team floor would have
+        # refused, which is why the floor is structural instead.
+        report = {"page_bytes": 480_000, "blocks": 15, "games": 15,
+                  "teams_with_order": 2, "teams_without_order": 28}
+        self.assertIsNone(self.frl.check_parse_floor(report))
+
+    def test_a_light_schedule_day_is_not_a_failure(self):
+        # A 9-game day is 18 teams even with every lineup posted.
+        report = {"page_bytes": 300_000, "blocks": 9, "games": 9,
+                  "teams_with_order": 18, "teams_without_order": 0}
+        self.assertIsNone(self.frl.check_parse_floor(report))
+
+    def test_min_teams_is_the_knob_for_a_caller_that_knows_better(self):
+        report = {"page_bytes": 300_000, "blocks": 15, "games": 15,
+                  "teams_with_order": 18, "teams_without_order": 12}
+        self.assertIsNone(self.frl.check_parse_floor(report, min_teams=18))
+        with self.assertRaisesRegex(self.frl.RotoWireParseFloor, r"floor 24"):
+            self.frl.check_parse_floor(report, min_teams=24)
+
+    def test_an_empty_response_is_not_diagnosed_as_regex_drift(self):
+        # A truncated or empty body has no game containers either, but calling
+        # that "the layout moved" would send the operator to the wrong place.
+        report = {"page_bytes": 12, "blocks": 0, "games": 0,
+                  "teams_with_order": 0, "teams_without_order": 0}
+        with self.assertRaisesRegex(self.frl.RotoWireParseFloor, "nothing to merge"):
+            self.frl.check_parse_floor(report)
+
+    def test_the_parser_reports_the_counts_the_floor_reads(self):
+        # Built from the module's own regex constants rather than a hand-typed
+        # page, so this pins the report wiring without pretending to be a
+        # fixture of the real page (see R90).
+        frl = self.frl
+
+        def team_block(abbr, anchor, players):
+            rows = "".join(
+                f'<div class="lineup__pos">{pos}</div>'
+                f'<a href="/x" title="{name}">{name}</a>'
+                f'<span class="lineup__bats">{bats}</span>'
+                for pos, name, bats in players)
+            return f'<div class="{anchor}"><div class="lineup__abbr">{abbr}</div>{rows}</div>'
+
+        def game(away, home, away_players, home_players):
+            return ('<div class="lineup is-mlb">'
+                    f'<div class="lineup__abbr">{away}</div>'
+                    f'<div class="lineup__abbr">{home}</div>'
+                    + team_block(away, "lineup__list is-visit", away_players)
+                    + team_block(home, "lineup__list is-home", home_players)
+                    + "</div>")
+
+        nine = [("C", "A B", "R")] * 9
+        page = ("<html>" + " " * 3000
+                + game("NYY", "BOS", nine, nine)
+                + game("LAD", "SF", nine, [])          # SF has not posted
+                + '<div class="lineup is-mlb">template only</div>'
+                + "</html>")
+        report = {}
+        teams = frl.parse_lineups(page, report=report)
+        self.assertEqual(report["games"], 2, "the template block must not count")
+        self.assertEqual(report["blocks"], 3)
+        self.assertEqual(report["teams_with_order"], 3)
+        self.assertEqual(report["teams_without_order"], 1)
+        self.assertEqual(report["page_bytes"], len(page))
+        self.assertEqual([t["abbrev"] for t in teams], ["NYY", "BOS", "LAD"])
+        self.assertIsNone(frl.check_parse_floor(report))
+        # and the report travels on the emitted document
+        doc = frl.to_platoon_schema(teams, "2026-08-05")
+        self.assertEqual(doc["team_count"], 3)
+
+    def test_collected_date_defaults_to_et(self):
+        import inspect
+        src = inspect.getsource(self.frl.fetch_rotowire_platoon)
+        self.assertIn("today_et()", src)
+        self.assertNotIn("dt.date.today()", src)
+
+
 class BuildSlateScriptTests(unittest.TestCase):
     """Covers the two pure helpers in the generate-lineups build script.
 
     The script is the production front door but had no test harness; its
     top-level imports are stdlib only, so it loads without the engine.
     """
+
+    def test_rotowire_window_reads_the_et_calendar(self):
+        # R65. The window logic was always right; the two dates handed to it
+        # came from the container's UTC calendar. With ET dates, a build started
+        # at 8:15pm ET resolves tonight's slate to "today" (it used to fall out
+        # of the window entirely and skip the merge in silence) and tomorrow's
+        # to "tomorrow" (it used to resolve to "today" and fetch the wrong ET
+        # day under a fresh collected_date).
+        mod = self._module()
+        from mlb_engine.repo_env import et_day_offsets
+        now = datetime(2026, 8, 6, 0, 15, tzinfo=timezone.utc)  # 8:15pm ET Aug 5
+        today, tomorrow = et_day_offsets(now=now)
+        self.assertEqual(mod.rotowire_window("2026-08-05", today, tomorrow), "today")
+        self.assertEqual(mod.rotowire_window("2026-08-06", today, tomorrow), "tomorrow")
+        # a backfill is still out of range, which is the branch that must stay
+        self.assertIsNone(mod.rotowire_window("2026-08-04", today, tomorrow))
+        self.assertIsNone(mod.rotowire_window("2026-08-07", today, tomorrow))
+        # and the pre-fix UTC dates prove the failure this pins
+        utc_today = now.date().isoformat()
+        utc_tomorrow = (now.date() + dtmod.timedelta(days=1)).isoformat()
+        self.assertIsNone(mod.rotowire_window("2026-08-05", utc_today, utc_tomorrow))
+        self.assertEqual(mod.rotowire_window("2026-08-06", utc_today, utc_tomorrow),
+                         "today")
+
+    def test_the_rotowire_gate_asks_the_et_authority_not_the_container(self):
+        """R65 at the call site, behaviorally.
+
+        `rotowire_window` and `repo_env` are each pinned on their own, and that
+        left the join between them unpinned: reverting this call site to
+        `date.today()` kept both green. So this drives the real function with an
+        injected ET clock and a stubbed fetch, and asserts which RotoWire page it
+        asked for.
+        """
+        mod = self._module()
+        from mlb_engine import repo_env
+        from tools import fetch_rotowire_lineups as frl
+
+        # 00:15 UTC == 8:15pm ET the previous day, which is the rollover window.
+        # The date is deliberately in the PAST and far from any run date: if the
+        # frozen instant sat near today, a call site reading the container clock
+        # would produce the same answers and this test would pass under the very
+        # mutation it exists to catch. Asserted, not assumed.
+        frozen = datetime(2026, 6, 10, 0, 15, tzinfo=timezone.utc)
+        self.assertNotEqual(frozen.date(), dtmod.date.today(),
+                            "the frozen instant must not be able to coincide with "
+                            "the container's calendar, or this pins nothing")
+        asked = []
+
+        def fake_fetch(date, **kwargs):
+            asked.append(date)
+            return {"teams": [], "collected_date": kwargs.get("collected_date")}
+
+        real_now, real_fetch = repo_env.now_et, frl.fetch_rotowire_platoon
+        repo_env.now_et = lambda now=None: real_now(frozen if now is None else now)
+        frl.fetch_rotowire_platoon = fake_fetch
+        try:
+            args = types.SimpleNamespace(date="2026-06-09", rotowire=True)
+            self.assertIsNotNone(mod.resolve_platoon_json(args))
+            self.assertEqual(asked, ["today"],
+                             "the gate fell out of the ET window for tonight's slate")
+            args = types.SimpleNamespace(date="2026-06-10", rotowire=True)
+            mod.resolve_platoon_json(args)
+            self.assertEqual(asked[-1], "tomorrow",
+                             "tomorrow's ET slate asked for the wrong RotoWire page")
+            # a real backfill still declines, and now says so out loud
+            args = types.SimpleNamespace(date="2026-06-01", rotowire=True)
+            self.assertIsNone(mod.resolve_platoon_json(args))
+            self.assertEqual(len(asked), 2, "a backfill fetched anyway")
+        finally:
+            repo_env.now_et, frl.fetch_rotowire_platoon = real_now, real_fetch
+
+    def test_the_script_still_loads_without_the_engine_on_the_path(self):
+        # The ET authority is imported inside the functions that need it, so the
+        # class docstring's stdlib-only top-level property survives R65.
+        import ast
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        top_level = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
+        engine = [n for n in top_level
+                  if isinstance(n, ast.ImportFrom) and (n.module or "").startswith("mlb_engine")]
+        self.assertEqual(engine, [], "build_slate grew a top-level engine import")
 
     @staticmethod
     def _module():

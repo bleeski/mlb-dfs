@@ -92,3 +92,68 @@ def resolve_secret(name: str, path: Optional[Path] = None) -> Optional[str]:
 def resolve_odds_api_key(path: Optional[Path] = None) -> Optional[str]:
     """THE_ODDS_API_KEY, from the environment or the repo ``.env``."""
     return resolve_secret(ODDS_KEY_ENV, path)
+
+
+# ---------------------------------------------------------------------------
+# The one ET calendar authority (R65)
+# ---------------------------------------------------------------------------
+# Baseball's day is an Eastern-time day. This container runs on UTC, so
+# ``date.today()`` rolls over at 8pm ET (7pm in EST months) and every caller
+# that used it was answering a different question than the one it asked:
+#
+#   - build_slate's RotoWire gate compared args.date to the LOCAL today, so a
+#     build started after 8pm ET for tonight's slate fell out of RotoWire's
+#     today/tomorrow window entirely and skipped the merge in silence, leaving
+#     the platoon staleness clock uncleared; and a build for TOMORROW's ET slate
+#     resolved to "today", fetching the wrong ET day's page and stamping it with
+#     args.date -- wrong-day batting orders wearing a fresh collected_date,
+#     which defeats the staleness rule from the inside.
+#   - fetch_rotowire_lineups defaulted collected_date the same way.
+#   - fetch_slate_bundle approximated ET as a hardcoded UTC-4, which is an hour
+#     wrong in EST months and flips the DATE for any instant between 04:00 and
+#     05:00 UTC.
+#
+# ZoneInfo is stdlib from 3.9, so this file stays dependency-free and remains
+# importable by the tools that carry their own loaders.
+
+ET_ZONE_NAME = "America/New_York"
+
+
+def now_et(now=None):
+    """Current time as an aware datetime in America/New_York.
+
+    ``now`` accepts any aware datetime and is converted; it exists so callers
+    and tests can inject an instant instead of monkeypatching a clock. A naive
+    datetime is rejected rather than assumed to be in any particular zone,
+    because guessing is how this class of bug started.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    eastern = ZoneInfo(ET_ZONE_NAME)
+    if now is None:
+        return datetime.now(eastern)
+    if now.tzinfo is None or now.tzinfo.utcoffset(now) is None:
+        raise ValueError("now must be timezone-aware; a naive datetime has no ET")
+    return now.astimezone(eastern)
+
+
+def today_et(now=None) -> str:
+    """Today's ET calendar date as YYYY-MM-DD.
+
+    Use this anywhere a slate date, a collected_date, or a today/tomorrow
+    comparison is being computed. Never ``date.today()``: that is the
+    container's calendar, and it is not the one the schedule runs on.
+    """
+    return now_et(now).date().isoformat()
+
+
+def et_day_offsets(days: int = 1, now=None):
+    """``(today_et, today_et + days)`` from ONE clock reading.
+
+    Two separate ``date.today()`` calls can straddle midnight and return dates
+    that are not one day apart, which is how the RotoWire gate could compute a
+    today/tomorrow pair spanning two days. One reading cannot.
+    """
+    from datetime import timedelta
+    base = now_et(now).date()
+    return base.isoformat(), (base + timedelta(days=days)).isoformat()

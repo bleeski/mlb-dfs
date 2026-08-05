@@ -121,7 +121,26 @@ def slate_date_from_salary(salary_csv: Path) -> str:
         parsed = parse_game_info_datetime(sp.game_info)
         if parsed is not None:
             return parsed.date().isoformat()
-    return dt.date.today().isoformat()
+    # ET, not the container's calendar: a salary file we could not date at all
+    # must still fall back to the day the schedule is on (R65).
+    from mlb_engine.repo_env import today_et
+    return today_et()
+
+
+def rotowire_window(slate_date: str, today_et: str, tomorrow_et: str) -> str | None:
+    """Which RotoWire page serves this slate date: "today", "tomorrow", or neither.
+
+    Pure on purpose (R65). The bug was never in this comparison, it was in the
+    two dates handed to it: they came from ``dt.date.today()``, this container's
+    UTC calendar, which rolls over at 8pm ET. Splitting the decision out lets the
+    window be pinned by test without a clock or a network fetch, and lets the ET
+    authority be pinned separately in mlb_engine.repo_env.
+    """
+    if slate_date == today_et:
+        return "today"
+    if slate_date == tomorrow_et:
+        return "tomorrow"
+    return None
 
 
 def feed_age_minutes(feed: dict) -> float | None:
@@ -403,11 +422,23 @@ def resolve_platoon_json(args):
     """
     if not getattr(args, "rotowire", True):
         return None
-    today = dt.date.today().isoformat()
-    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
-    rw_when = "today" if args.date == today else "tomorrow" if args.date == tomorrow else None
+    # ET, from ONE clock reading (R65). dt.date.today() is this container's UTC
+    # calendar: after 8pm ET it rolls over, so a build for TONIGHT's slate fell
+    # out of the today/tomorrow window and skipped this merge in silence, while a
+    # build for TOMORROW's ET slate resolved to "today" and fetched the wrong ET
+    # day's page under a fresh collected_date. Two separate today() calls could
+    # also straddle midnight and yield a non-adjacent pair.
+    from mlb_engine.repo_env import et_day_offsets
+    today, tomorrow = et_day_offsets()
+    rw_when = rotowire_window(args.date, today, tomorrow)
     if rw_when is None:
         # RotoWire only serves today and tomorrow; a backfill keeps the default.
+        # Said out loud, because this branch used to be the silent one and it is
+        # indistinguishable from "RotoWire had nothing" in the build log.
+        print(f"rotowire: slate date {args.date} is neither today ({today}) nor "
+              f"tomorrow ({tomorrow}) in ET; skipping the merge and keeping the "
+              "FanGraphs reference, whose staleness rule still applies",
+              file=sys.stderr)
         return None
     try:
         from tools.fetch_rotowire_lineups import fetch_rotowire_platoon

@@ -110,8 +110,17 @@ def _get_json(url: str, secret: Optional[str] = None) -> Any:
 
 
 def _today_et() -> str:
-    # ET without a tz database dependency: UTC-4 (EDT) covers the MLB season.
-    return (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%Y-%m-%d")
+    """Today's ET slate date, from the one ET authority (R65).
+
+    This used to approximate ET as a hardcoded UTC-4 with the comment "EDT
+    covers the MLB season". It does not: in EST months the offset is UTC-5, so
+    any instant between 04:00 and 05:00 UTC returned tomorrow's date, and
+    offseason archive work runs in exactly those months. repo_env is stdlib-only
+    (ZoneInfo ships with Python), so importing it keeps this script's
+    dependency-free property, the same reasoning the .env loader above uses.
+    """
+    from mlb_engine.repo_env import today_et
+    return today_et()
 
 
 # --------------------------------------------------------------------------- #

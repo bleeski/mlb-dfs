@@ -25,6 +25,114 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R65: one ET calendar authority, and a RotoWire parser that refuses to fail empty
+
+### Fixed
+
+- **R65 — slate-date gating reads the calendar the schedule runs on (P1).**
+  Baseball's day is an Eastern day; this container's day is a UTC day, and three
+  callers computed slate dates from `date.today()` or an approximation. Confirmed
+  by injecting instants rather than by reading the code:
+  at 00:15 UTC — 8:15pm ET, mid-slate — `build_slate`'s RotoWire gate compared
+  `args.date` against a local today that had already rolled over. A build for
+  **tonight's** slate fell out of RotoWire's today/tomorrow window entirely and
+  skipped the merge in silence, leaving the platoon staleness clock uncleared. A
+  build for **tomorrow's** ET slate resolved to `"today"`, fetching the wrong ET
+  day's page and stamping it `collected_date=args.date` — wrong-day batting orders
+  wearing a fresh date, which defeats the staleness rule from the inside. Both
+  fire every night between 8pm ET and midnight, which is a normal build window.
+  `fetch_slate_bundle._today_et` approximated ET as a hardcoded UTC-4 under the
+  comment "EDT covers the MLB season"; in EST months the offset is UTC-5, so any
+  instant in the 04:00–05:00 UTC window returned tomorrow's date. Reproduced at
+  2026-12-01T04:30Z: UTC-4 said 12-01, the tz database says 11-30.
+  `mlb_engine/repo_env.py` is now the single ET authority — `now_et`, `today_et`,
+  `et_day_offsets` — on `zoneinfo`, which is stdlib, so the file stays
+  dependency-free and the tools that carry their own loaders can still import it.
+  All three callers go through it. Each takes an injectable instant, so the
+  rollover is pinnable without a clock; a naive datetime raises instead of being
+  assumed into a zone, because guessing the zone is how this started.
+  Two things beyond the filed line. `et_day_offsets` returns the pair from ONE
+  clock reading: the gate called `date.today()` twice and could straddle midnight
+  into a non-adjacent pair. And the out-of-window branch now prints why it
+  declined — it was the silent one, indistinguishable in the build log from
+  "RotoWire had nothing".
+- **R65 — the RotoWire parser refuses to emit an empty document (P1).** It is
+  regex over live third-party HTML, so a layout change surfaces as an empty parse,
+  not an error, and an empty platoon file is worse than no file: the next build
+  merges it, counts zero lineups, and reports a successful fetch. `parse_lineups`
+  now fills a structural report (page bytes, raw blocks, games, teams with and
+  without a posted order) and `check_parse_floor` raises `RotoWireParseFloor` on
+  two collapse signals. `main()` exits 2 and writes nothing; `build_slate`'s
+  existing handler turns it into "rotowire fetch unavailable (...); using FanGraphs
+  reference only", which is the documented fallback rather than a new failure mode.
+  `fetch_rotowire_platoon` also stops defaulting `collected_date` to the container's
+  calendar, and carries the parse report on the document it returns.
+
+### Where this diverges from the filed Fix, and why
+
+- **The ≥24-team parse floor was NOT shipped as filed.** The entry asks for a
+  "≥24-team parse floor and refuse to write an output below it". That number is a
+  full slate with every lineup posted — the live page carries 30 on a 15-game day —
+  and as an absolute floor it refuses correct parses routinely: `build_slate` runs
+  hours before lock, when most clubs have not posted, and a light 9-game day is 18
+  teams even after they all have. A floor that fails closed on good data gets
+  turned off, and the RotoWire merge is the thing that clears the platoon
+  staleness clock, so turning it off has a cost. What shipped instead are two
+  signals that cannot fire on legitimately thin data: **zero game containers on a
+  page with real bytes in it** (the containers exist whether or not lineups have
+  posted, so this is regex drift and nothing else), and **zero teams with a parsed
+  order** (nothing to merge). The two raise different messages on purpose — "the
+  layout moved" sends the operator to the regexes, "nothing to merge" sends them
+  to the slate — and a test pins which diagnosis each input gets. `min_teams`
+  remains as the knob for a caller that genuinely knows the page should be full;
+  `--min-teams 24` reproduces the filed behavior for anyone who wants it.
+- **The frozen real-page fixture is NOT in this commit.** The other half of R65's
+  Fix ("freeze one real RotoWire page as a fixture") cannot be built from a Cowork
+  session: the web-fetch tool returns markdown, and this parser is regex over raw
+  HTML, so a markdown rendering is useless as a fixture and the alternate fetch
+  paths that would return raw bytes are closed to this session by policy. A
+  hand-written page would test my reading of the regexes rather than the parser,
+  which is precisely the false comfort the item exists to remove — so the report
+  wiring is pinned with a page built from the module's own constants and labeled
+  as exactly that, and the real-page freeze carries a dated note on R90, which
+  already owns the fixture (its entry names this fixture as riding R65). Same
+  class as the `mlb-game-odds` key residual already on the Do-not-build list: a
+  thing that needs a hand step outside Cowork.
+
+### Tests
+
+- Sixteen new tests; the pin moves 651 → 667 in all three places. Five in a new
+  `EasternCalendarAuthorityTests` pin the authority at the boundary that broke: the
+  8:15pm-ET instant, EST being UTC-5 with the retired approximation's answer
+  asserted alongside the correct one, the offsets pair being adjacent at every
+  hour tried, a naive datetime raising, and `fetch_slate_bundle` agreeing with the
+  authority. Eight in `RotoWireParseFloorTests` cover the floor: regex drift and
+  nothing-to-merge each raise with their own diagnosis, an early fetch before
+  lineups post and a light 9-game day both pass (the two cases an absolute floor
+  would have refused), `min_teams` works in both directions, an empty response is
+  not misdiagnosed as drift, the parser's report counts games and skips the
+  template block, and `collected_date` defaults through the authority. Three in
+  `BuildSlateScriptTests`: the pure window helper against both ET and the pre-fix
+  UTC dates, the call site driven with an injected clock and a stubbed fetch, and
+  an AST check that the script kept its stdlib-only top-level imports.
+- Mutation-checked, and **two of the four mutations initially survived**, which is
+  the part worth recording. Reverting the call site to `date.today()` stayed green,
+  because the pure helper and the authority were each pinned and the join between
+  them was not — the R92 class, one commit after filing R92. It now has a
+  behavioral test, whose frozen instant is deliberately a past date far from any
+  run date and asserts that it differs from the container's calendar, because a
+  frozen instant near today makes the container-clock mutation produce identical
+  answers and pin nothing. Dropping the drift check also stayed green, because
+  "0 game containers" is an accidental substring of the other branch's message;
+  the assertion now targets wording unique to each diagnosis. Both mutations fail
+  correctly now.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  667 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R55: the solver's id boundary holds one dtype, and the bank cache only records jobs it answered
 
 ### Fixed

@@ -53,10 +53,36 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-VERSION = "v1.0"
+VERSION = "v1.1"
 
 BASE_URL = "https://www.rotowire.com/baseball/daily-lineups.php"
 DEFAULT_TIMEOUT_S = 30
+
+# R65 parse floor. This parser is regex over live third-party HTML, so a layout
+# change surfaces as an EMPTY parse rather than an error, and an empty
+# platoon file merges zero lineups while looking exactly like a successful
+# fetch. Two collapse signals are checked, and neither of them can fire on
+# legitimately thin data:
+#
+#   * zero game containers found on a page with real bytes in it. The game
+#     containers exist whether or not lineups have posted, so this is regex
+#     drift and nothing else.
+#   * zero teams carrying a parsed batting order, when games WERE found.
+#     Nothing to merge; writing that file records a no-op as data.
+#
+# What is deliberately NOT the floor is an absolute team count. The filed fix
+# asked for >=24 teams; that number is a FULL slate with every lineup posted
+# (the real page carries 30 on a 15-game day), and it refuses correct parses
+# routinely: build_slate runs hours before lock, when most teams have not
+# posted yet, and a light 9-game day is 18 teams even once they all have.
+# A floor that fails closed on good data would just be turned off. ``min_teams``
+# is the knob for a caller that genuinely knows the page should be full.
+MIN_PAGE_BYTES = 2000
+DEFAULT_MIN_TEAMS = 1
+
+
+class RotoWireParseFloor(RuntimeError):
+    """The page parsed to less than the caller demanded. Never write this."""
 _UA = "Mozilla/5.0 (compatible; mlb-dfs-engine/1.0; +local)"
 
 # Repo root on sys.path so the engine's canonical team-code normalizer can be
@@ -121,15 +147,26 @@ def _players_from(chunk: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def parse_lineups(page_html: str) -> List[Dict[str, Any]]:
-    """Parse the page into per-team dicts: abbrev, status, and the 9-row order."""
+def parse_lineups(page_html: str, *,
+                  report: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Parse the page into per-team dicts: abbrev, status, and the 9-row order.
+
+    Pass a ``report`` dict to receive the structural counts the parse floor
+    reads: ``page_bytes``, ``blocks`` (raw splits), ``games`` (blocks carrying
+    both a visitor and a home list), ``teams_with_order``, and
+    ``teams_without_order`` (a game container whose lineup has not posted yet,
+    which is normal and not a failure).
+    """
     teams: List[Dict[str, Any]] = []
     parts = _GAME_SPLIT.split(page_html)
+    games = 0
+    no_order = 0
     for block in parts[1:]:  # parts[0] is everything before the first game
         vi = block.find(_VISIT_ANCHOR)
         hi = block.find(_HOME_ANCHOR)
         if vi == -1 or hi == -1:
             continue  # template / non-game block
+        games += 1
         abbrs = _ABBR.findall(block[:vi] or block[:2000])
         if len(abbrs) < 2:
             # Abbrevs can trail the anchor in some layouts; widen the search.
@@ -142,6 +179,7 @@ def parse_lineups(page_html: str) -> List[Dict[str, Any]]:
         for abbr, chunk in ((visit_abbr, visit_chunk), (home_abbr, home_chunk)):
             players = _players_from(chunk)
             if not players:
+                no_order += 1
                 continue
             teams.append({
                 "abbrev": _to_dk_abbrev(abbr),
@@ -149,6 +187,14 @@ def parse_lineups(page_html: str) -> List[Dict[str, Any]]:
                 "status": _status_of(chunk),
                 "players": players,
             })
+    if report is not None:
+        report.update({
+            "page_bytes": len(page_html or ""),
+            "blocks": max(0, len(parts) - 1),
+            "games": games,
+            "teams_with_order": len(teams),
+            "teams_without_order": no_order,
+        })
     return teams
 
 
@@ -202,14 +248,50 @@ def to_platoon_schema(teams: List[Dict[str, Any]], collected_date: str) -> Dict[
     }
 
 
+def check_parse_floor(report: Dict[str, Any], min_teams: int = DEFAULT_MIN_TEAMS) -> None:
+    """Raise RotoWireParseFloor when the parse collapsed. Returns None when it did not.
+
+    See MIN_PAGE_BYTES / DEFAULT_MIN_TEAMS for why the two signals are these two
+    and not an absolute team count (R65).
+    """
+    page_bytes = int(report.get("page_bytes") or 0)
+    games = int(report.get("games") or 0)
+    with_order = int(report.get("teams_with_order") or 0)
+    if page_bytes >= MIN_PAGE_BYTES and games == 0:
+        raise RotoWireParseFloor(
+            f"parsed 0 game containers from {page_bytes} bytes of HTML "
+            f"({report.get('blocks', 0)} raw blocks): the page layout moved and "
+            "the lineup regexes no longer match. Refusing to emit an empty "
+            "platoon file that would read as a successful fetch."
+        )
+    if with_order < min_teams:
+        raise RotoWireParseFloor(
+            f"parsed {with_order} team lineups (floor {min_teams}) from {games} "
+            f"games; {report.get('teams_without_order', 0)} game containers had no "
+            "posted order. Refusing to emit a platoon file with nothing to merge."
+        )
+
+
 def fetch_rotowire_platoon(date: str = "today", *,
                            timeout: int = DEFAULT_TIMEOUT_S,
-                           collected_date: Optional[str] = None) -> Dict[str, Any]:
-    """Fetch + parse + wrap in one call. Returns the FanGraphs-schema dict."""
+                           collected_date: Optional[str] = None,
+                           min_teams: int = DEFAULT_MIN_TEAMS,
+                           parse_report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Fetch + parse + wrap in one call. Returns the FanGraphs-schema dict.
+
+    Raises RotoWireParseFloor when the parse collapsed, rather than returning a
+    zero-team document (R65). ``collected_date`` defaults to today in ET, not to
+    the container's calendar, because the date being stamped is a slate date.
+    """
     page = fetch_html(date, timeout=timeout)
-    teams = parse_lineups(page)
-    cd = collected_date or dt.date.today().isoformat()
-    return to_platoon_schema(teams, cd)
+    report: Dict[str, Any] = {} if parse_report is None else parse_report
+    teams = parse_lineups(page, report=report)
+    check_parse_floor(report, min_teams=min_teams)
+    from mlb_engine.repo_env import today_et
+    cd = collected_date or today_et()
+    out = to_platoon_schema(teams, cd)
+    out["parse_report"] = dict(report)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -221,10 +303,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="RotoWire only serves today and tomorrow.")
     ap.add_argument("--out", help="Write the platoon-schema JSON here.")
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_S)
+    ap.add_argument("--min-teams", type=int, default=DEFAULT_MIN_TEAMS,
+                    dest="min_teams",
+                    help="refuse to emit fewer than this many parsed lineups "
+                         "(exit 2, nothing written). Raise it when you know the "
+                         "page should be full; the default only catches collapse.")
     args = ap.parse_args(argv)
 
     try:
-        data = fetch_rotowire_platoon(args.date, timeout=args.timeout)
+        data = fetch_rotowire_platoon(args.date, timeout=args.timeout,
+                                      min_teams=args.min_teams)
+    except RotoWireParseFloor as exc:
+        # Exit 2 and write NOTHING: an empty platoon file on disk is worse than
+        # no file, because the next build merges it and reports success (R65).
+        print(f"PARSE FLOOR: {exc}", file=sys.stderr)
+        return 2
     except Exception as exc:
         print(f"ERROR fetching RotoWire: {exc}", file=sys.stderr)
         return 1
@@ -233,8 +326,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     conf = sum(1 for t in teams if t["status"] == "confirmed")
     exp = sum(1 for t in teams if t["status"] == "expected")
     unk = sum(1 for t in teams if t["status"] == "unknown")
+    pr = data.get("parse_report") or {}
     print(f"RotoWire {args.date}: {len(teams)} teams "
-          f"({conf} confirmed, {exp} expected, {unk} unknown)")
+          f"({conf} confirmed, {exp} expected, {unk} unknown) "
+          f"from {pr.get('games', '?')} games, "
+          f"{pr.get('teams_without_order', '?')} without a posted order")
     for t in teams:
         n = len(t["vs_RHP"])
         flag = "" if n == 9 else f"  <-- {n}/9 rows"
