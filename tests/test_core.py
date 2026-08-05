@@ -6,6 +6,7 @@ import datetime as dtmod
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import types
 import unittest
@@ -7041,6 +7042,127 @@ class MinerPaidPlacesTests(unittest.TestCase):
         value, note = fm.paid_places_from_file(str(parked), "192784475")
         self.assertEqual(value, 1)
         self.assertIn("dk_contest_paid_places.json", note)
+
+
+class MinerMoneyHonestyTests(unittest.TestCase):
+    """R30(b) and R50: the two ends of the same lie about fees.
+
+    (b) --entry-fee and --winnings are consumed only inside the own-results
+    stage, which runs only when own entry ids resolve. On 6 of 10 backfilled
+    dates no upload manifest existed, so the mine printed no own-results line,
+    exited 0, and left entry_fee null with nothing said. It cost ARCHIVE a full
+    pass. (R50) At the other end, a contest mined WITH a fee still emitted "fees
+    and winnings not supplied" whenever the net line was absent, recording the
+    false half in the permanent archive for 94 contests.
+    """
+
+    HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup",
+              "", "Player", "Roster Position", "%Drafted", "FPTS"]
+    CLASSIC = ("P Gerrit Cole P Tarik Skubal C Cal Raleigh 1B Matt Olson "
+               "2B Ketel Marte 3B Jose Ramirez SS Bobby Witt Jr. OF Aaron Judge "
+               "OF Juan Soto OF Kyle Tucker")
+
+    def _standings_csv(self, tmp):
+        path = Path(tmp) / "contest-standings-777777777.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.HEADER)
+            for i in range(6):
+                writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
+                                 f"{120 - i}.5", self.CLASSIC, "", "Aaron Judge",
+                                 "OF", "41.2%", "18.5"])
+        return path
+
+    def _run(self, tmp, *extra):
+        return subprocess.run(
+            [sys.executable, "-m", "mlb_engine.field.field_miner",
+             "--standings", str(self._standings_csv(tmp)),
+             "--contest-id", "777777777", *extra],
+            capture_output=True, text=True, cwd=str(REPO))
+
+    def test_a_money_flag_with_no_own_entries_is_an_error_not_a_no_op(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            done = self._run(tmp, "--entry-fee", "0.25")
+            self.assertEqual(done.returncode, fm.EXIT_MONEY_WITHOUT_OWN_ENTRIES,
+                             done.stdout + done.stderr)
+            self.assertIn("--entry-fee", done.stderr)
+            self.assertIn("upload_manifest.json", done.stderr,
+                          "the error must name the missing manifest")
+            self.assertIn("--my-entry-ids", done.stderr,
+                          "and the way out of it")
+
+    def test_every_money_flag_is_covered_and_named(self):
+        from mlb_engine.field import field_miner as fm
+        for flag, value in (("--entry-fee", "0.25"), ("--winnings", "1.00"),
+                            ("--paid-places", "1")):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as tmp:
+                done = self._run(tmp, flag, value)
+                self.assertEqual(done.returncode,
+                                 fm.EXIT_MONEY_WITHOUT_OWN_ENTRIES, done.stderr)
+                self.assertIn(flag, done.stderr)
+
+    def test_a_mine_with_no_money_flags_still_exits_clean(self):
+        # The guard must not fire on the ordinary no-money mine, which is most of
+        # them.
+        with tempfile.TemporaryDirectory() as tmp:
+            done = self._run(tmp)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    # -- R50: the block reports what it actually has ------------------------
+
+    @staticmethod
+    def _own(**kw):
+        base = {"matched": 2, "field_size": 53, "best_rank": 1,
+                "best_finish_percentile": 100.0, "median_finish_percentile": 92.0,
+                "best_points": 120.5, "winning_points": 120.5,
+                "own_lineups_duplicated_by_field": 0,
+                "max_copies_of_an_own_lineup": 1, "entry_fee": None,
+                "fees_total": None, "winnings_total": None, "net": None,
+                "paid_places": None, "payout_breadth_observed": None,
+                "cashed_entries": None}
+        base.update(kw)
+        return base
+
+    def _block(self, own):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            standings = fm.parse_standings_export(str(self._standings_csv(tmp)))
+            mined = fm.mine_contest(standings, None, contest_id="777777777")
+        mined["own_results"] = own
+        block = fm.emit_ledger_block(mined)
+        return block if isinstance(block, str) else "\n".join(block)
+
+    def test_a_supplied_fee_is_never_reported_as_not_supplied(self):
+        text = self._block(self._own(entry_fee=0.10, fees_total=0.50))
+        self.assertIn("fee $0.10/entry, $0.50 total", text)
+        self.assertIn("winnings not captured", text)
+        self.assertNotIn("fees and winnings not supplied", text)
+
+    def test_neither_supplied_still_says_so(self):
+        text = self._block(self._own())
+        self.assertIn("neither fee nor winnings supplied", text)
+
+    def test_both_supplied_reports_the_net_line(self):
+        text = self._block(self._own(entry_fee=0.10, fees_total=0.50,
+                                     winnings_total=15.0, net=14.5))
+        self.assertIn("net $14.50", text)
+        self.assertNotIn("not captured", text)
+
+    def test_winnings_without_a_fee_is_its_own_sentence(self):
+        text = self._block(self._own(winnings_total=15.0))
+        self.assertIn("fee not supplied", text)
+        self.assertNotIn("winnings not captured", text)
+
+    def test_the_paid_line_reaches_the_permanent_block(self):
+        # R30(a). What makes a rank-1 finish gradeable as a seat belongs in the
+        # archived block, not only in JSON.
+        text = self._block(self._own(entry_fee=0.25, fees_total=0.50,
+                                     paid_places=1, payout_breadth_observed=0.0189,
+                                     cashed_entries=1))
+        self.assertIn("Paid places 1 of 53", text)
+        self.assertIn("observed breadth 0.0189", text)
+        self.assertIn("1 own entry inside the paid line", text)
 
 
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):

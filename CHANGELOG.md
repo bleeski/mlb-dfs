@@ -25,6 +25,54 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R30(b) + R50: the two ends of the same lie about fees
+
+### Fixed
+
+- **R30(b) — money flags with no resolvable own entry ids now fail instead of
+  no-opping (P1).** `--entry-fee`, `--winnings` and the new `--paid-places` are
+  consumed only inside the own-results stage, which runs only when own entry ids
+  resolve, and those are harvested from `outputs/<date>/upload_manifest.json` —
+  which existed for 4 of the 10 backfilled dates. On the other 6 the mine printed
+  no own-results line, exited 0, and left `entry_fee` null with nothing said. It
+  cost ARCHIVE a full pass. Supplying money for a contest whose entries cannot be
+  identified is a caller error, so it now exits
+  `EXIT_MONEY_WITHOUT_OWN_ENTRIES` (7), names which flags were supplied, names the
+  manifest path it looked for, and names the way out (`--my-entry-ids`, sourced
+  from the entry history's `Entry_Key` column). A mine with no money flags is
+  untouched, which is most of them.
+- **R50 — the ledger block reports what it actually has (P2).** The block chose
+  between two sentences on `net is not None`, so "fees and winnings not supplied"
+  printed whenever the net line was absent — including when the fee WAS supplied
+  and only the winnings were missing. That is the common case: every A-029 contest
+  and all 94 of A-030..A-034, $35.87 of captured fees, each carrying the false half
+  permanently in the archive. A later reader asking "which contests have a known
+  cost" concluded wrongly. There are four states now and each gets its own
+  sentence: both, fee only, winnings only, neither. Same class as R38 one layer
+  down.
+- **R30(a) follow-through: the paid line reaches the permanent block.** It shipped
+  into `own_results.json` earlier today; what makes a rank-1 finish gradeable as a
+  seat belongs in the archived block too, so the block now carries paid places, the
+  observed breadth, and how many own entries finished inside the paid line.
+
+### Tests
+
+- Eight new tests in a new `MinerMoneyHonestyTests`; the pin moves 691 → 699.
+  Three drive the CLI in a subprocess: a money flag with no resolvable own ids
+  exits 7 and the message names the flag, the manifest and the remedy; every one of
+  the four money flags is covered; and an ordinary no-money mine still exits 0, so
+  the guard cannot fire on the common path. Five pin the block's wording state by
+  state, including that a supplied fee is never reported as not supplied, and that
+  the paid line reaches the block.
+- Mutation-checked: restoring the old two-way sentence fails three of the wording
+  tests; removing the guard fails all four CLI cases.
+
+### Verified
+
+- `PASS  v2.26.0  26 modules  699 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R30(a): the archive can record how many places a contest paid
 
 ### Fixed

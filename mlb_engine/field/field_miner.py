@@ -1164,6 +1164,10 @@ EXIT_WRONG_SALARY_FILE = 4      # standings and salary are different contest typ
 EXIT_PARSED_NOTHING = 5         # zero entry rows produced a complete lineup
 EXIT_MOSTLY_UNPARSED = 6        # unparsed share above the tolerance
 EXIT_STRUCTURAL_OTHER = 3       # slot-count or intra-entry duplicate failure
+# R30(b): money was supplied that nothing could consume. Distinct from the
+# structural exits above, because the parse succeeded and the archive is fine;
+# what failed is the caller's expectation that a fee would be recorded.
+EXIT_MONEY_WITHOUT_OWN_ENTRIES = 7
 
 
 def structural_exit_code(diagnostics: Mapping[str, Any]) -> int:
@@ -1228,10 +1232,34 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
         lines.append(f"- SP-pair field share (top): {top}.")
     own = mined.get("own_results")
     if own and own.get("matched"):
-        net = (f"; fees ${own['fees_total']:.2f}, winnings ${own['winnings_total']:.2f}, "
-               f"net ${own['net']:.2f}"
-               if own.get("net") is not None else
-               "; fees and winnings not supplied, so no net line for this contest")
+        # R50: three states, not two. The old sentence read "fees and winnings
+        # not supplied" whenever `net` was None, which is also true when the FEE
+        # was supplied and only the winnings were missing -- and that is the
+        # common case, 94 contests with $35.87 of captured fees all carrying the
+        # false half in the permanent archive. A later reader asking "which
+        # contests have a known cost" concluded wrongly. Same class as R38 one
+        # layer down.
+        if own.get("net") is not None:
+            net = (f"; fees ${own['fees_total']:.2f}, "
+                   f"winnings ${own['winnings_total']:.2f}, net ${own['net']:.2f}")
+        elif own.get("fees_total") is not None:
+            net = (f"; fee ${own['entry_fee']:.2f}/entry, "
+                   f"${own['fees_total']:.2f} total; winnings not captured, so no "
+                   f"net line for this contest")
+        elif own.get("winnings_total") is not None:
+            net = (f"; winnings ${own['winnings_total']:.2f}; fee not supplied, so "
+                   f"no net line for this contest")
+        else:
+            net = "; neither fee nor winnings supplied, so no net line for this contest"
+        # R30(a): the paid line is what makes a finish gradeable as a cash or a
+        # seat, so it belongs in the permanent block rather than only in JSON.
+        if own.get("paid_places") is not None:
+            net += (f". Paid places {own['paid_places']} of {own['field_size']} "
+                    f"(observed breadth {own['payout_breadth_observed']})")
+            if own.get("cashed_entries") is not None:
+                net += f"; {own['cashed_entries']} own entr"
+                net += "y" if own["cashed_entries"] == 1 else "ies"
+                net += " inside the paid line"
         lines.append(
             f"- **Self vs field**: {own['matched']} own entries; best rank "
             f"{own['best_rank']}/{own['field_size']} "
@@ -1443,7 +1471,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                          f"{EXIT_WRONG_SALARY_FILE} wrong salary file, "
                          f"{EXIT_PARSED_NOTHING} zero entries parsed, "
                          f"{EXIT_MOSTLY_UNPARSED} unparsed share over tolerance, "
-                         f"{EXIT_STRUCTURAL_OTHER} other structural failure.")
+                         f"{EXIT_STRUCTURAL_OTHER} other structural failure, "
+                         f"{EXIT_MONEY_WITHOUT_OWN_ENTRIES} money flags supplied "
+                         f"with no resolvable own entry ids (R30b).")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
@@ -1518,6 +1548,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         own_ids = harvest_own_entry_ids(args.slate_date, args.contest_id)
         if own_ids:
             print(f"own entries: {len(own_ids)} harvested from the upload manifest")
+    # R30(b): --entry-fee, --winnings and --paid-places are consumed ONLY inside
+    # the own-results stage, which runs only when own entry ids resolve. Those
+    # are harvested from outputs/<date>/upload_manifest.json, which existed for
+    # 4 of 10 backfilled dates; on the other 6 the mine printed no own-results
+    # line, exited 0, and left entry_fee null with nothing said. It cost ARCHIVE
+    # a full pass. Passing money for a contest whose entries cannot be
+    # identified is a caller error, not a no-op.
+    money_flags = [name for name, value in (
+        ("--entry-fee", args.entry_fee), ("--winnings", args.winnings),
+        ("--paid-places", args.paid_places),
+        ("--paid-places-from", args.paid_places_from)) if value is not None]
+    if money_flags and not own_ids:
+        manifest = (Path(__file__).resolve().parents[2] / "outputs"
+                    / str(args.slate_date or "<slate-date>") / "upload_manifest.json")
+        print(f"ERROR  {', '.join(money_flags)} supplied but no own entry ids "
+              f"resolved, so nothing would consume them and this mine would "
+              f"record no fee, no winnings and no paid line while exiting 0.\n"
+              f"       Pass --my-entry-ids explicitly (source them from the entry "
+              f"history's Entry_Key column), or make {manifest} resolvable.",
+              file=sys.stderr)
+        return EXIT_MONEY_WITHOUT_OWN_ENTRIES
     if own_ids:
         mined["own_results"] = summarize_own_entries(
             mined, own_ids, entry_fee=args.entry_fee, winnings=args.winnings,
