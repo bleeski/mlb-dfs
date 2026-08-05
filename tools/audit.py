@@ -33,7 +33,7 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 667  # core 429 + showdown 49 + upload 124 + golden 9 + paste 56
+EXPECTED_TEST_COUNT = 676  # core 429 + showdown 49 + upload 124 + golden 9 + paste 65
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -52,6 +52,9 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.2"',
     "mlb_engine/determinism.py": 'VERSION = "v1.0"',
     "mlb_engine/contest_shapes.py": 'VERSION = "v1.0"',
+    # R59: the team-code boundary is an ingest contract, so it is pinned
+    # like the other boundary modules rather than left to R76(e).
+    "mlb_engine/team_codes.py": 'VERSION = "v1.0"',
 }
 
 CSV_REQUIRED = {

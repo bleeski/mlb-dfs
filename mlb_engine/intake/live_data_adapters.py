@@ -82,63 +82,14 @@ DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
 
-# MLB Stats API abbreviations that differ from DraftKings CSV abbreviations.
-# One canonical map to DraftKings team codes. Three vocabularies reach this
-# engine: the MLB Stats API (AZ), FanGraphs RosterResource (WSN/TBR/CHW/KCR/SDP/
-# SFG), and DraftKings itself. A code that fails to normalize does not raise --
-# it silently matches nothing, which is how WSH once filled 0 of 9 hitters and
-# reported success. Every ingest boundary routes through to_dk_abbrev().
-# ATH passes through unchanged: DraftKings, the salary CSV, and data/reference all
-# key the Athletics as ATH post-relocation (was OAK).
-DK_ABBREV_REMAP = {
-    # MLB Stats API
-    "AZ": "ARI",
-    # FanGraphs RosterResource
-    "WSN": "WSH", "TBR": "TB", "CHW": "CWS", "KCR": "KC", "SDP": "SD", "SFG": "SF",
-}
-
-# the-odds-api returns full team names; DraftKings CSVs use abbreviations.
-MLB_TEAM_NAME_TO_DK = {
-    "arizona diamondbacks": "ARI", "atlanta braves": "ATL",
-    "baltimore orioles": "BAL", "boston red sox": "BOS",
-    "chicago cubs": "CHC", "chicago white sox": "CWS",
-    "cincinnati reds": "CIN", "cleveland guardians": "CLE",
-    "colorado rockies": "COL", "detroit tigers": "DET",
-    "houston astros": "HOU", "kansas city royals": "KC",
-    "los angeles angels": "LAA", "los angeles dodgers": "LAD",
-    "miami marlins": "MIA", "milwaukee brewers": "MIL",
-    "minnesota twins": "MIN", "new york mets": "NYM",
-    "new york yankees": "NYY", "athletics": "ATH",
-    "oakland athletics": "ATH", "philadelphia phillies": "PHI",
-    "pittsburgh pirates": "PIT", "san diego padres": "SD",
-    "san francisco giants": "SF", "seattle mariners": "SEA",
-    "st louis cardinals": "STL", "st. louis cardinals": "STL",
-    "tampa bay rays": "TB", "texas rangers": "TEX",
-    "toronto blue jays": "TOR", "washington nationals": "WSH",
-    # R33: the club NICKNAME alone, which is what mlb.com/starting-lineups
-    # renders in its matchup links ("[Astros](...)@[Angels](...)"). Every MLB
-    # nickname is unique, so these add no ambiguity, and they are what lets a
-    # pasted '<TEAM> Lineup' header be cross-checked against a second,
-    # independent read of the same fact instead of being trusted alone.
-    "diamondbacks": "ARI", "d-backs": "ARI", "braves": "ATL",
-    "orioles": "BAL", "red sox": "BOS", "cubs": "CHC", "white sox": "CWS",
-    "reds": "CIN", "guardians": "CLE", "rockies": "COL", "tigers": "DET",
-    "astros": "HOU", "royals": "KC", "angels": "LAA", "dodgers": "LAD",
-    "marlins": "MIA", "brewers": "MIL", "twins": "MIN", "mets": "NYM",
-    "yankees": "NYY", "phillies": "PHI", "pirates": "PIT", "padres": "SD",
-    "giants": "SF", "mariners": "SEA", "cardinals": "STL", "rays": "TB",
-    "rangers": "TEX", "blue jays": "TOR", "nationals": "WSH",
-}
-
-
-def to_dk_abbrev(api_abbrev: str) -> str:
-    text = str(api_abbrev or "").strip().upper()
-    return DK_ABBREV_REMAP.get(text, text)
-
-
-def team_name_to_dk_abbrev(team_name: str) -> Optional[str]:
-    key = " ".join(str(team_name or "").strip().lower().replace(".", ". ").split())
-    return MLB_TEAM_NAME_TO_DK.get(key) or MLB_TEAM_NAME_TO_DK.get(key.replace(". ", " ").replace(".", ""))
+# Team-code normalization moved to mlb_engine.team_codes (R59/R82) and is
+# re-exported here so every existing import path is unchanged. It left this
+# module because normalizing a code has nothing to do with fetching one, and
+# tools/lineups_from_paste.py -- which carries a pinned zero-network contract --
+# needs the normalizer without this module's urllib import graph.
+from mlb_engine.team_codes import (  # noqa: E402,F401
+    DK_ABBREV_REMAP, MLB_TEAM_NAME_TO_DK, to_dk_abbrev, team_name_to_dk_abbrev,
+)
 
 
 def _scrub(text: str, secret: Optional[str]) -> str:

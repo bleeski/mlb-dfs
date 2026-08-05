@@ -24,6 +24,7 @@ sys.path.insert(0, str(REPO))
 from mlb_engine.intake.paste_lineups import (  # noqa: E402
     parse_paste, resolve_paste_to_feed,
 )
+from tools.lineups_from_paste import merge_feeds  # noqa: E402
 
 PASTE = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-29_late3.txt"
 SALARY = REPO / "data" / "slates" / "2026-07-29" / "DKSalaries.csv"
@@ -405,6 +406,202 @@ class PasteWinsOverTheApiFeedTests(unittest.TestCase):
                       if isinstance(node, ast.Call)
                       and isinstance(node.func, ast.Attribute)}
             self.assertNotIn("urlopen", called, f"{path.name} opens a URL")
+
+    def test_the_zero_network_contract_holds_TRANSITIVELY(self):
+        """The single-file import check above is shallow, and that let one through.
+
+        R59 needed `to_dk_abbrev` in lineups_from_paste. The obvious import is
+        from `live_data_adapters`, where the team-code maps lived -- and that
+        module imports `urllib.request` at module scope, so three lines of dict
+        lookup would have pulled a live HTTP client into this tool's import graph
+        while the check above stayed green: `live_data_adapters` is not itself in
+        the forbidden set. The maps moved to the network-free
+        `mlb_engine.team_codes` instead, and this test asks the question the
+        contract actually makes, which is about the whole graph and not one file.
+
+        It runs in a FRESH interpreter on purpose. Measuring `sys.modules` in
+        this process cannot work: by the time this test runs, the rest of the
+        suite has already imported `urllib.request`, so a before/after diff comes
+        back empty and the check passes under the very mutation it exists to
+        catch. That was observed, not theorized.
+        """
+        # Only modules that can actually open a connection. `urllib.parse` is
+        # pure string work and is already in the graph via the parser's own
+        # imports; listing it would fail on something that is not a fetch.
+        probe = (
+            "import sys, json\n"
+            "import tools.lineups_from_paste\n"
+            "capable = {'urllib.request', 'http.client', 'requests', 'httpx', 'aiohttp'}\n"
+            "print(json.dumps(sorted(capable & set(sys.modules))))\n"
+        )
+        result = subprocess.run([sys.executable, "-c", probe], cwd=str(REPO),
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        pulled = json.loads(result.stdout.strip().splitlines()[-1])
+        self.assertEqual(
+            pulled, [],
+            f"the paste tool's import graph now reaches {pulled}; the "
+            "zero-network contract is a property of the graph, not of one file")
+
+
+class MergeFeedsTeamCodeAndFieldTests(unittest.TestCase):
+    """R59. merge_feeds is a pure function on two feed dicts, tested at that grain.
+
+    It had NO coverage of any kind before this, which is how both halves shipped:
+    the merge key was the only place in the pipeline not normalizing team codes,
+    and the side fill replaced a whole side dict instead of merging fields.
+    """
+
+    @staticmethod
+    def _side(abbr, *, hitters=0, probable=None, status="tbd", **extra):
+        side = {
+            "team_abbrev": abbr,
+            "lineup": [{"order": i + 1, "name": f"{abbr} bat {i + 1}"}
+                       for i in range(hitters)],
+            "lineup_status": status,
+            "probable_pitcher": probable,
+        }
+        side.update(extra)
+        return side
+
+    @staticmethod
+    def _game(away, home, pk=1, utc="2026-08-05T23:10:00Z"):
+        return {"game_pk": pk, "game_date_utc": utc, "status": "Scheduled",
+                "away": away, "home": home}
+
+    def _feed(self, *games):
+        return {"date": "2026-08-05", "games": list(games)}
+
+    def test_a_raw_api_team_code_matches_the_dk_coded_paste(self):
+        # The filed case. StatsAPI ships AZ; the paste is DK-coded ARI. Unnormalized,
+        # the same game was keyed twice, the API copy was APPENDED, and
+        # games_added_from_api reported that as a success. _select_slate_legs
+        # normalizes, so it then saw one matchup twice and dropped one leg -- the
+        # API's real confirmed lineup went with it, looking like leg selection.
+        pasted = self._feed(self._game(
+            self._side("SD", hitters=9, status="confirmed"), self._side("ARI")))
+        api = self._feed(self._game(
+            self._side("SD", hitters=9, status="confirmed"),
+            self._side("AZ", hitters=9, status="confirmed",
+                       probable={"name": "AZ Arm", "hand": "R"})))
+        out = merge_feeds(pasted, api)
+        self.assertEqual(len(out["games"]), 1, "the API copy was appended as a phantom game")
+        game = out["games"][0]
+        self.assertEqual(game["home"]["team_abbrev"], "ARI",
+                         "the merged side must keep the paste's DK code")
+        self.assertEqual(len(game["home"]["lineup"]), 9,
+                         "the API's confirmed lineup never reached the pasted side")
+        self.assertEqual(out["merge_report"]["games_added_from_api"], [])
+        self.assertEqual(out["merge_report"]["sides_filled_from_api"], ["SD@ARI home"])
+        self.assertEqual(out["merge_report"]["api_keys_normalized"],
+                         ["SD@AZ -> SD@ARI"])
+
+    def test_every_remapped_code_matches(self):
+        for raw, dk in (("AZ", "ARI"), ("WSN", "WSH"), ("TBR", "TB"),
+                        ("CHW", "CWS"), ("KCR", "KC"), ("SDP", "SD"), ("SFG", "SF")):
+            with self.subTest(raw=raw):
+                pasted = self._feed(self._game(
+                    self._side("NYY", hitters=9, status="confirmed"), self._side(dk)))
+                api = self._feed(self._game(
+                    self._side("NYY", hitters=9, status="confirmed"),
+                    self._side(raw, hitters=9, status="confirmed")))
+                out = merge_feeds(pasted, api)
+                self.assertEqual(len(out["games"]), 1, f"{raw} did not match {dk}")
+
+    def test_a_pasted_probable_survives_a_side_fill(self):
+        # R59b, the late-scratch case: Ben pasted the replacement starter by name
+        # and that side has no order yet. The old code replaced the whole side
+        # dict, so the API's stale probable displaced the pasted one in silence --
+        # R32 paste-primacy inverted.
+        pasted = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"),
+            self._side("BOS", probable={"name": "Replacement SP", "hand": "R"})))
+        api = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"),
+            self._side("BOS", hitters=9, status="confirmed",
+                       probable={"name": "Scratched SP", "hand": "L"})))
+        out = merge_feeds(pasted, api)
+        bos = out["games"][0]["home"]
+        self.assertEqual(bos["probable_pitcher"]["name"], "Replacement SP")
+        self.assertEqual(bos["probable_pitcher"]["hand"], "R")
+        self.assertEqual(len(bos["lineup"]), 9, "the API's order should still fill")
+        self.assertEqual(bos["lineup_status"], "confirmed")
+        report = out["merge_report"]
+        self.assertEqual(report["fields_filled_from_api"], ["NYY@BOS home: lineup"])
+        self.assertEqual(
+            report["probables_kept_from_paste"],
+            ["NYY@BOS home: kept pasted 'Replacement SP' over API 'Scratched SP'"],
+            "keeping the pasted arm over a disagreeing API must be reported, not silent")
+
+    def test_an_uncovered_side_takes_the_api_probable(self):
+        # The fallback still works where the paste said nothing at all.
+        pasted = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"), self._side("BOS")))
+        api = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"),
+            self._side("BOS", probable={"name": "API Arm", "hand": "L"})))
+        out = merge_feeds(pasted, api)
+        bos = out["games"][0]["home"]
+        self.assertEqual(bos["probable_pitcher"]["name"], "API Arm")
+        self.assertEqual(bos["source"], "api_feed_fallback")
+        self.assertEqual(out["merge_report"]["fields_filled_from_api"],
+                         ["NYY@BOS home: probable_pitcher"])
+        self.assertEqual(out["merge_report"]["probables_kept_from_paste"], [])
+
+    def test_a_covered_side_is_never_touched(self):
+        pasted = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed",
+                       probable={"name": "Pasted Arm", "hand": "R"}),
+            self._side("BOS", hitters=9, status="confirmed")))
+        api = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed",
+                       probable={"name": "Other Arm", "hand": "L"}),
+            self._side("BOS", hitters=9, status="confirmed")))
+        out = merge_feeds(pasted, api)
+        nyy = out["games"][0]["away"]
+        self.assertEqual(nyy["probable_pitcher"]["name"], "Pasted Arm")
+        self.assertEqual(nyy["lineup"][0]["name"], "NYY bat 1")
+        self.assertEqual(out["merge_report"]["sides_filled_from_api"], [])
+        self.assertTrue(out["merge_report"]["paste_is_complete"])
+
+    def test_an_api_only_field_fills_an_empty_slot_and_is_named(self):
+        pasted = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"), self._side("BOS")))
+        api = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"),
+            self._side("BOS", hitters=9, status="confirmed", batting_park_factor=104)))
+        out = merge_feeds(pasted, api)
+        bos = out["games"][0]["home"]
+        self.assertEqual(bos["batting_park_factor"], 104)
+        self.assertEqual(out["merge_report"]["fields_filled_from_api"],
+                         ["NYY@BOS home: batting_park_factor+lineup"])
+
+    def test_a_game_the_paste_never_mentioned_is_still_added_whole(self):
+        pasted = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"),
+            self._side("BOS", hitters=9, status="confirmed")))
+        api = self._feed(
+            self._game(self._side("NYY", hitters=9), self._side("BOS", hitters=9)),
+            self._game(self._side("LAD", hitters=9, status="confirmed"),
+                       self._side("SFG", hitters=9, status="confirmed"), pk=2))
+        out = merge_feeds(pasted, api)
+        self.assertEqual(len(out["games"]), 2)
+        added = out["games"][1]
+        self.assertEqual(added["source"], "api_feed_fallback")
+        self.assertEqual(added["away"]["source"], "api_feed_fallback")
+        # keyed on the normalized code even when the whole game is new
+        self.assertEqual(out["merge_report"]["games_added_from_api"], ["LAD@SF"])
+        self.assertEqual(out["merge_report"]["api_keys_normalized"],
+                         ["LAD@SFG -> LAD@SF"])
+
+    def test_a_side_with_a_missing_team_code_is_skipped_not_crashed(self):
+        pasted = self._feed(self._game(
+            self._side("NYY", hitters=9, status="confirmed"), self._side("BOS")))
+        api = self._feed({"game_pk": 5, "game_date_utc": "2026-08-05T23:10:00Z",
+                          "away": {"team_abbrev": ""}, "home": {"team_abbrev": "BOS"}})
+        out = merge_feeds(pasted, api)
+        self.assertEqual(len(out["games"]), 1)
+        self.assertEqual(out["merge_report"]["games_added_from_api"], [])
 
 
 PLAINTEXT = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-30_1910_6g_plaintext.txt"

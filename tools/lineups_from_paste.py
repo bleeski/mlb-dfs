@@ -41,13 +41,20 @@ import json
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from mlb_engine.intake.paste_lineups import resolve_paste_to_feed  # noqa: E402
+# R59: the merge key has to be DK-coded on BOTH sides. The paste is DK-coded
+# because the salary file is authoritative for identity; the MLB Stats API is
+# not (it ships AZ, TBR, SDP, SFG, WSN, CHW, KCR). _select_slate_legs already
+# normalizes through this same function, which is why an unnormalized merge
+# key failed SILENTLY: the two spellings survived as separate games and the
+# leg selector, seeing one matchup twice, dropped one as a doubleheader leg.
+from mlb_engine.team_codes import to_dk_abbrev  # noqa: E402
 
 
 def _parse_resolves(values: Optional[Sequence[str]]) -> Dict[str, str]:
@@ -63,30 +70,66 @@ def _parse_resolves(values: Optional[Sequence[str]]) -> Dict[str, str]:
     return out
 
 
+def _merge_key(game: Mapping[str, Any]) -> Optional[str]:
+    """DK-coded ``AWAY@HOME`` for a feed game, or None when either side is missing."""
+    away = to_dk_abbrev((game.get("away") or {}).get("team_abbrev"))
+    home = to_dk_abbrev((game.get("home") or {}).get("team_abbrev"))
+    return f"{away}@{home}" if away and home else None
+
+
+# Fields whose provenance the side merge decides explicitly. Everything else the
+# API carries is copied only into a slot the paste left empty.
+_SIDE_OWNED_FIELDS = ("team_abbrev", "lineup", "lineup_status",
+                      "probable_pitcher", "source")
+
+
 def merge_feeds(pasted: Dict[str, Any], api: Dict[str, Any]) -> Dict[str, Any]:
-    """Paste wins per SIDE; the API feed fills only what the paste left uncovered.
+    """Paste wins per SIDE and per FIELD; the API fills only what the paste left empty.
 
     Per side rather than per game, because a paste routinely covers one side of a
     game while the other is still TBD, and refetching the covered side to get the
     uncovered one would reintroduce exactly the disagreement this avoids.
 
     A side is 'covered' when the paste posted hitters for it. A pasted side with
-    no hitters (tbd) yields to the API feed, which is the fallback working.
+    no hitters (tbd) takes the API's batting order, which is the fallback working.
+    Per FIELD (R59b) because "the paste posted no order for this side" is not the
+    same fact as "the paste said nothing about this side": a pasted probable with
+    no batting order is the late-scratch-replacement case, and it is a fact. The
+    old code replaced the whole side dict, so the API's stale probable silently
+    displaced the one Ben typed, which is R32 paste-primacy inverted. A paste-named
+    probable is now kept and the disagreement is reported.
+
+    Both sides of the key are normalized to DK codes (R59a). The API ships AZ for
+    Arizona against the paste's ARI, so the same game was keyed twice: the API copy
+    was appended as a second game, `games_added_from_api` reported it as a success,
+    and the leg selector downstream -- which DOES normalize -- then saw one matchup
+    twice and dropped one as a doubleheader leg. The API's real confirmed lineup
+    disappeared with it.
     """
     merged = dict(pasted)
     by_id: Dict[str, Dict[str, Any]] = {}
     for game in pasted.get("games") or []:
-        key = f"{game['away']['team_abbrev']}@{game['home']['team_abbrev']}"
-        by_id[key] = game
+        key = _merge_key(game)
+        if key:
+            by_id[key] = game
 
     added_games: List[str] = []
     filled_sides: List[str] = []
+    filled_fields: List[str] = []
+    probables_kept: List[str] = []
+    normalized_keys: List[str] = []
     for game in api.get("games") or []:
-        away = (game.get("away") or {}).get("team_abbrev")
-        home = (game.get("home") or {}).get("team_abbrev")
-        if not away or not home:
+        raw_away = (game.get("away") or {}).get("team_abbrev")
+        raw_home = (game.get("home") or {}).get("team_abbrev")
+        if not raw_away or not raw_home:
             continue
-        key = f"{away}@{home}"
+        key = _merge_key(game)
+        if key is None:
+            continue
+        if key != f"{raw_away}@{raw_home}":
+            # Named so an operator can see that AZ matched ARI rather than
+            # wondering why a game they expected to be added was not.
+            normalized_keys.append(f"{raw_away}@{raw_home} -> {key}")
         existing = by_id.get(key)
         if existing is None:
             enriched = dict(game)
@@ -101,18 +144,57 @@ def merge_feeds(pasted: Dict[str, Any], api: Dict[str, Any]) -> Dict[str, Any]:
             added_games.append(key)
             continue
         for side in ("away", "home"):
-            if (existing.get(side) or {}).get("lineup"):
+            current = dict(existing.get(side) or {})
+            if current.get("lineup"):
                 continue  # the paste covered it; never refetch, never overwrite
-            replacement = dict(game.get(side) or {})
-            if not replacement.get("lineup") and not replacement.get("probable_pitcher"):
+            candidate = dict(game.get(side) or {})
+            if not candidate.get("lineup") and not candidate.get("probable_pitcher"):
                 continue
-            replacement["source"] = "api_feed_fallback"
-            existing[side] = replacement
+            took: List[str] = []
+            if candidate.get("lineup"):
+                current["lineup"] = candidate["lineup"]
+                if candidate.get("lineup_status"):
+                    current["lineup_status"] = candidate["lineup_status"]
+                took.append("lineup")
+            if candidate.get("probable_pitcher"):
+                if current.get("probable_pitcher"):
+                    # The paste named this arm. Keep it, and say so: a scratch is
+                    # exactly when the API is the stale one.
+                    pasted_name = (current["probable_pitcher"] or {}).get("name")
+                    api_name = (candidate["probable_pitcher"] or {}).get("name")
+                    if pasted_name != api_name:
+                        probables_kept.append(
+                            f"{key} {side}: kept pasted {pasted_name!r} over API {api_name!r}")
+                else:
+                    current["probable_pitcher"] = candidate["probable_pitcher"]
+                    took.append("probable_pitcher")
+            for field, value in candidate.items():
+                if field in _SIDE_OWNED_FIELDS:
+                    continue
+                if current.get(field) in (None, "", [], {}):
+                    current[field] = value
+                    took.append(field)
+            if not took:
+                continue
+            # team_abbrev stays the paste's DK code; the salary file is
+            # authoritative for identity and the API's raw code is not.
+            current["source"] = "api_feed_fallback"
+            existing[side] = current
             filled_sides.append(f"{key} {side}")
+            filled_fields.append(f"{key} {side}: {'+'.join(sorted(took))}")
 
     merged["merge_report"] = {
         "games_added_from_api": sorted(added_games),
         "sides_filled_from_api": sorted(filled_sides),
+        # Which fields the API actually supplied on each filled side, so a side
+        # that took only a probable is distinguishable from one that took an
+        # order (R59b).
+        "fields_filled_from_api": sorted(filled_fields),
+        # A pasted probable the API disagreed with. Never empty silently: this is
+        # the late-scratch case and the operator needs to see the call was made.
+        "probables_kept_from_paste": sorted(probables_kept),
+        # API game keys that only matched after DK normalization (AZ -> ARI).
+        "api_keys_normalized": sorted(normalized_keys),
         "paste_is_complete": not added_games and not filled_sides,
     }
     return merged

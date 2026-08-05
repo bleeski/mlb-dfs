@@ -25,6 +25,99 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R59: the feed merge speaks one team-code vocabulary, and fills fields instead of replacing sides
+
+### Fixed
+
+- **R59(a) — the merge key normalizes both sides to DK codes (P1).**
+  `merge_feeds` keyed games as `f"{away}@{home}"` off raw `team_abbrev`. The paste
+  is DK-coded, because the salary file is authoritative for identity; the MLB Stats
+  API is not, and ships `AZ` for Arizona (plus FanGraphs' `WSN`/`TBR`/`CHW`/`KCR`/
+  `SDP`/`SFG` on other paths). Reproduced on a pasted SD side of SD@ARI with the
+  ARI side still TBD: the API's copy keyed `SD@AZ`, missed the merge, was
+  **appended as a second game**, and `merge_report` reported that as
+  `games_added_from_api` — a success. The pasted ARI side stayed at zero hitters
+  while the API's nine sat in the phantom game. `_select_slate_legs` then
+  normalized (it always did), saw one matchup twice, and dropped one as a
+  doubleheader leg. A real confirmed lineup disappeared wearing the reason
+  "leg selection". `merge_feeds` was the ONLY place in the pipeline not
+  normalizing, and its own downstream consumer did.
+  Both sides now go through `to_dk_abbrev`, the merged side keeps the paste's DK
+  code, and `merge_report` gained `api_keys_normalized` so an operator can see
+  `SD@AZ -> SD@ARI` happened rather than wondering why an expected game was not
+  added.
+- **R59(b) — a side fill merges fields; a pasted probable is kept and the
+  disagreement is reported (P1).** The fill replaced the whole side dict. "The
+  paste posted no batting order for this side" is not the same fact as "the paste
+  said nothing about this side": a pasted probable with no order is the
+  late-scratch-replacement case, and it is a fact Ben typed. Reproduced: a pasted
+  `Replacement SP` was silently displaced by the API's stale `Scratched SP`, which
+  is R32 paste-primacy inverted, and `merge_report` said only
+  `sides_filled_from_api`.
+  The fill is now per field. The API supplies the batting order and
+  `lineup_status`; a paste-named `probable_pitcher` is kept; any other API field
+  lands only in a slot the paste left empty. `merge_report` gained
+  `fields_filled_from_api` (so a side that took only a probable is distinguishable
+  from one that took an order) and `probables_kept_from_paste`, which names the
+  kept arm and the API's disagreeing one, because the whole point of the case is
+  that the operator needs to see the call was made.
+
+### The team-code boundary moved, and why that was not optional
+
+- **New module `mlb_engine/team_codes.py`,** holding `DK_ABBREV_REMAP`,
+  `MLB_TEAM_NAME_TO_DK`, `to_dk_abbrev` and `team_name_to_dk_abbrev`.
+  `live_data_adapters` re-exports all four, so every existing caller, import path
+  and test is unchanged.
+  The filed Fix says to "normalize both sides through `to_dk_abbrev` (the import
+  already exists in the file)". **It does not** — that is a correction to the
+  entry; `tools/lineups_from_paste.py` imported no such thing. And adding the
+  obvious import would have broken a different contract: `live_data_adapters`
+  imports `urllib.request` at module scope, so taking three lines of dict lookup
+  from there pulls a live HTTP client into the import graph of a tool whose
+  zero-network property is a stated contract with a test. Measured, not assumed:
+  the import added `urllib.request`, `http.client`, `socket` and `ssl` to that
+  graph. Normalizing a team code has nothing to do with fetching one, so the pure
+  data and the two pure functions moved to the network-free side of the line.
+  This is the first half of **R82** ("one team-code boundary with an unknown-code
+  report"). R82 still owns the second half: a code that fails to normalize passes
+  through unchanged and silently matches nothing, which is how WSH once filled 0
+  of 9 hitters and reported success. A dated note says so on that entry.
+
+### A guard that could not fail, found by mutation
+
+- **`test_the_tool_reaches_no_network` is single-file and would not have caught
+  this.** It parses `lineups_from_paste.py` and `paste_lineups.py` for imports in a
+  forbidden set; `live_data_adapters` is not in that set, so the urllib-pulling
+  import passes it. A transitive check was added — and the first version of that
+  check was also wrong, in a way worth recording: it diffed `sys.modules` in-process,
+  and by the time it runs the rest of the suite has already imported
+  `urllib.request`, so the diff came back empty and it passed under the very
+  mutation it existed to catch. It now runs the probe in a fresh interpreter via
+  subprocess. Both failures were found by running the mutation, not by reading the
+  code.
+
+### Tests
+
+- Nine new tests; the pin moves 667 → 676 and the module count 25 → 26 (counted off
+  disk, so it moves on its own). `merge_feeds` had **no coverage of any kind**
+  before this, which is how both halves shipped, and it is a pure function on two
+  feed dicts so the tests drive it at that grain: the AZ/ARI case end to end with
+  the report assertions, all seven remapped codes, a pasted probable surviving a
+  fill with the disagreement reported, an uncovered side still taking the API
+  probable, a covered side untouched, an API-only field filling an empty slot and
+  being named, a never-mentioned game still added whole on a normalized key, and a
+  missing team code skipped rather than crashing. Plus the transitive zero-network
+  probe.
+- Mutation-checked three ways: an unnormalized merge key fails 9 assertions,
+  restoring the wholesale side replacement fails the pasted-probable test, and
+  importing `to_dk_abbrev` from `live_data_adapters` fails the transitive probe.
+
+### Verified
+
+- `PASS  v2.26.0  26 modules  676 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R65: one ET calendar authority, and a RotoWire parser that refuses to fail empty
 
 ### Fixed
