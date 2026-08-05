@@ -122,8 +122,12 @@ class BankCache:
     """Persistent, resumable candidate store.
 
     ``path`` holds a JSON document: the candidate rosters plus the set of jobs
-    already attempted. Attempted-but-failed jobs are recorded too, so a resumed
-    run does not re-pay for infeasible combinations.
+    already ANSWERED. A job is answered when a lineup came back or when the
+    solver proved infeasibility under these conditions; a proven-infeasible
+    combination is recorded so a resumed run does not re-pay for it. A timeout,
+    a raised exception, and an empty return that proved nothing are all
+    UNANSWERED and stay retryable (R55b). ``clear_attempted`` is the escape hatch
+    for a record poisoned before that distinction existed.
     """
 
     def __init__(self, path: str | Path):
@@ -131,6 +135,10 @@ class BankCache:
         self.candidates: List[Dict[str, Any]] = []
         self.attempted: set[str] = set()
         self._seen: set[Tuple[str, ...]] = set()
+        # Keys cleared by clear_attempted and not yet persisted. save() unions
+        # memory with disk, so without this a clear would be undone by the very
+        # next save (R55).
+        self._cleared: set[str] = set()
         self.corrupt_on_load = False
         # Filled by as_candidates: scored/failed counts for the payload it just
         # emitted, so a silent scoring failure is countable (F15).
@@ -148,6 +156,7 @@ class BankCache:
             # discard and start over rather than block the build.
             self.corrupt_on_load = True
             self.candidates, self.attempted, self._seen = [], set(), set()
+            self._cleared = set()
             return
         self.candidates = list(payload.get("candidates") or [])
         self.attempted = set(payload.get("attempted") or [])
@@ -176,6 +185,32 @@ class BankCache:
         self.candidates = keep
         self._seen = {tuple(c["roster"]) for c in keep}
         return len(stale_attempts) + len(stale_candidates)
+
+    def clear_attempted(self, conditions_sig: str = "") -> int:
+        """Forget the attempted-job record, keeping every candidate. Returns the count.
+
+        The maintenance escape hatch for a poisoned bank (R55). `attempted` is
+        meant to hold answered jobs, and a bug that recorded unanswered ones
+        leaves a cache that reports `job_list_exhausted: True` over an empty
+        candidate list and will never retry a single job -- the failure looks
+        like a dry pool forever, and `drop_stale_jobs` cannot help because the
+        conditions signature is unchanged.
+
+        Pass a `conditions_sig` to clear only the jobs solved under those
+        conditions; omit it to clear every attempt. Candidates are never touched:
+        real lineups are real regardless of what poisoned the attempt record, and
+        `add` dedupes rosters, so re-running a cleared job cannot double-count.
+        """
+        if conditions_sig:
+            suffix = f"|{conditions_sig}"
+            doomed = {k for k in self.attempted if k.endswith(suffix)}
+        else:
+            doomed = set(self.attempted)
+        if not doomed:
+            return 0
+        self.attempted -= doomed
+        self._cleared |= doomed
+        return len(doomed)
 
     def save(self) -> None:
         """Reload-and-union, then tmp + os.replace (R22).
@@ -213,9 +248,13 @@ class BankCache:
         tmp.write_text(json.dumps({
             "version": VERSION,
             "candidates": merged_candidates,
-            "attempted": sorted(self.attempted | disk_attempted),
+            # The union keeps concurrent writers' work (see above). Keys an
+            # operator deliberately cleared are subtracted once, here, or the
+            # union would silently reinstate them (R55).
+            "attempted": sorted((self.attempted | disk_attempted) - self._cleared),
         }, indent=1), encoding="utf-8")
         os.replace(tmp, self.path)
+        self._cleared = set()
 
     def add(self, roster: Sequence[str], objective: float, job: str = "") -> bool:
         """Store a candidate. Dedupes on the ordered roster, never the player set."""
@@ -529,6 +568,14 @@ def extend_bank(
     worst = 0.0
     timed_out_jobs = 0
     time_limited_accepted = 0
+    # R55(b). `attempted` means "this job has been ANSWERED", and only two
+    # answers qualify: a lineup came back, or the solver PROVED infeasibility
+    # under these conditions. Everything else is unanswered and retryable, and
+    # each kind is counted here so a systematic failure cannot read as a dry
+    # pool -- the exact misdiagnosis F13 exists to prevent.
+    raised_by_reason: Dict[str, int] = {}
+    raised_examples: List[str] = []
+    unanswered_by_status: Dict[str, int] = {}
     exhausted = True
     for pair, team in jobs:
         if max_candidates is not None and len(cache) >= max_candidates:
@@ -557,11 +604,20 @@ def extend_bank(
                 time_limit_s=resolve_solver_time_limit(solver_time_limit_s, remaining),
                 status_out=status,
             )
-        except Exception:  # noqa: BLE001 - an infeasible combination is data, not an error
+        except Exception as exc:  # noqa: BLE001
             worst = max(worst, time.monotonic() - attempt_started)
-            # A proven-infeasible combination will be infeasible again under the
-            # same conditions, so it is recorded and never retried.
-            cache.attempted.add(key)
+            # An exception is NEVER data (R55b). This handler's old comment said
+            # "an infeasible combination is data, not an error" and then recorded
+            # the key as attempted-forever -- but build_single_lineup returns
+            # (None, None) for infeasibility and never raises for it. Anything
+            # that reaches here is a NaN objective, a schema drift, a dtype
+            # mismatch, or a bug: causes that a later slice CAN retry once
+            # they are fixed, and none of which this job list has answered.
+            # Recording them made a poisoned bank read as a completed one.
+            reason = type(exc).__name__
+            raised_by_reason[reason] = raised_by_reason.get(reason, 0) + 1
+            if len(raised_examples) < 3:
+                raised_examples.append(f"{reason}: {exc}"[:300])
             continue
         if status.get("timed_out"):
             # F13: a timeout is not an answer about this job, so it is not
@@ -574,14 +630,25 @@ def extend_bank(
             time_limited_accepted += 1
         else:
             worst = max(worst, time.monotonic() - attempt_started)
+        roster = ordered_roster(lineup_df)
         # Recorded only after the solve returned. Keys used to enter `attempted`
         # BEFORE the solve and persist, so a job that hit the time limit was
         # marked done forever and never retried on a later slice: the sliced path
         # is the big-slate path, and this quietly dropped exactly the jobs a
         # second slice exists to finish.
+        #
+        # R55(b): and a solve that came back empty WITHOUT proving infeasibility
+        # is not an answer either. A returned lineup or a proven_infeasible
+        # verdict is; anything else (roster_size_mismatch, a rejected incumbent,
+        # a control that could not be matched) is counted by status and left
+        # retryable, so 0-built-16-attempted-exhausted cannot happen again
+        # without saying why.
         if not status.get("timed_out"):
-            cache.attempted.add(key)
-        roster = ordered_roster(lineup_df)
+            if roster is not None or bool(status.get("proven_infeasible")):
+                cache.attempted.add(key)
+            else:
+                label = str(status.get("status") or "unknown")
+                unanswered_by_status[label] = unanswered_by_status.get(label, 0) + 1
         if roster is None:
             continue
         if locked_slot_assignments:
@@ -630,6 +697,15 @@ def extend_bank(
         "jobs_timed_out": timed_out_jobs,
         "time_limited_accepted": time_limited_accepted,
         "solver_time_limit_s": resolve_solver_time_limit(solver_time_limit_s),
+        # R55(b): a raised exception is a defect, not a dry pool. Counted per
+        # reason with up to three verbatim examples, and never entered in
+        # `attempted`, so a later slice retries once the cause is fixed.
+        "jobs_raised": sum(raised_by_reason.values()),
+        "raised_by_reason": dict(sorted(raised_by_reason.items())),
+        "raised_examples": list(raised_examples),
+        # Solves that returned no lineup and proved nothing. Also retryable.
+        "jobs_unanswered": sum(unanswered_by_status.values()),
+        "unanswered_by_status": dict(sorted(unanswered_by_status.items())),
         "note": "deterministic candidate generation through the certified MILP path; "
                 "never an ROI, win-rate, or probability claim",
     }

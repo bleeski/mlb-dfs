@@ -683,21 +683,40 @@ def _prepare_single_lineup_df(
     penalized_players=None,
     apply_suppression=True,
 ):
-    """Shared preprocessing for all single-lineup solver backends."""
-    if not skip_feasibility_check:
-        _check_stack_feasibility(projections_df, stack_constraints, locks)
+    """Shared preprocessing for all single-lineup solver backends.
 
+    R55: ``Player_ID`` is normalized to a stripped string HERE, once, before any
+    control is matched against it. Every control that arrives as a set of ids --
+    locks, locked slot assignments, excludes, penalized players, forbidden
+    combos, overlap references -- is a set of STRINGS by contract
+    (``determinism.stable_union`` returns sorted strings). A frame whose
+    Player_ID column arrives int64, which is what
+    ``runs/<id>/inputs/projections.csv`` reloaded with a plain ``read_csv``
+    gives you, matched none of them: `isin` found nothing, so excludes and caps
+    no-opped, and a lock reported ``locked_player_unavailable`` with
+    ``proven_infeasible=True`` -- a dtype artifact wearing the reserved
+    infeasibility label. Both failures were silent and neither reduced the pool
+    visibly in the certified output.
+    """
     df = projections_df.copy()
+    if 'Player_ID' in getattr(df, 'columns', []):
+        df['Player_ID'] = df['Player_ID'].astype(str).str.strip()
+
+    if not skip_feasibility_check:
+        _check_stack_feasibility(df, stack_constraints, locks)
+
     if excludes:
-        df = df[~df['Player_ID'].isin(excludes)]
+        df = df[~df['Player_ID'].isin({str(x).strip() for x in excludes})]
     df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
 
     df['_pos_set'] = df['Position'].apply(_parse_positions)
 
     value_col = 'Ceiling' if target == 'ceiling' else 'Floor'
     if penalized_players:
+        # Same string contract as every other id-keyed control (R55).
+        penalties = {str(k).strip(): v for k, v in penalized_players.items()}
         df['_obj'] = df.apply(
-            lambda r: r[value_col] - penalized_players.get(r['Player_ID'], 0),
+            lambda r: r[value_col] - penalties.get(r['Player_ID'], 0),
             axis=1
         )
     else:
@@ -798,10 +817,19 @@ def _build_single_lineup_scipy(
     }
     suppression_var_idx = (n_assign + len(game_ids)) if suppression_coefs else None
     n_vars = n_assign + len(game_ids) + (1 if suppression_coefs else 0)
+    # Keyed on the normalized string ids _prepare_single_lineup_df guarantees, so
+    # a control looked up here matches by the same contract stable_union emits
+    # (R55). Incoming id iterables are stringified at each lookup below for the
+    # same reason.
     pid_to_var_idxs = {}
     for (pid, slot), idx in assign_index.items():
         pid_to_var_idxs.setdefault(pid, []).append(idx)
     row_by_pid = {row['Player_ID']: row for _, row in df.iterrows()}
+
+    def _known_pids(candidate_ids):
+        """Stringify an incoming id iterable and keep the ones in this pool."""
+        return [pid for pid in (str(x).strip() for x in (candidate_ids or []))
+                if pid in pid_to_var_idxs]
 
     c = np.zeros(n_vars, dtype=float)
     for (pid, slot), idx in assign_index.items():
@@ -866,7 +894,7 @@ def _build_single_lineup_scipy(
                 add_constraint(coefs, -np.inf, 0.0)
         add_constraint({game_index[gid]: 1.0 for gid in game_ids}, MIN_GAMES, np.inf)
 
-    for pid in (locks or []):
+    for pid in (str(x).strip() for x in (locks or [])):
         if pid_to_var_idxs.get(pid):
             add_constraint({idx: 1.0 for idx in pid_to_var_idxs[pid]}, 1.0, 1.0)
         else:
@@ -913,17 +941,17 @@ def _build_single_lineup_scipy(
         add_selected_sum_constraint(pids, bringback_constraint.get('min', 1), bringback_constraint.get('max', 2))
     if overlap_reference and max_overlap is not None:
         for reference in overlap_reference:
-            pids = [pid for pid in reference if pid in pid_to_var_idxs]
+            pids = _known_pids(reference)
             if pids:
                 add_selected_sum_constraint(pids, -np.inf, max_overlap)
     if stack_core_blocklist:
         for core in stack_core_blocklist:
-            pids = [pid for pid in core if pid in pid_to_var_idxs]
+            pids = _known_pids(core)
             if pids:
                 add_selected_sum_constraint(pids, -np.inf, len(pids) - 1)
     if forbidden_player_combos:
         for combo in forbidden_player_combos:
-            pids = [pid for pid in combo if pid in pid_to_var_idxs]
+            pids = _known_pids(combo)
             if len(pids) >= 2:
                 add_selected_sum_constraint(pids, -np.inf, len(pids) - 1)
 

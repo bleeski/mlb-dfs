@@ -4796,6 +4796,216 @@ class SolverTimeoutSemanticsTests(unittest.TestCase):
             self.assertEqual(bank_cache.BankCache(path).attempted, set())
 
 
+class SolverIdDtypeBoundaryTests(unittest.TestCase):
+    """R55(a). A control keyed on Player_ID must not depend on the column's dtype.
+
+    stable_union returns sorted STRINGS by contract, and the solver looked the
+    results up against df['Player_ID'] taken raw. A frame whose Player_ID arrives
+    int64 -- runs/<id>/inputs/projections.csv reloaded with a plain read_csv, or
+    any projections_override built from a numeric column -- matched none of them.
+    Reproduced 2026-08-04 on all three controls; these drive the same frames.
+    """
+
+    @staticmethod
+    def _frames():
+        as_str = diverse_projection_frame()
+        as_int = as_str.copy()
+        as_int["Player_ID"] = as_int["Player_ID"].astype("int64")
+        return as_str, as_int
+
+    @staticmethod
+    def _sp_ids(frame):
+        return [str(p) for p in frame[frame["Position"] == "P"]["Player_ID"]]
+
+    def test_a_lock_binds_on_an_int64_player_id_frame(self):
+        # The headline: the lock is IN the pool, and the solver called it
+        # unavailable and stamped the reserved proven_infeasible label on a
+        # dtype artifact.
+        _, as_int = self._frames()
+        lock_id = self._sp_ids(as_int)[0]
+        status = {}
+        lineup, _ = opt.build_single_lineup(
+            as_int, target="ceiling", locks=[lock_id], status_out=status)
+        self.assertIsNotNone(
+            lineup, f"lock no-opped into a refusal on an int64 frame: {status}")
+        self.assertNotEqual(status.get("status"), "locked_player_unavailable")
+        self.assertFalse(status.get("proven_infeasible"))
+        self.assertIn(lock_id, {str(p) for p in lineup["Player_ID"]})
+
+    def test_excludes_bind_on_an_int64_player_id_frame(self):
+        # max_sp_exposure and the seed-pair excludes both arrive as id sets, and
+        # both silently no-opped: cap=1 with an SP rostered three times, caught
+        # only by post-hoc anchor_validation.
+        _, as_int = self._frames()
+        excluded = self._sp_ids(as_int)[:2]
+        lineup, _ = opt.build_single_lineup(
+            as_int, target="ceiling", excludes=excluded)
+        self.assertIsNotNone(lineup)
+        rostered = {str(p) for p in lineup["Player_ID"]}
+        self.assertEqual(
+            set(excluded) & rostered, set(),
+            "an excluded player was rostered because the id types never matched")
+
+    def test_a_locked_slot_assignment_binds_on_an_int64_frame(self):
+        _, as_int = self._frames()
+        catcher = str(as_int[as_int["Position"] == "C"].iloc[0]["Player_ID"])
+        status = {}
+        lineup, _ = opt.build_single_lineup(
+            as_int, target="ceiling",
+            locked_slot_assignments={"C": catcher}, status_out=status)
+        self.assertIsNotNone(lineup, f"locked slot refused: {status}")
+        by_slot = {str(r["Assigned_Slot"]): str(r["Player_ID"])
+                   for _, r in lineup.iterrows()}
+        self.assertEqual(by_slot["C"], catcher)
+
+    def test_dtype_is_not_a_strategy_input(self):
+        # Same pool, same controls, two dtypes: the lineup and the objective are
+        # the same or the column is deciding strategy.
+        as_str, as_int = self._frames()
+        lock_id = self._sp_ids(as_str)[0]
+        out = []
+        for frame in (as_str, as_int):
+            lineup, objective = opt.build_single_lineup(
+                frame, target="ceiling", locks=[lock_id])
+            self.assertIsNotNone(lineup)
+            out.append(([str(p) for p in lineup["Player_ID"]], round(objective, 9)))
+        self.assertEqual(out[0], out[1])
+        # And the returned Player_ID is a string on both, so downstream joins
+        # against DK ids do not have to care either.
+        for frame in (as_str, as_int):
+            lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+            self.assertTrue(all(isinstance(p, str) for p in lineup["Player_ID"]))
+
+    def test_extend_bank_builds_the_same_jobs_on_either_dtype(self):
+        # The filed case: extend_bank locks each SP pair, so on an int64 frame it
+        # built 0 of 16 jobs while marking all 16 attempted-forever with
+        # job_list_exhausted True -- a permanently poisoned, empty-looking-but-
+        # "done" bank. The string control built 8 of 16.
+        as_str, as_int = self._frames()
+        results = []
+        for frame in (as_str, as_int):
+            with tempfile.TemporaryDirectory() as tmp:
+                cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+                report = bank_cache.extend_bank(cache, frame, time_budget_s=30)
+                results.append((report["built_this_slice"], report["jobs_total"],
+                                report["job_list_exhausted"]))
+        self.assertEqual(results[0], results[1],
+                         f"the bank build depends on the Player_ID dtype: {results}")
+        self.assertGreater(results[1][0], 0,
+                           "an int64 frame still builds nothing")
+
+
+class BankCacheAnsweredJobTests(unittest.TestCase):
+    """R55(b). `attempted` holds ANSWERED jobs, and only two answers qualify.
+
+    A lineup came back, or the solver proved infeasibility. A raised exception is
+    neither: build_single_lineup returns (None, None) for infeasibility and never
+    raises for it, so anything escaping the handler is a defect a later slice can
+    retry. Recording those made a systematic error indistinguishable from a
+    genuinely dry pool -- the misdiagnosis the module's own F13 note warns about.
+    """
+
+    @staticmethod
+    def _stub(status_fields=None, raises=None):
+        def fake(projections_df, **kwargs):
+            if raises is not None:
+                raise raises
+            opt._record_solver_status(kwargs.get("status_out"), **(status_fields or {}))
+            return None, None
+        return fake
+
+    def _run(self, stub, frame, path, **kw):
+        cache = bank_cache.BankCache(path)
+        original = bank_cache.build_single_lineup
+        bank_cache.build_single_lineup = stub
+        try:
+            report = bank_cache.extend_bank(cache, frame, **kw)
+        finally:
+            bank_cache.build_single_lineup = original
+        return cache, report
+
+    def test_a_raised_exception_is_counted_and_stays_retryable(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache, report = self._run(
+                self._stub(raises=ValueError("Base contains nonnumeric values")),
+                frame, path, time_budget_s=20)
+            self.assertEqual(report["built_this_slice"], 0)
+            self.assertEqual(report["jobs_raised"], report["jobs_total"])
+            self.assertEqual(report["raised_by_reason"],
+                             {"ValueError": report["jobs_total"]})
+            self.assertTrue(report["raised_examples"])
+            self.assertIn("nonnumeric", report["raised_examples"][0])
+            self.assertEqual(cache.attempted, set(),
+                             "a raised exception was recorded as an answered job")
+            self.assertEqual(bank_cache.BankCache(path).attempted, set())
+            # and once the cause is gone, the same cache builds
+            follow = bank_cache.extend_bank(
+                bank_cache.BankCache(path), frame, time_budget_s=30)
+            self.assertGreater(follow["built_this_slice"], 0)
+
+    def test_an_empty_return_that_proved_nothing_is_not_an_answer(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache, report = self._run(
+                self._stub({"status": "roster_size_mismatch",
+                            "proven_infeasible": False,
+                            "incumbent_rejected": True}),
+                frame, path, time_budget_s=20)
+            self.assertEqual(report["jobs_unanswered"], report["jobs_total"])
+            self.assertEqual(report["unanswered_by_status"],
+                             {"roster_size_mismatch": report["jobs_total"]})
+            self.assertEqual(cache.attempted, set())
+
+    def test_a_proven_infeasible_job_is_recorded_and_never_retried(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache, report = self._run(
+                self._stub({"status": "infeasible", "proven_infeasible": True}),
+                frame, path, time_budget_s=20)
+            self.assertEqual(len(cache.attempted), report["jobs_total"])
+            self.assertEqual(report["jobs_unanswered"], 0)
+            self.assertEqual(report["jobs_raised"], 0)
+            second = bank_cache.extend_bank(
+                bank_cache.BankCache(path), frame, time_budget_s=10)
+            self.assertEqual(second["attempted_this_slice"], 0,
+                             "a proven-infeasible job was re-paid for")
+
+    def test_clear_attempted_survives_save_and_keeps_candidates(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache = bank_cache.BankCache(path)
+            report = bank_cache.extend_bank(cache, frame, time_budget_s=30)
+            self.assertGreater(report["built_this_slice"], 0)
+            reopened = bank_cache.BankCache(path)
+            candidates_before = len(reopened.candidates)
+            attempted_before = len(reopened.attempted)
+            self.assertGreater(attempted_before, 0)
+            cleared = reopened.clear_attempted(report["conditions_signature"])
+            self.assertEqual(cleared, attempted_before)
+            reopened.save()
+            # save() unions memory with disk to protect concurrent writers, so a
+            # clear that is not subtracted there is undone by the next save.
+            after = bank_cache.BankCache(path)
+            self.assertEqual(after.attempted, set())
+            self.assertEqual(len(after.candidates), candidates_before,
+                             "clearing the attempt record threw away real lineups")
+
+    def test_clear_attempted_scopes_to_a_conditions_signature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            cache.attempted = {"a|b|SIG1", "c|d|SIG1", "e|f|SIG2"}
+            self.assertEqual(cache.clear_attempted("SIG1"), 2)
+            self.assertEqual(cache.attempted, {"e|f|SIG2"})
+            self.assertEqual(cache.clear_attempted("SIG1"), 0)
+            self.assertEqual(cache.clear_attempted(), 1)
+            self.assertEqual(cache.attempted, set())
+
+
 class AllocatorSolverStatusTests(unittest.TestCase):
     """F13/F15 at the allocator boundary."""
 

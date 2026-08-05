@@ -25,6 +25,127 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R55: the solver's id boundary holds one dtype, and the bank cache only records jobs it answered
+
+### Fixed
+
+- **R55(a) — every id-keyed control binds regardless of the Player_ID column's
+  dtype (P1).** `determinism.stable_union` returns sorted STRINGS by contract and
+  the solver looked the results up against `df['Player_ID']` taken raw. On any
+  frame whose Player_ID arrives int64 — `runs/<id>/inputs/projections.csv`
+  reloaded with a plain `read_csv`, or a `projections_override` built from a
+  numeric column — nothing matched, and all three filed failures reproduced on
+  one pool solved twice:
+  a lock on a player who is demonstrably in the pool came back
+  `locked_player_unavailable` with `proven_infeasible=True`, a dtype artifact
+  wearing the label reserved for a proof; excludes no-opped, so a player passed
+  in as excluded was rostered; and `bank_cache.extend_bank`, which locks each SP
+  pair, **built 0 of 16 jobs while marking all 16 attempted and reporting
+  `job_list_exhausted: True`** — an empty bank that reads as completed work. The
+  string control built 8 of 16.
+  `Player_ID` is now normalized to a stripped string once, in
+  `_prepare_single_lineup_df`, before any control is matched against it, so
+  `pid_to_var_idxs` is keyed the way `stable_union` emits. Every incoming id
+  iterable is stringified at its lookup for the same reason — locks, the exclude
+  set, penalized players, overlap references, stack-core blocklists and forbidden
+  combos — through one `_known_pids` helper rather than six spellings of the same
+  filter. The stack-feasibility pre-check now runs on the normalized frame too.
+  The dtype was deciding strategy and doing it invisibly: neither the lock
+  refusal nor the ignored exclude appeared anywhere in the certified output as a
+  reduced pool.
+- **R55(b) — `attempted` means answered, and an exception is not an answer
+  (P1).** `extend_bank`'s `except Exception` handler recorded the job key as
+  attempted-forever under a comment reading "an infeasible combination is data,
+  not an error". But `build_single_lineup` returns `(None, None)` for
+  infeasibility and never raises for it, so everything that actually reaches that
+  handler — a NaN objective, schema drift, the dtype case above — is a defect a
+  later slice can retry once the cause is fixed. Recording them made a
+  systematically broken bank indistinguishable from a genuinely dry pool, which
+  is the misdiagnosis the module's own F13 note exists to prevent, and the slice
+  report counted only timeouts so nothing said otherwise.
+  A job now enters `attempted` on exactly two answers: a lineup came back, or the
+  solver reported `proven_infeasible`. A raised exception is counted per exception
+  type in `raised_by_reason` with up to three verbatim `raised_examples`, and an
+  empty return that proved nothing (a rejected incumbent, a roster-size mismatch,
+  a control that could not be matched) is counted per solver status in
+  `unanswered_by_status`. Both are left retryable. Timeouts keep their existing
+  F13 treatment. `0 built / 16 attempted / exhausted` cannot recur without the
+  report saying which of the three things happened.
+  `BankCache.clear_attempted(conditions_sig)` is the maintenance hatch for a
+  record poisoned before that distinction existed: `drop_stale_jobs` cannot help,
+  because the conditions signature of a poisoned bank is correct. It clears the
+  attempt record for one signature (or all, with no argument) and never touches
+  candidates — real lineups are real whatever poisoned the attempt record, and
+  `add` dedupes rosters so a re-run cannot double-count. It also had to be
+  subtracted inside `save()`: that method deliberately unions memory with disk to
+  protect concurrent slices, which would have silently reinstated every cleared
+  key on the very next save. The subtraction applies once and then resets, so a
+  clear is a one-time operator action rather than a permanent suppression.
+
+### Filed rather than fixed here
+
+- **R92 (new, P2/S) — `build_slate.py`'s bank warning for failed cache jobs is a
+  dead read.** Found while wiring R55(b)'s counters:
+  `build_slate.py:1376` and `:1382` build `bank_warnings` from
+  `bank_report.get('jobs_failed')` and `bank_report.get('budget_exhausted')`, and
+  `extend_bank` has never emitted either key (verified against the full return
+  dict; `budget_exhausted` exists only on optimizer_v3's unrelated augmentation
+  report, which is presumably where the reader was copied from). Both lines are
+  unreachable, so the sliced path's failures have never reached a warning — the
+  R51 class, a guard that cannot fail. R55(b) now emits the counters that warning
+  wanted, which is exactly why this is filed and not folded in: choosing which
+  counters surface, and how they interact with R64's clean/unknown verdict, is a
+  decision with its own test, not a line to slip into this commit.
+
+### What the reproduction corrected about the filed diagnosis
+
+- **The poisoning path is the normal one, not the exception handler.** R55(b)
+  reads as though the `except Exception` recorded the 16 dtype-broken jobs. It did
+  not: `build_single_lineup` returned `(None, None)` and the loop's ordinary
+  `if not status.get("timed_out"): cache.attempted.add(key)` — which ran BEFORE
+  the roster was even checked — is what recorded them. The entry's own reasoning
+  is what caught this ("an exception is never data"), and the fix needed both
+  halves: the exception handler stops recording, and the normal path stops
+  recording an empty return that proved nothing. Fixing only the handler would
+  have left the reproduced case fully intact.
+- **Line numbers had drifted:** the filed `optimizer_v3.py:816,984` are the lock
+  loop and `build_single_lineup`'s `stable_union` call; `bank_cache.py:560` is the
+  `except Exception`.
+- **`jobs_attempted` in the slice report now means "answered", which is what it
+  always claimed.** It counts keys in `cache.attempted` carrying this slice's
+  suffix, so it tightened along with the recording rule. `attempted_this_slice`
+  still counts jobs this slice tried. The two were interchangeable only while
+  everything non-timeout was recorded.
+
+### Tests
+
+- Ten new tests; the pin moves 641 → 651 in all three places. Five in
+  `SolverIdDtypeBoundaryTests` drive the reproduced int64 frame: a lock binds, a
+  locked slot assignment binds, excludes bind, the same pool at two dtypes
+  produces the same lineup and objective and returns string ids either way, and
+  `extend_bank` builds the same jobs on both (the filed 0-of-16 case). Five in
+  `BankCacheAnsweredJobTests` cover the recording rule: a raised exception is
+  counted per reason with its message, stays out of `attempted` on disk as well as
+  in memory, and the same cache builds once the cause is gone; an empty return
+  that proved nothing is counted by status and stays retryable; a proven-infeasible
+  job IS recorded and a second slice re-pays for nothing; `clear_attempted`
+  survives a save and keeps every candidate; and it scopes to one conditions
+  signature, is idempotent, and clears everything when called bare.
+- Mutation-checked four ways. Removing the Player_ID normalization fails all five
+  dtype tests. Restoring `cache.attempted.add(key)` in the exception handler fails
+  the exception test. Recording every non-timeout return again fails the
+  unanswered test. Dropping the `_cleared` subtraction in `save()` fails the
+  persistence test — that last one is the mutation that matters most, because the
+  in-memory clear looks correct on its own.
+- Golden replay digests unmoved, verified: the replay frames carry string
+  Player_IDs already, so normalization is a no-op there, and its jobs all answer.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  651 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R56: salary suppression bounds the bonus it counts, not the set of legal lineups
 
 ### Fixed
