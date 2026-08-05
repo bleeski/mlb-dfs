@@ -210,21 +210,36 @@ def select_one_leg_per_matchup(
         if not dated:
             kept.append(legs[0])
             continue
+        # R58(a): the reason is written from the DROPPED leg's point of view.
+        # It used to describe why the KEPT leg won and then be stamped on every
+        # dropped record, so a matinee dropped in favour of a night leg carried
+        # "matched salary start <night time>" -- a true sentence about a
+        # different leg, and false about the record it was attached to. That
+        # text is quoted in the R58 report as evidence, which is how it was
+        # found.
+        def _off(start: Any) -> float:
+            return abs((start - target).total_seconds()) / 60.0
+
         if target is None:
-            chosen, _ = min(dated, key=lambda pair: pair[1])
-            reason = "no salary start time; kept earliest leg"
+            chosen, chosen_start = min(dated, key=lambda pair: pair[1])
+            def _reason(_start: Any) -> str:
+                return ("no salary start time to choose on; kept the earliest leg "
+                        f"({chosen_start.isoformat()})")
         else:
-            chosen, delta = min(
-                ((entry, abs((start - target).total_seconds()) / 60.0) for entry, start in dated),
+            chosen, chosen_delta = min(
+                ((entry, _off(start)) for entry, start in dated),
                 key=lambda pair: pair[1],
             )
-            if delta > tolerance_minutes:
-                reason = (
-                    f"no leg within {tolerance_minutes}m of the salary start "
-                    f"{target.isoformat()}; kept closest ({delta:.0f}m off)"
-                )
+            if chosen_delta > tolerance_minutes:
+                def _reason(start: Any) -> str:
+                    return (f"no leg within {tolerance_minutes}m of the salary start "
+                            f"{target.isoformat()}; kept the closest at "
+                            f"{chosen_delta:.0f}m off, this leg is {_off(start):.0f}m off")
             else:
-                reason = f"matched salary start {target.isoformat()}"
+                def _reason(start: Any) -> str:
+                    return (f"another leg matched the salary start "
+                            f"{target.isoformat()} to within {tolerance_minutes}m; "
+                            f"this leg is {_off(start):.0f}m off it")
         kept.append(chosen)
         for entry, start in dated:
             if entry is chosen:
@@ -232,10 +247,27 @@ def select_one_leg_per_matchup(
             dropped.append({
                 "game_id": game_id,
                 "start_utc": start.isoformat(),
-                "reason": reason,
+                "reason": _reason(start),
                 "entry": entry,
             })
     return kept, dropped
+
+
+def _legs_for_extraction(
+    feed: Mapping[str, Any],
+    salary_game_times: Optional[Mapping[str, datetime]] = None,
+) -> List[Mapping[str, Any]]:
+    """The feed games an extractor should read: one leg per matchup when the
+    caller supplied salary game times, every game as-is when it did not (R58b).
+
+    One place, so the three team-keyed extractors cannot drift from each other
+    or from the status map.
+    """
+    games = list(feed.get("games") or [])
+    if not salary_game_times:
+        return games
+    kept, _dropped = _select_slate_legs(games, salary_game_times)
+    return list(kept)
 
 
 def _select_slate_legs(
@@ -440,7 +472,10 @@ def build_status_map_from_lineups_feed(
     }
 
 
-def extract_opposing_probables(feed: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
+def extract_opposing_probables(
+    feed: Mapping[str, Any],
+    salary_game_times: Optional[Mapping[str, datetime]] = None,
+) -> Dict[str, Dict[str, Any]]:
     """From an mlb-lineups feed, map each DK team abbrev to the OPPOSING probable SP.
 
     Returns ``{team: {"id": mlbam_id_str, "name": ..., "hand": "R"/"L"}}``. The
@@ -450,9 +485,17 @@ def extract_opposing_probables(feed: Mapping[str, Any]) -> Dict[str, Dict[str, A
     probable are simply absent; projection_builder.compute_f4_factors treats
     them as neutral and reports them. Feed probables are usually populated even
     when batting orders are still TBD.
+
+    R58(b): pass ``salary_game_times`` on a doubleheader slate. This function
+    writes into a TEAM-keyed dict while iterating the feed's games, so two legs
+    of one matchup are last-write-wins and a matinee build silently took the
+    night starter. The status map and the odds packet already leg-select through
+    ``select_one_leg_per_matchup``; these extractors did not, so the same feed
+    produced a leg-correct status map and a leg-wrong platoon view. Omitting the
+    argument keeps the previous behavior exactly.
     """
     out: Dict[str, Dict[str, Any]] = {}
-    for game_entry in feed.get("games") or []:
+    for game_entry in _legs_for_extraction(feed, salary_game_times):
         away = game_entry.get("away") or {}
         home = game_entry.get("home") or {}
         away_team = to_dk_abbrev(away.get("team_abbrev"))
@@ -474,7 +517,11 @@ def extract_opposing_probables(feed: Mapping[str, Any]) -> Dict[str, Dict[str, A
     return out
 
 
-def extract_batter_hands(feed: Mapping[str, Any], salary_players: Any) -> Dict[str, str]:
+def extract_batter_hands(
+    feed: Mapping[str, Any],
+    salary_players: Any,
+    salary_game_times: Optional[Mapping[str, datetime]] = None,
+) -> Dict[str, str]:
     """From an mlb-lineups feed, map DK Player_ID -> bat side ("L"/"R"/"S").
 
     Uses the same name+team salary match as the status map, so the crosswalk
@@ -482,6 +529,14 @@ def extract_batter_hands(feed: Mapping[str, Any], salary_players: Any) -> Dict[s
     ``bat_side``, so TBD teams are absent; the F4 platoon component simply
     stays neutral for them while the team-level SP-quality component still
     applies. Ambiguous or unmatched feed hitters are skipped, never guessed.
+
+    R58(b): pass ``salary_game_times`` on a doubleheader slate. This function
+    writes into a TEAM-keyed dict while iterating the feed's games, so two legs
+    of one matchup are last-write-wins and a matinee build silently took the
+    night starter. The status map and the odds packet already leg-select through
+    ``select_one_leg_per_matchup``; these extractors did not, so the same feed
+    produced a leg-correct status map and a leg-wrong platoon view. Omitting the
+    argument keeps the previous behavior exactly.
     """
     players = _load_salary_players(salary_players)
     salary_by_name_team: Dict[Tuple[str, str], List[str]] = {}
@@ -489,7 +544,7 @@ def extract_batter_hands(feed: Mapping[str, Any], salary_players: Any) -> Dict[s
         key = (normalize_name(_record_get(record, "name")), str(_record_get(record, "team")).strip().upper())
         salary_by_name_team.setdefault(key, []).append(str(pid))
     out: Dict[str, str] = {}
-    for game_entry in feed.get("games") or []:
+    for game_entry in _legs_for_extraction(feed, salary_game_times):
         for side in (game_entry.get("away") or {}, game_entry.get("home") or {}):
             dk_team = to_dk_abbrev(side.get("team_abbrev"))
             if not dk_team:
@@ -772,7 +827,8 @@ def build_slate_pool(
             else:
                 platoon_source = "caller_supplied"
             if resolved is not None:
-                opp_throws = extract_opp_throws_from_lineups(lineups_feed)
+                opp_throws = extract_opp_throws_from_lineups(
+                    lineups_feed, _salary_game_times(salary_map))
                 platoon_order, platoon_report = build_projected_order(
                     resolved, salary_csv, opp_throws, only_teams=list(tbd_teams),
                 )
@@ -1084,8 +1140,14 @@ def build_slate_pool(
         "platoon_report": platoon_report,
         "platoon_source": platoon_source,
         "team_by_player_id": team_by_player_id,
-        "opposing_probables": extract_opposing_probables(lineups_feed),
-        "batter_hands": extract_batter_hands(lineups_feed, salary_map),
+        # R58(b): one leg per matchup, the same selection the status map above
+        # already applies. Without it these two are last-write-wins on a
+        # doubleheader and a matinee build takes the night starter's F4 quality
+        # and the night side's bat hands.
+        "opposing_probables": extract_opposing_probables(
+            lineups_feed, _salary_game_times(salary_map)),
+        "batter_hands": extract_batter_hands(
+            lineups_feed, salary_map, _salary_game_times(salary_map)),
         "clock": clock,
         "lock_time_by_game_id": status.get("lock_time_by_game_id"),
         "pool_report": {

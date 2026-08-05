@@ -25,6 +25,103 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R58(a)(b): a doubleheader's legs stop collapsing onto one start
+
+### Fixed
+
+- **R58(a) — each pasted leg carries its own start (P1).** A DK draftgroup prices
+  ONE leg of a doubleheader and `salary_game_times` is keyed on `AWAY@HOME`, so
+  `resolve_paste_to_feed` stamped every pasted leg with the same start. Downstream
+  `_select_slate_legs` tie-breaks on `game_date_utc` against that same salary
+  start, so with both legs carrying an identical stamp it kept whichever leg was
+  pasted FIRST. Reproduced end to end on a 9:38 PM night draftgroup: it confirmed
+  the **1:05 PM leg's batting order**, the night-only starters were absent from the
+  pool, the rested matinee bats were confirmed, and the whole thing exited 0.
+  The date still comes from the salary file, which is authoritative for the slate
+  and carries a full date. Only the TIME OF DAY comes from the paste, which is the
+  one thing the paste knows per leg and the CSV cannot, and **only for a matchup
+  pasted more than once** — a single-leg game keeps the salary start verbatim, so
+  the existing "lock times come from the salary file, the paste's clock is a
+  cross-check" contract is untouched.
+  A matchup whose legs cannot be told apart by clock is a BLOCKER and writes no
+  game, because two indistinguishable legs mean the selector has to pick
+  arbitrarily, which is the failure being closed.
+  The clock cross-check also stopped firing on the wrong leg. On a doubleheader the
+  non-priced leg's clock differs legitimately, and the old single-leg wrong-slate
+  warning fired on it while the real leg was silent. The multi-leg case now names
+  which leg the salary file prices, and reserves a warning for the case that
+  actually is a wrong-slate signal: no pasted leg matching the priced start at all.
+- **R58(b) — the three team-keyed extractors leg-select, like the status map
+  already did (P1).** `extract_opposing_probables`, `extract_batter_hands` and
+  `extract_opp_throws_from_lineups` all write into a TEAM-keyed dict while
+  iterating the feed's games, so two legs of one matchup were last-write-wins. The
+  status map and the odds packet route through `select_one_leg_per_matchup` (F18)
+  and these did not, so **the same feed produced a leg-correct status map and a
+  leg-wrong platoon view**. Reproduced: a matinee draftgroup took the night
+  starter's name, MLBAM id and throw hand, which flips the platoon view for every
+  hitter on that side and feeds the wrong arm's quality into F4.
+  All three now take an optional `salary_game_times` and route through one shared
+  `_legs_for_extraction`, which delegates to `_select_slate_legs`. Omitting the
+  argument is exactly the previous behavior. `build_slate_pool` passes it at all
+  three call sites.
+- **A dropped leg's reason now describes the dropped leg (P2, found by the
+  reproduction).** `select_one_leg_per_matchup` built one `reason` explaining why
+  the KEPT leg won and stamped it on every dropped record, so a matinee dropped in
+  favour of a night leg carried `"matched salary start <night time>"` — a true
+  sentence about a different leg and a false one about the record holding it. That
+  exact text is quoted in R58's What line as evidence, which is how it surfaced. The
+  reason is now per-dropped-leg and states how far off that leg is.
+
+### Declined in this commit, with reasons
+
+- **R58(c), the RotoWire per-leg order, is NOT built.** The filed fix is "key
+  per-leg orders by (team, clock)", and the RotoWire schema carries no clock at
+  all: `to_platoon_schema` emits `abbrev`, `status`, `page_updated`, `vs_RHP`,
+  `vs_LHP`. Doing it means teaching the regex parser to capture a per-game clock,
+  widening the emitted schema, and updating `build_projected_order` — in the same
+  regex-over-live-HTML parser that still has no frozen real-page fixture (R65
+  declined that half; it sits on R90 with the hand step named). Changing that
+  parser's extraction surface without a fixture of the page it parses is how a
+  silent-empty regression ships. It is scoped, dated and noted on R58.
+- **R58(d), the same-venue weather window, is NOT built.** Independent surface
+  (`fetch_slate_bundle`'s fetch window), no interaction with (a) or (b), and it
+  wants a decision about whether the second leg gets its own window or the first
+  leg's window is widened to cover both. Noted on R58.
+  Both remaining parts affect a DH slate only, and neither is in the
+  wrong-lineup-reaches-the-pool class that (a) and (b) were.
+
+### Tests
+
+- Eight new tests; the pin moves 676 → 684. Five in a new
+  `DoubleheaderPastedLegTests` drive the filed reproduction through the real paste
+  path with a synthetic night draftgroup: each leg gets its own start and the
+  9:38 PM file keeps the night batting order and the night arm, the doubleheader is
+  named instead of a false wrong-slate warning, indistinguishable legs block and
+  write no game, a paste where NO leg matches the priced start is still reported,
+  and a single-leg game still takes its start from the salary file with its
+  cross-check intact. Three in `DoubleheaderLegTests`: the extractors take the
+  priced leg's arm and hand where the un-argumented call takes the wrong leg's, a
+  call-graph pin that all three route through one `_legs_for_extraction` and that
+  it routes through `_select_slate_legs` (extending F18's existing selector check,
+  so a fourth extractor cannot be written the old way), and the dropped-leg reason.
+- Mutation-checked four ways: re-stamping every leg with the salary start fails the
+  per-leg test, dropping the inseparable-legs blocker fails the block test, making
+  `_legs_for_extraction` ignore its argument fails the extractor test, and
+  restoring the old dropped-leg wording fails the reason test.
+- One regression caught mid-change and worth recording: deriving the start from the
+  paste clock and then handing that derived value to `_cross_check_clock` compares
+  the clock against a number computed from itself, which agrees by construction and
+  silenced the wrong-slate detector entirely. The existing
+  `test_a_clock_disagreement_is_reported_as_a_wrong_slate_signal` caught it. The
+  cross-check reads the salary start, always.
+
+### Verified
+
+- `PASS  v2.26.0  26 modules  684 tests` on the pinned container stack. Golden
+  replay digests unmoved.
+
+---
+
 ## 2026-08-05 — R37 decision input: the feasibility gate is answered, and a probe that reproduces it
 
 ### Added

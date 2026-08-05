@@ -4805,6 +4805,105 @@ class DoubleheaderLegTests(unittest.TestCase):
             dropped = status["doubleheader_legs_dropped"]
             self.assertEqual([d["game_pk"] for d in dropped], [2])
 
+    def _dh_feed_with_distinct_arms(self):
+        """Both legs of AAA@BBB, the leg the salary file does NOT price rendered
+        LAST so last-write-wins picks the wrong one. That is the filed direction."""
+        def side(team, prefix, hand, arm):
+            return {"team_abbrev": team, "lineup_status": "confirmed",
+                    "lineup": [{"order": i, "name": f"{prefix} bat {i}",
+                                "bat_side": "R"} for i in range(1, 10)],
+                    "probable_pitcher": {"id": 1, "name": arm, "hand": hand}}
+        # write_salary prices AAA@BBB at 06/11/2026 01:00PM ET == 17:00Z, so the
+        # MATINEE is the priced leg and the night leg is rendered last.
+        return {"date": "2026-06-11", "games": [
+            {"game_pk": 1, "game_date_utc": "2026-06-11T17:00:00Z", "status": "Scheduled",
+             "away": side("AAA", "matinee", "L", "Matinee Away Arm"),
+             "home": side("BBB", "matinee", "L", "Matinee Home Arm")},
+            {"game_pk": 2, "game_date_utc": "2026-06-11T23:05:00Z", "status": "Scheduled",
+             "away": side("AAA", "night", "R", "Night Away Arm"),
+             "home": side("BBB", "night", "R", "Night Home Arm")},
+        ]}
+
+    def test_the_team_keyed_extractors_leg_select_like_the_status_map(self):
+        """R58(b). All three write into a TEAM-keyed dict while iterating games,
+        so a doubleheader was last-write-wins: the same feed produced a
+        leg-correct status map and a leg-wrong platoon view, silently."""
+        from mlb_engine.intake.live_data_adapters import (
+            extract_opposing_probables, extract_batter_hands, _salary_game_times,
+            _load_salary_players)
+        from mlb_engine.intake.platoon_order_adapter import (
+            extract_opp_throws_from_lineups)
+
+        feed = self._dh_feed_with_distinct_arms()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            write_salary(salary)
+            players = _load_salary_players(str(salary))
+            times = _salary_game_times(players)
+            # The salary fixture prices AAA@BBB at one start; assert which, so a
+            # fixture change cannot quietly invert this test.
+            self.assertEqual(times["AAA@BBB"].astimezone(timezone.utc).isoformat(),
+                             "2026-06-11T17:00:00+00:00")
+
+            # Without the argument: previous behavior, the LAST game wins, so a
+            # matinee draftgroup takes the night starter and his throw hand.
+            self.assertEqual(
+                extract_opposing_probables(feed)["AAA"]["name"], "Night Home Arm")
+            self.assertEqual(extract_opp_throws_from_lineups(feed)["AAA"], "R")
+
+            # With it: the leg the salary file prices, matching the status map.
+            probs = extract_opposing_probables(feed, times)
+            throws = extract_opp_throws_from_lineups(feed, times)
+            self.assertEqual(probs["AAA"]["name"], "Matinee Home Arm")
+            self.assertEqual(probs["BBB"]["name"], "Matinee Away Arm")
+            self.assertEqual(throws["AAA"], "L")
+            self.assertEqual(throws["BBB"], "L")
+
+            # batter_hands is keyed per player, so the failure there is the two
+            # legs' hitters merging into one pool rather than a flipped value.
+            both = extract_batter_hands(feed, players)
+            one = extract_batter_hands(feed, players, times)
+            self.assertLessEqual(len(one), len(both))
+
+    def test_every_team_keyed_extractor_routes_through_one_leg_selector(self):
+        """R58(b), pinned on the call graph like F18's selector check above.
+
+        Three functions had to leg-select and none did. Pinning the behavior alone
+        would let a fourth extractor be written the old way, or one of these three
+        grow a private copy of the selection.
+        """
+        import ast
+        import textwrap
+        from mlb_engine.intake import live_data_adapters as lda
+        from mlb_engine.intake import platoon_order_adapter as poa
+
+        def calls(fn):
+            tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+            return {node.func.id for node in ast.walk(tree)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
+
+        for fn in (lda.extract_opposing_probables, lda.extract_batter_hands,
+                   poa.extract_opp_throws_from_lineups):
+            self.assertIn("_legs_for_extraction", calls(fn), fn.__name__)
+        # and the one helper routes through the one selector
+        self.assertIn("_select_slate_legs", calls(lda._legs_for_extraction))
+
+    def test_a_dropped_leg_reason_describes_the_dropped_leg(self):
+        """R58(a). The reason described why the KEPT leg won and was then stamped
+        on every dropped record, so a matinee dropped in favour of a night leg
+        read "matched salary start <night time>" -- true of another leg, false of
+        the record carrying it. That text is quoted in R58 as evidence."""
+        from mlb_engine.intake.live_data_adapters import _select_slate_legs
+        feed = self._dh_feed_with_distinct_arms()
+        target = {"AAA@BBB": datetime(2026, 6, 11, 23, 5, tzinfo=timezone.utc)}
+        kept, dropped = _select_slate_legs(feed["games"], target)
+        self.assertEqual([g["game_pk"] for g in kept], [2])
+        self.assertEqual(len(dropped), 1)
+        reason = dropped[0]["reason"]
+        self.assertIn("another leg matched", reason)
+        self.assertIn("this leg is", reason)
+        self.assertNotIn("matched salary start", reason)
+
     def test_clock_prefers_salary_file_when_feed_disagrees(self):
         with tempfile.TemporaryDirectory() as tmp:
             salary = Path(tmp) / "salary.csv"

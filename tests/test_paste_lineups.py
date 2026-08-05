@@ -444,6 +444,124 @@ class PasteWinsOverTheApiFeedTests(unittest.TestCase):
             "zero-network contract is a property of the graph, not of one file")
 
 
+class DoubleheaderPastedLegTests(unittest.TestCase):
+    """R58(a). Every pasted leg of a matchup used to get the salary file's one start.
+
+    A DK draftgroup prices ONE leg of a doubleheader and salary_game_times is keyed
+    on AWAY@HOME, so both pasted legs carried an identical game_date_utc and
+    _select_slate_legs kept whichever was pasted first. Reproduced on a 9:38 PM
+    night draftgroup: it confirmed the 1:05 PM leg's batting order, the night-only
+    starters were absent from the pool, and the build exited 0.
+    """
+
+    AWAY, HOME = "AAA", "BBB"
+    SLOTS = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"]
+    DK_SLOTS = ["C", "1B", "2B", "3B", "SS", "OF", "OF", "OF", "OF"]
+
+    def _salary(self, path, clock="09:38PM"):
+        game_info = f"{self.AWAY}@{self.HOME} 08/05/2026 {clock} ET"
+        header = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+                  "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame"]
+        rows, pid = [], 40000
+        def add(pos, name, team, sal):
+            nonlocal pid
+            pid += 1
+            rows.append([pos, f"{name} ({pid})", name, str(pid), pos, str(sal),
+                         game_info, team, "8.0"])
+        add("SP", "Matinee Arm", self.AWAY, 9000)
+        add("SP", "Night Arm", self.AWAY, 8800)
+        add("SP", "Home Arm", self.HOME, 8600)
+        for prefix, team in (("Matinee", self.AWAY), ("Night", self.AWAY),
+                             ("Home", self.HOME)):
+            for i, slot in enumerate(self.DK_SLOTS, 1):
+                add(slot, f"{prefix} {prefix[0]}{i}", team, 3000)
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh); writer.writerow(header); writer.writerows(rows)
+
+    def _side(self, prefix):
+        return "\n".join(
+            f"{i}. [{prefix} {prefix[0]}{i}](https://www.mlb.com/player/x-{i}) (R) {slot}"
+            for i, slot in enumerate(self.SLOTS, 1))
+
+    def _paste(self, legs):
+        """legs: [(clock, away_arm, away_prefix), ...] in the order mlb.com renders."""
+        blocks = []
+        for clock, arm, prefix in legs:
+            blocks.append("\n".join([
+                "[Alphas](https://www.mlb.com/alphas)@[Betas](https://www.mlb.com/betas)",
+                "(50-50)", clock, "Some Park", "(50-50)",
+                f"[{arm}](https://www.mlb.com/player/arm-1)", "RHP", "0-0, 1.00 ERA, 1 SO",
+                "[Home Arm](https://www.mlb.com/player/arm-3)", "RHP", "0-0, 1.00 ERA, 1 SO",
+                f"{self.AWAY} Lineup", f"{self.HOME} Lineup", "",
+                self._side(prefix), "", self._side("Home"), "",
+            ]))
+        return "\n".join(blocks)
+
+    BOTH_LEGS = [("1:05 PM", "Matinee Arm", "Matinee"),
+                 ("9:38 PM", "Night Arm", "Night")]
+
+    def _resolve(self, legs=None, clock="09:38PM"):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "DKSalaries.csv"
+            self._salary(salary, clock=clock)
+            out = resolve_paste_to_feed(self._paste(legs or self.BOTH_LEGS), str(salary))
+            from mlb_engine.intake.live_data_adapters import (
+                salary_game_times, _select_slate_legs)
+            times = salary_game_times(str(salary))
+            return out, times, _select_slate_legs(
+                list((out["feed"] or {}).get("games") or []), times)
+
+    def test_each_pasted_leg_gets_its_own_start(self):
+        out, _times, (kept, dropped) = self._resolve()
+        stamps = [g["game_date_utc"] for g in out["feed"]["games"]]
+        self.assertEqual(len(set(stamps)), 2,
+                         f"both legs carry the same start: {stamps}")
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(len(dropped), 1)
+        first = kept[0]["away"]["lineup"][0]["name"]
+        self.assertIn("Night", first,
+                      "the 9:38 PM salary file kept the matinee leg's batting order")
+        self.assertEqual(kept[0]["away"]["probable_pitcher"]["name"], "Night Arm")
+
+    def test_the_priced_leg_is_named_instead_of_a_false_wrong_slate_warning(self):
+        # The matinee's 1:05 PM legitimately differs from the salary start on a
+        # doubleheader, so the single-leg wrong-slate warning was firing on the
+        # wrong leg. The doubleheader is reported as what it is.
+        out, _t, _s = self._resolve()
+        warnings = out["report"]["warnings"]
+        self.assertTrue(any("doubleheader" in w and "9:38 PM" in w for w in warnings),
+                        warnings)
+        self.assertFalse(any("wrong slate" in w for w in warnings), warnings)
+
+    def test_indistinguishable_legs_block_and_write_no_feed(self):
+        # Two legs the operator pasted with the same clock cannot be told apart,
+        # and guessing is what this closes.
+        out, _t, _s = self._resolve(legs=[("9:38 PM", "Matinee Arm", "Matinee"),
+                                          ("9:38 PM", "Night Arm", "Night")])
+        self.assertTrue(any("cannot be told apart by clock" in b
+                            for b in out["report"]["blockers"]),
+                        out["report"]["blockers"])
+        self.assertEqual(out["feed"]["games"], [],
+                         "a blocked matchup must contribute no game")
+
+    def test_no_leg_matching_the_salary_start_is_still_reported(self):
+        # A real wrong-slate paste: both legs pasted, neither matches the priced
+        # start. That has to stay loud.
+        out, _t, _s = self._resolve(clock="07:05PM")
+        self.assertTrue(any("NONE" in w and "matches the salary file" in w
+                            for w in out["report"]["warnings"]),
+                        out["report"]["warnings"])
+
+    def test_a_single_leg_still_takes_its_start_from_the_salary_file(self):
+        # The contract is unchanged off the doubleheader path: the CSV carries a
+        # full dated start and the paste's bare clock stays a cross-check only.
+        out, times, _s = self._resolve(legs=[("1:05 PM", "Matinee Arm", "Matinee")])
+        game = out["feed"]["games"][0]
+        self.assertEqual(game["game_date_utc"], "2026-08-06T01:38:00Z")
+        self.assertTrue(any("wrong slate" in w for w in out["report"]["warnings"]),
+                        "a single-leg clock disagreement is a wrong-slate signal")
+
+
 class MergeFeedsTeamCodeAndFieldTests(unittest.TestCase):
     """R59. merge_feeds is a pure function on two feed dicts, tested at that grain.
 

@@ -85,15 +85,30 @@ def load_platoon_lineups(path: str | Path) -> Dict[str, Any]:
         return json.load(f)
 
 
-def extract_opp_throws_from_lineups(lineups_json: Mapping[str, Any]) -> Dict[str, str]:
+def _legs_for_extraction(feed: Mapping[str, Any], salary_game_times: Any):
+    """Delegates to live_data_adapters so there is one leg-selection rule (R58b)."""
+    from mlb_engine.intake.live_data_adapters import _legs_for_extraction as _impl
+    return _impl(feed, salary_game_times)
+
+
+def extract_opp_throws_from_lineups(
+    lineups_json: Mapping[str, Any],
+    salary_game_times: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, str]:
     """From an mlb-lineups feed, map each DK team abbrev to the OPPOSING starter's
     throw hand ('R'/'L'). A team's platoon view keys off the pitcher it faces, so
     the away team gets the home probable's hand and vice versa. The mlb-lineups
     feed usually populates probable_pitcher.hand even when lineup_status is 'tbd',
     which is exactly the TBD scenario the fallback targets.
+
+    R58(b): pass ``salary_game_times`` on a doubleheader slate. This map is
+    TEAM-keyed and the loop is last-write-wins, so both legs of one matchup wrote
+    the same key and a matinee build took the night starter's throw hand -- which
+    flips the platoon view for every hitter on that side. Omitting the argument
+    keeps the previous behavior exactly.
     """
     out: Dict[str, str] = {}
-    for g in lineups_json.get("games") or []:
+    for g in _legs_for_extraction(lineups_json, salary_game_times):
         away, home = g.get("away") or {}, g.get("home") or {}
         a_team = _dk_abbrev(away.get("team_abbrev"))
         h_team = _dk_abbrev(home.get("team_abbrev"))

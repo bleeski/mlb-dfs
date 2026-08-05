@@ -609,6 +609,9 @@ def resolve_paste_to_feed(
     blockers: List[str] = []
     unrostered: List[Dict[str, str]] = []
     feed_games: List[Dict[str, Any]] = []
+    # R58(a): resolved up front, because whether a matchup's legs are separable
+    # is a property of the whole paste and cannot be decided one game at a time.
+    leg_start_by_game = _leg_starts(games, start_by_game, blockers, warnings)
     confirmed: List[str] = []
     partial: List[Dict[str, Any]] = []
     dk_probables: List[Dict[str, str]] = []
@@ -629,8 +632,20 @@ def resolve_paste_to_feed(
                 f"{sorted(salary_game_ids)}; it is not on this slate and is "
                 f"skipped, not merged")
             continue
-        start = start_by_game[game_id]
-        _cross_check_clock(game, start, warnings)
+        if id(game) not in leg_start_by_game:
+            # _leg_starts blocked this matchup as inseparable; it already said so.
+            continue
+        start = leg_start_by_game[id(game)]
+        # The single-leg cross-check is a wrong-slate detector. On a doubleheader
+        # the non-priced leg's clock differs LEGITIMATELY, and warning about it
+        # attributed a wrong-slate signal to the wrong leg (R58a); _leg_starts
+        # reports the multi-leg case instead.
+        if sum(1 for g in games if g.game_id == game_id) == 1:
+            # Against the SALARY start, not the derived one. Handing it the
+            # derived value would compare the paste's clock with a number
+            # computed from that same clock, which agrees by construction and
+            # silences the wrong-slate detector entirely.
+            _cross_check_clock(game, start_by_game[game_id], warnings)
 
         sides: Dict[str, Dict[str, Any]] = {}
         for side, team, lineup, pitcher in (
@@ -791,6 +806,101 @@ def resolve_paste_to_feed(
 def _utc():
     from datetime import timezone
     return timezone.utc
+
+
+def _paste_clock_hm(game: PastedGame) -> Optional[Tuple[int, int]]:
+    """The paste's bare clock as (hour, minute) in ET, or None when unreadable.
+
+    mlb.com renders Eastern and the salary file's Game Info is Eastern, so the
+    two are directly comparable without a zone conversion.
+    """
+    match = _CLOCK.match(game.clock_text or "")
+    if not match:
+        return None
+    hour = int(match.group("h")) % 12
+    if (match.group("ap") or "PM").upper() == "PM":
+        hour += 12
+    return hour, int(match.group("m"))
+
+
+def _leg_starts(
+    games: Sequence[PastedGame],
+    start_by_game: Mapping[str, datetime],
+    blockers: List[str],
+    warnings: List[str],
+) -> Dict[int, datetime]:
+    """Per-LEG start per pasted game, keyed by ``id(game)`` (R58a).
+
+    Every pasted leg of a matchup used to be stamped with the one start the
+    salary file carries for that ``game_id``, because a DK draftgroup prices a
+    single leg of a doubleheader and ``salary_game_times`` is keyed on
+    ``AWAY@HOME``. Downstream, ``_select_slate_legs`` tie-breaks on
+    ``game_date_utc`` against that same salary start, so with both legs carrying
+    an identical stamp it kept whichever leg was pasted FIRST and dropped the
+    other with the reason "matched salary start". Reproduced: a 9:38 PM night
+    draftgroup confirmed the 1:05 PM leg's batting order, the night-only starters
+    were absent from the pool, and the build exited 0.
+
+    The date still comes from the salary file, which is authoritative for the
+    slate and carries a full date; only the TIME OF DAY comes from the paste,
+    which is the one thing the paste knows per leg and the salary file cannot.
+
+    A matchup pasted more than once whose legs cannot be told apart by clock is a
+    BLOCKER, not a guess: two indistinguishable legs mean the downstream selector
+    has to pick arbitrarily, which is exactly the failure this closes.
+    """
+    legs_by_id: Dict[str, List[PastedGame]] = {}
+    for game in games:
+        if game.game_id in start_by_game:
+            legs_by_id.setdefault(game.game_id, []).append(game)
+
+    out: Dict[int, datetime] = {}
+    for game_id, legs in legs_by_id.items():
+        salary_start = start_by_game[game_id]
+        clocks = [_paste_clock_hm(game) for game in legs]
+        if len(legs) > 1:
+            readable = [c for c in clocks if c is not None]
+            if len(readable) != len(legs) or len(set(readable)) != len(legs):
+                shown = ", ".join(
+                    (game.clock_text or "<no clock>") for game in legs)
+                blockers.append(
+                    f"{game_id}: pasted {len(legs)} times and the legs cannot be "
+                    f"told apart by clock ({shown}). A doubleheader needs one "
+                    f"distinct start per leg or the wrong leg's batting order "
+                    f"reaches the pool; re-paste with both game times shown"
+                )
+                continue
+        for game, clock in zip(legs, clocks):
+            # A single-leg matchup keeps the salary file's start verbatim. The CSV
+            # is authoritative for the slate and the paste's bare clock stays a
+            # pure CROSS-CHECK there, which is the existing contract. The ONLY
+            # case where the salary file cannot answer the question is a matchup
+            # pasted more than once, because it prices one leg and both legs
+            # share the DK game_id.
+            if clock is None or len(legs) == 1:
+                out[id(game)] = salary_start
+                continue
+            out[id(game)] = salary_start.replace(
+                hour=clock[0], minute=clock[1], second=0, microsecond=0)
+        if len(legs) > 1:
+            matched = [game for game, clock in zip(legs, clocks)
+                       if clock == (salary_start.hour, salary_start.minute)]
+            if not matched:
+                warnings.append(
+                    f"{game_id}: pasted {len(legs)} legs "
+                    f"({', '.join(g.clock_text or '?' for g in legs)}) and NONE "
+                    f"matches the salary file's "
+                    f"{salary_start.strftime('%I:%M %p ET').lstrip('0')}; if this "
+                    f"is the wrong slate nothing downstream will say so"
+                )
+            else:
+                warnings.append(
+                    f"{game_id}: doubleheader, {len(legs)} legs pasted; the "
+                    f"{matched[0].clock_text} leg is the one the salary file "
+                    f"prices and the others are carried with their own start so "
+                    f"leg selection can tell them apart"
+                )
+    return out
 
 
 def _cross_check_clock(game: PastedGame, start: datetime, warnings: List[str]) -> None:
