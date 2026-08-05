@@ -5002,6 +5002,158 @@ class RunSlateExclusionSeamTests(unittest.TestCase):
                                 for w in result["checkpoint_plan"]["warnings"]))
 
 
+class SalarySuppressionBoundedTiebreakerTests(unittest.TestCase):
+    """R56. Suppression may bound the bonus it counts, never the feasible set.
+
+    MLB_Classic: "Salary suppression is a bounded tiebreaker only." The lineup
+    cap was a constraint row over sum(bonus * x), so four tagged players at the
+    per-player cap summed to 1.0 and only three could be rostered -- a legal,
+    projection-optimal lineup removed from the set and invisible in the
+    certified output. Suppression had no test of any kind (R79f), so the
+    reproduction from the 2026-08-04 audit is the test.
+    """
+
+    TAG = "SALARY_SUPPRESSION:role_elevation"
+
+    @classmethod
+    def _frame(cls, n_tagged=4, tag=None, suppression=1000.0, tagged_ceiling=40.0):
+        """Two games, four arms, eight hitters each on T1 and T3.
+
+        The tagged hitters are the highest-ceiling bats in the pool and sit at
+        distinct T1 slots, so the unconstrained optimum rosters all of them:
+        two arms at 25.0 + n_tagged bats at 40.0 + the rest at 10.0. Salary is
+        2*9000 + 8*3000 = 42000 against a 50000 cap, so nothing here is a
+        salary-driven refusal.
+        """
+        tag = cls.TAG if tag is None else tag
+        game = {"T1": "T1@T2", "T2": "T1@T2", "T3": "T3@T4", "T4": "T3@T4"}
+        opp = {"T1": "T2", "T2": "T1", "T3": "T4", "T4": "T3"}
+        rows = []
+        pid = 30000
+        for team in ("T1", "T2", "T3", "T4"):
+            pid += 1
+            rows.append({"Player_ID": str(pid), "Name": f"P_{team}", "Team": team,
+                         "Opponent": opp[team], "Position": "P", "Salary": 9000.0,
+                         "Game_ID": game[team], "Floor": 12.0, "Ceiling": 25.0,
+                         "Excluded": False, "Locked": False, "Notes": "",
+                         "Salary_Suppression": 0.0})
+        elevated = ["C", "1B", "2B", "3B"][:n_tagged]
+        base = 31000
+        for team in ("T1", "T3"):
+            for pos in ("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"):
+                base += 1
+                tagged = team == "T1" and pos in elevated
+                rows.append({
+                    "Player_ID": str(base), "Name": f"{team}_{pos}_{base}",
+                    "Team": team, "Opponent": opp[team], "Position": pos,
+                    "Salary": 3000.0, "Game_ID": game[team],
+                    "Floor": 5.0, "Ceiling": tagged_ceiling if tagged else 10.0,
+                    "Excluded": False, "Locked": False,
+                    "Notes": tag if tagged else "",
+                    "Salary_Suppression": suppression if tagged else 0.0,
+                })
+                if tagged:
+                    elevated.remove(pos)
+        return pd.DataFrame(rows)
+
+    def _solve(self, frame, apply_suppression=True):
+        lineup, objective = opt.build_single_lineup(
+            frame, target="ceiling", apply_suppression=apply_suppression)
+        self.assertIsNotNone(lineup, "the reproduction pool must be feasible")
+        return lineup, objective
+
+    def _tagged_ids(self, frame):
+        return set(frame[frame["Salary_Suppression"] > 0]["Player_ID"])
+
+    def test_four_tagged_players_keep_the_legal_optimum(self):
+        # The filed reproduction. Four tagged bats sum to 1.0 in bonus; before
+        # R56 the solver could roster only three and the ceiling came back 220.0
+        # against an identical legal pool's 250.0.
+        frame = self._frame(n_tagged=4)
+        on, _ = self._solve(frame, apply_suppression=True)
+        off, _ = self._solve(frame, apply_suppression=False)
+        self.assertAlmostEqual(float(off["Ceiling"].sum()), 250.0, places=6)
+        self.assertAlmostEqual(
+            float(on["Ceiling"].sum()), 250.0, places=6,
+            msg="suppression removed a legal, projection-optimal lineup from the set")
+        self.assertEqual(len(self._tagged_ids(frame) & set(on["Player_ID"])), 4)
+        self.assertNotAlmostEqual(
+            float(on["Ceiling"].sum()), 220.0, places=6,
+            msg="220.0 is the pre-R56 suppressed ceiling; the cap is a "
+                "feasibility constraint again")
+
+    def test_counted_bonus_is_capped_not_the_feasible_set(self):
+        # The other half: R56 is not "delete the cap". Four tagged players earn
+        # 1.0 of raw bonus and the objective may count only 0.75 of it.
+        frame = self._frame(n_tagged=4)
+        lineup, objective = self._solve(frame, apply_suppression=True)
+        self.assertAlmostEqual(
+            objective, 250.0 + opt.SUPPRESSION_LINEUP_CAP, places=6,
+            msg="the objective counted more than SUPPRESSION_LINEUP_CAP of bonus")
+        self.assertAlmostEqual(
+            float(lineup["Suppression_Objective_Bonus"].sum()), 1.0, places=6,
+            msg="the per-player column reports what each player earned, uncapped")
+        self.assertAlmostEqual(lineup.attrs["suppression_bonus_raw"], 1.0, places=6)
+        self.assertAlmostEqual(
+            lineup.attrs["suppression_bonus_counted"],
+            opt.SUPPRESSION_LINEUP_CAP, places=6)
+        self.assertTrue(lineup.attrs["suppression_bonus_capped"])
+
+    def test_at_the_cap_exactly_the_full_bonus_still_counts(self):
+        # Three tagged players sum to exactly 0.75. This case was always legal
+        # and must stay bit-identical, which is what makes the boundary a
+        # boundary rather than an off-by-one.
+        frame = self._frame(n_tagged=3)
+        lineup, objective = self._solve(frame, apply_suppression=True)
+        self.assertEqual(len(self._tagged_ids(frame) & set(lineup["Player_ID"])), 3)
+        self.assertAlmostEqual(objective, 220.0 + 0.75, places=6)
+        self.assertFalse(lineup.attrs["suppression_bonus_capped"])
+
+    def test_suppression_breaks_a_tie_without_moving_the_ceiling(self):
+        # It is still a TIEBREAKER: one tagged bat priced and projected exactly
+        # like its alternatives gets rostered, and the lineup's ceiling is
+        # unchanged. All the tag bought was the tie.
+        frame = self._frame(n_tagged=1, tagged_ceiling=10.0)
+        tagged_id = next(iter(self._tagged_ids(frame)))
+        on, obj_on = self._solve(frame, apply_suppression=True)
+        off, obj_off = self._solve(frame, apply_suppression=False)
+        self.assertIn(tagged_id, set(on["Player_ID"]),
+                      "the tie went against the role-elevated bat")
+        self.assertAlmostEqual(float(on["Ceiling"].sum()),
+                               float(off["Ceiling"].sum()), places=6)
+        self.assertAlmostEqual(
+            obj_on - obj_off, opt.SUPPRESSION_PER_PLAYER_CAP, places=6)
+
+    def test_only_role_elevation_activates_the_bonus(self):
+        # MLB_Classic authorizes role_elevation alone. The other three triggers
+        # parse and carry one-off labels; they never reach the objective, and
+        # neither does the legacy DIVERGENCE_LEVERAGE:value tag. Before R56 two
+        # docstrings claimed all four plus the legacy tag activate.
+        for tag in ("SALARY_SUPPRESSION:metric_disconnect",
+                    "SALARY_SUPPRESSION:late_news",
+                    "SALARY_SUPPRESSION:environment",
+                    opt.DIVERGENCE_VALUE_TAG):
+            with self.subTest(tag=tag):
+                frame = self._frame(n_tagged=4, tag=tag)
+                bonus = opt._compute_suppression_bonus(frame)
+                self.assertEqual(bonus, {}, f"{tag} activated the bonus")
+                _, objective = self._solve(frame, apply_suppression=True)
+                self.assertAlmostEqual(objective, 250.0, places=6)
+        active = opt._compute_suppression_bonus(self._frame(n_tagged=4))
+        self.assertEqual(len(active), 4)
+        self.assertTrue(all(abs(v - opt.SUPPRESSION_PER_PLAYER_CAP) < 1e-9
+                            for v in active.values()))
+
+    def test_untagged_pool_adds_no_suppression_variable(self):
+        # No tag anywhere means no auxiliary variable and no extra constraint
+        # row, so a slate with no role elevation solves exactly as before.
+        frame = self._frame(n_tagged=0)
+        lineup, objective = self._solve(frame, apply_suppression=True)
+        self.assertAlmostEqual(objective, float(lineup["Ceiling"].sum()), places=6)
+        self.assertAlmostEqual(lineup.attrs["suppression_bonus_raw"], 0.0, places=6)
+        self.assertFalse(lineup.attrs["suppression_bonus_capped"])
+
+
 class ExcludedColumnCoercionTests(unittest.TestCase):
     """F21. A blank cell used to remove a player from the legal pool."""
 

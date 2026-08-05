@@ -72,10 +72,14 @@ v3.9 additions:
     contest_allocator.select_and_assign_entries.
 
 v3.8 additions:
-  - Salary suppression activation now supports SALARY_SUPPRESSION:<trigger>
-    tags for metric_disconnect, role_elevation, late_news, and environment.
-  - Legacy DIVERGENCE_LEVERAGE:value remains backward-compatible for one
-    transition version, but new projection CSVs should use SALARY_SUPPRESSION.
+  - Salary suppression reads SALARY_SUPPRESSION:<trigger> tags. The trigger
+    INVENTORY is metric_disconnect, role_elevation, late_news, environment
+    (SALARY_SUPPRESSION_TRIGGERS, used for parsing and one-off labels), but only
+    role_elevation ACTIVATES the bonus, which is what MLB_Classic authorizes:
+    "Only confirmed role_elevation may activate it." The other three parse and
+    do nothing. Corrected 2026-08-05 (R56); the previous wording claimed all
+    four activate, and claimed a DIVERGENCE_LEVERAGE:value fallback that
+    _compute_suppression_bonus has never checked.
   - Added deterministic wind_bearing_to_f5_label helper for translating
     meteorological wind bearings into out/in/cross using CF azimuth.
   - Chalk one-off labels updated for trigger-specific suppression tags.
@@ -422,10 +426,12 @@ def _parse_positions(pos_string):
 def _has_suppression_tag(notes_value):
     """Return True when Notes contains an MLB v3.8 salary-suppression tag.
 
-    New projection CSVs should use SALARY_SUPPRESSION:<trigger>. The legacy
-    DIVERGENCE_LEVERAGE:value tag remains supported by _compute_suppression_bonus
-    for transition compatibility, but this helper intentionally checks only
-    the new v3.8 prefix.
+    Projection CSVs use SALARY_SUPPRESSION:<trigger>. This helper answers "is
+    there a suppression tag of any trigger", which is a WIDER question than
+    "does the bonus activate" — only role_elevation activates, in
+    _compute_suppression_bonus. Corrected 2026-08-05 (R56): this docstring used
+    to say DIVERGENCE_LEVERAGE:value "remains supported by
+    _compute_suppression_bonus", which was never true of that function.
     """
     if notes_value is None or pd.isna(notes_value):
         return False
@@ -454,12 +460,21 @@ def _suppression_trigger(notes_value):
 def _compute_suppression_bonus(df):
     """Compute capped per-player suppression bonus.
 
-    v3.8 source-of-truth activation is the dual gate:
-      1. Notes contains SALARY_SUPPRESSION:<trigger>; and
+    Activation is a dual gate, and the tag half is NARROW on purpose:
+      1. Notes contains SALARY_SUPPRESSION:role_elevation; and
       2. Salary_Suppression > 0.
 
-    Legacy DIVERGENCE_LEVERAGE:value also activates for one transition version
-    so older projection CSVs do not silently lose their tiebreaker.
+    role_elevation is the only trigger that activates, per MLB_Classic: "Salary
+    suppression is a bounded tiebreaker only. Only confirmed role_elevation ...
+    may activate it." The other members of SALARY_SUPPRESSION_TRIGGERS are
+    parsed by _suppression_trigger and carry one-off labels; they do not reach
+    the objective. DIVERGENCE_LEVERAGE:value does not activate either.
+    Docstring corrected 2026-08-05 (R56) — it had promised all four triggers
+    plus the legacy tag, none of which this function has ever read.
+
+    Each bonus is clamped to SUPPRESSION_PER_PLAYER_CAP. The lineup-level cap is
+    applied in the solver as a bound on the COUNTED total, not as a feasibility
+    constraint; see the suppression counter in _build_single_lineup_scipy.
     """
     bonus = {}
     if 'Salary_Suppression' not in df.columns or 'Notes' not in df.columns:
@@ -712,9 +727,21 @@ def _build_lineup_output_from_selected(df, selected, suppression_bonus):
     lineup_df = pd.DataFrame(lineup_rows)
     if '_pos_set' in lineup_df.columns:
         lineup_df = lineup_df.drop(columns=['_pos_set'])
-    objective_value = sum(
-        row['_obj'] + row['Suppression_Objective_Bonus'] for row in lineup_rows
-    )
+    # The per-row column stays the raw per-player bonus, which is what the
+    # player earned. The OBJECTIVE counts the capped total, because that is what
+    # the solver maximized (R56); reporting the raw sum here would make the
+    # returned objective disagree with the number the lineups were ranked by the
+    # moment a lineup carries more than SUPPRESSION_LINEUP_CAP of bonus.
+    raw_suppression = sum(row['Suppression_Objective_Bonus'] for row in lineup_rows)
+    counted_suppression = min(raw_suppression, SUPPRESSION_LINEUP_CAP)
+    objective_value = sum(row['_obj'] for row in lineup_rows) + counted_suppression
+    try:
+        lineup_df.attrs['suppression_bonus_raw'] = float(raw_suppression)
+        lineup_df.attrs['suppression_bonus_counted'] = float(counted_suppression)
+        lineup_df.attrs['suppression_bonus_capped'] = bool(
+            raw_suppression > SUPPRESSION_LINEUP_CAP + 1e-12)
+    except Exception:  # noqa: BLE001 - attrs are a diagnostic, never a gate
+        pass
     return lineup_df, objective_value
 
 
@@ -759,7 +786,18 @@ def _build_single_lineup_scipy(
     n_assign = len(assign_keys)
     game_ids = list(df['Game_ID'].unique()) if 'Game_ID' in df.columns else []
     game_index = {gid: n_assign + i for i, gid in enumerate(game_ids)}
-    n_vars = n_assign + len(game_ids)
+    # R56: suppression is a BOUNDED TIEBREAKER (MLB_Classic: "Salary suppression
+    # is a bounded tiebreaker only"), so what the cap bounds is the bonus this
+    # lineup may COUNT, never which lineups are legal. The bound rides on one
+    # auxiliary continuous variable z below; the coefficient map is built here
+    # because the variable count depends on whether any bonus exists at all.
+    suppression_coefs = {
+        idx: suppression_bonus.get(pid, 0.0)
+        for (pid, _slot), idx in assign_index.items()
+        if suppression_bonus.get(pid, 0.0) != 0.0
+    }
+    suppression_var_idx = (n_assign + len(game_ids)) if suppression_coefs else None
+    n_vars = n_assign + len(game_ids) + (1 if suppression_coefs else 0)
     pid_to_var_idxs = {}
     for (pid, slot), idx in assign_index.items():
         pid_to_var_idxs.setdefault(pid, []).append(idx)
@@ -768,7 +806,12 @@ def _build_single_lineup_scipy(
     c = np.zeros(n_vars, dtype=float)
     for (pid, slot), idx in assign_index.items():
         row = row_by_pid[pid]
-        c[idx] = -float(row['_obj'] + suppression_bonus.get(pid, 0.0))
+        c[idx] = -float(row['_obj'])
+    if suppression_var_idx is not None:
+        # z enters the maximized objective at weight 1.0 (c is negated because
+        # scipy.optimize.milp minimizes), so the solver pushes z to its own
+        # upper bound: min(sum(bonus * x), SUPPRESSION_LINEUP_CAP).
+        c[suppression_var_idx] = -1.0
 
     rows = []
     lbs = []
@@ -787,9 +830,19 @@ def _build_single_lineup_scipy(
     for slot, _required_pos in EXACT_ROSTER_SLOTS:
         add_constraint({idx: 1.0 for (pid, candidate_slot), idx in assign_index.items() if candidate_slot == slot}, 1.0, 1.0)
 
-    suppression_coefs = {idx: suppression_bonus.get(pid, 0.0) for (pid, _slot), idx in assign_index.items() if suppression_bonus.get(pid, 0.0) != 0.0}
-    if suppression_coefs:
-        add_constraint(suppression_coefs, -np.inf, SUPPRESSION_LINEUP_CAP)
+    if suppression_var_idx is not None:
+        # z - sum(bonus * x) <= 0 holds z at or below the rostered bonus sum;
+        # z's own upper bound (SUPPRESSION_LINEUP_CAP, set on Bounds below)
+        # holds it at or below the cap. Maximizing z therefore counts exactly
+        # min(sum, cap) and NO lineup is removed from the feasible set.
+        # The previous form bounded sum(bonus * x) directly, which made the cap
+        # a hard feasibility constraint: four tagged players at the per-player
+        # cap sum to 1.0, so the solver could roster only three of them and the
+        # projection-optimal lineup was silently unreachable on a legal pool.
+        cap_coefs = {suppression_var_idx: 1.0}
+        for idx, bonus in suppression_coefs.items():
+            cap_coefs[idx] = cap_coefs.get(idx, 0.0) - float(bonus)
+        add_constraint(cap_coefs, -np.inf, 0.0)
     add_constraint({idx: float(row_by_pid[pid]['Salary']) for (pid, _slot), idx in assign_index.items()}, -np.inf, SALARY_CAP)
 
     for team in df['Team'].unique():
@@ -883,10 +936,17 @@ def _build_single_lineup_scipy(
     lb_array = np.array(lbs)
     ub_array = np.array(ubs)
     effective_limit = resolve_solver_time_limit(time_limit_s)
+    # Every assignment and game-indicator variable is binary. The suppression
+    # counter z is the one continuous variable, bounded by the lineup cap (R56).
+    integrality = np.ones(n_vars, dtype=int)
+    var_upper = np.ones(n_vars)
+    if suppression_var_idx is not None:
+        integrality[suppression_var_idx] = 0
+        var_upper[suppression_var_idx] = float(SUPPRESSION_LINEUP_CAP)
     solve_started = _time.monotonic()
     result = milp(
-        c=c, integrality=np.ones(n_vars, dtype=int),
-        bounds=Bounds(np.zeros(n_vars), np.ones(n_vars)),
+        c=c, integrality=integrality,
+        bounds=Bounds(np.zeros(n_vars), var_upper),
         constraints=LinearConstraint(matrix, lb_array, ub_array),
         options={'time_limit': effective_limit, 'disp': False},
     )
@@ -913,7 +973,16 @@ def _build_single_lineup_scipy(
     # it is allowed anywhere near a certified export.
     x = np.asarray(result.x, dtype=float)
     rounded = np.round(x)
-    integral = bool(np.max(np.abs(x - rounded)) <= 1e-5) if x.size else False
+    # Only the binary variables are checked for integrality and only they are
+    # rounded. Rounding the continuous suppression counter would both fail the
+    # integrality test (0.75 is not near an integer) and feed the constraint
+    # check a value the solver never proposed, which would reject every
+    # time-limited incumbent on any slate carrying a suppression tag (R56).
+    integer_mask = integrality.astype(bool)
+    if suppression_var_idx is not None:
+        rounded[suppression_var_idx] = x[suppression_var_idx]
+    integral = (bool(np.max(np.abs(x[integer_mask] - rounded[integer_mask])) <= 1e-5)
+                if x.size and integer_mask.any() else False)
     feasible = False
     if integral:
         lhs = matrix @ rounded

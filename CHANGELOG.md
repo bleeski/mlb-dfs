@@ -25,6 +25,86 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R56: salary suppression bounds the bonus it counts, not the set of legal lineups
+
+### Fixed
+
+- **R56 — the lineup cap stops removing legal, projection-optimal lineups
+  (P1).** `_build_single_lineup_scipy` put the per-player suppression bonuses in
+  the objective AND added `Σ bonus·x ≤ SUPPRESSION_LINEUP_CAP` (0.75) as a
+  constraint row. That row is a hard feasibility constraint on the roster, not a
+  bound on a tiebreaker. MLB_Classic is explicit — "Salary suppression is a
+  bounded tiebreaker only" — and the per-player bonus caps at 0.25, so any four
+  role-elevation-tagged players at the cap sum to 1.0 and the solver could roster
+  at most three of them no matter what they projected. Reproduced before
+  changing anything, on one pool solved twice: four tagged bats that belong in
+  the DK-optimal lineup together came back at ceiling **220.0** with suppression
+  on and **250.0** with it off, three of four rostered instead of four, on an
+  identical legal pool with 8000 of salary headroom. Punt-heavy role-elevation
+  slates are the feature's use case and are exactly where four or more tagged
+  players cluster.
+  The cap now rides on one auxiliary continuous variable z: `z − Σ bonus·x ≤ 0`
+  holds z at or below the rostered bonus sum, z's own upper bound holds it at or
+  below `SUPPRESSION_LINEUP_CAP`, and z enters the objective at weight 1.0. The
+  solver therefore counts exactly `min(Σ bonus·x, 0.75)` and no lineup leaves the
+  feasible set. This is not "delete the cap": four tagged players still earn 1.0
+  of raw bonus and the objective still counts only 0.75 of it, which is pinned by
+  its own test.
+  Two consequences that had to move with it. The incumbent verification rounded
+  every variable before checking it against the constraint matrix; z is
+  continuous, so rounding it would fail the integrality test at 0.75 and feed the
+  check a value the solver never proposed — which would have rejected every
+  time-limited incumbent on any slate carrying a suppression tag. Only the binary
+  variables are rounded and checked now. And the returned objective summed the
+  RAW per-player bonuses, which agreed with the solver only while the old
+  constraint made disagreement impossible; it now counts the capped total, so the
+  number lineups are ranked by is the number the solver maximized. The per-row
+  `Suppression_Objective_Bonus` column stays raw — that is what the player
+  earned — and the lineup carries `suppression_bonus_raw`,
+  `suppression_bonus_counted` and `suppression_bonus_capped` in `attrs` so the
+  difference is legible rather than inferred.
+- **The two docstrings that overstated activation are corrected (docs).** The
+  module's v3.8 block claimed `SALARY_SUPPRESSION:<trigger>` activates for all
+  four of `metric_disconnect`, `role_elevation`, `late_news`, `environment`, plus
+  a legacy `DIVERGENCE_LEVERAGE:value` fallback. `_compute_suppression_bonus`
+  reads `role_elevation` and nothing else, which is what MLB_Classic authorizes
+  ("Only confirmed role_elevation ... may activate it"), and it has never checked
+  the legacy tag at all. `_has_suppression_tag`'s docstring repeated the same
+  false claim about a function other than itself. The code was right and the
+  prose was wrong, so the prose moved: the trigger tuple is documented as a
+  parsing/labelling inventory, activation is documented as role_elevation alone,
+  and the correction is dated in place. A build reading the old docstring would
+  have expected three tags to do something they have never done.
+
+### Tests
+
+- Six new tests in a new `SalarySuppressionBoundedTiebreakerTests`; the pin moves
+  635 → 641 in all three places. Suppression had **no test of any kind** before
+  this (R79f), so the filed reproduction is the test rather than a synthetic
+  stand-in: four tagged bats keep the legal optimum at 250.0 and all four are
+  rostered, with an explicit assertion that 220.0 — the pre-fix suppressed
+  ceiling — is not what comes back; the counted bonus is capped at 0.75 while the
+  per-player column still reports 1.0; three tagged players at exactly 0.75 still
+  count their full bonus, so the boundary is a boundary and not an off-by-one; a
+  single tagged bat priced and projected identically to its alternatives wins the
+  tie without moving the lineup's ceiling; only `role_elevation` activates, with
+  the other three triggers and the legacy tag each asserted inert; and an
+  untagged pool adds no auxiliary variable and no constraint row.
+- Mutation-checked. Restoring the old constraint row fails three of the six;
+  removing the cap (z unbounded, uncapped counted total) fails the
+  capped-objective test; widening activation to any `SALARY_SUPPRESSION:` prefix
+  fails the trigger test on all three inert tags.
+- The golden replays are unaffected and their digests did not move: emergency-proxy
+  rows carry no `Notes` and no `Salary_Suppression`, so `_compute_suppression_bonus`
+  returns empty and the solver builds the same model it always did, with no z and
+  no extra row. Verified, not assumed.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  641 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R57: the xwOBA correction stops overwriting a Base it did not produce
 
 ### Fixed
