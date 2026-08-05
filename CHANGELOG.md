@@ -25,6 +25,68 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R30(a): the archive can record how many places a contest paid
+
+### Fixed
+
+- **R30(a) — `paid_places` reaches a mined record, and the allocator stops
+  returning UNRESOLVED (P1).** Three things had to be true at once and none was:
+  the miner had no flag, `own_results` had no field, and the only consumer,
+  `posture_allocator.classify_tier`, reads `paid_places` off a contest dict the
+  archival path never populated. So every archived contest classified UNRESOLVED,
+  and the archive's first two rank-1 satellite finishes could not be graded as
+  seats. Ben's entry-history export has carried the numbers since 2026-07-29,
+  parked in `data/reference/dk_contest_paid_places.json` for 100 contests
+  specifically because no CLI could read them.
+  `summarize_own_entries` now takes `paid_places` and records it alongside
+  `payout_breadth_observed` (only when both it and `field_size` are real) and
+  `cashed_entries` (own entries finishing inside the paid line). The no-match
+  early return carries the field too, so a contest whose own entry ids did not
+  resolve no longer looks like a contest with no paid line.
+  `--paid-places` sets it per contest and `--paid-places-from <json>` reads it in
+  bulk, accepting both the flat `{contest_id: {...}}` shape and the `contests`-wrapped
+  shape the parked export uses, so a 100-contest re-mine is one command instead of
+  one hundred. An explicit flag wins over the file.
+  The loader never raises and never goes quiet. A missing file, an unreadable one,
+  a contest the export does not cover, a row with no `paid_places`, and a
+  non-integer value each resolve to `(None, why)` and the miner prints the note.
+  That distinction is the point: a file parked where nothing reads it is exactly
+  the state this closes, so "the export did not carry this contest" and "the
+  export was never read" have to be different sentences.
+
+### Not this commit
+
+- **The DATA half of R30(a) is still open and is Ben's.** `paid_places` coverage
+  ends at the 2026-07-28 entry-history export, so none of the 94 contests mined on
+  2026-08-04 carries a paid line and the 3.16 cash-line finding stays ungradeable.
+  The tool half shipping means a fresh export now has somewhere to go: one
+  `--paid-places-from` re-mine backfills the archive. Until that export lands, the
+  100 already-parked contests are what can be backfilled. Noted on R30.
+- **No re-mine was run.** This session is DEV and the archive is ARCHIVE's surface;
+  nothing under `data/archive/`, `data/standings/` or `ledger/` was touched.
+
+### Tests
+
+- Seven new tests in a new `MinerPaidPlacesTests`; the pin moves 684 → 691. The
+  item's done-when is driven end to end rather than asserted about: `classify_tier`
+  is shown returning UNRESOLVED on a field-size-only contest and a real tier once
+  the mined summary's `paid_places` is handed to it, with `paid_places == 1`
+  resolving to winner-take-all, which is what a one-seat satellite is. Plus the
+  observed breadth and cashed-entry count on a 53-entry one-seat contest, omission
+  recording unknown rather than a guess, the no-match record keeping its paid line,
+  both accepted file shapes, one assertion per unreadable case, and the real parked
+  export resolving a real archived contest id, pinned against the file itself
+  rather than a fixture.
+- Mutation-checked: severing `paid_places` from the record fails the record test
+  and the allocator done-when test; collapsing the loader's miss into a generic
+  note fails the case-by-case test.
+
+### Verified
+
+- `PASS  v2.26.0  26 modules  691 tests` on the pinned container stack.
+
+---
+
 ## 2026-08-05 — R58(a)(b): a doubleheader's legs stop collapsing onto one start
 
 ### Fixed

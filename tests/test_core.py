@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+REPO = Path(__file__).resolve().parents[1]
+
 from mlb_engine.optimize import optimizer_v3 as opt
 
 from mlb_engine.pipeline import execution_pipeline as epi
@@ -6923,6 +6925,122 @@ class BankCacheMergeOnSaveTests(unittest.TestCase):
             self.assertIn(tuple(self._roster("b")), rosters,
                           "the purge leaked to disk and erased SIG2's work")
             self.assertIn("pb|TB||SIG2", after.attempted)
+
+
+class MinerPaidPlacesTests(unittest.TestCase):
+    """R30(a). Nothing in the archival path could write paid_places.
+
+    No flag, no own_results field, and the only consumer
+    (posture_allocator.classify_tier) reads it off a contest dict the archival
+    path never populated -- so every archived contest classified UNRESOLVED and a
+    rank-1 satellite finish could not be graded as a seat. Ben's entry-history
+    export has carried the numbers since 2026-07-29, parked in
+    data/reference/dk_contest_paid_places.json because no CLI could read them.
+    The item's done-when is both halves: a mined record carries paid_places, and
+    posture_allocator stops returning UNRESOLVED.
+    """
+
+    @staticmethod
+    def _mined(field_size=53, ranks=(1, 7)):
+        entries = []
+        for i in range(field_size):
+            entries.append({"entry_id": str(9000 + i), "rank": i + 1,
+                            "points": 100.0 - i, "players_norm": [f"p{i}"]})
+        return {"contest_id": "192892126",
+                "meta": {"entries_total": field_size, "winning_points": 100.0},
+                "entries": entries}, [str(9000 + r - 1) for r in ranks]
+
+    def test_a_mined_record_carries_paid_places_and_its_observed_breadth(self):
+        from mlb_engine.field import field_miner as fm
+        mined, ids = self._mined()
+        summary = fm.summarize_own_entries(mined, ids, entry_fee=0.25, paid_places=1)
+        self.assertEqual(summary["paid_places"], 1)
+        self.assertEqual(summary["payout_breadth_observed"], round(1 / 53, 4))
+        # rank 1 of the two own entries is inside a one-place payout, rank 7 is not
+        self.assertEqual(summary["cashed_entries"], 1)
+
+    def test_omitting_it_records_unknown_rather_than_a_guess(self):
+        from mlb_engine.field import field_miner as fm
+        mined, ids = self._mined()
+        summary = fm.summarize_own_entries(mined, ids, entry_fee=0.25)
+        self.assertIsNone(summary["paid_places"])
+        self.assertIsNone(summary["payout_breadth_observed"])
+        self.assertIsNone(summary["cashed_entries"])
+
+    def test_posture_allocator_stops_returning_unresolved(self):
+        """The item's done-when, driven end to end rather than asserted about."""
+        from mlb_engine.field import field_miner as fm
+        from mlb_engine.allocate.posture_allocator import classify_tier
+        mined, ids = self._mined()
+
+        before = classify_tier({"field_size": 53})
+        self.assertEqual(before["tier"], "UNRESOLVED")
+
+        summary = fm.summarize_own_entries(mined, ids, paid_places=1)
+        after = classify_tier({"field_size": summary["field_size"],
+                               "paid_places": summary["paid_places"]})
+        self.assertNotEqual(after["tier"], "UNRESOLVED")
+        # paid_places == 1 is winner-take-all, which is what a one-seat satellite is
+        self.assertEqual(after["tier"], "A")
+        self.assertIn("winner-take-all", after["reason"])
+
+    def test_a_no_match_record_still_reports_the_paid_line(self):
+        # The early return had no paid_places key at all, so a contest whose own
+        # ids did not resolve looked like a contest with no paid line.
+        from mlb_engine.field import field_miner as fm
+        mined, _ids = self._mined()
+        summary = fm.summarize_own_entries(mined, ["not-an-entry"], paid_places=3)
+        self.assertEqual(summary["matched"], 0)
+        self.assertEqual(summary["paid_places"], 3)
+
+    # -- the bulk loader ---------------------------------------------------
+
+    def _table(self, tmp, payload):
+        path = Path(tmp) / "paid.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return str(path)
+
+    def test_the_bulk_file_reads_both_shapes(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            wrapped = self._table(tmp, {"_label": "x", "contests": {"1": {"paid_places": 4}}})
+            self.assertEqual(fm.paid_places_from_file(wrapped, "1")[0], 4)
+            flat = self._table(tmp, {"1": {"paid_places": 5}})
+            self.assertEqual(fm.paid_places_from_file(flat, "1")[0], 5)
+
+    def test_every_unreadable_case_says_which_one_it_was(self):
+        """A parked file nothing reads is the state this closes, so "the file did
+        not carry it" and "the file was never read" have to be distinguishable."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = str(Path(tmp) / "nope.json")
+            self.assertEqual(fm.paid_places_from_file(missing, "1")[0], None)
+            self.assertIn("does not exist", fm.paid_places_from_file(missing, "1")[1])
+
+            bad = Path(tmp) / "bad.json"; bad.write_text("{not json", encoding="utf-8")
+            self.assertIn("unreadable", fm.paid_places_from_file(str(bad), "1")[1])
+
+            table = self._table(tmp, {"contests": {"1": {"paid_places": 4}}})
+            self.assertIn("not in", fm.paid_places_from_file(table, "2")[1])
+            self.assertIn("no contest id", fm.paid_places_from_file(table, "")[1])
+
+            nofield = self._table(tmp, {"contests": {"1": {"field_size": 10}}})
+            self.assertIn("carries no paid_places",
+                          fm.paid_places_from_file(nofield, "1")[1])
+
+            junk = self._table(tmp, {"contests": {"1": {"paid_places": "many"}}})
+            self.assertIn("non-integer", fm.paid_places_from_file(junk, "1")[1])
+
+    def test_the_parked_export_resolves_a_real_archived_contest(self):
+        """The file has existed since 2026-07-29 with 100 contests in it and no
+        code path could read it. Pinned against the real file, not a fixture."""
+        from mlb_engine.field import field_miner as fm
+        parked = REPO / "data" / "reference" / "dk_contest_paid_places.json"
+        if not parked.exists():
+            self.skipTest("the parked paid-places export is not staged")
+        value, note = fm.paid_places_from_file(str(parked), "192784475")
+        self.assertEqual(value, 1)
+        self.assertIn("dk_contest_paid_places.json", note)
 
 
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):

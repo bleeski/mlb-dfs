@@ -76,7 +76,7 @@ import tempfile
 import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 VERSION = "0.5-review"
 SALARY_CAP = 50000
@@ -922,11 +922,54 @@ def harvest_own_entry_ids(slate_date: str, contest_id: str = "") -> List[str]:
     return sorted(set(out))
 
 
+def paid_places_from_file(
+    path: str,
+    contest_id: Optional[str],
+) -> Tuple[Optional[int], str]:
+    """``paid_places`` for one contest out of a parked JSON export (R30a).
+
+    Accepts either a flat ``{contest_id: {...}}`` mapping or one wrapped under a
+    ``contests`` key, which is the shape
+    ``data/reference/dk_contest_paid_places.json`` uses. Returns
+    ``(paid_places, note)`` and never raises: a missing file, an unreadable one,
+    or a contest the export does not cover all resolve to ``(None, why)``, and
+    the caller prints the note. Silence is the one thing this must not do --
+    parking these numbers in a file nothing reads is the state R30(a) exists to
+    end, and "the file did not have it" and "the file was never read" have to be
+    different sentences.
+    """
+    p = Path(path)
+    if not p.exists():
+        return None, f"{path} does not exist; paid_places stays unknown"
+    try:
+        payload = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, f"{path} is unreadable ({exc}); paid_places stays unknown"
+    table = payload.get("contests") if isinstance(payload, Mapping) else None
+    if not isinstance(table, Mapping):
+        table = payload if isinstance(payload, Mapping) else {}
+    key = str(contest_id or "").strip()
+    if not key:
+        return None, "no contest id to look up; paid_places stays unknown"
+    row = table.get(key)
+    if row is None:
+        return None, (f"{key} is not in {p.name} ({sum(1 for k in table if not str(k).startswith('_'))} "
+                      f"contests covered); paid_places stays unknown")
+    value = row.get("paid_places") if isinstance(row, Mapping) else row
+    if value is None:
+        return None, f"{key} is in {p.name} but carries no paid_places"
+    try:
+        return int(value), f"{key} -> {int(value)} paid place(s), from {p.name}"
+    except (TypeError, ValueError):
+        return None, f"{key} in {p.name} has a non-integer paid_places ({value!r})"
+
+
 def summarize_own_entries(
     mined: Mapping[str, Any],
     my_entry_ids: Sequence[str],
     entry_fee: Optional[float] = None,
     winnings: Optional[float] = None,
+    paid_places: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Where Ben's own entries finished, against the field he was in.
 
@@ -938,6 +981,16 @@ def summarize_own_entries(
     Everything here is an observed outcome read off a completed contest. It is
     not a graded prediction, an ROI model, a win rate, or a probability claim,
     and it says nothing about whether any of it was skill.
+
+    R30(a): ``paid_places`` is how many places the contest paid, which for a
+    satellite is the ticket count it awarded. Nothing in the archival path could
+    write it, so ``posture_allocator.classify_tier`` returned UNRESOLVED on every
+    archived contest and a rank-1 satellite finish could not be graded as a seat.
+    It is an observed count off the contest page or Ben's entry-history export,
+    never inferred here: ``breadth`` is recorded only when both it and
+    ``field_size`` are real, and ``paid_places_source`` names where it came from
+    so an exact count is never confused with the contest library's name-inferred
+    breadth.
     """
     wanted = {str(x).strip() for x in (my_entry_ids or []) if str(x).strip()}
     all_entries = list(mined.get("entries") or [])
@@ -945,6 +998,7 @@ def summarize_own_entries(
     mine = [e for e in all_entries if str(e.get("entry_id")) in wanted]
     if not mine:
         return {"matched": 0, "requested": len(wanted), "field_size": field_size,
+                "paid_places": (int(paid_places) if paid_places is not None else None),
                 "note": "none of the supplied entry ids appear in this contest's "
                         "standings; check the contest id"}
 
@@ -984,6 +1038,16 @@ def summarize_own_entries(
         "entry_fee": entry_fee,
         "fees_total": fees,
         "winnings_total": winnings,
+        # R30(a). An observed count, and the breadth derived from it only when
+        # both halves are real. A satellite's paid_places IS its ticket count,
+        # which is what makes a rank-1 finish gradeable as a seat.
+        "paid_places": (int(paid_places) if paid_places is not None else None),
+        "payout_breadth_observed": (
+            round(int(paid_places) / field_size, 4)
+            if paid_places is not None and field_size else None),
+        "cashed_entries": (
+            sum(1 for r in ranks if r <= int(paid_places))
+            if paid_places is not None and ranks else None),
         "net": (round(float(winnings) - fees, 2)
                 if winnings is not None and fees is not None else None),
         "labels": "observed outcomes from a completed contest; never a graded "
@@ -1358,6 +1422,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help="fee per entry for this contest, for the net line")
     ap.add_argument("--winnings", type=float,
                     help="total winnings for Ben's entries in this contest")
+    ap.add_argument("--paid-places", type=int, dest="paid_places",
+                    help="how many places this contest paid; for a satellite, the "
+                         "ticket count it awarded (R30a). An observed count off the "
+                         "contest page or the entry-history export, never inferred. "
+                         "Without it posture_allocator.classify_tier returns "
+                         "UNRESOLVED for this contest forever.")
+    ap.add_argument("--paid-places-from", dest="paid_places_from",
+                    help="JSON mapping contest_id -> {paid_places, ...} to read "
+                         "--paid-places from, so a bulk re-mine is one command "
+                         "rather than one per contest. "
+                         "data/reference/dk_contest_paid_places.json is the parked "
+                         "export; --paid-places still wins if both are given.")
     ap.add_argument("--force", action="store_true",
                     help="archive despite a failed structural parse check. The "
                          "override is recorded verbatim as line 2 of the emitted "
@@ -1429,6 +1505,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # G4: own results. Evidence decays, and DK exports age out; five contests are
     # already unrecoverable. Capturing this at mining time is the only chance.
+    # R30(a): resolve paid_places before the own-results stage. An explicit flag
+    # beats the file, and a file that does not carry this contest says so rather
+    # than leaving the caller to wonder whether it was read at all.
+    paid_places = args.paid_places
+    if paid_places is None and args.paid_places_from:
+        paid_places, note = paid_places_from_file(
+            args.paid_places_from, args.contest_id or mined.get("contest_id"))
+        print(f"paid places: {note}")
     own_ids = [x.strip() for x in (args.my_entry_ids or "").split(",") if x.strip()]
     if not own_ids and args.slate_date:
         own_ids = harvest_own_entry_ids(args.slate_date, args.contest_id)
@@ -1436,7 +1520,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"own entries: {len(own_ids)} harvested from the upload manifest")
     if own_ids:
         mined["own_results"] = summarize_own_entries(
-            mined, own_ids, entry_fee=args.entry_fee, winnings=args.winnings)
+            mined, own_ids, entry_fee=args.entry_fee, winnings=args.winnings,
+            paid_places=paid_places)
         summary = mined["own_results"]
         if summary.get("matched"):
             print(f"own results: {summary['matched']}/{summary['requested']} entries "
@@ -1463,7 +1548,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         "matched", "field_size", "best_rank", "best_finish_percentile",
                         "median_finish_percentile", "best_points", "winning_points",
                         "own_lineups_duplicated_by_field", "entry_fee",
-                        "fees_total", "winnings_total", "net")},
+                        "fees_total", "winnings_total", "net",
+                        "paid_places", "payout_breadth_observed",
+                        "cashed_entries")},
                 })
                 print("own results appended to ledger/own_results.json "
                       "(python tools/net_to_date.py for the cumulative table)")
