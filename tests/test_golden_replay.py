@@ -423,7 +423,15 @@ class GoldenProductionReplayTests(unittest.TestCase):
             # writes Base (base_out); rows that carry only Base leave the
             # correction structurally inert, which is exactly the silent no-op
             # this gate exists to catch.
-            r["AvgPointsPerGame"] = r["Base"]
+            #
+            # Base MOVES to AvgPointsPerGame rather than being copied to it
+            # (R57). The production intake front door, live_data_adapters._pool_row,
+            # emits AvgPointsPerGame and no Base at all; Base is derived from it
+            # during assembly. A row carrying BOTH is an operator-supplied Base,
+            # which the correction is no longer allowed to overwrite, so copying
+            # made this replay silently stop exercising the enrichment it exists
+            # to pin. Same numbers either way -- the baseline does not move.
+            r["AvgPointsPerGame"] = r.pop("Base")
         enr = dict(
             savant_batting_csv=ENRICHMENT_FIXTURES / "expected_stats_batting_frozen_2026-07-25.csv",
             savant_pitching_csv=ENRICHMENT_FIXTURES / "expected_stats_pitching_frozen_2026-07-25.csv",

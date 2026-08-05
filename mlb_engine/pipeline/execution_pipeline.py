@@ -2324,6 +2324,23 @@ def _plan_joint_allocation(
         return verdict
 
 
+def _is_blank(value: Any) -> bool:
+    """True for None, empty/whitespace strings, and float NaN.
+
+    A projections CSV read with ``pandas`` turns a blank cell into NaN, so
+    ``value in (None, "")`` is not the same question as "did the caller supply
+    this" (R57).
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
+
+
 def _assemble_projection_frame(
     salary_csv: str | Path,
     projection_rows: Any,
@@ -2421,6 +2438,9 @@ def _assemble_projection_frame(
     }
 
     assembled: list[Dict[str, Any]] = []
+    # Parallel to ``assembled``: True where Base was derived from
+    # AvgPointsPerGame, False where the caller supplied Base explicitly.
+    base_sources: list[bool] = []
     for raw in rows:
         r = dict(raw)
         pid = str(r.get("Player_ID") or r.get("player_id") or "").strip()
@@ -2458,11 +2478,22 @@ def _assemble_projection_frame(
             bo_val = int(slot)
             r["F2"] = batting_order_factor(int(slot))
             notes = (notes + "; platoon_order: F2 from projected batting order").lstrip("; ")
+        # Base source, recorded because the xwOBA correction downstream must not
+        # overwrite an operator-supplied Base (R57). A blank cell in a
+        # projections_override CSV arrives as NaN, not "", so NaN counts as
+        # absent here: treating it as supplied both skips the APPG fallback that
+        # exists for exactly that row and would leave a NaN Base for
+        # validate_projection_factors to reject.
         base = r.get("Base")
-        if base in (None, "") and "AvgPointsPerGame" in r:
+        if _is_blank(base):
+            base = None
+        base_from_appg = False
+        if base is None and not _is_blank(r.get("AvgPointsPerGame")):
             base = r["AvgPointsPerGame"]
-        if base in (None, ""):
+            base_from_appg = True
+        if base is None:
             raise ValueError(f"row for Player_ID {pid} missing Base/AvgPointsPerGame")
+        base_sources.append(base_from_appg)
         assembled.append({
             "Player_ID": pid,
             "Name": r.get("Name") or sp.name,
@@ -2515,11 +2546,21 @@ def _assemble_projection_frame(
                 "them to build uncorrected on purpose."
             )
         if "AvgPointsPerGame" in frame.columns and frame["AvgPointsPerGame"].notna().any():
+            # The correction restates Base from APPG, so it may only touch rows
+            # whose Base CAME from APPG. A row where the operator supplied Base
+            # keeps it, and a row with no APPG keeps it too rather than taking a
+            # NaN (R57). The mask is the pre-correction source, captured above;
+            # after this call Base carries no record of where it came from.
             frame, _xwoba_audit = apply_xwoba_correction(
-                frame, corrections, base_in="AvgPointsPerGame", base_out="Base")
+                frame, corrections, base_in="AvgPointsPerGame", base_out="Base",
+                apply_mask=base_sources)
             xwoba_summary["applied"] = True
-            non_neutral = _xwoba_audit[abs(_xwoba_audit["xwoba_correction"] - 1.0) > 1e-9]
+            applied_rows = _xwoba_audit[_xwoba_audit["applied"]]
+            non_neutral = applied_rows[abs(applied_rows["xwoba_correction"] - 1.0) > 1e-9]
             xwoba_summary["non_neutral_applied"] = int(len(non_neutral))
+            xwoba_summary["rows_corrected"] = int(_xwoba_audit["applied"].sum())
+            xwoba_summary["rows_skipped_operator_base"] = int(
+                len(_xwoba_audit) - int(_xwoba_audit["applied"].sum()))
             if xwoba_summary["match_rate"] < XWOBA_LOW_MATCH_RATE_WARN:
                 enrichment["warnings"].append(
                     f"xwOBA match rate {xwoba_summary['match_rate']:.0%} is below "

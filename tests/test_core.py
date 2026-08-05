@@ -1239,6 +1239,39 @@ class TestXwobaBaselineCorrection(unittest.TestCase):
         self.assertTrue(matched["100"])
         self.assertFalse(matched["999"])
 
+    def test_null_base_in_is_never_corrected_to_nan(self):
+        # R57(b) at the helper: base_in null * factor is NaN, and a NaN Base is
+        # a crash in validate_projection_factors, not a correction. The row
+        # keeps the base_out it arrived with.
+        rows = pd.DataFrame([
+            {"Player_ID": "100", "Name": "HasAppg", "AvgPointsPerGame": 10.0, "Base": 10.0},
+            {"Player_ID": "100", "Name": "NoAppg", "AvgPointsPerGame": None, "Base": 12.0},
+        ])
+        out, audit = apply_xwoba_correction(rows, {"100": 1.1})
+        self.assertAlmostEqual(float(out.iloc[0]["Base"]), 11.0, places=6)
+        self.assertAlmostEqual(float(out.iloc[1]["Base"]), 12.0, places=6)
+        self.assertFalse(pd.isna(out["Base"]).any())
+        self.assertEqual([True, False], list(audit["applied"]))
+        # the audit reports what actually multiplied Base, not what would have
+        self.assertAlmostEqual(float(audit.iloc[1]["xwoba_correction"]), 1.0, places=6)
+
+    def test_apply_mask_false_rows_keep_their_base(self):
+        # R57(a) at the helper: the mask is how a caller says "this base_out
+        # came from a source the correction may not overwrite."
+        rows = pd.DataFrame([
+            {"Player_ID": "100", "Name": "FromAppg", "AvgPointsPerGame": 10.0, "Base": 10.0},
+            {"Player_ID": "100", "Name": "Operator", "AvgPointsPerGame": 10.0, "Base": 12.0},
+        ])
+        out, audit = apply_xwoba_correction(rows, {"100": 1.1}, apply_mask=[True, False])
+        self.assertAlmostEqual(float(out.iloc[0]["Base"]), 11.0, places=6)
+        self.assertAlmostEqual(float(out.iloc[1]["Base"]), 12.0, places=6)
+        self.assertEqual([True, False], list(audit["applied"]))
+
+    def test_misaligned_apply_mask_raises(self):
+        rows = pd.DataFrame([{"Player_ID": "100", "AvgPointsPerGame": 10.0, "Base": 10.0}])
+        with self.assertRaisesRegex(ValueError, "aligned"):
+            apply_xwoba_correction(rows, {"100": 1.1}, apply_mask=[True, True])
+
     def test_loader_handles_bom_and_normalizes_player_id(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "x.csv"
@@ -2368,6 +2401,93 @@ class ProjectionEnrichmentWiringTests(unittest.TestCase):
             self.assertEqual(x["matched"], 3)
             self.assertGreater(x["match_rate"], 0.0)
             self.assertEqual(x["non_neutral_applied"], 3)
+
+    def _r57_fixture(self, root, base_overrides=None, drop_appg=()):
+        """The R57 reproduction: a matched-and-corrected pool where selected rows
+        carry an explicit operator Base and/or no AvgPointsPerGame."""
+        salary = root / "salary.csv"; ids = write_salary(salary)
+        bat = root / "bat.csv"
+        write_savant_batting(bat, [
+            ("SS, AAA", 700001, 200, 0.300, 0.360, 0.250, 0.450),  # ratio 1.2 -> clip 1.15
+            ("C, AAA", 700002, 200, 0.360, 0.300, 0.260, 0.380),   # .833 -> clip 0.85
+        ])
+        base_overrides = base_overrides or {}
+        rows = []
+        for raw in salary_rows():
+            key, pid = raw[2], raw[3]
+            r = {"Player_ID": pid}
+            if key not in drop_appg:
+                r["AvgPointsPerGame"] = 10.0
+            if key in base_overrides:
+                r["Base"] = base_overrides[key]
+            rows.append(r)
+        return salary, bat, ids, rows
+
+    def test_operator_supplied_base_survives_the_xwoba_correction(self):
+        # R57(a): the correction restates Base from APPG, so it may only touch
+        # rows whose Base came from APPG. AAA SS is matched at factor 1.15; an
+        # operator Base of 12.0 must not become 10.0 * 1.15 = 11.5.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, bat, ids, rows = self._r57_fixture(root, base_overrides={"AAA SS": 12.0})
+            frame, enrich = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", str(bat), None, None,
+                apply_value_sanity_guard=False)
+            by_id = {str(r["Player_ID"]): r for r in frame.to_dict("records")}
+            self.assertAlmostEqual(float(by_id[ids["AAA SS"]]["Base"]), 12.0, places=6)
+            # the rest of the pool still gets corrected, so this is a mask and
+            # not a disabled correction
+            self.assertAlmostEqual(float(by_id[ids["AAA C"]]["Base"]), 8.5, places=6)
+            x = enrich["xwoba"]
+            self.assertTrue(x["applied"])
+            self.assertEqual(x["rows_skipped_operator_base"], 1)
+            self.assertEqual(x["rows_corrected"], len(frame) - 1)
+
+    def test_explicit_base_without_appg_does_not_crash_the_front_door(self):
+        # R57(b): live_data_adapters tells the operator to "supply Base before
+        # run_slate". That row has no APPG, so APPG * factor is NaN and
+        # build_projections rejected it as nonnumeric — an uncaught crash at
+        # both approve legs, triggered by following the documented remedy.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, bat, ids, rows = self._r57_fixture(
+                root, base_overrides={"AAA SS": 12.0}, drop_appg=("AAA SS",))
+            frame, enrich = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", str(bat), None, None,
+                apply_value_sanity_guard=False)
+            by_id = {str(r["Player_ID"]): r for r in frame.to_dict("records")}
+            self.assertAlmostEqual(float(by_id[ids["AAA SS"]]["Base"]), 12.0, places=6)
+            self.assertFalse(frame["Base"].isna().any())
+            self.assertTrue(enrich["xwoba"]["applied"])
+
+    def test_blank_base_cell_still_falls_back_to_appg(self):
+        # The mask is "did the operator supply Base", and a blank cell in a
+        # projections_override CSV arrives as NaN, not "". Treating NaN as
+        # supplied would skip the APPG fallback and leave a NaN Base for
+        # validate_projection_factors to reject — with or without Savant CSVs.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, bat, ids, rows = self._r57_fixture(
+                root, base_overrides={"AAA SS": float("nan")})
+            frame, _ = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", str(bat), None, None,
+                apply_value_sanity_guard=False)
+            by_id = {str(r["Player_ID"]): r for r in frame.to_dict("records")}
+            self.assertAlmostEqual(float(by_id[ids["AAA SS"]]["Base"]), 11.5, places=6)
+            frame2, _ = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None,
+                apply_value_sanity_guard=False)
+            by_id2 = {str(r["Player_ID"]): r for r in frame2.to_dict("records")}
+            self.assertAlmostEqual(float(by_id2[ids["AAA SS"]]["Base"]), 10.0, places=6)
+
+    def test_row_with_neither_base_nor_appg_still_raises(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, bat, ids, rows = self._r57_fixture(root, drop_appg=("AAA SS",))
+            with self.assertRaisesRegex(ValueError, "missing Base/AvgPointsPerGame"):
+                epi._assemble_projection_frame(
+                    str(salary), rows, "emergency_proxy", str(bat), None, None,
+                    apply_value_sanity_guard=False)
 
     def test_xwoba_zero_match_raises_wiring_error(self):
         with tempfile.TemporaryDirectory() as tmp:

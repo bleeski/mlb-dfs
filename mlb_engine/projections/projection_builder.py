@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
 
 VERSION = "v1.6"
@@ -299,6 +300,7 @@ def apply_xwoba_correction(
     base_in: str = "AvgPointsPerGame",
     base_out: str = "Base",
     default: float = 1.0,
+    apply_mask: Optional[Any] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Set ``base_out = base_in * correction`` and return (rows, audit).
 
@@ -307,6 +309,25 @@ def apply_xwoba_correction(
     as early-season call-ups or sub-floor PA. Merge the batter and pitcher
     correction maps (``{**batter, **pitcher}``) before calling; the role-correct
     ratio direction is already baked into each map.
+
+    Two rows are NEVER corrected, and both keep whatever ``base_out`` already
+    holds (R57):
+
+    - a row whose ``base_in`` is null. ``base_in * factor`` is NaN there, and a
+      NaN ``Base`` is not a correction, it is a crash one call later in
+      ``validate_projection_factors``. The caller that supplies ``Base`` without
+      ``AvgPointsPerGame`` is following the documented remedy, not making a
+      mistake.
+    - a row masked out by ``apply_mask``, an optional boolean sequence aligned
+      to ``rows``. This is how a caller says "``base_out`` here came from a
+      source the correction has no business overwriting" — an operator-supplied
+      Base is the case that motivated it. The mask must be computed from the
+      PRE-correction Base source, because after this function runs the two are
+      indistinguishable.
+
+    Skipped rows are audited with ``applied=False`` and a 1.0 factor, so the
+    audit's ``xwoba_correction`` column is what actually multiplied the Base
+    rather than what would have if the row had been eligible.
     """
     frame = _as_dataframe(rows)
     if base_in not in frame.columns:
@@ -314,14 +335,29 @@ def apply_xwoba_correction(
     ids = frame["Player_ID"].astype(str).str.strip() if "Player_ID" in frame.columns else pd.Series([""] * len(frame))
     raw = pd.to_numeric(frame[base_in], errors="raise").astype(float)
     factor = ids.map(lambda p: float(corrections.get(p, default)))
-    frame[base_out] = (raw.to_numpy() * factor.to_numpy()).clip(min=0)
+    eligible = raw.notna().to_numpy()
+    if apply_mask is not None:
+        supplied = list(apply_mask)
+        if len(supplied) != len(frame):
+            raise ValueError(
+                f"apply_mask has {len(supplied)} entries for {len(frame)} rows; "
+                "the mask must be aligned to rows"
+            )
+        requested = pd.Series(supplied, index=frame.index).fillna(False).to_numpy(dtype=bool)
+        eligible = eligible & requested
+    prior = (pd.to_numeric(frame[base_out], errors="coerce").astype(float).to_numpy()
+             if base_out in frame.columns else np.full(len(frame), float("nan")))
+    corrected = (raw.to_numpy() * factor.to_numpy()).clip(min=0)
+    applied_factor = np.where(eligible, factor.to_numpy(), 1.0)
+    frame[base_out] = np.where(eligible, corrected, prior)
     audit = pd.DataFrame({
         "Player_ID": frame["Player_ID"] if "Player_ID" in frame.columns else ids,
         "Name": frame["Name"] if "Name" in frame.columns else "",
         "raw_base": raw.to_numpy(),
-        "xwoba_correction": factor.to_numpy(),
+        "xwoba_correction": applied_factor,
         "corrected_base": frame[base_out].to_numpy(),
         "matched": ids.isin(set(corrections.keys())).to_numpy(),
+        "applied": eligible,
     })
     return frame, audit
 

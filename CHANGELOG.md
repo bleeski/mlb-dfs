@@ -25,6 +25,100 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R57: the xwOBA correction stops overwriting a Base it did not produce
+
+### Fixed
+
+- **R57 — an operator-supplied Base survives the correction, and the documented
+  remedy stops crashing the build (P1).** `_assemble_projection_frame` resolves
+  `Base` per row from the caller's explicit `Base` or, failing that, from
+  `AvgPointsPerGame`. It then handed the whole frame to
+  `apply_xwoba_correction(base_in="AvgPointsPerGame", base_out="Base")`, which
+  rewrote `Base = APPG × factor` for EVERY row unconditionally. Both filed halves
+  reproduced exactly before anything changed:
+  (a) a row carrying an explicit operator `Base` of 12.0 alongside APPG 10.0 at a
+  matched factor of 1.15 came out of the front door at 11.5. The operator's number
+  was gone with no warning and no counter.
+  (b) a row carrying an explicit `Base` and NO APPG — which is verbatim what
+  `live_data_adapters` tells the operator to do when a kept row has no average
+  ("supply Base before run_slate") — took `NaN × factor`, and
+  `validate_projection_factors` then rejected it as `Base contains nonnumeric
+  values`. An uncaught `ValueError` at both approve legs, reachable by following
+  the project's own printed remedy.
+  The correction now runs under a mask computed from the PRE-correction Base
+  source, which is the only moment the two are still distinguishable: rows whose
+  Base came from APPG are corrected, rows where the caller supplied Base keep it.
+  `apply_xwoba_correction` gained an `apply_mask` argument for that, and
+  independently refuses to correct any row whose `base_in` is null, because
+  `base_in × factor` is NaN there and a NaN Base is a crash one call later rather
+  than a correction. Skipped rows are audited `applied=False` at a 1.0 factor, so
+  the audit's `xwoba_correction` column is what actually multiplied the Base and
+  not what would have. `enrichment["xwoba"]` gained `rows_corrected` and
+  `rows_skipped_operator_base`, because a masked correction that reports only
+  "applied: true" is the same silent no-op the v1.6 wiring guard exists to block.
+
+### What the reproduction corrected about the filed diagnosis
+
+- **The trigger needs a Savant CSV, not just APPG.** The entry reads "applies the
+  correction whenever ANY row has APPG"; that is the inner condition. The whole
+  block sits under `if savant_batting_csv or savant_pitching_csv:`, so a build with
+  no expected-stats CSV was never exposed to either half. Confirmed by
+  reproduction: the same rows that crash with a batting CSV supplied come through
+  clean without one. This narrows who was exposed; it does not change the fix.
+- **Line numbers had drifted.** The filed `execution_pipeline.py:2447` is now
+  2518, and `projection_builder.py:317` is inside `apply_xwoba_correction`.
+- **A third case sat on the same line, and it is why "supplied" had to mean more
+  than `in (None, "")`.** A blank `Base` cell in a `projections_override` CSV
+  arrives from pandas as NaN. `base in (None, "")` is False for NaN, so that row
+  was treated as carrying an explicit Base: the APPG fallback that exists for
+  exactly that row was skipped, and the row survived only because the correction
+  then overwrote the NaN. Reproduced both ways — with a Savant CSV the buggy
+  overwrite accidentally rescued it, and with no Savant CSV it crashed on
+  `Base contains nonnumeric values` today, unrelated to the correction. Masking on
+  "explicit Base supplied" without fixing this would have converted the accidental
+  rescue into a crash, so a new `_is_blank` (None, whitespace-only, NaN) now
+  decides the question and is pinned by test in both directions. This is folded
+  into R57 rather than filed separately because it is not incidental to the Fix
+  line: "mask on the pre-correction Base source" is unanswerable until "supplied"
+  is defined, and the two readings disagree on this row.
+- **The production golden replay was relying on the clobber to exercise the
+  enrichment it exists to pin.** `GoldenProductionReplayTests` built its rows with
+  `r["AvgPointsPerGame"] = r["Base"]` — a copy, leaving both keys set — precisely
+  so the correction would not be structurally inert. Under the mask that pool
+  reads as operator-supplied for every row, the correction went inert, and the
+  certified leg stopped certifying (`KeyError: 'assignments_path'` out of
+  `setUpClass`). The fixture, not the mask, was the thing out of step: the real
+  intake front door `live_data_adapters._pool_row` emits `AvgPointsPerGame` and no
+  `Base` at all. The copy is now a MOVE (`r.pop("Base")`), which is what production
+  hands in, and **the frozen baseline did not move** — aggregates, enrichment
+  counters and the entry-to-lineup assignment are all byte-identical, because the
+  numbers were the same either way. No golden regeneration, and R87's pending
+  decision is untouched.
+
+### Tests
+
+- Seven new tests; the pin moves 628 → 635 in all three places
+  (`tools/audit.py`, `CLAUDE.md`, `skills/generate-lineups/SKILL.md`). Four in
+  `ProjectionEnrichmentWiringTests` drive the filed reproduction through the real
+  front door: the operator Base survives while the rest of the pool is still
+  corrected (so this is a mask, not a disabled correction), the explicit-Base
+  no-APPG row does not crash and leaves no NaN, a blank Base cell still falls back
+  to APPG with and without Savant CSVs, and a row with neither Base nor APPG still
+  raises. Three in `TestXwobaBaselineCorrection` pin the helper itself: a null
+  `base_in` is never corrected to NaN, `apply_mask=False` rows keep their Base, and
+  a misaligned mask raises instead of silently truncating.
+- Mutation-checked against the true pre-fix state. Removing the mask alone fails
+  the operator-Base test; removing both the mask and the null guard fails the
+  operator-Base test and errors the no-APPG test, which is the pair of failures
+  the filed reproduction predicted. Neither half is pinned only by the other.
+
+### Verified
+
+- `PASS  v2.26.0  25 modules  635 tests` on the pinned container stack
+  (numpy 2.2.6 / pandas 2.3.3 / scipy 1.15.3).
+
+---
+
 ## 2026-08-04 — R53 + R64: the certification gate and the delivery record stop attesting to things they never checked
 
 ### Fixed
