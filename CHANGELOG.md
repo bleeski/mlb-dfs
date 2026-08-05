@@ -25,6 +25,73 @@ performance claim.
 
 ---
 
+## 2026-08-05 — R37 decision input: the feasibility gate is answered, and a probe that reproduces it
+
+### Added
+
+- **`tools/stack_shape_probe.py`.** The 2026-08-04 regrade of the field-shape
+  analysis put one gate in front of any `primary_stack_min_size` decision: on thin
+  slates, is our large "3 or fewer primary" share a FEASIBILITY outcome (the team
+  cap crossed with `max_shared_players` leaving no room) or a solver CHOICE? That
+  question is answerable by measurement and was being answered by reading the
+  constraint set. The probe forces `stack_constraints` at min_size 3, 4 and 5
+  against every team with at least five rostered hitters, reports how many teams
+  admit a solution, and reports the best objective reachable under each floor
+  against the unconstrained optimum on the same pool. It exists as a tool rather
+  than a one-off script because the same measurement has to be re-run after any
+  floor lands and on any slate whose width is unusual.
+  It measures what the ENGINE can build and what a constraint costs, which is the
+  half the archive cannot see. It says nothing about what a shape is worth in a
+  contest; that evidence is in the archive analyses, conditioned on archetype.
+
+### The gate, answered
+
+Five staged Classic salary files at 3, 3, 4, 6 and 8 games:
+
+- **It is choice, not feasibility.** A 5-primary lineup is feasible on 100% of
+  stackable teams at every width, thin slates included (6/6, 6/6, 8/8, 12/12,
+  16/16). Nothing in the constraint set produces the low-primary share.
+- **The objective drifts away from stacking as the slate widens**, picking primary
+  5, 3, 3, 3 and 2 across those five files. A correlation-free mean-max solve
+  cherry-picks harder the more teams it has. On the two 3-game files it landed on
+  5 once and 3 once, so even the thin-slate outcome is incidental.
+- **A floor is cheap.** Floor-4 costs 0.00% to 0.76% of the unconstrained best;
+  floor-5 costs 0.00% to 1.55%, worst case on the 6-game file.
+- **The secondary shape may not need its own control, which shrinks R37.** Forcing
+  floor-5 produces the shape the archive prefers for that archetype as a
+  by-product of slate width: an even 5-1-1-1 / 5-2-1 split on the 6- and 8-game
+  files (where mini-MAX lives, and where the archive's strongest shape is the
+  lone-5 at +3.6pp), and mostly 5-2-1 on the 3- and 4-game files (where the WTA
+  satellites live, and where 5-2-1 over-wins its share). 5-3, at-share everywhere
+  in the archive, appears only on the thin files and never at 6 or 8 games.
+
+Two caveats travel with every number: this is single-lineup feasibility, so a
+portfolio floor still has to satisfy `max_primary_stack_exposure_pct` and
+`max_shared_players` across N entries; and with no Savant CSVs supplied the
+Floor/Ceiling multipliers are uniform, so the cost column is the constraint's
+salary-and-position price rather than a variance-aware one. The probe takes the
+enrichment CSVs for the second.
+
+### Not decided, and not built
+
+R37 stays open and stays Ben's. The dated note on that entry carries the
+measurement above plus a recommendation on the table: a universal
+`primary_stack_min_size = 4` baseline (breadth-independent, because the floor is
+nearly free at the paid line and positive at the top end), raised to 5 only on the
+narrow-breadth postures, with a partial five-stack quota rather than a hard floor
+on cut-line satellites, and no cash-game claim at all because the archive holds
+zero cash contests and no paid-places coverage since 2026-07-28. Nothing in this
+commit changes a control, a default, or a posture. No `Decided` entry, because no
+decision has been made.
+
+### Verified
+
+- `PASS  v2.26.0  26 modules  676 tests` on the pinned container stack. No test
+  count change: the probe adds no behavior to the engine and its output is a
+  measurement, not a gate.
+
+---
+
 ## 2026-08-05 — R59: the feed merge speaks one team-code vocabulary, and fills fields instead of replacing sides
 
 ### Fixed
