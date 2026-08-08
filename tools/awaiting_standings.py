@@ -116,7 +116,22 @@ def _row_is_filled(
 
 
 def _today(date_override: str | None = None) -> str:
-    return date_override or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """Today's date in ET, from the one ET calendar authority (R65).
+
+    R95: this was `datetime.now(timezone.utc)`, and the difference is not
+    cosmetic here. `today` is what decides whether a slate has settled, and the
+    container runs on UTC, so after 8pm ET the UTC date is already tomorrow --
+    which is exactly when a night slate is mid-flight. On a UTC clock, tonight's
+    unsettled contests would satisfy `slate_date < today` and get listed for a
+    pull DK cannot serve. Baseball's day is an Eastern day. R31(b) is the same
+    mistake in claim.py's staleness check.
+    """
+    if date_override:
+        return date_override
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from mlb_engine.repo_env import today_et
+    return today_et()
 
 
 def _plural(n: int, word: str) -> str:
@@ -203,16 +218,49 @@ def inbox_ids(data_dir: Path) -> set[str]:
     """Contest IDs already sitting in data/standings/inbox/, pulled but not
     necessarily mined yet -- either way, not something to ask Ben to pull
     again."""
-    out: set[str] = set()
+    return _scan_inbox(data_dir)[0]
+
+
+def _scan_inbox(data_dir: Path) -> tuple[set[str], dict[str, str]]:
+    """``(pulled, failed)`` off the inbox filenames.
+
+    R95(b): membership was by filename alone, so a ZERO-BYTE file counted as
+    pulled. DK serves an empty export before a contest settles, and on
+    2026-08-08 four such files landed in the inbox and made their contests read
+    as done -- the R74(b) direction, where a contest wrongly marked pulled is a
+    contest nobody goes back for. Size is the only thing that separates a real
+    export from a failed one at this stage, so it is read here rather than
+    inferred from the name.
+
+    A failed pull is reported, not merely omitted: dropping the row would make
+    the contest reappear on the list with no explanation of why the file already
+    on disk does not count.
+    """
+    pulled: set[str] = set()
+    failed: dict[str, str] = {}
     inbox_dir = data_dir / "standings" / "inbox"
     if not inbox_dir.is_dir():
-        return out
-    for path in inbox_dir.iterdir():
-        if path.is_file() and path.suffix.lower() in (".csv", ".zip"):
-            m = INBOX_ID_RE.search(path.stem)
-            if m:
-                out.add(m.group(1))
-    return out
+        return pulled, failed
+    for path in sorted(inbox_dir.iterdir()):
+        if not (path.is_file() and path.suffix.lower() in (".csv", ".zip")):
+            continue
+        m = INBOX_ID_RE.search(path.stem)
+        if not m:
+            continue
+        cid = m.group(1)
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 0
+        if size == 0:
+            failed[cid] = path.name
+        else:
+            pulled.add(cid)
+    # A real export alongside a stray empty one is still a real export.
+    for cid in list(failed):
+        if cid in pulled:
+            del failed[cid]
+    return pulled, failed
 
 
 # --------------------------------------------------------------------------
@@ -252,13 +300,54 @@ def save_exceptions(data_dir: Path, data: dict) -> None:
 # Combine
 # --------------------------------------------------------------------------
 
-def compute_open(entered: dict[str, dict], have: set[str], exceptions: dict) -> dict[str, list[tuple[str, str]]]:
+def compute_open(entered: dict[str, dict], have: set[str], exceptions: dict,
+                 today: str | None = None) -> dict[str, list[tuple[str, str]]]:
+    """The contests still owed a pull, by slate date.
+
+    R95(a): ``today`` excludes contests whose slate has not settled. The scan
+    enrolls a contest the moment its delivered DKEntries file exists, which is
+    hours before the games are played, so on 2026-08-08 four contests appeared on
+    the pull list -- and in the clickable HTML -- at 12:43, before the slate
+    locked. Ben clicked all four, DK served zero-byte exports, and those files
+    then read as pulled. Asking for an export DK cannot serve is what created the
+    failed pulls, so this is the upstream half of the fix and R95(b)'s size check
+    is the downstream half; both are kept, because a pull between lock and settle
+    still produces an empty file.
+
+    ``today`` is optional so the pure function stays callable without a clock,
+    but ``cmd_scan`` always passes it.
+    """
     excluded = set(have)
     excluded |= {e["contest_id"] for e in exceptions.get("unrecoverable", [])}
     excluded |= {e["contest_id"] for e in exceptions.get("placeholder", [])}
     by_date: dict[str, list[tuple[str, str]]] = {}
     for cid, meta in entered.items():
         if cid in excluded:
+            continue
+        # >= and not >: a slate dated today has not finished settling, whatever
+        # time of day it is read at. The cost of waiting a day is one day; the
+        # cost of a premature pull is a lost contest.
+        if today is not None and meta["date"] >= today:
+            continue
+        by_date.setdefault(meta["date"], []).append((cid, meta["name"]))
+    for date in by_date:
+        by_date[date].sort()
+    return by_date
+
+
+def compute_unsettled(entered: dict[str, dict], have: set[str], exceptions: dict,
+                      today: str) -> dict[str, list[tuple[str, str]]]:
+    """The contests compute_open holds back because their slate has not settled.
+
+    Reported rather than silently withheld, so the checklist says "not yet"
+    instead of leaving Ben to wonder why tonight's contests are absent.
+    """
+    excluded = set(have)
+    excluded |= {e["contest_id"] for e in exceptions.get("unrecoverable", [])}
+    excluded |= {e["contest_id"] for e in exceptions.get("placeholder", [])}
+    by_date: dict[str, list[tuple[str, str]]] = {}
+    for cid, meta in entered.items():
+        if cid in excluded or meta["date"] < today:
             continue
         by_date.setdefault(meta["date"], []).append((cid, meta["name"]))
     for date in by_date:
@@ -270,9 +359,13 @@ def compute_open(entered: dict[str, dict], have: set[str], exceptions: dict) -> 
 # Rendering
 # --------------------------------------------------------------------------
 
-def render_markdown(by_date: dict, archived_count: int, invalid: dict, exceptions: dict, today: str) -> str:
+def render_markdown(by_date: dict, archived_count: int, invalid: dict, exceptions: dict,
+                    today: str, failed_pulls: dict[str, str] | None = None,
+                    unsettled: dict | None = None) -> str:
     total = sum(len(v) for v in by_date.values())
     dates_asc = sorted(by_date)  # oldest first -- see module docstring
+    failed_pulls = failed_pulls or {}
+    unsettled = unsettled or {}
 
     lines = [
         f"# Contests awaiting standings — regenerated {today}",
@@ -284,8 +377,14 @@ def render_markdown(by_date: dict, archived_count: int, invalid: dict, exception
         "",
         "Pull each while logged in to DraftKings, **check the file size is non-zero**, and",
         "drop it in `data/standings/inbox/`. A zero-byte export is a failed pull, not a",
-        "pulled file. The inbox is flat; the miner reads Classic vs Showdown off the",
-        "lineup cells and resolves the salary file itself (`--auto-salary`).",
+        "pulled file, and this scan now agrees: an empty inbox file counts as not-pulled",
+        "and its contest stays on the list (R95). The inbox is flat; the miner reads",
+        "Classic vs Showdown off the lineup cells and resolves the salary file itself",
+        "(`--auto-salary`).",
+        "",
+        "Contests whose slate date is today or later are held back, because DK serves an",
+        "empty export until a contest settles. They are listed under \"not yet settled\"",
+        "below rather than omitted.",
         "",
         f"## Status as of {today}: {_plural(total, 'contest')} open across {_plural(len(dates_asc), 'slate date')}",
         "",
@@ -301,6 +400,32 @@ def render_markdown(by_date: dict, archived_count: int, invalid: dict, exception
         for cid, name in ids:
             url = f"https://www.draftkings.com/contest/exportfullstandingscsv/{cid}"
             lines.append(f"- [{name}]({url}) — `{cid}`")
+        lines.append("")
+
+    if failed_pulls:
+        lines.append(f"## Failed pulls — {_plural(len(failed_pulls), 'zero-byte file')} in the inbox")
+        lines.append("")
+        lines.append("These files are 0 bytes, so they are not exports. Their contests are ON the")
+        lines.append("list above (or under \"not yet settled\" if the slate has not finished).")
+        lines.append("Delete or quarantine the empty file and pull again after the slate settles.")
+        lines.append("")
+        for cid in sorted(failed_pulls):
+            lines.append(f"- `{failed_pulls[cid]}` — contest `{cid}`")
+        lines.append("")
+
+    if unsettled:
+        unsettled_total = sum(len(v) for v in unsettled.values())
+        lines.append(f"## Not yet settled — {_plural(unsettled_total, 'contest')}, do not pull yet")
+        lines.append("")
+        lines.append("Slate date is today or later. DK serves a zero-byte export until a contest")
+        lines.append("settles, and an empty file in the inbox is how a contest gets lost, so these")
+        lines.append("are deliberately not linked. They move to the list above on the next scan")
+        lines.append("after their slate date passes.")
+        lines.append("")
+        for date in sorted(unsettled):
+            ids = unsettled[date]
+            lines.append(f"**{date}** ({_plural(len(ids), 'contest')}): "
+                         + ", ".join(f"`{cid}`" for cid, _name in ids))
         lines.append("")
 
     lines.append("## Not on this list — do not pull")
@@ -467,17 +592,23 @@ def cmd_scan(args: argparse.Namespace) -> int:
     data_dir = root / args.data_dir
 
     entered, invalid = scan_entered(outputs_dir)
-    have = archived_ids(data_dir) | inbox_ids(data_dir)
+    pulled, failed_pulls = _scan_inbox(data_dir)
+    archived = archived_ids(data_dir)
+    have = archived | pulled
     exceptions = load_exceptions(data_dir)
-    by_date = compute_open(entered, have, exceptions)
     today = _today(args.date)
+    by_date = compute_open(entered, have, exceptions, today)
+    unsettled = compute_unsettled(entered, have, exceptions, today)
     total = sum(len(v) for v in by_date.values())
 
-    md = render_markdown(by_date, len(archived_ids(data_dir)), invalid, exceptions, today)
+    md = render_markdown(by_date, len(archived), invalid, exceptions, today,
+                         failed_pulls=failed_pulls, unsettled=unsettled)
 
     if args.check:
         print(md)
         print(f"\n[check] {_plural(total, 'contest')} open across {_plural(len(by_date), 'date')}; "
+              f"{_plural(sum(len(v) for v in unsettled.values()), 'contest')} held back "
+              f"as unsettled; {_plural(len(failed_pulls), 'failed pull')}; "
               f"nothing written", file=sys.stderr)
         return 0
 

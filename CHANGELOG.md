@@ -25,6 +25,57 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R95: the pull list stops asking for exports DK cannot serve, and an empty file stops counting as a pull
+
+### Fixed
+
+- **R95(a) — a contest whose slate has not settled is held back (P1).** The scan
+  enrolled a contest the moment its delivered DKEntries file existed, which is
+  hours before the games are played. On 2026-08-08 four 1505_3g contests appeared
+  on the pull list and in the clickable HTML at 12:43, before the slate locked.
+  Ben clicked all four, DK served zero-byte exports, and those files then read as
+  pulled. `compute_open` now takes `today` and skips any slate dated **>= today**
+  — inclusive, because a slate dated today has not finished settling whatever
+  hour it is read at, and the cost of waiting a day is a day while the cost of a
+  premature pull is a lost contest. A new `compute_unsettled` reports what was
+  held back under a "Not yet settled — do not pull yet" heading, deliberately
+  unlinked, because silently omitting tonight's contests leaves the reader
+  wondering whether the tool saw them at all.
+- **`_today` now reads the ET calendar, not UTC, and that is load-bearing here.**
+  It was `datetime.now(timezone.utc)`. `today` is the value that decides whether
+  a slate has settled, and the container runs on UTC, so after 8pm ET the UTC
+  date is already tomorrow — which is precisely when a night slate is mid-flight.
+  On a UTC clock tonight's unsettled contests satisfy `slate_date < today` and get
+  listed. It now delegates to `repo_env.today_et`, the one ET authority R65
+  established. R31(b) is this same mistake in `claim.py`'s staleness check and is
+  still open.
+- **R95(b) — a zero-byte inbox file counts as not-pulled (P1).** Inbox membership
+  was by filename alone. A new `_scan_inbox` returns `(pulled, failed)` and
+  stats each file, so an empty export leaves its contest ON the list and is named
+  under a "Failed pulls" heading with the offending filename. `inbox_ids` is now a
+  thin wrapper over it, so every existing caller inherits the fix. A real export
+  sitting beside a stray empty file still counts as pulled. **Both halves are
+  kept rather than either alone:** (a) stops the tool asking for an export DK
+  cannot serve, and (b) catches the case (a) cannot — a pull made between lock and
+  settle, which still produces an empty file.
+- **Why P1 rather than P2.** Every other item in this batch wastes time. This one
+  destroyed evidence: a contest that reads as pulled is never mined and never
+  reappears on the list, and the only reason the four were recovered is that a
+  human noticed four zero-byte files. Verified against the live tree — the scan
+  now holds those exact four contests (193403851, 193403935, 193405185,
+  193405226) under "not yet settled" instead of linking them.
+
+### Tests
+
+- Seven new tests in a new `AwaitingStandingsSettlementTests`; the pin moves
+  719 → 726 (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). The
+  partition test asserts `compute_open` and `compute_unsettled` together account
+  for every entered contest exactly once, so a future edit cannot drop a contest
+  into neither bucket — which would be the original defect in a new costume. The
+  boundary test pins `>=` by checking both sides of it. The ET test pins the
+  delegation AND the property that makes it matter: at 01:30 UTC on 08-09 the ET
+  date is still 08-08, and the UTC clock's answer is the bug.
+
 ## 2026-08-08 — R94: the registry accumulates on every mine, so the runbook's own instruction is finally true
 
 ### Fixed

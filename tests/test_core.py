@@ -7582,6 +7582,115 @@ class MinerRegistryDefaultTests(unittest.TestCase):
                       "the runbook must record that the sentence is now true")
 
 
+class AwaitingStandingsSettlementTests(unittest.TestCase):
+    """R95. The scan enrolled a contest the moment its DKEntries file existed, so
+    four 2026-08-08 contests hit the pull list at 12:43, before the slate locked.
+    Ben clicked all four, DK served zero-byte exports, and those files then read
+    as "pulled" by filename -- the R74(b) direction, where a contest wrongly
+    marked pulled is a contest nobody goes back for."""
+
+    def _aw(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        import awaiting_standings as aw
+        return aw
+
+    ENTERED = {
+        "111111111": {"date": "2026-08-06", "name": "Settled Contest"},
+        "222222222": {"date": "2026-08-08", "name": "Tonight's Contest"},
+        "333333333": {"date": "2026-08-09", "name": "Tomorrow's Contest"},
+    }
+    NO_EXC = {"unrecoverable": [], "placeholder": []}
+
+    def test_a_slate_dated_today_is_held_back_not_listed(self):
+        aw = self._aw()
+        by_date = aw.compute_open(self.ENTERED, set(), self.NO_EXC, "2026-08-08")
+        self.assertIn("2026-08-06", by_date)
+        self.assertNotIn("2026-08-08", by_date,
+                         "today's slate has not settled; DK serves an empty export")
+        self.assertNotIn("2026-08-09", by_date)
+
+    def test_the_held_back_contests_are_reported_not_silently_dropped(self):
+        aw = self._aw()
+        unsettled = aw.compute_unsettled(self.ENTERED, set(), self.NO_EXC, "2026-08-08")
+        self.assertEqual(sorted(unsettled), ["2026-08-08", "2026-08-09"])
+        self.assertEqual(unsettled["2026-08-08"], [("222222222", "Tonight's Contest")])
+        # and the two halves partition the entered set exactly
+        opened = aw.compute_open(self.ENTERED, set(), self.NO_EXC, "2026-08-08")
+        seen = {cid for rows in list(opened.values()) + list(unsettled.values())
+                for cid, _ in rows}
+        self.assertEqual(seen, set(self.ENTERED))
+
+    def test_the_boundary_is_inclusive(self):
+        # >= not >: a slate dated today is still settling whatever the hour.
+        aw = self._aw()
+        entered = {"444444444": {"date": "2026-08-08", "name": "Edge"}}
+        self.assertEqual(aw.compute_open(entered, set(), self.NO_EXC, "2026-08-09"),
+                         {"2026-08-08": [("444444444", "Edge")]})
+        self.assertEqual(aw.compute_open(entered, set(), self.NO_EXC, "2026-08-08"), {})
+
+    def test_today_is_an_et_day_not_a_utc_one(self):
+        """The container runs UTC, so after 8pm ET the UTC date is already
+        tomorrow -- exactly when a night slate is mid-flight. On a UTC clock
+        tonight's contests satisfy `slate_date < today` and get listed."""
+        aw = self._aw()
+        sys.path.insert(0, str(REPO))
+        from mlb_engine.repo_env import today_et
+        self.assertEqual(aw._today(), today_et(),
+                         "_today must delegate to the one ET authority (R65)")
+        night = datetime(2026, 8, 9, 1, 30, tzinfo=timezone.utc)  # 21:30 ET on 08-08
+        self.assertEqual(today_et(night), "2026-08-08")
+        self.assertEqual(night.strftime("%Y-%m-%d"), "2026-08-09",
+                         "the UTC clock is a day ahead here; that is the bug")
+
+    # -- R95(b): a zero-byte export is not a pull -----------------------------
+
+    def _inbox(self, tmp, files):
+        inbox = Path(tmp) / "standings" / "inbox"
+        inbox.mkdir(parents=True)
+        for name, body in files:
+            (inbox / name).write_text(body, encoding="utf-8")
+        return Path(tmp)
+
+    def test_a_zero_byte_inbox_file_counts_as_not_pulled(self):
+        aw = self._aw()
+        with tempfile.TemporaryDirectory() as tmp:
+            data = self._inbox(tmp, [
+                ("contest-standings-111111111.csv", "Rank,EntryId\n1,9000\n"),
+                ("contest-standings-222222222.csv", ""),  # DK pre-settle export
+            ])
+            pulled, failed = aw._scan_inbox(data)
+            self.assertEqual(pulled, {"111111111"})
+            self.assertEqual(failed, {"222222222": "contest-standings-222222222.csv"})
+            # and the public helper agrees, so every caller inherits the fix
+            self.assertEqual(aw.inbox_ids(data), {"111111111"})
+
+    def test_the_failed_pull_keeps_its_contest_on_the_list(self):
+        aw = self._aw()
+        with tempfile.TemporaryDirectory() as tmp:
+            data = self._inbox(tmp, [("contest-standings-222222222.csv", "")])
+            pulled, failed = aw._scan_inbox(data)
+            entered = {"222222222": {"date": "2026-08-06", "name": "Empty Pull"}}
+            by_date = aw.compute_open(entered, pulled, self.NO_EXC, "2026-08-08")
+            self.assertEqual(by_date, {"2026-08-06": [("222222222", "Empty Pull")]},
+                             "an empty file must not retire its contest")
+            md = aw.render_markdown(by_date, 0, {}, self.NO_EXC, "2026-08-08",
+                                    failed_pulls=failed, unsettled={})
+            self.assertIn("Failed pulls", md)
+            self.assertIn("contest-standings-222222222.csv", md,
+                          "the checklist must name the empty file, not just omit it")
+
+    def test_a_real_export_beside_a_stray_empty_one_still_counts(self):
+        aw = self._aw()
+        with tempfile.TemporaryDirectory() as tmp:
+            data = self._inbox(tmp, [
+                ("contest-standings-111111111.csv", "Rank\n1\n"),
+                ("dupe-contest-standings-111111111.csv", ""),
+            ])
+            pulled, failed = aw._scan_inbox(data)
+            self.assertEqual(pulled, {"111111111"})
+            self.assertEqual(failed, {}, "a real export outranks a stray empty file")
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""
