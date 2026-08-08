@@ -7691,6 +7691,170 @@ class AwaitingStandingsSettlementTests(unittest.TestCase):
             self.assertEqual(failed, {}, "a real export outranks a stray empty file")
 
 
+class MinerManifestFirstSalaryTests(unittest.TestCase):
+    """R49(1)(2). Scoring cannot find the right salary file when a same-family
+    SUPERSET exists: a 9-game slate's players all sit inside the 10-game file, so
+    both join 100% and the resolver correctly declines rather than guessing. The
+    manifest already knows -- each delivery records its run_id, and
+    runs/<run_id>/inputs/DKSalaries.csv is by construction what the build used.
+    Validated by hand across 31 contests on 2026-08-08."""
+
+    SALARY_HEADER = MinerSalaryJoinFloorTests.SALARY_HEADER
+    DRAFTED = MinerSalaryJoinFloorTests.RIGHT_SLATE
+    # The superset is one extra GAME on top of the same slate, which is the real
+    # shape of the failure: the drafted players are all still present and the two
+    # extra teams keep team_coverage above MIN_AUTO_TEAM_COVERAGE (9 drafted of 11
+    # priced = 0.82), so the 2026-07-24 team-coverage asymmetry cannot separate
+    # them either. That leaves both candidates usable at 100% join with differing
+    # content, which is the ambiguity branch, which is the decline that cost 11
+    # manual resolutions.
+    EXTRA = [("OF", "Julio Rodriguez", "SEA"), ("1B", "Pete Alonso", "NYM"),
+             ("2B", "Jose Altuve", "HOU"), ("3B", "Austin Riley", "ATL"),
+             ("SS", "Trea Turner", "PHI"), ("C", "Adley Rutschman", "NYY"),
+             ("P", "Corbin Burnes", "DET"), ("OF", "Yordan Alvarez", "HOU")]
+
+    def _standings(self, tmp, cid="777777777"):
+        from mlb_engine.field import field_miner as fm
+        path = Path(tmp) / f"contest-standings-{cid}.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            w = csv.writer(fh)
+            w.writerow(MinerMoneyHonestyTests.HEADER)
+            for i in range(6):
+                w.writerow([str(i + 1), str(9000 + i), f"u{i}", "0", f"{120 - i}.5",
+                            MinerMoneyHonestyTests.CLASSIC, "", "Aaron Judge",
+                            "OF", "41.2%", "18.5"])
+        return fm.parse_standings_export(str(path))
+
+    def _salary(self, path, rows):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(self.SALARY_HEADER)
+            for i, (pos, nm, team) in enumerate(rows):
+                w.writerow([pos, f"{nm} ({7000 + i})", nm, str(7000 + i), pos,
+                            "5000", "AAA@BBB 07:05PM ET", team, "8.0"])
+        return path
+
+    def _tree(self, tmp, date="2026-08-06", cid="777777777", run="20260806T1607Z_abc",
+              deliveries=None, superseded_run=None):
+        """The authoritative file in the run inputs, a SUPERSET staged in-date."""
+        root = Path(tmp)
+        self._salary(root / "runs" / run / "inputs" / "DKSalaries.csv", self.DRAFTED)
+        if superseded_run:
+            self._salary(root / "runs" / superseded_run / "inputs" / "DKSalaries.csv",
+                         self.DRAFTED)
+        self._salary(root / "data" / "slates" / date / "DKSalaries.csv",
+                     self.DRAFTED + self.EXTRA)
+        if deliveries is None:
+            deliveries = [{"run_id": run, "contest_ids": [cid], "status": "upload_ready"}]
+        manifest = root / "outputs" / date / "upload_manifest.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(json.dumps({"deliveries": deliveries}), encoding="utf-8")
+        return root
+
+    def test_the_manifest_tier_names_the_run_inputs_for_this_contest(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(tmp)
+            got = fm.manifest_salary_candidates(root, "2026-08-06", "777777777")
+            self.assertEqual(len(got), 1)
+            self.assertIn("20260806T1607Z_abc", got[0])
+
+    def test_a_delivery_for_other_contests_is_not_this_contest_s_file(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(tmp, deliveries=[
+                {"run_id": "20260806T1607Z_abc", "contest_ids": ["999999999"],
+                 "status": "upload_ready"}])
+            self.assertEqual(fm.manifest_salary_candidates(root, "2026-08-06", "777777777"), [])
+
+    def test_a_live_delivery_outranks_a_superseded_one(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(tmp, superseded_run="20260806T1600Z_old", deliveries=[
+                {"run_id": "20260806T1600Z_old", "contest_ids": ["777777777"],
+                 "status": "superseded"},
+                {"run_id": "20260806T1607Z_abc", "contest_ids": ["777777777"],
+                 "status": "upload_ready"}])
+            got = fm.manifest_salary_candidates(root, "2026-08-06", "777777777")
+            self.assertEqual(len(got), 2, "a superseded run is a fallback, not a drop")
+            self.assertIn("20260806T1607Z_abc", got[0],
+                          "the surviving delivery is the file that was entered")
+
+    def test_the_manifest_resolves_a_superset_that_pooled_scoring_cannot(self):
+        """The load-bearing test. Both files join 100%; pooled they are a
+        content-differing tie and the resolver declines, which is the state that
+        forced 11 manual resolutions on 2026-08-04."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._tree(tmp)
+            st = self._standings(tmp)
+            pooled = fm.resolve_salary_file(st, [
+                str(root / "runs" / "20260806T1607Z_abc" / "inputs" / "DKSalaries.csv"),
+                str(root / "data" / "slates" / "2026-08-06" / "DKSalaries.csv")])
+            self.assertIsNone(pooled["path"], "pooled scoring must be shown to fail here")
+            self.assertIn("ambiguous", pooled["reason"])
+
+            tiered = fm.resolve_salary_tiered(st, root, slate_date="2026-08-06",
+                                              contest_id="777777777")
+            self.assertEqual(tiered["tier"], "manifest")
+            self.assertIn("20260806T1607Z_abc", tiered["path"])
+
+    def test_in_date_answers_when_there_is_no_manifest(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._salary(root / "data" / "slates" / "2026-08-06" / "DKSalaries.csv",
+                         self.DRAFTED)
+            st = self._standings(tmp)
+            tiered = fm.resolve_salary_tiered(st, root, slate_date="2026-08-06",
+                                              contest_id="777777777")
+            self.assertEqual(tiered["tier"], "in_date")
+
+    def test_the_wide_scan_is_the_last_resort_and_says_so(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # not in-date, not in a manifest: only reachable by the repo-wide glob
+            self._salary(root / "data" / "archive" / "2026-07-01" / "DKSalaries.csv",
+                         self.DRAFTED)
+            st = self._standings(tmp)
+            tiered = fm.resolve_salary_tiered(st, root, slate_date="2026-08-06",
+                                              contest_id="777777777")
+            self.assertEqual(tiered["tier"], "repo_wide")
+            self.assertEqual([a["tier"] for a in tiered["attempts"]],
+                             ["manifest", "in_date", "repo_wide"],
+                             "the tier order is the contract")
+
+    def test_every_tier_failing_leaves_standings_only_with_all_three_reasons(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp)
+            tiered = fm.resolve_salary_tiered(st, Path(tmp), slate_date="2026-08-06",
+                                              contest_id="777777777")
+            self.assertIsNone(tiered["path"])
+            self.assertIsNone(tiered["tier"])
+            for tier in ("manifest", "in_date", "repo_wide"):
+                self.assertIn(tier, tiered["reason"])
+
+    def test_a_delivered_dkentries_is_never_offered_as_a_salary_source(self):
+        """R49(1). The runbook and this block both claimed a retained DKEntries
+        upload "embeds the full salary block". True of DK's downloaded template;
+        false of the engine's delivered file, which has no Salary column at all."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp)
+            mined = fm.mine_contest(st, None, contest_id="777777777")
+            block = fm.emit_ledger_block(mined)
+            text = block if isinstance(block, str) else "\n".join(block)
+            self.assertEqual(mined["coverage"], "standings_only")
+            self.assertNotIn("embeds the salary block", text)
+            self.assertIn("NOT a salary source", text)
+        runbook = (REPO / "docs" / "cowork_archival_runbook.md").read_text(encoding="utf-8")
+        self.assertNotIn("it embeds the full salary block", runbook)
+        self.assertIn("NOT a salary source", runbook)
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""

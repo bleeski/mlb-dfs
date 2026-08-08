@@ -505,6 +505,108 @@ def default_salary_candidates(root: Path) -> List[str]:
     return [str(p) for p in sorted(set(seen), key=lambda p: -p.stat().st_mtime)]
 
 
+def manifest_salary_candidates(root: Path, slate_date: str,
+                               contest_id: str = "") -> List[str]:
+    """The salary files the upload manifest says this contest was built from (R49).
+
+    This is the authoritative tier and it exists because scoring cannot find it.
+    A same-family SUPERSET defeats `--auto-salary` outright: a 9-game slate's
+    players all sit inside the 10-game file, so several candidates join 100% and
+    the resolver correctly declines rather than guessing. Meanwhile the manifest
+    already knows the answer without scoring anything -- each delivery records
+    its `run_id`, and `runs/<run_id>/inputs/DKSalaries.csv` is by construction the
+    file the build actually used for every contest in that delivery.
+
+    Non-superseded deliveries come first: when a slate was delivered twice, the
+    surviving delivery is the one whose file was entered. Superseded ones follow
+    rather than being dropped, because a superseded run for the same slate still
+    staged the same slate's salary file, and a stale-but-correct file beats
+    falling through to a repo-wide scan.
+
+    Returns [] when there is no manifest, no matching delivery, or no staged
+    input -- all three of which are ordinary and simply mean the next tier runs.
+    """
+    root = Path(root)
+    manifest_path = root / "outputs" / str(slate_date) / "upload_manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    wanted = str(contest_id or "").strip()
+    live: List[str] = []
+    superseded: List[str] = []
+    for record in manifest.get("deliveries", []):
+        run_id = str(record.get("run_id") or "").strip()
+        if not run_id:
+            continue
+        if wanted:
+            covered = {str(c) for c in (record.get("contest_ids") or [])}
+            # A delivery that names contests and does not name this one is a
+            # different contest's file. One that names none is not evidence
+            # either way, so it stays a candidate.
+            if covered and wanted not in covered:
+                continue
+        bucket = superseded if record.get("status") == "superseded" else live
+        for path in sorted((root / "runs" / run_id / "inputs").glob("DKSalaries*.csv")):
+            bucket.append(str(path))
+    out: List[str] = []
+    for path in live + superseded:
+        if path not in out:
+            out.append(path)
+    return out
+
+
+def in_date_salary_candidates(root: Path, slate_date: str) -> List[str]:
+    """Salary CSVs staged under this slate's own date (R30(c)).
+
+    The middle tier. `--auto-salary` used to scan all 170 salary CSVs in the
+    repo, which runs 7-25s where a date-scoped scan runs under a second, and the
+    join-and-team-coverage checks still guard against the wrong slate either way.
+    """
+    root = Path(root)
+    out: List[str] = []
+    for sub in ("data/slates", "data/archive"):
+        for path in sorted((root / sub / str(slate_date)).glob("DKSalaries*.csv")):
+            if str(path) not in out:
+                out.append(str(path))
+    return out
+
+
+def resolve_salary_tiered(standings: Dict[str, Any], root: Path,
+                          slate_date: str = "",
+                          contest_id: str = "") -> Dict[str, Any]:
+    """Resolve this contest's salary file MANIFEST-FIRST, then in-date, then wide.
+
+    R49. The 2026-08-04 mine resolved 11 of 94 contests by hand; the 2026-08-08
+    tranche validated this order by hand across 31. The tiers are tried in
+    sequence and the FIRST tier that yields a usable file wins -- they are not
+    pooled and scored together, because pooling is what lets a superset outrank
+    the authoritative file. The returned ``tier`` says which one answered, so a
+    mine that fell through to the wide scan is visibly different from one the
+    manifest resolved.
+    """
+    root = Path(root)
+    tiers: List[Tuple[str, List[str]]] = []
+    if slate_date:
+        tiers.append(("manifest", manifest_salary_candidates(root, slate_date, contest_id)))
+        tiers.append(("in_date", in_date_salary_candidates(root, slate_date)))
+    tiers.append(("repo_wide", default_salary_candidates(root)))
+    attempts: List[Dict[str, Any]] = []
+    for tier, candidates in tiers:
+        if not candidates:
+            attempts.append({"tier": tier, "candidates": 0, "reason": "no candidates"})
+            continue
+        resolved = resolve_salary_file(standings, candidates)
+        attempts.append({"tier": tier, "candidates": len(candidates),
+                         "reason": resolved["reason"]})
+        if resolved["path"]:
+            resolved["tier"] = tier
+            resolved["attempts"] = attempts
+            return resolved
+    return {"path": None, "tier": None, "attempts": attempts, "scored": [],
+            "reason": "; ".join(f"{a['tier']}: {a['reason']}" for a in attempts)}
+
+
 # ---------------------------------------------------------------------------
 # Per-contest mining
 # ---------------------------------------------------------------------------
@@ -1328,9 +1430,16 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
     if salary_tables_valid and c["max_stack_histogram"]:
         lines.append(f"- Max-stack histogram: {c['max_stack_histogram']}.")
     if cov == "standings_only":
+        # R49(1): this used to name "the slate's DKEntries upload file (which
+        # embeds the salary block)" as a recovery path. That is true only of DK's
+        # own downloaded template; the engine's delivered DKEntries_*.csv carries
+        # no Name or Salary columns at all and load_salary_map raises on it. The
+        # real recovery path is the run inputs the manifest points at.
         lines.append("- Salary-usage and stack tables unavailable at this coverage tier "
-                     "(no salary file); re-run at full coverage if the slate salary CSV or the "
-                     "slate's DKEntries upload file (which embeds the salary block) surfaces.")
+                     "(no salary file); re-run with --auto-salary if this slate's "
+                     "DKSalaries.csv surfaces, in runs/<run_id>/inputs/ via the date's "
+                     "upload manifest or staged under data/slates/<date>/. A delivered "
+                     "DKEntries_*.csv is NOT a salary source.")
     if salary_tables_valid and c["sp_pair_top"]:
         top = ", ".join(f"{'/'.join(x['pair'])} {x['field_share_pct']}%" for x in c["sp_pair_top"][:4])
         lines.append(f"- SP-pair field share (top): {top}.")
@@ -1607,13 +1716,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     salary_path = args.salary
     if not salary_path and args.auto_salary:
         root = Path(__file__).resolve().parents[2]
-        candidates = ([str(p) for p in sorted(Path(args.salary_dir).glob("DKSalaries*.csv"))]
-                      if args.salary_dir else default_salary_candidates(root))
-        resolved = resolve_salary_file(st, candidates)
+        if args.salary_dir:
+            # An explicit directory is the operator overriding the tiers; honour
+            # it exactly, and the join-and-team-coverage check still applies.
+            resolved = resolve_salary_file(
+                st, [str(p) for p in sorted(Path(args.salary_dir).glob("DKSalaries*.csv"))])
+            resolved.setdefault("tier", "salary_dir")
+        else:
+            # R49: manifest -> in-date -> repo-wide, first usable tier wins.
+            resolved = resolve_salary_tiered(
+                st, root, slate_date=args.slate_date,
+                contest_id=args.contest_id or st.get("contest_id") or "")
         salary_path = resolved["path"]
         if salary_path:
-            print(f"salary auto-resolved: {Path(salary_path).name} "
-                  f"({resolved['reason']})")
+            print(f"salary auto-resolved [{resolved.get('tier')}]: "
+                  f"{Path(salary_path).name} ({resolved['reason']})")
         else:
             print(f"NOTICE: salary auto-resolution declined: {resolved['reason']}")
     if salary_path:

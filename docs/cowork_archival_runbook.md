@@ -67,13 +67,30 @@ Per contest:
    allocator (an UNRESOLVED tier blocks allocation).
 3. Save the slate salary CSV used that day:
    `archive/<slate_date>/DKSalaries_<slate_date>.csv`. The salary file is
-   authoritative for salary and team; the miner joins on it. If the salary CSV
-   for a past slate is missing, check for the slate's DKEntries upload file
-   first; it embeds the full salary block and restores full coverage. If
-   neither exists, run the miner without `--salary` (the `standings_only`
-   degraded tier): duplication, winner copies, chalk scores, SP pairs, and the
-   registry still land; salary and stack tables report unavailable and the
-   archive block carries the coverage tag.
+   authoritative for salary and team; the miner joins on it.
+
+   **R49, fixed 2026-08-08: `--auto-salary` now resolves this itself, in three
+   tiers, and the first tier that yields a usable file wins.** (1) MANIFEST:
+   `outputs/<slate_date>/upload_manifest.json` names each delivery's `run_id`,
+   and `runs/<run_id>/inputs/DKSalaries.csv` is by construction the file the
+   build used for every contest in that delivery. (2) IN-DATE:
+   `data/slates/<slate_date>/` then `data/archive/<slate_date>/`. (3) REPO-WIDE,
+   the old behaviour, which now runs only when the first two find nothing. The
+   mine prints which tier answered, so a fall-through to the wide scan is
+   visible. Pass `--slate-date`, or tier 1 and 2 cannot run.
+
+   **A delivered `DKEntries_*.csv` is NOT a salary source.** This step used to
+   say to check the DKEntries upload file because "it embeds the full salary
+   block"; that is true only of DK's own downloaded template. The engine's
+   delivered file carries no Name or Salary columns and `load_salary_map` raises
+   on it. If no salary file exists anywhere, run the miner without `--salary`
+   (the `standings_only` degraded tier): duplication, winner copies, chalk
+   scores, SP pairs, and the registry still land; salary and stack tables report
+   unavailable and the archive block carries the coverage tag. Prefer that to
+   pointing `--salary` at a neighbouring slate's file — since R49(3) the miner
+   blocks a file that prices under half the field (exit 4) rather than archiving
+   it as `coverage: "full"`, but `standings_only` is the honest answer and does
+   not need the gate to catch it.
 4. Record Ben's own Entry IDs for the contest in the contest JSON or a sidecar,
    for the self-vs-winner decomposition.
 5. Run the miner from the project working copy:

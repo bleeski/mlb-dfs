@@ -25,6 +25,69 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R49(1)(2) + R30(c): the miner resolves salary manifest-first, and stops naming a file that never had a salary block
+
+### Fixed
+
+- **R49(2) — salary resolution is TIERED, and the first tier that answers wins
+  (P2).** `--auto-salary` scored every salary CSV in the repo against the
+  standings and took the best. That cannot find the right file when a same-family
+  SUPERSET exists: a 9-game slate's players all sit inside the 10-game file, so
+  several candidates join 100%, differ in content, and the resolver correctly
+  DECLINES rather than guessing. Eleven of 94 contests needed manual resolution on
+  2026-08-04 for exactly this reason. New `resolve_salary_tiered` tries, in order:
+  **(1) MANIFEST** — `outputs/<date>/upload_manifest.json` names each delivery's
+  `run_id`, and `runs/<run_id>/inputs/DKSalaries.csv` is by construction the file
+  that build used for every contest in that delivery; **(2) IN-DATE** —
+  `data/slates/<date>` then `data/archive/<date>`; **(3) REPO-WIDE** — the old
+  behaviour. **The tiers are tried in sequence, not pooled and scored together**,
+  because pooling is precisely what lets a superset tie with the authoritative
+  file. Within the manifest tier a live delivery outranks a superseded one (the
+  surviving delivery is the file that was entered) and superseded runs stay as
+  fallbacks rather than being dropped, since a superseded run for the same slate
+  staged the same slate's salary. The resolved `tier` is printed and returned, so
+  a mine that fell through to the wide scan is visibly different from one the
+  manifest answered.
+- **R30(c) — the repo-wide scan is now the last resort, which is the speed fix
+  (P2).** It ran first on every mine. The repo currently holds **289** salary
+  CSVs, not the 170 the item recorded, so the saving grew rather than shrank; the
+  join-and-team-coverage guards still sit in front of every tier. R30(c) is closed
+  by the same change and its (a) data half — a fresh entry-history export from Ben
+  — remains the only open part of R30.
+- **R49(1) — a delivered `DKEntries_*.csv` is not a salary source, and two places
+  said it was.** The runbook's step 3 and `emit_ledger_block`'s standings_only
+  line both told the reader to recover coverage from "the slate's DKEntries upload
+  file, which embeds the full salary block". That is true of DK's downloaded
+  template and false of the engine's delivered file, which carries no Name or
+  Salary column at all and makes `load_salary_map` raise. Both now name the real
+  recovery path (the run inputs the manifest points at, or the staged slate file)
+  and say in as many words that a delivered DKEntries is not a salary source.
+- **Verified against the live tree, including the case it does NOT fix.** On
+  2026-08-05 contest 193253036 the manifest tier resolves to
+  `runs/20260805T214233Z_6f18cb6c/inputs/` at 100% join without scoring 289 files.
+  On the 1910_4g five (193297994 and siblings) all three tiers correctly return
+  nothing and the contest stays `standings_only` — matching what ARCHIVE reached
+  by hand — because that delivery has no manifest row at all and therefore no
+  `run_id` to follow. **That residue is R96, still open**, and it is worth stating
+  plainly: manifest-first resolution is only as good as the manifest, so R96 is
+  now the binding constraint on archive coverage rather than the resolver.
+
+### Tests
+
+- Eight new tests in a new `MinerManifestFirstSalaryTests`; the pin moves
+  726 → 734 (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). The
+  load-bearing one asserts BOTH halves: pooled scoring over the same two files
+  returns None with "ambiguous" in the reason, and the tiered resolver returns the
+  manifest file — so the test would still fail if the fix stopped mattering.
+  Building that fixture corrected an assumption worth recording: the first version
+  used a superset with eight new teams, and the 2026-07-24 team-coverage asymmetry
+  separated them on its own (9 drafted of 17 priced = 0.53, below the 0.80 floor),
+  so the test passed for the wrong reason. The superset is now one extra GAME —
+  two new teams, coverage 0.82 — which clears the floor and lands in the ambiguity
+  branch, which is the decline that actually happened. Also pinned: the tier order
+  as a list, a delivery naming other contests being skipped, and the corrected
+  wording in both the ledger block and the runbook.
+
 ## 2026-08-08 — R95: the pull list stops asking for exports DK cannot serve, and an empty file stops counting as a pull
 
 ### Fixed
