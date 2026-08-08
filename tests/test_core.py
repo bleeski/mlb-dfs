@@ -9249,5 +9249,65 @@ class PrimaryStackSizeFloorTests(unittest.TestCase):
         self.assertEqual(sig.parameters["bank_secondary_size"].default, 0)
 
 
+class RebuildRegistryResolutionTests(unittest.TestCase):
+    """R97: the rebuild resolves salary the way the miner does, and --restart
+    survives a filesystem that refuses deletion."""
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_rebuild_registry_tool",
+            Path(__file__).resolve().parents[1] / "tools" / "rebuild_registry.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_rebuild_cannot_reach_the_pooled_resolver(self):
+        """One question, one policy. The tool imports the tiered resolver and
+        does NOT import the repo-wide pooled one, so it cannot silently drift
+        back to scoring 289 candidates against every contest the way it did
+        before R97 -- the name is not in its namespace to call."""
+        mod = self._tool()
+        self.assertTrue(hasattr(mod, "resolve_salary_tiered"))
+        self.assertFalse(
+            hasattr(mod, "resolve_salary_file"),
+            msg="rebuild_registry must not carry the pooled resolver; R49 "
+                "replaced it in the miner and R97 replaced it here")
+        self.assertFalse(
+            hasattr(mod, "default_salary_candidates"),
+            msg="the repo-wide candidate list is the pooled policy's input; "
+                "the tiered resolver builds its own tiers")
+
+    def test_discard_staged_deletes_when_the_filesystem_allows_it(self):
+        mod = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            staged = Path(tmp) / ".registry.rebuild"
+            staged.write_text(json.dumps({"contests_mined": ["1", "2"]}), encoding="utf-8")
+            self.assertEqual(mod.discard_staged(staged), "deleted")
+            self.assertFalse(staged.exists())
+
+    def test_discard_staged_truncates_when_unlink_is_refused(self):
+        """The Cowork device mount raises PermissionError on unlink, so the
+        flag whose whole job is to start clean used to crash before mining
+        anything. Truncating to {} is equivalent for every reader: nothing
+        resumes, and update_registry setdefaults from {} exactly as it does
+        from a missing file."""
+        mod = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            staged = Path(tmp) / ".registry.rebuild"
+            staged.write_text(json.dumps({"contests_mined": ["1", "2"]}), encoding="utf-8")
+
+            def refuse(self, *a, **k):
+                raise PermissionError(1, "Operation not permitted")
+
+            with unittest.mock.patch.object(Path, "unlink", refuse):
+                self.assertEqual(mod.discard_staged(staged), "truncated")
+            self.assertTrue(staged.exists())
+            payload = json.loads(staged.read_text(encoding="utf-8"))
+            self.assertEqual(payload.get("contests_mined", []), [],
+                             msg="a truncated stage must resume nothing")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

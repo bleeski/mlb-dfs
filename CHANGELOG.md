@@ -25,6 +25,98 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R97: one question, one salary-resolution policy, and `--restart` stops crashing on the mount it was written for
+
+### Fixed
+
+- **R97 — `tools/rebuild_registry.py` resolves salary the way the miner does (P2, S).**
+  It called `resolve_salary_file(standings, default_salary_candidates(REPO))`:
+  repo-wide pooled scoring over all 289 candidates, for every one of the 267
+  archived contests. That is exactly the policy R49 replaced in the miner earlier
+  the same day with `resolve_salary_tiered` — manifest, then in-date, then
+  repo-wide, first usable tier wins — because pooling is what lets a same-type
+  superset outrank the authoritative file. Two resolution policies answering one
+  question is the defect, and the registry is derived from the same archive the
+  miner reads, so the two disagreeing means the registry and the mined records
+  could be built off different salary files. Both inputs the tiered resolver
+  needs were already in hand at the call site: the slate date the tool derives
+  from the archive path, and the contest id it parses from the filename.
+- **`--restart` could not run at all on the device mount (found while preparing
+  the rebuild, fixed here).** It called `staged.unlink()`, and the Cowork device
+  mount raises `PermissionError` on unlink, so the one flag whose whole job is to
+  start clean crashed before mining anything. It is also precisely the flag a
+  resolution-policy change forces you to use, so the bug sat directly in front of
+  the only run that needed it. `discard_staged()` now unlinks where it can and
+  otherwise truncates the staged file to `{}`, which is equivalent for every
+  reader in this tool: `contests_mined` reads back empty so nothing resumes, and
+  `update_registry` setdefaults the whole structure from `{}` exactly as it does
+  from a missing file. It reports which mechanism it used rather than leaving the
+  operator to infer it, and the "resuming" line no longer prints at zero.
+- **The summary says which tier answered.** A rebuild that fell through to the
+  repo-wide scan is now visibly different from one the manifest resolved
+  (`tiers  manifest=5, None=7` on the 08-05 slice), which is the entire point of
+  tiering and was otherwise invisible in a run that prints only `mined`.
+- **`--max-seconds` help corrected.** It claimed the Cowork sandbox caps a call at
+  45s. It is roughly 170-180s. `docs/cowork_archival_runbook.md` carried the same
+  wrong number in operational form (`--max-seconds 35`) and is corrected to 150 in
+  this commit, with the `--restart` requirement stated.
+
+### Measured, before claiming anything
+
+Five real archived contests, resolve step only, parse done once and reused so the
+number is the resolver and not the CSV read:
+
+| contest | type | pooled | tiered | tier |
+|---|---|---|---|---|
+| 2026-08-06/193296906 | showdown | 4.80s | 4.03s | in_date |
+| 2026-08-05/193253036 | classic | 4.59s | 2.41s | manifest |
+| 2026-07-29/192896278 | classic | 2.72s | 1.79s | manifest |
+| 2026-07-25/192707473 | classic | 2.02s | 1.55s | manifest |
+| 2026-06-20/191506958 | classic | 2.67s | 3.36s | none resolved |
+
+Mean 3.36s → 2.63s, total 16.80s → 13.14s, 22% faster. **A large speedup is not
+established and this entry does not claim one.** The saving is real but modest
+and it is not uniform: it appears only where an early tier hits, and the fifth
+row is a SLOWDOWN, because a contest no tier resolves pays for all three tiers
+where the pooled path paid for one scan. Contests with no salary source in the
+repo are common in this archive (7 of 12 on the 08-05 slice), so that case is
+not a curiosity. On runtime alone this is close to a wash; **the change lands on
+the consistency argument** — one question should have one policy, and the miner's
+is the one R49 validated by hand across 31 contests.
+
+The five-contest sample also disagreed on WHICH FILE three times (pooled took
+`data/slates/<date>/DKSalaries.csv`, tiered took the manifest's
+`runs/<run_id>/inputs/DKSalaries.csv`). Checked rather than assumed: all three
+pairs are byte-identical, both mines return `parse_structural_ok=True` and
+`coverage=full`, so on this sample the aggregates do not move. That is a
+five-contest observation, not a guarantee across 267.
+
+### Consequence for the rebuild that follows
+
+The registry rebuild is run with `--restart` rather than resumed. The 11 contests
+already staged were folded in under the pooled policy; resuming would leave the
+file half under one resolution policy and half under the other, which is the same
+defect this entry closes, expressed as data instead of code. Restarting is
+cheap — the archive is the source and the mine is deterministic. Separately,
+R49(3)'s salary-join floor (`MIN_SALARY_JOIN_RATE`, 0.50) is part of
+`parse_structural_ok`, which this tool enforces, so contests whose pooled
+resolver previously picked a same-type wrong-slate file under 50% join now SKIP
+instead of folding in. Skips are expected to rise against pre-08-08 behaviour and
+each one is a finding, not noise. The rebuild's OUTCOME — counts, skip list,
+reasons — is a ledger record under section 3 and is deliberately not in this file.
+
+### Tests
+
+- Three new tests in a new `RebuildRegistryResolutionTests`; the pin moves
+  742 → 745 (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). The policy
+  test asserts on the tool's NAMESPACE, not its source: `resolve_salary_tiered`
+  is present and both `resolve_salary_file` and `default_salary_candidates` are
+  absent, so the tool cannot drift back to the pooled policy because the name is
+  not there to call. Both `discard_staged` branches are pinned separately, the
+  refused-unlink one by patching `Path.unlink` to raise, since the container's
+  own tmpdir allows deletion and the mount's behaviour would otherwise be
+  untestable where it matters.
+
 ## 2026-08-08 — R39: the captain survives the parse, and the captain table becomes a standing per-contest measurement
 
 ### Fixed

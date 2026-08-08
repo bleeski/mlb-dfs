@@ -129,9 +129,14 @@ Per contest:
    note and know the check is wrong.
 
    To rebuild the registry from scratch (it is derived data, and the archive is
-   the source): `python tools/rebuild_registry.py`. Add `--max-seconds 35` if
+   the source): `python tools/rebuild_registry.py`. Add `--max-seconds 150` if
    you are running inside a sandbox with a call timeout; it exits 10 with
-   progress kept and finishes across several runs.
+   progress kept and finishes across several runs, so run the same command again
+   until it exits 0. The Cowork sandbox caps a call at roughly 170-180s, not the
+   45s this line assumed before R97. Add `--restart` to discard staged progress
+   and rebuild from zero, which is what a change to salary resolution requires:
+   resuming would leave the registry half under the old policy and half under
+   the new one.
 
    **Capture the money at mining time, not later.** Add `--entry-fee <fee>` and
    `--winnings <won>` for the contests Ben entered. Entry IDs are harvested from
