@@ -7359,6 +7359,126 @@ class MinerOutputPathTests(unittest.TestCase):
             self.assertIn("is a directory", fm.check_output_path(str(root / "a")))
 
 
+class MinerSalaryJoinFloorTests(unittest.TestCase):
+    """R49(3). `contest_type_mismatch` caught the Showdown-file-on-a-Classic-
+    export case; nothing caught the SAME-TYPE wrong slate. Five 1910_4g contests
+    were mined against the 1235_5g Classic file on 2026-08-08, joined 0.0%, and
+    archived as coverage "full" at exit 0 with every stack_pattern empty."""
+
+    HEADER = MinerMoneyHonestyTests.HEADER
+    CLASSIC = MinerMoneyHonestyTests.CLASSIC
+    SALARY_HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+                     "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame"]
+
+    def _standings_csv(self, tmp):
+        path = Path(tmp) / "contest-standings-777777777.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.HEADER)
+            for i in range(6):
+                writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
+                                 f"{120 - i}.5", self.CLASSIC, "", "Aaron Judge",
+                                 "OF", "41.2%", "18.5"])
+        return path
+
+    def _salary_csv(self, tmp, names, name="DKSalaries.csv"):
+        """A Classic salary file naming `names`. A wrong-slate file is simply one
+        whose players are not the players the standings drafted."""
+        path = Path(tmp) / name
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.SALARY_HEADER)
+            for i, (pos, nm, team) in enumerate(names):
+                writer.writerow([pos, f"{nm} ({7000 + i})", nm, str(7000 + i),
+                                 pos, "5000", "AAA@BBB 07:05PM ET", team, "8.0"])
+        return path
+
+    RIGHT_SLATE = [("P", "Gerrit Cole", "NYY"), ("P", "Tarik Skubal", "DET"),
+                   ("C", "Cal Raleigh", "SEA"), ("1B", "Matt Olson", "ATL"),
+                   ("2B", "Ketel Marte", "ARI"), ("3B", "Jose Ramirez", "CLE"),
+                   ("SS", "Bobby Witt Jr.", "KC"), ("OF", "Aaron Judge", "NYY"),
+                   ("OF", "Juan Soto", "NYM"), ("OF", "Kyle Tucker", "CHC")]
+    WRONG_SLATE = [("P", "Zack Wheeler", "PHI"), ("P", "Logan Webb", "SF"),
+                   ("C", "Will Smith", "LAD"), ("1B", "Freddie Freeman", "LAD"),
+                   ("2B", "Marcus Semien", "TEX"), ("3B", "Rafael Devers", "BOS"),
+                   ("SS", "Corey Seager", "TEX"), ("OF", "Mookie Betts", "LAD"),
+                   ("OF", "Ronald Acuna Jr.", "ATL"), ("OF", "Kyle Schwarber", "PHI")]
+
+    def _mine(self, tmp, salary_rows):
+        from mlb_engine.field import field_miner as fm
+        standings = fm.parse_standings_export(str(self._standings_csv(tmp)))
+        smap = fm.load_salary_map(str(self._salary_csv(tmp, salary_rows)))
+        return fm.mine_contest(standings, smap, contest_id="777777777")
+
+    def test_the_right_slate_still_mines_clean(self):
+        """The floor must not fire on the ordinary full-coverage mine."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, self.RIGHT_SLATE)
+            g = mined["diagnostics"]
+            self.assertEqual(g["salary_join_rate_pct"], 100.0)
+            self.assertFalse(g["salary_join_collapsed"])
+            self.assertTrue(g["parse_structural_ok"])
+            self.assertEqual(mined["coverage"], "full")
+            block = fm.emit_ledger_block(mined)
+            text = block if isinstance(block, str) else "\n".join(block)
+            self.assertNotIn("**unavailable**", text)
+
+    def test_a_same_type_wrong_slate_file_no_longer_passes_as_full(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, self.WRONG_SLATE)
+            g = mined["diagnostics"]
+            # the failure this gate exists for: right contest type, 0% join
+            self.assertFalse(g["contest_type_mismatch"],
+                             "both files are Classic; type mismatch cannot catch this")
+            self.assertEqual(g["salary_join_rate_pct"], 0.0)
+            self.assertTrue(g["salary_join_collapsed"])
+            self.assertFalse(g["parse_structural_ok"],
+                             "a 0% join archived as coverage 'full' before R49(3)")
+            self.assertEqual(fm.structural_exit_code(g), fm.EXIT_WRONG_SALARY_FILE)
+            self.assertIn("WRONG SALARY FILE", g["verification_note"])
+            self.assertIn("standings_only", g["verification_note"],
+                          "the note must name the honest alternative")
+
+    def test_the_cli_blocks_and_writes_nothing(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp) / "reg.json"
+            done = subprocess.run(
+                [sys.executable, "-m", "mlb_engine.field.field_miner",
+                 "--standings", str(self._standings_csv(tmp)),
+                 "--salary", str(self._salary_csv(tmp, self.WRONG_SLATE)),
+                 "--contest-id", "777777777", "--emit-ledger",
+                 "--registry", str(registry)],
+                capture_output=True, text=True, cwd=str(REPO))
+            self.assertEqual(done.returncode, fm.EXIT_WRONG_SALARY_FILE,
+                             done.stdout + done.stderr)
+            self.assertIn("BLOCKED", done.stdout)
+            self.assertFalse(registry.exists())
+            self.assertNotIn("ledger block written", done.stdout)
+
+    def test_forced_through_the_gate_the_salary_tables_are_suppressed(self):
+        """--force records the override rather than blocking, so the ONE thing
+        that must not happen is a plausible-looking histogram in the archive."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, self.WRONG_SLATE)
+            block = fm.emit_ledger_block(mined)
+            text = block if isinstance(block, str) else "\n".join(block)
+            self.assertIn("**unavailable**", text)
+            self.assertIn("different slate's file", text)
+            self.assertNotIn("Salary usage:", text)
+
+    def test_the_floor_sits_well_below_the_auto_selection_threshold(self):
+        # The two numbers answer different questions and must not be collapsed:
+        # 0.95 selects between candidates, 0.50 asks whether this is the slate.
+        from mlb_engine.field import field_miner as fm
+        self.assertLess(fm.MIN_SALARY_JOIN_RATE, fm.MIN_AUTO_JOIN_RATE)
+        self.assertGreater(fm.MIN_SALARY_JOIN_RATE, 0.0,
+                           "a floor of 0 is not a floor")
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""

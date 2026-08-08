@@ -25,6 +25,56 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R49(3): a salary file that prices under half the field is the wrong slate, not "full" coverage
+
+### Fixed
+
+- **R49(3) — the structural gate gained a salary join floor (P2).** The gate
+  already refused a contest-type mismatch, which is the Showdown-file-on-a-
+  Classic-export case. Nothing refused the SAME-TYPE wrong slate. On 2026-08-08
+  five 1910_4g contests were mined against the 1235_5g Classic file: join 0.0%,
+  every `stack_pattern` empty, every `salary_left` null, record archived
+  `coverage: "full"`, exit 0. **`full` with an empty join is worse than
+  `standings_only`**, which is honest: downstream shape aggregation reads an
+  empty pattern as an 'other' bucket rather than as missing data, so the defect
+  presented as a shape finding and survived four days until the tranche analysis
+  noticed five winners with no stack pattern. `mine_contest` now computes the
+  join rate before the gate rather than after it, sets
+  `salary_join_collapsed` below `MIN_SALARY_JOIN_RATE`, and includes it in
+  `parse_structural_ok`; `structural_exit_code` maps it to the existing
+  `EXIT_WRONG_SALARY_FILE` (4) deliberately, because from the caller's side a
+  type mismatch and a wrong slate mean the same thing and have the same remedy,
+  and a separate code would imply a different fix. The verification note names
+  both ways out: supply this slate's file, or omit `--salary` for the honest
+  `standings_only` tier. `emit_ledger_block` suppresses the salary tables on this
+  condition too, which is only reachable under `--force`, so a forced archive
+  cannot carry a plausible-looking histogram.
+- **Why the floor is 0.50 and not 0.95.** `MIN_AUTO_JOIN_RATE` is a SELECTION
+  threshold, picking the best of many candidates; this is a SANITY threshold,
+  asking whether the file describes this slate at all. A wrong-slate file joins
+  near 0% and a correct file with name collisions or withdrawn players joins
+  high, so a floor between the two catches the gross case without second-
+  guessing a legitimately imperfect file. Recorded limit, in the code comment
+  and here: **this does not catch a partial overlap** — a 5-game file against a
+  4-game contest sharing 3 games could clear 50% and still archive partly-empty
+  patterns. Picking the right file is R49(1)/(2)'s manifest-first resolution;
+  this gate is only its backstop, and it is deliberately landed first so the
+  backstop exists before the mechanism it backs up.
+
+### Tests
+
+- Five new tests in a new `MinerSalaryJoinFloorTests`; the pin moves 709 → 714
+  (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). The fixture is the one
+  the item asks for: two Classic salary files, one naming the players the
+  standings drafted and one naming ten different players, so the wrong-slate
+  case is same-type-and-0%-join by construction rather than by mocking. Two
+  independent guards are pinned separately (`parse_structural_ok` goes false,
+  and `structural_exit_code` returns 4), because dropping either clause alone
+  must redden something — checked by hand against both mutations. The
+  right-slate test pins that the floor does NOT fire at 100% join and that the
+  block keeps its salary tables, since a gate that also rejects good input is a
+  worse defect than the one being fixed.
+
 ## 2026-08-08 — R93: the miner refuses an unwritable `--json` path before it touches anything shared
 
 ### Fixed

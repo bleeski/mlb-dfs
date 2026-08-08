@@ -373,6 +373,12 @@ MIN_AUTO_JOIN_MARGIN = 0.02
 # joins just as well but leaves whole teams untouched. Not 1.0, because a small
 # field can legitimately ignore one bad team.
 MIN_AUTO_TEAM_COVERAGE = 0.80
+# R49(3). The sanity floor a salary file must clear however it was chosen: below
+# this, it is a different slate's file and the record must not claim coverage
+# "full". Distinct from MIN_AUTO_JOIN_RATE above, which selects between
+# candidates; see the comment at the gate for why the two numbers differ by so
+# much and what this floor deliberately does not catch.
+MIN_SALARY_JOIN_RATE = 0.50
 
 
 def score_salary_candidate(standings: Dict[str, Any],
@@ -679,12 +685,35 @@ def mine_contest(
     unparsed_share = (unparsed / n_all) if n_all else 0.0
     parsed_nothing = n_all > 0 and n_complete == 0
     mostly_unparsed = n_all > 0 and unparsed_share > MAX_UNPARSED_ENTRY_SHARE
+    # R49(3): the join rate is computed here rather than after the gate, because
+    # the gate needs it. `contest_type_mismatch` caught the Showdown-salary-on-a
+    # -Classic-export case and nothing caught the SAME-TYPE wrong slate: on
+    # 2026-08-08 five 1910_4g contests were mined against the 1235_5g Classic
+    # file, joined 0.0%, and archived as `coverage: "full"` at exit 0 with every
+    # stack_pattern empty and salary_left null. `full` with an empty join is the
+    # misleading middle -- worse than standings_only, which is honest -- because
+    # downstream shape aggregation reads empty patterns as an 'other' bucket, so
+    # the defect surfaces as a shape finding rather than as a coverage failure.
+    joined = [e for e in complete if not e["unmatched"]]
+    join_rate = round(100.0 * len(joined) / n_complete, 1) if (has_salary and n_complete) else None
+    # Deliberately far below MIN_AUTO_JOIN_RATE (0.95). That one is a SELECTION
+    # threshold, picking the best of many candidates; this is a SANITY threshold,
+    # asking whether this file describes this slate at all. A wrong-slate file
+    # joins near 0%; a correct file with name collisions or withdrawn players
+    # joins high. A floor between the two catches the gross case without
+    # second-guessing a legitimately imperfect file. What it does NOT catch is a
+    # partial overlap (a 5-game file against a 4-game contest sharing 3 games);
+    # picking the right file in the first place is R49's manifest-first
+    # resolution, and this gate is only its backstop.
+    salary_join_collapsed = (has_salary and join_rate is not None
+                             and join_rate < MIN_SALARY_JOIN_RATE * 100.0)
     parse_structural_ok = (
         (not intra_entry_dupes)
         and (observed_slots == expected_slots)
         and not parsed_nothing
         and not mostly_unparsed
         and not contest_type_mismatch
+        and not salary_join_collapsed
     )
     denom_used = n_all if own_denominator == "all_entries" else n_complete
     recomputed_total_pct = round(100.0 * observed_slots / denom_used, 1) if denom_used else None
@@ -699,6 +728,15 @@ def mine_contest(
             "matches on name and silently misprices every entry. Supply the "
             f"{contest_type} salary file for this slate, or omit --salary to mine "
             "the standings_only tier. Do not archive anything downstream of this.")
+    elif salary_join_collapsed:
+        verification_note = (
+            f"WRONG SALARY FILE: the salary CSV is the right contest type "
+            f"({contest_type}) but priced only {join_rate}% of complete entries, "
+            f"below the {MIN_SALARY_JOIN_RATE:.0%} floor. It is a different "
+            "slate's file. Every stack pattern would archive empty and every "
+            "salary_left null while the record claimed coverage 'full'. Supply "
+            "this slate's salary file, or omit --salary to mine the honest "
+            "standings_only tier. Do not archive anything downstream of this.")
     elif parsed_nothing:
         verification_note = (
             f"PARSE FAILURE: none of the {n_all} entry rows parsed into a complete "
@@ -726,9 +764,6 @@ def mine_contest(
             f"players); DK's %Drafted table sums {dk_deficit_pts} pts short, which is DK "
             "omitting position rows for multi-position players. Lineup-derived ownership is "
             "authoritative for this contest.")
-
-    joined = [e for e in complete if not e["unmatched"]]
-    join_rate = round(100.0 * len(joined) / n_complete, 1) if (has_salary and n_complete) else None
 
     return {
         "label": REVIEW_LABEL,
@@ -782,6 +817,7 @@ def mine_contest(
             "parsed_nothing": parsed_nothing,
             "mostly_unparsed": mostly_unparsed,
             "contest_type_mismatch": contest_type_mismatch,
+            "salary_join_collapsed": salary_join_collapsed,
             "entries_unparsed_share": round(unparsed_share, 4),
             "intra_entry_duplicate_entry_ids": intra_entry_dupes[:5],
             "roster_slots_observed": observed_slots,
@@ -1226,6 +1262,11 @@ def structural_exit_code(diagnostics: Mapping[str, Any]) -> int:
     """Map a failed structural gate to its pinned exit code."""
     if diagnostics.get("contest_type_mismatch"):
         return EXIT_WRONG_SALARY_FILE
+    # R49(3). Same verdict as a type mismatch and deliberately the same code:
+    # from the caller's side both mean "you handed me another slate's file", and
+    # the remedy is identical. A separate code would imply a different fix.
+    if diagnostics.get("salary_join_collapsed"):
+        return EXIT_WRONG_SALARY_FILE
     if diagnostics.get("parsed_nothing"):
         return EXIT_PARSED_NOTHING
     if diagnostics.get("mostly_unparsed"):
@@ -1264,11 +1305,22 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
     # not merely uncertain, they are wrong. Report them unavailable rather than
     # print a plausible-looking histogram nobody can later distinguish from a
     # real one.
-    salary_tables_valid = not g.get("contest_type_mismatch")
+    # R49(3) adds the same-type wrong slate to the same suppression. A file that
+    # priced under half the field leaves the histograms mostly empty, and an
+    # empty stack_pattern aggregates downstream as an 'other' bucket rather than
+    # as missing data -- which is how five contests read as a shape finding for
+    # four days. This branch is only reachable under --force, since the gate
+    # otherwise blocks the mine.
+    salary_tables_valid = not (g.get("contest_type_mismatch")
+                               or g.get("salary_join_collapsed"))
     if not salary_tables_valid:
+        why = ("resolved to a different contest type, so the join matched on name "
+               "across contests"
+               if g.get("contest_type_mismatch") else
+               f"priced only {g.get('salary_join_rate_pct')}% of complete entries, "
+               f"so it is a different slate's file")
         lines.append("- Salary usage, stack histogram and SP-pair tables: **unavailable**. "
-                     "The salary file resolved to a different contest type, so the "
-                     "join matched on name across contests and every salary-derived "
+                     f"The salary file {why} and every salary-derived "
                      "number would be wrong.")
     if salary_tables_valid and c["at_cap_share_pct"] is not None:
         lines.append(f"- Salary usage: {c['at_cap_share_pct']}% of entries within "
