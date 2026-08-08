@@ -25,6 +25,44 @@ performance claim.
 
 ---
 
+## 2026-08-08 — backlog merge: R98–R99 filed from the 1910_9g build, one BUILD fragment consumed
+
+### Changed
+
+- **Two items filed after Ben asked for a self-diagnostic on a portfolio that
+  "seemed weird and different."** It was, and the delivered file was not the
+  problem — all three gates passed, preflight was clean, and the manifest and
+  sha256 were correct. The problem was that a 9-entry portfolio shipped with 7
+  distinct lineups and one pitcher at 5/9, and every honest report in the run
+  record still pointed the operator at the wrong cause. **R98** (P1, S then M) —
+  `build_slate.py:1453` derives the bank budget as
+  `max(deadline - now - 6.0, 5.0)`; under the Cowork 45s call ceiling
+  `--max-seconds` runs low enough that the subtraction goes negative and the
+  budget lands silently on the `5.0` floor. Observed: `time_budget_s: 5.0`,
+  `jobs_attempted: 47` of `2592`, `job_list_exhausted: false`, 38 candidates for
+  9 entries. Against a bank that thin the default portfolio controls are
+  arithmetically impossible, so `contest_allocator.py:1886` proves the joint MILP
+  infeasible and `build_slate.py:1497` offers `--controls-override` as the only
+  remedy — correct for `max_shared_players` reaching an engine-named floor, wrong
+  for the exposure caps, which have none and are a strategy decision. The
+  operator relaxed the caps and certified. Fourth instance of the pattern in
+  eight days; the three earlier ones each recorded it as a "small multi-contest
+  slate" property and generalised the wrong variable. **R99** (P2, XS) — the
+  brief reports `slate_clock.salary_cross_check: false` on a slate whose clock
+  agrees, because `:1556` reads a `.get("agrees")` sub-key that the stderr check
+  at `:1209` does not; a field the skill's reporting checklist tells the operator
+  to explain should not cry wolf on a clean slate.
+- **Why both are the R51/R92 family.** Neither is a false claim. R64 already made
+  the relaxation record honest, and it was honest here: `controls_override_applied`
+  says exactly what was relaxed. What it cannot say is that the bank was 1.8%
+  explored when the relaxation was chosen, which is the fact that would have
+  changed the decision. Filed, not fixed; R98(1) is the small part that would have
+  caught all four instances.
+- **Consumed:** `docs/backlog_inbox/2026-08-08_BUILD_thin-bank-drove-control-relaxation.md`.
+  Still open in the inbox: the 08-08 postures/ticket-count fragment.
+
+---
+
 ## 2026-08-08 — R97: one question, one salary-resolution policy, and `--restart` stops crashing on the mount it was written for
 
 ### Fixed
