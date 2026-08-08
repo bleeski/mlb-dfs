@@ -1181,6 +1181,45 @@ EXIT_STRUCTURAL_OTHER = 3       # slot-count or intra-entry duplicate failure
 # structural exits above, because the parse succeeded and the archive is fine;
 # what failed is the caller's expectation that a fee would be recorded.
 EXIT_MONEY_WITHOUT_OWN_ENTRIES = 7
+# R93: the requested --json destination cannot be written. Distinct again,
+# because nothing about the standings or the salary file is wrong; the mine was
+# asked to report to a place it cannot reach, and it has to say so BEFORE it
+# starts appending to shared records.
+EXIT_OUTPUT_PATH_UNUSABLE = 8
+
+
+def check_output_path(json_out: str) -> Optional[str]:
+    """Return a reason string if ``json_out`` cannot be written, else None (R93).
+
+    Checked BEFORE the mine touches anything shared. The original failure mode
+    was ordering, not a missing ``mkdir``: ``open(json_out, "w")`` is the last
+    thing ``main`` does, so a nonexistent ``data/archive/<date>/`` raised
+    ``FileNotFoundError`` only after the ``own_results`` append and the ledger
+    fragment had already landed. The operator saw a traceback saying the mine
+    did not happen while the durable records said it partly did, and re-running
+    after a manual ``mkdir -p`` appended a second time. An operation that
+    mutates shared state cannot discover an unusable output path at the end.
+
+    Creating the parent here rather than at write time is deliberate: the
+    directory is the part that can fail for reasons the caller must fix
+    (unwritable ancestor, a FILE sitting where the directory should be), and
+    those are exactly what has to surface early. ``data/archive/<date>/`` is
+    created by a successful mine's archive move anyway, so materializing it a
+    few steps sooner adds no state the mine would not have written.
+    """
+    target = Path(json_out)
+    if target.is_dir():
+        return f"{target} is a directory, not a file path"
+    parent = target.parent if str(target.parent) else Path(".")
+    if parent.exists() and not parent.is_dir():
+        return f"{parent} exists and is not a directory"
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return f"cannot create {parent}: {exc}"
+    if not os.access(parent, os.W_OK):
+        return f"{parent} is not writable"
+    return None
 
 
 def structural_exit_code(diagnostics: Mapping[str, Any]) -> int:
@@ -1493,6 +1532,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return _selftest()
     if not args.standings:
         ap.error("--standings is required (or --selftest)")
+    # R93: fail on an unusable --json destination BEFORE anything shared is
+    # touched. Everything below this line can append to ledger/own_results.json,
+    # write a ledger fragment, update the registry and move the standings file;
+    # the JSON write used to be last, so an unreachable path turned a mine into
+    # a partial one. See check_output_path for the full incident.
+    if args.json_out:
+        reason = check_output_path(args.json_out)
+        if reason:
+            print(f"ERROR  --json destination unusable: {reason}\n"
+                  f"       Nothing was written. No mine ran, so no own-results row, "
+                  f"no ledger fragment and no registry update exist to undo.",
+                  file=sys.stderr)
+            return EXIT_OUTPUT_PATH_UNUSABLE
     st = parse_standings_export(args.standings)
     salary_path = args.salary
     if not salary_path and args.auto_salary:

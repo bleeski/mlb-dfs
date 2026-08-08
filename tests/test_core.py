@@ -7280,6 +7280,85 @@ class MinerEdgeIntegrityTests(unittest.TestCase):
             self.assertNotIn("222222222", entered)
 
 
+class MinerOutputPathTests(unittest.TestCase):
+    """R93. The `--json` write was the LAST thing main did, so a nonexistent
+    archive-date directory failed the mine after its side effects had landed.
+    All 30 mines of the 08-05/06 tranche hit this. The defect is the ordering:
+    an operation that appends to shared records cannot discover an unusable
+    output path at the end."""
+
+    def _standings_csv(self, tmp):
+        path = Path(tmp) / "contest-standings-777777777.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(MinerMoneyHonestyTests.HEADER)
+            for i in range(6):
+                writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
+                                 f"{120 - i}.5", MinerMoneyHonestyTests.CLASSIC,
+                                 "", "Aaron Judge", "OF", "41.2%", "18.5"])
+        return path
+
+    def _run(self, tmp, *extra):
+        # --registry into tmp on every invocation: the mine accumulates by
+        # default (R94), and a test must never write the real registry.
+        return subprocess.run(
+            [sys.executable, "-m", "mlb_engine.field.field_miner",
+             "--standings", str(self._standings_csv(tmp)),
+             "--contest-id", "777777777",
+             "--registry", str(Path(tmp) / "reg.json"), *extra],
+            capture_output=True, text=True, cwd=str(REPO))
+
+    def test_a_missing_json_parent_directory_is_created(self):
+        """The concrete fix: the first mine into a fresh archive date works."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "archive" / "2026-08-05" / "mined_777777777.json"
+            self.assertFalse(target.parent.exists())
+            done = self._run(tmp, "--json", str(target))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertTrue(target.exists(), "the mine's JSON never landed")
+            payload = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(payload["contest_id"], "777777777")
+
+    def test_an_unusable_json_path_fails_before_any_side_effect(self):
+        """The general rule, and the one that actually matters: when the path
+        cannot be made usable, NOTHING is written -- no own-results row, no
+        ledger fragment, no registry entry -- so a re-run cannot double-append."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            # a FILE where the parent directory would have to be
+            blocker = Path(tmp) / "not_a_dir"
+            blocker.write_text("", encoding="utf-8")
+            registry = Path(tmp) / "reg.json"
+            done = self._run(tmp, "--json", str(blocker / "mined.json"))
+            self.assertEqual(done.returncode, fm.EXIT_OUTPUT_PATH_UNUSABLE,
+                             done.stdout + done.stderr)
+            self.assertIn("--json destination unusable", done.stderr)
+            self.assertFalse(registry.exists(),
+                             "the registry was written before the path check")
+            self.assertNotIn("ledger block written", done.stdout)
+            self.assertNotIn("own results appended", done.stdout)
+
+    def test_the_exit_code_is_distinct_from_every_structural_code(self):
+        # A scheduled task has to tell "I cannot write there" from "this is the
+        # wrong salary file" without parsing prose.
+        from mlb_engine.field import field_miner as fm
+        codes = [fm.EXIT_OK, fm.EXIT_WRONG_SALARY_FILE, fm.EXIT_PARSED_NOTHING,
+                 fm.EXIT_MOSTLY_UNPARSED, fm.EXIT_STRUCTURAL_OTHER,
+                 fm.EXIT_MONEY_WITHOUT_OWN_ENTRIES, fm.EXIT_OUTPUT_PATH_UNUSABLE]
+        self.assertEqual(len(codes), len(set(codes)))
+
+    def test_check_output_path_names_each_refusal(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertIsNone(fm.check_output_path(str(root / "a" / "b" / "m.json")))
+            self.assertTrue((root / "a" / "b").is_dir(), "the parent was not created")
+            (root / "plain").write_text("", encoding="utf-8")
+            self.assertIn("not a directory",
+                          fm.check_output_path(str(root / "plain" / "m.json")))
+            self.assertIn("is a directory", fm.check_output_path(str(root / "a")))
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""

@@ -25,6 +25,46 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R93: the miner refuses an unwritable `--json` path before it touches anything shared
+
+### Fixed
+
+- **R93 — the mine's last write can no longer fail after its side effects have
+  landed (P2).** `open(args.json_out, "w")` was the final statement in `main`,
+  so a nonexistent `data/archive/<date>/` raised `FileNotFoundError` at the very
+  end — after the `own_results` append, the ledger fragment and the registry
+  update had all completed. All 30 mines of the 08-05/08-06 tranche hit it. The
+  operator saw a traceback and a nonzero exit saying the mine had not happened,
+  while the durable records said it partly had, and re-running after a manual
+  `mkdir -p` appended a second row. **The defect was ordering, not a missing
+  `mkdir`**, which is why the fix is not a one-liner at the write site: a new
+  `check_output_path` runs immediately after argument validation, before
+  `parse_standings_export`, and returns a named reason for each way the
+  destination is unusable (the path is itself a directory; a FILE sits where the
+  parent must be; the parent cannot be created; the parent is not writable). A
+  refusal exits the new `EXIT_OUTPUT_PATH_UNUSABLE = 8` and says in as many
+  words that nothing was written, so there is nothing to undo before retrying.
+  Materializing the parent directory in the check rather than at write time is
+  deliberate and noted in the docstring: the directory is the part that fails
+  for reasons the caller must fix, and a successful mine's archive move creates
+  `data/archive/<date>/` anyway, so the check adds no state the mine would not
+  have written. Exit 8 is distinct from all six existing codes, pinned by a test,
+  because a scheduled task has to tell "I cannot write there" from "this is the
+  wrong salary file" without parsing prose.
+
+### Tests
+
+- Four new tests in a new `MinerOutputPathTests`; the pin moves 705 → 709
+  (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). The load-bearing one
+  is `test_an_unusable_json_path_fails_before_any_side_effect`: it plants a FILE
+  where the parent directory would go and asserts the registry was never
+  created, no ledger fragment was written and no own-results row was appended —
+  the ordering property, not the `mkdir`. `test_check_output_path_names_each
+  _refusal` pins each reason string, and the distinct-exit-code test pins the
+  code separation by value. Every invocation in the new class passes
+  `--registry` into a temp directory: a bare mine accumulates by default once
+  R94 lands, and a test must never write the real registry.
+
 ## 2026-08-08 — backlog merge: R93–R96 filed, R49 gains its zero-join gate, R37/R39/R40 decision inputs appended, eight fragments consumed
 
 ### Changed
