@@ -7855,6 +7855,135 @@ class MinerManifestFirstSalaryTests(unittest.TestCase):
         self.assertIn("NOT a salary source", runbook)
 
 
+class MinerCaptainTests(unittest.TestCase):
+    """R39. `players_norm` is sorted and position-blind and was the only thing
+    carried forward, so the CPT marker the raw Lineup cell carries was normalized
+    away one line after being parsed. Captain choice is the largest Showdown
+    construction decision; the 2026-08-08 review had to re-parse 64 archived
+    standings CSVs directly to measure it at all."""
+
+    HEADER = MinerMoneyHonestyTests.HEADER
+    # CPT is priced and counted differently from UTIL; 1CPT + 5UTIL is complete.
+    def _sd(self, cpt, utils):
+        return f"CPT {cpt} " + " ".join(f"UTIL {u}" for u in utils)
+
+    UTILS = ["Bo Bichette", "Vladimir Guerrero Jr.", "George Springer",
+             "Alejandro Kirk", "Daulton Varsho"]
+
+    def _standings(self, tmp, captains, points=None):
+        """One entry per captain, with the same five UTIL bats underneath."""
+        from mlb_engine.field import field_miner as fm
+        path = Path(tmp) / "contest-standings-888888888.csv"
+        rows = []
+        for i, cpt in enumerate(captains):
+            pts = points[i] if points else 100.0 - i
+            rows.append([str(i + 1), str(9000 + i), f"u{i}", "0", f"{pts}",
+                         self._sd(cpt, self.UTILS), "", cpt, "CPT", "20.0%", "18.5"])
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            w = csv.writer(fh)
+            w.writerow(self.HEADER)
+            w.writerows(rows)
+        return fm.parse_standings_export(str(path))
+
+    def test_the_cpt_marker_survives_the_parse(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp, ["Kevin Gausman", "Bo Bichette"])
+            self.assertEqual(st["contest_type"], "showdown")
+            self.assertEqual([e["captain_norm"] for e in st["entries"]],
+                             ["kevin gausman", "bo bichette"])
+            # players_norm is why it was lost: sorted, and position-blind.
+            self.assertEqual(st["entries"][0]["players_norm"],
+                             tuple(sorted(st["entries"][0]["players_norm"])))
+
+    def test_a_classic_lineup_has_no_captain_and_claims_none(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contest-standings-777777777.csv"
+            with path.open("w", newline="", encoding="utf-8-sig") as fh:
+                w = csv.writer(fh)
+                w.writerow(self.HEADER)
+                w.writerow(["1", "9000", "u0", "0", "120.5",
+                            MinerMoneyHonestyTests.CLASSIC, "", "Aaron Judge",
+                            "OF", "41.2%", "18.5"])
+            st = fm.parse_standings_export(str(path))
+            self.assertEqual(st["contest_type"], "classic")
+            self.assertIsNone(st["entries"][0]["captain_norm"])
+            mined = fm.mine_contest(st, None, contest_id="777777777")
+            self.assertEqual(mined["construction"]["captain_table"], [],
+                             "Classic has no captain slot; the table must be empty")
+            self.assertIsNone(mined["construction"]["winner_captain"])
+
+    def test_the_captain_table_is_a_standing_per_contest_measurement(self):
+        """The point of the item: what 3.18 derived by re-parsing 64 CSVs is now
+        emitted per contest."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp, ["Kevin Gausman"] * 3 + ["Bo Bichette"])
+            mined = fm.mine_contest(st, None, contest_id="888888888")
+            table = mined["construction"]["captain_table"]
+            self.assertEqual([r["player"] for r in table],
+                             ["Kevin Gausman", "Bo Bichette"])
+            self.assertEqual(table[0]["captain_count"], 3)
+            self.assertEqual(table[0]["captain_share_pct"], 75.0)
+            self.assertEqual(table[1]["captain_share_pct"], 25.0)
+            # captain share and roster share sit on the same row, because the
+            # 3.18 comparison is one against the other.
+            self.assertIn("pct_drafted", table[0])
+
+    def test_the_winner_s_captain_is_recorded_with_its_ownership(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            # the chalk captain is used 3 times; the WINNER captains the other one
+            st = self._standings(tmp, ["Kevin Gausman", "Kevin Gausman",
+                                       "Kevin Gausman", "Bo Bichette"],
+                                 points=[10.0, 9.0, 8.0, 99.0])
+            mined = fm.mine_contest(st, None, contest_id="888888888")
+            wc = mined["construction"]["winner_captain"]
+            self.assertEqual(wc["player"], "Bo Bichette")
+            self.assertEqual(wc["captain_share_pct"], 25.0)
+            self.assertFalse(wc["was_top_owned_captain"],
+                             "the winner captained the 25% option, not the 75% one")
+
+    def test_the_top_owned_captain_winning_is_recorded_as_such(self):
+        # 22 of 85 in the 3.18 sample, so both branches are live.
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp, ["Kevin Gausman", "Kevin Gausman", "Bo Bichette"],
+                                 points=[99.0, 9.0, 8.0])
+            mined = fm.mine_contest(st, None, contest_id="888888888")
+            self.assertTrue(mined["construction"]["winner_captain"]["was_top_owned_captain"])
+
+    def test_captain_norm_reaches_the_archived_entries(self):
+        """A re-mine must backfill the archive, so the field has to be in the
+        per-entry projection, not only in the aggregate."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp, ["Kevin Gausman", "Bo Bichette"])
+            mined = fm.mine_contest(st, None, contest_id="888888888")
+            self.assertEqual([e["captain_norm"] for e in mined["entries"]],
+                             ["kevin gausman", "bo bichette"])
+
+    def test_the_ledger_block_carries_the_captain_lines(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            st = self._standings(tmp, ["Kevin Gausman", "Kevin Gausman", "Bo Bichette"],
+                                 points=[9.0, 8.0, 99.0])
+            mined = fm.mine_contest(st, None, contest_id="888888888")
+            block = fm.emit_ledger_block(mined)
+            text = block if isinstance(block, str) else "\n".join(block)
+            self.assertIn("Captain field share (top)", text)
+            self.assertIn("Winning entry captained Bo Bichette", text)
+            self.assertIn("top-owned captain: no", text)
+
+    def test_a_lineup_with_no_cpt_slot_yields_none_rather_than_a_guess(self):
+        from mlb_engine.field import field_miner as fm
+        self.assertIsNone(fm._captain_norm([("UTIL", "Bo Bichette")]))
+        self.assertIsNone(fm._captain_norm([]))
+        self.assertEqual(fm._captain_norm([("UTIL", "A B"), ("CPT", "Kevin Gausman")]),
+                         "kevin gausman")
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""

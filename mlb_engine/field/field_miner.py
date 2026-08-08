@@ -186,6 +186,26 @@ def parse_lineup_string(lineup: str,
     return out, complete
 
 
+CAPTAIN_SLOT = "CPT"
+
+
+def _captain_norm(lineup: Sequence[Tuple[str, str]]) -> Optional[str]:
+    """The normalized name in the CPT slot, or None (R39).
+
+    None for a Classic lineup, which has no captain, and None for a Showdown cell
+    that parsed without one, because "no captain in this lineup" and "this contest
+    has no captains" are the same absence as far as any aggregate is concerned and
+    neither is worth inventing a value for. Returns the FIRST CPT slot: the roster
+    contract admits exactly one, and a cell carrying two is malformed input the
+    structural gate rejects on slot counts, so guessing between them here would
+    only hide that.
+    """
+    for slot, name in lineup:
+        if slot == CAPTAIN_SLOT:
+            return normalize_name(name)
+    return None
+
+
 def _parse_pct(cell: str) -> Optional[float]:
     s = str(cell or "").strip().replace("%", "")
     if not s or s == "-":
@@ -242,6 +262,15 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
                 "lineup": lineup,
                 "lineup_complete": complete,
                 "players_norm": tuple(sorted(normalize_name(n) for _, n in lineup)),
+                # R39: `players_norm` is sorted and position-blind, and it was the
+                # only thing carried forward, so the CPT marker the raw Lineup
+                # cell carries ("CPT <name> UTIL ...") was normalized away one
+                # line after being parsed. Captain choice is the single largest
+                # Showdown construction decision and no downstream analysis
+                # could see it: the 2026-08-08 review had to re-parse 64 archived
+                # standings CSVs directly to measure it at all. Captured here, at
+                # parse time, so a re-mine backfills the whole archive.
+                "captain_norm": _captain_norm(lineup),
             })
         # Right block: a player row has a non-empty Player cell.
         if len(row) > 10 and str(row[7]).strip():
@@ -743,6 +772,39 @@ def mine_contest(
         key=lambda t: -t[1],
     )[:5]
 
+    # R39: the captain table, per contest, so the measurement is standing rather
+    # than a session-sized re-parse of 64 archived CSVs. `own` is the ownership
+    # recompute keyed on normalized name, which is what makes "the winner
+    # captained at N% owned" answerable without a second pass over the file.
+    # Empty on Classic, where no entry has a CPT slot.
+    captain_freq = Counter(e["captain_norm"] for e in complete if e.get("captain_norm"))
+    n_captained = sum(captain_freq.values())
+    captain_table = [
+        {
+            "player": disp.get(nm, nm),
+            "captain_count": count,
+            "captain_share_pct": round(100.0 * count / n_captained, 1) if n_captained else None,
+            # The player's OVERALL ownership in this contest, captain or not. The
+            # 3.18 comparison is captain-share against roster-share, so both
+            # numbers have to sit on the same row or the reader recomputes it.
+            "pct_drafted": own.get(nm),
+        }
+        for nm, count in captain_freq.most_common(8)
+    ]
+    winner_captain: Optional[Dict[str, Any]] = None
+    if winner and winner.get("captain_norm"):
+        wc = winner["captain_norm"]
+        winner_captain = {
+            "player": disp.get(wc, wc),
+            "pct_drafted": own.get(wc),
+            "captain_share_pct": (round(100.0 * captain_freq[wc] / n_captained, 1)
+                                  if n_captained else None),
+            # 22 of 85 in the 3.18 sample, so it is neither rare nor the norm;
+            # recorded per contest rather than inferred from the table's order.
+            "was_top_owned_captain": bool(captain_freq
+                                          and captain_freq.most_common(1)[0][0] == wc),
+        }
+
     # Parse/join diagnostics, including the ownership recompute self-check:
     # %rostered recomputed from parsed lineups must track the export's %Drafted.
     n_all, n_complete = len(entries), len(complete)
@@ -905,6 +967,9 @@ def mine_contest(
                 for p, c in sp_pair_freq.most_common(8)
             ] if n_complete else [],
             "top_owned": [{"player": n, "pct_drafted": v} for n, v in top_owned],
+            # R39. Empty on Classic, which has no captain slot.
+            "captain_table": captain_table,
+            "winner_captain": winner_captain,
         },
         "diagnostics": {
             "salary_join_rate_pct": join_rate,
@@ -939,6 +1004,9 @@ def mine_contest(
                 "rank", "entry_id", "username", "points", "salary_used", "salary_left",
                 "sp_pair", "max_stack", "stack_pattern", "chalk_score", "n_cheap",
                 "players_norm", "lineup_complete",
+                # R39: per entry, so the archive can answer "who did the winner
+                # captain" without re-parsing the source CSV.
+                "captain_norm",
             )} for e in entries if e["lineup_complete"]
         ],
         "player_table": ptable,
@@ -1443,6 +1511,22 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
     if salary_tables_valid and c["sp_pair_top"]:
         top = ", ".join(f"{'/'.join(x['pair'])} {x['field_share_pct']}%" for x in c["sp_pair_top"][:4])
         lines.append(f"- SP-pair field share (top): {top}.")
+    # R39: the Showdown counterpart of the SP-pair line. Absent on Classic, where
+    # captain_table is empty, so no branch on contest_type is needed.
+    if c.get("captain_table"):
+        top_cpt = ", ".join(
+            f"{x['player']} {x['captain_share_pct']}% CPT"
+            + (f" / {x['pct_drafted']}% rostered" if x["pct_drafted"] is not None else "")
+            for x in c["captain_table"][:4])
+        lines.append(f"- Captain field share (top): {top_cpt}.")
+        wc = c.get("winner_captain")
+        if wc:
+            owned = (f"{wc['pct_drafted']}% rostered" if wc["pct_drafted"] is not None
+                     else "ownership unknown")
+            lines.append(
+                f"- Winning entry captained {wc['player']} ({owned}, "
+                f"{wc['captain_share_pct']}% of captains); top-owned captain: "
+                f"{'yes' if wc['was_top_owned_captain'] else 'no'}.")
     own = mined.get("own_results")
     if own and own.get("matched"):
         # R50: three states, not two. The old sentence read "fees and winnings

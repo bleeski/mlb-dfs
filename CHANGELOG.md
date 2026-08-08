@@ -25,6 +25,53 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R39: the captain survives the parse, and the captain table becomes a standing per-contest measurement
+
+### Fixed
+
+- **R39 — `captain_norm` is captured per entry at parse time (P2).**
+  `parse_lineup_string` already returned `[(slot, name), ...]` with `CPT`
+  intact, and the very next line threw it away: `players_norm` is a SORTED,
+  position-blind tuple and it was the only thing carried forward. Captain choice
+  is the single largest Showdown construction decision, and no downstream
+  analysis could see it — the 2026-08-08 review had to re-parse 64 archived
+  standings CSVs directly to measure it at all. `captain_norm` now rides every
+  parsed entry and appears in the per-entry archived projection, so **a re-mine
+  backfills the whole archive** with no other change.
+- **The measurement is now emitted, not derivable.** `construction` gained
+  `captain_table` (top captains with `captain_count`, `captain_share_pct` and the
+  player's overall `pct_drafted` on the same row, because 3.18's comparison is
+  captain-share against roster-share and splitting them across two structures
+  just makes the reader recompute it) and `winner_captain` (the winner's captain,
+  its ownership, its share of captains, and `was_top_owned_captain` — recorded
+  per contest rather than inferred from table order, since the top-owned captain
+  won 22 of 85 in the 3.18 sample and both branches are live). The ledger block
+  gained two lines, the Showdown counterpart of the existing SP-pair line. No
+  branch on contest type is needed anywhere: Classic entries have no `CPT` slot,
+  so the table is empty and the lines do not render.
+- **Absence stays absence.** `_captain_norm` returns None for a Classic lineup and
+  None for a Showdown cell that parsed without a captain, because both are the
+  same absence to any aggregate and neither is worth inventing a value for. It
+  returns the FIRST `CPT` slot; the roster contract admits exactly one, and a cell
+  carrying two is malformed input the structural gate already rejects on slot
+  counts, so choosing between them here would only hide that.
+- **Verified against the archive.** Re-mined contest 193034899 (205-entry
+  Showdown): Kevin Gausman 30.7% of captains against 30.58% rostered, the winner
+  captained him, `was_top_owned_captain` true — the shape of measurement 3.18 had
+  to derive by hand, now emitted by the mine.
+
+### Tests
+
+- Eight new tests in a new `MinerCaptainTests`; the pin moves 734 → 742
+  (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). Both winner branches are
+  pinned separately — a winner captaining the 25% option and a winner captaining
+  the 75% one — so `was_top_owned_captain` cannot be satisfied by a constant. The
+  Classic test asserts the empty table and the None winner rather than only
+  asserting nothing crashes, since "no captains here" is the case that would
+  otherwise pick up a junk value from a position-blind read. Also pinned: that
+  `captain_norm` reaches the per-entry archived projection, which is what makes
+  the backfill a re-mine rather than a migration.
+
 ## 2026-08-08 — R49(1)(2) + R30(c): the miner resolves salary manifest-first, and stops naming a file that never had a salary block
 
 ### Fixed
