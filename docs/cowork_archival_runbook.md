@@ -94,6 +94,16 @@ Per contest:
    forked. Accumulation is now idempotent per contest, so re-running a mine
    changes nothing.
 
+   **R94, fixed 2026-08-08: this sentence is now true.** Until then the miner
+   gated the registry update on the flag, so a runbook-compliant mine never
+   touched the registry and said nothing about it — 31 mines of the 2026-08-08
+   tranche skipped accumulation silently. Every mine now prints either
+   `registry updated: <path>` or a `NOTICE: registry NOT updated` line naming
+   the reason. **If you do not see one of those two lines, the mine did not do
+   what this step says.** A mine with no `--contest-id` and no winning entry id
+   is the one case that legitimately declines (R74(a)); it is non-fatal and the
+   rest of the mine is still good.
+
    The structural gate is fail-closed and blocks: exit 4 wrong salary file,
    5 zero entries parsed, 6 unparsed share over tolerance, 3 other structural
    failure. Nothing is written on a block, so there is nothing to undo. `--force`

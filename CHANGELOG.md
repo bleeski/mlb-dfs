@@ -25,6 +25,57 @@ performance claim.
 
 ---
 
+## 2026-08-08 — R94: the registry accumulates on every mine, so the runbook's own instruction is finally true
+
+### Fixed
+
+- **R94 — `main` no longer gates the registry update on the `--registry` flag
+  (P2).** The archival runbook says, in words, "Do not pass `--registry`. It
+  defaults to `data/reference/field_opponent_registry.json`." `field_miner.main`
+  ran `if args.registry: update_registry(...)`, and `update_registry`'s internal
+  `registry_path or default_registry_path()` was unreachable unless the flag had
+  been passed with some value. **A runbook-compliant mine therefore never touched
+  the registry, and said nothing about it.** All 31 mines of the 2026-08-08
+  tranche skipped opponent accumulation; it was caught only by comparing registry
+  `contests_mined` (236) against `own_results` (267), by hand, by someone who
+  thought to.
+- **The code moved, not the runbook, and the reason is in the runbook itself.**
+  Its instruction not to pass a path is load-bearing: passing a bare relative one
+  had already forked the registry into two diverging copies, and an earlier
+  version of the runbook telling people to do that is what kept it forked. "One
+  registry, resolved by the tool" is the intent, so `main` now calls
+  `update_registry(args.registry or None, mined)` unconditionally and the flag
+  only overrides the location. Its `--help` text says so. The runbook gained a
+  dated note recording that the sentence is now true, plus the operator-visible
+  contract: **every mine prints either `registry updated: <path>` or a
+  `NOTICE: registry NOT updated` line naming the reason, and if you see neither,
+  the mine did not do what the step says.**
+- **R74(a) still refuses a null identity, and that refusal no longer kills the
+  mine.** With the call unconditional, the `ValueError` R74(a) raises for a mine
+  with no `contest_id` and no winning entry id would have taken down an
+  otherwise-good mine (reachable on a header-only standings export, where
+  `parsed_nothing` does not fire because `n_all` is 0). It is now caught and
+  reported as a named NOTICE: the invariant holds, nothing null reaches the
+  registry, and the JSON, ledger block and own-results row are still written.
+
+### Tests
+
+- Five new tests in a new `MinerRegistryDefaultTests`; the pin moves 714 → 719
+  (`tools/audit.py`, CLAUDE.md, SKILL.md in this commit). The regression test
+  runs **the runbook's invocation** — no `--registry` — because running the
+  flagged form is precisely what hid this for a whole tranche; it patches
+  `default_registry_path` and asserts the redirected file gained the contest, so
+  the test proves the tool resolves its own path without writing the real
+  `data/reference` registry. `MinerMoneyHonestyTests._run` gained `--registry`
+  into a temp directory for the same reason: accumulation is now the default, and
+  a bare mine from a test would write the live registry — which ARCHIVE happens
+  to be mid-rebuild on. **One test was written and then thrown away**, and the
+  replacement is the point: the first version asserted `"if args.registry:" not
+  in inspect.getsource(fm.main)` and failed against its own explanatory comment,
+  which is exactly R91's "assertion satisfied by the wrong text" class. The
+  behavioural pin — `update_registry(None, mined)` resolving the default — cannot
+  be fooled that way.
+
 ## 2026-08-08 — R49(3): a salary file that prices under half the field is the wrong slate, not "full" coverage
 
 ### Fixed

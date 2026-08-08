@@ -1538,7 +1538,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                          "directory (default: every salary CSV in the repo)")
     ap.add_argument("--contest-id", default="")
     ap.add_argument("--slate-date", default="")
-    ap.add_argument("--registry")
+    ap.add_argument("--registry",
+                    help="override the opponent-registry location. The registry "
+                         "is accumulated on EVERY mine (R94); omit this and it "
+                         "resolves to data/reference/field_opponent_registry.json, "
+                         "which is the one registry. Pass a path only to write "
+                         "somewhere else deliberately -- a bare relative path is "
+                         "what forked it into two diverging copies once already.")
     ap.add_argument("--emit-ledger", action="store_true")
     ap.add_argument("--no-archive-move", action="store_true",
                     help="leave a mined inbox CSV in place instead of moving it "
@@ -1725,9 +1731,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             except Exception as exc:  # noqa: BLE001 - bookkeeping never blocks
                 print(f"own results not persisted: {exc}")
 
-    if args.registry:
-        update_registry(args.registry, mined)
-        print(f"registry updated: {args.registry}")
+    # R94: accumulate by DEFAULT. This was `if args.registry:`, so the runbook's
+    # own instruction -- "Do not pass --registry. It defaults to
+    # data/reference/field_opponent_registry.json" -- described a mine that never
+    # touched the registry, and `update_registry`'s internal
+    # `registry_path or default_registry_path()` was unreachable unless the flag
+    # had been passed with some value. All 31 mines of the 2026-08-08 tranche
+    # skipped accumulation silently; it was caught only by comparing registry
+    # contests_mined (236) against own_results (267).
+    #
+    # The code moved rather than the runbook, because the runbook's wording is
+    # load-bearing: it says not to pass a path precisely BECAUSE passing a bare
+    # relative one forked the registry into two diverging copies once already.
+    # "One registry, resolved by the tool" is the intent, and the flag now only
+    # overrides the location.
+    registry_target = args.registry or default_registry_path()
+    try:
+        update_registry(args.registry or None, mined)
+        print(f"registry updated: {registry_target}")
+    except ValueError as exc:
+        # R74(a) refuses a mine with no contest identity rather than folding it
+        # in under a placeholder, and that invariant holds. What must not happen
+        # is the refusal killing an otherwise-good mine now that the call is
+        # unconditional: the JSON, the ledger block and the own-results row are
+        # all still valid. Loud, named, and non-fatal.
+        print(f"NOTICE: registry NOT updated: {exc}")
     if args.json_out:
         slim = {k: v for k, v in mined.items() if k not in ("own_by_norm", "fpts_by_norm")}
         with open(args.json_out, "w", encoding="utf-8") as fh:

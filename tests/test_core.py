@@ -7074,10 +7074,13 @@ class MinerMoneyHonestyTests(unittest.TestCase):
         return path
 
     def _run(self, tmp, *extra):
+        # --registry into tmp: R94 made accumulation the default, so a bare mine
+        # would otherwise write the real data/reference registry from a test.
         return subprocess.run(
             [sys.executable, "-m", "mlb_engine.field.field_miner",
              "--standings", str(self._standings_csv(tmp)),
-             "--contest-id", "777777777", *extra],
+             "--contest-id", "777777777",
+             "--registry", str(Path(tmp) / "reg.json"), *extra],
             capture_output=True, text=True, cwd=str(REPO))
 
     def test_a_money_flag_with_no_own_entries_is_an_error_not_a_no_op(self):
@@ -7477,6 +7480,106 @@ class MinerSalaryJoinFloorTests(unittest.TestCase):
         self.assertLess(fm.MIN_SALARY_JOIN_RATE, fm.MIN_AUTO_JOIN_RATE)
         self.assertGreater(fm.MIN_SALARY_JOIN_RATE, 0.0,
                            "a floor of 0 is not a floor")
+
+
+class MinerRegistryDefaultTests(unittest.TestCase):
+    """R94. `main` gated the registry update on `--registry`, while the runbook
+    says to omit the flag. A runbook-compliant mine therefore never touched the
+    registry and said nothing about it; 31 mines of the 2026-08-08 tranche
+    skipped accumulation silently. The runbook's wording is load-bearing (a bare
+    relative path forked the registry once), so the CODE moved."""
+
+    def _standings_csv(self, tmp, contest="777777777"):
+        path = Path(tmp) / f"contest-standings-{contest}.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(MinerMoneyHonestyTests.HEADER)
+            for i in range(6):
+                writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
+                                 f"{120 - i}.5", MinerMoneyHonestyTests.CLASSIC,
+                                 "", "Aaron Judge", "OF", "41.2%", "18.5"])
+        return path
+
+    def test_the_documented_invocation_advances_the_registry(self):
+        """The regression test is the RUNBOOK's command -- no `--registry` -- not
+        the flagged one. Running the flagged form is what hid this for the whole
+        tranche. In-process with the default path redirected, because the point
+        is that the tool resolves the path itself and a test must not write the
+        real data/reference registry to prove it."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            redirected = str(Path(tmp) / "field_opponent_registry.json")
+            with unittest.mock.patch.object(fm, "default_registry_path",
+                                            return_value=redirected):
+                code = fm.main(["--standings", str(self._standings_csv(tmp)),
+                                "--contest-id", "777777777",
+                                "--no-archive-move"])
+            self.assertEqual(code, 0)
+            self.assertTrue(Path(redirected).exists(),
+                            "a bare mine did not accumulate the registry")
+            reg = json.loads(Path(redirected).read_text(encoding="utf-8"))
+            self.assertEqual(reg["contests_mined"], ["777777777"])
+            self.assertIn("u0", reg["users"])
+
+    def test_update_registry_resolves_its_own_default_when_passed_none(self):
+        """The internal `registry_path or default_registry_path()` was
+        unreachable from main, because the only caller sat behind a truthiness
+        check on the same value it would have passed. Pinned behaviourally: a
+        source-text assertion here is the R91 failure class, and the first
+        version of this test proved it by matching its own explanatory comment."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            redirected = str(Path(tmp) / "reg.json")
+            mined = {"contest_id": "555555555", "meta": {}, "entries": [],
+                     "diagnostics": {}}
+            with unittest.mock.patch.object(fm, "default_registry_path",
+                                            return_value=redirected):
+                fm.update_registry(None, mined)
+            self.assertTrue(Path(redirected).exists(),
+                            "passing None must resolve the default, not skip")
+
+    def test_a_mine_with_no_identity_declines_loudly_without_killing_the_mine(self):
+        """R74(a) still refuses a null identity. Now that the call is
+        unconditional, that refusal must not take the whole mine down with it."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            # header only: no entries, so no winning entry id, and no --contest-id
+            path = Path(tmp) / "contest-standings-empty.csv"
+            with path.open("w", newline="", encoding="utf-8-sig") as fh:
+                csv.writer(fh).writerow(MinerMoneyHonestyTests.HEADER)
+            done = subprocess.run(
+                [sys.executable, "-m", "mlb_engine.field.field_miner",
+                 "--standings", str(path),
+                 "--registry", str(Path(tmp) / "reg.json")],
+                capture_output=True, text=True, cwd=str(REPO))
+            self.assertIn("registry NOT updated", done.stdout + done.stderr,
+                          "the decline must be named, not swallowed")
+            self.assertIn("--contest-id", done.stdout + done.stderr,
+                          "and must say how to fix it")
+            self.assertFalse((Path(tmp) / "reg.json").exists(),
+                             "a null identity must never reach the registry")
+            del fm
+
+    def test_the_flag_still_overrides_the_location(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = Path(tmp) / "elsewhere" / "reg.json"
+            registry.parent.mkdir(parents=True)
+            done = subprocess.run(
+                [sys.executable, "-m", "mlb_engine.field.field_miner",
+                 "--standings", str(self._standings_csv(tmp)),
+                 "--contest-id", "777777777", "--registry", str(registry)],
+                capture_output=True, text=True, cwd=str(REPO))
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertTrue(registry.exists())
+            reg = json.loads(registry.read_text(encoding="utf-8"))
+            self.assertEqual(reg["contests_mined"], ["777777777"])
+
+    def test_the_runbook_and_the_code_agree(self):
+        """The item's done-when is agreement, so the doc is pinned too."""
+        text = (REPO / "docs" / "cowork_archival_runbook.md").read_text(encoding="utf-8")
+        self.assertIn("Do not pass `--registry`", text)
+        self.assertIn("R94", text,
+                      "the runbook must record that the sentence is now true")
 
 
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
