@@ -14,7 +14,7 @@ audit warning; the `--terse` session-start macro hides that warning.
 
 ## 0. Quick Card (session-start read; the full ledger is post-slate reading)
 
-1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  25 modules  602 tests`. If the audit fails on pins or inventory only while the suites pass in full, proceed and flag; never repair infrastructure mid-slate. The source of truth for the count is `EXPECTED_TEST_COUNT` in `tools/audit.py`; when this line and that constant disagree the constant wins and this line is stale. **Sandbox caveat (re-measured 2026-08-03, on the device mount through `device_bash`):** the suites exceed a 45s tool call, and `tests.test_core` alone now does too, so the old single-suite fallback is no longer enough. Split `test_core` by test class: the first 33 classes run 205 tests in ~20s, classes 34-45 run 51 tests in ~23s, and `DeterminismTests` exceeds 40s on its own and must be run alone or in the background (chunk boundaries stale by 7 tests since R42(a) added `VendoredPylibsTests` to `test_core`; re-measure before trusting the class numbers). Then `tests.test_showdown` 49, `tests.test_upload_integrity` 100, `tests.test_golden_replay` 9, `tests.test_paste_lineups` 56, then `python tools/audit.py --terse` for pins and inventory. The counts sum to 602 (388 + 49 + 100 + 9 + 56) and nothing about what the audit checks changes. **R42(a), landed 2026-08-03: `env_probe.py` and `audit.py` now check `.pylibs` before anything else runs.** The repo vendors a working scipy 1.15.3 in `.pylibs/`; both tools put it on `sys.path` and report `env warm (vendored at ...)` / a clean dependency PASS with zero installs, zero network -- this replaces the prior workaround note (manually export `PYTHONPATH=$PWD/.pylibs` when `--terse` reported missing scipy) with the tools doing it themselves. `python tools/env_probe.py --install` still runs the pinned install for a genuinely empty `.pylibs` and empty site-packages. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
+1. Macro: from the repo root, `python tools/audit.py --run-tests --terse` -> `PASS  v2.26.0  26 modules  745 tests`. If the audit fails on pins or inventory only while the suites pass in full, proceed and flag; never repair infrastructure mid-slate. The source of truth for the count is `EXPECTED_TEST_COUNT` in `tools/audit.py`; when this line and that constant disagree the constant wins and this line is stale. (Corrected 2026-08-08: this line read `25 modules  602 tests` while the constant stood at 742 and then 745, so by its own rule it had been stale for several pin moves. The chunk boundaries below were measured against the 602-test tree and are staler still; re-measure before trusting them.) **Sandbox caveat (re-measured 2026-08-03, on the device mount through `device_bash`):** the suites exceed a 45s tool call, and `tests.test_core` alone now does too, so the old single-suite fallback is no longer enough. Split `test_core` by test class: the first 33 classes run 205 tests in ~20s, classes 34-45 run 51 tests in ~23s, and `DeterminismTests` exceeds 40s on its own and must be run alone or in the background (chunk boundaries stale by 7 tests since R42(a) added `VendoredPylibsTests` to `test_core`; re-measure before trusting the class numbers). Then `tests.test_showdown` 49, `tests.test_upload_integrity` 100, `tests.test_golden_replay` 9, `tests.test_paste_lineups` 56, then `python tools/audit.py --terse` for pins and inventory. The counts sum to 602 (388 + 49 + 100 + 9 + 56) and nothing about what the audit checks changes. **R42(a), landed 2026-08-03: `env_probe.py` and `audit.py` now check `.pylibs` before anything else runs.** The repo vendors a working scipy 1.15.3 in `.pylibs/`; both tools put it on `sys.path` and report `env warm (vendored at ...)` / a clean dependency PASS with zero installs, zero network -- this replaces the prior workaround note (manually export `PYTHONPATH=$PWD/.pylibs` when `--terse` reported missing scipy) with the tools doing it themselves. `python tools/env_probe.py --install` still runs the pinned install for a genuinely empty `.pylibs` and empty site-packages. (Corrected 2026-07-24: this line still carried the pre-restructure claude.ai macro, naming a `/mnt/project` mount, a `/home/claude/work` copy, and a `project_audit.py` that do not exist in the v3.0.0-pre layout, plus stale counts. It is the mandated session-start read, so every session began by running a command that could not work.)
 2. Pool: `build_slate_pool(salary_csv, lineups_feed, platoon_json, declared_pitchers)` is THE intake. Confirmed nine plus platoon nine plus probable/declared arms only; every other salary row is immaterial. Splat `pool["run_slate_kwargs"]` into `run_slate`.
 3. Clock: T-5 delivery rule. `checkpoint["slate_clock"]` shows first lock, deadline, minutes remaining. T-20 skip optionals, T-10 approve on defaults, T-5 present the best certified file; refinements via `run_late_swap`.
 4. Postures: pass explicit `contest_postures` by contest ID; never trust `infer_contest_archetype` on family names (Pocket Cup, Knuckleball, Relay Throw). This applies to late swap too as of 2026-07-27 (F16): `tools/late_swap.py --postures <id>=<posture>` resolves identity the way the build does and blocks on a contest that matches no archetype, where it used to stamp every entry `large_wta`.
@@ -1070,6 +1070,66 @@ Five archival-tooling defects found while mining are filed as `docs/backlog_inbo
 fragments (miner --json parent dir; explicit wrong --salary passing as full coverage; registry
 update gated on the --registry flag against the runbook; awaiting_standings listing unsettled
 slates; the unmanifested 1910_4g delivery with unstaged salary).
+
+### 3.19 The opponent-registry rebuild: 267 contests under one resolution policy (2026-08-08)
+
+Written by ARCHIVE after rebuilding `data/reference/field_opponent_registry.json` from the archive.
+Deterministic bookkeeping over observed field behaviour; record-only, never a prediction, and it
+grades nothing. The code change that made it necessary is R97 in `CHANGELOG.md`; this is the
+outcome, which is why it lives here and not there.
+
+**Why it ran.** R94 made the miner accumulate the registry by default, but the 31 mines that had
+already run without accumulation were only recoverable by rebuilding from source. R97 then changed
+how the rebuild resolves salary, so it ran `--restart` from zero rather than resuming: the 11
+contests already staged had been folded in under the old pooled policy, and resuming would have
+left one file half under each policy.
+
+**Counts, and they reconcile exactly.**
+
+| | |
+|---|---|
+| source standings CSVs under `data/archive/` | 267 |
+| mined | 267 |
+| skipped | 0 |
+| contests in the rebuilt registry | 267 (267 unique) |
+| users | 15,402 |
+| prior live file | 236 contests, 14,547 users |
+
+`contests_mined` equals the 267 source contest ids exactly: no id in the archive missing from the
+registry, none in the registry absent from the archive. The contest delta is 236 + 31 = 267, and
+those 31 are precisely the tranche that skipped accumulation before R94 — the rebuild recovered the
+population it was run to recover, with nothing else moving. Users rose 855 (+5.9%), an increase and
+not the drop that would have meant stopping. 2,211 users now carry five or more contests, which is
+the "regular" threshold 3.18 used.
+
+**Tier distribution, first measurement.** R97's tiered resolver reports which tier answered:
+
+| tier | contests |
+|---|---|
+| manifest | 126 |
+| in_date | 112 |
+| repo_wide | 4 |
+| no salary source resolved | 25 |
+
+238 of 267 (89%) resolved at tier 1 or tier 2, and only 4 fell through to the repo-wide scan. The
+25 that resolved nothing are the `standings_only` population — no salary file for that slate exists
+in the repo — which is the same coverage limit 3.18 recorded for the STL@NYY Showdown seven and the
+1910_4g five. The oldest dates carry the tier-None and repo_wide cases; `manifest` only starts
+appearing once runs began staging their inputs.
+
+**The predicted skip rise did not happen, and the reason is the point.** R49(3) added a 0.50 salary
+join floor to `parse_structural_ok`, which this tool enforces, so contests whose resolver picked a
+same-type wrong-slate file at under 50% join were expected to start skipping. Zero did. The floor is
+a backstop against a bad resolution, and R97 removed the thing that produced bad resolutions here:
+the tiered resolver either finds this slate's file or returns nothing and mines the honest
+`standings_only` tier, so there is no wrong-slate file left for the floor to catch. A gate that
+stops firing because its input stopped being generated is the intended end state, not a gate that
+was never needed. It stays as the backstop for the explicit-`--salary` path, which is where 3.18's
+five 1910_4g contests went wrong in the first place.
+
+**Run shape.** Six chunks at `--max-seconds 150` (54, 52, 48, 44, 42, 27 contests), exit 10 with
+progress kept between them, exit 0 on the last. `ledger/field_opponent_registry.json`, the dead
+fork, is still on disk and still superseded; the miner no longer writes there and nothing reads it.
 
 ## 4. CALIBRATION CONTENT (INERT until the Section 0 gate opens)
 
