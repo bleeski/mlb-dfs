@@ -1,4 +1,4 @@
-# Contests awaiting standings — regenerated 2026-08-04
+# Contests awaiting standings — regenerated 2026-08-08
 
 Scan: every 9-digit Contest ID on a filled entry row in `outputs/*/DKEntries*.csv`,
 minus the archived set (`data/archive/*/mined_*.json`), what's already sitting in
@@ -10,19 +10,22 @@ drop it in `data/standings/inbox/`. A zero-byte export is a failed pull, not a
 pulled file. The inbox is flat; the miner reads Classic vs Showdown off the
 lineup cells and resolves the salary file itself (`--auto-salary`).
 
-## Status as of 2026-08-04: 1 contest open across 1 slate date
+## Status as of 2026-08-08: 4 contests open across 1 slate date
 
 Prioritize oldest first. The 2026-07-25 ledger note found DK's export ages out
 some days after a contest settles, so the oldest rows below are the ones closest
 to going empty; the newest date has the most runway left.
 
-**2026-07-29** (1 contest):
+**2026-08-08** (4 contests):
 
-- [MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)](https://www.draftkings.com/contest/exportfullstandingscsv/192896278) — `192896278`
+- [MLB Satellite to $15 Relay Throw (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193403851) — `193403851`
+- [MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [5x] (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193403935) — `193403935`
+- [MLB $10K mini-MAX [150 Entry Max] (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193405185) — `193405185`
+- [MLB $750 Daily Dollar [Single Entry]  (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/193405226) — `193405226`
 
 ## Not on this list — do not pull
 
-- **Archived** (239 contests) — already mined into `data/archive/`;
+- **Archived** (270 contests) — already mined into `data/archive/`;
   see the ledger's A-NNN entries for the per-contest mapping.
 - **Non-DK IDs on filled entry rows** — filtered out because a real contest ID is
   9 digits; these would otherwise emit a dead export URL:

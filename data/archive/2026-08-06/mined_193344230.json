@@ -1,0 +1,1234 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "standings_only",
+ "contest_id": "193344230",
+ "slate_date": "2026-08-06",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 133.3,
+  "winning_entry_id": "5210384497",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": null,
+  "at_cap_entries": null,
+  "at_cap_share_pct": null,
+  "salary_left_histogram": {},
+  "max_stack_histogram": {},
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Michael Wacha",
+     "Ranger Suarez"
+    ],
+    "count": 9,
+    "field_share_pct": 39.1
+   },
+   {
+    "pair": [
+     "Martin Perez",
+     "Ranger Suarez"
+    ],
+    "count": 4,
+    "field_share_pct": 17.4
+   },
+   {
+    "pair": [
+     "Michael Wacha",
+     "Walker Buehler"
+    ],
+    "count": 2,
+    "field_share_pct": 8.7
+   },
+   {
+    "pair": [
+     "Martin Perez",
+     "Michael Wacha"
+    ],
+    "count": 2,
+    "field_share_pct": 8.7
+   },
+   {
+    "pair": [
+     "Janson Junk",
+     "Ranger Suarez"
+    ],
+    "count": 2,
+    "field_share_pct": 8.7
+   },
+   {
+    "pair": [
+     "Janson Junk",
+     "Michael Wacha"
+    ],
+    "count": 2,
+    "field_share_pct": 8.7
+   },
+   {
+    "pair": [
+     "Martin Perez",
+     "Walker Buehler"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Kohl Drake",
+     "Ranger Suarez"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Ranger Suarez",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Michael Wacha",
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Wilyer Abreu",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Bobby Witt Jr.",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Caleb Durbin",
+    "pct_drafted": 39.13
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": null,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 230,
+  "roster_slots_expected": 230,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.1,
+  "dk_table_deficit_pts": -0.1,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5210384497",
+   "username": "Wanna_Square_Up1567",
+   "points": 133.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 37.39,
+   "n_cheap": null,
+   "players_norm": [
+    "agustin ramirez",
+    "andruw monasterio",
+    "caleb durbin",
+    "jarren duran",
+    "matt olson",
+    "michael wacha",
+    "nick sogard",
+    "ranger suarez",
+    "ronald acuna",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5210503182",
+   "username": "jaakko",
+   "points": 130.95,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Walker Buehler"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 17.39,
+   "n_cheap": null,
+   "players_norm": [
+    "carter jensen",
+    "chase meidroth",
+    "jim jarvis",
+    "kyle isbel",
+    "michael harris",
+    "michael wacha",
+    "miguel vargas",
+    "munetaka murakami",
+    "ronald acuna",
+    "walker buehler"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5210428274",
+   "username": "wazzu24",
+   "points": 120.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Michael Wacha"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 24.35,
+   "n_cheap": null,
+   "players_norm": [
+    "chase meidroth",
+    "colson montgomery",
+    "jarren duran",
+    "joey bart",
+    "martin perez",
+    "masataka yoshida",
+    "michael wacha",
+    "miguel vargas",
+    "munetaka murakami",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "4",
+   "entry_id": "5210498718",
+   "username": "kevinreider4",
+   "points": 118.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 29.13,
+   "n_cheap": null,
+   "players_norm": [
+    "drake baldwin",
+    "esteury ruiz",
+    "jim jarvis",
+    "leo jimenez",
+    "matt olson",
+    "michael harris",
+    "michael wacha",
+    "ranger suarez",
+    "ronald acuna",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5210345584",
+   "username": "Greenbay26",
+   "points": 117.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Michael Wacha"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 34.35,
+   "n_cheap": null,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "geraldo perdomo",
+    "martin perez",
+    "masataka yoshida",
+    "matt olson",
+    "michael wacha",
+    "nick sogard",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5210403828",
+   "username": "Calvin3470",
+   "points": 115.95,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Walker Buehler"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 20.44,
+   "n_cheap": null,
+   "players_norm": [
+    "andruw monasterio",
+    "fernando tatis",
+    "gabriel moreno",
+    "isaac collins",
+    "manny machado",
+    "martin perez",
+    "matt olson",
+    "walker buehler",
+    "wilyer abreu",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5210292895",
+   "username": "cheffrank",
+   "points": 113.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 30.0,
+   "n_cheap": null,
+   "players_norm": [
+    "austin riley",
+    "drake baldwin",
+    "jim jarvis",
+    "martin perez",
+    "masataka yoshida",
+    "matt olson",
+    "nick sogard",
+    "ranger suarez",
+    "ronald acuna",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5210365620",
+   "username": "sasmallen",
+   "points": 106.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 39.13,
+   "n_cheap": null,
+   "players_norm": [
+    "agustin ramirez",
+    "bobby witt",
+    "caleb durbin",
+    "heriberto hernandez",
+    "lars nootbaar",
+    "matt olson",
+    "michael wacha",
+    "nick sogard",
+    "ranger suarez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5210480424",
+   "username": "claytankgunner",
+   "points": 102.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 34.35,
+   "n_cheap": null,
+   "players_norm": [
+    "agustin ramirez",
+    "bobby witt",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "jackson merrill",
+    "jarren duran",
+    "michael wacha",
+    "nick sogard",
+    "ranger suarez",
+    "ty france"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5210313552",
+   "username": "kngof9ex",
+   "points": 101.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 36.09,
+   "n_cheap": null,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "geraldo perdomo",
+    "jarren duran",
+    "martin perez",
+    "matt olson",
+    "nick sogard",
+    "ranger suarez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5210456740",
+   "username": "jefftheho",
+   "points": 94.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 38.7,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "caleb durbin",
+    "jac caglianone",
+    "jarren duran",
+    "masataka yoshida",
+    "michael massey",
+    "michael wacha",
+    "ranger suarez",
+    "salvador perez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5210493249",
+   "username": "Branaman12",
+   "points": 89.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 31.74,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "brian navarreto",
+    "esteury ruiz",
+    "javier sanoja",
+    "kyle stowers",
+    "masataka yoshida",
+    "michael wacha",
+    "ranger suarez",
+    "wilyer abreu",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5210499711",
+   "username": "Nbot11",
+   "points": 88.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Janson Junk",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 33.04,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "janson junk",
+    "kody clemens",
+    "kyle stowers",
+    "nick sogard",
+    "ranger suarez",
+    "salvador perez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5210371305",
+   "username": "mrclean913",
+   "points": 87.95,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Walker Buehler"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 22.18,
+   "n_cheap": null,
+   "players_norm": [
+    "drake baldwin",
+    "fernando tatis",
+    "heriberto hernandez",
+    "kyle stowers",
+    "leo jimenez",
+    "michael harris",
+    "michael wacha",
+    "otto lopez",
+    "walker buehler",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5210301998",
+   "username": "pgk8",
+   "points": 84.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Kohl Drake",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 31.3,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "caleb durbin",
+    "carter jensen",
+    "ceddanne rafaela",
+    "jac caglianone",
+    "jarren duran",
+    "kohl drake",
+    "nick sogard",
+    "ranger suarez",
+    "salvador perez"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5210344974",
+   "username": "Byronn5",
+   "points": 82.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 23.04,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "brooks lee",
+    "jac caglianone",
+    "kody clemens",
+    "luke keaschall",
+    "martin perez",
+    "ranger suarez",
+    "royce lewis",
+    "salvador perez",
+    "trevor larnach"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5210427314",
+   "username": "Lucasj42o",
+   "points": 74.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 36.96,
+   "n_cheap": null,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "jac caglianone",
+    "jarren duran",
+    "michael massey",
+    "michael wacha",
+    "otto lopez",
+    "ranger suarez",
+    "salvador perez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5210436913",
+   "username": "whoisjohngalt420",
+   "points": 73.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 30.44,
+   "n_cheap": null,
+   "players_norm": [
+    "drake baldwin",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "javier sanoja",
+    "lars nootbaar",
+    "matt olson",
+    "michael wacha",
+    "otto lopez",
+    "ranger suarez",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5210456040",
+   "username": "sirleged7777",
+   "points": 64.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Michael Wacha",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 28.7,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "gavin sheets",
+    "jac caglianone",
+    "kyle isbel",
+    "manny machado",
+    "michael massey",
+    "michael wacha",
+    "ranger suarez",
+    "salvador perez",
+    "ty france"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5210350417",
+   "username": "tmoney88",
+   "points": 61.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Martin Perez",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 22.17,
+   "n_cheap": null,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jarren duran",
+    "ketel marte",
+    "luke keaschall",
+    "manny machado",
+    "martin perez",
+    "ranger suarez",
+    "victor caratini"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5210502706",
+   "username": "bleeski",
+   "points": 59.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Janson Junk",
+    "Ranger Suarez"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 25.65,
+   "n_cheap": null,
+   "players_norm": [
+    "bobby witt",
+    "heriberto hernandez",
+    "jac caglianone",
+    "janson junk",
+    "josh bell",
+    "ketel marte",
+    "manny machado",
+    "ranger suarez",
+    "salvador perez",
+    "trevor larnach"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "22",
+   "entry_id": "5210429964",
+   "username": "drunkonpappy",
+   "points": 49.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Janson Junk",
+    "Michael Wacha"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 23.04,
+   "n_cheap": null,
+   "players_norm": [
+    "agustin ramirez",
+    "corbin carroll",
+    "esteury ruiz",
+    "heriberto hernandez",
+    "janson junk",
+    "michael wacha",
+    "miguel vargas",
+    "munetaka murakami",
+    "otto lopez",
+    "xavier edwards"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "23",
+   "entry_id": "5210512347",
+   "username": "hutchdawg16",
+   "points": 43.3,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [
+    "Janson Junk",
+    "Michael Wacha"
+   ],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 22.61,
+   "n_cheap": null,
+   "players_norm": [
+    "agustin ramirez",
+    "corbin carroll",
+    "geraldo perdomo",
+    "heriberto hernandez",
+    "janson junk",
+    "ketel marte",
+    "kyle stowers",
+    "lars nootbaar",
+    "manny machado",
+    "michael wacha"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Ranger Suarez",
+   "player_norm": "ranger suarez",
+   "roster_position": "P",
+   "pct_drafted": 69.57,
+   "fpts": 3.15
+  },
+  {
+   "player": "Michael Wacha",
+   "player_norm": "michael wacha",
+   "roster_position": "P",
+   "pct_drafted": 65.22,
+   "fpts": 9.15
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 47.83,
+   "fpts": 11.0
+  },
+  {
+   "player": "Bobby Witt Jr.",
+   "player_norm": "bobby witt",
+   "roster_position": "SS",
+   "pct_drafted": 39.13,
+   "fpts": 20.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 39.13,
+   "fpts": 19.0
+  },
+  {
+   "player": "Matt Olson",
+   "player_norm": "matt olson",
+   "roster_position": "1B",
+   "pct_drafted": 34.78,
+   "fpts": 27.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 34.78,
+   "fpts": 4.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "2B",
+   "pct_drafted": 34.78,
+   "fpts": 9.0
+  },
+  {
+   "player": "Martin Perez",
+   "player_norm": "martin perez",
+   "roster_position": "P",
+   "pct_drafted": 30.43,
+   "fpts": 12.15
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "C",
+   "pct_drafted": 30.43,
+   "fpts": 7.0
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "C",
+   "pct_drafted": 26.09,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jac Caglianone",
+   "player_norm": "jac caglianone",
+   "roster_position": "1B",
+   "pct_drafted": 26.09,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 11.0
+  },
+  {
+   "player": "Xavier Edwards",
+   "player_norm": "xavier edwards",
+   "roster_position": "2B",
+   "pct_drafted": 26.09,
+   "fpts": 11.0
+  },
+  {
+   "player": "Heriberto Hernandez",
+   "player_norm": "heriberto hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Manny Machado",
+   "player_norm": "manny machado",
+   "roster_position": "3B",
+   "pct_drafted": 21.74,
+   "fpts": 6.0
+  },
+  {
+   "player": "Masataka Yoshida",
+   "player_norm": "masataka yoshida",
+   "roster_position": "OF",
+   "pct_drafted": 21.74,
+   "fpts": 14.0
+  },
+  {
+   "player": "Agustin Ramirez",
+   "player_norm": "agustin ramirez",
+   "roster_position": "C",
+   "pct_drafted": 21.74,
+   "fpts": 5.0
+  },
+  {
+   "player": "Janson Junk",
+   "player_norm": "janson junk",
+   "roster_position": "P",
+   "pct_drafted": 17.39,
+   "fpts": 1.15
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 30.0
+  },
+  {
+   "player": "Otto Lopez",
+   "player_norm": "otto lopez",
+   "roster_position": "SS",
+   "pct_drafted": 17.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "SS",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Stowers",
+   "player_norm": "kyle stowers",
+   "roster_position": "1B",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Esteury Ruiz",
+   "player_norm": "esteury ruiz",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Walker Buehler",
+   "player_norm": "walker buehler",
+   "roster_position": "P",
+   "pct_drafted": 13.04,
+   "fpts": 8.8
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "1B",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 7.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "3B",
+   "pct_drafted": 13.04,
+   "fpts": 11.0
+  },
+  {
+   "player": "Ketel Marte",
+   "player_norm": "ketel marte",
+   "roster_position": "2B",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 26.0
+  },
+  {
+   "player": "Michael Massey",
+   "player_norm": "michael massey",
+   "roster_position": "2B",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Lars Nootbaar",
+   "player_norm": "lars nootbaar",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jim Jarvis",
+   "player_norm": "jim jarvis",
+   "roster_position": "SS",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Fernando Tatis Jr.",
+   "player_norm": "fernando tatis",
+   "roster_position": "OF",
+   "pct_drafted": 8.7,
+   "fpts": 11.0
+  },
+  {
+   "player": "Kody Clemens",
+   "player_norm": "kody clemens",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Carter Jensen",
+   "player_norm": "carter jensen",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ty France",
+   "player_norm": "ty france",
+   "roster_position": "1B",
+   "pct_drafted": 8.7,
+   "fpts": 12.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 39.0
+  },
+  {
+   "player": "Trevor Larnach",
+   "player_norm": "trevor larnach",
+   "roster_position": "OF",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 16.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 8.7,
+   "fpts": 12.0
+  },
+  {
+   "player": "Luke Keaschall",
+   "player_norm": "luke keaschall",
+   "roster_position": "OF",
+   "pct_drafted": 8.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Leo Jimenez",
+   "player_norm": "leo jimenez",
+   "roster_position": "3B",
+   "pct_drafted": 8.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Kyle Isbel",
+   "player_norm": "kyle isbel",
+   "roster_position": "OF",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 13.0
+  },
+  {
+   "player": "Kohl Drake",
+   "player_norm": "kohl drake",
+   "roster_position": "P",
+   "pct_drafted": 4.35,
+   "fpts": -0.55
+  },
+  {
+   "player": "Jackson Merrill",
+   "player_norm": "jackson merrill",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 10.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 4.35,
+   "fpts": 14.0
+  },
+  {
+   "player": "Austin Riley",
+   "player_norm": "austin riley",
+   "roster_position": "3B",
+   "pct_drafted": 4.35,
+   "fpts": 2.0
+  },
+  {
+   "player": "Royce Lewis",
+   "player_norm": "royce lewis",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 16.0
+  },
+  {
+   "player": "Brooks Lee",
+   "player_norm": "brooks lee",
+   "roster_position": "3B",
+   "pct_drafted": 4.35,
+   "fpts": 7.0
+  },
+  {
+   "player": "Josh Bell",
+   "player_norm": "josh bell",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 7.0
+  },
+  {
+   "player": "Gavin Sheets",
+   "player_norm": "gavin sheets",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Joey Bart",
+   "player_norm": "joey bart",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 4.0
+  },
+  {
+   "player": "Isaac Collins",
+   "player_norm": "isaac collins",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Victor Caratini",
+   "player_norm": "victor caratini",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 4.0
+  },
+  {
+   "player": "Brian Navarreto",
+   "player_norm": "brian navarreto",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 2.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 21,
+  "worst_rank": 21,
+  "best_finish_percentile": 13.04,
+  "median_finish_percentile": 13.04,
+  "best_points": 59.3,
+  "winning_points": 133.3,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

@@ -1,0 +1,692 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "standings_only",
+ "contest_id": "193253743",
+ "slate_date": "2026-08-05",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 21,
+  "entries_complete_lineups": 21,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 76.6,
+  "winning_entry_id": "5209554145",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 20,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 9.5,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 19,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": null,
+  "at_cap_entries": null,
+  "at_cap_share_pct": null,
+  "salary_left_histogram": {},
+  "max_stack_histogram": {},
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Will Warren",
+    "pct_drafted": 76.19
+   },
+   {
+    "player": "Andre Pallante",
+    "pct_drafted": 61.9
+   },
+   {
+    "player": "Blaze Jordan",
+    "pct_drafted": 57.14
+   },
+   {
+    "player": "Ben Rice",
+    "pct_drafted": 42.86
+   },
+   {
+    "player": "Alec Burleson",
+    "pct_drafted": 42.86
+   }
+  ]
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": null,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 126,
+  "roster_slots_expected": 126,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5209554145",
+   "username": "bleeski",
+   "points": 76.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 47.62,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "ben rice",
+    "blaze jordan",
+    "jimmy crooks",
+    "jj wetherholt",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "2",
+   "entry_id": "5209576800",
+   "username": "Ezilodi",
+   "points": 65.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 43.65,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "andre pallante",
+    "blaze jordan",
+    "jazz chisholm",
+    "jj wetherholt",
+    "nathan church"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5208508616",
+   "username": "aramisj22",
+   "points": 64.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 50.0,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "ben rice",
+    "blaze jordan",
+    "nathan church",
+    "ryan mcmahon",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "3",
+   "entry_id": "5209438997",
+   "username": "Baca369",
+   "points": 64.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 50.0,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "ben rice",
+    "blaze jordan",
+    "nathan church",
+    "ryan mcmahon",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "5",
+   "entry_id": "5208922598",
+   "username": "whoisjohngalt420",
+   "points": 63.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 41.27,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "andre pallante",
+    "blaze jordan",
+    "jimmy crooks",
+    "jj wetherholt",
+    "spencer jones"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "6",
+   "entry_id": "5209358430",
+   "username": "Diesel",
+   "points": 59.6,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 36.51,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "blaze jordan",
+    "bryan torres",
+    "ivan herrera",
+    "jj wetherholt",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "7",
+   "entry_id": "5209566722",
+   "username": "NYC5788",
+   "points": 56.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 49.21,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "andre pallante",
+    "blaze jordan",
+    "bryan torres",
+    "nathan church",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "8",
+   "entry_id": "5209077501",
+   "username": "Stree",
+   "points": 53.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 41.27,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "andre pallante",
+    "cesar prieto",
+    "jimmy crooks",
+    "spencer jones",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "9",
+   "entry_id": "5209020826",
+   "username": "macyfan",
+   "points": 50.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 50.79,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "austin wells",
+    "blaze jordan",
+    "jazz chisholm",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "10",
+   "entry_id": "5208939412",
+   "username": "jep4576",
+   "points": 49.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 47.62,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "austin wells",
+    "ben rice",
+    "blaze jordan",
+    "jazz chisholm",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "11",
+   "entry_id": "5209365248",
+   "username": "crf_333",
+   "points": 47.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 52.38,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "blaze jordan",
+    "nathan church",
+    "spencer jones",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "12",
+   "entry_id": "5209271862",
+   "username": "KILLANADZ24",
+   "points": 47.1,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 46.83,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "andre pallante",
+    "nathan church",
+    "ryan mcmahon",
+    "spencer jones",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "13",
+   "entry_id": "5209513040",
+   "username": "corruption79",
+   "points": 45.5,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 34.13,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "austin wells",
+    "ben rice",
+    "jj wetherholt",
+    "luis garcia",
+    "spencer jones"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "14",
+   "entry_id": "5209552313",
+   "username": "coleproffer",
+   "points": 45.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 49.21,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "blaze jordan",
+    "bryan torres",
+    "spencer jones",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "15",
+   "entry_id": "5209565518",
+   "username": "L053R666",
+   "points": 44.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 42.85,
+   "n_cheap": null,
+   "players_norm": [
+    "andre pallante",
+    "austin wells",
+    "cesar prieto",
+    "jazz chisholm",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "16",
+   "entry_id": "5209505793",
+   "username": "beccapatt",
+   "points": 43.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 41.27,
+   "n_cheap": null,
+   "players_norm": [
+    "blaze jordan",
+    "jj wetherholt",
+    "luis garcia",
+    "ryan mcmahon",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "17",
+   "entry_id": "5209362881",
+   "username": "grantgoupil",
+   "points": 42.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 40.48,
+   "n_cheap": null,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "bryan torres",
+    "jazz chisholm",
+    "spencer jones",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "18",
+   "entry_id": "5209434195",
+   "username": "mrmoz48",
+   "points": 39.5,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 29.37,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "ben rice",
+    "ivan herrera",
+    "jimmy crooks",
+    "luis garcia",
+    "trent grisham"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "19",
+   "entry_id": "5209231779",
+   "username": "Aoteoroa",
+   "points": 38.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 38.09,
+   "n_cheap": null,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "jazz chisholm",
+    "jose fermin",
+    "spencer jones",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "20",
+   "entry_id": "5208856784",
+   "username": "11baller20",
+   "points": 37.8,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 42.86,
+   "n_cheap": null,
+   "players_norm": [
+    "alec burleson",
+    "jazz chisholm",
+    "nathan church",
+    "ryan mcmahon",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  },
+  {
+   "rank": "21",
+   "entry_id": "5209533705",
+   "username": "MCSuchNSuch",
+   "points": 36.2,
+   "salary_used": null,
+   "salary_left": null,
+   "sp_pair": [],
+   "max_stack": null,
+   "stack_pattern": null,
+   "chalk_score": 42.06,
+   "n_cheap": null,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "luis garcia",
+    "nathan church",
+    "trent grisham",
+    "will warren"
+   ],
+   "lineup_complete": true
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Will Warren",
+   "player_norm": "will warren",
+   "roster_position": "UTIL",
+   "pct_drafted": 76.19,
+   "fpts": 11.2
+  },
+  {
+   "player": "Andre Pallante",
+   "player_norm": "andre pallante",
+   "roster_position": "UTIL",
+   "pct_drafted": 61.9,
+   "fpts": 18.4
+  },
+  {
+   "player": "Blaze Jordan",
+   "player_norm": "blaze jordan",
+   "roster_position": "UTIL",
+   "pct_drafted": 57.14,
+   "fpts": 6.0
+  },
+  {
+   "player": "Ben Rice",
+   "player_norm": "ben rice",
+   "roster_position": "UTIL",
+   "pct_drafted": 42.86,
+   "fpts": 13.0
+  },
+  {
+   "player": "Alec Burleson",
+   "player_norm": "alec burleson",
+   "roster_position": "UTIL",
+   "pct_drafted": 42.86,
+   "fpts": 5.0
+  },
+  {
+   "player": "Trent Grisham",
+   "player_norm": "trent grisham",
+   "roster_position": "UTIL",
+   "pct_drafted": 42.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Spencer Jones",
+   "player_norm": "spencer jones",
+   "roster_position": "UTIL",
+   "pct_drafted": 38.1,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nathan Church",
+   "player_norm": "nathan church",
+   "roster_position": "UTIL",
+   "pct_drafted": 38.1,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jazz Chisholm Jr.",
+   "player_norm": "jazz chisholm",
+   "roster_position": "UTIL",
+   "pct_drafted": 33.33,
+   "fpts": 6.0
+  },
+  {
+   "player": "Austin Wells",
+   "player_norm": "austin wells",
+   "roster_position": "UTIL",
+   "pct_drafted": 33.33,
+   "fpts": 3.0
+  },
+  {
+   "player": "JJ Wetherholt",
+   "player_norm": "jj wetherholt",
+   "roster_position": "UTIL",
+   "pct_drafted": 28.57,
+   "fpts": 15.0
+  },
+  {
+   "player": "Ryan McMahon",
+   "player_norm": "ryan mcmahon",
+   "roster_position": "UTIL",
+   "pct_drafted": 23.81,
+   "fpts": 4.0
+  },
+  {
+   "player": "Luis Garcia Jr.",
+   "player_norm": "luis garcia",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.05,
+   "fpts": 2.0
+  },
+  {
+   "player": "Bryan Torres",
+   "player_norm": "bryan torres",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.05,
+   "fpts": 4.0
+  },
+  {
+   "player": "Jimmy Crooks",
+   "player_norm": "jimmy crooks",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.05,
+   "fpts": 10.0
+  },
+  {
+   "player": "Ivan Herrera",
+   "player_norm": "ivan herrera",
+   "roster_position": "UTIL",
+   "pct_drafted": 9.52,
+   "fpts": 7.0
+  },
+  {
+   "player": "Cesar Prieto",
+   "player_norm": "cesar prieto",
+   "roster_position": "UTIL",
+   "pct_drafted": 9.52,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Fermin",
+   "player_norm": "jose fermin",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.76,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 21,
+  "best_rank": 1,
+  "worst_rank": 1,
+  "best_finish_percentile": 100.0,
+  "median_finish_percentile": 100.0,
+  "best_points": 76.6,
+  "winning_points": 76.6,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}
