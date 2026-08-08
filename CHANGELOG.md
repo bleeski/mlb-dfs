@@ -25,6 +25,67 @@ performance claim.
 
 ---
 
+## 2026-08-08 — backlog merge: R93–R96 filed, R49 gains its zero-join gate, R37/R39/R40 decision inputs appended, eight fragments consumed
+
+### Changed
+
+- **Four items filed from ARCHIVE's five 2026-08-08 tooling fragments, and one
+  fold.** All five came out of mining A-035..A-037 (31 contests, ledger 3.18),
+  none touches the certified path, and every one of them is a tool that
+  reported success while doing nothing or did work in an order that left side
+  effects behind a failure — the archival-side view of the R51/R92 family.
+  **R93** — `field_miner` raises `FileNotFoundError` on its own `--json` path
+  when the archive date folder does not exist, AFTER the `own_results` append
+  and the fragment write have already landed, so the operation is not
+  retry-safe (all 30 mines of the 08-05/06 tranche hit it). **R94** — a
+  runbook-verbatim mine never touches the opponent registry: the runbook says
+  omit `--registry`, `main` gates the call on the flag, and
+  `update_registry`'s internal path default is unreachable without it; 31
+  mines skipped accumulation silently, caught only by comparing registry
+  `contests_mined` (236) against `own_results` (267). **R95** (P1) —
+  `awaiting_standings` enrolls contests whose slate has not settled, DK serves
+  a zero-byte export pre-settle, and a zero-byte inbox file then satisfies the
+  by-filename "pulled" test, which is the R74(b) direction: four contests were
+  lost this way on 08-08 and recovered only because a human noticed the file
+  sizes. **R96** (P1) — a filled, entered `DKEntries` file exists in
+  `outputs/2026-08-06/` with no manifest row, no `runs/` directory and no
+  staged salary; it fails closed at preflight but sits outside supersession
+  tracking and the sha256-at-upload check, and it permanently caps those five
+  contests at `standings_only`. R96 absorbs the unnumbered R36 finding (three
+  such files under `outputs/2026-07-29/`, plus R29(2)'s refused-promotion
+  window) because the state has now recurred across three months and two
+  contest families, which makes it a defect in the delivery path rather than
+  an incident. The fifth fragment was folded rather than numbered: **R49(3)**,
+  an explicit wrong `--salary` joining 0.0% archiving as `coverage: "full"` at
+  exit 0 — it belongs behind R49's manifest-first resolution as the backstop
+  for a resolution that picked wrong, not as the primary mechanism.
+- **Three decision inputs appended, no decisions taken.** **R37** gains the
+  third tranche: `<=3-primary` negative a third consecutive time (-9.8pp
+  [-18.0,-1.6]) while our own share of it climbed 7.0% -> 21.5% -> 26.3%, and
+  the 08-04 "5-2-1 decayed under crowding" read did not survive (+13.6pp
+  [5.6,21.6] on a 21.6% field share; lift has moved opposite to field share
+  all three tranches). Net: the floor-first leg strengthens, the
+  narrow-breadth floor-5 leg is restored, and one build requirement is added —
+  a five-stack quota should read the shape's current field share rather than a
+  pinned lift constant. **R39** gains a measured payoff and leaves the
+  opportunistic tier: the 3.18 review had to re-parse 64 archived showdown
+  CSVs by hand to see captain choice at all (winner CPT own 14.8 vs field
+  13.0; top-owned captain won 22/85; our tranche captains chalkier than the
+  winners), so landing `captain_norm` converts a session-sized one-off into a
+  standing table and makes a captain-spread policy decidable. **R40** gains
+  the first cash-line anatomy, which complicates its own premise — in
+  satellites the winner and the last seat look alike (chalk percentile ~31,
+  4-primary median) while the band just outside the line is chalkier and more
+  5-stacked — plus a method requirement: grade candidate profiles against both
+  the mean-delta and the percentile statistic, never either alone.
+- **"What do we tackle next" amended, no R-numbers reassigned.** Two order
+  changes, both argued in the entry: the archival-tooling trio (R95 + R93 +
+  R94) moves to position 2 because R95 is the only open item losing evidence
+  on a recurring basis, and R39 moves from the opportunistic tier into the
+  numbered queue on 3.18's measurement. R37 stays at 1 and stays Ben-gated.
+  Eight consumed fragments moved to `_to_delete/`; deletions recorded in this
+  commit.
+
 ## 2026-08-05 — R74: three silent failures at the archival tooling's edges
 
 ### Fixed
