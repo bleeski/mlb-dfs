@@ -260,6 +260,44 @@ def feed_age_minutes(feed: dict) -> float | None:
     return round(delta.total_seconds() / 60.0, 1)
 
 
+def _contest_objective_block(posture_by_contest) -> list[dict]:
+    """R40: what objective each contest resolved to, and where it came from.
+
+    One row per contest: the posture, the source that chose it, the contest
+    shape, and the SCORING PROFILE that shape resolves to, weights included.
+    Deterministic bookkeeping of an input, not a claim about outcomes.
+
+    The weights are copied in rather than referenced by name on purpose. A
+    profile name is only meaningful against the version of
+    ``CONTEST_SHAPE_PROFILE_WEIGHTS`` that was current when the build ran, and
+    the whole reason this block exists is that a build's objective had to be
+    reconstructed months later from a table that had moved in between.
+    """
+    rows: list[dict] = []
+    try:
+        from mlb_engine.optimize.optimizer_v3 import resolve_contest_shape_profile
+    except Exception:  # never let bookkeeping break a delivery
+        resolve_contest_shape_profile = None  # type: ignore
+    for cid, info in sorted((posture_by_contest or {}).items()):
+        shape = info.get("contest_shape")
+        row = {
+            "contest_id": str(cid),
+            "contest_name": info.get("contest_name"),
+            "posture": info.get("posture"),
+            "posture_source": info.get("posture_source") or "name_inference",
+            "matched_pattern": info.get("matched_pattern"),
+            "contest_shape": shape,
+            "profile": None,
+        }
+        if shape and resolve_contest_shape_profile is not None:
+            try:
+                row["profile"] = resolve_contest_shape_profile(contest_shape=shape)
+            except Exception as exc:  # an unknown shape is worth recording as one
+                row["profile"] = {"error": str(exc)}
+        rows.append(row)
+    return rows
+
+
 def manifest_repo_relative(path) -> str | None:
     if not path:
         return None
@@ -1676,6 +1714,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "pool_blockers_overridden": hard if (hard and args.ignore_pool_blockers) else [],
         "pool_blockers_soft": soft,
         "run_id": result.get("run_id"),
+        # R40. The resolved objective, per contest, recorded in the artifact
+        # rather than reconstructed later. It used to print to stderr and stop
+        # there, so answering "which profile scored this build" a week later
+        # meant reading runs/ and cross-referencing a weights table by hand --
+        # which is how R40 became archaeology for two rank-1 finishes rather
+        # than a lookup. The scoring weights are included, not just the shape
+        # name, because the weights are the thing that actually ranked the
+        # candidates and the table they come from is versioned code.
+        "contests": _contest_objective_block(result.get("posture_by_contest")),
         "gates": {
             "workflow_valid": result.get("workflow_valid"),
             "selection_certified": result.get("selection_certified"),

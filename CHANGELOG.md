@@ -25,6 +25,82 @@ performance claim.
 
 ---
 
+## 2026-08-09 — R40 archaeology answered; the routing it was going to license is NOT written
+
+Test pin 782 -> 784. `build_slate.py` records the resolved objective per
+contest in the brief. No routing, weight, or profile changed.
+
+### R40 — which profile scored the two rank-1 satellite builds
+
+**Answered, from `runs/` and the run diagnostics rather than the miner, as the
+item specifies.**
+
+| contest | archive | slate | field | finish | resolved shape | profile that scored it |
+|---|---|---|---|---|---|---|
+| 192892126 ($15 Relay Throw) | A-034 | 2026-07-28 | 53 | 1 of 53 | `satellite` | floor 0.42 / ceiling 0.58, stack 0.35, uniqueness 0.10, field pressure 0.25 |
+| 192973047 ($5 FFM) | A-032 | 2026-07-30 | 23 | 1 of 23 | `large_wta` | floor 0.00 / ceiling 1.00, stack 1.10, uniqueness 1.00, field pressure 1.15 |
+
+Neither is `wta_ticket_satellite`, which is the profile the item was written to
+route toward. The record: the run promoted for 192892126 is
+`20260728T221859Z_7567b76a` (three earlier runs that evening are `blocked`);
+192973047 has TWO runs marked `promoted` with no supersession between them
+(`20260730T153239Z_4ec8f869` and `20260730T154316Z_226d98ea`) and they assign
+different lineups to the same entry — that is R96's unmanifested-delivery
+problem showing up in the record, and it does not affect which PROFILE scored
+either one, because both runs resolved the same shape.
+
+**The routing change is NOT written, and the reason is the evidence rather than
+the plumbing.** Ben's instruction was conditional: write the `paid_places == 1`
+routing to `wta_ticket_satellite` if the answer is the `satellite` floor-blend
+profile. It is, for one of the two. Three things say do not act on that yet.
+
+1. **The floor blend WON.** The item's premise is that "the floor blend has been
+   pulling toward exactly the construction the archive says does not win seats."
+   The one contest that cleanly instantiates the floor blend finished first of
+   53. That is n=1 and proves nothing on its own — but it is evidence against
+   the premise, not for it, and it is the only direct evidence there is.
+2. **The 2026-08-08 cash-line anatomy already complicated the premise
+   independently**, and grading on both required statistics keeps it
+   complicated. On PERCENTILE, satellite winners and last-paid seats look alike
+   (~31, sub-median chalk, looser salary, 4-primary median) and the band just
+   OUTSIDE the line is more 5-stacked and chalkier, so a floor blend pulling
+   toward 4-primary sub-median chalk is pulling toward what actually got paid.
+   On MEAN-delta, 3.17's +4.9 cumulative-ownership-over-field still holds. Both
+   are true at once in a left-skewed chalk distribution; neither alone settles
+   this, and the profile difference the routing would make (floor 0.42 -> 0.00,
+   field pressure 0.25 -> 0.80) moves construction on exactly the axis the two
+   statistics disagree about.
+3. **The routing key is null for both contests.** `paid_places` is absent from
+   both mined records and from `contest_library` for both contest names, so a
+   `paid_places == 1` rule would not have fired on either build even if it had
+   existed. Writing a router keyed on a field that is empty where it matters
+   most produces no change and a false sense that one was made. That is
+   downstream of the curated-archetypes decision now sitting in
+   `docs/backlog_inbox/` for ARCHIVE, which is what would populate the key.
+
+Reranking lineups on contests entered tonight is a strategy change and Ben's
+dated decision. The archaeology is done and the finding is the opposite shape
+from the one the conditional anticipated, so it goes back to him rather than
+into the engine.
+
+### R40 — the "either way" half, which is unconditional and is shipped
+
+`build_slate.py` writes a `contests` block into `build_brief.json`: one row per
+contest carrying contest_id, name, posture, posture_source, matched pattern,
+resolved contest shape, and the full scoring profile including its weights. It
+printed to stderr and stopped there, which is precisely why answering this
+question three months later meant reading `runs/` and cross-referencing a
+weights table by hand.
+
+The weights are copied in rather than referenced by name: a profile name is only
+meaningful against the version of `CONTEST_SHAPE_PROFILE_WEIGHTS` current when
+the build ran, and that table has moved. The block is built through a deferred
+import so `build_slate`'s stdlib-only top level survives, an unresolvable shape
+is recorded as an error rather than as a missing profile, and bookkeeping never
+breaks a delivery.
+
+---
+
 ## 2026-08-09 — R37 stage 1: the primary-stack floor lands at 4 on every posture
 
 Test pin 773 -> 782 (core 521 -> 530). `contest_allocator` gains

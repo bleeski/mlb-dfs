@@ -3840,6 +3840,39 @@ class BuildSlateScriptTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_the_brief_records_the_objective_each_contest_resolved_to(self):
+        """R40. The build's objective per contest used to print to stderr and
+        stop there, which is how 'which profile scored this build' became
+        archaeology for two rank-1 finishes. The weights ride along with the
+        shape name because a name only means something against the version of
+        the profile table that was current when the build ran."""
+        mod = self._module()
+        rows = mod._contest_objective_block({
+            "9": {"contest_name": "MLB Satellite to $15 Relay Throw",
+                  "posture": "wta_satellite", "contest_shape": "satellite",
+                  "posture_source": "name_inference", "matched_pattern": "satellite"},
+            "1": {"contest_name": "MLB $5 FFM", "posture": "wta_satellite",
+                  "contest_shape": "large_wta", "posture_source": "curated"},
+        })
+        self.assertEqual([r["contest_id"] for r in rows], ["1", "9"],
+                         "contests are recorded in a stable order")
+        by_id = {r["contest_id"]: r for r in rows}
+        self.assertEqual(by_id["9"]["posture"], "wta_satellite")
+        self.assertEqual(by_id["9"]["posture_source"], "name_inference")
+        self.assertEqual(by_id["9"]["profile"]["contest_shape"], "satellite")
+        self.assertAlmostEqual(by_id["9"]["profile"]["floor_weight"], 0.42)
+        self.assertEqual(by_id["1"]["profile"]["mode_family"], "wta")
+        self.assertAlmostEqual(by_id["1"]["profile"]["floor_weight"], 0.00)
+        self.assertEqual(mod._contest_objective_block(None), [])
+
+    def test_an_unknown_contest_shape_is_recorded_as_an_error_not_dropped(self):
+        """Bookkeeping must never break a delivery, and must never quietly
+        report a shape it could not resolve as having no profile."""
+        mod = self._module()
+        row = mod._contest_objective_block(
+            {"7": {"contest_shape": "not_a_shape", "posture": "large_gpp"}})[0]
+        self.assertIn("error", row["profile"])
+
     def test_gate_failure_detail_collects_cause(self):
         """R27 open half: a failed pre-export gate names itself, its evidence
         line, and the pool blockers, so the not_certified payload carries the
