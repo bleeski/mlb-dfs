@@ -8788,14 +8788,28 @@ class SwapControlsInheritanceTests(unittest.TestCase):
         self.assertEqual(derived,
                          dict(epi.STRATEGY_DEFAULTS["single_entry"]["controls"]))
 
-    def test_a_cash_only_file_enforces_nothing_and_matches_the_build(self):
-        """The other counterexample. cash carries no controls, so a cash-only
-        swap enforces none. That is inheritance working, not a cap going
-        missing, and the pre-solve line prints it rather than looking blank."""
+    def test_a_cash_only_file_enforces_no_cap_and_matches_the_build(self):
+        """The other counterexample. cash carries no exposure CAP, so a
+        cash-only swap enforces none. That is inheritance working, not a cap
+        going missing, and the pre-solve line prints it rather than looking
+        blank.
+
+        R37, 2026-08-09: cash is no longer literally empty. It declares
+        `primary_stack_min_size` and nothing else, and the reason is the
+        floor-merge rule rather than an opinion about cash games -- a floor is
+        retired for the whole portfolio the moment one posture goes silent on
+        it, so a single cash contest in a mixed file would otherwise switch the
+        floor off for every other contest in that file. The assertion that
+        matters here never was 'the dict is empty', it is 'cash contributes no
+        cap', so that is what it now says."""
         derived = self._late_swap().resolve_swap_controls(
             self._postures("cash"), None, None)
-        self.assertEqual(derived, {})
-        self.assertEqual(epi.STRATEGY_DEFAULTS["cash"]["controls"], {})
+        self.assertEqual(derived, {"primary_stack_min_size": 4})
+        self.assertEqual(epi.STRATEGY_DEFAULTS["cash"]["controls"],
+                         {"primary_stack_min_size": 4})
+        self.assertEqual(
+            [k for k in derived if k.startswith("max_")], [],
+            "cash must contribute no exposure or repetition cap")
         text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
             encoding="utf-8")
         self.assertIn("none for these postures", text)
@@ -9917,6 +9931,179 @@ class RebuildRegistryResolutionTests(unittest.TestCase):
             payload = json.loads(staged.read_text(encoding="utf-8"))
             self.assertEqual(payload.get("contests_mined", []), [],
                              msg="a truncated stage must resume nothing")
+
+
+class PrimaryStackFloorTests(unittest.TestCase):
+    """R37 stage 1: the universal primary-stack SIZE floor.
+
+    Ben's dated decision of 2026-08-09. Three tranches put the `<=3-primary`
+    family negative while our own share of it climbed to 26.3%, and the
+    2026-08-05 probe priced a floor of 4 at 0.00-0.76% of the unconstrained
+    objective. What is pinned here is the MECHANISM, not the numbers: that the
+    floor binds, that it relaxes and counts rather than starving an entry, that
+    it refuses to guess when the bank cannot be read, and that it is absent
+    when nobody asked for it.
+    """
+
+    ENTRIES = [
+        {"entry_id": "1", "contest_id": "x", "contest_shape": "large_field_gpp"},
+        {"entry_id": "2", "contest_id": "x", "contest_shape": "large_field_gpp"},
+    ]
+
+    @staticmethod
+    def _cand(cid, roster, score, size, primary="AAA"):
+        payload = candidate(cid, roster, score, primary)
+        if size is not None:
+            payload["primary_stack_size"] = size
+        return payload
+
+    def _bank(self, sizes, scores=None):
+        """One candidate per size, each on a disjoint-enough roster.
+
+        ``scores`` matters more than it looks. Left to descend with the index,
+        the solver picks the leading candidates anyway and a floor that is never
+        enforced still passes -- the test would be measuring the report instead
+        of the constraint. Callers that care put the ineligible candidate on top.
+        """
+        out = []
+        for i, size in enumerate(sizes):
+            roster = [f"P{i}a", f"P{i}b"] + [f"H{i}_{j}" for j in range(8)]
+            score = (scores or [100 - j for j in range(len(sizes))])[i]
+            out.append(self._cand(f"c{i}", roster, score, size))
+        return out
+
+    def test_the_floor_excludes_a_smaller_stack_and_counts_what_it_dropped(self):
+        """The three-stack is the BEST-scoring candidate here, so an unenforced
+        floor selects it and this test fails. That is the point: a floor whose
+        removal changes no outcome is a floor that was never binding."""
+        bank = self._bank([4, 4, 3], scores=[98, 97, 100])
+        unfloored = select_and_assign_entries(bank, self.ENTRIES, {})
+        self.assertIn("c2", {a["candidate_id"] for a in unfloored["assignments"]},
+                      "fixture is wrong: the three-stack must win without the floor")
+
+        result = select_and_assign_entries(
+            bank, self.ENTRIES, {"primary_stack_min_size": 4})
+        self.assertTrue(result["passed"], result.get("errors"))
+        block = result["primary_stack_floor"]
+        self.assertEqual(block["applied"], 4)
+        self.assertEqual(block["status"], "applied")
+        self.assertEqual(block["relaxations"], 0)
+        self.assertEqual(block["candidates_excluded"], 1)
+        self.assertEqual(block["size_histogram"], {"3": 1, "4": 2})
+        self.assertEqual(block["assigned_below_requested"], 0)
+        self.assertNotIn("c2", {a["candidate_id"] for a in result["assignments"]},
+                         "the three-stack was still selected, so the floor is inert")
+
+    def test_a_bank_the_floor_cannot_carry_relaxes_and_counts_instead_of_starving(self):
+        """The Showdown rule, applied here: relax before you truncate. A floor
+        that refuses leaves a blank reserved row, and a blank row blocks
+        certification -- which is strictly worse than a counted relaxation."""
+        result = select_and_assign_entries(
+            self._bank([3, 3, 3]), self.ENTRIES, {"primary_stack_min_size": 4})
+        self.assertTrue(result["passed"], result.get("errors"))
+        block = result["primary_stack_floor"]
+        self.assertEqual(block["requested"], 4)
+        self.assertEqual(block["applied"], 3)
+        self.assertEqual(block["status"], "applied_relaxed")
+        self.assertEqual(block["relaxations"], 1)
+        self.assertEqual(block["relaxation_steps"][0]["from"], 4)
+        self.assertEqual(block["relaxation_steps"][0]["to"], 3)
+        self.assertEqual(block["relaxation_steps"][0]["trigger"],
+                         "entry_starved_before_solve")
+        self.assertEqual(block["assigned_below_requested"], 2)
+        self.assertTrue(
+            any("relaxed 1 time" in w for w in result.get("warnings", [])),
+            f"a relaxation must be stated, not just counted: {result.get('warnings')}")
+
+    def test_a_bank_that_reports_no_size_at_all_is_unmeasurable_not_empty(self):
+        """The failure this repairs. Before R37 `bank_cache.as_candidates`
+        emitted the stack TEAM and not the SIZE, so every sliced-path candidate
+        read 0 -- the same value a stackless lineup carries. Excluding a whole
+        bank on the strength of a field its producer never wrote is the worst
+        available reading of that ambiguity."""
+        result = select_and_assign_entries(
+            self._bank([None, None, None]), self.ENTRIES,
+            {"primary_stack_min_size": 4})
+        self.assertTrue(result["passed"], result.get("errors"))
+        block = result["primary_stack_floor"]
+        self.assertEqual(block["status"], "unmeasurable")
+        self.assertIsNone(block["applied"])
+        self.assertEqual(block["candidates_excluded"], 0)
+        self.assertTrue(any("NOT enforced" in w for w in result.get("warnings", [])))
+
+    def test_an_absent_control_leaves_the_result_shape_exactly_as_it_was(self):
+        """Absent means absent: no exclusion, and no floor key on the result."""
+        result = select_and_assign_entries(self._bank([4, 3]), self.ENTRIES, {})
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertNotIn("primary_stack_floor", result)
+        self.assertEqual(
+            {a["candidate_id"] for a in result["assignments"]}, {"c0", "c1"},
+            "with no floor requested the three-stack stays selectable")
+
+    def test_the_ladder_stops_at_the_bucket_rule_then_switches_off(self):
+        from mlb_engine.allocate.contest_allocator import primary_stack_floor_rungs
+        self.assertEqual(primary_stack_floor_rungs(4), [4, 3, None])
+        self.assertEqual(primary_stack_floor_rungs(5), [5, 4, 3, None])
+        # Below the bucket rule the quantity is always 0, so a floor of 2 would
+        # exclude every candidate while looking like the loosest rung there is.
+        self.assertEqual(primary_stack_floor_rungs(2), [None])
+
+    def test_every_posture_declares_the_floor_so_the_merge_is_unanimous(self):
+        for posture, spec in epi.STRATEGY_DEFAULTS.items():
+            self.assertEqual(
+                spec["controls"].get("primary_stack_min_size"), 4,
+                f"{posture} does not declare the floor; one silent posture "
+                f"retires it for the whole portfolio")
+        merged = epi._merged_controls_for_build(
+            {"1": {"posture": "wta_satellite"}, "2": {"posture": "cash"}}, None)
+        self.assertEqual(merged["primary_stack_min_size"], 4)
+        self.assertIsInstance(merged["primary_stack_min_size"], int)
+
+    def test_one_silent_posture_still_retires_the_floor_for_the_portfolio(self):
+        """The R34 floor-merge rule, which R37 inherits rather than restates. A
+        portfolio serving a contest that never asked for the floor must not
+        carry one; forcing it on is a strategy change made invisibly."""
+        silent = dict(epi.STRATEGY_DEFAULTS["cash"])
+        silent["controls"] = {}
+        with unittest.mock.patch.dict(
+                epi.STRATEGY_DEFAULTS, {"cash": silent}, clear=False):
+            merged = epi._merged_controls_for_build(
+                {"1": {"posture": "wta_satellite"}, "2": {"posture": "cash"}}, None)
+        self.assertEqual(merged["primary_stack_min_size"], 0,
+                         "a silent posture must retire the floor, not inherit it")
+
+    def test_the_mme_plan_string_no_longer_claims_a_five_three(self):
+        """The archive has 5-3 at-share in every slice measured, and the
+        mini-MAX slice this posture serves prefers the lone five. The retired
+        name stays in the size map because archived records still carry it."""
+        self.assertNotEqual(epi.STRATEGY_DEFAULTS["mme"]["stack_plan"],
+                            "five_three_with_diversification")
+        self.assertEqual(
+            epi._STACK_SIZE_BY_PLAN[epi.STRATEGY_DEFAULTS["mme"]["stack_plan"]], 5,
+            "the label changed; the size it resolves to must not")
+        self.assertEqual(
+            epi._STACK_SIZE_BY_PLAN.get("five_three_with_diversification"), 5,
+            "a replayed record carrying the old name must still resolve")
+
+    def test_the_bank_cache_payload_carries_the_size_the_lineup_has(self):
+        """The plumbing the floor rides on, pinned at its producer. This is the
+        test that would have caught the original omission: the team was emitted
+        and the count was not, which reads as working."""
+        from mlb_engine.optimize.bank_cache import BankCache
+        from mlb_engine.allocate.contest_allocator import _candidate_primary_stack_size
+        with tempfile.TemporaryDirectory() as tmp:
+            ids = write_salary(Path(tmp) / "salary.csv")
+            frame = projection_frame(ids)
+            roster, _ = legal_rosters(ids)
+            cache = BankCache(Path(tmp) / "bank.json")
+            self.assertTrue(cache.add(roster, 100.0, job="j0"))
+            payload = cache.as_candidates(frame, requested_n=1)[0]
+            expected = opt.candidate_primary_stack_size(
+                frame.assign(pid=frame["Player_ID"].astype(str))
+                     .set_index("pid", drop=False).loc[[str(p) for p in roster]])
+            self.assertEqual(payload["primary_stack_size"], expected)
+            self.assertEqual(_candidate_primary_stack_size(payload), expected)
+            self.assertGreater(expected, 0, "the fixture roster carries a real stack")
 
 
 if __name__ == "__main__":

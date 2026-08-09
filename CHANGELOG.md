@@ -25,6 +25,132 @@ performance claim.
 
 ---
 
+## 2026-08-09 — R37 stage 1: the primary-stack floor lands at 4 on every posture
+
+Test pin 773 -> 782 (core 521 -> 530). `contest_allocator` gains
+`primary_stack_min_size` with a counted relaxation ladder; `bank_cache` emits
+the field that control reads; `execution_pipeline` declares the floor on all six
+postures and corrects `mme`'s stack-plan label.
+
+### R37(1) — universal `primary_stack_min_size = 4`
+
+**Decided by Ben 2026-08-09**, accepting DEV's 2026-08-05 floor-first
+recommendation as written, amended by the 2026-08-08 third-tranche input. Stage
+1 only. Explicitly deferred by the same decision: floor 5 at breadth <= 0.02
+waits for one measured tranche, the 4-2-x cap is sized separately after this
+lands, no contrarian push, salary-left untouched. Any future five-stack quota
+reads the shape's CURRENT field share rather than a pinned lift constant.
+
+**Shipped.** `primary_stack_min_size` is a portfolio control, declared at 4 by
+every posture in `STRATEGY_DEFAULTS` and enforced in
+`select_and_assign_entries`: a candidate whose primary stack carries fewer
+hitters is not selectable. It is the first LOWER bound among the per-candidate
+controls, and it merges under R34's floor rule rather than the ceiling rule --
+least demanding wins, and one posture going silent retires the floor for the
+whole portfolio. `cash` therefore declares it too, and that is the only control
+`cash` carries; a single cash contest in a mixed file would otherwise switch the
+floor off for every other contest in that file.
+
+**The evidence, and its label.** Three tranches put `<=3-primary` negative every
+time (-2.8pp [-3.8,-1.8] combined over the first two, -9.8pp [-18.0,-1.6] on the
+third) while our own share of that family climbed 7.0% -> 21.5% -> 26.3%. The
+2026-08-05 probe priced the floor at 0.00-0.76% of the unconstrained objective
+across 3-to-8-game slates and found a 5-primary lineup feasible on 100% of
+stackable teams at every width. Observed outcomes and deterministic review
+proxies. Nothing here is a win rate, a cash rate, or a probability.
+
+**Relaxations are counted, Showdown-style, and the ladder is 4 -> 3 -> off.**
+The reason is the one CLAUDE.md already gives for the Showdown controls: a short
+bank leaves a blank reserved row and a blank row blocks certification, so a
+floor that refuses is worse than a floor that steps down and says so. It steps
+on two triggers, both recorded with a `from`, a `to` and a reason:
+`entry_starved_before_solve` when an entry retains no compatible candidate at
+the current rung, and `proven_infeasible_with_floor` after the MILP proves
+infeasibility with the floor active. It NEVER steps on a timeout — the rule that
+a compute limit may not move a strategy control is the same rule the DU ladder
+already follows, and a slow solve must not quietly buy a looser portfolio. The
+ladder stops at 3 because below `PRIMARY_STACK_MIN_HITTERS` the bucket rule
+reports no stack at all, so a "floor of 2" would exclude every candidate while
+looking like the loosest setting available.
+
+`primary_stack_floor` on the result carries requested, applied, status, the
+relaxation count and steps, the bank's size histogram, how many candidates were
+excluded, the histogram of what was actually ASSIGNED, and
+`assigned_below_requested` — counted from the delivered assignments rather than
+asserted from the constraint. A portfolio is not clean because it certified; it
+is clean when that count and the relaxation count are both zero.
+
+**This is not the pool trimming CLAUDE.md forbids.** That rule is about reducing
+the legal PLAYER set to fit a COMPUTE limit, invisibly. This reduces the
+CANDIDATE set to fit a stated strategy, is decided before the solve rather than
+discovered during it, and names every rung it lands on. Same distinction the
+fixed-exposure blocking already draws two hundred lines above it.
+
+### R37(1) — the plumbing it rides on was broken, and R34 was broken with it
+
+**Found while building, reproduced on the real 2026-08-08 1910_9g delivery.**
+`bank_cache.as_candidates` emitted `primary_stack` and not
+`primary_stack_size`. The allocator reads the size through
+`_candidate_primary_stack_size`, which returns 0 for a missing key — and 0 is
+also the honest encoding of a genuinely stackless lineup. So every sliced-path
+candidate reported "no stack" regardless of what it held: seven candidates
+carrying real four-man stacks all read 0.
+
+That is not a weakened control, it is an inverted one. R34's
+`min_five_stack_share_pct` would have refused a bank that satisfied it ("the
+bank contains 0 such candidates"), and R37's floor would have excluded every
+candidate it was handed. The quota shipping at 0.0 is the only reason this never
+fired. The team was emitted and the count was not, which is the shape of bug
+that reads as working.
+
+**Shipped.** `as_candidates` emits `primary_stack_size`, pinned by a test at the
+producer. And because a missing field and a stackless lineup remain
+indistinguishable per candidate, the floor treats a bank in which NO candidate
+reports a size as `unmeasurable`: it does not enforce, and it says in a warning
+that the producer is the thing to fix. A Classic bank of genuinely stackless
+lineups is not realistic; excluding everything on the strength of an unwritten
+field is the worst available reading of that ambiguity.
+
+### R37(1) — `mme`'s stack-plan label said something the archive contradicts
+
+**Shipped.** `five_three_with_diversification` -> `tight_5_with_diversification`.
+The archive has 5-3 at-share on both the win line and the top decile in every
+slice measured, and the mini-MAX slice this posture serves prefers the lone five
+(5-1-1-1, +3.6pp [+1.4,+5.6] over 73,343 entries). Only `_STACK_SIZE_BY_PLAN`
+reads the string, for the size 5, which is unchanged — so this is a label
+correction with no behavioural effect, which is exactly why it was worth doing
+before something got wired to it. The retired name stays in the size map:
+archived build records still carry it, and a plan string that map does not know
+drops silently out of the max-stack computation.
+
+### Fixture moves, both deliberate
+
+**`tests/golden/golden_replay_2026-06-03.json` regenerated.** The floor bound on
+the replay: 14 candidates in, one 3-primary excluded, 13 eligible, zero
+relaxations, zero assigned below 4. Worth stating precisely what moved, because
+"the golden baseline changed" invites the wrong reading — the DELIVERED
+PORTFOLIO DID NOT CHANGE. Per contest the multiset of lineups is identical, and
+`exposure_summary`, `sp_pair_distribution`, the stack distribution (BOS 12, PHI
+5, SD 1) and the eight distinct signatures are all byte-identical to the old
+baseline. What permuted is which entry_id received which candidate_id: removing
+one candidate shifts the MILP's variable indices and therefore its tie-breaks.
+Verified deterministic across two consecutive runs before regenerating.
+
+**`test_a_cash_only_file_enforces_nothing_and_matches_the_build` renamed to
+`..._enforces_no_cap_...`.** It asserted `cash`'s controls were literally empty.
+The assertion that carried its meaning was always "cash contributes no cap", so
+that is what it now says, and it now also asserts no key starting `max_` appears.
+
+**Mutation-checked by hand.** The first version of the floor's headline test
+passed against a mutant with enforcement disabled, because the ineligible
+candidate was also the lowest-scoring one and the solver skipped it anyway — the
+test was measuring the report, not the constraint. The fixture now puts the
+3-stack on top with the best score and asserts it wins without the floor, so
+removing the enforcement turns the test red. Both mutants (enforcement disabled,
+payload field dropped) are caught.
+
+---
+
 ## 2026-08-09 — R61 shipped whole; R47 investigated, mechanism found, fix repriced
 
 Test pin 758 -> 773 (core 506 -> 521). `contest_allocator` and

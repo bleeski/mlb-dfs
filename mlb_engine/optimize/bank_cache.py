@@ -290,6 +290,19 @@ class BankCache:
         The no-stack case is the empty string, never the DU signature's 'NONE'
         sentinel, which the allocator would read as a team.
 
+        R37, v1.3: ``primary_stack_size`` is emitted alongside it, and the
+        omission it repairs was not cosmetic. The allocator reads the SIZE
+        through ``_candidate_primary_stack_size``, which returns 0 when the key
+        is absent, and 0 is also the honest encoding of a stackless lineup. So
+        every sliced-path candidate reported "no stack" no matter what it held:
+        measured on the 2026-08-08 1910_9g delivery, seven bank-cache
+        candidates carrying real four-man stacks all read 0. Any size-
+        conditioned control reading that bank is not merely weakened, it is
+        inverted -- R34's five-stack quota would have refused a bank that
+        satisfied it, and R37's primary-stack floor would exclude every
+        candidate it was handed. The team was emitted and the count was not,
+        which is the sort of half-plumbed field that reads as working.
+
         ``contest_shapes`` populates ``contest_fit_by_shape``. The single
         ``mode="wta"`` score is a ceiling-max ranking, and the allocator's cash
         branch then applies its floor weighting on top of it, so a cash entry
@@ -303,8 +316,8 @@ class BankCache:
         blank row blocks certification. Doing it silently is not.
         """
         from mlb_engine.optimize.optimizer_v3 import (
-            candidate_primary_stack, score_lineup_candidate,
-            _mode_for_contest_shape,
+            candidate_primary_stack, candidate_primary_stack_size,
+            score_lineup_candidate, _mode_for_contest_shape,
         )
 
         shapes: List[str] = []
@@ -336,6 +349,13 @@ class BankCache:
                 # first two entries are P1 and P2 by construction.
                 "sp_ids": list(roster[:2]),
                 "primary_stack": "",
+                # R37. Stays 0 when the frame cannot resolve the roster, which
+                # is the same value a genuinely stackless lineup carries. The
+                # allocator therefore cannot tell "no stack" from "not
+                # measured" per candidate, and treats a bank where NO candidate
+                # reports a size as unmeasurable rather than as a bank of
+                # stackless lineups.
+                "primary_stack_size": 0,
             }
             if by_id is not None:
                 try:
@@ -345,6 +365,7 @@ class BankCache:
                             f"{len(roster) - len(lineup_df)} roster ids absent from projections"
                         )
                     payload["primary_stack"] = candidate_primary_stack(lineup_df)
+                    payload["primary_stack_size"] = candidate_primary_stack_size(lineup_df)
                     score = score_lineup_candidate(
                         lineup_df, projections_df, mode="wta",
                         candidate_id=cid, requested_n=requested_n)

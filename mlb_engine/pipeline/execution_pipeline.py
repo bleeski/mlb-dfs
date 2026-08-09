@@ -742,6 +742,25 @@ def run_late_swap(
 # is not enough accumulated slate data to calibrate construction numbers, so
 # these are starting points keyed on contest posture and are never to be called
 # win rates or ROI. Override any field per slate via portfolio_controls_override.
+#
+# R37 stage 1, Ben's dated decision of 2026-08-09: `primary_stack_min_size` is 4
+# on EVERY posture, cash included. It is the one construction number here with
+# an archive behind it rather than a principle, and it is stated once so the six
+# copies below are not read as six separate opinions. Three independent tranches
+# put the `<=3-primary` family negative -- -2.8pp [-3.8,-1.8] combined over the
+# first two, -9.8pp [-18.0,-1.6] on the third -- while our own share of that
+# family climbed 7.0% -> 21.5% -> 26.3%. The 2026-08-05 feasibility probe
+# (`tools/stack_shape_probe.py`) priced the floor at 0.00-0.76% of the
+# unconstrained objective across slates from 3 to 8 games and found a 5-primary
+# lineup feasible on 100% of stackable teams at every width, so the constraint
+# is close to free and the family it removes is the one the archive is firmest
+# about. Those are observed outcomes and deterministic review proxies; none of
+# it is a win rate, a cash rate, or a probability claim.
+#
+# What is deliberately NOT here, per the same decision: the floor of 5 on
+# narrow-breadth postures waits for one measured tranche, the 4-2-x secondary
+# cap is deferred and sized separately after this lands, no contrarian push is
+# added on top, and the salary-left gap is left alone.
 
 STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "single_entry": {
@@ -753,6 +772,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "controls": {
             "max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
             "max_primary_stack_exposure_pct": 1.0, "max_sp_pair_repetition": 1,
+            "primary_stack_min_size": 4,
         },
         "note": "one max-ceiling lineup; no decorrelation needed at one entry",
     },
@@ -786,6 +806,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             # the relaxation counts in the brief.
             "min_five_stack_share_pct": 0.0,
             "five_stack_min_size": 5,
+            "primary_stack_min_size": 4,
         },
         "note": "cut-line and first-place objectives both want independent "
                 "shots; section 8 caps, floored up by _slate_feasibility when "
@@ -801,7 +822,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "controls": {
             "max_player_exposure_pct": 0.50, "max_pitcher_exposure_pct": 0.60,
             "max_primary_stack_exposure_pct": 0.55, "max_sp_pair_repetition": 2,
-            "max_shared_players": 6,
+            "max_shared_players": 6, "primary_stack_min_size": 4,
         },
         "note": "tight consecutive stacks; cover viable SP pairs only on deep slates",
     },
@@ -814,7 +835,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "controls": {
             "max_player_exposure_pct": 0.40, "max_pitcher_exposure_pct": 0.55,
             "max_primary_stack_exposure_pct": 0.50, "max_sp_pair_repetition": 3,
-            "max_shared_players": 6,
+            "max_shared_players": 6, "primary_stack_min_size": 4,
         },
         "note": "top-heavy field rewards a tight five-stack plus a secondary",
     },
@@ -822,12 +843,22 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "construction": "multi_wide",
         "objective": "ceiling",
         "entry_count_policy": "scale_to_bank_coverage",
-        "stack_plan": "five_three_with_diversification",
+        # R37, 2026-08-09. Was "five_three_with_diversification". The archive
+        # contradicts the 5-3 half of that string in every slice measured: 5-3
+        # is at-share on both the win line and the top decile, and the mini-MAX
+        # slice this posture serves prefers the lone five (5-1-1-1, +3.6pp
+        # [+1.4,+5.6] over 73,343 entries). The string was never read as a
+        # constraint -- only _STACK_SIZE_BY_PLAN reads it, for the size 5, which
+        # is unchanged -- so this is a label correction with no behavioural
+        # effect, which is exactly why it was worth doing before it got wired to
+        # something. The new name commits to the floor and stays silent about a
+        # secondary size, because the secondary is R37's deferred half.
+        "stack_plan": "tight_5_with_diversification",
         "decorrelation": "high",
         "controls": {
             "max_player_exposure_pct": 0.35, "max_pitcher_exposure_pct": 0.50,
             "max_primary_stack_exposure_pct": 0.45, "max_sp_pair_repetition": 3,
-            "max_shared_players": 6,
+            "max_shared_players": 6, "primary_stack_min_size": 4,
         },
         "note": "wider exposure and higher decorrelation; deployed count scales with bank coverage",
     },
@@ -837,7 +868,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "entry_count_policy": "none",
         "stack_plan": "none",
         "decorrelation": "none",
-        "controls": {},
+        "controls": {"primary_stack_min_size": 4},
         "note": "cash and double-up are a weak architectural fit for this engine; flag and confirm before building",
     },
 }
@@ -1817,7 +1848,12 @@ def _merged_controls_for_build(
     # because the same portfolio must be legal for the contest that never asked
     # for the floor, and forcing a 5-stack quota onto a posture that did not
     # request it is a strategy change for that contest, made invisibly.
-    floor_keys = ("min_five_stack_share_pct",)
+    # R37 adds `primary_stack_min_size` to the same rule for the same reason.
+    # Every posture declares it today, so the unanimity branch below returns 4
+    # and the merge is a no-op; the rule still has to hold, because a posture
+    # that stops declaring it must retire the floor for the whole portfolio
+    # rather than inherit one it never asked for.
+    floor_keys = ("min_five_stack_share_pct", "primary_stack_min_size")
     for info in posture_by_contest.values():
         controls = STRATEGY_DEFAULTS.get(info["posture"], STRATEGY_DEFAULTS["large_gpp"])["controls"]
         for key in pct_keys:
@@ -1844,6 +1880,11 @@ def _merged_controls_for_build(
         if not vals:
             continue          # nobody asked: the key stays absent entirely
         merged[key] = min(vals) if len(vals) == len(declared) else 0.0
+        # R37: a stack SIZE is a count of hitters, and it reaches the brief and
+        # the allocator's report as it is written here. `min` over floats would
+        # print a floor of 4.0 hitters.
+        if key == "primary_stack_min_size":
+            merged[key] = int(merged[key])
 
     for key, floor_val in (feasibility_floors or {}).items():
         if floor_val is None or key not in merged:
@@ -1912,6 +1953,12 @@ def feasibility_floors_from(feasibility_inputs: Mapping[str, Any]) -> Dict[str, 
 _STACK_SIZE_BY_PLAN: Dict[str, int] = {
     "tight_consecutive_1_5": 5,
     "tight_5_plus_secondary": 5,
+    "tight_5_with_diversification": 5,   # R37: mme's corrected label, same size
+    # R37 retired this name from STRATEGY_DEFAULTS but not from this map. The
+    # lookup is fed by archived build records and stored specs as well as by
+    # today's postures, and a plan string this map does not know drops silently
+    # out of the max-stack computation. Keeping the old key costs one line and
+    # keeps a replayed 2026-07 record resolving to the size it resolved to then.
     "five_three_with_diversification": 5,
     "tight_4_or_5": 5,
     "tight_consecutive_1_4": 4,

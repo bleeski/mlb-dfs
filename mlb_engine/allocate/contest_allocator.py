@@ -1714,6 +1714,169 @@ def uncovered_locked_team_players(
     return sorted(uncovered)
 
 
+# R37 stage 1. The lowest rung the primary-stack floor ladder will step to
+# before it switches off entirely. It is optimizer_v3.PRIMARY_STACK_MIN_HITTERS
+# by value and not by import, because this module is deliberately not coupled to
+# the optimizer at runtime. Below 3 the bucket rule stops reporting a primary
+# stack at all, so a "floor of 2" would be a floor on a quantity that is always
+# 0 -- it would exclude every candidate while appearing to be the loosest
+# setting on the ladder.
+PRIMARY_STACK_FLOOR_MIN_RUNG = 3
+
+
+def primary_stack_floor_rungs(requested: int) -> List[Optional[int]]:
+    """The relaxation ladder for a requested primary-stack floor, tightest first.
+
+    ``4 -> [4, 3, None]``. The final ``None`` is the floor switched off, which
+    is the truncation-avoiding rung: Showdown relaxes its overlap and captain
+    controls before it returns a short bank, for the reason CLAUDE.md states --
+    a short bank leaves a blank reserved row and a blank row blocks
+    certification. A primary-stack floor that cannot be met has the same two
+    outcomes available to it, and the same one is worse.
+    """
+    top = int(requested)
+    if top < PRIMARY_STACK_FLOOR_MIN_RUNG:
+        return [None]
+    return [n for n in range(top, PRIMARY_STACK_FLOOR_MIN_RUNG - 1, -1)] + [None]
+
+
+def _resolve_primary_stack_floor(
+    candidates: Sequence[Dict[str, Any]],
+    full_compatible: Sequence[Sequence[bool]],
+    entry_ids: Sequence[str],
+    controls: Mapping[str, Any],
+    floor_state: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Pick the tightest primary-stack floor this bank can actually carry.
+
+    R37 stage 1, Ben's dated decision of 2026-08-09, accepting DEV's 2026-08-05
+    floor-first recommendation. Three tranches of archived contests put
+    ``<=3-primary`` negative every time (-2.8pp [-3.8,-1.8] combined, then
+    -9.8pp [-18.0,-1.6] on the third), while our own share of that family rose
+    7.0% -> 21.5% -> 26.3%. The 2026-08-05 feasibility probe found a 5-primary
+    lineup feasible on 100% of stackable teams at every slate width probed and
+    a floor of 4 costing 0.00-0.76% of the unconstrained objective, so the floor
+    is cheap and the family it removes is the one the archive is firmest about.
+    Deterministic construction control and an observed-outcome rationale; never
+    a win rate, a probability, or an ROI claim.
+
+    Two things this deliberately is NOT.
+
+    It is not the pool trimming CLAUDE.md forbids. That rule is about reducing
+    the legal PLAYER set to fit a COMPUTE limit, invisibly. This reduces the
+    candidate set to fit a stated STRATEGY, it is decided before the solve
+    rather than discovered during it, and every rung it lands on is named in the
+    result. The same distinction the fixed-exposure blocking above already
+    draws.
+
+    It is not a hard gate. The ladder steps down one rung at a time and counts
+    each step, exactly as the Showdown controls do, because a floor that
+    refuses is a floor that leaves a blank reserved row.
+
+    The check at each rung is a NECESSARY condition, not a sufficient one:
+    every entry must retain at least one compatible candidate. A rung that
+    passes it can still be infeasible against the exposure caps, and that case
+    is handled where it becomes visible -- the caller re-enters with the next
+    rung after the MILP PROVES infeasibility, never after a timeout.
+    """
+    state = dict(floor_state or {})
+    requested = controls.get("primary_stack_min_size")
+    report: Dict[str, Any] = {
+        "requested": None,
+        "applied": None,
+        "status": "not_requested",
+        "relaxations": int(state.get("relaxations") or 0),
+        "relaxation_steps": list(state.get("relaxation_steps") or []),
+        "candidates_in": len(candidates),
+        "candidates_eligible": len(candidates),
+        "excluded_candidate_idx": [],
+        "size_histogram": {},
+        "note": "deterministic construction control; observed-outcome rationale, "
+                "never a win rate, cash rate, or ROI claim",
+    }
+    if requested is None:
+        return report
+    try:
+        requested = int(requested)
+    except (TypeError, ValueError):
+        report["status"] = "unreadable"
+        report["requested"] = controls.get("primary_stack_min_size")
+        return report
+    report["requested"] = requested
+    if requested < PRIMARY_STACK_FLOOR_MIN_RUNG:
+        # 0 is what the floor merge writes when one posture in the portfolio
+        # never declared the control, and it means no opinion rather than a
+        # floor of zero. Distinct from `relaxed_off`, which is a floor that was
+        # asked for and could not be carried.
+        report["status"] = "off"
+        return report
+
+    sizes = [_candidate_primary_stack_size(c) for c in candidates]
+    histogram: Dict[str, int] = {}
+    for size in sizes:
+        key = str(int(size))
+        histogram[key] = histogram.get(key, 0) + 1
+    report["size_histogram"] = dict(sorted(histogram.items(), key=lambda kv: int(kv[0])))
+
+    # The bank cannot be read, so it is not enforced against. A Classic bank in
+    # which NOT ONE candidate has three hitters on any team is not a bank of
+    # stackless lineups, it is a bank whose primary_stack_size field never got
+    # written -- which is precisely what bank_cache.as_candidates did before
+    # R37. Excluding every candidate on the strength of a missing field is the
+    # worst available reading, so this says so instead.
+    if candidates and not any(int(s) > 0 for s in sizes):
+        report["status"] = "unmeasurable"
+        report["note"] = (
+            "no candidate in this bank reports a primary_stack_size, so the floor "
+            "was NOT enforced. A bank of genuinely stackless lineups is not a "
+            "realistic Classic bank; the likelier reading is that the candidate "
+            "payloads omit the field. Fix the producer rather than lowering the "
+            "floor"
+        )
+        return report
+
+    rungs = primary_stack_floor_rungs(requested)
+    start = int(state.get("rung_index") or 0)
+    entry_count = len(entry_ids)
+    for idx in range(start, len(rungs)):
+        rung = rungs[idx]
+        report["rung_index"] = idx
+        if rung is None:
+            report["applied"] = None
+            report["status"] = "relaxed_off"
+            report["candidates_eligible"] = len(candidates)
+            report["excluded_candidate_idx"] = []
+            return report
+        eligible = [k for k, size in enumerate(sizes) if int(size) >= rung]
+        eligible_set = set(eligible)
+        starved = [
+            entry_ids[e]
+            for e in range(entry_count)
+            if not any(full_compatible[e][k] for k in eligible_set)
+        ]
+        if starved:
+            report["relaxations"] += 1
+            report["relaxation_steps"].append({
+                "from": rung,
+                "to": rungs[idx + 1],
+                "reason": (
+                    f"{len(starved)} entry/entries retain no compatible candidate at "
+                    f"primary stack size >= {rung} "
+                    f"(first: {', '.join(starved[:3])}"
+                    f"{' ...' if len(starved) > 3 else ''})"
+                ),
+                "trigger": "entry_starved_before_solve",
+            })
+            continue
+        report["applied"] = rung
+        report["status"] = "applied" if rung == requested else "applied_relaxed"
+        report["candidates_eligible"] = len(eligible)
+        report["excluded_candidate_idx"] = [k for k in range(len(candidates))
+                                            if k not in eligible_set]
+        return report
+    return report
+
+
 def select_and_assign_entries(
     candidates: Sequence[Dict[str, Any]],
     entry_requirements: Sequence[Dict[str, Any]],
@@ -1721,6 +1884,7 @@ def select_and_assign_entries(
     *,
     bank_report: Optional[Mapping[str, Any]] = None,
     fixed_exposure: Optional[Mapping[str, Any]] = None,
+    _floor_state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
@@ -1751,8 +1915,23 @@ def select_and_assign_entries(
     build is deliberately left alone (the R28 precedent), because on a build
     from a blank template the authorized set and the complete-row set are the
     same set and there is nothing to offset.
+
+    ``controls['primary_stack_min_size']`` (R37 stage 1, v1.14) is the smallest
+    primary stack a selected candidate may carry. It is the first LOWER bound
+    among the per-candidate controls, it relaxes one rung at a time and counts
+    every step (see :func:`_resolve_primary_stack_floor`), and it is reported
+    under ``primary_stack_floor``. Absent means absent: no candidate is
+    excluded and the result carries no floor block.
+
+    ``_floor_state`` is private. It carries the ladder position and the
+    relaxation record across the one re-entry this function makes into itself,
+    after the MILP PROVES the floor infeasible. Never pass it from outside.
     """
     candidates = list(candidates)
+    # Kept whole for the floor re-entry below: `candidates` is rebound by the
+    # prefilter, and re-entering with a prefiltered bank would relax the floor
+    # against a bank that is not the one the caller handed us.
+    _all_candidates = list(candidates)
     entries = [dict(x) for x in entry_requirements]
     controls = dict(portfolio_controls or {})
     if not entries:
@@ -1940,6 +2119,19 @@ def select_and_assign_entries(
                 ],
                 "fixed_exposure_rows": fixed_rows,
             }
+
+    # R37 stage 1. The primary-stack floor is applied HERE: after entry
+    # compatibility and the untouchable-row blocking, so the starvation check
+    # sees the real compatible set, and before the prefilter, so the prefilter
+    # spends its keep-target on candidates that can actually be selected rather
+    # than discarding eligible ones in favour of ineligible ones.
+    floor_report = _resolve_primary_stack_floor(
+        candidates, full_compatible, entry_ids, controls, _floor_state
+    )
+    if floor_report.get("applied") is not None:
+        for k in floor_report["excluded_candidate_idx"]:
+            for e in range(E):
+                full_compatible[e][k] = False
 
     # F13: the pairwise overlap block is K-squared. An unfiltered bank is what
     # pushes this solve into its own time limit, and a time limit here used to
@@ -2227,6 +2419,38 @@ def select_and_assign_entries(
             # reached for the wrong lever, because nothing said the bank was
             # 1.8% explored.
             errors = errors + _infeasibility_remedies(bank_report, binding)
+
+        # R37. The one re-entry. A PROVEN infeasibility with the floor active is
+        # the case the ladder exists for, and relaxing beats refusing because a
+        # refusal here leaves every reserved row blank. Never on a timeout: the
+        # rule that a compute limit may not move a strategy control is the same
+        # rule that stops a slow solve from quietly buying a looser portfolio,
+        # and it is the rule the DU ladder already follows two modules over.
+        if (not timed_out) and floor_report.get("applied") is not None:
+            ladder = primary_stack_floor_rungs(int(floor_report["requested"]))
+            rung_idx = int(floor_report.get("rung_index") or 0)
+            if rung_idx + 1 < len(ladder):
+                stepped = list(floor_report.get("relaxation_steps") or [])
+                stepped.append({
+                    "from": floor_report["applied"],
+                    "to": ladder[rung_idx + 1],
+                    "reason": (
+                        "entry-level joint MILP proven infeasible with the primary-"
+                        "stack floor active; the floor is one of the controls whose "
+                        "interaction the solver could not satisfy"
+                    ),
+                    "trigger": "proven_infeasible_with_floor",
+                })
+                return select_and_assign_entries(
+                    _all_candidates, entry_requirements, portfolio_controls,
+                    bank_report=bank_report, fixed_exposure=fixed_exposure,
+                    _floor_state={
+                        "rung_index": rung_idx + 1,
+                        "relaxations": int(floor_report.get("relaxations") or 0) + 1,
+                        "relaxation_steps": stepped,
+                    },
+                )
+
         solver_report["binding_constraints"] = (
             [] if timed_out else _diagnose_binding_constraints(
                 E, stacks, sp_pairs, signatures, largest_contest, controls)
@@ -2237,6 +2461,8 @@ def select_and_assign_entries(
             "allocation_solver_status": solver_status,
             "allocation_solver_report": solver_report,
             "errors": errors,
+            **({"primary_stack_floor": floor_report}
+               if floor_report.get("status") != "not_requested" else {}),
         }
 
     # A time-limited incumbent satisfies every constraint in the matrix; it is
@@ -2304,8 +2530,49 @@ def select_and_assign_entries(
                     if pair_cap is not None and fixed_pairs[pair] > 0),
             },
         }}
+    # R37. What the delivered set actually holds, counted from the assignments
+    # rather than asserted from the constraint. The floor is a claim about the
+    # output, so the output is where it gets checked; `below_requested` is 0 on
+    # a clean portfolio and nonzero exactly when the ladder stepped.
+    floor_block: Dict[str, Any] = {}
+    if floor_report.get("status") != "not_requested":
+        assigned_sizes = [int(a.get("primary_stack_size") or 0) for a in assignments]
+        requested_floor = floor_report.get("requested")
+        floor_block = {"primary_stack_floor": {
+            **{k: v for k, v in floor_report.items()
+               if k not in ("excluded_candidate_idx",)},
+            "candidates_excluded": len(floor_report.get("excluded_candidate_idx") or []),
+            "assigned_size_histogram": dict(sorted(
+                Counter(str(s) for s in assigned_sizes).items(),
+                key=lambda kv: int(kv[0]),
+            )),
+            "assigned_below_requested": (
+                sum(1 for s in assigned_sizes if s < int(requested_floor))
+                if isinstance(requested_floor, int) else None
+            ),
+        }}
+
+    floor_warnings: List[str] = []
+    _fr = floor_block.get("primary_stack_floor") if floor_block else None
+    if _fr:
+        if _fr.get("relaxations"):
+            floor_warnings.append(
+                f"primary_stack_min_size relaxed {_fr['relaxations']} time(s): "
+                f"requested {_fr['requested']}, applied "
+                f"{_fr['applied'] if _fr['applied'] is not None else 'none'}. "
+                f"A portfolio is not clean because the gates passed; it is clean "
+                f"when the relaxation counts are zero"
+            )
+        if _fr.get("status") == "unmeasurable":
+            floor_warnings.append(
+                "primary_stack_min_size was requested but NOT enforced: no candidate "
+                "in this bank reports a primary_stack_size. The producer of these "
+                "payloads is the thing to fix"
+            )
+
     return {
         **fixed_report,
+        **floor_block,
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,
@@ -2314,7 +2581,7 @@ def select_and_assign_entries(
         "allocation_solver_status": solver_status,
         "allocation_solver_report": solver_report,
         "allocation_optimality": solver_report["optimality"],
-        "warnings": control_warnings + (
+        "warnings": control_warnings + floor_warnings + (
             [f"allocation accepted from a time-limited incumbent at gap "
              f"{'unknown' if mip_gap is None else format(float(mip_gap), '.4f')}; "
              f"every constraint verified, optimality not proven"]
