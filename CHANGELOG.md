@@ -25,6 +25,178 @@ performance claim.
 
 ---
 
+## 2026-08-09 — R61 shipped whole; R47 investigated, mechanism found, fix repriced
+
+Test pin 758 -> 773 (core 506 -> 521). `contest_allocator` and
+`dk_entries_manager` gain `fixed_exposure` / `fixed_portfolio_exposure`;
+`execution_pipeline` wires it on the late-swap path only.
+
+### R61 — the swap solved a subset and was graded on the whole file
+
+**Shipped.** `select_and_assign_entries` resolved every exposure cap against the
+entries it was HANDED (`total = E`); `validate_dk_entries_file` resolves them
+against every complete row in the exported file. `build_entry_requirements`
+drops unauthorized and fully-locked rows, so on a late swap those are different
+sets and a legal swap died at the gate closest to lock.
+
+Reproduced first, and the filed numbers held exactly: a 20-row file with 8 rows
+the solve cannot touch and `max_player_exposure_pct=0.45` gives the solve
+floor(12x0.45)=5 while 6 exposures sit fixed in the untouchable rows, and the
+validator then judges floor(20x0.45)=9 against a count of 11 and blocks. With
+the fix the same file resolves one cap of 9 against one denominator of 20, the
+solve takes 3 rather than 5, and `portfolio_caps_passed` is True.
+
+**Correction to the filed diagnosis: SEVEN controls shared the asymmetry, not
+one.** The entry named `max_player_exposure_pct` and the same-contest duplicate
+rule. Measured, the list is `max_player_exposure_pct`,
+`max_pitcher_exposure_pct`, `max_primary_stack_exposure_pct`,
+`max_sp_pair_repetition`, `max_game_exposure_pct_by_game`, the same-contest
+duplicate signature rule, and `max_shared_players`. Fixing the filed two would
+have left five instances of one defect live, so all seven are in.
+`min_five_stack_share_pct` is deliberately NOT in: it is a floor on the lineups
+being constructed and the export validator does not check it, so `E` is its
+correct denominator.
+
+Five are count caps and take arithmetic: `cap_k - fixed`. Two are pairwise and
+cannot, because the pairs that were never formed are the ones crossing into the
+untouchable rows — a candidate duplicating an untouched row of its own contest,
+or overlapping one past `max_shared_players`, is now unselectable, with the same
+identical-roster exemption the validator applies. That enforces a control the
+export gate already enforces; it is not the pool trimming CLAUDE.md forbids,
+which is a reduction made to fit a COMPUTE limit and invisible in the output.
+Every exclusion is named in `fixed_exposure_report`.
+
+**Decision 1, `cap_k - fixed <= 0`: a refusal, not a relaxation, and the
+boundary is `>` not `>=`.** `fixed == cap` is NOT a conflict — it is zero
+headroom, an ordinary constraint the solve satisfies by selecting none of that
+key. Only `fixed > cap` refuses, because no assignment of the authorized rows
+can bring a whole-file count under a cap the untouchable rows already exceed.
+It is decided before the MILP and carries its own label,
+`refusal: untouchable_rows_exceed_cap`, and the sentence "rows you are not
+authorized to change already hold N of a cap of M" — never CLAUDE.md's reserved
+"proven infeasible: <constraint>", which is a proof about a constraint system
+the solver was handed, not a fact about rows nobody asked it to touch.
+
+Not a relaxation, because widening a portfolio cap on the operator's behalf at
+T-minutes because the rows behind it happen to be frozen is a strategy change
+made invisibly — the move R98(2) closed one layer up. The remedies are ordered
+accordingly: authorize the offending rows with `--entry-ids` first (a SCOPE
+change, no strategy change at all), restate the parent build's own cap second
+(R29(3): a swap re-deriving a tighter cap than the build shipped is the common
+cause), and a genuinely new value last, as the strategy decision it is. Bank
+growth is deliberately NOT offered — the bank is irrelevant to a count the
+untouchable rows carry alone, and naming it would be the guess R98(2) removed.
+
+**Decision 2, absent means byte-identical.** `fixed_exposure` defaults to None
+and `execute_portfolio` supplies it only when `mode == "late_swap"`, so the
+initial build does not move (the R28 precedent). `fixed_exposure_report` is
+added to the result ONLY when offsets were supplied, which is why
+`test_golden_replay`'s frozen payloads did not shift — the key set is unchanged
+without it. Pinned by `test_absent_offsets_leave_the_result_untouched` across
+omitted / explicit None / `{}` / `row_count: 0`.
+
+**A bug in the first cut of this fix, found by that test.** The headroom
+subtraction read the count dicts unconditionally while the conflict check sat
+behind `if fixed_rows`. A stray `{"row_count": 0, "player_counts": {...}}` then
+spent headroom with the refusal skipped: HOT's cap went to zero and both hot
+candidates vanished with nothing in the output saying so — an invisible cap
+change, arriving through the code written to remove invisible cap changes. There
+is now ONE gate: the four count dicts stay empty unless there is at least one
+untouchable row.
+
+**Where the derivation lives, and why there.** `fixed_portfolio_exposure` is in
+`dk_entries_manager`, beside the validator, and reuses the same parser, the same
+`roster[:2]` pitchers, the same `_primary_stack`, the same per-lineup game set,
+and the same `"/"`-joined SP-pair key the validator publishes. A second
+derivation next to the solver would be a second definition of the same number,
+which is the defect one layer up.
+`test_derivation_matches_the_validator_on_the_whole_file` holds them together
+the way the `_cap_count` contract is held.
+
+**Corrosive half, `classify_swap_failure`.** Every cap violation used to end
+"pass it with --controls-override", teaching cap-loosening as the fix. It now
+reuses `contest_allocator.STRUCTURAL_FLOOR_CONTROLS` / `STRATEGY_CAP_CONTROLS`
+and orders remedies as `build_slate.infeasibility_hint` does: bank growth first
+where `job_list_exhausted is False`, then arithmetic, then the strategy
+decision, then a reminder to check the parent's own cap before inventing a
+value. Two prefixes were also missing from `_CONTROL_BY_ERROR_PREFIX` —
+`"entries "` (`max_shared_players`) and `"game "`
+(`max_game_exposure_pct_by_game`) — so the two controls that most often bind on
+a swap fell through with no control named at all.
+
+**A guard written and then deleted, because it could not be made red.** An
+explicit `_SELF_EXPLAINING_REFUSALS` branch was added to stop the trailer being
+appended under an allocator refusal. Mutating it to `if False:` left the suite
+green, and inspection said why: no refusal string starts with any prefix in the
+map, and `execute_portfolio` returns on `not allocation["passed"]` before any
+export gate, so allocator errors never arrive beside validator errors. The
+branch could not change the output of any reachable input. It is gone;
+`test_an_allocator_refusal_is_not_re_steered` now asserts the two facts that
+actually hold the invariant, against the real strings, and goes red if a prefix
+is added to the map or a refusal is renamed to lead with one.
+
+Twelve guards mutated by hand, one at a time; all twelve red.
+
+### R47 — investigated, both mechanisms found, both filed diagnoses corrected
+
+Not shipped as a fix. The item was filed with the mechanism unfound, and the
+mechanism is now found for both halves — neither is what the entry proposed.
+
+**(a) The 8-10 scoring band across bank sizes 33 -> 1,007 is not a scoring
+failure.** The entry's leading hypothesis was a silent exception path in
+`score_lineup_candidate`, and asked for the failure counter to be instrumented.
+That instrumentation already exists (F15) and `tools/late_swap.py` already
+prints it: all nine of `outputs/2026-08-03/_swap1..9.log` report `0 failed`.
+
+The cause is `bank_cache.drop_stale_jobs`, called at the top of every
+`extend_bank`. It discards every stored candidate whose job key does not end
+with the current conditions signature, and the conditions signature includes the
+exclude set. `late_swap.py` computes `excludes` per entry from that entry's own
+roster, so each targeted slice discards the candidates the previous slices built.
+The cache genuinely reached 1,007 while the joint solve was handed 8; scoped to
+the 2 entries that needed a change — which shared one exclude set, so nothing
+was discarded between them — it was handed 90. A larger `--budget` cannot close
+that gap, because the candidates are discarded after they are built.
+
+**(b) "+0 targeted candidates" is the same-game pair filter, not the targeted
+builder.** `extend_bank` builds its job list from `usable_pairs`, which drops any
+pair whose two pitchers share a `Game_ID`. Each job passes its pair as `locks` on
+top of the entry's `locked_slot_assignments`, so a job whose pair is not the
+pinned pair needs four pitchers in two slots. Entry 5207638174 had both P slots
+pinned to one game, its pair is therefore absent from every job, and every solve
+was infeasible. The "zero-open-pitcher-slots shape" reading in the entry is the
+right observation with the wrong cause; entries with one P pinned are fine
+because pairs containing that pitcher survive the filter.
+
+**Shipped from R47:** the documentation half, which the entry asked for
+regardless of the fix. `skills/generate-lineups/references/late_swap.md` now
+carries tight `--entry-ids` scoping as the recommended pattern WITH its
+mechanism, says to read `candidate scoring: N scored` rather than
+`bank: N candidates`, states that a larger budget does not help, and documents
+the both-pitchers-one-game zero-candidate case. `classify_swap_failure`'s
+"no compatible candidate" line no longer leads with `--budget`, because on the
+one case this was reproduced on the bank was never the cause.
+
+The remainder is repriced in the backlog as R101 (the discard) and R102 (the
+pinned same-game pair). R47 is closed.
+
+### Premises undermined elsewhere
+
+- **R61-tail (new, P3).** `execute_portfolio` writes the initial build with
+  `preserve_completed=True`, so a build from a template that already holds
+  completed rows outside its requirements has the same dual denominator. Not
+  changed here, deliberately: the initial build is byte-identical by decision,
+  and no reproduction of that shape exists. Filed rather than fixed silently.
+- **Finding 10 in the backlog** (prefilter starvation, "that 2+-options-but-all
+  -filtered shape is exactly the late-swap pinned-entry case") rests on targeted
+  candidates existing and scoring below the keep line. R47(a) shows the swap's
+  targeted candidates were mostly being discarded before the prefilter ever ran,
+  so the late-swap half of that reasoning is measured against a bank the solve
+  never saw. Dated note added to the item; the single-entry coverage floor it
+  proposes is unaffected.
+
+---
+
 ## 2026-08-08 (evening) — R63 decided and contracted; R98(1)(2) shipped; R98(4) half-landed
 
 ### Decided

@@ -726,6 +726,90 @@ def _infeasibility_remedies(
     return lines
 
 
+def _untouchable_cap_conflicts(
+    fixed: Mapping[str, Any],
+    controls: Mapping[str, Any],
+    total: int,
+) -> List[str]:
+    """R61. Caps the rows this solve CANNOT change have already blown through.
+
+    Decidable from the file before any MILP runs, and deliberately not reported
+    as one. A solver infeasibility is a proof about the constraint system the
+    solver was handed; this is a fact about rows nobody asked it to touch. No
+    assignment of the authorized entries can bring a whole-file count back under
+    a cap the untouchable rows already exceed, so there is nothing to prove and
+    CLAUDE.md's reserved "proven infeasible: <constraint>" label does not apply.
+
+    It is a refusal and not a relaxation. Widening a portfolio cap because the
+    rows behind it happen to be frozen is a strategy change made on the
+    operator's behalf, at T-minutes, invisibly -- the move R98(2) closed one
+    layer up. The remedies below are ordered accordingly: change the SCOPE
+    first (authorizing the offending rows makes them mutable and is not a
+    strategy change at all), restate the parent build's own cap second (R29(3):
+    a swap that re-derives a tighter cap than the build shipped is the common
+    cause), and treat a genuinely new cap value as the strategy decision it is,
+    last. Bank growth is NOT offered: the bank is irrelevant to a count the
+    untouchable rows carry on their own, and naming it would be the guess
+    R98(2) exists to remove.
+
+    ``fixed_count == cap`` is NOT a conflict. It means zero headroom, which is
+    an ordinary constraint the solve can satisfy by selecting none of that key.
+    """
+    lines: List[str] = []
+    row_count = int(fixed.get("row_count") or 0)
+    checks = (
+        ("max_player_exposure_pct", "player", fixed.get("player_counts") or {},
+         _cap_count(total, controls.get("max_player_exposure_pct"))),
+        ("max_pitcher_exposure_pct", "pitcher", fixed.get("pitcher_counts") or {},
+         _cap_count(total, controls.get("max_pitcher_exposure_pct"))),
+        ("max_primary_stack_exposure_pct", "primary stack",
+         fixed.get("primary_stack_counts") or {},
+         _cap_count(total, controls.get("max_primary_stack_exposure_pct"))),
+    )
+    for control, noun, counts, cap in checks:
+        if not cap:
+            continue
+        for key, count in sorted(counts.items()):
+            if int(count) > int(cap):
+                lines.append(
+                    f"{control}: {noun} {key} already appears in {int(count)} of "
+                    f"the {row_count} row(s) this solve cannot change, against a "
+                    f"whole-file cap of {cap} at {total} complete rows"
+                )
+    pair_cap = controls.get("max_sp_pair_repetition")
+    if pair_cap is not None:
+        for key, count in sorted((fixed.get("sp_pair_counts") or {}).items()):
+            if int(count) > int(pair_cap):
+                lines.append(
+                    f"max_sp_pair_repetition: SP pair {key} "
+                    f"already appears in {int(count)} of the {row_count} row(s) "
+                    f"this solve cannot change, against a cap of {int(pair_cap)}"
+                )
+    game_caps = dict(controls.get("max_game_exposure_pct_by_game") or {})
+    game_counts = fixed.get("game_counts") or {}
+    for gid, pct in sorted(game_caps.items()):
+        cap = max(0, int(math.floor(total * min(1.0, max(0.0, float(pct))) + 1e-9)))
+        count = int(game_counts.get(str(gid), 0))
+        if count > cap:
+            lines.append(
+                f"max_game_exposure_pct_by_game: game {gid} already appears in "
+                f"{count} of the {row_count} row(s) this solve cannot change, "
+                f"against a whole-file cap of {cap} at {total} complete rows"
+            )
+    if lines:
+        lines.append(
+            "This is not a solver infeasibility and not a bank problem. In "
+            "order: (1) authorize the rows holding the excess with --entry-ids "
+            "so the solve can change them -- that is a SCOPE change and alters "
+            "no strategy; (2) if the parent build itself shipped a looser cap, "
+            "restate that value, because a swap re-deriving a tighter cap than "
+            "the build is the common cause (R29(3)); (3) only a value neither "
+            "the parent nor this slate's floors chose is a portfolio strategy "
+            "decision, and it concentrates the entered set."
+        )
+    return lines
+
+
 def _prefilter_candidates(
     candidates: Sequence[Dict[str, Any]],
     entries: Sequence[Dict[str, Any]],
@@ -1636,6 +1720,7 @@ def select_and_assign_entries(
     portfolio_controls: Optional[Dict[str, Any]] = None,
     *,
     bank_report: Optional[Mapping[str, Any]] = None,
+    fixed_exposure: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
@@ -1650,6 +1735,22 @@ def select_and_assign_entries(
     fact about a partial search, and the remedy the caller is told to reach for
     changes accordingly. Omitting it costs nothing and asserts nothing; the
     allocator never infers a complete bank from a missing report.
+
+    ``fixed_exposure`` (R61, v1.13) is
+    :func:`dk_entries_manager.fixed_portfolio_exposure`'s return: what the rows
+    this solve cannot touch already hold. Supplying it makes this solve the
+    whole-file problem the export validator is going to grade -- the denominator
+    widens by ``row_count``, every cap row loses the count already fixed, the
+    untouchable signatures are pre-seeded into the same-contest duplicate rule,
+    and a candidate overlapping an untouchable roster past
+    ``max_shared_players`` is not selectable. Seven controls shared that
+    asymmetry, not the one the item was filed on.
+
+    It defaults to ABSENT and absent means byte-identical to v1.12 on every
+    path: ``total`` stays ``E``, no bound moves and no row is added. The initial
+    build is deliberately left alone (the R28 precedent), because on a build
+    from a blank template the authorized set and the complete-row set are the
+    same set and there is nothing to offset.
     """
     candidates = list(candidates)
     entries = [dict(x) for x in entry_requirements]
@@ -1704,6 +1805,42 @@ def select_and_assign_entries(
         }
 
     E = len(entries)
+
+    # R61. The whole-file problem, when the caller has told us what the rest of
+    # the file holds. `total` is the denominator every exposure cap resolves
+    # against, and it has to be the same number the export validator uses or a
+    # legal swap dies at the gate closest to lock.
+    fixed = dict(fixed_exposure or {})
+    fixed_rows = max(0, int(fixed.get("row_count") or 0))
+    total = E + fixed_rows
+    # ONE gate. Every offset below reads these four dicts, and they stay empty
+    # unless there is at least one untouchable row -- because `row_count` and the
+    # counts are derived from the same rows by `fixed_portfolio_exposure`, so
+    # counts arriving with a row_count of 0 are a contradiction, and the only
+    # honest reading of "no untouchable rows" is that nothing is fixed. Reading
+    # the counts on their own let a stray dict silently spend headroom while the
+    # conflict check above was skipped: an invisible cap change, which is the
+    # defect this whole item exists to remove.
+    fixed_players: Dict[str, int] = {}
+    fixed_pitchers: Dict[str, int] = {}
+    fixed_stacks: Dict[str, int] = {}
+    fixed_pairs: Dict[str, int] = {}
+    if fixed_rows:
+        fixed_players = {str(k): int(v) for k, v in (fixed.get("player_counts") or {}).items()}
+        fixed_pitchers = {str(k): int(v) for k, v in (fixed.get("pitcher_counts") or {}).items()}
+        fixed_stacks = {str(k): int(v) for k, v in (fixed.get("primary_stack_counts") or {}).items()}
+        fixed_pairs = {str(k): int(v) for k, v in (fixed.get("sp_pair_counts") or {}).items()}
+        conflicts = _untouchable_cap_conflicts(fixed, controls, total)
+        if conflicts:
+            return {
+                "passed": False, "assignments": [], "selection_certified": False,
+                "allocation_certified": False,
+                "allocation_method": "scipy_milp_entry_level",
+                "refusal": "untouchable_rows_exceed_cap",
+                "errors": conflicts,
+                "fixed_exposure_rows": fixed_rows,
+            }
+
     all_rosters = [_candidate_ordered_roster(c) for c in candidates]
     full_compatible = [
         [_entry_candidate_compatible(candidates[k], entries[e]) for k in range(len(candidates))]
@@ -1736,6 +1873,73 @@ def select_and_assign_entries(
             "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
             "errors": errors,
         }
+
+    # R61. Two of the seven asymmetries are not caps and cannot be offset by
+    # arithmetic: the same-contest duplicate rule and max_shared_players are
+    # PAIRWISE, and the pairs the solve never formed are the ones crossing into
+    # the untouchable rows. A candidate that duplicates an untouched row of its
+    # own contest, or overlaps one past the limit, is unselectable here for the
+    # same reason the validator will reject it there. This enforces a control the
+    # export gate already enforces; it is not the pool trimming CLAUDE.md
+    # forbids, which is a reduction made to fit a COMPUTE limit and invisible in
+    # the output. Every exclusion below is named in `fixed_exposure_report`.
+    fixed_blocked_overlap: List[int] = []
+    fixed_blocked_signature: List[Tuple[str, int]] = []
+    if fixed_rows:
+        candidate_sigs = [tuple(sorted(r)) for r in all_rosters]
+        untouchable = [tuple(str(p) for p in r) for r in (fixed.get("rosters") or [])]
+        untouchable_sigs = [tuple(sorted(r)) for r in untouchable]
+        overlap_limit = controls.get("max_shared_players")
+        if overlap_limit is not None and untouchable:
+            limit = int(overlap_limit)
+            u_sets = [set(r) for r in untouchable]
+            for k in range(len(candidates)):
+                k_set = set(all_rosters[k])
+                for u_idx, u_set in enumerate(u_sets):
+                    # Same exemption the validator applies: an identical roster
+                    # is approved reuse of one candidate, not an overlap.
+                    if candidate_sigs[k] == untouchable_sigs[u_idx]:
+                        continue
+                    if len(k_set & u_set) > limit:
+                        fixed_blocked_overlap.append(k)
+                        for e in range(E):
+                            full_compatible[e][k] = False
+                        break
+        taken = {
+            str(cid): {tuple(sorted(str(p) for p in sig)) for sig in sigs}
+            for cid, sigs in (fixed.get("signatures_by_contest") or {}).items()
+        }
+        if taken:
+            for e, entry in enumerate(entries):
+                occupied = taken.get(str(entry.get("contest_id") or ""))
+                if not occupied:
+                    continue
+                for k in range(len(candidates)):
+                    if full_compatible[e][k] and candidate_sigs[k] in occupied:
+                        full_compatible[e][k] = False
+                        fixed_blocked_signature.append((entry_ids[e], k))
+        starved = [entry_ids[e] for e in range(E) if not any(full_compatible[e])]
+        if starved:
+            return {
+                "passed": False, "assignments": [], "selection_certified": False,
+                "allocation_certified": False,
+                "allocation_method": "scipy_milp_entry_level",
+                "refusal": "untouchable_rows_starve_entry",
+                "errors": [
+                    f"Entry ID {eid}: every compatible candidate is ruled out by "
+                    f"the {fixed_rows} row(s) this solve cannot change -- either "
+                    f"it duplicates one of their rosters in the same contest, or "
+                    f"it shares more than max_shared_players="
+                    f"{controls.get('max_shared_players')} with one of them. This "
+                    f"is a portfolio control against the untouchable rows, NOT "
+                    f"this entry's pins and not a thin bank. Grow the bank only "
+                    f"if you want more DISTINCT shapes; authorizing the "
+                    f"conflicting rows with --entry-ids removes the conflict "
+                    f"outright."
+                    for eid in starved
+                ],
+                "fixed_exposure_rows": fixed_rows,
+            }
 
     # F13: the pairwise overlap block is K-squared. An unfiltered bank is what
     # pushes this solve into its own time limit, and a time limit here used to
@@ -1829,7 +2033,10 @@ def select_and_assign_entries(
         for group in sig_groups.values():
             add({x_idx(e, k): 1.0 for e in entry_idxs for k in group}, -np.inf, 1.0)
 
-    total = E
+    # R61: `total` is E plus the untouchable complete rows, set above. It was
+    # `total = E` here, which is the file's denominator only when the solve was
+    # handed every complete row -- true on an initial build, false on every
+    # scoped or partly-locked swap.
     max_reuse = controls.get("max_candidate_reuse")
     if max_reuse is not None:
         # Keyed by signature: duplicate candidate objects with identical rosters
@@ -1837,22 +2044,34 @@ def select_and_assign_entries(
         for group in sig_groups.values():
             add({x_idx(e, k): 1.0 for e in range(E) for k in group}, -np.inf, int(max_reuse))
 
+    # R61: headroom, not the raw cap. A key already sitting in the untouchable
+    # rows spends the cap before this solve chooses anything, and
+    # _untouchable_cap_conflicts has already refused the case where it has
+    # overspent it, so every value here is >= 0 by construction. The four dicts
+    # are empty unless offsets were supplied, so this is a no-op without them.
+    def headroom(cap: int, already: int) -> float:
+        return float(max(0, int(cap) - int(already)))
+
     player_cap = _cap_count(total, controls.get("max_player_exposure_pct"))
     pitcher_cap = _cap_count(total, controls.get("max_pitcher_exposure_pct"))
     stack_cap = _cap_count(total, controls.get("max_primary_stack_exposure_pct"))
     pair_cap = controls.get("max_sp_pair_repetition")
     if player_cap:
         for pid in sorted(set().union(*player_sets)):
-            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if pid in player_sets[k]}, -np.inf, player_cap)
+            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if pid in player_sets[k]},
+                -np.inf, headroom(player_cap, fixed_players.get(pid, 0)))
     if pitcher_cap:
         for pid in sorted(set().union(*pitcher_sets)):
-            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if pid in pitcher_sets[k]}, -np.inf, pitcher_cap)
+            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if pid in pitcher_sets[k]},
+                -np.inf, headroom(pitcher_cap, fixed_pitchers.get(pid, 0)))
     if stack_cap:
         for team in sorted({x for x in stacks if x}):
-            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if stacks[k] == team}, -np.inf, stack_cap)
+            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if stacks[k] == team},
+                -np.inf, headroom(stack_cap, fixed_stacks.get(team, 0)))
     if pair_cap is not None:
         for pair in sorted(set(sp_pairs)):
-            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if sp_pairs[k] == pair}, -np.inf, int(pair_cap))
+            add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if sp_pairs[k] == pair},
+                -np.inf, headroom(int(pair_cap), fixed_pairs.get("/".join(pair), 0)))
 
     # R34: primary-stack SIZE floor. Every other control here is a ceiling, so
     # this is the first row in the joint solve with a lower bound, and the
@@ -1894,11 +2113,17 @@ def select_and_assign_entries(
             for gid in {game_by_player.get(pid) for pid in pset}:
                 if gid:
                     candidates_in_game[gid].append(k)
+        fixed_games = ({str(k): int(v) for k, v in (fixed.get("game_counts") or {}).items()}
+                       if fixed_rows else {})
         for gid, pct in sorted(game_caps.items()):
-            cap = max(0, int(math.floor(E * min(1.0, max(0.0, float(pct))) + 1e-9)))
+            # R61: `total`, not E, and minus what the untouchable rows hold. This
+            # cap floors at 0 rather than 1 (_game_cap_count's contract: an
+            # explicit pct of 0 means zero), so headroom() is the same shape.
+            cap = max(0, int(math.floor(total * min(1.0, max(0.0, float(pct))) + 1e-9)))
             members = candidates_in_game.get(str(gid), [])
             if members:
-                add({x_idx(e, k): 1.0 for e in range(E) for k in members}, -np.inf, float(cap))
+                add({x_idx(e, k): 1.0 for e in range(E) for k in members},
+                    -np.inf, headroom(cap, fixed_games.get(str(gid), 0)))
 
     if use_y:
         for k in range(K):
@@ -2048,7 +2273,39 @@ def select_and_assign_entries(
     reuse_counts = Counter(a["candidate_id"] for a in assignments)
     for assignment in assignments:
         assignment["reused_across_contests"] = reuse_counts[assignment["candidate_id"]] > 1
+    # R61. Added to the result ONLY when offsets were supplied, so a build that
+    # passes no `fixed_exposure` gets a result dict with exactly the v1.12 keys.
+    # That is what makes "byte-identical when absent" checkable rather than
+    # asserted, and it is why test_golden_replay's frozen payloads did not move.
+    fixed_report: Dict[str, Any] = {}
+    if fixed_rows:
+        fixed_report = {"fixed_exposure_report": {
+            "untouchable_row_count": fixed_rows,
+            "solve_entry_count": E,
+            "entry_denominator": total,
+            "caps_resolved_against": total,
+            "candidates_blocked_by_untouchable_overlap":
+                sorted({candidate_ids[k] for k in set(fixed_blocked_overlap)
+                        if k < len(candidate_ids)}),
+            "entry_candidate_pairs_blocked_by_untouchable_signature":
+                len(fixed_blocked_signature),
+            "headroom_reduced_keys": {
+                "max_player_exposure_pct": sorted(
+                    pid for pid in fixed_players
+                    if player_cap and fixed_players[pid] > 0),
+                "max_pitcher_exposure_pct": sorted(
+                    pid for pid in fixed_pitchers
+                    if pitcher_cap and fixed_pitchers[pid] > 0),
+                "max_primary_stack_exposure_pct": sorted(
+                    team for team in fixed_stacks
+                    if stack_cap and fixed_stacks[team] > 0),
+                "max_sp_pair_repetition": sorted(
+                    pair for pair in fixed_pairs
+                    if pair_cap is not None and fixed_pairs[pair] > 0),
+            },
+        }}
     return {
+        **fixed_report,
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,

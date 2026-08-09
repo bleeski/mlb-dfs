@@ -764,6 +764,87 @@ def _primary_stack(roster: Sequence[str], players: Mapping[str, SalaryPlayer]) -
     return sorted(team for team, count in counts.items() if count == best)[0]
 
 
+def fixed_portfolio_exposure(
+    path: str | Path,
+    solved_entry_ids: Iterable[str],
+    *,
+    salary_csv_path: Optional[str | Path] = None,
+) -> Dict[str, Any]:
+    """R61. The exposure a solve cannot change, read off the rows it cannot touch.
+
+    ``select_and_assign_entries`` computes every exposure cap from the number of
+    entries it was HANDED, while :func:`validate_dk_entries_file` computes the
+    same caps from every complete row in the exported file. On an initial build
+    those are the same set. On a late swap they are not:
+    ``build_entry_requirements`` drops unauthorized and fully-locked rows, so a
+    twelve-entry solve inside a twenty-row file resolved a cap of
+    floor(12*0.45)=5 while the validator resolved floor(20*0.45)=9 and counted
+    the whole file. A feasible swap then died at the gate closest to lock, and
+    the operator was steered toward loosening a cap that was never the problem.
+
+    This returns the offsets that close the gap: the count already fixed in the
+    untouchable rows for every control the validator judges, the signatures
+    those rows already occupy per contest, and their rosters for the overlap
+    test. ``select_and_assign_entries`` subtracts the counts from its caps and
+    widens its denominator by ``row_count``, so it optimizes the whole-file
+    problem the validator is going to grade.
+
+    It lives HERE, beside the validator, deliberately. Every count below is
+    derived by the same code the validator uses -- the same parser, the same
+    ``roster[:2]`` pitchers, the same :func:`_primary_stack`, the same
+    per-lineup game set. A second derivation living next to the solver would be
+    a second definition of the same number, which is the defect one layer up.
+
+    Rows that are BLANK or incomplete contribute nothing, because the validator
+    counts ``legal_rosters`` and a blank reserved row is not one. Rows named in
+    ``solved_entry_ids`` contribute nothing, because the solve is about to
+    replace them.
+    """
+    solved = {str(x).strip() for x in solved_entry_ids}
+    players: Dict[str, SalaryPlayer] = {}
+    if salary_csv_path:
+        players = {p.player_id: p for p in parse_dk_salary_csv(str(salary_csv_path))}
+    entry_ids: List[str] = []
+    rosters: List[Tuple[str, ...]] = []
+    player_counts: Counter = Counter()
+    pitcher_counts: Counter = Counter()
+    stack_counts: Counter = Counter()
+    pair_counts: Counter = Counter()
+    game_counts: Counter = Counter()
+    signatures_by_contest: Dict[str, List[List[str]]] = defaultdict(list)
+    for entry in parse_dk_entry_rows(path):
+        if not entry.is_complete or entry.entry_id in solved:
+            continue
+        roster = entry.roster_cells
+        entry_ids.append(entry.entry_id)
+        rosters.append(tuple(roster))
+        player_counts.update(roster)
+        pitcher_counts.update(roster[:2])
+        # "/" joined, the same key shape validate_dk_entries_file publishes in
+        # ``exposures["sp_pair_counts"]``, so the two dicts compare directly.
+        pair_counts["/".join(sorted(roster[:2]))] += 1
+        if players:
+            stack = _primary_stack(roster, players)
+            if stack:
+                stack_counts[stack] += 1
+            for gid in {players[pid].game_id for pid in roster
+                        if pid in players and players[pid].game_id}:
+                game_counts[gid] += 1
+        signatures_by_contest[entry.contest_id].append(sorted(roster))
+    return {
+        "row_count": len(entry_ids),
+        "entry_ids": entry_ids,
+        "rosters": [list(r) for r in rosters],
+        "player_counts": dict(player_counts),
+        "pitcher_counts": dict(pitcher_counts),
+        "primary_stack_counts": dict(stack_counts),
+        "sp_pair_counts": dict(pair_counts),
+        "game_counts": dict(game_counts),
+        "signatures_by_contest": {k: v for k, v in signatures_by_contest.items()},
+        "stacks_derived": bool(players),
+    }
+
+
 def validate_dk_entries_file(
     path: str | Path,
     salary_csv_path: Optional[str | Path] = None,

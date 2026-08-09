@@ -181,40 +181,122 @@ def resolve_swap_controls(postures, override, solver_budget,
 # controls problem, and a swap that fails on "no compatible candidate" has a
 # bank or pins problem. They used to be indistinguishable in the output, so the
 # session chased the wrong one; each now names itself.
+#
+# R61 added the last two. `validate_dk_entries_file` reports overlap violations
+# as "entries A/B share N>M" and game-exposure violations as "game G exposure
+# N>M", and neither prefix was here, so the two controls that most often bind on
+# a swap fell through to the bare else branch with no control named at all.
 _CONTROL_BY_ERROR_PREFIX = (
     ("player ", "max_player_exposure_pct"),
     ("pitcher ", "max_pitcher_exposure_pct"),
     ("primary stack ", "max_primary_stack_exposure_pct"),
     ("SP pair ", "max_sp_pair_repetition"),
+    ("entries ", "max_shared_players"),
+    ("game ", "max_game_exposure_pct_by_game"),
 )
 
+# R61: the allocator's own refusals arrive here already carrying their ordered
+# remedies, and appending a cap-loosening steer to one would contradict the
+# sentence above it. This function adds nothing to them, and that holds WITHOUT a
+# special case, on two facts a test pins rather than trusts. No refusal string
+# starts with any prefix in the map above, so none is annotated and none reaches
+# the trailer. And allocator errors never arrive alongside validator errors,
+# because `execute_portfolio` returns on `not allocation["passed"]` before the
+# export gates run. An explicit guard was written for this first and deleted: it
+# could not be made to fail under mutation, because it could not change the
+# output of any reachable input. See `test_an_allocator_refusal_is_not_re_steered`
+# for what actually holds the invariant.
 
-def classify_swap_failure(errors, controls) -> list[str]:
+
+def classify_swap_failure(errors, controls, bank_report=None) -> list[str]:
     """Annotate each failure with the control that is binding, or say it is not one.
 
-    Returns the lines to print. A portfolio-control violation names the control
-    and the value in effect, so the fix (--controls-override, or the parent
-    build's own value) is readable off the failure. Anything that is per-entry
-    candidate compatibility says so explicitly, so it is never mistaken for a
-    cap and never sends a session off to grow a bank that is already big enough.
+    R61's corrosive half, and the third instance of the pattern R98(2) closed.
+    Every cap violation used to end with "pass it with --controls-override",
+    which teaches cap-loosening as THE fix for a swap that fails at the gate.
+    Two things were wrong with that. It made no distinction between a control
+    that reaches an engine-named structural floor -- where raising to the floor
+    is arithmetic and changes nothing else -- and an exposure cap that has no
+    floor at all, where any value that clears the file is a portfolio strategy
+    decision that concentrates the entered set. And it never asked whether the
+    bank was a completed search, so a refusal against a bank explored to 1.8%
+    read exactly like a refusal against an exhausted one.
+
+    The vocabulary is `contest_allocator`'s: STRUCTURAL_FLOOR_CONTROLS versus
+    STRATEGY_CAP_CONTROLS, ordered as `build_slate.infeasibility_hint` orders
+    them -- bank growth first where the bank is still a slice, then arithmetic,
+    then the strategy decision. Reused rather than restated, so a third copy of
+    the split cannot drift from the first two.
     """
+    from mlb_engine.allocate.contest_allocator import (
+        STRATEGY_CAP_CONTROLS, STRUCTURAL_FLOOR_CONTROLS,
+    )
+
     lines: list[str] = []
+    named_structural: set[str] = set()
+    named_strategy: set[str] = set()
     for err in errors or []:
         text = str(err)
         control = next((name for prefix, name in _CONTROL_BY_ERROR_PREFIX
                         if text.startswith(prefix)), None)
         if control:
             value = controls.get(control, "unset")
-            lines.append(f"  {text}  [binding control: {control}={value}; the "
-                         f"parent build may have used a looser value, pass it "
-                         f"with --controls-override]")
+            if control in STRUCTURAL_FLOOR_CONTROLS:
+                named_structural.add(control)
+                kind = ("reaches an engine-named structural floor, so raising it "
+                        "to that floor is arithmetic")
+            else:
+                # STRATEGY_CAP_CONTROLS plus max_game_exposure_pct_by_game, which
+                # the constant does not list because it is per-game and keyed
+                # rather than one number. It is the same class: a ceiling with no
+                # engine-named floor under it.
+                named_strategy.add(control)
+                kind = ("has NO engine-named floor" if control in STRATEGY_CAP_CONTROLS
+                        or control == "max_game_exposure_pct_by_game"
+                        else "is not an engine-classified control")
+                kind += (", so any value that clears this file is a portfolio "
+                         "strategy decision")
+            lines.append(f"  {text}  [binding control: {control}={value}; it {kind}]")
         elif "no compatible candidate" in text:
             lines.append(f"  {text}  [not a portfolio control: this entry's "
                          f"pins and excluded_new_teams admit none of the bank's "
-                         f"candidates. Grow the bank with --budget, or check "
-                         f"that the entry's locked slots are what you expect]")
+                         f"candidates. Check that the entry's locked slots are "
+                         f"what you expect before growing anything]")
         else:
             lines.append(f"  {text}")
+
+    # Bank first, exactly as the allocator now does it. A refusal against a
+    # partial search is a fact about the candidates that got built.
+    report = bank_report or {}
+    if report.get("job_list_exhausted") is False and (named_structural or named_strategy):
+        attempted = report.get("jobs_attempted")
+        total = report.get("jobs_total")
+        scope = ""
+        if attempted is not None and total:
+            scope = (f" ({int(attempted)} of {int(total)} jobs attempted, "
+                     f"{float(attempted) / float(total) * 100:.1f}%)")
+        lines.append(
+            f"  GROW THE BANK FIRST: the job list was not exhausted{scope}, so "
+            f"these caps bound the candidates that got built, not this slate. "
+            f"Re-run the same command with a larger --budget; the cache resumes."
+        )
+    if named_structural or named_strategy:
+        parts = []
+        if named_structural:
+            parts.append(
+                f"ARITHMETIC, not strategy: [{', '.join(sorted(named_structural))}] "
+                f"reach an engine-named structural floor")
+        if named_strategy:
+            parts.append(
+                f"A STRATEGY DECISION: [{', '.join(sorted(named_strategy))}] have "
+                f"no floor, and the minimum value that clears this file is not a "
+                f"recommendation")
+        lines.append("  " + ". ".join(parts) + ".")
+        lines.append(
+            "  Before overriding anything, check the parent build's own values: a "
+            "swap re-deriving a cap TIGHTER than the build shipped is the common "
+            "cause (R29(3)), and restating the parent's number is not a strategy "
+            "change. --controls-override takes JSON.")
     return lines
 
 
@@ -635,7 +717,12 @@ def main() -> int:
 
     if not result.get("passed"):
         print("late swap did not pass:", file=sys.stderr)
-        for line in classify_swap_failure(result.get("errors"), controls):
+        refusal = result.get("allocation", {}).get("refusal") if isinstance(
+            result.get("allocation"), dict) else None
+        if refusal:
+            print(f"refusal: {refusal}", file=sys.stderr)
+        for line in classify_swap_failure(result.get("errors"), controls,
+                                          bank_report=report):
             print(line, file=sys.stderr)
         return 3
 

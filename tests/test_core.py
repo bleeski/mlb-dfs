@@ -33,7 +33,8 @@ from mlb_engine.allocate.contest_allocator import (
     select_and_assign_portfolio, uncovered_locked_team_players,
 )
 from mlb_engine.entries.dk_entries_manager import (
-    ROSTER_SLOTS, parse_dk_entry_rows, reconcile_entries_against_assignments,
+    ROSTER_SLOTS, fixed_portfolio_exposure, parse_dk_entry_rows,
+    reconcile_entries_against_assignments,
     validate_dk_entries_file, validate_template_preservation,
     validate_upload_ready_gates,
 )
@@ -973,6 +974,283 @@ class LiveDataAdapterTests(unittest.TestCase):
         self.assertAlmostEqual(hr_rows[0]["implied_prob"], 1.0 / 1.30, places=6)
 
 
+
+
+class FixedExposureOffsetTests(unittest.TestCase):
+    """R61. The solve and the export validator resolve one cap, one denominator.
+
+    `select_and_assign_entries` resolved every exposure cap against the entries
+    it was HANDED; `validate_dk_entries_file` resolves them against every
+    complete row in the file. On a late swap those differ, and a feasible swap
+    died at the gate closest to lock while the operator was pointed at
+    --controls-override. `fixed_exposure` closes it. Seven controls shared the
+    asymmetry, so these tests cover all seven, not the one the item was filed on.
+    """
+
+    ENTRIES = [{"entry_id": str(i), "contest_id": "c1",
+                "contest_shape": "large_wta"} for i in range(1, 5)]
+
+    def _bank(self, hot="HOT"):
+        """Six candidates for four entries: two hold the hot player and four do
+        not, every signature distinct. The slack matters -- with exactly four
+        candidates the same-contest duplicate rule forces all four into the
+        solve, and every headroom assertion below would be testing that
+        compulsion instead of the headroom."""
+        return [
+            candidate("h1", [hot, "p1", *[f"a{i}" for i in range(8)]], 100),
+            candidate("h2", [hot, "p2", *[f"b{i}" for i in range(8)]], 99),
+            candidate("c1", ["p3", "p4", *[f"c{i}" for i in range(8)]], 10, "QQQ"),
+            candidate("c2", ["p5", "p6", *[f"d{i}" for i in range(8)]], 9, "ZZZ"),
+            candidate("c3", ["p7", "p8", *[f"e{i}" for i in range(8)]], 8, "WWW"),
+            candidate("c4", ["p9", "p0", *[f"g{i}" for i in range(8)]], 7, "VVV"),
+        ]
+
+    def test_absent_offsets_leave_the_result_untouched(self):
+        """The R28 precedent: an initial build must not move because a swap fix
+        landed. Absent means the v1.12 key set and the v1.12 assignments."""
+        controls = {"max_player_exposure_pct": 0.5}
+        plain = select_and_assign_entries(self._bank(), self.ENTRIES, controls)
+        explicit_none = select_and_assign_entries(
+            self._bank(), self.ENTRIES, controls, fixed_exposure=None)
+        empty = select_and_assign_entries(
+            self._bank(), self.ENTRIES, controls, fixed_exposure={})
+        zero_rows = select_and_assign_entries(
+            self._bank(), self.ENTRIES, controls,
+            fixed_exposure={"row_count": 0, "player_counts": {"HOT": 99}})
+        self.assertTrue(plain["passed"], plain.get("errors"))
+        for label, other in (("explicit None", explicit_none), ("empty", empty),
+                             ("row_count 0", zero_rows)):
+            with self.subTest(offsets=label):
+                self.assertEqual(sorted(plain), sorted(other))
+                self.assertNotIn("fixed_exposure_report", other)
+                self.assertEqual(plain["assignments"], other["assignments"])
+                self.assertEqual(plain["direct_constraints"],
+                                 other["direct_constraints"])
+        # `row_count: 0` carrying counts is a contradiction no derivation can
+        # produce, and it must read as "no untouchable rows", not as a cap the
+        # counts quietly spend. Before this was one gate it did the latter: the
+        # conflict check was skipped while HOT's headroom went to zero, dropping
+        # both hot candidates with nothing in the output saying so.
+        self.assertEqual(zero_rows["direct_constraints"]["max_player_count"],
+                         plain["direct_constraints"]["max_player_count"])
+
+    def test_denominator_widens_by_the_untouchable_rows(self):
+        result = select_and_assign_entries(
+            self._bank(), self.ENTRIES, {"max_player_exposure_pct": 0.5},
+            fixed_exposure={"row_count": 4})
+        self.assertTrue(result["passed"], result.get("errors"))
+        report = result["fixed_exposure_report"]
+        self.assertEqual(report["solve_entry_count"], 4)
+        self.assertEqual(report["untouchable_row_count"], 4)
+        self.assertEqual(report["entry_denominator"], 8)
+        # floor(8*0.5)=4 where the old denominator gave floor(4*0.5)=2.
+        self.assertEqual(result["direct_constraints"]["max_player_count"], 4)
+
+    def test_headroom_is_the_cap_minus_what_is_already_fixed(self):
+        """Two untouchable rows already hold HOT, cap 3 over six rows, so the
+        solve may add exactly one -- not three."""
+        result = select_and_assign_entries(
+            self._bank(), self.ENTRIES, {"max_player_exposure_pct": 0.5},
+            fixed_exposure={"row_count": 2, "player_counts": {"HOT": 2}})
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(result["direct_constraints"]["max_player_count"], 3)
+        chosen = {row["candidate_id"] for row in result["assignments"]}
+        self.assertEqual(len(chosen & {"h1", "h2"}), 1)
+        self.assertIn("HOT", result["fixed_exposure_report"]
+                      ["headroom_reduced_keys"]["max_player_exposure_pct"])
+
+    def test_untouchable_rows_over_cap_refuse_and_never_say_infeasible(self):
+        """The cap is already blown by rows nobody asked the solver to touch.
+        Decidable from the file, so it is decided before the MILP, and it does
+        not wear the reserved 'proven infeasible' label."""
+        result = select_and_assign_entries(
+            self._bank(), self.ENTRIES, {"max_player_exposure_pct": 0.5},
+            fixed_exposure={"row_count": 4, "player_counts": {"HOT": 5}})
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["refusal"], "untouchable_rows_exceed_cap")
+        self.assertFalse(result["selection_certified"])
+        self.assertFalse(result["allocation_certified"])
+        blob = " ".join(result["errors"])
+        self.assertIn("max_player_exposure_pct", blob)
+        self.assertIn("already appears in 5", blob)
+        self.assertIn("cannot change", blob)
+        self.assertIn("whole-file cap of 4", blob)
+        self.assertNotIn("infeasible", blob.lower())
+        # Remedies in R98(2)'s order: scope first, the parent's own cap second,
+        # a strategy decision last, and NEVER bank growth -- the bank has
+        # nothing to do with a count the untouchable rows carry alone.
+        self.assertIn("--entry-ids", blob)
+        self.assertIn("SCOPE change", blob)
+        self.assertIn("strategy decision", blob)
+        self.assertNotIn("grow the bank", blob.lower())
+        self.assertNotIn("job list", blob.lower())
+
+    def test_fixed_equal_to_cap_is_zero_headroom_not_a_refusal(self):
+        """The boundary. Meeting the cap exactly is an ordinary constraint the
+        solve satisfies by taking none of that key; only EXCEEDING it refuses."""
+        at_cap = select_and_assign_entries(
+            self._bank(), self.ENTRIES, {"max_player_exposure_pct": 0.5},
+            fixed_exposure={"row_count": 4, "player_counts": {"HOT": 4}})
+        self.assertNotIn("refusal", at_cap)
+        self.assertTrue(at_cap["passed"], at_cap.get("errors"))
+        chosen = {row["candidate_id"] for row in at_cap["assignments"]}
+        self.assertEqual(chosen & {"h1", "h2"}, set())
+        over_by_one = select_and_assign_entries(
+            self._bank(), self.ENTRIES, {"max_player_exposure_pct": 0.5},
+            fixed_exposure={"row_count": 4, "player_counts": {"HOT": 5}})
+        self.assertEqual(over_by_one.get("refusal"), "untouchable_rows_exceed_cap")
+
+    def test_every_count_control_refuses_on_its_own_key(self):
+        cases = [
+            ({"max_pitcher_exposure_pct": 0.5},
+             {"pitcher_counts": {"p1": 5}}, "max_pitcher_exposure_pct"),
+            ({"max_primary_stack_exposure_pct": 0.5},
+             {"primary_stack_counts": {"AAA": 5}},
+             "max_primary_stack_exposure_pct"),
+            ({"max_sp_pair_repetition": 2},
+             {"sp_pair_counts": {"HOT|p1": 3}}, "max_sp_pair_repetition"),
+            ({"max_game_exposure_pct_by_game": {"G1": 0.5},
+              "player_game_by_id": {"HOT": "G1"}},
+             {"game_counts": {"G1": 5}}, "max_game_exposure_pct_by_game"),
+        ]
+        for controls, fixed, control in cases:
+            with self.subTest(control=control):
+                result = select_and_assign_entries(
+                    self._bank(), self.ENTRIES, controls,
+                    fixed_exposure={"row_count": 4, **fixed})
+                self.assertFalse(result["passed"])
+                self.assertEqual(result["refusal"], "untouchable_rows_exceed_cap")
+                self.assertIn(control, " ".join(result["errors"]))
+
+    def test_untouchable_signature_is_a_same_contest_duplicate(self):
+        """A candidate identical to an untouched row of the SAME contest is a
+        duplicate in the exported file; the solve's own duplicate rows never
+        formed that pair because the row was not in the solve."""
+        roster = ["HOT", "p1", *[f"a{i}" for i in range(8)]]
+        bank = [candidate("dup", list(roster), 100),
+                candidate("other", ["p3", "p4", *[f"c{i}" for i in range(8)]],
+                          10, "QQQ")]
+        entries = [{"entry_id": "1", "contest_id": "c1",
+                    "contest_shape": "large_wta"}]
+        offsets = {"row_count": 1,
+                   "signatures_by_contest": {"c1": [sorted(roster)]}}
+        blocked = select_and_assign_entries(bank, entries, {},
+                                            fixed_exposure=offsets)
+        self.assertTrue(blocked["passed"], blocked.get("errors"))
+        self.assertEqual([r["candidate_id"] for r in blocked["assignments"]],
+                         ["other"])
+        self.assertEqual(blocked["fixed_exposure_report"]
+                         ["entry_candidate_pairs_blocked_by_untouchable_signature"], 1)
+        # A DIFFERENT contest is approved cross-contest reuse, not a duplicate.
+        elsewhere = select_and_assign_entries(
+            bank, entries, {},
+            fixed_exposure={"row_count": 1,
+                            "signatures_by_contest": {"c9": [sorted(roster)]}})
+        self.assertEqual([r["candidate_id"] for r in elsewhere["assignments"]],
+                         ["dup"])
+
+    def test_untouchable_overlap_blocks_the_candidate_with_the_same_exemption(self):
+        shared = [f"s{i}" for i in range(6)]
+        untouchable = [*shared, "u1", "u2", "u3", "u4"]
+        near = [*shared, "n1", "n2", "n3", "n4"]
+        far = [f"f{i}" for i in range(10)]
+        bank = [candidate("near", near, 100), candidate("far", far, 10, "QQQ")]
+        entries = [{"entry_id": "1", "contest_id": "c1",
+                    "contest_shape": "large_wta"}]
+        result = select_and_assign_entries(
+            bank, entries, {"max_shared_players": 5},
+            fixed_exposure={"row_count": 1, "rosters": [untouchable]})
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual([r["candidate_id"] for r in result["assignments"]], ["far"])
+        self.assertEqual(result["fixed_exposure_report"]
+                         ["candidates_blocked_by_untouchable_overlap"], ["near"])
+        # Five shared is at the limit, not over it.
+        at_limit = select_and_assign_entries(
+            [candidate("near", [*shared[:5], "x1", "x2", "x3", "x4", "x5"], 100)],
+            entries, {"max_shared_players": 5},
+            fixed_exposure={"row_count": 1, "rosters": [untouchable]})
+        self.assertTrue(at_limit["passed"], at_limit.get("errors"))
+        # An IDENTICAL roster is approved reuse of one candidate, which is the
+        # exemption validate_dk_entries_file applies; the duplicate rule owns it.
+        identical = select_and_assign_entries(
+            [candidate("same", list(untouchable), 100)], entries,
+            {"max_shared_players": 5},
+            fixed_exposure={"row_count": 1, "rosters": [untouchable]})
+        self.assertTrue(identical["passed"], identical.get("errors"))
+
+    def test_starved_entry_names_the_untouchable_rows_not_the_bank(self):
+        roster = ["HOT", "p1", *[f"a{i}" for i in range(8)]]
+        result = select_and_assign_entries(
+            [candidate("dup", list(roster), 100)],
+            [{"entry_id": "1", "contest_id": "c1", "contest_shape": "large_wta"}],
+            {"max_shared_players": 5},
+            fixed_exposure={"row_count": 1,
+                            "signatures_by_contest": {"c1": [sorted(roster)]}})
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["refusal"], "untouchable_rows_starve_entry")
+        blob = " ".join(result["errors"])
+        self.assertIn("Entry ID 1", blob)
+        self.assertIn("cannot change", blob)
+        self.assertIn("NOT", blob)
+        self.assertIn("--entry-ids", blob)
+
+    def test_derivation_matches_the_validator_on_the_whole_file(self):
+        """The two definitions cannot drift, because there is one of them.
+
+        With nothing solved, `fixed_portfolio_exposure` is measuring exactly the
+        set `validate_dk_entries_file` measures, so every count must agree. This
+        is the same guard the _cap_count contract gets, applied to the counts.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            r1, r2 = legal_rosters(ids)
+            entries = root / "entries.csv"
+            write_entries(entries, [r1, r2, r1], ["1", "2", "2"])
+            whole = fixed_portfolio_exposure(entries, [], salary_csv_path=salary)
+            report = validate_dk_entries_file(entries, salary_csv_path=salary)
+            self.assertEqual(whole["row_count"], report["complete_entry_count"])
+            self.assertEqual(whole["player_counts"],
+                             report["exposures"]["player_counts"])
+            self.assertEqual(whole["pitcher_counts"],
+                             report["exposures"]["pitcher_counts"])
+            self.assertEqual(whole["primary_stack_counts"],
+                             report["exposures"]["primary_stack_counts"])
+            self.assertEqual(whole["sp_pair_counts"],
+                             report["exposures"]["sp_pair_counts"])
+            # Naming a row as solved removes it and only it. These are ENTRY
+            # IDs, which write_entries assigns as 5001..500N; the third argument
+            # above is the contest column.
+            self.assertEqual(whole["entry_ids"], ["5001", "5002", "5003"])
+            partial = fixed_portfolio_exposure(entries, ["5001"],
+                                               salary_csv_path=salary)
+            self.assertEqual(partial["row_count"], 2)
+            self.assertEqual(partial["entry_ids"], ["5002", "5003"])
+
+    def test_derivation_skips_blank_rows_and_groups_signatures_by_contest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            r1, r2 = legal_rosters(ids)
+            entries = root / "entries.csv"
+            # Numeric contest IDs: parse_dk_entry_rows skips any row whose Entry
+            # ID or Contest ID is not all digits.
+            write_entries(entries, [r1, None, r2], ["901", "901", "902"])
+            offsets = fixed_portfolio_exposure(entries, [], salary_csv_path=salary)
+            # The blank reserved row is not a legal roster, so it is not a row.
+            self.assertEqual(offsets["row_count"], 2)
+            self.assertEqual(sorted(offsets["signatures_by_contest"]), ["901", "902"])
+            self.assertEqual(offsets["signatures_by_contest"]["901"], [sorted(r1)])
+            self.assertEqual(offsets["rosters"], [list(r1), list(r2)])
+            # Without a salary file there is no team map, so stacks and games are
+            # not invented; the flag says so rather than the caller guessing.
+            no_salary = fixed_portfolio_exposure(entries, [])
+            self.assertFalse(no_salary["stacks_derived"])
+            self.assertEqual(no_salary["primary_stack_counts"], {})
+            self.assertEqual(no_salary["game_counts"], {})
+            self.assertEqual(no_salary["player_counts"], offsets["player_counts"])
 
 
 class ControlAlignmentTests(unittest.TestCase):
@@ -8589,15 +8867,21 @@ class SwapFailureClassificationTests(unittest.TestCase):
     the same. Both messages now classify themselves."""
 
     @staticmethod
-    def _classify(errors, controls=None):
+    def _classify(errors, controls=None, bank_report=None):
         return SwapControlsInheritanceTests._late_swap().classify_swap_failure(
             errors, controls or {"max_sp_pair_repetition": 3,
-                                "max_player_exposure_pct": 0.4})
+                                 "max_player_exposure_pct": 0.4},
+            bank_report=bank_report)
 
     def test_a_control_violation_names_the_control_and_its_value(self):
         lines = self._classify(["SP pair 43703590/43709134 count 2>1"])
         self.assertIn("binding control: max_sp_pair_repetition=3", lines[0])
-        self.assertIn("--controls-override", lines[0])
+        # R61: --controls-override moved OFF the per-error line and into the
+        # ordered trailer. On the per-error line it read as the fix for that one
+        # violation; in the trailer it arrives after the bank and after the
+        # floor-versus-cap split, which is the order that fixes the problem.
+        self.assertNotIn("--controls-override", lines[0])
+        self.assertIn("--controls-override", " ".join(lines))
 
     def test_every_control_prefix_is_mapped(self):
         cases = {
@@ -8605,16 +8889,120 @@ class SwapFailureClassificationTests(unittest.TestCase):
             "pitcher 123 count 4>3": "max_pitcher_exposure_pct",
             "primary stack AAA count 4>3": "max_primary_stack_exposure_pct",
             "SP pair 1/2 count 4>3": "max_sp_pair_repetition",
+            # R61: both of these fell through unannotated, and they are the two
+            # that most often bind on a swap.
+            "entries 900/901 share 6>5": "max_shared_players",
+            "game AAA@BBB exposure 7>5": "max_game_exposure_pct_by_game",
         }
         for err, control in cases.items():
             self.assertIn(f"binding control: {control}",
                           self._classify([err])[0], err)
 
+    def test_floors_and_caps_are_not_presented_as_the_same_lever(self):
+        """R61, reusing R98(2)'s vocabulary rather than writing a third copy."""
+        from mlb_engine.allocate.contest_allocator import (
+            STRATEGY_CAP_CONTROLS, STRUCTURAL_FLOOR_CONTROLS,
+        )
+        self.assertIn("max_shared_players", STRUCTURAL_FLOOR_CONTROLS)
+        self.assertIn("max_player_exposure_pct", STRATEGY_CAP_CONTROLS)
+        structural = " ".join(self._classify(
+            ["entries 900/901 share 6>5"],
+            {"max_shared_players": 5}))
+        self.assertIn("ARITHMETIC, not strategy", structural)
+        self.assertNotIn("A STRATEGY DECISION", structural)
+        strategy = " ".join(self._classify(
+            ["player 123 count 4>3"], {"max_player_exposure_pct": 0.4}))
+        self.assertIn("A STRATEGY DECISION", strategy)
+        self.assertIn("not a recommendation", strategy)
+        self.assertNotIn("ARITHMETIC, not strategy", strategy)
+        both = " ".join(self._classify(
+            ["entries 900/901 share 6>5", "player 123 count 4>3"],
+            {"max_shared_players": 5, "max_player_exposure_pct": 0.4}))
+        self.assertLess(both.index("ARITHMETIC, not strategy"),
+                        both.index("A STRATEGY DECISION"))
+
+    def test_a_partial_bank_is_named_before_any_control_change(self):
+        partial = {"job_list_exhausted": False, "jobs_attempted": 21,
+                   "jobs_total": 1176}
+        lines = self._classify(["player 123 count 4>3"], bank_report=partial)
+        blob = " ".join(lines)
+        self.assertIn("GROW THE BANK FIRST", blob)
+        self.assertIn("21 of 1176", blob)
+        self.assertLess(blob.index("GROW THE BANK FIRST"),
+                        blob.index("A STRATEGY DECISION"))
+        # An exhausted bank says nothing about the bank, and a missing report
+        # never asserts that the bank was complete.
+        for report in ({"job_list_exhausted": True}, None, {}):
+            self.assertNotIn("GROW THE BANK FIRST", " ".join(
+                self._classify(["player 123 count 4>3"], bank_report=report)))
+        # No cap violation, nothing to order: the bank line is not a preamble.
+        self.assertNotIn("GROW THE BANK FIRST", " ".join(self._classify(
+            ["no compatible candidate for Entry ID 900"], bank_report=partial)))
+
+    def test_the_parents_own_cap_is_checked_before_a_new_value(self):
+        blob = " ".join(self._classify(["player 123 count 4>3"]))
+        self.assertIn("R29(3)", blob)
+        self.assertIn("not a strategy change", blob)
+
+    def test_an_allocator_refusal_is_not_re_steered(self):
+        """R61's refusals arrive carrying their own ordered remedies, and this
+        function must add nothing to them: a cap-loosening trailer under a
+        refusal that just said not to loosen the cap is a contradiction.
+
+        No special case enforces that. It holds because no refusal string starts
+        with a prefix in `_CONTROL_BY_ERROR_PREFIX`, so none is annotated and
+        none reaches the trailer. That is a property of two vocabularies that
+        live in different modules, which is exactly the kind of coupling that
+        rots silently, so it is asserted here against the real strings. Adding a
+        prefix like "max_player" to the map, or renaming a refusal to lead with
+        "player ", turns this red.
+        """
+        ls = SwapControlsInheritanceTests._late_swap()
+        refusals = [
+            # contest_allocator._untouchable_cap_conflicts
+            "max_player_exposure_pct: player 40003 already appears in 10 of the "
+            "8 row(s) this solve cannot change, against a whole-file cap of 9 "
+            "at 20 complete rows",
+            "max_sp_pair_repetition: SP pair 1/2 already appears in 3 of the 8 "
+            "row(s) this solve cannot change, against a cap of 2",
+            "This is not a solver infeasibility and not a bank problem. In "
+            "order: (1) authorize the rows holding the excess with --entry-ids",
+            # the starve refusal
+            "Entry ID 1: every compatible candidate is ruled out by the 8 row(s) "
+            "this solve cannot change",
+            # contest_allocator._infeasibility_remedies (R98(2))
+            "FIRST REMEDY, grow the bank: the job list was NOT exhausted",
+            "NEXT REMEDY, --controls-override, and the two kinds are not alike:",
+        ]
+        for refusal in refusals:
+            with self.subTest(refusal=refusal[:40]):
+                self.assertEqual(
+                    [], [c for p, c in ls._CONTROL_BY_ERROR_PREFIX
+                         if refusal.startswith(p)],
+                    "a refusal that matches a control prefix would be annotated "
+                    "and would drag the cap-loosening trailer in behind it")
+                lines = self._classify([refusal], {"max_player_exposure_pct": 0.45,
+                                                   "max_sp_pair_repetition": 2})
+                self.assertEqual(lines, [f"  {refusal}"])
+        # And the two error sources cannot arrive together: execute_portfolio
+        # returns on a failed allocation before any export gate runs, so a
+        # refusal is never mixed with a validator cap violation.
+        source = (Path(__file__).resolve().parents[1] / "mlb_engine" / "pipeline"
+                  / "execution_pipeline.py").read_text(encoding="utf-8")
+        head = source.split("allocation = select_and_assign_entries", 1)[1]
+        self.assertLess(head.index('if not allocation.get("passed")'),
+                        head.index("validate_dk_entries_file"))
+
     def test_no_compatible_candidate_says_it_is_not_a_control(self):
         lines = self._classify(["no compatible candidate for Entry ID 5202734526"])
         self.assertIn("not a portfolio control", lines[0])
-        self.assertIn("--budget", lines[0])
         self.assertNotIn("binding control", lines[0])
+        # R47: the bank was NOT the cause in the one case this was reproduced on
+        # (entry 5207638174, both P slots pinned to one game -- the pinned pair is
+        # excluded from the job list, so no bank size produces a candidate). The
+        # pins are what to read first, so --budget no longer leads.
+        self.assertNotIn("--budget", lines[0])
+        self.assertIn("locked slots", lines[0])
 
     def test_the_two_failure_classes_do_not_read_alike(self):
         control = self._classify(["SP pair 1/2 count 2>1"])[0]

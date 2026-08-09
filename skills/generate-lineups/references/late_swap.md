@@ -27,6 +27,33 @@ without swapping. Good first move when you are unsure how much room there is.
 `--entry-ids` restricts mutability to exactly those entries. Omitting it
 authorizes every reserved entry in the file.
 
+## Scope `--entry-ids` tightly, to the entries that actually need a change
+
+This is the recommended pattern, not a workaround, and it is worth stating why
+(R47, measured 2026-08-08 against `outputs/2026-08-03/_swap1..9.log`).
+
+The swap builds one general bank, then one targeted slice per pinned entry, and
+each targeted slice passes an `excludes` list computed from *that entry's own*
+roster. The exclude set is part of `bank_cache`'s conditions signature, and
+`extend_bank` opens by calling `drop_stale_jobs`, which discards every stored
+candidate built under a different signature. So each targeted slice throws away
+the candidates the previous slices built. Across nine runs on 2026-08-03 the
+cache reached 1,007 candidates while the joint solve was handed 8, 9 or 10 of
+them; scoped to the 2 entries that needed a change — which shared one exclude
+set, so nothing was discarded between them — it was handed 90.
+
+Practical consequences until that is fixed:
+
+- **Name only the entries that need a change.** Two entries with the same
+  exclude set do not wipe each other, so a tight scope keeps the bank the solve
+  actually sees.
+- **Read `candidate scoring: N scored`, not `bank: N candidates`.** The first is
+  what the joint solve gets. A large gap between them is this effect, not a
+  scoring failure — `scoring_failed` is reported on the same line and was `0` in
+  all nine runs.
+- **A bigger `--budget` does not close that gap.** The candidates are being
+  discarded after they are built, not left unbuilt.
+
 ## The two rules that explain most failures
 
 **A locked slot cannot move.** The player who is already playing stays in the exact
@@ -60,6 +87,17 @@ allocator needs.
 **A pinned pitcher constrains the SP pair space.** If P1 is pinned, every pair
 excluding that pitcher is infeasible. Enumerating them burns the budget on
 guaranteed failures, so the pair space is narrowed to the pins up front.
+
+**Both pitcher slots pinned to the SAME GAME yields zero candidates, at any
+budget.** `extend_bank` builds its job list from `usable_pairs`, which drops any
+pair whose two pitchers share a `Game_ID`. Each job then passes its pair as
+`locks` *on top of* the entry's `locked_slot_assignments`, so a job whose pair is
+not the pinned pair needs four pitchers in two slots and is infeasible. If the
+pinned pair itself is not in `usable_pairs`, every job is infeasible and the
+slice reports `+0 targeted candidates` (R47; reproduced on entry 5207638174,
+both P slots pinned to the locked STL@NYY game). Entries with one P pinned are
+fine, because pairs containing that pitcher survive the same-game filter. Until
+this is fixed, exclude such an entry from the swap rather than growing the bank.
 
 **Enough pinned hitter slots makes a stack impossible.** A Classic roster has 8
 hitter slots. Pin 5 and only 3 are free, so a 4-man stack cannot fit and no budget

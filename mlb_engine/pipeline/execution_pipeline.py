@@ -162,7 +162,8 @@ from mlb_engine.contest_shapes import (
     satellite_shape_for, validate_shape,
 )
 from mlb_engine.entries.dk_entries_manager import (
-    derive_workflow_certification, reconcile_entries_against_assignments,
+    derive_workflow_certification, fixed_portfolio_exposure,
+    reconcile_entries_against_assignments,
     validate_dk_entries_file, validate_template_preservation,
     validate_upload_ready_gates, write_candidate_from_template,
 )
@@ -334,12 +335,31 @@ def execute_portfolio(
     _materialize_projections(projections, projection_path)
     register_artifact(run_dir, projection_path, "projections")
 
+    # R61: on a late swap the solve is handed a SUBSET of the file's complete
+    # rows, and the export validator grades all of them. Hand the allocator what
+    # the rows it cannot touch already hold so both ends resolve the same caps
+    # against the same denominator.
+    #
+    # Late swap only, deliberately. On an initial build from a reserved template
+    # the authorized set and the complete-row set are the same set, so there is
+    # nothing to offset and passing None keeps the build byte-identical (the R28
+    # precedent). `preserve_completed=True` below means an initial build CAN in
+    # principle carry completed rows outside the requirements; that case is
+    # filed as R61-tail rather than changed silently here.
+    fixed_exposure = None
+    if mode == "late_swap":
+        fixed_exposure = fixed_portfolio_exposure(
+            entries_csv,
+            [str(req["entry_id"]) for req in entry_requirements],
+            salary_csv_path=salary_csv,
+        )
     # R98(2): the bank record travels with the candidates it produced. The
     # allocator can prove infeasibility against a bank; it cannot see whether
     # that bank was a completed search or a slice, and that difference decides
     # whether the honest remedy is another slice or a control change.
     allocation = select_and_assign_entries(
-        candidates, entry_requirements, controls, bank_report=bank_diagnostics)
+        candidates, entry_requirements, controls, bank_report=bank_diagnostics,
+        fixed_exposure=fixed_exposure)
     if not allocation.get("passed"):
         diagnostics = {
             "run_id": run["run_id"], "mode": mode, "allocation": allocation,
