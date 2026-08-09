@@ -4,6 +4,13 @@ VERSION is the authoritative version constant for this module.
 Framework patch: MLB Classic v2.16.0 lean joint selection/allocation
 Compiled: 2026-06-11 (v1.10 reliability and game-exposure patch)
 
+v1.12 changes (R98(2)): ``select_and_assign_entries`` accepts an advisory
+``bank_report``. On a PROVEN-infeasible solve it appends ordered remedies to
+``errors``: grow the bank first when ``job_list_exhausted`` is False, and only
+then ``--controls-override``, with the structural-floor controls separated from
+the exposure caps that have no floor. The solver's own arithmetic is unchanged
+and still leads the list.
+
 v1.10 changes: shadowed duplicate definitions removed; candidate-reuse caps are
 keyed by lineup signature, not candidate object; optional per-game exposure caps
 (``max_game_exposure_pct_by_game`` with ``player_game_by_id``) are encoded in the
@@ -36,9 +43,9 @@ from collections import Counter, defaultdict
 import csv
 import json
 import math
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-VERSION = "v1.11"
+VERSION = "v1.12"
 
 CONTEST_TYPES = {"cash", "se_gpp", "portfolio_gpp", "wta", "satellite"}
 PRIORITY_MULTIPLIER = {"low": 0.80, "medium": 1.00, "high": 1.18, "must": 1.35}
@@ -633,6 +640,90 @@ def _diagnose_binding_constraints(
                 f"{pitcher_cap} = {len(arms) * pitcher_cap} < {total * 2} pitcher slots"
             )
     return findings
+
+
+# R98(2). Controls that reach an ENGINE-NAMED structural floor, versus controls
+# that do not have one. The distinction is the whole point: `max_shared_players`
+# below the inherent overlap of a stack plus a shared SP pair is arithmetically
+# impossible, so raising it to that floor changes nothing about the portfolio --
+# no two lineups built on one 5-stack CAN overlap less. An exposure cap has no
+# such floor. The engine can compute the minimum value that makes a given build
+# feasible, but that number is a consequence of the bank it was handed, not a
+# property of the slate, and adopting it concentrates the portfolio. Calling
+# both "raise the cap to the named floor" is what taught the 1910_9g operator to
+# move three exposure caps from 0.35/0.43 to 0.56 against a bank explored to
+# 1.8%.
+STRUCTURAL_FLOOR_CONTROLS = frozenset({"max_shared_players", "max_sp_pair_repetition"})
+STRATEGY_CAP_CONTROLS = frozenset({
+    "max_player_exposure_pct", "max_pitcher_exposure_pct",
+    "max_primary_stack_exposure_pct", "max_candidate_reuse",
+})
+
+
+def _infeasibility_remedies(
+    bank_report: Optional[Mapping[str, Any]],
+    binding: Sequence[str],
+) -> List[str]:
+    """R98(2). The ordered remedies for a PROVEN-infeasible joint allocation.
+
+    A MILP that proves infeasible against a bank whose job list was never
+    exhausted has proved a fact about the candidates it was handed, not about
+    the slate. Every control this module then names is binding on THAT bank, so
+    relaxing one is a strategy change made to fit an infrastructure limit -- the
+    move CLAUDE.md's pool rule already forbids one layer down, arriving here
+    instead. So bank growth is stated FIRST and ``--controls-override`` second,
+    and the two kinds of control are never presented as the same lever.
+
+    Returns [] when there is nothing honest to add: an absent or silent
+    ``bank_report`` is not evidence that the bank was complete, and this
+    function never guesses which it was.
+    """
+    lines: List[str] = []
+    exhausted = (bank_report or {}).get("job_list_exhausted")
+    if exhausted is False:
+        attempted = (bank_report or {}).get("jobs_attempted")
+        total = (bank_report or {}).get("jobs_total")
+        scope = ""
+        if attempted is not None and total:
+            scope = (f" ({int(attempted)} of {int(total)} jobs attempted, "
+                     f"{float(attempted) / float(total) * 100:.1f}%)")
+        floored = ""
+        if (bank_report or {}).get("budget_floored"):
+            floored = (" and its time budget bottomed out on the engine floor "
+                       "rather than the requested window")
+        lines.append(
+            f"FIRST REMEDY, grow the bank: the job list was NOT exhausted{scope}"
+            f"{floored}, so this proof is about the candidates that were built, "
+            f"not about the slate. Re-run the same build command; it exits 10 and "
+            f"resumes into the same cache until the job list is exhausted. Do not "
+            f"relax a control against a bank that is still a slice."
+        )
+    named = {
+        control
+        for control in (STRUCTURAL_FLOOR_CONTROLS | STRATEGY_CAP_CONTROLS)
+        if any(str(b).startswith(f"{control}:") for b in binding)
+    }
+    structural = sorted(named & STRUCTURAL_FLOOR_CONTROLS)
+    strategy = sorted(named & STRATEGY_CAP_CONTROLS)
+    if structural or strategy:
+        parts = []
+        if structural:
+            parts.append(
+                f"[{', '.join(structural)}] reach an engine-named structural floor, "
+                f"so raising to that floor is arithmetic and changes nothing else"
+            )
+        if strategy:
+            parts.append(
+                f"[{', '.join(strategy)}] have NO engine-named floor, so any value "
+                f"that clears this bank is a portfolio strategy decision and "
+                f"concentrates the entered set"
+            )
+        label = "NEXT REMEDY" if lines else "REMEDY"
+        lines.append(
+            f"{label}, --controls-override, and the two kinds are not alike: "
+            + "; ".join(parts) + "."
+        )
+    return lines
 
 
 def _prefilter_candidates(
@@ -1543,12 +1634,22 @@ def select_and_assign_entries(
     candidates: Sequence[Dict[str, Any]],
     entry_requirements: Sequence[Dict[str, Any]],
     portfolio_controls: Optional[Dict[str, Any]] = None,
+    *,
+    bank_report: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
     This is the v2.15 production allocation contract. Entry-level locks and
     candidate compatibility are enforced before solve; no leftover allocation
     step exists.
+
+    ``bank_report`` (R98(2), v1.12) is the caller's bank-construction record --
+    ``bank_cache.extend_bank``'s return, or the merged ``bank_diagnostics`` the
+    pipeline assembles. It is advisory and read on ONE path only: when the MILP
+    proves infeasible, ``job_list_exhausted is False`` means this refusal is a
+    fact about a partial search, and the remedy the caller is told to reach for
+    changes accordingly. Omitting it costs nothing and asserts nothing; the
+    allocator never infers a complete bank from a missing report.
     """
     candidates = list(candidates)
     entries = [dict(x) for x in entry_requirements]
@@ -1894,6 +1995,13 @@ def select_and_assign_entries(
                         )) if controls.get(k) is not None
                     )
                 ]
+            # R98(2). Appended, never substituted: the arithmetic above is what
+            # the solver proved and it stays first among the facts. What follows
+            # is what to DO about it, and the order matters more than the words
+            # -- on 1910_9g both lines above were true and the operator still
+            # reached for the wrong lever, because nothing said the bank was
+            # 1.8% explored.
+            errors = errors + _infeasibility_remedies(bank_report, binding)
         solver_report["binding_constraints"] = (
             [] if timed_out else _diagnose_binding_constraints(
                 E, stacks, sp_pairs, signatures, largest_contest, controls)

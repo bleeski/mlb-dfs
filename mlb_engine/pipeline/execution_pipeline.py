@@ -4,6 +4,15 @@ VERSION is the authoritative version constant for this module.
 Initial builds and late swaps share one immutable, hash-bound production path.
 The exact final DKEntries file is re-read to derive all post-export gates.
 
+v1.16 changes (R98(2)):
+- ``run_initial_build`` passes its merged ``bank_diagnostics`` to
+  ``select_and_assign_entries`` as ``bank_report``. A proven-infeasible joint
+  allocation against a bank whose ``job_list_exhausted`` is False now returns
+  ordered remedies naming bank growth first. The plan path is deliberately NOT
+  threaded: ``_plan_joint_allocation`` already returns ``unchecked`` and never
+  solves when its own plan bank did not exhaust its job list, so a report there
+  would describe a bank that never reached the solver.
+
 v1.15 changes (R28):
 - ``run_slate(approve=False)`` gains a plan-mode joint-allocation verdict.
   ``_plan_joint_allocation`` builds a bank through the sliced path into a
@@ -162,7 +171,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.15"
+VERSION = "v1.16"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -325,7 +334,12 @@ def execute_portfolio(
     _materialize_projections(projections, projection_path)
     register_artifact(run_dir, projection_path, "projections")
 
-    allocation = select_and_assign_entries(candidates, entry_requirements, controls)
+    # R98(2): the bank record travels with the candidates it produced. The
+    # allocator can prove infeasibility against a bank; it cannot see whether
+    # that bank was a completed search or a slice, and that difference decides
+    # whether the honest remedy is another slice or a control change.
+    allocation = select_and_assign_entries(
+        candidates, entry_requirements, controls, bank_report=bank_diagnostics)
     if not allocation.get("passed"):
         diagnostics = {
             "run_id": run["run_id"], "mode": mode, "allocation": allocation,

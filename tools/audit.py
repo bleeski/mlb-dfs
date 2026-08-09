@@ -33,17 +33,17 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 745  # core 493 + showdown 49 + upload 124 + golden 9 + paste 70
+EXPECTED_TEST_COUNT = 758  # core 506 + showdown 49 + upload 124 + golden 9 + paste 70
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
     "mlb_engine/optimize/optimizer_v3.py": "OPTIMIZER_VERSION = 'v3.23'",
-    "mlb_engine/allocate/contest_allocator.py": 'VERSION = "v1.11"',
+    "mlb_engine/allocate/contest_allocator.py": 'VERSION = "v1.12"',
     "mlb_engine/intake/slate_intake_manager.py": 'VERSION = "v1.10"',
     "mlb_engine/entries/dk_entries_manager.py": 'VERSION = "v1.6"',
     "mlb_engine/swap/late_swap_manager.py": 'VERSION = "v1.4"',
     "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.4"',
-    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.15"',
+    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.16"',
     "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.6"',
     "mlb_engine/projections/xwoba_base_correction.py": 'VERSION = "v1.2"',
     "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.6"',

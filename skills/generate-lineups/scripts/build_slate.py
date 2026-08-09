@@ -32,6 +32,7 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+from typing import Any, Mapping
 
 # F19: pinned before anything else runs, because the interpreter reads
 # PYTHONHASHSEED at startup and setting it later does nothing. This is the
@@ -89,6 +90,103 @@ SALARY_CAP = 50000
 CLASSIC_SLOTS = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF")
 MAX_HITTERS_PER_TEAM = 5
 MIN_GAMES_PER_LINEUP = 2
+
+# R98(1). Both bank budgets in this script are `max(what is left of the window,
+# BANK_BUDGET_FLOOR_S)`. When the floor wins, the search is no longer bounded by
+# the operator's --max-seconds; it is bounded by a constant, and the thin bank
+# that follows is an infrastructure limit reaching through to shape strategy.
+# CLAUDE.md permits an infrastructure limit to reduce search effort and forbids
+# it changing the legal player set -- but the permission is only honest while
+# the reduction is visible. On the 1910_9g build it was not: the brief recorded
+# `time_budget_s: 5.0` with nothing to distinguish a deliberate five seconds
+# from a window that had already run out, and the operator read a 1.8%-explored
+# bank as a considered set of caps. So a floored budget announces itself, both
+# on stderr and in the record.
+BANK_BUDGET_FLOOR_S = 5.0
+
+# R98(2). Which failing feasibility checks name a floor the ENGINE derived from
+# the slate, and which name a number that is merely the minimum clearing THIS
+# bank. `max_shared_players` below the inherent stack-plus-pair overlap is
+# arithmetically impossible: no two lineups sharing a five-man stack can overlap
+# less, so raising it to that floor changes nothing about the portfolio. An
+# exposure cap has no such floor, and raising one concentrates the entered set.
+# The old hint called both "not a strategy or player-pool change", which is how
+# 1910_9g moved three exposure caps from 0.35/0.43 to 0.56.
+STRUCTURAL_FEASIBILITY_CHECKS = frozenset({"shared_players_floor", "sp_pair_capacity"})
+
+
+def resolve_bank_budget(computed_s: float, *, label: str) -> tuple[float, bool]:
+    """Return ``(budget_s, floored)`` and SAY SO when the floor wins (R98(1))."""
+    floored = float(computed_s) < BANK_BUDGET_FLOOR_S
+    budget = max(float(computed_s), BANK_BUDGET_FLOOR_S)
+    if floored:
+        print(
+            f"BANK BUDGET FLOORED ({label}): {float(computed_s):.1f}s remained of "
+            f"--max-seconds after reserve, so the {BANK_BUDGET_FLOOR_S:g}s engine "
+            f"floor applies. This bank is bounded by a constant, not by the window "
+            f"you asked for. If the build then refuses, grow the bank (re-run; the "
+            f"build exits 10 and resumes) or raise --max-seconds -- do not relax "
+            f"portfolio controls against a bank this size.",
+            file=sys.stderr,
+        )
+    return budget, floored
+
+
+def infeasibility_hint(
+    feasibility: Mapping[str, Any] | None,
+    bank_report: Mapping[str, Any] | None,
+) -> str | None:
+    """R98(2). Remedies in the order that fixes the actual problem.
+
+    Returns None when there is nothing honest to say. Silence is correct for a
+    refusal on an exhausted bank with no failing structural check: the allocator
+    has already named what it proved, and inventing a remedy here would be the
+    guess this item exists to remove.
+    """
+    parts: list[str] = []
+    report = bank_report or {}
+    if report.get("job_list_exhausted") is False:
+        attempted = report.get("jobs_attempted")
+        total = report.get("jobs_total")
+        scope = ""
+        if attempted is not None and total:
+            scope = (f" ({int(attempted)} of {int(total)} jobs attempted, "
+                     f"{float(attempted) / float(total) * 100:.1f}%)")
+        floored = (" Its time budget also hit the engine floor, so the slice was "
+                   "bounded by a constant." if report.get("budget_floored") else "")
+        parts.append(
+            f"GROW THE BANK FIRST. The job list was not exhausted{scope}, so this "
+            f"refusal is about the candidates that got built, not about the slate."
+            f"{floored} Re-run the SAME command: the build exits 10 and resumes into "
+            f"the same cache. Relaxing a control now fits the portfolio to a partial "
+            f"search and records the result as a deliberate cap."
+        )
+    structural: list[str] = []
+    strategy: list[str] = []
+    for check in ((feasibility or {}).get("checks") or []):
+        if check.get("passed") is False and check.get("remedy"):
+            line = f"{check.get('name')}: {check['remedy']}"
+            (structural if check.get("name") in STRUCTURAL_FEASIBILITY_CHECKS
+             else strategy).append(line)
+    if structural:
+        parts.append(
+            "ARITHMETIC, not strategy -- " + "; ".join(structural)
+            + ". These are structural floors of this slate; raising the control to "
+            "the named floor removes an impossibility and changes nothing else."
+        )
+    if strategy:
+        parts.append(
+            "A STRATEGY DECISION -- " + "; ".join(strategy)
+            + ". Exposure caps have NO engine-named floor. The value above is the "
+            "minimum that clears this build, not a recommendation, and adopting it "
+            "concentrates the entered set."
+        )
+    if not parts:
+        return None
+    if structural or strategy:
+        parts.append("Apply control changes with --controls-override "
+                     "'{\"max_shared_players\": <n>, ...}'.")
+    return " ".join(parts)
 
 
 # --------------------------------------------------------------------------- #
@@ -1338,14 +1436,21 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     bank_report = None
     candidates = None
 
+    bank_budget_floored = False
     if projected_direct > remaining:
         strategy = "sliced_bank"
         cache = BankCache(bank_path)
+        # R98(1): this is the floor the 1910_9g build actually hit. `time_budget_s`
+        # in the bank report is THIS value, so the brief's `solve.bank` recorded
+        # 5.0 with no way to tell it apart from a chosen budget.
+        slice_budget, bank_budget_floored = resolve_bank_budget(
+            remaining - 8.0, label="sliced bank")
         bank_report = extend_bank(
             cache, projections,
-            time_budget_s=max(remaining - 8.0, 5.0),
+            time_budget_s=slice_budget,
             max_candidates=max(n_entries * 12, 60),
         )
+        bank_report["budget_floored"] = bank_budget_floored
         # F15: score each contest shape the reserved CSV actually contains. A
         # single wta score is a ceiling-max ranking, and the allocator's cash
         # branch then applies its floor weighting on top of it, so cash entries
@@ -1415,6 +1520,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                     (f"{bank_report.get('jobs_timed_out')} cache jobs hit the solver "
                      f"time limit and are retryable on another slice"
                      if bank_report.get("jobs_timed_out") else None),
+                    # R98(1): the reason a slice is thin belongs beside the fact
+                    # that it is thin.
+                    (f"the bank budget hit the {BANK_BUDGET_FLOOR_S:g}s engine "
+                     f"floor, so this slice was bounded by a constant rather "
+                     f"than by --max-seconds"
+                     if bank_report.get("budget_floored") else None),
                     (f"{cache.last_payload_report.get('scoring_failed')} candidates "
                      f"could not be scored and allocate on raw objective"
                      if cache.last_payload_report.get("scoring_failed") else None),
@@ -1438,6 +1549,22 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     if assumed:
         slate_kwargs["assume_gates"] = assumed
 
+    # Always bounded, even on the direct path. The estimate above decides
+    # strategy; this makes a wrong estimate degrade to a smaller bank instead of
+    # a killed process that leaves nothing behind. R98(1): and when the bound is
+    # the floor rather than the remaining window, say so. On the sliced path
+    # `candidates` are already in hand and run_slate never builds a bank, so this
+    # value governs only the direct path -- which is why the floor that matters
+    # is reported per strategy below rather than as one merged flag.
+    if strategy == "direct":
+        run_bank_budget, bank_budget_floored = resolve_bank_budget(
+            deadline - time.monotonic() - 6.0, label="run_slate auto-bank")
+    else:
+        # Inert on the sliced path: candidates were handed in, so run_slate
+        # builds no bank and a floor notice here would be noise about a budget
+        # nothing spends.
+        run_bank_budget = max(deadline - time.monotonic() - 6.0, BANK_BUDGET_FLOOR_S)
+
     result = run_slate(
         runs_root=str(REPO / "runs"),
         salary_csv=str(salary), entries_csv=str(entries),
@@ -1447,10 +1574,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # frame internally, so passing anything less here would build the bank on
         # enriched projections and then certify against unenriched ones.
         **enrich_kwargs,
-        # Always bounded, even on the direct path. The estimate above decides
-        # strategy; this makes a wrong estimate degrade to a smaller bank instead
-        # of a killed process that leaves nothing behind.
-        bank_time_budget_s=max(deadline - time.monotonic() - 6.0, 5.0),
+        bank_time_budget_s=run_bank_budget,
         portfolio_controls_override=args.controls_override,
         **slate_kwargs,
     )
@@ -1493,13 +1617,26 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                    **detail}
         if not feas.get("passed", True):
             payload["feasibility"] = feas
-            payload["hint"] = (
-                "one or more portfolio controls are structurally infeasible for "
-                "this pool/entry count (see feasibility.checks[].remedy). Rerun "
-                "with --controls-override '{\"max_shared_players\": <n>, ...}' "
-                "set to at least the named floors. This raises diversity caps to "
-                "match the slate, not a strategy or player-pool change."
-            )
+        # R98(2). The old hint fired only on a feasibility failure and named one
+        # remedy for two different kinds of control. It now fires whenever there
+        # is something true to say, leads with bank growth when the job list was
+        # not exhausted, and separates a structural floor from an exposure cap.
+        # The counts the hint is derived from travel beside it, so a refusal can
+        # be read without re-deriving them. That is R98(4) on the REFUSAL path
+        # only; carrying them into the certified brief beside
+        # controls_override_applied is the open half and stays in the backlog.
+        hint = infeasibility_hint(feas, bank_report)
+        if hint:
+            payload["hint"] = hint
+            print(f"hint: {hint}", file=sys.stderr)
+        if bank_report is not None:
+            payload["bank_exploration"] = {
+                "jobs_attempted": bank_report.get("jobs_attempted"),
+                "jobs_total": bank_report.get("jobs_total"),
+                "job_list_exhausted": bank_report.get("job_list_exhausted"),
+                "total_candidates": bank_report.get("total_candidates"),
+                "budget_floored": bank_report.get("budget_floored"),
+            }
         # R28(5): the refusal writes the brief too. This used to return an empty
         # brief, so `--brief` produced no file on the one path where the reader
         # most needs one, and a session that captured only the brief learned
@@ -1547,6 +1684,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "solve": {
             "strategy": strategy,
             "single_lineup_s": round(single_s, 2),
+            # R98(1). The governing budget's floor state, named at the level a
+            # reader reaches first. `bank` is None on the direct path, so a flag
+            # that lived only inside it would be invisible on exactly the path
+            # where run_slate builds the bank.
+            "bank_budget_floored": bank_budget_floored,
             "bank": bank_report,
         },
         "slate_clock": {

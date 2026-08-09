@@ -3649,6 +3649,228 @@ class BuildSlateScriptTests(unittest.TestCase):
                               if "hitters" in f or "game(s)" in f], [])
 
 
+class BankBudgetFloorTests(unittest.TestCase):
+    """R98(1): a bank budget bounded by a constant instead of by --max-seconds
+    must say so, because the thin bank that follows is otherwise indistinguishable
+    from a deliberately small search. The 1910_9g brief recorded
+    ``time_budget_s: 5.0`` and the operator read it as a choice."""
+
+    _module = staticmethod(BuildSlateScriptTests._module)
+
+    @staticmethod
+    def _capture():
+        import contextlib
+        import io
+        return contextlib.redirect_stderr(io.StringIO())
+
+    def test_a_computed_budget_above_the_floor_is_silent_and_unfloored(self):
+        mod = self._module()
+        with self._capture() as err:
+            budget, floored = mod.resolve_bank_budget(21.5, label="sliced bank")
+        self.assertEqual(budget, 21.5)
+        self.assertFalse(floored)
+        self.assertEqual(err.getvalue(), "")
+
+    def test_a_budget_below_the_floor_is_raised_flagged_and_announced(self):
+        mod = self._module()
+        # The live shape: --max-seconds 11, most of it already spent on imports
+        # and pool construction, so the subtraction goes negative.
+        with self._capture() as err:
+            budget, floored = mod.resolve_bank_budget(-3.0, label="sliced bank")
+        self.assertEqual(budget, mod.BANK_BUDGET_FLOOR_S)
+        self.assertTrue(floored)
+        printed = err.getvalue()
+        self.assertIn("BANK BUDGET FLOORED", printed)
+        self.assertIn("sliced bank", printed)
+        # The announcement must name the remedy, not merely the condition.
+        self.assertIn("exits 10 and resumes", printed)
+        self.assertIn("do not relax", printed.lower())
+
+    def test_the_floor_boundary_itself_does_not_report_as_floored(self):
+        mod = self._module()
+        with self._capture() as err:
+            budget, floored = mod.resolve_bank_budget(
+                mod.BANK_BUDGET_FLOOR_S, label="sliced bank")
+        self.assertEqual(budget, mod.BANK_BUDGET_FLOOR_S)
+        self.assertFalse(floored, "equal to the floor is not bounded BY the floor")
+        self.assertEqual(err.getvalue(), "")
+
+
+class InfeasibilityRemedyOrderTests(unittest.TestCase):
+    """R98(2), both halves of the same lesson.
+
+    The 1910_9g build proved infeasible against a bank explored to 1.8% and every
+    message it printed was true. The operator raised three exposure caps from
+    0.35/0.43 to 0.56 and certified, because nothing distinguished a control that
+    was genuinely binding from a search that had not run.
+    """
+
+    # --- allocator half -------------------------------------------------- #
+
+    @staticmethod
+    def _roster(seed):
+        return [f"{seed}-{i}" for i in range(10)]
+
+    def _infeasible(self, **kwargs):
+        """The live shape: far fewer distinct stacks than the cap needs."""
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary="AAA")
+                 for i in range(3)]
+        return select_and_assign_entries(
+            cands, _entry_reqs(6), {"max_primary_stack_exposure_pct": 0.34},
+            **kwargs)
+
+    def test_an_unexhausted_job_list_makes_bank_growth_the_first_remedy(self):
+        result = self._infeasible(bank_report={
+            "job_list_exhausted": False, "jobs_attempted": 47,
+            "jobs_total": 2592, "budget_floored": True,
+        })
+        self.assertFalse(result["passed"])
+        errors = result["errors"]
+        # The solver's own arithmetic still leads: what it PROVED is unchanged.
+        self.assertIn("proven infeasible", errors[0])
+        remedies = [e for e in errors if "REMEDY" in e]
+        self.assertTrue(remedies, errors)
+        self.assertIn("grow the bank", remedies[0])
+        self.assertIn("47 of 2592", remedies[0])
+        self.assertIn("1.8%", remedies[0])
+        self.assertIn("exits 10 and resumes", remedies[0])
+        self.assertIn("engine floor", remedies[0])
+        # --controls-override never precedes it.
+        self.assertLess(errors.index(remedies[0]),
+                        min(i for i, e in enumerate(errors)
+                            if "--controls-override" in e))
+
+    def test_an_exhausted_job_list_never_claims_the_bank_is_the_problem(self):
+        result = self._infeasible(bank_report={"job_list_exhausted": True})
+        joined = " ".join(result["errors"])
+        self.assertNotIn("grow the bank", joined)
+        self.assertIn("--controls-override", joined)
+
+    def test_a_missing_bank_report_asserts_nothing_about_the_bank(self):
+        """Absence of evidence is not evidence the search completed.
+
+        The floor-versus-cap classification is true of the controls whatever the
+        bank did, so it survives; the bank sentence is the one claim that needs
+        evidence, and without a report it is simply not made.
+        """
+        silent = self._infeasible()
+        joined = " ".join(silent["errors"])
+        self.assertIn("proven infeasible", joined)
+        self.assertNotIn("grow the bank", joined)
+        self.assertNotIn("job list", joined)
+        self.assertIn("--controls-override", joined)
+        # With no bank line there is no earlier remedy to be "NEXT" after.
+        self.assertNotIn("NEXT REMEDY", joined)
+
+    def test_a_structural_floor_and_an_exposure_cap_are_named_differently(self):
+        result = self._infeasible(bank_report={"job_list_exhausted": True})
+        line = next(e for e in result["errors"] if "--controls-override" in e)
+        # The failing control here is an exposure cap, which has no floor.
+        self.assertIn("max_primary_stack_exposure_pct", line)
+        self.assertIn("NO engine-named floor", line)
+        self.assertIn("strategy decision", line)
+        self.assertNotIn("is arithmetic", line)
+
+    def test_a_time_limit_gets_no_remedies_because_it_proved_nothing(self):
+        """CLAUDE.md: the allocator says time limit OR proven infeasible, never
+        both. A remedy list attached to a clock would be the same conflation."""
+        cands = [candidate(f"c{i}", self._roster(i), 100.0 - i, primary=f"T{i}")
+                 for i in range(8)]
+        with _patch_milp(lambda real, *a, **k: _FakeMilpResult(None, mip_gap=0.01)):
+            result = select_and_assign_entries(
+                cands, _entry_reqs(4),
+                bank_report={"job_list_exhausted": False, "jobs_attempted": 47,
+                             "jobs_total": 2592})
+        joined = " ".join(result["errors"])
+        self.assertIn("clock, not a proven infeasibility", joined)
+        self.assertNotIn("REMEDY", joined)
+
+    # --- build_slate half ------------------------------------------------ #
+
+    @staticmethod
+    def _hint(feasibility, bank_report):
+        return BuildSlateScriptTests._module().infeasibility_hint(
+            feasibility, bank_report)
+
+    def test_the_hint_leads_with_the_bank_then_splits_floor_from_cap(self):
+        """The exact 1910_9g composite: a starved bank AND a max_shared_players
+        floor failure AND an exposure cap that could be raised to fit."""
+        hint = self._hint(
+            {"passed": False, "checks": [
+                {"name": "shared_players_floor", "passed": False,
+                 "detail": "max_shared_players 6 vs inherent overlap floor 7",
+                 "remedy": "raise max_shared_players to >= 7"},
+                {"name": "pitcher_exposure_capacity", "passed": False,
+                 "detail": "cap 3 x 5 viable SPs = 15 vs 18 pitcher slots",
+                 "remedy": "raise max_pitcher_exposure_pct to >= 0.560 (cap 5)"},
+                {"name": "sp_pair_capacity", "passed": True, "detail": "fine"},
+            ]},
+            {"job_list_exhausted": False, "jobs_attempted": 47,
+             "jobs_total": 2592, "budget_floored": True, "total_candidates": 38})
+        self.assertIsNotNone(hint)
+        self.assertTrue(hint.startswith("GROW THE BANK FIRST"), hint)
+        self.assertIn("47 of 2592", hint)
+        self.assertIn("engine floor", hint)
+        # Order: bank, then the arithmetic floor, then the strategy decision.
+        self.assertLess(hint.index("GROW THE BANK"), hint.index("ARITHMETIC"))
+        self.assertLess(hint.index("ARITHMETIC"), hint.index("STRATEGY DECISION"))
+        self.assertIn("max_shared_players to >= 7", hint)
+        self.assertIn("NO engine-named floor", hint)
+        self.assertIn("not a recommendation", hint)
+
+    def test_an_exhausted_bank_with_only_a_structural_failure_omits_growth(self):
+        hint = self._hint(
+            {"passed": False, "checks": [
+                {"name": "shared_players_floor", "passed": False, "detail": "d",
+                 "remedy": "raise max_shared_players to >= 7"},
+            ]},
+            {"job_list_exhausted": True, "jobs_attempted": 2592,
+             "jobs_total": 2592})
+        self.assertNotIn("GROW THE BANK", hint)
+        self.assertTrue(hint.startswith("ARITHMETIC"), hint)
+        self.assertNotIn("STRATEGY DECISION", hint)
+
+    def test_nothing_true_to_say_produces_no_hint_rather_than_a_guess(self):
+        self.assertIsNone(self._hint({"passed": True, "checks": []},
+                                     {"job_list_exhausted": True}))
+        self.assertIsNone(self._hint(None, None))
+        # A passing check with a remedy string is not a failure.
+        self.assertIsNone(self._hint(
+            {"passed": True, "checks": [
+                {"name": "shared_players_floor", "passed": True,
+                 "detail": "d", "remedy": None}]},
+            {"job_list_exhausted": True}))
+
+
+class BuildContractCheckpointTests(unittest.TestCase):
+    """R63, decided 2026-08-08: build_slate reviews on its own approve=True call
+    and does NOT run a plan leg first. These pin the two halves of that decision
+    so a later session re-reading CLAUDE.md item 3 cannot quietly reopen it."""
+
+    def test_build_slate_makes_exactly_one_run_slate_call_and_it_approves(self):
+        """Behavioural intent stated structurally, because the alternative -- a
+        second run_slate(approve=False) call -- is exactly a call-graph fact."""
+        import ast
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        calls = [n for n in ast.walk(tree)
+                 if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "run_slate"]
+        self.assertEqual(len(calls), 1, "build_slate grew a second run_slate call")
+        approve = [kw.value for kw in calls[0].keywords if kw.arg == "approve"]
+        self.assertEqual(len(approve), 1)
+        self.assertIs(approve[0].value, True)
+
+    def test_the_engine_api_checkpoint_still_carries_the_plan_verdict(self):
+        """The other half of the decision: approve=False keeps R28's bank
+        verdict, so the contract's engine-API leg is not hollowed out by
+        build_slate's exemption."""
+        import inspect
+        source = inspect.getsource(epi.run_slate)
+        self.assertIn("_plan_joint_allocation", source)
+        self.assertIn("if not approve:", source)
+
+
 class BuildSlateEnrichmentWiringTests(unittest.TestCase):
     """The I-1 gap: enrichment that exists, is tested, and reaches no build.
 

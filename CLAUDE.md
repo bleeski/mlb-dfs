@@ -74,9 +74,22 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    engine default (`stale_platoon_policy='block'`); build_slate.py and
    late_swap.py pass `'warn'`, so it prints and the build ships (R27). A
    fresh RotoWire merge (no `--no-rotowire`) clears the age entirely.
-3. `run_slate(approve=False)` first, always. The checkpoint is the review:
-   slate clock, pool report, postures, stack plan, caps, feasibility, and one
-   Blockers line where every blocker maps to an engine action.
+3. Every build is reviewed before it certifies, and WHERE the review happens
+   depends on the door (R63, decided 2026-08-08). Entering at the engine API,
+   `run_slate(approve=False)` comes first, always; it is the only caller of
+   R28's `_plan_joint_allocation`, so it is the only place the BANK-interaction
+   verdict exists. Entering at `build_slate.py`, the review is the script's own,
+   on its single `approve=True` call: slate clock, pool report, postures, stack
+   plan, caps, feasibility, and one Blockers line where every blocker maps to an
+   engine action, with a refusal at exit 3 carrying all of it in the brief.
+   build_slate does NOT run a plan leg first, deliberately: on the sliced path
+   that solves the identical MILP on the identical candidates twice, and on the
+   direct path it builds a second bank that is not the build's and spends the
+   window the real bank needs. What build_slate therefore does not have is the
+   plan verdict, and it does not pretend to; what it has instead is the refusal
+   itself, which is the same MILP's answer and now names bank growth before any
+   control change (R98). Never approve a slate whose pool report you have not
+   read.
 4. The certified artifact is runs/<run_id>/final/DKEntries.csv and it is
    immutable. outputs/<date>/ holds the mirror, returned as `delivered_path`.
 5. Refinements after delivery go through `run_late_swap` with
@@ -87,7 +100,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  745 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  758 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The

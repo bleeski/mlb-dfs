@@ -25,6 +25,141 @@ performance claim.
 
 ---
 
+## 2026-08-08 (evening) — R63 decided and contracted; R98(1)(2) shipped; R98(4) half-landed
+
+### Decided
+
+- **R63 — build_slate does NOT run a plan leg first, and CLAUDE.md item 3 now
+  says which door gets which review.** The contradiction was real:
+  `build_slate.py`'s only `run_slate` call passes `approve=True`, so R28's
+  `_plan_joint_allocation` — written to predict a proven-infeasible thin slate
+  before staging — never fired on the primary path, while item 3 read
+  "`run_slate(approve=False)` first, always."
+
+  The two candidate fixes are not symmetric and the cost decides it. On
+  build_slate's sliced path the plan leg would call
+  `select_and_assign_entries(candidates, entries, controls)` — literally the
+  same call the build then makes, on the same candidates, under the same
+  controls. That is not an approximation of duplicated work, it is duplicated
+  work by construction. On the direct path the plan builds its OWN temporary
+  sliced bank, which `_plan_joint_allocation` itself documents as "not the
+  build's `build_diverse_candidate_bank` bank" and marks
+  `exact_for_this_build: False` — so it would spend the window the real bank
+  needs, to answer a question about a different problem. R98 had just measured
+  that window bottoming out on a 5-second floor, so the plan-then-approve path
+  would have made the defect shipping in the same commit strictly worse.
+
+  The deciding argument is what a refusal would have meant on 1910_9g. The plan
+  would have proved infeasible against the same 38 candidates, and under
+  "refuse on `verdict == proven_infeasible`" build_slate would have refused —
+  on a bank explored to 1.8%, where the correct answer was another slice.
+  Wiring a hard refusal to that signal institutionalises the exact
+  misdiagnosis R98 exists to correct. Note also that `run_slate(approve=False)`
+  returns `passed=True` even when its plan predicts refusal, and says so in
+  code: "this is the review checkpoint, not a gate." Option A would have
+  converted a self-described non-gate into a gate, which is a larger contract
+  change than the one taken.
+
+  So the contract moved instead, and it moved without losing anything. Item 3
+  now distinguishes the two doors: at the engine API `approve=False` still comes
+  first, always, and remains the only place the bank-interaction verdict exists;
+  at `build_slate.py` the review is the script's own on its single `approve=True`
+  call — slate clock, pool report, postures, stack plan, caps, feasibility, and
+  one Blockers line, with a refusal at exit 3 carrying all of it in the brief.
+  What build_slate does not have is the plan verdict, and the contract says so
+  in words rather than implying an equivalence it does not have. What it has
+  instead is the refusal itself, which is the same MILP's answer, and which as
+  of this commit names bank growth before any control change.
+
+### Changed
+
+- **R98(1) — a bank budget bounded by a constant now says so.**
+  `resolve_bank_budget()` replaces both bare `max(..., 5.0)` expressions in
+  `build_slate.py` and returns `(budget, floored)`. A floored budget prints
+  `BANK BUDGET FLOORED (<label>)` on stderr naming the remedy (re-run, exit 10
+  resumes) rather than merely the condition, sets `budget_floored: true` inside
+  `solve.bank`, adds a `bank_warnings` line, and surfaces
+  `solve.bank_budget_floored` at the level a reader reaches first — because
+  `solve.bank` is None on the direct path, which is the one path where
+  `run_slate` builds the bank.
+
+  **A correction to the filed item, found by reproducing it.** R98(a) named
+  `build_slate.py:1453` (`run_slate`'s `bank_time_budget_s`), but the observed
+  `time_budget_s: 5.0` came from `:1346`, `extend_bank`'s budget on the sliced
+  path — the bank report's `time_budget_s` is `extend_bank`'s own parameter, and
+  `:1453` is inert whenever `candidates_override` is supplied. Both are the same
+  silent floor and both are now audible; `:1346` is the one the live evidence
+  hit. The floor value itself is unchanged and named once, as
+  `BANK_BUDGET_FLOOR_S`.
+
+- **R98(2) — the infeasibility path names bank growth first, and stops calling
+  two different levers by one name.** `select_and_assign_entries` takes an
+  advisory `bank_report` (contest_allocator v1.12); `run_initial_build` passes
+  its merged `bank_diagnostics` (execution_pipeline v1.16). On a PROVEN
+  infeasibility with `job_list_exhausted is False`, the allocator appends
+  ordered remedies: grow the bank, with the attempted/total counts and the
+  percentage, then `--controls-override`. The solver's own arithmetic is
+  untouched and still leads `errors`, so `_plan_joint_allocation`'s summary
+  keeps reading `errors[0]`.
+
+  The second half is the classification. `max_shared_players` and
+  `max_sp_pair_repetition` reach an engine-named structural floor — no two
+  lineups sharing a five-man stack CAN overlap less — so raising one to that
+  floor is arithmetic and changes nothing else. The exposure caps have no such
+  floor: the number the engine computes is the minimum that clears the bank it
+  was handed, not a property of the slate, and adopting it concentrates the
+  entered set. The old `build_slate.py` hint called both "not a strategy or
+  player-pool change," which is how the 1910_9g operator moved three exposure
+  caps from 0.35/0.43 to 0.56 against a 1.8%-explored bank. `infeasibility_hint()`
+  now orders them — bank, then arithmetic, then strategy decision — and fires
+  whenever any of the three is true, instead of only on a feasibility failure.
+
+  Two things it deliberately does not do. A time limit gets no remedies, because
+  the allocator says "time limit at gap X" or "proven infeasible", never both,
+  and a remedy list attached to a clock is the same conflation. And a missing
+  `bank_report` produces no bank sentence at all: absence of evidence is not
+  evidence that the search completed, and the classification half — true of the
+  controls whatever the bank did — survives on its own.
+
+- **R98(4), refusal path only.** The not_certified payload carries
+  `bank_exploration` (`jobs_attempted`, `jobs_total`, `job_list_exhausted`,
+  `total_candidates`, `budget_floored`) beside the hint derived from it, so a
+  refusal reads without re-deriving the counts. Carrying them into the
+  CERTIFIED brief beside `controls_override_applied` — the half that lets a
+  reader tell a deliberate cap from a starved one after a build succeeds — is
+  still open and stays in the backlog with (3).
+
+- **13 tests, and the pin moves 745 -> 758.** `BankBudgetFloorTests` (3):
+  above-floor is silent and unfloored, below-floor is raised, flagged and
+  announced with its remedy, and the boundary value is not "bounded by" the
+  floor. `InfeasibilityRemedyOrderTests` (8) reproduces the 1910_9g shape — 47
+  of 2592 jobs, `job_list_exhausted: false`, `budget_floored: true`, an
+  exposure cap binding — and asserts remedy ORDER, not just presence:
+  `--controls-override` never precedes bank growth. It also pins the three
+  silences (exhausted bank, missing report, time limit) and the composite hint
+  where a structural floor and an exposure cap fail together.
+  `BuildContractCheckpointTests` (2) pins R63 from both sides: build_slate makes
+  exactly one `run_slate` call and it approves, and `run_slate`'s not-approve
+  branch still carries `_plan_joint_allocation`, so the engine-API leg of the
+  contract is not hollowed out by build_slate's exemption.
+
+- **Pins and versions.** `contest_allocator` v1.11 -> v1.12, `execution_pipeline`
+  v1.15 -> v1.16, both mirrored in `tools/audit.py`. `EXPECTED_TEST_COUNT`
+  745 -> 758 (core 493 -> 506). The PASS line moved in all three documents that
+  quote it: `CLAUDE.md`, `skills/generate-lineups/SKILL.md`, and the ledger
+  Quick Card (a one-line pin edit under a DEV-held `ledger` claim, at Ben's
+  explicit instruction; no ledger section was touched).
+
+### Still open
+
+- **R98(3)** — derive the bank budget from entry count and job-list size rather
+  than from whatever is left of `--max-seconds`. Repriced in the backlog: making
+  the floor audible removes the invisibility, not the bad budget, and five
+  seconds for 2592 jobs and 9 entries still could never have supported the
+  defaults. **R98(4)**'s certified-brief half rides with it.
+
+---
+
 ## 2026-08-08 — backlog merge: R98–R99 filed from the 1910_9g build, one BUILD fragment consumed
 
 ### Changed
