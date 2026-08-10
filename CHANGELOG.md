@@ -25,6 +25,139 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R103–R106: adjudication of the greenfield spec revision; six fragments merged; the R102 collision corrected (docs only)
+
+No code, no tests, no pins moved. Write set: `docs/2026-07-27_backlog_v2.md`,
+`docs/2026-08-10_critique_greenfield_spec.md` (new, the archived copy of Ben's
+root upload `DFS_SYSTEM_GREENFIELD_SPEC.md`, which stays his), seven consumed
+`docs/backlog_inbox/` fragments deleted, and this entry.
+
+### Changed
+
+- **Adjudicated the 2026-08-10 revision of the greenfield spec** (34 flaws
+  F-01..F-34, 42 architecture items A-01..A-42) against the tree at 89ca350,
+  which is this HEAD — the spec read the current tree, so every line cite was
+  checkable, per the R36 method. It is a revision of the 2026-08-01 spec
+  disposed in the R41/R42 entry; the disposition map:
+  - **Already on the board, no new item (the bulk):** F-09 = R36 Finding 10
+    (+ R101's landed upstream half and the owed re-measure); F-11 = Finding 3
+    + Finding 21's design pass; F-12 = Finding 1 as modified (R34's verdict
+    mechanism, UNKNOWN routing, minutes-to-lock staleness policy); F-13 =
+    Finding 7 + the exactly-50% boundary test; F-14 = Finding 2 (+ R66/R68);
+    F-15 = Finding 6 as modified (+ corrupt-is-not-empty, salary_sha256,
+    append-only records); F-17 = R81 (armed) + R85; F-18 = R41 (decision
+    first, through the EXISTING three gates); F-19's relaxation-integrity
+    half = R54 (reproduced); F-24 = R9a landed / R9b open, absolutism stays
+    rejected; F-25/F-26 = R63's one-command door + R12's loop state, daemons
+    stay rejected; F-27 = R42(b) + R78 + R62 (the reviewer's own cold Windows
+    run is an environment-limited result, as it concedes); F-28 = the DK wall
+    + R88; F-29 = rejected engine, accepted slivers already filed; F-30 =
+    Finding 14 + R62 + R79 + R91, and its MANIFEST.md claim is true and
+    already filed as R76(a); F-31 = premature, no sim exists to leak; F-32 =
+    R13, parked on Ben's own promo-channel call; F-34 = rejected 2026-08-01,
+    threat model unchanged. Architecture: A-04≈R81, A-07's ladder≈the
+    T-schedule + counted relaxations + `time_limited` tagging, A-10≈runs/
+    input snapshots + R49 + the R81 fingerprint, A-26≈`run_late_swap`'s
+    frozen-slot contract, A-27≈R63/R98's refusal-with-brief shape, A-28≈
+    preflight/verify_export (no engine import, no network) + R91 mutation
+    tests, A-32≈R9b, A-33≈R12's stop rule, A-36≈R84 + briefs, A-37≈R88,
+    A-38≈R62/R79/R90/R91, A-39≈R10's grading bar + R13's ledger target.
+  - **Rejected on re-verified facts:** F-05 ("phantom" `slate_sim.py` /
+    `calibration_engine.py` / post-slate evaluator) — MLB_Classic.md banners
+    all three "Retired as of v2.20.0 and not present in this repo" at lines
+    520/547/563; the doc is truthful and the residual (retired prose weight)
+    is R9b's split. F-02's premise — `contest_allocator.py:35-36` already
+    says verbatim "All scores are deterministic review/selection proxies. Do
+    not label them ROI, profitability, win rate, cash rate..."; the label
+    discipline the spec demands as its fix is the shipped posture, and the
+    honest-label closing sentence of the spec's A-42 restates CLAUDE.md's own
+    truthful-labels section back at it.
+  - **Rejected unchanged, no new evidence since 2026-08-01:** the greenfield
+    program itself (A-02/A-03/A-05/A-06/A-40/A-41/A-42 — the `dfs_vnext`
+    package, fifteen epics, SQLite/WAL authority, persisted FSM, signed
+    manifests A-30, CP-SAT benchmarking A-21, evidence-policy resolver A-08,
+    provider client A-09, event-driven refresh A-31, latency SLOs A-34, cost
+    instrumentation A-35) and the economics stack it feeds (F-07/F-10,
+    A-12..A-20, A-22/A-23/A-25's clustering half), all gated behind R13 and
+    R10 per the do-not-build list, which gains a dated 2026-08-10 paragraph
+    stating this and answering F-33's demand to supersede the anti-goals:
+    DEV recommends no, because the gate funds the EV prerequisites (archive
+    integrity, R10's graded satellite prior, R48, curated contest truth)
+    while refusing the infrastructure until the stakes decision makes it
+    rational. Noted for the record: A-25's Showdown "defaults" (captain
+    ≤ floor(0.33·n), overlap ≤ 4) are the currently shipped values.
+  - **Accepted where the tree and the fragments confirm it:** F-21 → R104,
+    F-16 → R105, F-20 → the R45 elevation. In all three cases the BUILD
+    fragments predate the spec and carry the sharper evidence.
+- **Filed R104** (P1, S-M): DK `Starting` token policy — PO is rosterable in
+  Classic (`viable_bulk_or_alt_sp`, `live_data_adapters.py:1073-1074`) and a
+  declared starter in Showdown (`showdown.py:136,150`) against Ben's stated
+  2026-08-05 policy, and Classic intake documents PLR falsely as "no role
+  claim" (`live_data_adapters.py:78-79`) so a PLR arm never enters the pool
+  (live case: DET Ty Madden, 2026-08-05). Fix shape per the fragment: PO
+  barred deterministically via a new non-rosterable role; PLR surfaced as a
+  named soft blocker with a new `--declare-pitcher` CLI flag reaching the
+  `declared_pitchers` mapping the engine already accepts, so the web-search
+  confirm step stays an operator act recorded in the brief, never a hidden
+  fetch inside a replayable build.
+- **Filed R105** (P1, S): the Showdown export path stamps the manifest status
+  from preflight's verdict string (`review_ready`,
+  `preflight_upload.py:1078`), which is outside `upload_manifest.py:36`'s
+  closed vocabulary, so every clean Showdown delivery fails `verify_export`
+  red (burned 2026-08-05 and 2026-08-06) and supersession cannot be reasoned
+  about for Showdown. Fix: the manifest writes `candidate`; verdict and
+  status stay separate facts; pinned by test.
+- **Filed R106** (P2, S): `--postures` cannot express `ticket_count`, so the
+  operator's deciding fact could not reach `resolve_contest_shape` on
+  2026-08-08 and a per-slate driver script was the workaround. Fix: JSON
+  form or `--postures-file`. The fragment's second half (minimum-feasible
+  relaxation hint on jointly-infeasible defaults) was folded into R98's
+  remainder.
+- **Elevated R45 to P1** and folded in the 2026-08-05 and 2026-08-09 burns:
+  three live Showdown builds in six days ran on hand-written feeds because
+  the sanctioned paste tool refuses every Showdown salary file. R32 names the
+  paste the PRIMARY source; a primary intake failing an entire contest
+  family is a contract violation, not a degraded enrichment. One fix detail
+  added from the 08-09 fragment: resolve probables off `Starting`, not
+  Roster Position, on Showdown files.
+- **Reordered "What do we tackle next":** new position 1 is the Showdown
+  intake-and-bookkeeping batch — R104 + R45 + R105 in one DEV session, with
+  R54 riding per its own "schedule it with, or ahead of, any Showdown-heavy
+  week" rule. Rationale: three-to-five live burns in six days, every one
+  hand-worked-around at T-minus, and the batch is the cheapest half of R41's
+  remaining gap. R37(2), R10, R62, R40, R96 hold their relative order behind
+  it (R37(2) is waiting on ARCHIVE and slates, not on a DEV slot).
+- **Corrected the R102 collision.** The backlog item filed 2026-08-09 as
+  R102 (pinned same-game pitcher pair) is renumbered **R103**: the
+  2026-08-10 sync commit took R102 in its commit subject, this changelog,
+  `tests/test_core.py`, `tools/claim.py`, `tools/sync_check.py`, and
+  CLAUDE.md, and shipped history is immutable, so the open backlog item is
+  the thing that moves. The three historical amendment references are
+  annotated in place rather than rewritten. Lesson recorded on the R103
+  entry: the next free R-number comes from scanning BOTH the backlog and
+  this file; the backlog alone is not the counter.
+- **Merged the sync fragment's remainder:** the GH PAT is filed as
+  **Sync-tail (Ben)** with the token-transport rule preserved verbatim;
+  fixture vendoring is sequenced behind it on the R62 entry; the
+  engine-mutex-is-nominal finding is **R31(d)**, decision-first because
+  making the mutex real starts blocking sessions that today proceed.
+- **Fragment consumption:** six BUILD/DEV fragments deleted per the
+  protocol (po-plr, paste-double-row 08-05, verify-export-status 08-05,
+  manifest-vocab 08-06, postures 08-08, paste-rejects 08-09, three-way-sync
+  08-10 — seven files, six logical fragments after the two paste burns).
+  `2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md` stays in the
+  inbox: it is ARCHIVE's work order, already referenced by R40.
+
+### Why
+
+Ben asked for the revised spec to be adjudicated element by element with
+every claim validated, and for the backlog to put the priority items first.
+The revision's value was not its architecture, which re-argues settled
+rejections without new evidence; it was convergence — three of its flaws
+were things this project's own builds had already hit live and filed as
+fragments, which is exactly the evidence standard this board files on. The
+queue now leads with the batch that stops the recurring operator burns.
+
 ## 2026-08-10 — R102: the sync state is measurable, and a marker-only release is loud
 
 Test pin 792 -> 810. New tool `tools/sync_check.py`. No engine module, no
