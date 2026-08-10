@@ -28,6 +28,19 @@ Two contracts that are easy to get wrong
 2. **Respect ``excluded_new_teams``.** Once a game locks, a late swap may not
    introduce any *new* player from that game, even in an unlocked slot. A candidate
    generated without that exclusion is legal-looking and unusable.
+3. **Two kinds of fact live in the conditions signature, and only one of them
+   invalidates** (R101). The PROJECTION values are truth: when they move, a
+   stored candidate is an answer to a question nobody asked, and it is dropped
+   (the 2026-07-26 incident in ``_job_key``'s docstring). The excludes and the
+   stack bounds are a per-request NARROWING: they shrink the legal set for one
+   caller and say nothing about anyone else's. Folding both into one signature
+   meant every targeted late-swap slice deleted the general bank and the
+   previous slices with it. They are separated now -- ``projection_digest``
+   destroys, the conditions signature buckets -- and the union of live buckets
+   is what ``as_candidates`` serves. That is safe because per-entry legality is
+   enforced downstream by ``contest_allocator._entry_candidate_compatible``,
+   which tests every candidate against that entry's pins and its
+   ``excluded_new_teams``: the bank is a superset, the allocator is the filter.
 
 Everything here is a deterministic review input. Nothing is an ROI, win-rate, cash
 -rate, or probability claim.
@@ -48,7 +61,7 @@ from mlb_engine.optimize.optimizer_v3 import (
     build_single_lineup, _new_solver_status, resolve_solver_time_limit,
 )
 
-VERSION = "v1.2"
+VERSION = "v1.3"
 
 
 def pool_signature(salary_csv: str | Path, length: int = 10) -> str:
@@ -139,6 +152,11 @@ class BankCache:
         # memory with disk, so without this a clear would be undone by the very
         # next save (R55).
         self._cleared: set[str] = set()
+        # R101. conditions signature -> the projection digest it was built
+        # under. Persisted, because that is the only record of WHICH kind of
+        # difference separates two stored buckets: same pool truth (live, keep)
+        # or different pool truth (stale, purge).
+        self.conditions_index: Dict[str, str] = {}
         self.corrupt_on_load = False
         # Filled by as_candidates: scored/failed counts for the payload it just
         # emitted, so a silent scoring failure is countable (F15).
@@ -157,33 +175,82 @@ class BankCache:
             self.corrupt_on_load = True
             self.candidates, self.attempted, self._seen = [], set(), set()
             self._cleared = set()
+            self.conditions_index = {}
             return
-        self.candidates = list(payload.get("candidates") or [])
         self.attempted = set(payload.get("attempted") or [])
-        self._seen = {tuple(c["roster"]) for c in self.candidates}
+        self.conditions_index = {
+            str(k): str(v) for k, v in (payload.get("conditions_index") or {}).items()
+        }
+        # R101: memory now legitimately holds several buckets at once, so a
+        # roster stored twice under two signatures would reach the solve twice
+        # and double-count in every exposure denominator. Deduping here keeps
+        # `len(cache)` the number of distinct candidates it has always meant.
+        self.candidates = []
+        self._seen = set()
+        for entry in (payload.get("candidates") or []):
+            key = tuple(str(p) for p in (entry.get("roster") or []))
+            if len(key) != 10 or not all(key) or key in self._seen:
+                continue
+            self._seen.add(key)
+            self.candidates.append(entry)
 
-    def drop_stale_jobs(self, conditions_sig: str) -> int:
-        """Forget candidates and attempts built under different conditions.
+    def register_conditions(self, conditions_sig: str, projection_digest: str) -> None:
+        """Record which projection truth a conditions signature was built under."""
+        if conditions_sig and projection_digest:
+            self.conditions_index[str(conditions_sig)] = str(projection_digest)
 
-        A job key ends with the conditions signature. Anything carrying a
-        different one was solved against a different exclude set, different
-        stack bounds, or different projections, and serving it now is serving
-        an answer to a question nobody asked. Returns how many were dropped.
+    def live_buckets(self) -> List[str]:
+        """The distinct conditions signatures currently held in memory, sorted."""
+        return sorted({_key_conditions(c.get("job")) for c in self.candidates
+                       if c.get("job")})
+
+    def drop_stale_jobs(self, conditions_sig: str, projection_digest: str = "") -> int:
+        """Forget candidates and attempts built under a different pool truth.
+
+        A job key ends with the conditions signature. R101 splits what that
+        signature encodes into two questions and answers them separately:
+
+        * Was this built under the projections now in force? ``projection_digest``
+          answers it through ``conditions_index``. No means the stored answer is
+          an answer to a different question and it goes -- the 2026-07-26
+          incident, where a rebuild after the DK Status filter landed certified a
+          pitcher with no role out of a cache built before the filter existed.
+        * Was it built under this exact request's excludes and stack bounds?
+          That is a NARROWING, and a narrower request does not make another
+          caller's lineups illegal. It buckets. ``as_candidates`` serves the
+          union and ``contest_allocator._entry_candidate_compatible`` filters
+          per entry.
+
+        A signature the index cannot place fails CLOSED: not provably under this
+        pool's truth, so it is dropped. That is what stops a cache file written
+        before this change from resurrecting pre-invalidation candidates.
+
+        Omitting ``projection_digest`` keeps the v1.2 behaviour exactly -- only
+        ``conditions_sig`` survives -- which is what the maintenance callers and
+        the concurrency tests rely on. Returns how many were dropped.
         """
         if not conditions_sig:
             return 0
-        suffix = f"|{conditions_sig}"
-        stale_attempts = {k for k in self.attempted if not k.endswith(suffix)}
+
+        def _live(job: Any) -> bool:
+            sig = _key_conditions(job)
+            if sig == conditions_sig:
+                return True
+            if not projection_digest:
+                return False
+            return self.conditions_index.get(sig) == projection_digest
+
+        stale_attempts = {k for k in self.attempted if not _live(k)}
         stale_candidates = [
-            c for c in self.candidates
-            if c.get("job") and not str(c["job"]).endswith(suffix)
+            c for c in self.candidates if c.get("job") and not _live(c["job"])
         ]
         if not stale_attempts and not stale_candidates:
             return 0
         self.attempted -= stale_attempts
-        keep = [c for c in self.candidates if c not in stale_candidates]
+        stale_ids = {id(c) for c in stale_candidates}
+        keep = [c for c in self.candidates if id(c) not in stale_ids]
         self.candidates = keep
-        self._seen = {tuple(c["roster"]) for c in keep}
+        self._seen = {tuple(str(p) for p in c["roster"]) for c in keep}
         return len(stale_attempts) + len(stale_candidates)
 
     def clear_attempted(self, conditions_sig: str = "") -> int:
@@ -226,15 +293,25 @@ class BankCache:
         and entries built under someone else's conditions signature are not
         answers to this session's question. They survive in the file for that
         session's next resume instead of being erased by this one.
+
+        R101: memory now holds several live buckets rather than one, and none of
+        that changes here. The union is still keyed on the ordered roster, so a
+        roster this writer holds under one signature and the disk holds under
+        another is written once. The conditions index is unioned on the same
+        principle -- another session's signature is another session's fact, and
+        dropping it would make its buckets unplaceable and therefore stale.
         """
         self.path.parent.mkdir(parents=True, exist_ok=True)
         disk_candidates: List[Dict[str, Any]] = []
         disk_attempted: set[str] = set()
+        disk_index: Dict[str, str] = {}
         if self.path.exists():
             try:
                 payload = json.loads(self.path.read_text(encoding="utf-8"))
                 disk_candidates = list(payload.get("candidates") or [])
                 disk_attempted = set(payload.get("attempted") or [])
+                disk_index = {str(k): str(v) for k, v
+                              in (payload.get("conditions_index") or {}).items()}
             except (OSError, ValueError):
                 pass  # unreadable disk state is rebuilt, the same policy as _load
         merged_seen = set(self._seen)
@@ -252,6 +329,10 @@ class BankCache:
             # operator deliberately cleared are subtracted once, here, or the
             # union would silently reinstate them (R55).
             "attempted": sorted((self.attempted | disk_attempted) - self._cleared),
+            # Sorted, because this file is read by the next session and an
+            # unordered map makes two identical caches look different.
+            "conditions_index": dict(sorted({**disk_index,
+                                             **self.conditions_index}.items())),
         }, indent=1), encoding="utf-8")
         os.replace(tmp, self.path)
         self._cleared = set()
@@ -314,6 +395,15 @@ class BankCache:
         vanishing into ``except: pass``. Degrading to the unscored payload is
         still right, because a short bank leaves a blank reserved row and a
         blank row blocks certification. Doing it silently is not.
+
+        R101, v1.3: this serves the UNION of every live conditions bucket, which
+        under ``drop_stale_jobs`` means every bucket built under the projections
+        now in force. It emits one payload per distinct ordered roster, first
+        occurrence wins, and counts what it collapsed under
+        ``duplicate_rosters_dropped`` -- two buckets can legitimately reach the
+        same ten players in the same ten slots, and a candidate list that names
+        it twice double-counts in every exposure denominator the allocator
+        computes.
         """
         from mlb_engine.optimize.optimizer_v3 import (
             candidate_primary_stack, candidate_primary_stack_size,
@@ -330,6 +420,8 @@ class BankCache:
         by_id = None
         scored_count = 0
         failed_count = 0
+        duplicate_rosters = 0
+        emitted: set[Tuple[str, ...]] = set()
         failure_reasons: Dict[str, int] = {}
         if projections_df is not None and hasattr(projections_df, "columns"):
             frame = projections_df.copy()
@@ -339,6 +431,10 @@ class BankCache:
         for i, entry in enumerate(self.candidates):
             cid = f"bank{i}"
             roster = [str(p) for p in entry["roster"]]
+            if tuple(roster) in emitted:
+                duplicate_rosters += 1
+                continue
+            emitted.add(tuple(roster))
             payload: Dict[str, Any] = {
                 "lineup_id": cid,
                 "candidate_id": cid,
@@ -402,6 +498,14 @@ class BankCache:
             "scoring_failure_reasons": dict(failure_reasons),
             "shapes_scored": list(shapes),
             "projections_supplied": by_id is not None,
+            # R101. `stored` minus `duplicate_rosters_dropped` is `candidates`,
+            # and `scored` plus `scoring_failed` is `candidates` again when
+            # projections were supplied. Every gap between the number the
+            # operator reads and the number the solve gets is named on the line
+            # it appears on, which is the whole point of the item.
+            "stored": len(self.candidates),
+            "duplicate_rosters_dropped": duplicate_rosters,
+            "conditions_buckets": self.live_buckets(),
             "note": "an unscored candidate still allocates, on raw objective; "
                     "deterministic bookkeeping, never a claim",
         }
@@ -431,6 +535,49 @@ def _job_key(pair: Sequence[str], team: str, lock_sig: str = "",
     ])
 
 
+# The projection columns the objective is built from. Hashing the VALUES rather
+# than the row count matters: an enrichment pass changes Ceiling without
+# changing the pool.
+_PROJECTION_COLUMNS: Tuple[str, ...] = (
+    "Player_ID", "Ceiling", "Floor", "Base", "Salary", "Excluded",
+)
+
+
+def _projection_bytes(projections_df) -> bytes:
+    """The projection half of the signature, as the exact bytes both digests hash.
+
+    Factored out of ``conditions_signature`` byte-for-byte (R101). The stored
+    signatures in every live cache file are values of that function, so the
+    stream it feeds sha256 is a compatibility surface: change the bytes and
+    every cache on disk silently invalidates on its next read.
+    """
+    chunks: List[bytes] = []
+    for column in _PROJECTION_COLUMNS:
+        if column not in getattr(projections_df, "columns", []):
+            continue
+        try:
+            values = projections_df.sort_values("Player_ID")[column].tolist()
+        except Exception:  # noqa: BLE001 - a signature must not kill a build
+            values = list(projections_df[column])
+        chunks.append((column + ":" + ",".join(f"{v}" for v in values) + "\n").encode())
+    return b"".join(chunks)
+
+
+def projection_digest(projections_df) -> str:
+    """The INVALIDATING half: the pool and projection truth, and nothing else.
+
+    R101. A change here means every stored candidate answers a different
+    question, so ``drop_stale_jobs`` destroys on a mismatch. It deliberately
+    does NOT read the excludes or the stack bounds: those narrow one caller's
+    search and say nothing about whether another caller's stored lineups are
+    still real.
+    """
+    digest = hashlib.sha256()
+    digest.update(b"pool-v1")
+    digest.update(_projection_bytes(projections_df))
+    return digest.hexdigest()[:16]
+
+
 def conditions_signature(
     projections_df,
     excludes: Optional[Sequence[str]] = None,
@@ -440,22 +587,24 @@ def conditions_signature(
     """A short digest of everything outside (pair, team, locks) that moves a solve.
 
     Covers the excluded set, the stack bounds, and the projection values the
-    objective is built from. Hashing the values rather than the row count
-    matters: an enrichment pass changes Ceiling without changing the pool.
+    objective is built from. This is the BUCKET key: it identifies the exact
+    question a stored candidate answered. Whether that bucket is still live is
+    :func:`projection_digest`'s call, not this one's (R101).
+
+    The byte stream is unchanged from v1.2 on purpose, so the signatures already
+    written into live cache files keep their meaning across this change.
     """
     digest = hashlib.sha256()
     digest.update(b"v2")
     digest.update(("|".join(sorted(str(x) for x in (excludes or []))) + "\n").encode())
     digest.update(f"{stack_min}:{stack_max}\n".encode())
-    for column in ("Player_ID", "Ceiling", "Floor", "Base", "Salary", "Excluded"):
-        if column not in getattr(projections_df, "columns", []):
-            continue
-        try:
-            values = projections_df.sort_values("Player_ID")[column].tolist()
-        except Exception:  # noqa: BLE001 - a signature must not kill a build
-            values = list(projections_df[column])
-        digest.update((column + ":" + ",".join(f"{v}" for v in values) + "\n").encode())
+    digest.update(_projection_bytes(projections_df))
     return digest.hexdigest()[:16]
+
+
+def _key_conditions(job: Any) -> str:
+    """The conditions signature a job key ends with. Empty for a keyless entry."""
+    return str(job or "").rpartition("|")[2]
 
 
 def _lock_signature(locked_slot_assignments: Optional[Mapping[str, str]]) -> str:
@@ -483,6 +632,23 @@ def extend_bank(
     the caller knows whether another slice is worth running. ``locked_slot_assignments``
     pins DK slots for a late-swap entry; ``excludes`` carries that entry's
     ``excluded_new_teams`` player IDs.
+
+    R101: calling this repeatedly with different ``excludes`` or different pins
+    ADDS buckets to the cache. It no longer discards the previous calls' work,
+    which is what made ``tools/late_swap.py`` hand its joint solve a bank two
+    orders of magnitude smaller than the one it had just paid to build. What
+    still discards is a change in the projections themselves -- see
+    :func:`projection_digest`.
+
+    One consequence to hold onto, because it is not obvious from the call site:
+    the stack bounds are relaxed to the free hitter slots BEFORE the signature is
+    computed, so a heavily pinned entry buckets under bounds that are looser than
+    the general slice's, and the union can therefore contain candidates carrying
+    a smaller primary stack than the general call asked for. That is not a
+    loophole in the stack rule -- generation bounds were never the enforcement
+    point. The allocator's ``primary_stack_min_size`` floor is (R37 stage 1,
+    4 on every posture), it is applied to whatever bank it is handed, and every
+    relaxation of it is counted in the report.
     """
     started = time.monotonic()
     lock_sig = _lock_signature(locked_slot_assignments)
@@ -506,8 +672,13 @@ def extend_bank(
 
     # Everything outside (pair, team, locks) that changes a solve's answer, fixed
     # now that the stack bounds are settled and used as part of every job key.
+    # R101 splits it in two: the pool digest is the half that INVALIDATES, the
+    # full signature is the bucket this slice writes into. Register before the
+    # drop, so the bucket this call is about to fill is placeable by the next one.
     conditions_sig = conditions_signature(projections_df, excl, stack_min, stack_max)
-    superseded = cache.drop_stale_jobs(conditions_sig)
+    pool_digest = projection_digest(projections_df)
+    cache.register_conditions(conditions_sig, pool_digest)
+    superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
 
     pitchers = projections_df[projections_df["Position"] == "P"]
     if "Ceiling" in pitchers.columns:
@@ -692,10 +863,17 @@ def extend_bank(
     # current list contains.
     suffix = f"|{lock_sig}|{conditions_sig}"
     done_here = sum(1 for key in cache.attempted if key.endswith(suffix))
+    live_buckets = cache.live_buckets()
+    this_bucket = sum(1 for c in cache.candidates
+                      if _key_conditions(c.get("job")) == conditions_sig)
     return {
         "version": VERSION,
         "built_this_slice": built,
         "attempted_this_slice": attempted_now,
+        # R101: the union this cache will serve, which is now what the joint
+        # solve receives. Before the split it was whatever the LAST slice
+        # happened to leave behind, and the gap between the two is the whole
+        # defect -- 1,007 stored, 8 solved, on 2026-08-03.
         "total_candidates": len(cache),
         "jobs_total": len(jobs),
         "jobs_attempted": done_here,
@@ -704,9 +882,16 @@ def extend_bank(
         "time_budget_s": float(time_budget_s),
         "lock_signature": lock_sig,
         "conditions_signature": conditions_sig,
+        # The half that invalidates, named separately from the half that
+        # buckets, so a reviewer can tell a purge from a new slice.
+        "projection_digest": pool_digest,
+        "conditions_buckets_live": len(live_buckets),
+        "candidates_this_conditions": this_bucket,
         # Named so a reviewer can see the cache decided some of its stored work
         # no longer answers this build's question, rather than wondering why the
-        # candidate count fell.
+        # candidate count fell. Post-R101 a non-zero value here means the
+        # PROJECTIONS moved (or a legacy cache held signatures this file cannot
+        # place), never that a sibling slice ran.
         "superseded_jobs_dropped": superseded,
         "cache_was_corrupt_on_load": bool(getattr(cache, "corrupt_on_load", False)),
         "unknown_game_pairs_kept": unknown_game_pairs,

@@ -33,7 +33,7 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 784  # core 532 + showdown 49 + upload 124 + golden 9 + paste 70
+EXPECTED_TEST_COUNT = 792  # core 537 + showdown 49 + upload 127 + golden 9 + paste 70
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -49,7 +49,7 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.6"',
     "mlb_engine/optimize/tail_candidate_scanner.py": 'VERSION = "v1.0"',
     "mlb_engine/intake/platoon_order_adapter.py": 'VERSION = "v1.1"',
-    "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.2"',
+    "mlb_engine/optimize/bank_cache.py": 'VERSION = "v1.3"',
     "mlb_engine/determinism.py": 'VERSION = "v1.0"',
     "mlb_engine/contest_shapes.py": 'VERSION = "v1.0"',
     # R59: the team-code boundary is an ingest contract, so it is pinned

@@ -611,11 +611,20 @@ def main() -> int:
     # locked players need candidates built against those exact pins and against the
     # excluded-new-teams rule, or the allocator reports "no compatible candidate".
     report = extend_bank(cache, projections, time_budget_s=_slice_budget())
-    print(f"bank: {report['total_candidates']} candidates "
+    print(f"bank after the general slice: {report['total_candidates']} candidates "
           f"(+{report['built_this_slice']} this slice, "
           f"{report['jobs_attempted']}/{report['jobs_total']} jobs)")
+    if report["superseded_jobs_dropped"]:
+        # R101: post-split this can only mean the PROJECTIONS moved since the
+        # cache was written, or the file predates the conditions index. Either
+        # way it is a purge, and it used to be indistinguishable from a sibling
+        # slice quietly deleting the bank.
+        print(f"  {report['superseded_jobs_dropped']} stored job(s) dropped: they "
+              f"were built under a different projection digest than "
+              f"{report['projection_digest']}")
 
     all_ids = {str(p) for p in projections["Player_ID"]}
+    last_report = report
     parent_rosters = _load_entry_rosters(Path(args.parent_entries))
     for requirement in requirements:
         lsa = requirement.get("locked_slot_assignments") or {}
@@ -636,8 +645,21 @@ def main() -> int:
             cache, projections, time_budget_s=_slice_budget(),
             locked_slot_assignments=lsa, excludes=excludes,
         )
+        last_report = slice_report
         print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
-              f"+{slice_report['built_this_slice']} targeted candidates")
+              f"+{slice_report['built_this_slice']} targeted candidates "
+              f"(bank now {slice_report['total_candidates']})")
+
+    # R101. Before the conditions-signature split this number did not exist:
+    # each targeted slice discarded the previous ones, so what the joint solve
+    # received was whatever the LAST slice happened to leave behind, and the
+    # `bank:` line above described a bank nothing downstream ever saw. Print the
+    # union, and print the bucket count, because a bucket is a distinct
+    # (excludes, stack bounds) question and their number is the shape of the
+    # swap, not noise.
+    print(f"bank the joint solve will see: {last_report['total_candidates']} "
+          f"candidates across {last_report['conditions_buckets_live']} conditions "
+          f"bucket(s), projection digest {last_report['projection_digest']}")
 
     # F16: scored, and scored in each contest's own shape. as_candidates() with
     # no projections carries roster and objective only: no stack-correlation
@@ -651,9 +673,15 @@ def main() -> int:
         contest_shapes=requested_shapes,
     )
     payload_report = cache.last_payload_report or {}
-    print(f"candidate scoring: {payload_report.get('scored')} scored, "
-          f"{payload_report.get('scoring_failed')} failed, shapes "
-          f"{payload_report.get('shapes_scored')}")
+    # R101. `bank the joint solve will see: N` and this line's candidate count
+    # are the same number now, and the two ways they can differ are both named
+    # on this line rather than left for the operator to infer: a roster two
+    # buckets both reached, and a candidate whose scoring raised.
+    print(f"candidate scoring: {len(candidates)} candidates the solve receives, "
+          f"{payload_report.get('scored')} scored, "
+          f"{payload_report.get('scoring_failed')} failed, "
+          f"{payload_report.get('duplicate_rosters_dropped')} duplicate roster(s) "
+          f"collapsed across buckets, shapes {payload_report.get('shapes_scored')}")
     for reason, count in sorted((payload_report.get("scoring_failure_reasons") or {}).items()):
         print(f"  scoring failure x{count}: {reason}", file=sys.stderr)
     if args.dry_run:

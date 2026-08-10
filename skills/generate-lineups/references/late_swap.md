@@ -27,32 +27,42 @@ without swapping. Good first move when you are unsure how much room there is.
 `--entry-ids` restricts mutability to exactly those entries. Omitting it
 authorizes every reserved entry in the file.
 
-## Scope `--entry-ids` tightly, to the entries that actually need a change
+## Scope `--entry-ids` to the entries you mean, not to protect the bank
 
-This is the recommended pattern, not a workaround, and it is worth stating why
+**This section changed on 2026-08-10 (R101). Scoping is now a scope choice.**
+It used to be a bank-preservation workaround, and if you learned the habit from
+the older version of this page, the reason you learned it is gone.
+
+The mechanism, as dated history. The swap builds one general bank, then one
+targeted slice per pinned entry, and each targeted slice passes an `excludes`
+list computed from *that entry's own* roster. Until R101 the exclude set was
+part of one `bank_cache` conditions signature, and `extend_bank` opened by
+calling `drop_stale_jobs`, which discarded every stored candidate built under a
+different signature — so each targeted slice threw away the candidates the
+previous slices built, the general bank included. Across nine runs on 2026-08-03
+the cache reached 1,007 candidates while the joint solve was handed 8, 9 or 10
+of them; scoped to the 2 entries that needed a change, which happened to share
+one exclude set so nothing was discarded between them, it was handed 90
 (R47, measured 2026-08-08 against `outputs/2026-08-03/_swap1..9.log`).
 
-The swap builds one general bank, then one targeted slice per pinned entry, and
-each targeted slice passes an `excludes` list computed from *that entry's own*
-roster. The exclude set is part of `bank_cache`'s conditions signature, and
-`extend_bank` opens by calling `drop_stale_jobs`, which discards every stored
-candidate built under a different signature. So each targeted slice throws away
-the candidates the previous slices built. Across nine runs on 2026-08-03 the
-cache reached 1,007 candidates while the joint solve was handed 8, 9 or 10 of
-them; scoped to the 2 entries that needed a change — which shared one exclude
-set, so nothing was discarded between them — it was handed 90.
+What holds now:
 
-Practical consequences until that is fixed:
-
-- **Name only the entries that need a change.** Two entries with the same
-  exclude set do not wipe each other, so a tight scope keeps the bank the solve
-  actually sees.
-- **Read `candidate scoring: N scored`, not `bank: N candidates`.** The first is
-  what the joint solve gets. A large gap between them is this effect, not a
-  scoring failure — `scoring_failed` is reported on the same line and was `0` in
-  all nine runs.
-- **A bigger `--budget` does not close that gap.** The candidates are being
-  discarded after they are built, not left unbuilt.
+- **Name the entries you actually want to change, for the ordinary reason.**
+  A tight `--entry-ids` limits what may move in the file. It is no longer buying
+  you a bigger bank; the general bank and every targeted slice survive each
+  other regardless of scope.
+- **Read `bank the joint solve will see: N candidates across K conditions
+  bucket(s)`.** That line is printed after the targeted slices and it is the
+  number the solve receives. The `candidate scoring:` line leads with the same
+  number and names the only two things that can move it — duplicate rosters two
+  buckets both reached, and scoring failures. `bank after the general slice:` is
+  the general slice alone and says so.
+- **`superseded_jobs_dropped` now means one thing.** A non-zero value is the
+  PROJECTIONS having moved since the cache was written (or a cache file older
+  than R101), and it prints with the projection digest that caused it. It can no
+  longer mean a sibling slice quietly deleted your bank.
+- **A bigger `--budget` still does not fix a thin bank on its own.** It buys
+  more jobs, which is now worth buying, since nothing throws the results away.
 
 ## The two rules that explain most failures
 

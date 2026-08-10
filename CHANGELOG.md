@@ -25,6 +25,155 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R101: the late swap stops discarding the bank it just built
+
+Test pin 784 -> 792. `bank_cache` v1.2 -> v1.3, and its stored document gains a
+field. No projection, no MILP constraint, and no control moved.
+
+### R101 — one conditions signature was doing two different jobs
+
+**The mechanism, verified in the tree before anything changed.**
+`tools/late_swap.py` calls `extend_bank` once for the general bank (`:613`) and
+then once per pinned entry (`:635`), each with an `excludes` list computed from
+that entry's own `excluded_new_teams` minus its own current roster.
+`extend_bank` folded the excludes, the stack bounds and the projection values
+into ONE `conditions_signature` and opened with
+`drop_stale_jobs(conditions_sig)`, which deletes from memory every candidate
+whose job key does not end in that signature. `as_candidates` serves the memory
+view, so each targeted slice wiped the previous slices and the general bank with
+them, and the joint solve received whatever the LAST slice happened to leave
+behind. `save()` unions with disk, which is why the file kept growing while the
+solve did not.
+
+**The second-order finding in the item held, and it is the sharper half.**
+`extend_bank` relaxes `stack_min`/`stack_max` to the free hitter slots BEFORE
+computing the signature (`bank_cache.py:496-509`), so two pinned entries with
+identical exclude sets still land in different buckets when they pin different
+numbers of hitter slots. The blast radius was wider than "one bucket per exclude
+set", and it is visible in the 2026-08-03 record: five distinct signatures over
+one slate's swap.
+
+**Decision: bucket by conditions signature (option (a)). Option (b), one exclude
+set for the whole solve, is rejected.** (b) is the union of every entry's
+`excluded_new_teams`, and for an entry that never held those locks it removes
+legal players from the search as a convenience, invisibly, inside a certified
+artifact. That is the pool reduction CLAUDE.md's guardrail forbids, and it
+changes swap semantics on top of it. (a) is safe for a reason that was checked
+rather than assumed: `contest_allocator._entry_candidate_compatible`
+(`contest_allocator.py:1654`) tests every candidate against that entry's
+`allowed_candidate_ids`, its `locked_slot_assignments`, its `locked_player_ids`,
+its `excluded_player_ids`, and its `excluded_new_teams` with R72(i)'s
+fail-closed treatment of an unmapped pid; `full_compatible` is built across all
+E x K at `:2024` before the MILP is written. A candidate built under another
+entry's excludes cannot be assigned to an entry it violates. **The bank is a
+superset, the allocator is the filter**, and that guard now has its own test
+rather than riding on the bucketing tests.
+
+**What moved.** `conditions_signature` is split into the two facts it was
+carrying, and only one of them still destroys.
+
+- `projection_digest(projections_df)` is new: the pool and projection truth
+  alone. A change here means every stored candidate answers a different
+  question, and `drop_stale_jobs` purges on a mismatch. This is the half that
+  exists because of 2026-07-26, when a rebuild after the DK Status filter landed
+  certified a pitcher with no role out of a cache built before the filter.
+- `conditions_signature` keeps its exact byte stream and therefore its exact
+  values, deliberately: the signatures already written into live cache files are
+  a compatibility surface. It is now the BUCKET key, not the liveness test.
+- `BankCache.conditions_index` maps a conditions signature to the projection
+  digest it was built under. Persisted, unioned across writers on `save()` the
+  same way candidates and attempts already were, and written sorted. A signature
+  the index cannot place fails CLOSED — dropped, not served — which is what
+  stops a cache file written before this change from resurrecting
+  pre-invalidation candidates.
+- `drop_stale_jobs(conditions_sig, projection_digest="")` keeps every job under
+  the current projection digest and every job under this exact request.
+  Omitting `projection_digest` reproduces v1.2 byte for byte, which is what the
+  maintenance callers and the concurrency tests rely on.
+- `as_candidates` serves the union of live buckets, emits one payload per
+  distinct ordered roster, and reports `stored`, `duplicate_rosters_dropped` and
+  `conditions_buckets` alongside the scoring counts. `_load` dedupes on the
+  ordered roster too, because memory now legitimately holds several buckets and
+  a roster stored twice would double-count in every exposure denominator the
+  allocator computes.
+
+**Report truth, which is the half the operator actually reads.**
+`bank: N candidates` and `candidate scoring: N scored` were the two numbers that
+sent the operator hunting for a scoring failure for twenty minutes on
+2026-08-03, and nothing on either line said they were describing different
+banks. `tools/late_swap.py` now prints `bank after the general slice:` (that
+slice, named as such), one line per targeted entry carrying the running total,
+`bank the joint solve will see: N candidates across K conditions bucket(s)`
+after the loop, and a `candidate scoring:` line that leads with the count the
+solve receives and names the two ways it can differ from the stored count —
+collapsed duplicate rosters and scoring failures — on the line itself. A
+non-zero `superseded_jobs_dropped` now prints with the projection digest that
+caused it, because post-split it can only mean the projections moved.
+
+**Counts. Deterministic candidate counts, never a performance claim.**
+
+Replayed against the stored 2026-08-03 bank
+(`runs/bank_cache_2026-08-03_8b239b254b.json`, read-only, on a copy) using the
+signatures that file actually contains, in the order the swap used them, with no
+solve budget so no MILP runs and no clock enters the numbers:
+
+| | HEAD | after R101 |
+|---|---|---|
+| stored in the file | 1,180 across 6 conditions buckets | same |
+| after the general slice's drop | 1,006 | 1,152 |
+| after every targeted slice's drop | 0 | 1,152 |
+| served to the joint solve | 0 | 1,152 |
+
+The 1,152 is 1,006 general + 90 + 25 + 20 + 11 targeted. The 28 not in it are a
+second no-locks bucket built under a different projections frame; it is still
+purged, which is the invalidating half doing its job. End to end through the
+certified MILP path on the synthetic slate the suite uses, one general slice
+capped at 8 plus two targeted slices with different exclude sets: 8 + 2 + 2 = 12
+served across 3 buckets with 0 superseded, where HEAD served the last slice's 2.
+
+**What could NOT be reproduced, stated rather than restated.** The item's
+headline number — cache 1,007, solve 8 — is not reproducible from the
+2026-08-03 inputs today. Rebuilding that slate's projections frame from
+`data/slates/2026-08-03/DKSalaries.csv` and `lineups_feed_v2.json` yields
+conditions signature `d192d9a6a2df3415` against the `02a23bbd1b190ab8` the cache
+stores, because `data/reference/` has moved since (the FanGraphs platoon
+reference was refreshed 2026-08-05). Every candidate in that file therefore
+reads as built under a different projection truth, and both code paths correctly
+serve 0 from a re-run. The 8/9/10-and-90 figures stay what they always were: an
+observed record read out of `outputs/2026-08-03/_swap1..9.log`, not something
+this commit reproduced.
+
+**One consequence to hold onto, because it is not obvious from the call site.**
+Since the stack bounds are relaxed before the signature is computed, the union a
+heavily pinned swap serves can contain candidates carrying a smaller primary
+stack than the general slice asked for. Generation bounds were never the
+enforcement point; the allocator's `primary_stack_min_size` floor is, it is 4 on
+every posture as of R37 stage 1, it is applied to whatever bank it is handed,
+and every relaxation of it is counted. Named in `extend_bank`'s docstring so the
+next reader does not have to rediscover it.
+
+**Tests, written failing first against the real shape.**
+`BankCacheBucketingTests` (`tests/test_core.py`) runs the real call sequence
+through `extend_bank` — general, then two targeted slices with different exclude
+sets — and asserts `as_candidates` serves general plus both; asserts the report
+counts the union it will serve; asserts two buckets holding one roster serve one
+candidate; asserts an enrichment pass still purges destructively; and asserts,
+on its own, that the allocator refuses to assign an entry a candidate its
+excludes forbid. `BankCacheCorrectnessTests` (`tests/test_upload_integrity.py`)
+gains the storage-contract half: the pool digest ignores excludes and stack
+bounds while the conditions signature does not, sibling buckets survive under
+one pool digest while a foreign one is purged, an unindexed signature fails
+closed, and the index survives a save and unions two writers. Four of the five
+core tests and all three integrity tests fail on HEAD.
+
+**Not done here, on purpose.** `--budget` was not widened: the candidates were
+being discarded after they were built, so a bigger budget bought more of what
+was about to be thrown away. The initial build path is untouched (R61-tail,
+unchanged by decision). R102 — the pinned same-game pitcher pair — is a
+different filter with a different fix and stays open.
+
+---
+
 ## 2026-08-09 — R40 archaeology answered; the routing it was going to license is NOT written
 
 Test pin 782 -> 784. `build_slate.py` records the resolved objective per

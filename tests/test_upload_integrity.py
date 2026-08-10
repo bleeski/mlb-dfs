@@ -1235,6 +1235,85 @@ class BankCacheCorrectnessTests(unittest.TestCase):
             # idempotent: running it again changes nothing
             self.assertEqual(cache.drop_stale_jobs("NEWSIG"), 0)
 
+    def test_projection_digest_is_the_invalidating_half_only(self):
+        """R101. The conditions signature mixed two kinds of fact. The
+        projection half is TRUTH -- a change means the stored answer answers a
+        different question -- and the excludes/stack-bounds half only NARROWS.
+        Splitting them is what lets one bucket while the other still purges."""
+        from mlb_engine.optimize.bank_cache import (
+            conditions_signature, projection_digest)
+
+        frame = self._frame()
+        base = projection_digest(frame)
+        self.assertEqual(base, projection_digest(frame))
+        # Narrowing does not move the pool digest ...
+        self.assertEqual(base, projection_digest(frame),
+                         "the pool digest must not read excludes")
+        self.assertNotEqual(conditions_signature(frame, ["2"], 4, 5),
+                            conditions_signature(frame, [], 4, 5))
+        self.assertNotEqual(conditions_signature(frame, [], 3, 5),
+                            conditions_signature(frame, [], 4, 5))
+        # ... but an enrichment pass moves both.
+        enriched = frame.copy()
+        enriched.loc[0, "Ceiling"] = 11.5
+        self.assertNotEqual(base, projection_digest(enriched))
+        self.assertNotEqual(conditions_signature(frame, [], 4, 5),
+                            conditions_signature(enriched, [], 4, 5))
+
+    def test_drop_stale_jobs_keeps_sibling_buckets_under_one_pool_digest(self):
+        """The R101 fix at the storage contract. Two conditions signatures
+        registered under the same projection digest are two live buckets; a
+        third registered under a different one is stale and still purged."""
+        from mlb_engine.optimize.bank_cache import BankCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = BankCache(Path(tmp) / "bank.json")
+            cache.register_conditions("GENERAL", "POOL_A")
+            cache.register_conditions("ENTRY_A", "POOL_A")
+            cache.register_conditions("OLD_POOL", "POOL_B")
+            cache.attempted = {"p|T||GENERAL", "p|T||ENTRY_A", "p|T||OLD_POOL"}
+            cache.candidates = [
+                {"roster": [str(i) for i in range(10)], "objective": 1.0,
+                 "job": "p|T||GENERAL"},
+                {"roster": [str(i) for i in range(10, 20)], "objective": 2.0,
+                 "job": "p|T||ENTRY_A"},
+                {"roster": [str(i) for i in range(20, 30)], "objective": 3.0,
+                 "job": "p|T||OLD_POOL"},
+            ]
+            cache._seen = {tuple(c["roster"]) for c in cache.candidates}
+            dropped = cache.drop_stale_jobs("ENTRY_B", projection_digest="POOL_A")
+            self.assertEqual(dropped, 2, "only the other pool's job should go")
+            self.assertEqual(cache.attempted, {"p|T||GENERAL", "p|T||ENTRY_A"})
+            self.assertEqual([c["job"] for c in cache.candidates],
+                             ["p|T||GENERAL", "p|T||ENTRY_A"])
+            self.assertEqual(cache.live_buckets(), ["ENTRY_A", "GENERAL"])
+            # An unindexed signature is not provably under this pool's truth, so
+            # it fails closed. That is what keeps a legacy cache file from
+            # resurrecting the 2026-07-26 candidates.
+            cache.candidates.append(
+                {"roster": [str(i) for i in range(30, 40)], "objective": 4.0,
+                 "job": "p|T||UNKNOWN"})
+            cache._seen.add(tuple(str(i) for i in range(30, 40)))
+            self.assertEqual(
+                cache.drop_stale_jobs("ENTRY_B", projection_digest="POOL_A"), 1)
+            self.assertEqual([c["job"] for c in cache.candidates],
+                             ["p|T||GENERAL", "p|T||ENTRY_A"])
+
+    def test_the_conditions_index_survives_a_save_and_unions_writers(self):
+        from mlb_engine.optimize.bank_cache import BankCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            a = BankCache(path)
+            b = BankCache(path)
+            a.register_conditions("SIG_A", "POOL")
+            b.register_conditions("SIG_B", "POOL")
+            b.save()
+            a.save()  # the later writer merges rather than overwriting
+            merged = BankCache(path)
+            self.assertEqual(merged.conditions_index,
+                             {"SIG_A": "POOL", "SIG_B": "POOL"})
+
     def test_corrupt_cache_rebuilds_instead_of_blocking_the_build(self):
         from mlb_engine.optimize.bank_cache import BankCache
 

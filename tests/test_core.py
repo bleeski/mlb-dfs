@@ -7461,6 +7461,178 @@ class BankCacheMergeOnSaveTests(unittest.TestCase):
             self.assertIn("pb|TB||SIG2", after.attempted)
 
 
+class BankCacheBucketingTests(unittest.TestCase):
+    """R101. A targeted slice must not discard the bank it is extending.
+
+    ``late_swap.py`` calls ``extend_bank`` once for the general bank and then
+    once per pinned entry, each with that entry's own ``excludes``. The exclude
+    set was folded into ONE conditions signature and ``drop_stale_jobs`` deleted
+    every candidate carrying a different one, so each targeted slice wiped the
+    previous slices and the general bank with them: measured on
+    ``outputs/2026-08-03/_swap1..9.log``, a cache of 1,007 candidates handed the
+    joint solve 8.
+
+    The split these tests pin: the PROJECTION half of the signature still
+    invalidates destructively, because a changed projection means the stored
+    answer is an answer to a different question (the 2026-07-26 incident in
+    ``_job_key``'s docstring). The per-request half -- excludes and stack bounds
+    -- only NARROWS, so it buckets and never destroys. Safe because per-entry
+    legality is enforced downstream in ``_entry_candidate_compatible``: the bank
+    is a superset, the allocator is the filter.
+    """
+
+    @staticmethod
+    def _pinned(frame, team):
+        """A locked_slot_assignments dict pinning one hitter slot on `team`."""
+        hitters = frame[(frame["Position"] == "C") & (frame["Team"] == team)]
+        return {"C": str(hitters.iloc[0]["Player_ID"])}
+
+    @staticmethod
+    def _team_ids(frame, team):
+        return [str(p) for p in frame[frame["Team"] == team]["Player_ID"]]
+
+    def _swap_shaped_slices(self, tmp):
+        """The real call shape: one general slice, then two targeted ones whose
+        exclude sets differ, exactly as tools/late_swap.py:613 and :635 run."""
+        frame = diverse_projection_frame()
+        cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+        general = bank_cache.extend_bank(cache, frame, time_budget_s=25,
+                                         max_candidates=8)
+        pin_a = self._pinned(frame, "T1")
+        excl_a = [p for p in self._team_ids(frame, "T3")
+                  if p not in set(pin_a.values())]
+        targeted_a = bank_cache.extend_bank(
+            cache, frame, time_budget_s=25, locked_slot_assignments=pin_a,
+            excludes=excl_a)
+        pin_b = self._pinned(frame, "T2")
+        excl_b = [p for p in self._team_ids(frame, "T4")
+                  if p not in set(pin_b.values())]
+        targeted_b = bank_cache.extend_bank(
+            cache, frame, time_budget_s=25, locked_slot_assignments=pin_b,
+            excludes=excl_b)
+        return cache, frame, general, targeted_a, targeted_b
+
+    def test_as_candidates_serves_the_general_bank_plus_every_targeted_slice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache, frame, general, a, b = self._swap_shaped_slices(tmp)
+            for report, label in ((general, "general"), (a, "targeted a"),
+                                  (b, "targeted b")):
+                self.assertGreater(report["built_this_slice"], 0,
+                                   f"the {label} slice built nothing, so this "
+                                   f"test cannot measure what survives it")
+            self.assertEqual(a["superseded_jobs_dropped"], 0,
+                             "a targeted slice discarded the general bank")
+            self.assertEqual(b["superseded_jobs_dropped"], 0,
+                             "a targeted slice discarded the previous slices")
+            expected = (general["built_this_slice"] + a["built_this_slice"]
+                        + b["built_this_slice"])
+            served = cache.as_candidates(frame, requested_n=3)
+            self.assertEqual(len(served), expected,
+                             "the joint solve is handed fewer candidates than "
+                             "the slices built")
+            self.assertEqual(len(cache), expected)
+            self.assertEqual(cache.last_payload_report["candidates"], len(served))
+
+    def test_the_report_counts_the_union_it_will_serve(self):
+        """`bank: N candidates` and `candidate scoring: N scored` are the two
+        numbers that misled the operator for twenty minutes. They agree now."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cache, frame, general, a, b = self._swap_shaped_slices(tmp)
+            self.assertEqual(b["total_candidates"], len(cache))
+            served = cache.as_candidates(frame, requested_n=3)
+            self.assertEqual(b["total_candidates"], len(served))
+            self.assertEqual(cache.last_payload_report["scored"]
+                             + cache.last_payload_report["scoring_failed"],
+                             len(served),
+                             "every served candidate is either scored or "
+                             "counted as a scoring failure")
+            self.assertEqual(b["conditions_buckets_live"], 3)
+            self.assertEqual(general["projection_digest"], a["projection_digest"])
+            self.assertEqual(a["projection_digest"], b["projection_digest"])
+            self.assertNotEqual(general["conditions_signature"],
+                                a["conditions_signature"])
+            self.assertNotEqual(a["conditions_signature"],
+                                b["conditions_signature"])
+
+    def test_buckets_do_not_double_count_a_roster(self):
+        """Two buckets can legitimately hold the same ten players in the same
+        slots; the solve must see one candidate, not two."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            cache = bank_cache.BankCache(path)
+            roster = [str(i) for i in range(10)]
+            cache.candidates = [
+                {"roster": list(roster), "objective": 1.0, "job": "p|T|" "|SIG1"},
+                {"roster": list(roster), "objective": 2.0, "job": "p|T||SIG2"},
+            ]
+            cache._seen = {tuple(roster)}
+            served = cache.as_candidates()
+            self.assertEqual(len(served), 1)
+            self.assertEqual(cache.last_payload_report["duplicate_rosters_dropped"], 1)
+            # And a reload repairs the stored duplicate rather than serving it.
+            cache.save()
+            self.assertEqual(len(bank_cache.BankCache(path).candidates), 1)
+
+    def test_a_projection_change_still_invalidates_destructively(self):
+        """The 2026-07-26 incident: a rebuild after the DK Status filter landed
+        certified a pitcher with no role, served from a cache built before the
+        filter existed. Bucketing must not resurrect that."""
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = diverse_projection_frame()
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = bank_cache.extend_bank(cache, frame, time_budget_s=25,
+                                           max_candidates=6)
+            self.assertGreater(len(cache), 0)
+            enriched = frame.copy()
+            enriched.loc[enriched["Position"] == "P", "Ceiling"] = 44.0
+            after = bank_cache.extend_bank(cache, enriched, time_budget_s=25,
+                                           max_candidates=6)
+            self.assertNotEqual(first["projection_digest"],
+                                after["projection_digest"])
+            self.assertGreaterEqual(after["superseded_jobs_dropped"], 1,
+                                    "an enrichment pass must still purge the "
+                                    "candidates built before it")
+            for entry in cache.candidates:
+                self.assertTrue(
+                    str(entry["job"]).endswith(after["conditions_signature"]),
+                    "a candidate built under the old projections survived")
+
+    def test_a_narrowed_bucket_cannot_reach_an_entry_it_violates(self):
+        """The guard that makes bucketing safe, tested on its own.
+
+        A candidate built under entry A's exclude set is now visible to entry B.
+        `_entry_candidate_compatible` is what stops B from being assigned it, so
+        the union is a superset of legal candidates and never a wider legal set.
+        """
+        roster_bad = ["L", "P2", "C1", "B1", "B2", "B3", "B4", "B5", "B6", "X"]
+        roster_good = ["L", "P2", "C1", "B1", "B2", "B3", "B4", "B5", "B6", "B7"]
+        team_map = {pid: "CCC" for pid in set(roster_bad + roster_good)}
+        team_map.update({"L": "AAA", "X": "AAA"})
+        # Entry 1 has locked AAA and may not take a NEW Yankee; entry 2 has not.
+        entry_one = {
+            "entry_id": "1", "contest_id": "x", "contest_shape": "large_wta",
+            "locked_slot_assignments": {"P1": "L"}, "locked_player_ids": ["L"],
+            "excluded_new_teams": ["AAA"], "player_team_by_id": team_map,
+        }
+        entry_two = {
+            "entry_id": "2", "contest_id": "x", "contest_shape": "large_wta",
+            "player_team_by_id": team_map,
+        }
+        bank = [candidate("from_other_bucket", roster_bad, 100),
+                candidate("legal_here", roster_good, 99)]
+        self.assertFalse(_entry_candidate_compatible(bank[0], dict(entry_one)))
+        self.assertTrue(_entry_candidate_compatible(bank[1], dict(entry_one)))
+        self.assertTrue(_entry_candidate_compatible(bank[0], dict(entry_two)))
+        result = select_and_assign_entries(
+            bank, [dict(entry_one), dict(entry_two)],
+            {"max_shared_players": 10})
+        self.assertTrue(result["passed"], result.get("errors"))
+        chosen = {row["entry_id"]: row["candidate_id"] for row in result["assignments"]}
+        self.assertEqual(chosen["1"], "legal_here",
+                         "an entry was assigned a candidate built under another "
+                         "entry's excludes that its own excludes forbid")
+
+
 class MinerPaidPlacesTests(unittest.TestCase):
     """R30(a). Nothing in the archival path could write paid_places.
 
