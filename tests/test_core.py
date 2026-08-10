@@ -10648,5 +10648,296 @@ class ClaimReleaseMarkerTests(unittest.TestCase):
             self.assertIn("free", buf.getvalue())
 
 
+class AuditSkipHonestyTests(unittest.TestCase):
+    """R62(b): the audit must not advise lowering the pin over lost coverage.
+
+    The defect, reconfirmed the day this landed: the R101 dev cycle ran against
+    a matched-dependency copy of the tree off this machine, got `Ran 783`
+    against a pin of 792, and the audit said "the suite passed, so this is a
+    stale pin. Update EXPECTED_TEST_COUNT." The nine missing tests were
+    `test_golden_replay` in full. Following that advice writes the golden
+    replay out of the gate permanently, and nothing would ever say so.
+
+    Two unittest behaviours make this invisible without per-suite pins, both
+    measured on 3.10 while writing this:
+      - a class-level `skipUnless` keeps its tests in `Ran` AND adds them to
+        `skipped`, so the count holds while coverage drops;
+      - a `setUpClass` raising SkipTest removes the whole class from `Ran` and
+        adds exactly ONE to `skipped`, so nine lost tests report "skipped=1".
+    """
+
+    def _audit(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "audit.py"
+        spec = importlib.util.spec_from_file_location("audit_skip_honesty", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_the_pinned_total_is_the_sum_of_the_per_suite_pins(self):
+        audit = self._audit()
+        self.assertEqual(audit.EXPECTED_TEST_COUNT,
+                         sum(audit.EXPECTED_SUITE_COUNTS.values()))
+
+    def test_every_audited_suite_carries_its_own_pin(self):
+        """A suite added to the gate without a pin is a suite whose shortfall
+        cannot be attributed, which is the whole defect."""
+        audit = self._audit()
+        self.assertEqual(sorted(audit.EXPECTED_SUITE_COUNTS),
+                         sorted(audit.AUDITED_SUITES))
+
+    def test_footer_parsing_reads_skips_failures_and_errors(self):
+        audit = self._audit()
+        self.assertEqual(audit.parse_unittest_report("Ran 75 tests in 9.1s\n\nOK"),
+                         {"ran": 75, "skipped": 0, "failures": 0, "errors_count": 0})
+        self.assertEqual(
+            audit.parse_unittest_report("Ran 75 tests in 9.1s\n\nOK (skipped=29)"),
+            {"ran": 75, "skipped": 29, "failures": 0, "errors_count": 0})
+        self.assertEqual(
+            audit.parse_unittest_report(
+                "Ran 4 tests\n\nFAILED (failures=1, errors=2, skipped=3)"),
+            {"ran": 4, "skipped": 3, "failures": 1, "errors_count": 2})
+
+    def test_a_shortfall_is_never_called_a_stale_pin(self):
+        """The R62 case verbatim: golden replay's nine vanish behind a
+        setUpClass skip and report `skipped=1`."""
+        audit = self._audit()
+        verdict = audit.classify_suite(
+            "tests.test_golden_replay",
+            {"ran": 1, "skipped": 1, "present": True})
+        self.assertEqual(verdict["state"], "shortfall")
+        self.assertIn("not a stale pin", verdict["advice"])
+        self.assertNotIn("update EXPECTED", verdict["advice"].lower(),
+                         "the advice must never tell the operator to move the "
+                         "pin down to meet lost coverage")
+        self.assertIn("LOST COVERAGE", verdict["advice"])
+        self.assertIn("do not lower", verdict["advice"])
+        self.assertIn("data/archive/2026-06-03", verdict["advice"],
+                      "the advice names the precondition, not just a number")
+
+    def test_skips_that_keep_the_count_are_still_reported(self):
+        """The paste suite's 29: `Ran 75` matches the pin exactly and 29 of
+        those tests asserted nothing. The count proves nothing about coverage
+        and the old PASS line never mentioned it."""
+        audit = self._audit()
+        verdict = audit.classify_suite(
+            "tests.test_paste_lineups", {"ran": 75, "skipped": 29, "present": True})
+        self.assertEqual(verdict["state"], "skipped_in_place")
+        self.assertNotIn("update EXPECTED", verdict["advice"].lower())
+        self.assertIn("29 were SKIPPED", verdict["advice"])
+        self.assertIn("data/slates/2026-07-29", verdict["advice"])
+
+    def test_an_absent_suite_file_is_named_rather_than_silently_dropped(self):
+        """The same defect one level up: the audit used to filter AUDITED_SUITES
+        by file existence, so a renamed suite ran 0 tests, shrank the total, and
+        produced the stale-pin advice with nothing naming the missing file."""
+        audit = self._audit()
+        verdict = audit.classify_suite(
+            "tests.test_golden_replay", {"present": False, "ran": None})
+        self.assertEqual(verdict["state"], "absent")
+        self.assertIn("not a stale pin", verdict["advice"])
+        self.assertNotIn("update EXPECTED", verdict["advice"].lower())
+        self.assertIn("not on disk", verdict["advice"])
+
+    def test_a_genuinely_stale_pin_still_says_so(self):
+        """The conditional has to stay useful in the one case it is true for,
+        or the next session learns to ignore it."""
+        audit = self._audit()
+        # Derived from the live pin, never a literal: a test that hardcodes the
+        # count it is testing goes red every time the pin legitimately moves,
+        # which teaches the next session to edit the assertion reflexively.
+        pinned = audit.EXPECTED_SUITE_COUNTS["tests.test_core"]
+        verdict = audit.classify_suite(
+            "tests.test_core", {"ran": pinned + 6, "skipped": 0, "present": True})
+        self.assertEqual(verdict["state"], "grew")
+        self.assertIn("IS a stale pin", verdict["advice"])
+        self.assertIn("EXPECTED_SUITE_COUNTS", verdict["advice"])
+
+    def test_a_clean_suite_says_nothing(self):
+        audit = self._audit()
+        pinned = audit.EXPECTED_SUITE_COUNTS["tests.test_core"]
+        verdict = audit.classify_suite(
+            "tests.test_core", {"ran": pinned, "skipped": 0, "present": True})
+        self.assertEqual(verdict["state"], "clean")
+        self.assertIsNone(verdict["advice"])
+
+    def test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes(self):
+        """CLAUDE.md's session-start step quotes this string exactly, so the
+        clean line stays byte-identical and everything new prints only when
+        there is something to say."""
+        audit = self._audit()
+        root = Path(__file__).resolve().parent.parent
+        modules = audit.engine_module_count(root)
+        result = {"passed": True, "warnings": [],
+                  "project_version": audit.PROJECT_VERSION,
+                  "errors": [],
+                  "checks": {"tests": {
+                      "runtime_test_count": audit.EXPECTED_TEST_COUNT,
+                      "skipped_total": 0,
+                      "suite_results": {n: {"suite": n, "state": "clean"}
+                                        for n in audit.AUDITED_SUITES}}}}
+        line = audit.terse_output(result, root)
+        self.assertEqual(
+            line,
+            f"PASS  {audit.PROJECT_VERSION}  {modules} modules  "
+            f"{audit.EXPECTED_TEST_COUNT} tests")
+        self.assertIn(line, (root / "CLAUDE.md").read_text(encoding="utf-8"),
+                      "CLAUDE.md's session-start line and the audit's clean "
+                      "output have drifted apart")
+
+    def test_the_pass_line_shows_skips_and_the_suite_that_is_off_its_pin(self):
+        audit = self._audit()
+        root = Path(__file__).resolve().parent.parent
+        result = {"passed": True, "warnings": [], "errors": [],
+                  "project_version": audit.PROJECT_VERSION,
+                  "checks": {"tests": {
+                      "runtime_test_count": 821, "skipped_total": 1,
+                      "suite_results": {
+                          "tests.test_core": {"suite": "tests.test_core",
+                                              "state": "clean"},
+                          "tests.test_golden_replay": {
+                              "suite": "tests.test_golden_replay", "ran": 1,
+                              "pinned": 9, "skipped": 1, "state": "shortfall"}}}}}
+        line = audit.terse_output(result, root)
+        self.assertIn("1 skipped", line)
+        self.assertIn("test_golden_replay 1/9", line)
+        self.assertIn("shortfall", line)
+
+
+class TestDataDependenciesAreVendoredOrGuardedTests(unittest.TestCase):
+    """R62(a): every `REPO / "data" / ...` path in tests/ is vendored or guarded.
+
+    The defect this pins: five classes in test_paste_lineups read salary files
+    under the gitignored `data/slates/` with no skip guard, so a tracked-files
+    checkout ERRORED on them, and 29 more paste tests skipped behind a guard
+    nobody could see. CLAUDE.md's mandated session-start PASS line was
+    therefore unsatisfiable anywhere but this machine, and the audit's advice
+    for the resulting shortfall was to lower the pin.
+
+    Fixing the five classes once does not hold; the sixth gets written next
+    month. This walks the AST instead, so a new unguarded data dependency
+    fails here on the commit that adds it, with the file, line, class and the
+    constant named. It is also what makes the deferred fixture vendoring safe
+    to land later: whichever paths get vendored, the rest stay guarded.
+
+    Vendored means git tracks it (`data/reference/`, `data/archive/2026-06-03/`
+    -- the golden replay's inputs are in history and were never the gitignored
+    half). Guarded means a `skipUnless`/`skipIf` on the class names the
+    constant, or the class raises SkipTest from setUpClass/setUp.
+    """
+
+    ROOT_NAMES = {"REPO", "REPO_ROOT", "ROOT"}
+    # Used only when git cannot answer. Mirrors .gitignore's policy: per-slate
+    # dirs are ignored, reference and archive are tracked.
+    TRACKED_PREFIXES = ("data/reference/", "data/archive/")
+
+    @classmethod
+    def _segments(cls, node):
+        """Flatten `REPO / "a" / "b"` to ('REPO', 'a', 'b'); None if not that."""
+        import ast
+        if isinstance(node, ast.Name):
+            return (node.id,)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return (node.value,)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            left = cls._segments(node.left)
+            right = cls._segments(node.right)
+            return None if left is None or right is None else left + right
+        return None
+
+    @classmethod
+    def _is_data_path(cls, segs):
+        return bool(segs) and segs[0] in cls.ROOT_NAMES and \
+            len(segs) >= 2 and segs[1] == "data"
+
+    @classmethod
+    def _names_in(cls, node):
+        import ast
+        return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+
+    @classmethod
+    def _guards_on(cls, node):
+        """Names cited by skip decorators, plus a flag for a SkipTest raise."""
+        import ast
+        names = set()
+        for deco in getattr(node, "decorator_list", []):
+            if isinstance(deco, ast.Call):
+                fn = deco.func
+                attr = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                if attr in ("skipUnless", "skipIf"):
+                    names |= cls._names_in(deco)
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Raise) and sub.exc is not None:
+                if "SkipTest" in ast.dump(sub.exc):
+                    names.add("__SKIPTEST__")
+        return names
+
+    def _tracked(self, repo, rel):
+        proc = subprocess.run(["git", "-C", str(repo), "ls-files", rel],
+                              capture_output=True, text=True)
+        if proc.returncode != 0:
+            return any(rel.startswith(p) or (rel + "/").startswith(p)
+                       for p in self.TRACKED_PREFIXES)
+        return bool(proc.stdout.strip())
+
+    def test_no_test_reads_gitignored_data_without_a_skip_guard(self):
+        import ast
+        repo = Path(__file__).resolve().parent.parent
+        offenders = []
+        inspected = 0
+
+        for path in sorted((repo / "tests").glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+
+            constants = {}
+            for node in tree.body:
+                if not isinstance(node, ast.Assign):
+                    continue
+                segs = self._segments(node.value)
+                if not self._is_data_path(segs):
+                    continue
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        constants[target.id] = "/".join(segs[1:])
+
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                guards = self._guards_on(node)
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        guards |= self._guards_on(item)
+                skip_raised = "__SKIPTEST__" in guards
+
+                # constants referenced by name
+                cited = {(name, constants[name], node.lineno)
+                         for name in self._names_in(node) & set(constants)}
+                # paths written inline, attributed to the enclosing class
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.BinOp) and isinstance(sub.op, ast.Div):
+                        segs = self._segments(sub)
+                        if self._is_data_path(segs):
+                            cited.add(("(inline)", "/".join(segs[1:]), sub.lineno))
+
+                for name, rel, lineno in sorted(cited):
+                    inspected += 1
+                    if name in guards or skip_raised:
+                        continue
+                    if self._tracked(repo, rel):
+                        continue
+                    offenders.append(
+                        f"{path.name}:{lineno} {node.name} reads {rel} via "
+                        f"{name}: not tracked by git and not behind a skip "
+                        f"guard, so a tracked-files-only checkout ERRORS here "
+                        f"instead of skipping")
+
+        # R51's class: a walk that finds nothing passes for the wrong reason.
+        self.assertGreater(
+            inspected, 5,
+            "the walk found almost no data-path references, so it is passing "
+            "vacuously; the detector broke, not the tree")
+        self.assertEqual(offenders, [], "\n" + "\n".join(offenders))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

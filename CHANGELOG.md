@@ -25,6 +25,194 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R62 (two halves of three) and R85: the gate stops lying about skips, and preflight reads the contest name
+
+Second DEV session of 2026-08-10, engine claim `engine_2026-08-10`, scope
+"R62 audit honesty + R85". R85 completes and its entry migrates here. R62 is
+partial by design — the fixture vendoring was sequenced out of this session —
+so its entry stays on the board, rewritten in place to hold only that
+remainder. Audit pin 829 to 850, and the pin is now per-suite.
+
+### R62(b). The audit could advise its own weakening, and did
+
+**What moved.** `tools/audit.py` ran all five audited suites in ONE subprocess
+and parsed one number out of the footer, `Ran N`. A shortfall was therefore
+unattributable, and the tool's response to any shortfall on a green suite was
+a single unconditional sentence: "the suite passed, so this is a stale pin.
+Update EXPECTED_TEST_COUNT." It now runs each suite in its own subprocess
+against its own pin (`EXPECTED_SUITE_COUNTS`, from which the total is
+derived), parses `skipped=`, and classifies each suite into one of five
+states. Only `grew` is called a stale pin. `shortfall`, `skipped_in_place` and
+`absent` say LOST COVERAGE, name the suite, name the precondition to stage,
+and say do not lower the pin. All four remain WARNINGS, so a live slate still
+proceeds; a failing suite still blocks.
+
+**Why.** The session-start gate is the project's evidence that the tree is
+sound, and its advice could permanently remove coverage from it. The R101 dev
+cycle reconfirmed this the same day from the other side of the mount: a
+matched-dependency copy of the tree ran `Ran 783` against a pin of 792, the
+nine missing were `tests.test_golden_replay` in full and silent, and the
+audit said "stale pin". Following that advice once writes the golden replay
+out of the gate for good, and nothing would ever say so.
+
+**The measurement that shaped the fix.** Two unittest behaviours make a
+shortfall unreadable without per-suite pins, both measured on 3.10 in a
+scratch repro before any code changed, and both now recorded in
+`parse_unittest_report`'s docstring. A class-level `skipUnless` keeps every
+one of its tests in `Ran` AND adds them to `skipped`, so the count holds
+while coverage drops. A `setUpClass` that raises SkipTest removes the whole
+class from `Ran` and adds exactly ONE to `skipped` — so nine lost tests
+report as "skipped=1", and `skipped` alone can never explain the gap. Parsing
+`skipped=` was the filed fix and would not have been sufficient on its own.
+
+**Two decisions worth stating.** First, one subprocess per suite rather than
+one for all five. It costs four extra interpreter startups (~15s on top of
+~155s) and buys a shortfall attributable to a named suite, a `skipped` count
+that belongs to something, and numbers an operator reconciles by hand with
+the exact command the audit ran; it also isolates the suites that assert on
+process state, which R59 showed can pass under a combined run purely because
+an earlier suite dirtied the interpreter. Second, the clean PASS line is
+byte-identical to what it was, because CLAUDE.md's session-start step quotes
+it exactly and a gate that changes its own green output trains the operator
+to stop reading it. Skips, and a `{suite ran/pinned state}` breakdown for any
+suite off its pin, print only when there is something to say; the full
+per-suite record is always in the JSON output. The filing asked for per-suite
+counts on the PASS line unconditionally, and this is a deliberate departure
+from it. A test pins the clean line against CLAUDE.md's copy in both
+directions.
+
+**Also closed, one level up.** The audit filtered `AUDITED_SUITES` by file
+existence, so a renamed or missing suite file ran zero tests, shrank the
+total, and produced the stale-pin advice with nothing naming the missing
+file. An absent suite is now its own named state.
+
+### R62(a). Five test classes read gitignored data with no skip guard
+
+**What moved.** `SinglePostedSideAlignmentTests`,
+`LinkFreePitcherResolutionTests`, `DkStartingColumnTests` and
+`AbsentFromDkPoolPolicyTests` in `tests/test_paste_lineups.py` read
+`data/slates/2026-07-29/DKSalaries.csv` and
+`data/slates/2026-07-30/DKSalaries_1910_6g.csv` — both gitignored — with no
+guard, so a tracked-files-only checkout ERRORED on them rather than skipping.
+They now carry `skipUnless` guards naming the files. Guards do not change the
+count: a class-level skip keeps its tests in `Ran`, which is why the pin moved
+only for tests actually added.
+
+**The part that holds.** Fixing four classes once does not hold; the fifth
+gets written next month. `TestDataDependenciesAreVendoredOrGuardedTests` walks
+every file in `tests/` with `ast`, finds module-level constants and inline
+expressions rooted at `REPO`/`REPO_ROOT` that point under `data/`, and fails
+unless each is vendored (git tracks it) or guarded (a skip decorator names the
+constant, or the class raises SkipTest from setUp/setUpClass), naming
+file:line:class:constant. It also asserts it inspected more than a handful of
+references, because R51's class — a walk that passes by finding nothing — is
+the way this test would rot. Mutation-checked by hand: removing one guard
+reddens it with the right file, line and class named.
+
+**What the walk corrected in the filing.** R62 named
+`test_upload_integrity.py:617` as an unguarded site; at those line numbers
+today there is no data dependency, and the walk finds none anywhere in that
+suite. It also named `data/slates/2026-07-25` and `data/archive/2026-06-03` as
+part of the load-bearing gitignored set. Neither is: no test references
+2026-07-25 any more, and all seven files under `data/archive/2026-06-03/` are
+TRACKED and have been since the golden replay was written. The golden replay's
+inputs were never the gitignored half — its disappearance on 2026-08-10 was a
+partial copy of the tree through the tarball bridge. The deferred vendoring is
+therefore two files totalling 84 KB, not ~2.4MB, which is recorded on the
+rewritten backlog entry because it undercuts that entry's own reason for
+sequencing behind the GH PAT.
+
+**Not done here, deliberately.** The fixture vendoring itself. Ben scoped it
+out of this session; it stays on the board as the whole of R62.
+
+### R85. Preflight reads the contest name and refuses a file pointed at the wrong family
+
+**What moved.** `tools/preflight_upload.py` gains `check_contest_identity`,
+running before row shape. Every entry row's Contest Name is read for the
+Showdown token and compared against the header geometry. Two hard failures:
+all entries naming one family while the header says the other, and entries
+naming BOTH families in one file, which no single upload can satisfy and
+which means two draftgroups have been mixed. `data/reference/dk_contest_archetypes.csv`
+is joined for the archetype and objective class, reported as evidence; a
+contest name matching no pinned pattern warns and never fails.
+
+**Why.** A Showdown-geometry file whose entries belong to Classic contests
+passed every hard check, because nothing read the Contest Name column —
+geometry came off the header, legality off the roster, and the manifest
+cross-check only fires when a manifest resolves, which is exactly the state
+R96 records as able to go missing. The name is DK's own statement of what the
+contest is, it sits in column 2 of every row, and it was free to read.
+
+**Measured before it was allowed to fail anything.** Across all 871 entry rows
+in the repo's archived DKEntries exports, slate files and fixtures: 446
+classic-geometry rows, none carrying the Showdown token or a single-game
+"(A @ B)" suffix; 425 showdown-geometry rows, every one carrying the token.
+The separation is total in both directions, which is what makes the token's
+ABSENCE evidence rather than silence and justifies failing in both directions
+rather than one. If DK ever ships a Showdown contest without the token this
+reads classic and fails; `--force` (exit 4) is the operator's way past it,
+because preflight is never allowed to be the reason a slate is not entered.
+
+**The archetype table is not the geometry signal, and the filing implied it
+was.** Its patterns are objective families — Jukebox, Satellite, Double Up —
+and every one of them ships in BOTH geometries; "MLB Showdown $20 Quarter
+Jukebox (CHC @ STL)" and "MLB $30 Quarter Jukebox" are both real and both
+archived here. So the CSV supplies the archetype join and the
+is-this-a-recognized-family signal, and the geometry discriminator is the
+name's own token. Stated in the code rather than left for the next reader to
+rediscover.
+
+**One duplication, guarded rather than hoped for.** Preflight cannot import
+the engine, so `ARCHETYPE_TYPE_PRECEDENCE` is a second copy of
+`dk_entries_manager`'s table. Longest-pattern-wins was the obvious rule and is
+wrong: it resolves "Satellite to $2 MLB Pocket Cup MEGA Qualifier" on "Pocket
+Cup", turning a ticket_line contest into a generic GPP — the engine had
+already found and fixed exactly this, so preflight mirrors its ranking instead
+of inventing a second one. Two implementations of one rule is this project's
+named no-op failure class (R79(d)), so a test pins the copies equal and
+cross-checks both resolvers against real archived contest names, and another
+test pins the misrouting that motivates the table.
+
+### Filed, not fixed
+
+**R109 — `.git/index.lock` goes stale on this mount and `rm` cannot clear it.**
+Three incidents that had never carried a number: 2026-07-28, 2026-07-29 (both
+sitting in this file's imported record as incident narrative) and 2026-08-10,
+where `rm` returned "Operation not permitted" and `mv` worked. The mount
+grants create and truncate but not unlink, so git's own documented remedy is
+the one operation that fails, and the improvised workarounds have accumulated
+into eight residue files in `.git/` — `index.lock.bak`, `.stale`, `.stale2`,
+`.stale3`, `HEAD.lock`, `deadlock_*`, `tmp_probe_dead` — each a previous
+session's fixed-name attempt that the next session's identical attempt then
+collided with. The remedy is now written into
+`docs/cowork_sync_protocol.md` under "Known limits": confirm the lock is dead,
+then `mv` it aside under a TIMESTAMPED suffix, and check `HEAD.lock` the same
+way. Two more faces of the same asymmetry were hit while landing R62 and are
+recorded on the entry: `rm -rf` on `__pycache__` reclaimed nothing, and `cp`
+over an existing file returned "Invalid argument" mid-mutation-check, leaving
+a test file mutated until `cat > file` restored it (sha256 verified).
+
+**One live environment condition, no item.** The sandbox volume holding
+`TMPDIR` reached 100% (196 KB free) mid-session, which fails every test that
+builds a throwaway git repo — six of `ChangelogDebtTests` — and cannot be
+reclaimed, because `rm` on this mount refuses. Two consecutive `test_core`
+runs disagreed on their error count, which is what surfaced it. Running with
+`TMPDIR=/tmp` (a different volume, 2.9 GB free) is clean and is how this
+session's verification ran. That is R42(b)'s named scenario arriving live
+again, with R109's asymmetry underneath it.
+
+### Verification
+
+Suite counts reconciled by suite, not just in total, because this session
+edited the counting machinery. By hand and through the audit's own per-suite
+code path, both with `PYTHONHASHSEED=0`: core 570, showdown 55, upload 141,
+golden 9, paste 75, total 850 against a pinned 850, zero skips, every suite
+`clean`. `terse_output` returns `PASS  v2.26.0  26 modules  850 tests`, which
+is the line CLAUDE.md quotes, pinned in both directions by test. CLAUDE.md's
+session-start step is updated for the per-suite pin and the state vocabulary.
+R108 was deliberately excluded from this session: it moves the module count,
+and the counting machinery is what changed here.
+
 ## 2026-08-10 — R104, R45, R105, R54: the Workstream 1 Showdown batch
 
 Queue position 1, four entries in one session, migrated here from

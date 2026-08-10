@@ -735,6 +735,8 @@ def _side(feed, game_id, side):
     raise AssertionError(f"{game_id} not in feed")
 
 
+@unittest.skipUnless(SALARY_0730.exists(),
+                     "the 2026-07-30 salary file is not staged")
 class SinglePostedSideAlignmentTests(unittest.TestCase):
     """R32 round 2, the P0: a half-posted game must not swap the sides.
 
@@ -836,6 +838,8 @@ class SinglePostedSideAlignmentTests(unittest.TestCase):
         self.assertFalse([w for w in warnings if "only one lineup block" in w])
 
 
+@unittest.skipUnless(SALARY.exists() and SALARY_0730.exists(),
+                     "the 2026-07-29 and 2026-07-30 salary files are not staged")
 class LinkFreePitcherResolutionTests(unittest.TestCase):
     """R32 round 2, the P1: a plain-text paste must resolve its probables.
 
@@ -886,6 +890,8 @@ class LinkFreePitcherResolutionTests(unittest.TestCase):
         self.assertEqual(hou["id"], "669713", "the MLBAM id still comes off the link")
 
 
+@unittest.skipUnless(SALARY_0730.exists(),
+                     "the 2026-07-30 salary file is not staged")
 class DkStartingColumnTests(unittest.TestCase):
     """R32 round 2: DK's Starting column is a probable source, not a patch.
 
@@ -927,6 +933,8 @@ class DkStartingColumnTests(unittest.TestCase):
                         report["report"]["warnings"])
 
 
+@unittest.skipUnless(SALARY_0730.exists(),
+                     "the 2026-07-30 salary file is not staged")
 class AbsentFromDkPoolPolicyTests(unittest.TestCase):
     """R32 round 2, the P2: one absent name is a call-up, eighteen is a mistake.
 

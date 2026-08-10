@@ -104,12 +104,19 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  829 tests`. The module count comes off the
-   filesystem and moves on its own; the test count is a pin. A count mismatch
-   with the suite passing is a WARNING and prints in brackets on the PASS
-   line: proceed, fix the pin after the slate. A failing suite blocks. The
-   audit gates test_core, test_showdown, test_upload_integrity,
-   test_golden_replay, and test_paste_lineups.
+   `PASS  v2.26.0  26 modules  850 tests`. The module count comes off the
+   filesystem and moves on its own; the test count is a pin, and since R62 it
+   is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
+   from. Each audited suite runs in its own subprocess, so a shortfall names
+   the suite that lost it. A clean run prints exactly the line above; anything
+   else appends what is abnormal — `N skipped`, and `{suite ran/pinned
+   state}` for each suite off its pin. Read the state word before touching a
+   pin: only `grew` is a stale pin. `shortfall`, `skipped_in_place` and
+   `absent` are LOST COVERAGE, they name the precondition to stage, and
+   lowering the pin to meet them is how the golden replay's nine tests would
+   leave the gate for good. All four are WARNINGS: proceed, fix after the
+   slate. A failing suite blocks. The audit gates test_core, test_showdown,
+   test_upload_integrity, test_golden_replay, and test_paste_lineups.
 3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
    before any build. Exit 3 means the bank does not fit: pass `time_budget_s`
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.

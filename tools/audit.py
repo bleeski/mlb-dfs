@@ -33,7 +33,38 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 829  # core 559 + showdown 55 + upload 131 + golden 9 + paste 75
+
+# R62: the per-suite pin, not a comment beside a total. The total used to be
+# one int with the breakdown written next to it in prose, which meant the
+# breakdown could not be checked and a shortfall could not be attributed. A
+# shortfall that cannot be attributed is the whole defect: on 2026-08-10 an
+# off-machine run of the R101 dev cycle came back `Ran 783` against a pin of
+# 792, the nine missing were tests.test_golden_replay entire, and the audit
+# advised LOWERING the pin -- which would have written the golden replay out
+# of the gate permanently.
+EXPECTED_SUITE_COUNTS = {
+    "tests.test_core": 570,
+    "tests.test_showdown": 55,
+    "tests.test_upload_integrity": 141,
+    "tests.test_golden_replay": 9,
+    "tests.test_paste_lineups": 75,
+}
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 850
+
+# What a suite needs on disk beyond a tracked-files-only checkout. Named so a
+# shortfall prints its remedy instead of a number: "stage this" is an action,
+# "783 != 792" is a puzzle. Suites absent from this map have no precondition
+# and a shortfall in them is genuinely unexplained.
+SUITE_PRECONDITIONS = {
+    "tests.test_paste_lineups": (
+        "data/slates/2026-07-29/DKSalaries.csv and "
+        "data/slates/2026-07-30/DKSalaries_1910_6g.csv (gitignored; "
+        "vendoring them is R62's deferred half)"),
+    "tests.test_golden_replay": (
+        "data/archive/2026-06-03/ with the DKSalaries export and the BLANK "
+        "DKEntries file (tracked in git; absent only in a partial copy of "
+        "the tree, which is how it went missing on 2026-08-10)"),
+}
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",
@@ -211,9 +242,7 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     checks["scipy_milp"] = {"passed": scipy_ok}
 
     test_result = None
-    suites = [name for name in AUDITED_SUITES
-              if (root / "tests" / f"{name.split('.')[-1]}.py").exists()]
-    if run_tests and suites:
+    if run_tests:
         # F19: the suite includes a determinism gate, and a gate that runs under
         # a randomized hash seed cannot tell a fixed ordering from a lucky one.
         test_env = dict(os.environ)
@@ -226,36 +255,9 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
             existing_pp = test_env.get("PYTHONPATH", "")
             test_env["PYTHONPATH"] = deps["vendored_pylibs"] + (
                 os.pathsep + existing_pp if existing_pp else "")
-        proc = subprocess.run(
-            [sys.executable, "-m", "unittest", *suites],
-            cwd=str(root), text=True, capture_output=True, env=test_env,
-        )
-        combined = proc.stdout + "\n" + proc.stderr
-        match = re.search(r"Ran\s+(\d+)\s+tests?", combined)
-        runtime_count = int(match.group(1)) if match else None
-        suite_ok = proc.returncode == 0
-        count_ok = runtime_count == EXPECTED_TEST_COUNT
-        test_result = {
-            "passed": suite_ok and count_ok,
-            "suite_passed": suite_ok,
-            "count_matches": count_ok,
-            "suites": suites,
-            "returncode": proc.returncode,
-            "runtime_test_count": runtime_count,
-            "expected_test_count": EXPECTED_TEST_COUNT,
-            "stdout_tail": proc.stdout[-2000:],
-            "stderr_tail": proc.stderr[-4000:],
-        }
-        # Split, because CLAUDE.md tells the operator to proceed on one of these
-        # and not the other: a count mismatch during a live slate is bookkeeping
-        # that has not caught up, and a failing suite is not.
-        if not suite_ok:
-            errors.append(f"test suite FAILED (ran {runtime_count}); do not build")
-        elif not count_ok:
-            warnings.append(
-                f"test count {runtime_count} != pinned {EXPECTED_TEST_COUNT}; the "
-                f"suite passed, so this is a stale pin. Update EXPECTED_TEST_COUNT "
-                f"in tools/audit.py after the slate.")
+        test_result = run_audited_suites(root, test_env)
+        errors.extend(test_result.pop("_errors"))
+        warnings.extend(test_result.pop("_warnings"))
     checks["tests"] = test_result
 
     debt = changelog_debt(root)
@@ -277,6 +279,169 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
         "warnings": warnings,
         "checks": checks,
         "summary": "Audit passed" if not errors else "Audit failed",
+    }
+
+
+def parse_unittest_report(text: str) -> Dict[str, Any]:
+    """Ran/skipped/failure counts off one suite's standard footer.
+
+    Only the footer is parsed, deliberately. The alternative -- one combined
+    run plus `-v` and per-line attribution -- reads a verbose format that has
+    no stability contract, inside the tool whose whole job is to be trusted.
+    The footer's two shapes ("OK (skipped=3)", "FAILED (failures=1, errors=2,
+    skipped=3)") have been stable for the life of unittest.
+
+    `skipped` is NOT the number of skipped tests, and treating it as one is
+    how a shortfall gets misread. Measured on 3.10 while writing this (R62):
+    a class-level `skipUnless` reports every one of its tests in BOTH `Ran`
+    and `skipped`, so the count holds and coverage quietly drops; a
+    `setUpClass` that raises SkipTest removes the class's tests from `Ran`
+    entirely and adds exactly ONE to `skipped`, so nine lost tests read as
+    "skipped=1". Only the per-suite pin can tell the difference, which is why
+    EXPECTED_SUITE_COUNTS exists.
+    """
+    ran = re.search(r"Ran\s+(\d+)\s+tests?", text)
+    out: Dict[str, Any] = {
+        "ran": int(ran.group(1)) if ran else None,
+        "skipped": 0, "failures": 0, "errors_count": 0,
+    }
+    for key, field in (("skipped", "skipped"), ("failures", "failures"),
+                       ("errors", "errors_count")):
+        found = re.search(rf"\b{key}=(\d+)", text)
+        if found:
+            out[field] = int(found.group(1))
+    return out
+
+
+def classify_suite(name: str, rec: Dict[str, Any]) -> Dict[str, Any]:
+    """One suite's count against its pin, as a verdict rather than a delta.
+
+    R62(b): the old advice was unconditional -- suite green plus count
+    mismatch printed "this is a stale pin. Update EXPECTED_TEST_COUNT". That
+    sentence is true for exactly one of the five states below, and following
+    it in any of the others writes real coverage out of the gate for good.
+    """
+    pinned = EXPECTED_SUITE_COUNTS.get(name)
+    ran = rec.get("ran")
+    skipped = rec.get("skipped", 0)
+    precondition = SUITE_PRECONDITIONS.get(name)
+    verdict = dict(rec, suite=name, pinned=pinned, precondition=precondition)
+
+    if not rec.get("present", True):
+        verdict["state"] = "absent"
+        verdict["advice"] = (
+            f"{name} is in AUDITED_SUITES but tests/{name.split('.')[-1]}.py "
+            f"is not on disk, so its {pinned} tests did not run and were never "
+            f"counted. This is missing coverage, not a stale pin.")
+        return verdict
+    if ran is None or pinned is None:
+        verdict["state"] = "unknown"
+        verdict["advice"] = (f"{name}: no test count could be read from the "
+                             f"runner output; treat the gate as not run.")
+        return verdict
+    if ran == pinned and skipped == 0:
+        verdict["state"] = "clean"
+        verdict["advice"] = None
+        return verdict
+    if ran == pinned and skipped:
+        # skipUnless on a class: the count is intact and the coverage is not.
+        verdict["state"] = "skipped_in_place"
+        verdict["advice"] = (
+            f"{name} ran its pinned {pinned} but {skipped} were SKIPPED, so "
+            f"the count proves nothing about coverage."
+            + (f" Stage {precondition} and re-run." if precondition else ""))
+        return verdict
+    if ran < pinned:
+        # setUpClass/SkipTest: the tests never entered the count at all.
+        verdict["state"] = "shortfall"
+        verdict["advice"] = (
+            f"{name} ran {ran} against a pinned {pinned}: {pinned - ran} "
+            f"test(s) did not run"
+            + (f" and {skipped} skip(s) were reported" if skipped else "")
+            + f". This is LOST COVERAGE, not a stale pin -- do not lower "
+              f"EXPECTED_SUITE_COUNTS to match it."
+            + (f" Stage {precondition} and re-run." if precondition else ""))
+        return verdict
+    verdict["state"] = "grew"
+    verdict["advice"] = (
+        f"{name} ran {ran} against a pinned {pinned}: {ran - pinned} test(s) "
+        f"were added and the pin has not caught up. This one IS a stale pin; "
+        f"update EXPECTED_SUITE_COUNTS['{name}'] in tools/audit.py after the "
+        f"slate.")
+    return verdict
+
+
+def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
+    """Every audited suite in its own subprocess, counted against its own pin.
+
+    One subprocess per suite rather than one for all five. It costs the extra
+    interpreter startups and buys three things the combined run cannot give:
+    a shortfall attributable to a named suite, a `skipped` count that belongs
+    to something, and numbers an operator can reconcile by hand with the exact
+    command the audit ran. It also isolates the suites that assert on process
+    state (import graphs, module caches), which R59 showed can pass under a
+    combined run purely because an earlier suite dirtied the interpreter.
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
+    results: Dict[str, Any] = {}
+    stdout_tail = ""
+    stderr_tail = ""
+    any_failed = False
+
+    for name in AUDITED_SUITES:
+        path = root / "tests" / f"{name.split('.')[-1]}.py"
+        if not path.exists():
+            results[name] = classify_suite(name, {"present": False, "ran": None})
+            continue
+        proc = subprocess.run(
+            [sys.executable, "-m", "unittest", name],
+            cwd=str(root), text=True, capture_output=True, env=test_env,
+        )
+        combined = proc.stdout + "\n" + proc.stderr
+        rec = parse_unittest_report(combined)
+        rec["present"] = True
+        rec["returncode"] = proc.returncode
+        rec["passed"] = proc.returncode == 0
+        results[name] = classify_suite(name, rec)
+        if proc.returncode != 0:
+            any_failed = True
+            stdout_tail = proc.stdout[-2000:]
+            stderr_tail = proc.stderr[-4000:]
+
+    runtime_count = sum(r["ran"] for r in results.values()
+                        if isinstance(r.get("ran"), int))
+    total_skipped = sum(r.get("skipped", 0) for r in results.values())
+    count_ok = runtime_count == EXPECTED_TEST_COUNT
+    suite_ok = not any_failed
+
+    # Split, because CLAUDE.md tells the operator to proceed on one of these
+    # and not the other: a count mismatch during a live slate is bookkeeping
+    # that has not caught up, and a failing suite is not.
+    if not suite_ok:
+        failed = sorted(n for n, r in results.items()
+                        if r.get("present", True) and not r.get("passed"))
+        errors.append(f"test suite FAILED in {', '.join(failed)} "
+                      f"(ran {runtime_count}); do not build")
+    else:
+        for name in AUDITED_SUITES:
+            advice = results.get(name, {}).get("advice")
+            if advice:
+                warnings.append(advice)
+
+    return {
+        "passed": suite_ok and count_ok and not total_skipped,
+        "suite_passed": suite_ok,
+        "count_matches": count_ok,
+        "suites": [n for n, r in results.items() if r.get("present", True)],
+        "suite_results": results,
+        "runtime_test_count": runtime_count,
+        "expected_test_count": EXPECTED_TEST_COUNT,
+        "skipped_total": total_skipped,
+        "stdout_tail": stdout_tail,
+        "stderr_tail": stderr_tail,
+        "_errors": errors,
+        "_warnings": warnings,
     }
 
 
@@ -345,15 +510,34 @@ def engine_module_count(root: Path) -> int:
 
 
 def terse_output(result: Dict[str, Any], root: Path) -> str:
+    """The session-start line CLAUDE.md pins, plus whatever is abnormal.
+
+    R62: the clean line is byte-identical to what CLAUDE.md quotes, on
+    purpose. A gate that changes its own green output every release trains
+    the operator to stop reading it, and CLAUDE.md's session-start step
+    quotes this string exactly. Everything added here appears only when
+    there is something to say -- a skip, a shortfall, a suite off its pin --
+    and the per-suite breakdown is always in the JSON output.
+    """
     test_check = result["checks"].get("tests") or {}
     test_count = test_check.get("runtime_test_count", "?")
     modules = engine_module_count(root)
-    if result["passed"]:
-        line = f"PASS  {result['project_version']}  {modules} modules  {test_count} tests"
-        if result.get("warnings"):
-            line += "  [" + "; ".join(result["warnings"][:2]) + "]"
-        return line
-    return "FAIL  " + ";  ".join(result["errors"])
+    if not result["passed"]:
+        return "FAIL  " + ";  ".join(result["errors"])
+    line = f"PASS  {result['project_version']}  {modules} modules  {test_count} tests"
+    skipped = test_check.get("skipped_total", 0)
+    if skipped:
+        line += f"  {skipped} skipped"
+    off_pin = [r for r in (test_check.get("suite_results") or {}).values()
+               if r.get("state") not in (None, "clean")]
+    if off_pin:
+        line += "  {" + "; ".join(
+            f"{r['suite'].split('.')[-1]} {r.get('ran')}/{r.get('pinned')}"
+            + (f" ({r['skipped']} skipped)" if r.get("skipped") else "")
+            + f" {r.get('state')}" for r in off_pin) + "}"
+    if result.get("warnings"):
+        line += "  [" + "; ".join(result["warnings"][:2]) + "]"
+    return line
 
 
 def main() -> None:

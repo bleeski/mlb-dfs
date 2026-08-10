@@ -102,6 +102,29 @@ ROSTER_START_COL = 4
 OUT_STATUSES = frozenset({"IL", "O", "OUT", "NA", "IL10", "IL15", "IL60", "PUP", "SUSP"})
 WARN_STATUSES = frozenset({"DTD", "GTD", "Q"})
 
+# R85. DK writes the contest family into the contest name, and the roster
+# contract into the header. Those are two independent statements about the same
+# file and they can disagree -- a Showdown-geometry file carrying Classic
+# Contest IDs passes every other check here, because nothing reads the name.
+# Verified against every archived DKEntries and standings export in the repo:
+# Showdown contest names carry the literal token, Classic names never do.
+ARCHETYPES_CSV = REPO_ROOT / "data" / "reference" / "dk_contest_archetypes.csv"
+SHOWDOWN_NAME_TOKENS = ("showdown", "captain mode")
+
+# A verbatim copy of dk_entries_manager.ARCHETYPE_TYPE_PRECEDENCE, pinned equal
+# by test. Preflight cannot import the engine, and resolving the same contest
+# name to a different archetype than the engine did is this project's named
+# no-op failure class (R79(d)), so the table is duplicated and the duplication
+# is guarded rather than left to hold by luck.
+ARCHETYPE_TYPE_PRECEDENCE = {
+    "satellite": 100,
+    "cash": 90,
+    "wta": 80,
+    "se_gpp": 50,
+    "portfolio_gpp": 20,
+    "unknown": 0,
+}
+
 # R34: mirrors ``mlb_engine.entries.upload_manifest.STATUS_VALUES`` on purpose,
 # for the same reason parse_game_info_datetime is mirrored: this tool imports
 # nothing from the engine so it still runs when the engine does not, which is
@@ -384,6 +407,156 @@ def verdict_exit_code(failures: Sequence[str], force: bool) -> int:
     if not failures:
         return 0
     return 4 if force else 2
+
+
+def load_archetypes(path: Path = ARCHETYPES_CSV) -> List[Dict[str, str]]:
+    """The pinned contest-pattern table, read directly.
+
+    Preflight-native by contract: no network, no engine import. The engine has
+    its own reader in dk_entries_manager for allocation; this is a second,
+    smaller read of the same pinned CSV rather than an import, because
+    preflight must run when the engine cannot (R79(d) names this duplication
+    class; the constants cross-pin is the answer there, not an import here).
+
+    A missing or unreadable file returns [] and the caller degrades to the
+    geometry check alone. The archetype join is evidence, never the gate.
+    """
+    try:
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            return [row for row in csv.DictReader(handle)
+                    if str(row.get("pattern") or "").strip()]
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return []
+
+
+def match_archetype(contest_name: str,
+                    archetypes: Sequence[Mapping[str, str]]) -> Optional[Mapping[str, str]]:
+    """Type precedence, then max-entries, then pattern length, then name.
+
+    The identical ranking dk_entries_manager.infer_contest_archetype uses, for
+    the reason its comment gives: longest-pattern-wins misroutes real DK names,
+    because "Satellite to $2 MLB Pocket Cup MEGA Qualifier" resolves on "Pocket
+    Cup" and a satellite is not a GPP. Reproduced here on the archived names
+    before this was written.
+    """
+    name = str(contest_name or "").casefold()
+    matches = [row for row in archetypes
+               if str(row.get("pattern") or "").strip()
+               and str(row["pattern"]).strip().casefold() in name]
+    if not matches:
+        return None
+    return max(matches, key=lambda row: (
+        ARCHETYPE_TYPE_PRECEDENCE.get(
+            str(row.get("inferred_type") or "").strip().lower(), 0),
+        1 if str(row.get("inferred_max_entries") or "").strip() else 0,
+        len(str(row.get("pattern") or "").strip()),
+        str(row.get("pattern") or "").strip(),
+    ))
+
+
+def contest_type_from_name(contest_name: str) -> Optional[str]:
+    """'showdown' | 'classic' | None, read off DK's own contest name.
+
+    The archetypes CSV deliberately does NOT decide this. Its patterns are
+    objective families (Jukebox, Satellite, Double Up) and every one of them
+    ships in BOTH geometries -- 'MLB Showdown $20 Quarter Jukebox (CHC @ STL)'
+    and 'MLB $30 Quarter Jukebox' are both real, both archived here. So the
+    geometry discriminator is the name's own Showdown token and the archetype
+    is the objective join that rides alongside it.
+
+    Measured before it was allowed to fail anything, across all 871 entry rows
+    in this repo's archived DKEntries exports, slate files and fixtures: 446
+    classic-geometry rows, none carrying the token or a single-game "(A @ B)"
+    suffix; 425 showdown-geometry rows, every one carrying the token. The
+    separation is total in both directions, which is what makes the absence of
+    the token evidence and not just silence. If DK ever ships a Showdown
+    contest without it, this reads classic, the check fails, and `--force`
+    (exit 4) is the operator's way past it -- preflight is never allowed to be
+    the reason a slate is not entered.
+
+    Only a blank name returns None, which never fails.
+    """
+    name = str(contest_name or "").casefold()
+    if not name.strip():
+        return None
+    if any(token in name for token in SHOWDOWN_NAME_TOKENS):
+        return "showdown"
+    return "classic"
+
+
+def check_contest_identity(contest: str, entries: Sequence[EntryRow], rep: Report,
+                           archetypes: Optional[Sequence[Mapping[str, str]]] = None) -> None:
+    """R85: the contest NAME and the header geometry must tell the same story.
+
+    Today a Showdown-shaped file whose entries belong to Classic contests
+    passes every hard check, because nothing reads the Contest Name column --
+    the geometry check reads the header, the legality check reads the roster,
+    and the manifest cross-check only fires when a manifest resolves. The name
+    is DK's own statement of what the contest is, it sits in column 2 of every
+    row, and it is free to read.
+
+    Two hard failures, both money-boundary:
+      1. every named contest disagrees with the geometry (the whole file is
+         pointed at the wrong contest family);
+      2. the names disagree with EACH OTHER (two draftgroups in one file,
+         which no single upload can satisfy).
+
+    Unrecognized archetypes are recorded, never failed on.
+    """
+    if not entries:
+        return
+    rows = load_archetypes() if archetypes is None else archetypes
+    seen: Dict[str, List[EntryRow]] = collections.defaultdict(list)
+    unmatched: List[str] = []
+    objective_classes: set[str] = set()
+
+    for entry in entries:
+        implied = contest_type_from_name(entry.contest_name)
+        if implied is not None:
+            seen[implied].append(entry)
+        arche = match_archetype(entry.contest_name, rows)
+        if arche is None:
+            if entry.contest_name and entry.contest_name not in unmatched:
+                unmatched.append(entry.contest_name)
+        else:
+            klass = str(arche.get("objective_class") or "").strip()
+            if klass:
+                objective_classes.add(klass)
+
+    rep.info["contest_identity"] = {
+        "geometry": contest,
+        "implied_by_name": sorted(seen),
+        "objective_classes": sorted(objective_classes),
+        "unmatched_contest_names": unmatched,
+    }
+
+    if len(seen) > 1:
+        detail = "; ".join(
+            f"{kind}: {seen[kind][0].contest_name!r} (entry "
+            f"{seen[kind][0].entry_id}, {len(seen[kind])} row(s))"
+            for kind in sorted(seen))
+        rep.fail(f"the entries name BOTH contest families in one file, which no "
+                 f"single upload can satisfy -- {detail}. Two draftgroups have "
+                 f"been mixed; split them and re-run")
+        return
+
+    for kind, members in seen.items():
+        if kind == contest:
+            continue
+        first = members[0]
+        rep.fail(
+            f"contest identity: the header geometry is {contest} but all "
+            f"{len(members)} entries name {kind} contests, first "
+            f"{first.contest_name!r} (entry {first.entry_id}, contest ID "
+            f"{first.contest_id}). DK's contest name and DK's roster contract "
+            f"disagree, so this file is pointed at the wrong contest family; "
+            f"do not upload")
+
+    if unmatched:
+        rep.warn(f"{len(unmatched)} contest name(s) match no row in "
+                 f"{ARCHETYPES_CSV.name}, so no archetype could be inferred "
+                 f"for them: {unmatched[:3]}. Not a failure -- DK names change "
+                 f"faster than the pinned table")
 
 
 def check_row_shape(entries: Sequence[EntryRow], entry_id_rows: int, width: int,
@@ -1018,6 +1191,7 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     rep.info["salary_file"] = str(salary_path)
     salary = load_salary(salary_path)
 
+    check_contest_identity(contest, entries, rep)
     check_row_shape(entries, entry_id_rows, len(slots), rep, args.expect_entries)
     check_pool_membership(entries, salary, parse_embedded_pool(raw_rows),
                           args.min_pool_overlap, rep)

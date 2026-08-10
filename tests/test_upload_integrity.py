@@ -273,6 +273,161 @@ class ContestIdentityTests(unittest.TestCase):
         self.assertEqual(unresolved_contest_blockers(overridden), [])
 
 
+class PreflightContestIdentityTests(unittest.TestCase):
+    """R85: DK's contest NAME and DK's roster contract must agree.
+
+    The gap this closes: a Showdown-geometry file whose entries belong to
+    Classic contests passed every hard check, because nothing read the Contest
+    Name column. Geometry came off the header, legality off the roster, and
+    the manifest cross-check only fires when a manifest resolves -- which is
+    exactly the case R96 records as able to go missing.
+
+    Preflight-native by contract: no network, no engine import. The tests below
+    that compare against the engine's resolver import it themselves; the tool
+    does not.
+    """
+
+    def setUp(self):
+        import preflight_upload
+        self.pf = preflight_upload
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    def _row(self, name, entry_id="900", contest_id="5"):
+        return self.pf.EntryRow(
+            1, [entry_id, name, contest_id, "$1"] + [""] * 10, 10)
+
+    def test_classic_geometry_carrying_showdown_contest_names_fails(self):
+        write_entries(self.entries, CLASSIC_HEADER, [
+            classic_entry("900", "5", self.lineup,
+                          name="MLB Showdown $250 Solo Shot (STL @ TOR)"),
+            classic_entry("901", "5", self.lineup,
+                          name="MLB Showdown $2K Solo Shot (KC @ DET)")])
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("contest identity", result.stdout)
+        self.assertIn("header geometry is classic", result.stdout)
+        self.assertIn("name showdown contests", result.stdout)
+        self.assertIn("Solo Shot", result.stdout)
+
+    def test_showdown_geometry_carrying_classic_contest_names_fails(self):
+        """R85's filed case, in the direction that costs money: the file is
+        shaped for one contest family and the entries belong to the other."""
+        rows = [["900", "MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)", "5",
+                 "$1"] + [""] * 6 + ["", "1. instructions"]]
+        write_entries(self.entries, SHOWDOWN_HEADER, rows)
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("header geometry is showdown", result.stdout)
+        self.assertIn("name classic contests", result.stdout)
+
+    def test_two_contest_families_in_one_file_fails_as_mixed_draftgroups(self):
+        write_entries(self.entries, CLASSIC_HEADER, [
+            classic_entry("900", "5", self.lineup, name="MLB $1K Daily Dollar"),
+            classic_entry("901", "6", self.lineup,
+                          name="MLB Showdown $100 Solo Shot (SD @ ARI)")])
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("BOTH contest families in one file", result.stdout)
+
+    def test_agreeing_names_and_geometry_pass(self):
+        write_entries(self.entries, CLASSIC_HEADER, [
+            classic_entry("900", "5", self.lineup,
+                          name="MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)")])
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_the_real_showdown_fixture_is_not_flagged(self):
+        """The archived MIN@CHC pair: showdown header, showdown names, clean."""
+        rep = self.pf.Report()
+        fixture = REPO / "tests" / "fixtures" / "showdown" / "DKEntries_showdown_MIN_CHC.csv"
+        contest, _, entries, _, _ = self.pf.load_entries(fixture)
+        self.assertEqual(contest, "showdown")
+        self.pf.check_contest_identity(contest, entries, rep)
+        self.assertEqual(rep.failures, [])
+        self.assertEqual(rep.info["contest_identity"]["implied_by_name"],
+                         ["showdown"])
+
+    def test_an_unrecognized_contest_name_warns_and_never_fails(self):
+        """DK names change faster than the pinned table. An archetype we cannot
+        resolve is missing evidence, not a wrong file, and blocking on it would
+        stop a legal upload at T-5."""
+        rep = self.pf.Report()
+        entries = [self._row("MLB $3 Wednesday Special")]
+        self.pf.check_contest_identity("classic", entries, rep)
+        self.assertEqual(rep.failures, [])
+        self.assertTrue(any("match no row" in w for w in rep.warnings))
+        self.assertEqual(rep.info["contest_identity"]["unmatched_contest_names"],
+                         ["MLB $3 Wednesday Special"])
+
+    def test_empty_entries_do_not_pass_this_check_vacuously(self):
+        """R51's class. Row accounting owns the empty-file failure; this check
+        must simply not manufacture a verdict from nothing."""
+        rep = self.pf.Report()
+        self.pf.check_contest_identity("classic", [], rep)
+        self.assertEqual(rep.failures, [])
+        self.assertNotIn("contest_identity", rep.info)
+
+    def test_preflight_and_the_engine_resolve_archetypes_identically(self):
+        """R79(d)'s duplication class, guarded instead of hoped for.
+
+        preflight cannot import the engine, so the precedence table is a second
+        copy. Two implementations of one rule is this project's named no-op
+        failure, so the copies are pinned equal here and cross-checked on real
+        archived contest names.
+        """
+        from mlb_engine.entries import dk_entries_manager as dem
+        self.assertEqual(self.pf.ARCHETYPE_TYPE_PRECEDENCE,
+                         dem.ARCHETYPE_TYPE_PRECEDENCE,
+                         "the copied precedence table has drifted from the engine's")
+        rows = self.pf.load_archetypes()
+        engine_rows = dem.load_archetypes(str(self.pf.ARCHETYPES_CSV))
+        self.assertGreater(len(rows), 6)
+        for name in ("MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIN @ CHC)",
+                     "MLB Single Entry Satellite to $15 Relay Throw",
+                     "MLB $0.25 Knuckleball [150-Max]",
+                     "MLB $5 Double Up",
+                     "MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)",
+                     "MLB $3 Wednesday Special"):
+            mine = self.pf.match_archetype(name, rows)
+            theirs = dem.infer_contest_archetype(name, None, engine_rows)
+            self.assertEqual(
+                (mine or {}).get("pattern"), theirs["matched_pattern"],
+                f"preflight and the engine disagree about {name!r}")
+
+    def test_longest_pattern_alone_would_misroute_a_satellite(self):
+        """The mutation that motivates the precedence table: without it,
+        'Satellite to $2 MLB Pocket Cup MEGA Qualifier' resolves on 'Pocket
+        Cup' and a ticket_line contest reads as a generic GPP."""
+        rows = self.pf.load_archetypes()
+        name = "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier"
+        by_length = max(
+            [r for r in rows if str(r["pattern"]).casefold() in name.casefold()],
+            key=lambda r: len(r["pattern"]))
+        self.assertEqual(by_length["pattern"], "Pocket Cup")
+        self.assertEqual(self.pf.match_archetype(name, rows)["pattern"],
+                         "Satellite")
+
+    def test_a_missing_archetypes_file_degrades_to_the_geometry_check(self):
+        """The archetype join is evidence; the geometry contradiction is the
+        gate. Losing the CSV must not lose the gate."""
+        rep = self.pf.Report()
+        self.assertEqual(self.pf.load_archetypes(self.dir / "nope.csv"), [])
+        entries = [self._row("MLB Showdown $100 Solo Shot (SD @ ARI)")]
+        self.pf.check_contest_identity("classic", entries, rep, archetypes=[])
+        self.assertTrue(any("contest identity" in f for f in rep.failures))
+
+
 class PreflightToolTests(unittest.TestCase):
     """G1: the net. Every check is a fact about the file, decidable from disk."""
 

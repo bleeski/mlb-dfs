@@ -105,3 +105,29 @@ needs no unlink.
 - **A fresh clone cannot run the suite green.** It needs untracked fixtures.
   Tracking them is open backlog; until then, container runs start from a
   tarball of the working tree, not from GitHub.
+- **`.git/index.lock` goes stale here and `rm` cannot clear it (R109).** The
+  mount grants create and truncate but not unlink, so an interrupted git
+  write leaves a zero-byte lock that blocks every later commit, and git's own
+  documented remedy — delete the file — is the one operation that fails. Seen
+  2026-07-28, 2026-07-29 and 2026-08-10. The same asymmetry shows up all over
+  this mount: `rm` returns "Operation not permitted", `cp` over an existing
+  file returns "Invalid argument", while `mv` and `cat >` both work.
+
+  **The remedy, in order.** First confirm the lock is dead rather than a live
+  session mid-write: it is zero bytes and its mtime is minutes or hours old,
+  and `pgrep -f "git " ` finds nothing. A live git write is not yours to
+  clear. Then move it aside rather than deleting it, which needs no unlink
+  grant and leaves the evidence in place:
+
+  ```
+  ls -la .git/*.lock                       # size and mtime; 0 bytes and old
+  mv .git/index.lock .git/index.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)
+  ```
+
+  Use a timestamped suffix, never a fixed one. Fixed names collide with the
+  residue already there and then the `mv` itself fails: `.git/index.lock.bak`,
+  `.stale`, `.stale2`, `.stale3`, `deadlock_*` and `tmp_probe_dead` are all
+  sitting in `.git/` today for exactly that reason. Check `HEAD.lock` the same
+  way; it strands the same commit. The residue can only be swept with Ben's
+  explicit delete grant, so it accumulates, and that is cosmetic rather than
+  harmful — a `.lock.stale-<ts>` file blocks nothing.
