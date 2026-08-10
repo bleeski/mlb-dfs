@@ -9,9 +9,19 @@ else here is bookkeeping around that single fact.
 
 State lives in claims/<name>/owner.json (role, scope, taken_utc,
 released_utc). A claim is HELD while released_utc is null. Release also
-touches a RELEASED marker file, per the contract, so a plain directory
-listing answers the question; owner.json stays authoritative because
-creating a file never needs the delete grant that removing one does.
+touches a RELEASED marker file, so a plain directory listing answers the
+question; owner.json stays authoritative because creating a file never needs
+the delete grant that removing one does.
+
+A hand-written RELEASED marker therefore does NOT release a claim, and the
+precedence cannot be flipped to make it: `take` clears the marker with
+unlink, which fails on this mount, so a marker-authoritative rule would make
+every re-taken claim read as free while a session held it. Failing closed on
+a stale HELD is the safe direction; failing open on a live claim is not. What
+the tool owes the reader instead is loudness, so `check` and `sweep` name any
+claim carrying a marker with released_utc still null and print the one
+command that completes it (R102, after a marker-only release left an engine
+claim reading HELD for three hours on 2026-08-10).
 Re-taking a released claim rewrites owner.json, which is check-then-write
 rather than atomic; that is acceptable for an advisory tripwire, and the
 atomic mkdir still guards the case that matters, the first take.
@@ -118,6 +128,22 @@ def _is_held(claim: Path) -> bool:
     return not (claim / "RELEASED").exists()
 
 
+def _release_incomplete(claim: Path) -> bool:
+    """A RELEASED marker sits here while owner.json still reads held.
+
+    Someone released by hand instead of through `release`. The claim is very
+    likely free, but the tool must not assume it (see the module docstring on
+    why the precedence cannot be flipped), and it must not stay quiet either.
+    """
+    return (claim / "RELEASED").exists() and _is_held(claim)
+
+
+def _incomplete_note(name: str) -> str:
+    return (f"         RELEASED marker present but owner.json still holds it: "
+            f"a hand-written marker does not release. Complete it with "
+            f"`python tools/claim.py release {name}`")
+
+
 def _is_stale(name: str) -> bool:
     dates = re.findall(r"\d{4}-\d{2}-\d{2}", name)
     return bool(dates) and max(dates) < _today()
@@ -138,6 +164,8 @@ def cmd_take(args: argparse.Namespace) -> int:
             print(f"HELD  {name} by {owner.get('role', '?')} since "
                   f"{owner.get('taken_utc', '?')}"
                   + (f"  scope: {owner['scope']}" if owner.get("scope") else ""))
+            if _release_incomplete(target):
+                print(_incomplete_note(name))
             if getattr(args, "beacon", False):
                 print("beacon already lit: a parallel build is running; builds "
                       "never block builds, so proceed and note it to Ben")
@@ -170,6 +198,8 @@ def cmd_check(args: argparse.Namespace) -> int:
             owner = _read_owner(target)
             print(f"HELD  {name} by {owner.get('role', '?')} since "
                   f"{owner.get('taken_utc', '?')}")
+            if _release_incomplete(target):
+                print(_incomplete_note(name))
             return 2
         print(f"free  {name} (released)")
         return 0
@@ -187,6 +217,8 @@ def cmd_check(args: argparse.Namespace) -> int:
         stale = "  STALE (Ben arbitrates)" if held and _is_stale(claim.name) else ""
         print(f"{state:<8} {claim.name}  role={owner.get('role', '?')} "
               f"taken={owner.get('taken_utc', '?')}{stale}")
+        if _release_incomplete(claim):
+            print(_incomplete_note(claim.name))
     return 0
 
 
@@ -220,6 +252,8 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         print(f"STALE  {claim.name}  role={owner.get('role', '?')} "
               f"taken={owner.get('taken_utc', '?')}  Ben arbitrates; nothing "
               f"is deleted here")
+        if _release_incomplete(claim):
+            print(_incomplete_note(claim.name))
     return 0
 
 

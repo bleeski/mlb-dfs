@@ -27,6 +27,10 @@ it against real-world rosters.
 This file carries the contracts and the gotchas. Each procedure lives once:
 - Per-slate loop, start to upload: skills/generate-lineups/SKILL.md
 - Post-slate archival: docs/cowork_archival_runbook.md
+- Keeping disk, container and GitHub in sync: docs/cowork_sync_protocol.md,
+  which wraps `python tools/sync_check.py`. Read it before moving files
+  between the mount and a container, or before believing `git status` on the
+  mount.
 - What's missing from the standings inbox: skills/mlb-standings-pull-checklist/SKILL.md,
   which wraps `python tools/awaiting_standings.py scan`. Regenerated, never
   hand-maintained.
@@ -100,7 +104,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  792 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  810 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin. A count mismatch
    with the suite passing is a WARNING and prints in brackets on the PASS
    line: proceed, fix the pin after the slate. A failing suite blocks. The
@@ -196,8 +200,10 @@ before staging (`python tools/claim.py take slate_<date>_<tag> --role
 BUILD --beacon`) so DEV can see that builds are live, and a beacon
 another session already lit means a parallel build, which never stops a
 build. Yesterday's claims are stale by definition; a stale claim today is
-Ben's to arbitrate. Release by writing a RELEASED file inside your own
-claim. Re-read claims/ immediately before writing any contended surface,
+Ben's to arbitrate. Release with `python tools/claim.py release
+<resource>`, which writes released_utc AND touches the RELEASED marker;
+owner.json is authoritative, so a hand-written marker alone does not
+release and `check` will keep reporting the claim HELD (R102). Re-read claims/ immediately before writing any contended surface,
 not only at session start. ARCHIVE claims ledger and inbox before mining;
 DEV claims engine before touching code.
 

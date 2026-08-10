@@ -10311,5 +10311,231 @@ class PrimaryStackFloorTests(unittest.TestCase):
             self.assertGreater(expected, 0, "the fixture roster carries a real stack")
 
 
+class SyncCheckTests(unittest.TestCase):
+    """R102. The three-way sync report.
+
+    The rule these pin: this mount reports mtime changes as modifications, so
+    every claim of drift must be confirmed against content, and a GitHub head
+    that was never actually read must be reported as unread rather than as
+    agreement."""
+
+    def test_stat_noise_is_not_reported_as_a_change(self):
+        from tools import sync_check
+        porcelain = " M tools/audit.py\n M CLAUDE.md\n M tests/test_core.py\n"
+        # Only one of the three differs from HEAD by content.
+        out = sync_check.classify_dirt(porcelain, "tools/audit.py\n")
+        self.assertEqual(out["real_modified"], ["tools/audit.py"])
+        self.assertEqual(out["stat_noise"], ["CLAUDE.md", "tests/test_core.py"])
+
+    def test_content_wins_when_porcelain_misses_a_file(self):
+        """The regression this pins, found on the mount 2026-08-10. Seconds
+        after a write-back the mount served a stale stat, so `git status`
+        omitted a CHANGELOG.md that `git diff HEAD` scored at +51 lines.
+        Deriving modifications from porcelain made the file vanish from every
+        bucket. A sync tool that under-reports drift is worse than none."""
+        from tools import sync_check
+        out = sync_check.classify_dirt(" M tools/audit.py\n",
+                                       "tools/audit.py\nCHANGELOG.md\n")
+        self.assertIn("CHANGELOG.md", out["real_modified"])
+        self.assertNotIn("CHANGELOG.md", out["stat_noise"])
+
+    def test_untracked_is_separated_from_modified(self):
+        from tools import sync_check
+        out = sync_check.classify_dirt("?? notes.md\n M tools/audit.py\n",
+                                       "tools/audit.py\n")
+        self.assertEqual(out["untracked"], ["notes.md"])
+        self.assertEqual(out["real_modified"], ["tools/audit.py"])
+        self.assertEqual(out["stat_noise"], [])
+
+    def test_a_rename_is_keyed_to_its_destination(self):
+        from tools import sync_check
+        out = sync_check.classify_dirt('R  old.py -> tools/new.py\n',
+                                       "tools/new.py\n")
+        self.assertEqual(out["real_modified"], ["tools/new.py"])
+
+    def test_a_placeholder_token_is_not_a_credential(self):
+        """The container ships GH_TOKEN and GITHUB_TOKEN set to 14-character
+        stubs. Treating one as real produces an auth failure that reads like a
+        network outage, which is the wrong thing to go debugging."""
+        from tools import sync_check
+        name, token = sync_check.find_token({"GH_TOKEN": "x" * 14})
+        self.assertIsNone(name)
+        self.assertIsNone(token)
+
+    def test_gh_pat_wins_over_the_container_stubs(self):
+        from tools import sync_check
+        name, token = sync_check.find_token(
+            {"GH_TOKEN": "y" * 14, "GH_PAT": "z" * 40})
+        self.assertEqual(name, "GH_PAT")
+        self.assertEqual(token, "z" * 40)
+
+    def test_unmeasured_github_is_never_called_agreement(self):
+        from tools import sync_check
+        code, lines = sync_check.verdict({
+            "local_head": "a" * 40, "origin_ref": "a" * 40,
+            "ever_fetched": False, "token_env_var": None,
+            "remote_reachable": False, "remote_head": None,
+            "ahead_of_origin_ref": 0, "behind_origin_ref": 0,
+            "dirt": {"real_modified": [], "stat_noise": [], "untracked": []},
+            "errors": []})
+        self.assertEqual(code, 0)
+        body = "\n".join(lines)
+        self.assertIn("unmeasured", body)
+        self.assertIn("never fetched", body)
+        self.assertNotIn("disk and GitHub agree", body)
+
+    def test_unpushed_commits_are_drift(self):
+        from tools import sync_check
+        code, lines = sync_check.verdict({
+            "local_head": "b" * 40, "origin_ref": "a" * 40,
+            "ever_fetched": False, "token_env_var": None,
+            "remote_reachable": False, "remote_head": None,
+            "ahead_of_origin_ref": 1, "behind_origin_ref": 0,
+            "dirt": {"real_modified": [], "stat_noise": [], "untracked": []},
+            "errors": []})
+        self.assertEqual(code, 2)
+        self.assertIn("push from Windows", "\n".join(lines))
+
+    def test_a_measured_matching_remote_is_agreement(self):
+        from tools import sync_check
+        code, lines = sync_check.verdict({
+            "local_head": "c" * 40, "origin_ref": "c" * 40,
+            "ever_fetched": True, "token_env_var": "GH_PAT",
+            "remote_reachable": True, "remote_head": "c" * 40,
+            "ahead_of_origin_ref": 0, "behind_origin_ref": 0,
+            "dirt": {"real_modified": [], "stat_noise": [], "untracked": []},
+            "errors": []})
+        self.assertEqual(code, 0)
+        self.assertIn("disk and GitHub agree", "\n".join(lines))
+
+    def test_stat_noise_alone_does_not_raise_the_exit_code(self):
+        from tools import sync_check
+        code, lines = sync_check.verdict({
+            "local_head": "d" * 40, "origin_ref": "d" * 40,
+            "ever_fetched": True, "token_env_var": "GH_PAT",
+            "remote_reachable": True, "remote_head": "d" * 40,
+            "ahead_of_origin_ref": 0, "behind_origin_ref": 0,
+            "dirt": {"real_modified": [], "stat_noise": ["a.py", "b.py"],
+                     "untracked": []},
+            "errors": []})
+        self.assertEqual(code, 0)
+        self.assertIn("stat noise", "\n".join(lines))
+
+    def test_uncommitted_content_is_drift(self):
+        from tools import sync_check
+        code, _ = sync_check.verdict({
+            "local_head": "e" * 40, "origin_ref": "e" * 40,
+            "ever_fetched": True, "token_env_var": "GH_PAT",
+            "remote_reachable": True, "remote_head": "e" * 40,
+            "ahead_of_origin_ref": 0, "behind_origin_ref": 0,
+            "dirt": {"real_modified": ["mlb_engine/optimize/bank_cache.py"],
+                     "stat_noise": [], "untracked": []},
+            "errors": []})
+        self.assertEqual(code, 2)
+
+    def test_a_ref_resolves_out_of_packed_refs(self):
+        """Reading refs off the filesystem avoids a git call, and therefore an
+        index.lock this mount cannot unlink. Packed refs must still resolve."""
+        from tools import sync_check
+        with tempfile.TemporaryDirectory() as tmp:
+            git = Path(tmp) / ".git"
+            git.mkdir()
+            (git / "packed-refs").write_text(
+                "# pack-refs with: peeled fully-peeled sorted \n"
+                f"{'f' * 40} refs/heads/main\n", encoding="utf-8")
+            self.assertEqual(
+                sync_check._read_ref(Path(tmp), "refs/heads/main"), "f" * 40)
+
+
+class ClaimReleaseMarkerTests(unittest.TestCase):
+    """R102. A hand-written RELEASED marker does not release a claim.
+
+    CLAUDE.md used to say it did. It cannot: `take` clears the marker with
+    unlink, which fails on this mount, so making the marker authoritative
+    would report a live claim as free. The tool fails closed and says so."""
+
+    def _claim(self, root, name, released=False, marker=False):
+        target = Path(root) / "claims" / name
+        target.mkdir(parents=True)
+        (target / "owner.json").write_text(json.dumps({
+            "role": "DEV", "scope": "",
+            "taken_utc": "2026-08-10T01:05:16Z",
+            "released_utc": "2026-08-10T02:00:00Z" if released else None,
+        }), encoding="utf-8")
+        if marker:
+            (target / "RELEASED").touch()
+        return target
+
+    def test_a_marker_alone_leaves_the_claim_held(self):
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._claim(tmp, "engine_2026-08-10", marker=True)
+            self.assertTrue(claim._is_held(target))
+            self.assertTrue(claim._release_incomplete(target))
+
+    def test_a_completed_release_is_not_flagged(self):
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._claim(tmp, "engine_2026-08-10",
+                                 released=True, marker=True)
+            self.assertFalse(claim._is_held(target))
+            self.assertFalse(claim._release_incomplete(target))
+
+    def test_a_held_claim_without_a_marker_is_not_flagged(self):
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._claim(tmp, "engine_2026-08-10")
+            self.assertTrue(claim._is_held(target))
+            self.assertFalse(claim._release_incomplete(target))
+
+    def test_check_names_the_command_that_completes_the_release(self):
+        """The failure this closes: a marker-only release left an engine claim
+        reading HELD for three hours, and nothing on screen said why."""
+        import contextlib
+        import io
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            self._claim(tmp, "engine_2026-08-10", marker=True)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = claim.main(["--root", tmp, "check", "engine",
+                                   "--date", "2026-08-10"])
+            out = buf.getvalue()
+            self.assertEqual(code, 2)
+            self.assertIn("HELD", out)
+            self.assertIn("release engine_2026-08-10", out)
+
+    def test_take_on_an_incomplete_release_blocks_and_explains(self):
+        import contextlib
+        import io
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            self._claim(tmp, "engine_2026-08-10", marker=True)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = claim.main(["--root", tmp, "take", "engine",
+                                   "--role", "DEV", "--date", "2026-08-10"])
+            out = buf.getvalue()
+            self.assertEqual(code, 2)
+            self.assertIn("does not release", out)
+
+    def test_release_then_check_is_clean(self):
+        import contextlib
+        import io
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            self._claim(tmp, "engine_2026-08-10", marker=True)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(claim.main(
+                    ["--root", tmp, "release", "engine",
+                     "--date", "2026-08-10"]), 0)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = claim.main(["--root", tmp, "check", "engine",
+                                   "--date", "2026-08-10"])
+            self.assertEqual(code, 0)
+            self.assertIn("free", buf.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

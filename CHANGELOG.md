@@ -25,6 +25,67 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R102: the sync state is measurable, and a marker-only release is loud
+
+Test pin 792 -> 810. New tool `tools/sync_check.py`. No engine module, no
+projection, no MILP constraint, and no control moved.
+
+### R102 — three locations, two filesystems, and one link that does not exist
+
+**What prompted it.** Ben asked how cloud sessions and local files stay in
+sync. Measuring it turned up that the question has a false premise and a real
+gap. The Windows folder and the `device_bash` mount are the SAME files and
+cannot drift; only the container is separate. And the container cannot reach
+GitHub at all: `bleeski/mlb-dfs` is private, `GH_TOKEN` and `GITHUB_TOKEN` in
+the container are 14-character placeholders, and `gh` is not installed.
+github.com itself is reachable, so this is an auth gap and not a network one.
+
+**`tools/sync_check.py`.** One command, exit 0 in sync and 2 on drift. Two
+things it deliberately refuses to do. It never calls an unread GitHub head
+"agreement": with no token it reports the remote as unmeasured and says why,
+because the mount has never fetched and its `origin/main` moves only when Ben
+pushes. And it never reports the mount's stat noise as a change: every path it
+calls dirty is confirmed against `git diff HEAD --name-only`, which compares
+content, with the mtime-only paths counted separately. It reads refs off the
+filesystem rather than through git, which is one fewer `index.lock` this mount
+cannot unlink.
+
+**Which of those two sources is the authority is the whole design, and the
+first cut had it backwards.** Deriving modifications from porcelain and
+subtracting the content diff makes any path porcelain MISSES vanish from every
+bucket. That is not hypothetical: running the tool on the mount seconds after a
+write-back, this mount served a stale stat and porcelain omitted a CHANGELOG.md
+that `git diff HEAD` scored at +51 lines. Content is now the authority and
+porcelain only adds context, because a sync tool that under-reports drift is
+worse than no sync tool. Pinned by
+`test_content_wins_when_porcelain_misses_a_file`.
+
+**A hand-written `RELEASED` marker never released a claim, and CLAUDE.md said
+it did.** `_is_held` reads `released_utc` from owner.json and consults the
+marker only when owner.json is unreadable. So the contract's instruction
+produced a claim that reads HELD forever. It cost three hours on this date:
+an engine claim was arbitrated as orphaned, released by hand, and `check` kept
+reporting it held.
+
+The precedence is NOT flipped, and that is the decision rather than an
+oversight. `take` clears the marker with unlink, which fails on this mount, so
+a marker-authoritative rule would report a live claim as free — failing open on
+a held claim, where the current bug fails closed on a released one. Instead
+`take`, `check` and `sweep` now name any claim carrying a marker with
+`released_utc` still null and print the command that completes it. Six existing
+claims are in that state and the warning names them all. CLAUDE.md's release
+sentence is corrected to match the tool.
+
+**Also corrected.** `skills/generate-lineups/SKILL.md` carried the audit pin at
+773 while the real pin was 792, so the third of the three pin locations had
+been drifting through at least two changes. All three move together here.
+
+**Filed, not built.** Two limits are written down in the new
+`docs/cowork_sync_protocol.md` rather than fixed: the engine mutex is nominal,
+because `take engine_myslug` gets its own directory and blocks nobody, and a
+fresh clone still cannot run the suite green because the fixtures it needs are
+untracked.
+
 ## 2026-08-10 — R101: the late swap stops discarding the bank it just built
 
 Test pin 784 -> 792. `bank_cache` v1.2 -> v1.3, and its stored document gains a
