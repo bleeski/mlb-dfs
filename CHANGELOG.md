@@ -25,6 +25,78 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R107 filed; the backlog reorganized by workstream; next-session prompts rewritten (docs only)
+
+No code, no tests, no pins moved. Write set: `docs/2026-07-27_backlog_v2.md`,
+`docs/next_session_prompts.md`, this entry. Second docs commit of the date,
+at Ben's instruction: "update the backlog with any items and reorganize them
+so it's in a logical order for the development," with the session prompts
+carrying the backlog/changelog contract explicitly.
+
+### Changed
+
+- **The backlog's open board is now organized by workstream, entries
+  verbatim.** The old layout accreted by filing date (Section 1, Section 2,
+  then four dated "additions" tranches), so related open work was scattered:
+  the four Showdown items sat in three different sections, and the solver
+  family in four. The new layout after the unchanged what-next queue: seven
+  workstreams (Showdown correctness and certification; strategy controls and
+  their evidence; intake and pool truth; solver/allocator/swap/brief truth;
+  delivery/manifest/preflight evidence; infrastructure, tests, environment,
+  coordination, docs; archival and ledger tooling), then closed number
+  stubs, open tails and awaiting-Ben, do-not-build, and a new "Board
+  history" section holding the amendment record and the original dated
+  tranche introductions verbatim. Mechanics worth recording: the move was
+  performed by a script that treated every `### R` entry as an atomic block
+  and REFUSED to write unless all 55 open-entry bodies survived
+  byte-identically with none lost or duplicated — wording, priorities,
+  dates, and provenance lines are untouched, and each entry's header still
+  names when and where it was filed. The old opportunistic-tier paragraph is
+  replaced by pull rules that preserve every standing hold (R36 findings
+  slot in when tripped; R85 rides the Showdown batch; R87 holds for the
+  golden regen; R81 is armed; R13 stays parked on 3.14; R31 carries R86).
+  Nothing parses the backlog programmatically (verified by grep across
+  tools/, mlb_engine/, tests/, skills/ before restructuring), and CLAUDE.md's
+  pointer to the file and to "What do we tackle next" is unchanged.
+- **Filed R107** (P2, XS-S): untracked residue on DEV surfaces.
+  `tools/fetch_fangraphs_platoon.py` has been untracked since 2026-08-05
+  while the Quick Card names it as the sanctioned platoon-refresh path, and
+  `_stage_repo.tar.gz` sits in the repo root from the sync tarball bridge.
+  Adopt-or-delete is Ben's call for the tool (adopting is an engine-claim
+  change with VERSION and audit pin, not a drive-by `git add`); the tarball
+  gets a gitignore pattern or a bridge cleanup step. Both are session-start
+  noise that trains the foreign-dirt check to be skimmed.
+- **`docs/next_session_prompts.md` rewritten.** The stale ARCHIVE prompt
+  from 2026-07-31 (its pending-work list had been done for a week) is
+  replaced by three prompts matched to the queue: Prompt A, DEV, the
+  Showdown batch (R104 + R45 + R105 + R54, R85 as the named rider); Prompt
+  B, ARCHIVE, executing Ben's 2026-08-09 curated-archetypes decision plus
+  the Quick Card pin merge and an inbox sweep; Prompt C, DEV, R10 under its
+  decided scope and grading bar. Per Ben's instruction, every DEV prompt
+  carries the closing contract in the prompt text itself: completed entries
+  MIGRATE from the backlog to this file in the completing commit, the
+  changelog entry rides the same commit, the queue is updated, and the next
+  free R-number comes from scanning both files. The ARCHIVE prompt carries
+  the role-correct version: ledger in place, fragments for DEV surfaces,
+  never the backlog or changelog directly. A standing rule is written into
+  the file header: when a prompt and the backlog disagree, the backlog wins.
+- **One defect of this date's earlier commit corrected and disclosed:** the
+  R104–R106 section insert consumed the `# Do not build (updated)` header
+  line without restoring it, so the do-not-build body read as part of the
+  new section in 07a33c6. The reorganization script's anchor check caught
+  it; the header is restored. Cheap lesson in the R91 spirit: a structural
+  edit that a verifier would have caught in one grep shipped without one,
+  and the fix arrived only because the next tool refused to parse the
+  result.
+
+### Why
+
+A board organized by filing date answers "when was this found"; a DEV
+session asks "what do I touch tonight." The queue already answered that for
+the next session; the workstreams answer it for every session after, and the
+prompts make the backlog/changelog migration contract impossible to miss at
+the exact moment it applies.
+
 ## 2026-08-10 — R103–R106: adjudication of the greenfield spec revision; six fragments merged; the R102 collision corrected (docs only)
 
 No code, no tests, no pins moved. Write set: `docs/2026-07-27_backlog_v2.md`,
