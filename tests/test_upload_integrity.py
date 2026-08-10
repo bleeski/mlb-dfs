@@ -2130,6 +2130,69 @@ class UploadReadyIsReservedTests(unittest.TestCase):
         from tools.preflight_upload import STATUS_VALUES as tool_set
         self.assertEqual(tuple(engine_set), tuple(tool_set))
 
+    # ---- R105 ---------------------------------------------------------- #
+    def test_a_review_grade_delivery_records_candidate_not_the_verdict(self):
+        """R105. The verdict and the manifest status are separate facts.
+
+        R34 grew the VERDICT vocabulary a fifth value, `review_ready`, and
+        `stamp_manifest_status` wrote the verdict straight into `status` -- so
+        every clean Showdown delivery stamped a status outside the closed set and
+        the next read of that record hard-failed. Reproduced on both fragments'
+        builds (2026-08-05 STL@NYY, 2026-08-06 SD@ARI); every per-entry check
+        passed on both files.
+
+        Teeth: restoring `target["status"] = status` fails the status assertion
+        AND the round-trip test below, which is the one that matters, because the
+        first read after the stamp is what the operator actually does at T-5.
+        """
+        self._write_manifest(certification="review_grade")
+        payload = json.loads(self._run("--json").stdout)
+        record = json.loads(self.manifest.read_text())["deliveries"][0]
+        self.assertEqual(payload["verdict"], "review_ready")
+        self.assertEqual(record["status"], "candidate")
+        # The verdict is not lost. It is recorded where a verdict belongs.
+        self.assertEqual(record["preflight"]["verdict"], "review_ready")
+
+    def test_a_stamped_review_grade_record_reads_clean_on_the_next_pass(self):
+        """R105's actual consequence: supersession blindness, and a red FAIL on
+        every clean Showdown export that trains the operator to ignore FAILs."""
+        self._write_manifest(certification="review_grade")
+        self.assertEqual(self._run().returncode, 0)
+        second = self._run()
+        self.assertEqual(second.returncode, 0, second.stdout)
+        self.assertNotIn("not one of", second.stdout)
+
+    def test_every_verdict_maps_into_the_closed_status_set(self):
+        """The pin that stops the two writers drifting again. Any verdict this
+        tool can emit must map to a status the manifest accepts, and the map's
+        unknown-verdict fallback must be inside the set too."""
+        from tools.preflight_upload import STATUS_VALUES, status_for_verdict
+        for verdict in ("upload_ready", "review_ready", "blocked",
+                        "acknowledged", "a_verdict_nobody_has_written_yet"):
+            self.assertIn(status_for_verdict(verdict), STATUS_VALUES, verdict)
+        # A review-grade file is a CANDIDATE. Preflight checks bytes, not
+        # certification, and must not promote it past that.
+        self.assertEqual(status_for_verdict("review_ready"), "candidate")
+        self.assertEqual(status_for_verdict("upload_ready"), "upload_ready")
+
+    def test_an_out_of_vocabulary_status_exits_2_on_both_checkers(self):
+        """R105. The two BUILD fragments disagreed on the exit code (08-05 said
+        2, 08-06 said 3). Measured 2026-08-10: it is 2 on both tools. Exit 3 in
+        verify_export is the setup path -- an unreadable file or no resolvable
+        salary -- which is a different failure reached before any check runs."""
+        for tool in ("preflight_upload.py", "verify_export.py"):
+            # Rewritten per tool: preflight STAMPS the record, so a single write
+            # would leave the second tool reading a status the first repaired.
+            self._write_manifest(status="review_ready",
+                                 certification="review_grade")
+            result = subprocess.run(
+                [sys.executable, str(REPO / "tools" / tool),
+                 "--entries", str(self.entries), "--salary", str(self.salary),
+                 "--manifest", str(self.manifest)],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2, f"{tool}: {result.stdout}")
+            self.assertIn("not one of", result.stdout, tool)
+
     def test_a_corrupt_manifest_blocks_a_delivered_file(self):
         """R35: an ABSENT manifest already hard-failed a delivered file, so
         warning on a CORRUPT one had the provenance gate backwards -- the weaker

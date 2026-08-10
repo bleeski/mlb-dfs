@@ -33,7 +33,7 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
                   "tests.test_paste_lineups")
-EXPECTED_TEST_COUNT = 810  # core 555 + showdown 49 + upload 127 + golden 9 + paste 70
+EXPECTED_TEST_COUNT = 829  # core 559 + showdown 55 + upload 131 + golden 9 + paste 75
 
 EXPECTED_VERSION_TEXT = {
     "MLB_Classic.md": "v2.26.0",

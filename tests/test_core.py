@@ -6582,35 +6582,146 @@ class IntakeTrustTests(unittest.TestCase):
             self.assertTrue(any("T4" in w and "opposing pitcher hand unknown" in w
                                 for w in warnings), warnings)
 
-    def test_dk_probable_opener_does_not_enter_as_a_plain_probable(self):
-        """DK's Starting=PO is a probable opener, not a starter.
+    def test_dk_probable_opener_is_barred_from_pitcher_slots(self):
+        """R104. DK's Starting=PO is a probable opener and is NOT rosterable.
 
-        Teeth: without the token branch every arm resolves to
-        declared_probable_sp and both the role assertion and the warning
-        assertion fail. Verified against a real file: SD's Randy Vasquez carries
-        Starting=PO in data/slates/2026-07-25/DKSalaries.csv and entered that
-        build as a declared starter.
+        Supersedes the F17 pin, which asserted role viable_bulk_or_alt_sp and
+        called the opener "still rosterable". That role is in
+        ALLOWED_PITCHER_ROLES, OPTIONAL_SP_AUDIT_STATUSES and
+        ALLOWED_PITCHER_ROLES_FOR_GATE, so the optimizer could put a
+        one-or-two-inning arm in a P slot priced on a starter's workload and the
+        build certified with nothing flagging it. Verified against a real file:
+        SD's Randy Vasquez carries Starting=PO in
+        data/slates/2026-07-25/DKSalaries.csv.
+
+        Teeth: reinstating the old ``pitcher_roles[pid] = 'viable_bulk_or_alt_sp'``
+        line fails the absence assertions AND the frame assertion, because the
+        arm would be back in projection_rows where the solver can reach him.
         """
         with tempfile.TemporaryDirectory() as tmp:
             salary = self._salary(tmp, starting={"T4 Ace": "PO", "T1 Ace": "SP"})
             pool = lda.build_slate_pool(salary, pool_lineups_feed(),
                                         platoon_json=self._platoon())
             roles = pool["pitcher_roles"]
-            by_name = {r["Player_ID"]: r["Name"] for r in pool["projection_rows"]}
-            opener = [pid for pid, role in roles.items() if by_name[pid] == "T4 Ace"]
-            self.assertEqual(len(opener), 1)
-            self.assertEqual(roles[opener[0]], "viable_bulk_or_alt_sp")
-            self.assertEqual(roles[[p for p in roles if by_name[p] == "T1 Ace"][0]],
+            report = pool["pool_report"]
+            names = {r["Player_ID"]: r["Name"] for r in pool["projection_rows"]}
+            # Absent from the rosterable set AND from the frame: "absent, not
+            # excluded", the pool contract's own words.
+            self.assertNotIn("T4 Ace", set(names.values()))
+            self.assertEqual([p for p in roles if names.get(p) == "T4 Ace"], [])
+            # The plain starter is untouched.
+            self.assertEqual(roles[[p for p in roles if names[p] == "T1 Ace"][0]],
                              "declared_probable_sp")
+            # Visible, not silent: the bar is an audit trail, not a disappearance.
+            barred = report["non_rosterable_arms"]
+            self.assertEqual([a["name"] for a in barred], ["T4 Ace"])
+            self.assertEqual(barred[0]["role"], lda.BARRED_OPENER_ROLE)
+            self.assertEqual(barred[0]["dk_starting"], "PO")
             self.assertTrue(any("Starting=PO" in w and "T4 Ace" in w
-                                for w in pool["pool_report"]["warnings"]))
-            # An opener is still rosterable: the gate's allowed-role set and the
-            # export validator both accept viable_bulk_or_alt_sp. What changes is
-            # that it is outside REQUIRED_SP_AUDIT_STATUSES.
+                                for w in report["warnings"]))
+            # The barred role is in NO allowed-role set. This is the assertion
+            # that makes 'non-rosterable' mean something.
             from mlb_engine.entries.dk_entries_manager import ALLOWED_PITCHER_ROLES
-            from mlb_engine.optimize.optimizer_v3 import REQUIRED_SP_AUDIT_STATUSES
+            from mlb_engine.optimize.optimizer_v3 import (
+                OPTIONAL_SP_AUDIT_STATUSES, REQUIRED_SP_AUDIT_STATUSES)
+            from mlb_engine.pipeline.execution_pipeline import (
+                ALLOWED_PITCHER_ROLES_FOR_GATE)
+            for allowed in (ALLOWED_PITCHER_ROLES, REQUIRED_SP_AUDIT_STATUSES,
+                            OPTIONAL_SP_AUDIT_STATUSES,
+                            ALLOWED_PITCHER_ROLES_FOR_GATE):
+                self.assertNotIn(lda.BARRED_OPENER_ROLE, allowed)
+            # viable_bulk_or_alt_sp survives; PO simply stopped producing it, so
+            # it is now reachable only by explicit operator declaration.
             self.assertIn("viable_bulk_or_alt_sp", ALLOWED_PITCHER_ROLES)
             self.assertNotIn("viable_bulk_or_alt_sp", REQUIRED_SP_AUDIT_STATUSES)
+
+    def test_a_side_whose_only_arm_is_an_opener_blocks_and_names_the_cause(self):
+        """R104. The bar creates a decision point; it must not create a mystery.
+
+        Teeth: the generic "no probable or declared starter" text passes a naive
+        substring check, so this asserts the opener is NAMED in the blocker.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, starting={"T4 Ace": "PO"})
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(),
+                                        platoon_json=self._platoon())
+            blockers = pool["pool_report"]["blockers"]
+            hit = [b for b in blockers if b.startswith("T4:")]
+            self.assertEqual(len(hit), 1, blockers)
+            self.assertIn("T4 Ace", hit[0])
+            self.assertIn("opener", hit[0])
+            self.assertIn("no ROSTERABLE starter", hit[0])
+
+    def test_an_operator_declaration_lifts_the_opener_bar(self):
+        """R104. declared_pitchers is the documented way past the PO bar, and the
+        arm must then leave non_rosterable_arms rather than be in both places."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, starting={"T4 Ace": "PO", "T1 Ace": "SP"})
+            plain = lda.build_slate_pool(salary, pool_lineups_feed(),
+                                         platoon_json=self._platoon())
+            opener_id = plain["pool_report"]["non_rosterable_arms"][0]["player_id"]
+            pool = lda.build_slate_pool(
+                salary, pool_lineups_feed(), platoon_json=self._platoon(),
+                declared_pitchers={opener_id: "viable_bulk_or_alt_sp"})
+            self.assertEqual(pool["pitcher_roles"][opener_id],
+                             "viable_bulk_or_alt_sp")
+            self.assertEqual(pool["pool_report"]["non_rosterable_arms"], [])
+            self.assertEqual(
+                [b for b in pool["pool_report"]["blockers"] if b.startswith("T4:")],
+                [])
+
+    def test_a_plr_arm_outside_the_pool_is_surfaced_and_never_auto_resolved(self):
+        """R104. PLR is a projected long reliever, a role claim DK is making.
+
+        Classic intake documented PLR as meaningless, so a PLR arm who was not
+        also the feed probable never entered the pool and nothing said so. Live
+        case: DET Ty Madden, Starting=PLR, $5,800, DK 43755567, outside the
+        2026-08-05 pool. The confirm step is a web search, so the engine
+        surfaces and the operator decides.
+
+        Teeth: the arm must NOT be auto-added. A fix that quietly rostered him
+        would satisfy "no longer invisible" and fail this.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, starting={"T4 Ace": "SP", "T1 Ace": "SP",
+                                                 "T4 Pen1": "PLR"})
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(),
+                                        platoon_json=self._platoon())
+            hit = [b for b in pool["pool_report"]["blockers"] if "T4 Pen1" in b]
+            self.assertEqual(len(hit), 1, pool["pool_report"]["blockers"])
+            self.assertIn("projected long reliever", hit[0])
+            self.assertIn("--declare-pitcher", hit[0])
+            names = {r["Name"] for r in pool["projection_rows"]}
+            self.assertNotIn("T4 Pen1", names)
+            # Soft by build_slate's tiering: a decision the operator owes, not a
+            # statement that the pool is of the wrong slate. Asserted against the
+            # real regex, because a blocker that reads soft and tiers hard would
+            # stop every bullpen-game slate.
+            import importlib.util
+            path = (REPO / "skills" / "generate-lineups" / "scripts"
+                    / "build_slate.py")
+            spec = importlib.util.spec_from_file_location("_bs_r104", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            self.assertTrue(module.SOFT_POOL_BLOCKER_RE.search(hit[0]), hit[0])
+            self.assertFalse(
+                module.SOFT_POOL_BLOCKER_RE.search(
+                    "T4: no probable or declared starter; declare one via "
+                    "declared_pitchers or that side has no rosterable arm"),
+                "the generic no-arm blocker must stay HARD")
+
+    def test_the_dk_starting_vocabulary_is_pinned_in_sync_across_the_two_readers(self):
+        """R104. The tokens are parsed in two modules. Full consolidation into one
+        module is R108; until then a diverged copy is the defect itself, so the
+        two are pinned. Teeth: changing either frozenset alone fails here."""
+        from mlb_engine.optimize import showdown as sd
+        self.assertEqual(sd.DK_STARTING_OPENER_TOKENS,
+                         lda.DK_STARTING_OPENER_TOKENS)
+        # PO is an opener in both and declared in NEITHER. PLR is a declared
+        # bulk arm on the Showdown side, where every slot is a UTIL slot.
+        self.assertNotIn("PO", sd.DK_STARTING_DECLARED_TOKENS)
+        self.assertIn("PLR", sd.DK_STARTING_DECLARED_TOKENS)
+        self.assertEqual(lda.DK_STARTING_LONG_RELIEVER_TOKENS, frozenset({"PLR"}))
 
     def test_platoon_reference_is_tracked_and_aged_from_its_own_payload(self):
         from tools.refresh_reference_data import TRACKED_JSON, reference_status

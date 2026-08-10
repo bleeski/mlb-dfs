@@ -75,9 +75,35 @@ STALE_PLATOON_POLICIES = ("block", "warn")
 
 # DraftKings' Starting column tokens for arms. 'SP' is a declared starter. 'PO'
 # is a probable opener: one or two innings by design, and a two-pitcher Classic
-# roster priced on a starter's workload is a material error. 'PLR' is DK's
-# generic listed-player tag and carries no role claim.
+# roster priced on a starter's workload is a material error. 'PLR' is a
+# PROJECTED LONG RELIEVER -- a role claim, not a generic listed-player tag. This
+# module asserted the opposite until R104 while showdown.py:131-133 documented
+# the same token correctly in the same repo, and because Classic intake attached
+# no meaning to it, a PLR arm who was not also the feed probable never entered
+# the pool at all.
+#
+# R104. The two tokens are different facts and get different treatment, because
+# the confirm step differs. PO needs no judgment: an opener is barred from
+# pitcher slots outright, role BARRED_OPENER_ROLE. PLR needs a web search to
+# resolve, which is non-deterministic and must not live inside a replayable
+# build, so intake SURFACES it as a named soft blocker per arm and the operator
+# decides via declared_pitchers (build_slate.py's repeatable --declare-pitcher).
 DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
+DK_STARTING_LONG_RELIEVER_TOKENS = frozenset({"PLR"})
+
+# R104. The role a barred opener carries. Deliberately absent from
+# dk_entries_manager.ALLOWED_PITCHER_ROLES, optimizer_v3.OPTIONAL_SP_AUDIT_STATUSES
+# and execution_pipeline.ALLOWED_PITCHER_ROLES_FOR_GATE: it names an arm that was
+# audited and BARRED, not one that may be rostered. It is therefore never written
+# into ``pitcher_roles``, whose three consumers all read that mapping as "the arms
+# that may be rostered" -- a barred arm placed there would fail the pitcher-audit
+# gate on every slate carrying an opener. Barred arms ride the pool report's
+# ``non_rosterable_arms`` instead, so the arm stays visible without being legal.
+#
+# ``viable_bulk_or_alt_sp`` survives this change and PO stops being its producer:
+# it is now reachable only by explicit operator declaration, which is what the
+# role always meant. That is the answer to the entry's open question.
+BARRED_OPENER_ROLE = "declared_opener"
 
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
@@ -1059,26 +1085,43 @@ def build_slate_pool(
 
     # Pitchers: probables plus explicit declarations. Nothing else exists.
     pitcher_roles: Dict[str, str] = {}
+    # R104. Arms DK named that this build refuses to roster, carried as a
+    # reported fact rather than a silent absence. Never merged into
+    # pitcher_roles; see BARRED_OPENER_ROLE for why that separation matters.
+    non_rosterable_arms: List[Dict[str, str]] = []
+    barred_opener_teams: Dict[str, List[str]] = {}
     for pid in probable_ids:
         sp = by_id.get(str(pid))
         if sp is None or sp.team in excluded_teams:
             continue
-        # F17: DK's own Starting token decides the role. An opener and a
-        # starter arrived here as the same 'declared_probable_sp', so a
-        # two-inning arm was projected, priced and SP-pair-covered as a
-        # starter. viable_bulk_or_alt_sp is rosterable (it is in
-        # ALLOWED_PITCHER_ROLES and in OPTIONAL_SP_AUDIT_STATUSES) but it is
-        # outside REQUIRED_SP_AUDIT_STATUSES, so an opener no longer joins the
-        # required SP-pair coverage set.
+        # F17 established that DK's own Starting token decides the role and
+        # routed PO to viable_bulk_or_alt_sp, which took the opener out of
+        # REQUIRED_SP_AUDIT_STATUSES. R104 finishes the job, because that role is
+        # still ROSTERABLE -- ALLOWED_PITCHER_ROLES, OPTIONAL_SP_AUDIT_STATUSES
+        # and ALLOWED_PITCHER_ROLES_FOR_GATE all hold it -- so the optimizer could
+        # put a one-or-two-inning arm in a P slot priced on a starter's workload
+        # and the build certified with nothing downstream flagging it. The
+        # asymmetry decides it: excluding an opener costs an option, rostering
+        # one costs a P slot on a certified build. He is barred and absent from
+        # the frame, which is the pool contract's "absent, not excluded".
         if str(sp.starting).strip().upper() in DK_STARTING_OPENER_TOKENS:
-            pitcher_roles[str(pid)] = "viable_bulk_or_alt_sp"
+            non_rosterable_arms.append({
+                "player_id": str(pid), "name": sp.name, "team": sp.team,
+                "dk_starting": str(sp.starting).strip().upper(),
+                "role": BARRED_OPENER_ROLE,
+                "reason": "DK declares a probable opener: one or two innings by "
+                          "design, and a P slot is priced on a starter's workload",
+            })
+            barred_opener_teams.setdefault(sp.team, []).append(sp.name)
             warnings.append(
                 f"{sp.team} {sp.name} ({pid}): DK Starting={sp.starting} "
-                f"(probable opener), not a starter; role viable_bulk_or_alt_sp. "
-                f"Override via declared_pitchers if DK is wrong."
+                f"(probable opener); BARRED from pitcher slots, role "
+                f"{BARRED_OPENER_ROLE}, absent from the frame. If DK is wrong, "
+                f"declare him via declared_pitchers ({pid}=declared_probable_sp), "
+                f"and declare the bulk arm behind him the same way."
             )
-        else:
-            pitcher_roles[str(pid)] = "declared_probable_sp"
+            continue
+        pitcher_roles[str(pid)] = "declared_probable_sp"
         keep[str(pid)] = _pool_row(sp, batting_order=None)
     for pid, role in (declared_pitchers or {}).items():
         sp = by_id.get(str(pid))
@@ -1095,9 +1138,56 @@ def build_slate_pool(
             continue
         pitcher_roles[str(pid)] = str(role or "declared_probable_sp")
         keep.setdefault(str(pid), _pool_row(sp, batting_order=None))
+    # R104. An explicit declaration is the documented way past the PO bar, so an
+    # arm the operator declared is no longer a barred arm. Reconciled here rather
+    # than guarded above, because declared_pitchers is read after the probables.
+    if non_rosterable_arms:
+        non_rosterable_arms = [a for a in non_rosterable_arms
+                               if a["player_id"] not in pitcher_roles]
+        barred_now = {a["team"] for a in non_rosterable_arms}
+        barred_opener_teams = {t: n for t, n in barred_opener_teams.items()
+                               if t in barred_now}
+
+    # R104. PLR is a projected long reliever, a role claim DK is making, and this
+    # module used to document it as meaningless -- so a PLR arm who was not also
+    # the feed probable never entered the pool at all. Live case: DET Ty Madden
+    # (Starting=PLR, $5,800, DK 43755567) sat outside the 2026-08-05 pool while
+    # DK's own ID allocation put him inside the declared-starter block.
+    # Confirming what a long reliever will actually throw is a web search, which
+    # is non-deterministic and must not live inside a replayable build, so this
+    # SURFACES one named blocker per arm and stops. It is tiered SOFT by
+    # build_slate.py: it is a decision the operator owes, not a statement that
+    # the pool is of the wrong slate.
+    for pid_str in sorted(by_id):
+        sp = by_id[pid_str]
+        if str(getattr(sp, "starting", "") or "").strip().upper() \
+                not in DK_STARTING_LONG_RELIEVER_TOKENS:
+            continue
+        if "P" not in set(getattr(sp, "positions", ()) or ()):
+            continue
+        if sp.team in excluded_teams or str(pid_str) in pitcher_roles:
+            continue
+        blockers.append(
+            f"{sp.team} {sp.name} ({pid_str}): DK Starting=PLR, a projected long "
+            f"reliever, and he is not in the pool. Confirm the role, then either "
+            f"leave him out or add him with --declare-pitcher {pid_str}[=<role>]. "
+            f"Surfaced, never auto-resolved: the confirm step is a web search and "
+            f"a replayable build must not contain one."
+        )
+
     teams_with_arm = {by_id[pid].team for pid in pitcher_roles if pid in by_id}
     for team in slate_teams:
         if team in excluded_teams or team in teams_with_arm:
+            continue
+        if team in barred_opener_teams:
+            # R104. Naming the cause, because "no probable" reads as a feed gap
+            # and this is not one: DK named an arm and the build refused him.
+            blockers.append(
+                f"{team}: no ROSTERABLE starter. DK's only declared arm is "
+                f"{', '.join(sorted(barred_opener_teams[team]))}, a probable "
+                f"opener barred from pitcher slots; declare the bulk arm behind "
+                f"him via declared_pitchers, or that side has no rosterable arm"
+            )
             continue
         blockers.append(
             f"{team}: no probable or declared starter; declare one via "
@@ -1172,6 +1262,11 @@ def build_slate_pool(
                  "role": role}
                 for pid, role in sorted(pitcher_roles.items()) if pid in by_id
             ],
+            # R104. Arms DK named and this build refused. Separate from
+            # 'pitchers' on purpose: that key is the rosterable set and feeds
+            # the pitcher-audit gate, this one is the audit trail for the bar.
+            "non_rosterable_arms": sorted(non_rosterable_arms,
+                                          key=lambda a: (a["team"], a["player_id"])),
             "unmatched_feed_players": status.get("unmatched_feed_players"),
             "partial_lineup_teams": status.get("partial_lineup_teams") or [],
             "platoon_age_days": platoon_age_days,

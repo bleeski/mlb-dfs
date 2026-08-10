@@ -697,6 +697,34 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
                  f"{sorted(recorded)}, file carries {sorted(actual)}")
 
 
+def status_for_verdict(verdict: str) -> str:
+    """R105. The manifest STATUS this preflight VERDICT implies. Two vocabularies.
+
+    ``STATUS_VALUES`` is the manifest's closed record vocabulary, shared with
+    ``mlb_engine.entries.upload_manifest``. The verdict vocabulary is this tool's
+    own, and R34 grew it a fifth value -- ``review_ready`` -- without the
+    manifest growing one. ``stamp_manifest_status`` wrote the verdict straight
+    into ``status``, so every clean Showdown delivery stamped
+    ``status: 'review_ready'`` and the NEXT read of that record hard-failed:
+    "manifest records status 'review_ready', which is not one of [...]". Two
+    writers of one field disagreeing on its allowed values is exactly the
+    condition ``contest_shapes.py`` exists to prevent for shapes; the behavioral
+    cost is worse than the bookkeeping one, because a red FAIL on every clean
+    Showdown export trains the operator to ignore the FAIL that is someday real.
+
+    A ``review_ready`` file is a CANDIDATE: mechanically clean, not certified,
+    and preflight must not promote it past that. The verdict is not lost -- it is
+    recorded beside the status under ``preflight.verdict``, where it belongs,
+    because the verdict and the status are separate facts about the same bytes.
+    """
+    return {
+        "upload_ready": "upload_ready",
+        "review_ready": "candidate",
+        "blocked": "blocked",
+        "acknowledged": "acknowledged",
+    }.get(str(verdict), "candidate")
+
+
 def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
                           status: str, failures: Sequence[str], rep: Report) -> None:
     """Write the preflight verdict onto the matching manifest record.
@@ -705,6 +733,13 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
     operator's memory of what the terminal said. They belong on the artifact
     record, because the record is what a later session, a scheduled task, or a
     late swap reads.
+
+    R105. ``status`` here is a VERDICT, and it is mapped through
+    ``status_for_verdict`` before it is written, because the two vocabularies are
+    not the same set. The mapped value is asserted against ``STATUS_VALUES``
+    before the write: a verdict this function cannot map is a bug in this
+    function, and the honest response is to record the verdict and leave the
+    status alone rather than write a value the next reader will hard-fail on.
 
     Deliberately narrow: it only ever updates a record whose sha256 already
     equals these bytes, it never creates one, and a write failure is a warning.
@@ -719,7 +754,13 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
                    if isinstance(r, dict) and r.get("sha256") == entries_sha256), None)
     if target is None:
         return
-    target["status"] = status
+    record_status = status_for_verdict(status)
+    if record_status in STATUS_VALUES:
+        target["status"] = record_status
+    else:  # pragma: no cover - structurally unreachable; the guard is the point
+        rep.warn(f"preflight verdict {status!r} maps to {record_status!r}, which "
+                 f"is outside the manifest vocabulary {list(STATUS_VALUES)}; the "
+                 f"status was left unchanged and only the verdict recorded")
     target["preflight"] = {
         "version": VERSION,
         "verdict": status,
@@ -735,7 +776,11 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
         tmp.write_text(json.dumps(payload, indent=1, sort_keys=False) + "\n",
                        encoding="utf-8")
         tmp.replace(manifest_path)
-        rep.info["manifest_status_stamped"] = status
+        # R105. The STATUS that landed on the record, not the verdict that
+        # produced it: on a review-grade file those two differ, and reporting the
+        # verdict here is what made the divergence invisible.
+        rep.info["manifest_status_stamped"] = record_status
+        rep.info["manifest_verdict_recorded"] = status
     except OSError as exc:
         rep.warn(f"manifest status not stamped ({exc}); the verdict is this "
                  f"output only")

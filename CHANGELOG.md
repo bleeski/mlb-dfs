@@ -25,6 +25,203 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R104, R45, R105, R54: the Workstream 1 Showdown batch
+
+Queue position 1, four entries in one session, migrated here from
+`docs/2026-07-27_backlog_v2.md`. Write set: `mlb_engine/intake/`,
+`mlb_engine/optimize/`, `tools/preflight_upload.py`, `tools/audit.py`,
+`tests/`, `skills/generate-lineups/`, `CLAUDE.md`, `ledger/inbox/`, this entry.
+Audit `PASS  v2.26.0  26 modules` before and after; the pin moved 810 -> 829.
+Showdown stays REVIEW-GRADE throughout: none of this brings it under the three
+gates, which is R41 and remains open and decision-first.
+
+### R104. DK `Starting` token policy: PO is never startable, PLR is surfaced
+
+DK's `Starting` column was parsed in two modules with two token sets and two
+meanings, and both readings were wrong in the same direction.
+
+- **PO is now barred from pitcher slots outright.** F17 routed a probable
+  opener to `viable_bulk_or_alt_sp`, which took him out of
+  `REQUIRED_SP_AUDIT_STATUSES` but left him ROSTERABLE:
+  `ALLOWED_PITCHER_ROLES`, `OPTIONAL_SP_AUDIT_STATUSES` and
+  `ALLOWED_PITCHER_ROLES_FOR_GATE` all hold that role, so the optimizer could
+  put a one-or-two-inning arm in a P slot priced on a starter's workload and
+  the build certified with nothing downstream flagging it. The asymmetry
+  decides it: excluding an opener costs an option, rostering one costs a P slot
+  on a certified build. He now carries `BARRED_OPENER_ROLE`
+  (`'declared_opener'`), which is in no allowed-role set anywhere, and is
+  absent from the projection frame — "absent, not excluded", the pool
+  contract's own words.
+- **The barred role never enters `pitcher_roles`.** That mapping's three
+  consumers all read it as "the arms that may be rostered"; putting a barred
+  arm there would fail the pitcher-audit gate on every slate carrying an
+  opener. Barred arms ride the pool report's new `non_rosterable_arms`
+  instead, so the arm stays visible without being legal, and a side whose only
+  declared arm was an opener gets a blocker that NAMES him rather than the
+  generic "no probable or declared starter", which reads as a feed gap.
+- **`viable_bulk_or_alt_sp` survives; PO stopped producing it.** That is the
+  answer to the entry's open question. The role is now reachable only by
+  explicit operator declaration, which is what it always meant.
+- **PLR is surfaced, never auto-resolved.** `live_data_adapters` documented PLR
+  as "DK's generic listed-player tag [carrying] no role claim", which is false
+  — it is a projected long reliever, and `showdown.py` documented it correctly
+  in the same repo. Because Classic intake attached no meaning to it, a PLR arm
+  who was not also the feed probable never entered the pool at all: DET Ty
+  Madden, `Starting=PLR`, $5,800, DK 43755567, outside the 2026-08-05 pool
+  while DK's own ID allocation put him inside the declared-starter block.
+  Intake now emits one named blocker per such arm, tiered SOFT by
+  `build_slate.py`, because it is a decision the operator owes and not a
+  statement that the pool is of the wrong slate. Confirming the role is a web
+  search, which is non-deterministic and must not live inside a replayable
+  build, so the engine surfaces and stops.
+- **`build_slate.py --declare-pitcher <id>[=<role>]`, repeatable.** The engine
+  has accepted `declared_pitchers` since the pool contract was written; only
+  the CLI surface was missing, so the operator's answer had no way to reach the
+  build. Bare `<id>` means `declared_probable_sp`. It is the documented way
+  past the PO bar as well, and the brief records the declaration verbatim next
+  to `non_rosterable_arms`, so the decision is a recorded input rather than a
+  hidden fetch.
+- **Showdown: PO is no longer a declared starter.** `showdown.py`'s
+  `_is_declared` and `Is_Declared_Starter` returned True for PO, so on a
+  `declared_starters` basis an opener was a declared starter outright. He stays
+  ROSTERABLE in Showdown, where every slot is a UTIL slot and none is priced on
+  a starter's workload; he is simply not declared. A new `Is_Declared_Opener`
+  column keeps the reason visible instead of leaving a bare False.
+- **Not done, filed as R108:** consolidating the token vocabulary into one
+  module, the `mlb_engine.team_codes` treatment the entry's scope note asks
+  for. It adds a module mid-batch and the proportionate interim is the one this
+  repo already uses for preflight's mirrored status set: named constants on
+  both sides, pinned in sync by test. The GF spec's F-21 typed-role apparatus
+  stays rejected; the policy fix needed none of it.
+
+### R45. `lineups_from_paste.py` resolves a Showdown salary file
+
+Two independent breaks on one file shape, neither of them a name-matching bug,
+and `test_paste_lineups` covered Classic only so nothing caught either.
+
+- **Position column.** `POSITION_FIELD_CANDIDATES` is Roster-Position-first
+  deliberately, which is right for Classic and exactly wrong for Showdown,
+  where that column holds CPT/UTIL. `parse_positions('CPT')` matches neither
+  the pitcher aliases nor the hitter slots, so every player came out with an
+  empty `positions` tuple, the pitcher index was empty for everyone, and both
+  probables were reported as `unrostered_starters` while DK's own `Starting`
+  column named them. New `_showdown_aware_position_column` prefers `Position`
+  only when `Roster Position` is ENTIRELY roster slots — a branch, not a
+  reorder, because a reorder breaks Classic.
+- **Identity dedupe.** Every Showdown player has two salary rows, CPT and UTIL,
+  identical name and team, and `_resolve_one`'s ambiguity check counted them as
+  two people, so a fully-confirmed zero-ambiguity paste came back "matches 2
+  salary rows" on every hitter and was refused. `_dedupe_by_dk_identity` now
+  collapses candidates by EXACT normalized full name before the count, keeping
+  the UTIL row. The exactness is the safety property: two roster variants of
+  one person collapse, while Will Wilson and Weston Wilson — the real ambiguity
+  this module exists for, hit on the first live paste — do not, and still
+  block.
+- **Elevated to P1 on the recurrence record.** Three live burns in six days:
+  SD@ARI 2026-08-03, STL@NYY 2026-08-05 (16 blockers), HOU@SD 2026-08-09 (18
+  blockers), each ending with a hand-written feed at roughly T-18 and no
+  provenance line, on the intake R32 calls the PRIMARY source. Pool
+  construction was never affected, which is why the original filing was P2, but
+  a primary intake that fails an entire contest family is a contract violation
+  and not a degraded enrichment.
+- **The test the entry asked for.** A new class runs against the real 188-row
+  `DKSalaries_showdown_MIN_CHC.csv` fixture with the paste built FROM it so the
+  two cannot drift, and pins the ambiguity that must still block. The spec's
+  F-20 `UnderlyingPlayer`/`RosterVariant` type system stays rejected: identity
+  dedupe plus a fixture test was the whole job.
+
+### R105. The Showdown manifest records a status, not the preflight verdict
+
+`stamp_manifest_status` wrote preflight's VERDICT straight into the record's
+`status`. R34 had grown the verdict vocabulary a fifth value, `review_ready`,
+without the manifest growing one, so every CLEAN Showdown delivery stamped a
+status outside `STATUS_VALUES` and the next read hard-failed. Two writers of
+one field disagreeing about its allowed values is the condition
+`contest_shapes.py` exists to prevent for shapes; the behavioral cost is worse
+than the bookkeeping one, because a red FAIL on every clean Showdown export
+trains the operator to ignore the FAIL that is someday real.
+
+- New `status_for_verdict` maps the verdict into the closed set —
+  `review_ready` becomes `candidate`, because a review-grade file is a
+  candidate and a byte checker must not promote it past that — and the mapped
+  value is asserted against `STATUS_VALUES` before the write. The verdict is
+  not lost: it was already recorded beside the status under
+  `preflight.verdict`, which is where it belongs. `manifest_status_stamped` now
+  reports the STATUS that landed rather than the verdict that produced it,
+  which is what made the divergence invisible.
+- `build_slate.py`'s own Showdown export path was already correct and writes
+  `candidate` (R34); the defect was entirely on the preflight side, which is
+  worth stating because the entry located it at the build.
+- **The exit-code discrepancy is settled.** The two BUILD fragments disagreed
+  (08-05 reported 2, 08-06 reported 3). Measured 2026-08-10: the vocabulary
+  failure is exit **2** on both `preflight_upload.py` and `verify_export.py`,
+  and it is pinned by test. Exit 3 in `verify_export` is the setup path — an
+  unreadable file or no resolvable salary — reached before any check runs, so
+  the 08-06 report was a different failure.
+- Adjacent and deliberately not merged: R34-tail (the three
+  `status: upload_ready` Showdown records from 07-29) and R96 (unmanifested
+  deliveries). The spec's F-16 four-enum apparatus stays rejected.
+
+### R54. Showdown counted-relaxation honesty, all four parts
+
+The Showdown contract is explicit — every relaxation counted, clean means zero
+— and three of these made the counts lie while the fourth manufactured a
+blank-row blocker at the worst minute.
+
+- **(a) The uncounted overlap drop.** `build_showdown_bank`'s captain-relax
+  rung re-solved without `max_shared_players` as well as without the captain
+  cap, while incrementing only the captain counter. Reproduced 2026-08-10 on a
+  purpose-built pool: old code delivered max pairwise overlap 5-of-6 reporting
+  `overlap_relaxed_slots: 0`; the bound is passed through now and the same
+  solve delivers overlap 4 with the counter honestly at 0.
+- **(a) The fourth rung.** Both bounds dropped at once now exists, is counted,
+  and is counted in EVERY place it is true: `overlap_relaxed_slots` and
+  `relaxed_slots` answer "how many lineups were built without this control",
+  not "which rung fired", and `both_relaxed_slots` is the subset that dropped
+  both. Clean is all three at zero.
+- **(b) The thesis ladder had three rungs where the bank ladder had four**, so
+  a thesis solvable only under both relaxations returned None and left a blank
+  reserved row — write-blocked at T-5 — on a pool the bank path fills. Two
+  ladders over one solver disagreeing about how far they will bend is the same
+  defect class as two readers of one token set. `solve_ladder` gains the fourth
+  rung and the matching counters.
+- **(c) Silently ignored locks.** A lock naming a key the melted pool does not
+  carry — a typo, a stale key, a player the melt dropped on Status — used to
+  no-op in total silence: the whole bank built without the player and the
+  ladder's `cpt_counts` accounted against captains that were never enforced.
+  `build_showdown_lineup` returns `ignored_locks`, both ladders aggregate it,
+  and the brief prints it as the loudest of the four notes, because it is not a
+  relaxation the solver chose — it is an instruction that did not arrive.
+  Reported rather than raised: a lock that lost its player at T-5 must not be
+  the reason there is no file.
+- **(d) One OUT vocabulary.** The melt shelved IL/O/OUT/NA while preflight also
+  shelved IL10/IL15/IL60/PUP/SUSP, so an IL60 player built into the bank and
+  died at preflight. `showdown.OUT_STATUSES` now mirrors preflight's set and is
+  pinned in sync by test — a mirror rather than a shared import, because
+  preflight's "no engine import" contract is what makes it run when the engine
+  does not, which is exactly the state in which a pre-upload check matters
+  most.
+- **The brief gains a `counted_relaxations` block** carrying all three counts,
+  `ignored_locks`, and a single `clean` boolean. A portfolio is not clean
+  because the gates passed; it is clean when these are zero.
+- **The test gap was structural and is closed.** `test_showdown.py` asserted
+  that the counter KEYS existed, so deleting both `+= 1` lines stayed green
+  (R79c). The new assertions are biconditionals between the counters and the
+  delivered bank, so they fail in both directions: a counter that under-counts
+  a real relaxation and one that claims a relaxation that did not happen. The
+  pre-fix code was run against them and fails, which is recorded here because
+  a teeth claim nobody executed is a guess.
+
+### Also
+
+- `EXPECTED_TEST_COUNT` 810 -> 829 (core 559, showdown 55, upload 131, golden
+  9, paste 75). `CLAUDE.md` session-start step 2 and
+  `skills/generate-lineups/SKILL.md` corrected to match in this commit; the
+  ledger Quick Card is ARCHIVE's, so it gets a fragment.
+- Fixed in passing, unnumbered: the Showdown brief's overlap NOTE was a plain
+  string inside an f-string concatenation, so it printed a literal
+  `{share_cap}` rather than the bound.
+
 ## 2026-08-10 — R107 filed; the backlog reorganized by workstream; next-session prompts rewritten (docs only)
 
 No code, no tests, no pins moved. Write set: `docs/2026-07-27_backlog_v2.md`,

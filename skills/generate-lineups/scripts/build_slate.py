@@ -1301,6 +1301,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # merged as R27). 'warn' makes reality match the stated contract; the
     # age still prints, and a RotoWire merge still clears it entirely.
     pool = build_slate_pool(str(salary), feed, platoon_json=resolve_platoon_json(args),
+                            declared_pitchers=parse_declared_pitchers(
+                                args.declare_pitcher) or None,
                             stale_platoon_policy="warn")
     report = pool["pool_report"]
     clock = pool.get("clock") or {}
@@ -1693,6 +1695,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         payload["pool_blockers_soft"] = soft
         payload["pool_blockers_overridden"] = (
             hard if (hard and args.ignore_pool_blockers) else [])
+        payload["declared_pitchers"] = parse_declared_pitchers(args.declare_pitcher)
+        payload["non_rosterable_arms"] = report.get("non_rosterable_arms") or []
         return 3, payload
 
     delivered = result.get("delivered_path") or result.get("output_path")
@@ -1713,6 +1717,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "pool_blockers_overridden": hard if (hard and args.ignore_pool_blockers) else [],
         "pool_blockers_soft": soft,
+        # R104. The operator's PLR/PO decision is an INPUT to this build, so it is
+        # recorded verbatim rather than reconstructed from a terminal. The confirm
+        # step behind it is a web search and deliberately lives outside the build;
+        # what the build owes is a record of the answer it was given, next to the
+        # arms it refused on its own.
+        "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+        "non_rosterable_arms": report.get("non_rosterable_arms") or [],
         "run_id": result.get("run_id"),
         # R40. The resolved objective, per contest, recorded in the artifact
         # rather than reconstructed later. It used to print to stderr and stop
@@ -1976,12 +1987,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         relaxed_slots = ((ladder_meta.get("captain_cap_relaxed") or 0)
                          + (solve_diag.get("captain_lock_relaxed") or 0))
         overlap_relaxed = solve_diag.get("overlap_relaxed") or 0
+        # R54(a)/(b)/(c). Both new facts, on both paths.
+        both_relaxed = solve_diag.get("both_relaxed") or 0
+        ignored_locks = list(solve_diag.get("ignored_locks") or [])
         max_overlap = report.get("max_pairwise_overlap")
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
         relaxed_slots = cpt_diagnostics.get("relaxed_slots") or 0
         overlap_relaxed = cpt_diagnostics.get("overlap_relaxed_slots") or 0
+        both_relaxed = cpt_diagnostics.get("both_relaxed_slots") or 0
+        ignored_locks = list(cpt_diagnostics.get("ignored_locks") or [])
         max_overlap = None
     captain_exposure = {
         key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
@@ -2032,6 +2048,21 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "overlap_relaxed_slots": overlap_relaxed,
             "all_unique_rosters": report.get("all_unique_rosters") if use_ladder else None,
         },
+        # R54. The counts that decide whether the portfolio is clean. A portfolio
+        # is not clean because the gates passed; it is clean when these are zero.
+        # ``both_relaxed_slots`` is a subset of the other two, which each count
+        # every lineup built without that control, whichever rung produced it.
+        "counted_relaxations": {
+            "captain_relaxed_slots": relaxed_slots,
+            "overlap_relaxed_slots": overlap_relaxed,
+            "both_relaxed_slots": both_relaxed,
+            # R54(c). Locks the solver was handed and could not enforce, because
+            # the key is absent from the melted pool. Non-empty means the bank
+            # was built without a player the operator asked for.
+            "ignored_locks": ignored_locks,
+            "clean": not (relaxed_slots or overlap_relaxed or both_relaxed
+                          or ignored_locks),
+        },
         "construction": ({
             "mode": "thesis_ladder",
             "module_version": st.VERSION,
@@ -2064,9 +2095,21 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        if relaxed_slots else "")
                     + (f" NOTE: the {share_cap}-player overlap bound relaxed on "
                        f"{overlap_relaxed} slot(s); those lineups are still "
-                       "distinct but share more than {share_cap} players with an "
+                       f"distinct but share more than {share_cap} players with an "
                        "earlier one."
                        if overlap_relaxed else "")
+                    + (f" NOTE: {both_relaxed} slot(s) needed BOTH the overlap "
+                       "bound and the captain cap dropped at once; those are the "
+                       "least controlled lineups in the bank (R54)."
+                       if both_relaxed else "")
+                    # R54(c). Loudest of the four, because it is not a relaxation
+                    # the solver chose: it is an instruction that did not arrive.
+                    + (f" NOTE: {len(ignored_locks)} lock(s) named a player the "
+                       f"melted pool does not carry and were IGNORED: "
+                       f"{', '.join(ignored_locks)}. The bank was built without "
+                       "them; check the key against the salary file before "
+                       "uploading (R54)."
+                       if ignored_locks else "")
                     + (" NOTE: no moneyline was available, so entries were split "
                        "evenly between the two sides rather than weighted to the "
                        "market."
@@ -2148,7 +2191,38 @@ import re as _re
 # Everything else from build_slate_pool is HARD. Keeping the soft list explicit
 # and short means a new blocker is hard by default, which is the safe direction.
 SOFT_POOL_BLOCKER_RE = _re.compile(
-    r"(stale|days old|refresh|reference file|platoon file is)", _re.IGNORECASE)
+    r"(stale|days old|refresh|reference file|platoon file is"
+    # R104. A PLR arm is a decision the operator owes, not a statement that the
+    # pool is of the wrong slate: the arm is named, the remedy is named
+    # (--declare-pitcher), and leaving him out is a legitimate answer. Hard would
+    # stop every bullpen-game slate on a question with a defensible default.
+    r"|projected long reliever)", _re.IGNORECASE)
+
+
+def parse_declared_pitchers(values) -> dict:
+    """``--declare-pitcher 43755567=viable_bulk_or_alt_sp`` -> {id: role}.
+
+    R104. The engine has accepted ``declared_pitchers`` since the pool contract
+    was written (``live_data_adapters.build_slate_pool``, honored at the
+    declaration loop); only the CLI surface was missing, so the operator's answer
+    to a PLR blocker had no way to reach the build. Bare ``<id>`` means
+    ``declared_probable_sp``, the same default the engine applies.
+
+    Deliberately not validated against a role vocabulary here: the engine owns
+    the role set, and a typo'd role surfaces as a pitcher-audit gate failure
+    naming the arm, which is louder than an argparse error at T-10.
+    """
+    out: dict = {}
+    for raw in (values or []):
+        text = str(raw).strip()
+        if not text:
+            continue
+        pid, _, role = text.partition("=")
+        pid = pid.strip()
+        if not pid:
+            raise SystemExit(f"--declare-pitcher {raw!r}: no player ID before '='")
+        out[pid] = role.strip() or "declared_probable_sp"
+    return out
 
 ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
@@ -2281,6 +2355,15 @@ def main() -> int:
                     help="wall clock this invocation may use before saving and "
                          "asking to be rerun")
     ap.add_argument("--brief", help="write the brief JSON here")
+    ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
+                    default=[], metavar="ID[=ROLE]",
+                    help="R104. Repeatable. State that a DK player ID is a "
+                         "startable arm, e.g. --declare-pitcher 43755567 or "
+                         "--declare-pitcher 43755567=viable_bulk_or_alt_sp. This "
+                         "is the operator's answer to a PLR (projected long "
+                         "reliever) soft blocker, and the documented way past the "
+                         "PO (probable opener) bar. Bare ID means "
+                         "declared_probable_sp. Recorded verbatim in the brief.")
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "

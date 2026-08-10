@@ -1000,5 +1000,159 @@ class AbsentFromDkPoolPolicyTests(unittest.TestCase):
             self.assertIn("DK STARTING  SF: Robbie Ray", result.stdout)
 
 
+SHOWDOWN_SALARY = (REPO / "tests" / "fixtures" / "showdown"
+                   / "DKSalaries_showdown_MIN_CHC.csv")
+
+
+@unittest.skipUnless(SHOWDOWN_SALARY.exists(), "the Showdown fixture is missing")
+class ShowdownSalaryFileResolutionTests(unittest.TestCase):
+    """R45. A Showdown salary file broke paste resolution two independent ways.
+
+    Both are shape bugs, not name bugs, and `test_paste_lineups` covered Classic
+    only, so nothing caught either. Three live burns in six days: SD@ARI
+    2026-08-03, STL@NYY 2026-08-05 (16 blockers, every hitter "matches 2 salary
+    rows" where both rows are the same person, both SPs reported NOT IN DK POOL),
+    HOU@SD 2026-08-09 (18 blockers, identical shape). Each ended with a
+    hand-written feed at roughly T-18 and no provenance line, on the intake R32
+    calls the PRIMARY source.
+
+    The paste is built FROM the fixture so the two cannot drift apart; the
+    fixture is a real DK export (188 rows, CPT and UTIL per player, both
+    probables in the `Starting` column, batting orders 1-9 for both sides).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        with SHOWDOWN_SALARY.open(encoding="utf-8-sig") as fh:
+            rows = [r for r in csv.DictReader(fh)
+                    if r["Roster Position"] == "UTIL"]
+        cls.rows = rows
+        cls.order = {t: sorted((r for r in rows if r["TeamAbbrev"] == t
+                                and r["Starting"].isdigit()),
+                               key=lambda r: int(r["Starting"]))
+                     for t in ("MIN", "CHC")}
+        cls.probable = {t: next(r for r in rows if r["TeamAbbrev"] == t
+                                and r["Starting"] == "SP")
+                        for t in ("MIN", "CHC")}
+
+    @classmethod
+    def _paste(cls) -> str:
+        def block(team):
+            return "\n".join(
+                f"{i + 1}. [{r['Name']}](https://www.mlb.com/player/x-{i}) (R) "
+                f"{r['Position'].split('/')[0]}"
+                for i, r in enumerate(cls.order[team]))
+        return "\n".join([
+            "[Twins](https://www.mlb.com/twins)@[Cubs](https://www.mlb.com/cubs)",
+            "(50-50)", "2:20 PM", "Wrigley Field", "(50-50)",
+            f"[{cls.probable['MIN']['Name']}](https://www.mlb.com/player/a-1)",
+            "RHP", "0-0, 3.00 ERA, 10 SO",
+            f"[{cls.probable['CHC']['Name']}](https://www.mlb.com/player/b-2)",
+            "LHP", "0-0, 3.00 ERA, 10 SO",
+            "MIN Lineup", "CHC Lineup", "",
+            block("MIN"), "", block("CHC"), "",
+        ])
+
+    def test_a_fully_confirmed_showdown_paste_resolves_with_zero_blockers(self):
+        """The whole job, in one assertion set.
+
+        Teeth, both halves. Revert the `_dedupe_by_dk_identity` call and all
+        eighteen hitters come back "matches 2 salary rows" -- the CPT and UTIL
+        rows of one person counted as two people. Revert
+        `_showdown_aware_position_column` and `parse_positions('UTIL')` yields an
+        empty positions tuple for everyone, so the pitcher index is empty and
+        both probables land in `unrostered_starters`.
+        """
+        out = resolve_paste_to_feed(self._paste(), str(SHOWDOWN_SALARY))
+        report = out["report"]
+        self.assertEqual(report["blockers"], [])
+        # Eighteen hitters plus both probables. The probables are the half that
+        # never resolved before: they were reported as "no row in the DK salary
+        # file" while DK's own Starting column named them.
+        self.assertEqual(report["resolved"], 20)
+        self.assertEqual(report["unrostered_starters"], [])
+        self.assertEqual(report["confirmed_teams"], ["CHC", "MIN"])
+
+    def test_both_probables_resolve_off_the_starting_column(self):
+        """R45's 2026-08-09 detail: on a Showdown file the probable comes off
+        `Starting`, and it must carry the DK id so the feed is not a name."""
+        out = resolve_paste_to_feed(self._paste(), str(SHOWDOWN_SALARY))
+        game = out["feed"]["games"][0]
+        for side, team in (("away", "MIN"), ("home", "CHC")):
+            probable = game[side].get("probable_pitcher") or {}
+            self.assertEqual(probable.get("name"), self.probable[team]["Name"],
+                             f"{team} probable did not resolve")
+            self.assertTrue(probable.get("dk_player_id"), f"{team} probable id")
+
+    def test_the_resolved_row_is_the_util_variant_not_the_captain(self):
+        """Deterministic and correct: the UTIL row is the base identity, and the
+        CPT row's 1.5x salary must never be what the feed records."""
+        out = resolve_paste_to_feed(self._paste(), str(SHOWDOWN_SALARY))
+        util_ids = {r["ID"] for r in self.rows}
+        for side in ("away", "home"):
+            for hitter in out["feed"]["games"][0][side]["lineup"]:
+                self.assertIn(str(hitter["dk_player_id"]), util_ids,
+                              f"{hitter['name']} resolved to the CPT row")
+
+    def test_a_real_ambiguity_still_blocks_on_a_showdown_file(self):
+        """The safety property the dedupe must not cost.
+
+        Identity is the exact normalized FULL name, so two roster variants of one
+        person collapse and two different same-initial-surname teammates do not.
+        A dedupe keyed on the (initial, surname) match key instead would pass
+        every other test in this class and silently pick one of these two, which
+        is how the wrong player lands in a confirmed lineup.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sal.csv"
+            with SHOWDOWN_SALARY.open(encoding="utf-8-sig") as fh:
+                reader = csv.DictReader(fh)
+                header, rows = list(reader.fieldnames), list(reader)
+            twin = dict(rows[0])
+            real = self.order["MIN"][0]["Name"]
+            initial, surname = real.split(" ", 1)[0][0], real.rsplit(" ", 1)[-1]
+            twin.update({"Name": f"{initial}zzz {surname}", "ID": "99999999",
+                         "Name + ID": f"{initial}zzz {surname} (99999999)",
+                         "Roster Position": "UTIL", "TeamAbbrev": "MIN",
+                         "Starting": "", "Position": "OF"})
+            with path.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.DictWriter(fh, fieldnames=header)
+                writer.writeheader()
+                writer.writerows(rows + [twin])
+            paste = self._paste().replace(
+                f"[{real}](", f"[{initial} {surname}](", 1)
+            out = resolve_paste_to_feed(paste, str(path))
+            hit = [b for b in out["report"]["blockers"] if surname in b]
+            self.assertEqual(len(hit), 1, out["report"]["blockers"])
+            self.assertIn("matches 2 salary rows", hit[0])
+
+    def test_a_classic_file_still_reads_roster_position(self):
+        """The branch is data-driven and must not touch Classic, where
+        'Roster Position' is the DK-eligible slot set and the preference in
+        POSITION_FIELD_CANDIDATES is deliberate."""
+        from mlb_engine.intake.slate_intake_manager import (
+            _showdown_aware_position_column,
+        )
+        header = ["Position", "Roster Position", "Name"]
+        classic = [{"Roster Position": "SS/2B"}, {"Roster Position": "P"}]
+        showdown = [{"Roster Position": "CPT"}, {"Roster Position": "UTIL"}]
+        mixed = [{"Roster Position": "CPT"}, {"Roster Position": "OF"}]
+        self.assertEqual(
+            _showdown_aware_position_column("Roster Position", header, classic),
+            "Roster Position")
+        self.assertEqual(
+            _showdown_aware_position_column("Roster Position", header, showdown),
+            "Position")
+        self.assertEqual(
+            _showdown_aware_position_column("Roster Position", header, mixed),
+            "Roster Position")
+        # No 'Position' column to fall back to: leave it alone rather than
+        # returning a column that is not there.
+        self.assertEqual(
+            _showdown_aware_position_column("Roster Position",
+                                            ["Roster Position"], showdown),
+            "Roster Position")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

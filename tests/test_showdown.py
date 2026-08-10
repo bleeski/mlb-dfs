@@ -255,6 +255,49 @@ def _max_pairwise_overlap(bank):
                default=0)
 
 
+def _one_captain_pool():
+    """A pool where the captain cap binds and the overlap bound need not.
+
+    Only AA_Star is affordable at CPT salary -- everyone else's captain price
+    alone busts the 50000 cap -- so from the second slot on the captain cap must
+    relax. Twelve players leave room for overlap-distinct rosters underneath,
+    which is what makes this pool able to tell the two relaxations apart. That
+    separation is the whole point: on a pool where both must give way at once,
+    a counter that credits the wrong control looks correct.
+    """
+    rows = [_p("AA_Star|AA", "AA", 40, 5000, 7500, "1001", "2001")]
+    for i in range(5):
+        rows.append(_p(f"AA_{i}|AA", "AA", 10 - i * 0.5, 3000, 49000,
+                       f"11{i:02d}", f"21{i:02d}"))
+    for i in range(6):
+        rows.append(_p(f"BB_{i}|BB", "BB", 10 - i * 0.4, 3000, 49000,
+                       f"12{i:02d}", f"22{i:02d}"))
+    return pd.DataFrame(rows)
+
+
+def _assert_counts_match_the_bank(case, bank, diag, share_cap):
+    """R54/R79(c). The counters, checked against the artifact they describe.
+
+    Key-presence assertions are what let the uncounted overlap drop survive: both
+    ``+= 1`` lines could be deleted and the suite stayed green. These are
+    biconditionals, so they fail in both directions -- a counter that under-counts
+    a real relaxation AND a counter that claims one that did not happen.
+    """
+    counts = collections.Counter(l["captain"]["player_key"] for l in bank)
+    case.assertEqual(diag["overlap_relaxed_slots"] == 0,
+                     _max_pairwise_overlap(bank) <= share_cap,
+                     f"overlap counter {diag['overlap_relaxed_slots']} disagrees "
+                     f"with a delivered max overlap of "
+                     f"{_max_pairwise_overlap(bank)} against a cap of {share_cap}")
+    cap_count = diag.get("cap_count")
+    if cap_count:
+        case.assertEqual(diag["relaxed_slots"] == 0,
+                         max(counts.values(), default=0) <= cap_count,
+                         f"captain counter {diag['relaxed_slots']} disagrees with "
+                         f"a realized max of {max(counts.values(), default=0)} "
+                         f"against a cap count of {cap_count}")
+
+
 class ShowdownDiversityTests(unittest.TestCase):
     def test_defaults_are_a_third_and_four_shared(self):
         # 0.33 not 0.35: cap_count is a floor(), and 0.35 * 20 = 7, which is a
@@ -300,13 +343,101 @@ class ShowdownDiversityTests(unittest.TestCase):
 
     def test_cap_relaxes_rather_than_returning_a_short_bank(self):
         """A short bank leaves a blank reserved row, and a blank row blocks
-        certification. Relaxing a diversity control is the lesser failure."""
+        certification. Relaxing a diversity control is the lesser failure.
+
+        R54/R79(c): this used to assert only that the counter KEYS existed, so
+        deleting both ``+= 1`` lines kept it green. The counts are asserted
+        against the delivered bank now, by _assert_counts_match_the_bank.
+        """
         df = _synth()                       # 7 players, almost no legal variety
         diag = {}
-        bank = sd.build_showdown_bank(df, 6, diagnostics=diag, time_limit=4)
+        bank = sd.build_showdown_bank(df, 6, diagnostics=diag, time_limit=4,
+                                      max_shared_players=4)
         self.assertGreater(len(bank), 0)
-        self.assertIn("overlap_relaxed_slots", diag)
-        self.assertIn("relaxed_slots", diag)
+        _assert_counts_match_the_bank(self, bank, diag, share_cap=4)
+
+    # ---- R54 ----------------------------------------------------------- #
+    def test_the_captain_relax_rung_no_longer_drops_the_overlap_bound(self):
+        """R54(a). The reproduced lie, pinned as an invariant.
+
+        The old rung 3 re-solved without ``max_shared_players`` AND without the
+        captain cap while incrementing only the captain counter, so a bank
+        shipped at 5-of-6 pairwise overlap reporting
+        ``overlap_relaxed_slots: 0``. Measured on this pool 2026-08-10: old code
+        max overlap 5 with ovl 0; new code max overlap 4 with ovl 0.
+
+        Teeth: dropping ``max_shared_players=max_shared_players`` from the
+        captain-relax call restores overlap 5 and fails the bound assertion,
+        while the counter still reads 0 and fails the invariant.
+        """
+        df = _one_captain_pool()
+        diag = {}
+        bank = sd.build_showdown_bank(df, 4, diagnostics=diag, time_limit=5,
+                                      max_shared_players=4)
+        self.assertEqual(len(bank), 4)
+        # The captain cap genuinely binds here: only one player is affordable at
+        # CPT salary, so the cap must relax and the relaxation must be counted.
+        self.assertEqual(diag["cap_count"], 1)
+        self.assertGreater(diag["relaxed_slots"], 0)
+        # And the control that was NOT relaxed held.
+        self.assertLessEqual(_max_pairwise_overlap(bank), 4)
+        self.assertEqual(diag["overlap_relaxed_slots"], 0)
+        _assert_counts_match_the_bank(self, bank, diag, share_cap=4)
+
+    def test_the_bank_ladder_counts_a_both_relaxed_solve_in_every_true_place(self):
+        """R54(a). The fourth rung exists and is counted honestly.
+
+        ``both_relaxed_slots`` is a subset of the other two, because those answer
+        "how many lineups were built WITHOUT this control" rather than "which
+        rung fired" -- the first question is the one the brief's clean/relaxed
+        claim rests on.
+        """
+        df = _synth()
+        diag = {}
+        bank = sd.build_showdown_bank(df, 8, diagnostics=diag, time_limit=4,
+                                      max_shared_players=4)
+        self.assertGreater(len(bank), 0)
+        both = diag["both_relaxed_slots"]
+        self.assertLessEqual(both, diag["overlap_relaxed_slots"])
+        self.assertLessEqual(both, diag["relaxed_slots"])
+        self.assertLessEqual(diag["overlap_relaxed_slots"], len(bank))
+        self.assertLessEqual(diag["relaxed_slots"], len(bank))
+        _assert_counts_match_the_bank(self, bank, diag, share_cap=4)
+
+    def test_a_lock_the_pool_does_not_carry_is_reported_not_swallowed(self):
+        """R54(c). A typo'd or melt-dropped lock used to no-op in total silence:
+        the whole bank built without the player and the ladder's cpt_counts
+        accounted against captains that were never enforced.
+
+        Teeth: an assertion on the LINEUP would pass with the lock silently
+        dropped, because the lineup is legal either way. The fact under test is
+        that the engine SAID so.
+        """
+        df = _synth()
+        lu = sd.build_showdown_lineup(df, locks=["NOT_IN_POOL|ZZ"], time_limit=4)
+        self.assertIsNotNone(lu)
+        self.assertEqual(lu["ignored_locks"], ["NOT_IN_POOL|ZZ"])
+        clean = sd.build_showdown_lineup(df, locks=["AA_Star|AA"], time_limit=4)
+        self.assertEqual(clean["ignored_locks"], [])
+        # A captain lock is tagged, so the two kinds are distinguishable.
+        cpt = sd.build_showdown_lineup(df, cpt_lock="NOT_IN_POOL|ZZ", time_limit=4)
+        self.assertEqual(cpt["ignored_locks"], ["cpt:NOT_IN_POOL|ZZ"])
+        # And it reaches the bank diagnostics, which is what the brief reads.
+        diag = {}
+        sd.build_showdown_bank(df, 2, diagnostics=diag, time_limit=4,
+                               locks=["NOT_IN_POOL|ZZ"])
+        self.assertEqual(diag["ignored_locks"], ["NOT_IN_POOL|ZZ"])
+
+    def test_the_out_status_vocabulary_is_shared_with_preflight(self):
+        """R54(d). The melt shelved IL/O/OUT/NA while preflight also shelved
+        IL10/IL15/IL60/PUP/SUSP, so an IL60 player built into the bank and died
+        at preflight -- two implementations of one rule, the class R34 pinned
+        elsewhere. Preflight imports nothing from the engine by contract, so this
+        is a mirror pinned in sync rather than a shared import."""
+        from tools.preflight_upload import OUT_STATUSES as preflight_set
+        self.assertEqual(sd.OUT_STATUSES, preflight_set)
+        for shelved in ("IL60", "PUP", "SUSP", "IL10", "IL15"):
+            self.assertIn(shelved, sd.OUT_STATUSES)
 
 
 # --------------------------------------------------------------------------- #
@@ -355,6 +486,42 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         self.assertLessEqual(report["max_pairwise_overlap"], 4)
         self.assertLessEqual(report["max_captain_exposure_pct"], 100.0 / 3.0)
         self.assertTrue(all(r["lineup_certified"] for r in report["lineups"]))
+
+    def test_the_thesis_ladder_has_the_bank_ladder_s_fourth_rung(self):
+        """R54(b). ``solve_ladder`` never tried overlap+captain relaxed together
+        while ``build_showdown_bank`` did, so a thesis solvable only under both
+        returned None and left a blank reserved row -- write-blocked at T-5 -- on
+        a pool the bank path fills. Two ladders over one solver disagreeing about
+        how far they will bend is the same defect class as two readers of one
+        token set.
+
+        Teeth: deleting the fourth rung takes ``both_relaxed`` to 0 and pushes
+        that thesis into ``infeasible``, failing both assertions. Deleting only
+        the three counter increments fails the accounting assertion, which is
+        the R79(c) hole this closes.
+        """
+        df = _synth()                       # 7 players, almost no legal variety
+        theses = [{"cpt": "AA_Star|AA", "name": f"t{i}"} for i in range(8)]
+        diag = {}
+        out = st.solve_ladder(df, theses, max_shared_players=4, time_limit=4,
+                              diagnostics=diag)
+        self.assertGreaterEqual(diag["both_relaxed"], 1,
+                                "the fourth rung never fired on a pool built to "
+                                "need it; the scenario, not the fix, is stale")
+        solved = [l for l in out if l is not None]
+        self.assertEqual(len(solved) + diag["infeasible"], len(theses))
+        # Counted in every place it is true, matching build_showdown_bank.
+        self.assertLessEqual(diag["both_relaxed"], diag["overlap_relaxed"])
+        self.assertLessEqual(diag["both_relaxed"], diag["captain_lock_relaxed"])
+
+    def test_a_thesis_lock_outside_the_pool_reaches_the_ladder_diagnostics(self):
+        """R54(c), the ladder half: the ignored lock has to survive the trip from
+        one solve into the diagnostics dict the brief reads."""
+        df = _synth()
+        diag = {}
+        st.solve_ladder(df, [{"cpt": "GHOST|ZZ", "name": "t0"}], time_limit=4,
+                        diagnostics=diag)
+        self.assertEqual(diag["ignored_locks"], ["cpt:GHOST|ZZ"])
 
     def test_ladder_scales_below_and_above_the_template_count(self):
         for n in (1, 3, 25):

@@ -48,6 +48,27 @@ DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.33
 # two, so at least a third of every roster differs from every other roster.
 DEFAULT_MAX_SHARED_PLAYERS = 4
 
+# R104. DraftKings' Starting vocabulary for arms, named rather than inlined at
+# the two places that used to test it with a tuple literal. 'SP'/'P' is a
+# declared starter; 'PLR' is a projected long reliever, the bulk arm of a
+# bullpen game, and is declared; 'PO' is a probable opener and is NOT, because
+# one or two innings by design is not a start. These mirror
+# ``mlb_engine.intake.live_data_adapters`` on purpose and are pinned in sync by
+# test, the same way preflight mirrors the manifest status vocabulary: the full
+# consolidation into one module (the mlb_engine.team_codes treatment) is filed
+# as R108 rather than done here, because it adds a module mid-batch.
+DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
+DK_STARTING_DECLARED_TOKENS = frozenset({"SP", "P", "PLR"})
+
+# R54(d). One OUT vocabulary, shared with tools/preflight_upload.py. The melt
+# used to shelve IL/O/OUT/NA while preflight also shelved IL10/IL15/IL60/PUP/
+# SUSP, so an IL60 player built into the bank and died at preflight -- two
+# implementations of one rule, the class R34 pinned elsewhere. Preflight owns no
+# engine import and cannot be imported FROM at T-5 either, so this is a mirror
+# pinned in sync by test rather than a shared import.
+OUT_STATUSES = frozenset({"IL", "O", "OUT", "NA", "IL10", "IL15", "IL60",
+                          "PUP", "SUSP"})
+
 _DIGITS = re.compile(r"\d+")
 
 
@@ -101,7 +122,7 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
             if not name or not team or role not in ("CPT", "UTIL") or not pid or salary is None:
                 continue
             status = str(r.get("Status") or "").strip().upper()
-            if exclude_out and status in ("IL", "O", "OUT", "NA"):
+            if exclude_out and status in OUT_STATUSES:
                 continue
             game_info = str(r.get("Game Info") or "")
             matchup = game_info.split(" ", 1)[0] if game_info else ""
@@ -129,11 +150,18 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
 
     def _is_declared(rec: Mapping[str, Any]) -> bool:
         value = str(rec.get("Starting") or "").strip().upper()
-        # PO (probable/projected opener) and PLR (piggyback/long reliever) are
-        # DraftKings' own bullpen-game tags alongside SP/P; a bullpen-game slate
-        # (opener + bulk arm) must keep both declared pitchers in the pool or the
+        # PLR (projected long reliever) is DraftKings' bullpen-game tag alongside
+        # SP/P; a bullpen-game slate must keep the bulk arm in the pool or the
         # entire team's pitching option silently vanishes from the build.
-        return value in ("SP", "P", "PO", "PLR") or value.isdigit()
+        #
+        # R104: PO is NOT one of them any more. An opener throws one or two
+        # innings by design, and calling him a declared STARTER is the sharper
+        # half of the defect Classic had -- on a `declared_starters` basis this
+        # line made a PO opener a declared starter outright. He is still
+        # rosterable in Showdown, where every slot is a UTIL slot and no slot is
+        # priced on a starter's workload; he simply is not declared. On an
+        # all_healthy basis nothing about him changes.
+        return value in DK_STARTING_DECLARED_TOKENS or value.isdigit()
 
     declared = [r for r in rows if _is_declared(r)]
     basis = "all_healthy"
@@ -147,7 +175,11 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         rec["Pool_Basis"] = basis
         value = str(rec.get("Starting") or "").strip().upper()
         rec["Batting_Order"] = int(value) if value.isdigit() else None
-        rec["Is_Declared_Starter"] = value in ("SP", "P", "PO", "PLR")
+        rec["Is_Declared_Starter"] = value in DK_STARTING_DECLARED_TOKENS
+        # R104. The opener stays visible as the fact he is, so a reader of the
+        # frame can see WHY he is not a declared starter rather than inferring it
+        # from a False. Rosterable, not declared.
+        rec["Is_Declared_Opener"] = value in DK_STARTING_OPENER_TOKENS
 
     df = pd.DataFrame(rows)
     if not df.empty:
@@ -245,12 +277,26 @@ def build_showdown_lineup(
             add({**{cpt(i): 1.0 for i in idxs}, **{util(i): 1.0 for i in idxs}},
                 float(contract.min_players_per_team), np.inf)
 
+    # R54(c). A lock naming a key the melt does not carry -- a typo, a stale key,
+    # or a player the melt dropped on Status or on a missing CPT/UTIL row -- used
+    # to no-op in total silence: the whole bank built without the player, and the
+    # ladder's cpt_counts accounted against captains that were never enforced.
+    # Collected and returned rather than raised, because a lock that lost its
+    # player at T-5 must not be the reason there is no file; the count rides the
+    # brief next to the relaxation counters, which is where a reader is already
+    # asking what did not hold.
+    ignored_locks: List[str] = []
     for lk in (locks or []):                                   # lock: selected in some role
         if lk in key_row:
             i = keys.index(lk)
             add({cpt(i): 1.0, util(i): 1.0}, 1.0, np.inf)
-    if cpt_lock and cpt_lock in key_row:                       # lock captain
-        add({cpt(keys.index(cpt_lock)): 1.0}, 1.0, 1.0)
+        else:
+            ignored_locks.append(str(lk))
+    if cpt_lock:                                               # lock captain
+        if cpt_lock in key_row:
+            add({cpt(keys.index(cpt_lock)): 1.0}, 1.0, 1.0)
+        else:
+            ignored_locks.append(f"cpt:{cpt_lock}")
     for ck in (cpt_excludes or []):                            # exposure cap: still
         if ck in key_row:                                      # eligible at UTIL,
             add({cpt(keys.index(ck)): 1.0}, 0.0, 0.0)           # just not as CPT
@@ -290,10 +336,12 @@ def build_showdown_lineup(
     util_i = [i for i in range(n) if res.x[util(i)] > 0.5]
     if len(cpt_i) != 1 or len(util_i) != n_util:
         return None
-    return _assemble_lineup(work, cpt_i[0], util_i, cpt_mult, contract)
+    return _assemble_lineup(work, cpt_i[0], util_i, cpt_mult, contract,
+                            ignored_locks=ignored_locks)
 
 
-def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract) -> Dict[str, Any]:
+def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract,
+                     ignored_locks: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     def rec(i, role):
         row = work.iloc[i]
         rid = str(row["CPT_ID"]) if role == "CPT" else str(row["UTIL_ID"])
@@ -312,6 +360,9 @@ def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract) -> Dict[str, Any]:
         "players": players,
         "roster_ids": [captain["draftable_id"]] + [u["draftable_id"] for u in utils],
         "player_keys": [captain["player_key"]] + sorted(u["player_key"] for u in utils),
+        # R54(c). Locks this solve was handed and could not enforce, because the
+        # key is absent from the melted pool. Empty on a clean solve.
+        "ignored_locks": list(ignored_locks or []),
         "salary": round(salary, 1),
         "salary_cap": contract.salary_cap,
         "proj_points": round(sum(p["points"] for p in players), 3),
@@ -357,6 +408,8 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
     cap = max(1, math.floor(max_cpt_exposure_pct * n_target)) if max_cpt_exposure_pct else None
     relaxed_slots = 0
     overlap_relaxed_slots = 0
+    both_relaxed_slots = 0
+    ignored_locks: List[str] = []
     for _ in range(n_target):
         cpt_excludes = [k for k, c in cpt_counts.items() if cap is not None and c >= cap] or None
         lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
@@ -370,12 +423,36 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
                                        cpt_excludes=cpt_excludes, **kwargs)
             if lu is not None:
                 overlap_relaxed_slots += 1
+        # R54(a). This rung used to drop ``max_shared_players`` along with the
+        # captain cap while incrementing only the captain counter, so a bank
+        # shipped at 5-of-6 pairwise overlap with ``overlap_relaxed_slots: 0``.
+        # Reproduced: a delivered 3-lineup bank, max pairwise overlap 5-of-6, one
+        # captain at 100%, diagnostics {'relaxed_slots': 2,
+        # 'overlap_relaxed_slots': 0}. The bound is passed through now, so this
+        # rung relaxes exactly the one control it names.
         if lu is None and cpt_excludes:
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden, **kwargs)
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       max_shared_players=max_shared_players, **kwargs)
             if lu is not None:
+                relaxed_slots += 1
+        # R54(a). The fourth rung, which did not exist. It is counted in every
+        # place it is true: these counters answer "how many lineups were built
+        # WITHOUT this control", not "which rung fired", because the first
+        # question is the one the brief's clean/relaxed claim rests on. A clean
+        # portfolio is all three at zero.
+        if lu is None and cpt_excludes and max_shared_players is not None:
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       **kwargs)
+            if lu is not None:
+                both_relaxed_slots += 1
+                overlap_relaxed_slots += 1
                 relaxed_slots += 1
         if lu is None:
             break
+        # R54(c). A lock the melt never carried used to no-op in silence.
+        for key in (lu.get("ignored_locks") or []):
+            if key not in ignored_locks:
+                ignored_locks.append(key)
         bank.append(lu)
         forbidden.append(lu["player_keys"])
         cpt_key = lu["captain"]["player_key"]
@@ -387,6 +464,9 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         diagnostics["relaxed_slots"] = relaxed_slots
         diagnostics["max_shared_players"] = max_shared_players
         diagnostics["overlap_relaxed_slots"] = overlap_relaxed_slots
+        # R54(a)/(c). Both new facts ride the same dict the brief already reads.
+        diagnostics["both_relaxed_slots"] = both_relaxed_slots
+        diagnostics["ignored_locks"] = list(ignored_locks)
     return bank
 
 

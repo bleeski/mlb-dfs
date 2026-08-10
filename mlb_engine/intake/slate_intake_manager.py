@@ -61,7 +61,7 @@ import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 VERSION = "v1.10"
 DK_ROSTER_SLOTS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
@@ -71,8 +71,42 @@ REQUIRED_SALARY_FIELDS = ("Salary", "TeamAbbrev")
 ID_FIELD_CANDIDATES = ("ID", "Player_ID", "Player ID")
 NAME_ID_FIELD_CANDIDATES = ("Name + ID", "Name+ID")
 POSITION_FIELD_CANDIDATES = ("Roster Position", "Position")
+# R45. The Showdown roster-slot vocabulary. A DK Showdown salary file carries
+# BOTH columns: 'Roster Position' holds CPT/UTIL and 'Position' holds the real
+# fielding position, which is the reverse of what Classic needs.
+SHOWDOWN_ROSTER_SLOTS = frozenset({"CPT", "UTIL"})
 NAME_FIELD_CANDIDATES = ("Name", "Player")
 GAME_FIELD_CANDIDATES = ("Game Info", "GameInfo", "Game")
+
+
+def _showdown_aware_position_column(pos_col: Optional[str], header: Sequence[str],
+                                    rows: Sequence[Mapping[str, Any]]) -> Optional[str]:
+    """R45. Prefer 'Position' over 'Roster Position' when the latter is CPT/UTIL.
+
+    ``POSITION_FIELD_CANDIDATES`` is Roster-Position-first deliberately, because
+    on a Classic file that column is the DK-eligible slot set and 'Position' is
+    the looser listed position. On a SHOWDOWN file the same preference is exactly
+    wrong: 'Roster Position' holds CPT/UTIL, ``parse_positions('CPT')`` matches
+    neither ``PITCHER_ALIASES`` nor ``HITTER_SLOTS``, and every player came out
+    with an empty ``positions`` tuple. Downstream that made ``_index_salary``'s
+    pitcher filter empty for everyone, so ``tools/lineups_from_paste.py`` reported
+    both starting pitchers as ``unrostered_starters`` -- "no row in the DK salary
+    file" -- even when DK's own ``Starting`` column named them correctly. Hitters
+    still resolved, but only because "not a pitcher" was trivially true for
+    everyone under the bug.
+
+    Detected from the data rather than the header, and only when the column is
+    ENTIRELY roster slots: a Classic file whose Position column happens to be
+    absent, or a mixed file, is left alone. Reordering the candidate tuple would
+    have broken Classic, which is why this is a branch and not a reorder.
+    """
+    if pos_col != "Roster Position" or "Position" not in header:
+        return pos_col
+    values = {str(r.get("Roster Position") or "").strip().upper()
+              for r in rows if str(r.get("Roster Position") or "").strip()}
+    if values and values <= SHOWDOWN_ROSTER_SLOTS:
+        return "Position"
+    return pos_col
 
 
 @dataclass(frozen=True)
@@ -217,7 +251,8 @@ def parse_dk_salary_csv(path: str) -> List[SalaryPlayer]:
     header = list(rows[0].keys())
     id_col = _first_existing(header, ID_FIELD_CANDIDATES)
     name_id_col = _first_existing(header, NAME_ID_FIELD_CANDIDATES)
-    pos_col = _first_existing(header, POSITION_FIELD_CANDIDATES)
+    pos_col = _showdown_aware_position_column(
+        _first_existing(header, POSITION_FIELD_CANDIDATES), header, rows)
     name_col = _first_existing(header, NAME_FIELD_CANDIDATES) or name_id_col
     game_col = _first_existing(header, GAME_FIELD_CANDIDATES)
     players: List[SalaryPlayer] = []

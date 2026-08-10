@@ -497,7 +497,8 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     """
     prior: List[List[str]] = []
     out: List[Optional[Dict[str, Any]]] = []
-    overlap_relaxed = cpt_relaxed = infeasible = 0
+    overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
+    ignored_locks: List[str] = []
 
     for thesis in theses:
         work = df.copy()
@@ -521,10 +522,28 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                                        max_shared_players=max_shared_players, **kw)
             if lu is not None:
                 cpt_relaxed += 1
+        # R54(b). The fourth rung, which the BANK ladder had and this one did
+        # not: a thesis solvable only under both relaxations returned None and
+        # left a blank reserved row -- write-blocked at T-5 -- on a pool the bank
+        # path fills. Counted in every place it is true, matching
+        # build_showdown_bank: these answer "how many lineups were built without
+        # this control", so a clean ladder is all three at zero.
+        if lu is None and thesis.get("cpt") and max_shared_players is not None:
+            lu = build_showdown_lineup(work, forbidden_sets=prior or None, **kw)
+            if lu is not None:
+                both_relaxed += 1
+                overlap_relaxed += 1
+                cpt_relaxed += 1
         if lu is None:
             infeasible += 1
         else:
             prior.append(list(lu["player_keys"]))
+            # R54(c). A thesis lock the melt never carried used to no-op in
+            # silence, and cpt_counts then accounted against captains that were
+            # never enforced.
+            for key in (lu.get("ignored_locks") or []):
+                if key not in ignored_locks:
+                    ignored_locks.append(key)
         out.append(lu)
 
     if diagnostics is not None:
@@ -532,6 +551,8 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "max_shared_players": max_shared_players,
             "overlap_relaxed": overlap_relaxed,
             "captain_lock_relaxed": cpt_relaxed,
+            "both_relaxed": both_relaxed,
+            "ignored_locks": list(ignored_locks),
             "infeasible": infeasible,
         })
     return out

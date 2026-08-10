@@ -470,6 +470,49 @@ def _index_salary(salary_players: Sequence[Any], pitchers: bool) -> Dict[Tuple[s
     return index
 
 
+def _dedupe_by_dk_identity(hits: Sequence[Any]) -> List[Any]:
+    """Collapse salary rows that are the SAME PERSON into one candidate.
+
+    R45. A DK Showdown salary file carries two rows per player -- CPT and UTIL,
+    identical ``Name`` and ``TeamAbbrev``, different ``ID`` and ``Salary`` -- and
+    ``_resolve_one``'s ambiguity check counted them as two candidates. Every
+    hitter on a fully-confirmed, zero-ambiguity Showdown paste came back
+    "matches 2 salary rows" and the tool refused the paste. Three live burns in
+    six days (SD@ARI 2026-08-03, STL@NYY 2026-08-05 with 16 blockers, HOU@SD
+    2026-08-09 with 18), each ending in a hand-built feed at ~T-18 with no
+    provenance line.
+
+    Identity is the EXACT normalized full name, not the (initial, surname) match
+    key the index is bucketed by. That distinction is the whole safety property:
+    two CPT/UTIL rows share a full name and collapse, while Will Wilson and
+    Weston Wilson -- the real ambiguity this module exists for, hit on the first
+    live paste -- do not, and still raise the blocker that makes Ben state which.
+
+    The UTIL row wins where both exist: it is the base salary and the identity
+    the operator's own live workaround filtered to. Ties break on player_id so
+    the choice is deterministic.
+    """
+    groups: Dict[str, List[Any]] = {}
+    for player in hits:
+        groups.setdefault(normalize_name(str(getattr(player, "name", "") or "")),
+                          []).append(player)
+    out: List[Any] = []
+    for _, group in sorted(groups.items()):
+        if len(group) == 1:
+            out.append(group[0])
+            continue
+        out.append(sorted(group, key=_dk_identity_rank)[0])
+    return out
+
+
+def _dk_identity_rank(player: Any) -> Tuple[int, float, str]:
+    raw = getattr(player, "raw", None) or {}
+    slot = str(raw.get("Roster Position") or "").strip().upper()
+    return (0 if slot == "UTIL" else 1,
+            float(getattr(player, "salary", 0.0) or 0.0),
+            str(getattr(player, "player_id", "")))
+
+
 def _resolve_one(display_name: str, team: str,
                  index: Mapping[Tuple[str, str, str], List[Any]],
                  overrides: Mapping[str, str]) -> Tuple[Optional[Any], Optional[str]]:
@@ -488,6 +531,9 @@ def _resolve_one(display_name: str, team: str,
     if wanted:
         exact = [p for p in hits if normalize_name(p.name) == normalize_name(wanted)]
         hits = exact or hits
+    # R45. Before the count, not after: the ambiguity test asks "how many PEOPLE
+    # match", and two roster-variant rows for one person are one person.
+    hits = _dedupe_by_dk_identity(hits)
     if len(hits) == 1:
         return hits[0], None
     if not hits:
