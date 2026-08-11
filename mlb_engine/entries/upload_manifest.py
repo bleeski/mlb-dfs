@@ -60,6 +60,32 @@ def _valid_status(status: object) -> str:
 MANIFEST_NAME = "upload_manifest.json"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# R96(2). The name a delivery file wears until a manifest row exists for it.
+# Fail-open bookkeeping was the whole defect: every delivery path wrapped
+# ``record_delivery`` in a try/except so a certified build could never be broken
+# by a manifest write, which is right, but the file then landed under its
+# uploadable name with nothing on it saying the record was missing. Six paths
+# reached that state (see R96's table). The fix is ordering, not another guard:
+# write to a name nobody would upload, record, and only then promote the name. A
+# crash, an exception, or an early return anywhere in between leaves the
+# DO_NOT_UPLOAD_ name, which is self-labelling instead of merely failing preflight
+# later. ``showdown.write_showdown_entries`` already used this pattern internally
+# for truncated writes; this generalizes it to the manifest.
+UNRECORDED_PREFIX = "DO_NOT_UPLOAD_"
+
+
+def unrecorded_name(dest: str | Path) -> Path:
+    """The provisional path a delivery is written to before it has a row."""
+    dest = Path(dest)
+    if dest.name.startswith(UNRECORDED_PREFIX):
+        return dest
+    return dest.with_name(f"{UNRECORDED_PREFIX}{dest.name}")
+
+
+def is_unrecorded_name(path: str | Path) -> bool:
+    """True for a file that is labelling itself as having no manifest row."""
+    return Path(path).name.startswith(UNRECORDED_PREFIX)
+
 
 def sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
@@ -119,18 +145,26 @@ def record_delivery(
     projection_tier: str = "unknown",
     strategy_state: Optional[Mapping[str, Any]] = None,
     notes: str = "",
+    hash_source: Optional[str | Path] = None,
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
     Supersession is keyed on (contest_type, slate_tag), which is the identity of
     the thing being delivered. A second Classic build for the same draftgroup
     replaces the first; a Showdown build for a different game does not touch it.
+
+    R96(2). ``hash_source`` lets the row name the path the file is ABOUT to wear
+    while the hash is taken from the provisional file that holds those bytes now.
+    The record has to name the upload path, and the file cannot wear the upload
+    path until the record exists, so one of the two has to be told where to look.
+    A rename preserves bytes, so the hash is the same either way.
     """
     path = Path(delivered_file)
+    source = Path(hash_source) if hash_source is not None else path
     manifest = read_manifest(date)
     record = {
         "delivered_file": repo_relative(path),
-        "sha256": sha256_file(path) if path.exists() else None,
+        "sha256": sha256_file(source) if source.exists() else None,
         "contest_type": str(contest_type).lower(),
         "slate_tag": str(slate_tag or ""),
         "contest_ids": sorted({str(c) for c in (contest_ids or [])}),
@@ -170,6 +204,174 @@ def record_delivery(
     manifest["deliveries"].append(record)
     _write(manifest_path(date), manifest)
     return record
+
+
+def stage_salary_for_delivery(date: str, salary_csv: str | Path,
+                              slate_tag: str = "") -> Optional[str]:
+    """Copy the delivery's salary export to ``data/slates/<date>/`` (R96(4)).
+
+    This is what makes the contest MINEABLE and what R49's manifest-first
+    resolution reads. Without it a recovered delivery is permanently
+    ``standings_only``: `field_miner` globs ``data/slates/<date>/DKSalaries*.csv``
+    and a delivered ``DKEntries_*.csv`` is not a salary source, so the evidence is
+    degraded in a way no re-mine can undo. `build_slate.py` already staged; the
+    engine mirror and the late-swap path did not, which is why the 2026-08-06
+    1910_4g contests can never be mined.
+
+    Tagged rather than bare, because DK runs several draftgroups a date and a bare
+    ``DKSalaries.csv`` from one draftgroup silently answers for another. Returns
+    the staged path, or None when there was nothing to stage. Never raises: this
+    is bookkeeping and it runs beside a certified build.
+    """
+    try:
+        source = Path(salary_csv)
+        if not source.is_file():
+            return None
+        dest_dir = REPO_ROOT / "data" / "slates" / str(date)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        tag = str(slate_tag or "").strip().lstrip("_")
+        dest = dest_dir / (f"DKSalaries_{tag}.csv" if tag else "DKSalaries.csv")
+        payload = source.read_bytes()
+        if dest.exists() and dest.read_bytes() == payload:
+            return str(dest)
+        tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
+        tmp.write_bytes(payload)
+        os.replace(tmp, dest)
+        return str(dest)
+    except Exception:  # noqa: BLE001 - staging must never fail a delivery
+        return None
+
+
+def deliver(*, date: str, dest: str | Path, write, salary_csv: Optional[str | Path] = None,
+            **record_kwargs) -> Dict[str, Any]:
+    """The one front door for a delivery file under ``outputs/<date>/`` (R96(2)).
+
+    Ordering, in three steps that cannot be reordered without reopening R96:
+
+    1. ``write(provisional)`` puts the bytes at ``DO_NOT_UPLOAD_<name>``.
+    2. ``record_delivery`` writes the row, naming ``dest`` and hashing the
+       provisional file.
+    3. Only on a written row is the file promoted onto ``dest``.
+
+    Every way this can go wrong leaves the file at the DO_NOT_UPLOAD_ name: a
+    raising writer, a raising recorder, a crash between the two, or a caller that
+    returns early before calling this at all. That is the property R96 asks for --
+    a delivery file has a manifest row or it has a self-labelling name, never
+    neither.
+
+    ``write`` takes the provisional path and returns anything; a falsy return is
+    not treated as failure, only an exception is, because the Showdown writer
+    returns a report dict its caller inspects.
+
+    Returns ``{"path", "recorded", "record", "staged_salary", "error"}``. ``path``
+    is where the file actually is, which is what a caller should print and record
+    in a brief. Never raises.
+    """
+    dest = Path(dest)
+    provisional = unrecorded_name(dest)
+    out: Dict[str, Any] = {"path": str(provisional), "recorded": False,
+                           "record": None, "staged_salary": None, "error": ""}
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        out["write_report"] = write(provisional)
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"delivery write failed: {exc}"
+        return out
+    if not provisional.exists():
+        out["error"] = ("the writer returned without producing "
+                        f"{provisional.name}; nothing was delivered")
+        return out
+    try:
+        out["record"] = record_delivery(date=date, delivered_file=dest,
+                                        hash_source=provisional, **record_kwargs)
+        out["recorded"] = True
+    except Exception as exc:  # noqa: BLE001 - the file keeps the DO_NOT_UPLOAD_ name
+        out["error"] = (f"MANIFEST NOT RECORDED: {exc}. {provisional.name} holds "
+                        f"the lineups and is deliberately named so nobody uploads "
+                        f"it; it was NOT promoted to {dest.name}")
+        return out
+    if salary_csv is not None:
+        out["staged_salary"] = stage_salary_for_delivery(
+            date, salary_csv, str(record_kwargs.get("slate_tag") or ""))
+    try:
+        os.replace(provisional, dest)
+        out["path"] = str(dest)
+    except OSError as exc:
+        # The row exists and names dest, which does not exist yet. verify_manifest
+        # reports exactly this as "recorded but missing", and the bytes are still
+        # on disk under a name nobody uploads. Fail loud, lose nothing.
+        out["error"] = (f"recorded but not promoted: {exc}; the row names "
+                        f"{dest.name} and the bytes are at {provisional.name}")
+    return out
+
+
+def rename_recorded_delivery(date: str, old_path: str | Path,
+                             new_path: str | Path) -> bool:
+    """Point any row for ``old_path`` at ``new_path`` (R96, P6).
+
+    ``build_slate.preserve_prior_slate`` moves a previous draftgroup's delivered
+    file aside so a new build cannot overwrite it. That rename ORPHANED the row:
+    the manifest went on naming a path that no longer existed while the renamed
+    file sat there with no row, which is R96's state arrived at from the far side.
+    Ben's call, 2026-08-11: the row follows the rename rather than the rename being
+    refused, because refusing would block a BUILD mid-slate over bookkeeping and
+    that inverts the fail-open-but-loud posture the delivery path already takes.
+
+    The sha256 is untouched: a rename does not change bytes, and rehashing here
+    would mask a file that changed underneath. Returns whether a row moved.
+    """
+    old_rel, new_rel = repo_relative(old_path), repo_relative(new_path)
+    manifest = read_manifest(date)
+    moved = False
+    for record in manifest.get("deliveries", []):
+        if record.get("delivered_file") != old_rel:
+            continue
+        record["delivered_file"] = new_rel
+        record["renamed_from"] = old_rel
+        record["renamed_utc"] = datetime.now(timezone.utc).isoformat()
+        moved = True
+    if moved:
+        _write(manifest_path(date), manifest)
+    return moved
+
+
+def unrecorded_deliveries(date: str, root: Optional[Path] = None) -> List[str]:
+    """DKEntries files under ``outputs/<date>/`` that no manifest row names (R96(3)).
+
+    The reverse check. ARCHIVE is where an unrecorded delivery costs something --
+    own-entry harvest fails silently and the slate can only ever be
+    ``standings_only`` -- and it discovered this by hand five times across three
+    months. Repo-relative, sorted, so the output is deterministic.
+
+    A ``DO_NOT_UPLOAD_``-named file is NOT reported: that file is already saying
+    what it is, and the whole point of R96(2) is that saying so is sufficient.
+    Files in ``_``-prefixed directories are skipped for the same reason
+    ``awaiting_standings`` skips them -- those are scratch, not deliveries.
+
+    A date with NO manifest file at all reports nothing, deliberately. The manifest
+    did not exist before 2026-07-25 and there are eleven such dates on disk; listing
+    every file on them would put 20-odd permanent entries in a report whose whole
+    value is that it is normally empty, and this project has already learned twice
+    what happens to a warning the operator is trained to scroll past (R31's STALE
+    line, R3(a)'s silent manifest print). An absent manifest is a different fact
+    from a manifest that omits a file, and the caller reports it separately.
+    """
+    base = Path(root) if root is not None else REPO_ROOT
+    date_dir = base / "outputs" / str(date)
+    if not date_dir.is_dir():
+        return []
+    if not (date_dir / MANIFEST_NAME).is_file():
+        return []
+    recorded = {str(r.get("delivered_file") or "")
+                for r in read_manifest(date).get("deliveries", [])}
+    out: List[str] = []
+    for path in sorted(date_dir.glob("DKEntries*.csv")):
+        if is_unrecorded_name(path) or path.name.startswith("_"):
+            continue
+        rel = repo_relative(path)
+        if rel not in recorded:
+            out.append(rel)
+    return out
 
 
 def current_deliveries(date: str) -> List[Dict[str, Any]]:

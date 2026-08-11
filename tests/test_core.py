@@ -9029,11 +9029,19 @@ class DeferredPromotionTests(unittest.TestCase):
 
     def test_late_swap_defers_and_promotes_only_after_the_mirror(self):
         """The ordering is the fix. A refusal between the two is what used to
-        leave the pointer naming an undelivered run."""
+        leave the pointer naming an undelivered run.
+
+        R96(2), 2026-08-11: the mirror write is now to the DO_NOT_UPLOAD_ name,
+        because a refused promotion left an uploadable unrecorded file here -- one
+        of R96's six paths. R29(2)'s invariant is unchanged and is what this still
+        pins: SOMETHING is in outputs/ before the pointer moves, so a refusal never
+        names a run nothing was mirrored from. Which NAME it wears is R96's business
+        and is pinned in test_upload_integrity.R96PerCallerTests.
+        """
         text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
             encoding="utf-8")
         self.assertIn("defer_promotion=True", text)
-        mirror = text.index("os.replace(tmp, dest)")
+        mirror = text.index("os.replace(tmp, provisional)")
         promote = text.index("promote_deferred_run(result)")
         refusal = text.index("late swap refused: these entries score below")
         self.assertLess(mirror, promote,

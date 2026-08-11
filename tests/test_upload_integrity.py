@@ -2529,5 +2529,268 @@ class ArchetypeRowsResolveEndToEndTests(unittest.TestCase):
             self.assertEqual(self.resolve(posture, inferred), "mme_gpp", name)
 
 
+class R96UnrecordedDeliveryTests(unittest.TestCase):
+    """R96: a delivery file has a manifest row or it has a self-labelling name.
+
+    One test per path found in step 1's enumeration, not one for the class. The
+    six paths differ in HOW they reach the state -- a swallowed record exception,
+    an early return between the write and the record, no record call at all, a
+    rename that orphans a row -- and a single test over the shared helper would
+    pass while any individual caller still wrote its file under an uploadable name.
+    That is exactly the "makes the remaining path look closed" failure the entry
+    warned about, so the callers are pinned one at a time.
+
+    P1 mirror_to_outputs, P2 late_swap refused promotion, P3 late_swap record
+    raises, P4 Showdown record raises, P5 build_showdown_theses (deleted), P6
+    preserve_prior_slate rename.
+    """
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.date = "2026-06-03"
+        self.outputs = self.root / "outputs" / self.date
+        self.outputs.mkdir(parents=True)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _rows(self):
+        return self.um.read_manifest(self.date).get("deliveries", [])
+
+    # ---- the shared front door -------------------------------------------
+
+    def test_deliver_promotes_the_name_only_after_the_row_exists(self):
+        dest = self.outputs / "DKEntries_1605_4g.csv"
+        seen = {}
+
+        def write(provisional):
+            seen["path"] = provisional
+            # The bytes exist under the provisional name and the row does not
+            # exist yet. This is the window every one of the six paths died in.
+            self.assertTrue(provisional.name.startswith("DO_NOT_UPLOAD_"))
+            self.assertEqual(self._rows(), [])
+            provisional.write_text("payload", encoding="utf-8")
+
+        out = self.um.deliver(date=self.date, dest=dest, write=write,
+                              contest_type="classic", slate_tag="1605_4g")
+        self.assertTrue(out["recorded"], out["error"])
+        self.assertEqual(out["path"], str(dest))
+        self.assertTrue(dest.is_file())
+        self.assertFalse(seen["path"].exists(), "the provisional name is consumed")
+        self.assertEqual([r["delivered_file"] for r in self._rows()],
+                         [self.um.repo_relative(dest)])
+
+    def test_a_raising_recorder_leaves_the_file_self_labelled(self):
+        dest = self.outputs / "DKEntries_1605_4g.csv"
+        out = self.um.deliver(
+            date=self.date, dest=dest,
+            write=lambda p: p.write_text("payload", encoding="utf-8"),
+            contest_type="classic", slate_tag="1605_4g",
+            status="not-a-real-status")  # _valid_status raises on this
+        self.assertFalse(out["recorded"])
+        self.assertIn("MANIFEST NOT RECORDED", out["error"])
+        self.assertFalse(dest.exists(),
+                         "an unrecorded delivery must never wear the upload name")
+        self.assertTrue(self.um.unrecorded_name(dest).is_file())
+        self.assertEqual(self._rows(), [])
+
+    def test_the_row_names_the_upload_path_and_hashes_the_provisional_bytes(self):
+        dest = self.outputs / "DKEntries_1605_4g.csv"
+        out = self.um.deliver(
+            date=self.date, dest=dest,
+            write=lambda p: p.write_text("payload", encoding="utf-8"),
+            contest_type="classic", slate_tag="1605_4g")
+        self.assertEqual(out["record"]["delivered_file"],
+                         self.um.repo_relative(dest))
+        self.assertEqual(out["record"]["sha256"], self.um.sha256_file(dest))
+        self.assertTrue(self.um.verify_manifest(self.date)["passed"],
+                        "the row must not name a file that does not exist")
+
+    def test_a_writer_that_produces_nothing_is_reported_not_recorded(self):
+        dest = self.outputs / "DKEntries_1605_4g.csv"
+        out = self.um.deliver(date=self.date, dest=dest, write=lambda p: None,
+                              contest_type="classic", slate_tag="1605_4g")
+        self.assertFalse(out["recorded"])
+        self.assertIn("nothing was delivered", out["error"])
+        self.assertEqual(self._rows(), [])
+
+    # ---- step 4: the salary file --------------------------------------------
+
+    def test_a_recorded_delivery_stages_the_salary_file(self):
+        salary = self.root / "elsewhere" / "DKSalaries.csv"
+        salary.parent.mkdir(parents=True)
+        salary.write_text("Name,Salary\nA,5000\n", encoding="utf-8")
+        dest = self.outputs / "DKEntries_1605_4g.csv"
+        out = self.um.deliver(
+            date=self.date, dest=dest,
+            write=lambda p: p.write_text("payload", encoding="utf-8"),
+            salary_csv=salary, contest_type="classic", slate_tag="1605_4g")
+        staged = self.root / "data" / "slates" / self.date / "DKSalaries_1605_4g.csv"
+        self.assertEqual(out["staged_salary"], str(staged))
+        self.assertEqual(staged.read_bytes(), salary.read_bytes())
+        # field_miner globs data/slates/<date>/DKSalaries*.csv; the tag is what
+        # keeps one draftgroup from answering for another on the same date.
+        self.assertTrue(list(staged.parent.glob("DKSalaries*.csv")))
+
+    def test_staging_is_tagged_so_two_draftgroups_do_not_collide(self):
+        for tag, body in (("1605_4g", "early"), ("1910_6g", "late")):
+            salary = self.root / f"s_{tag}.csv"
+            salary.write_text(body, encoding="utf-8")
+            self.um.stage_salary_for_delivery(self.date, salary, tag)
+        staged = sorted(p.name for p in
+                        (self.root / "data" / "slates" / self.date).glob("DKSalaries*.csv"))
+        self.assertEqual(staged, ["DKSalaries_1605_4g.csv", "DKSalaries_1910_6g.csv"])
+
+    def test_staging_never_raises_on_a_missing_salary_file(self):
+        self.assertIsNone(
+            self.um.stage_salary_for_delivery(self.date, self.root / "nope.csv", "t"))
+
+    # ---- step 3: the reverse check ------------------------------------------
+
+    def test_the_reverse_check_names_a_file_with_no_row(self):
+        (self.outputs / "upload_manifest.json").write_text(
+            json.dumps({"version": "1.1", "date": self.date, "deliveries": []}),
+            encoding="utf-8")
+        orphan = self.outputs / "DKEntries_1910_4g.csv"
+        orphan.write_text("payload", encoding="utf-8")
+        self.assertEqual(self.um.unrecorded_deliveries(self.date),
+                         [self.um.repo_relative(orphan)])
+
+    def test_the_reverse_check_ignores_a_self_labelled_file(self):
+        (self.outputs / "upload_manifest.json").write_text(
+            json.dumps({"version": "1.1", "date": self.date, "deliveries": []}),
+            encoding="utf-8")
+        (self.outputs / "DO_NOT_UPLOAD_DKEntries_1910_4g.csv").write_text(
+            "payload", encoding="utf-8")
+        self.assertEqual(self.um.unrecorded_deliveries(self.date), [],
+                         "a file that says what it is needs no second report")
+
+    def test_the_reverse_check_is_silent_on_a_date_with_no_manifest(self):
+        (self.outputs / "DKEntries_1910_4g.csv").write_text("payload", encoding="utf-8")
+        self.assertEqual(self.um.unrecorded_deliveries(self.date), [],
+                         "the manifest did not exist before 2026-07-25; eleven such "
+                         "dates on disk would make this report permanently noisy")
+
+    def test_a_recorded_delivery_is_not_reported(self):
+        dest = self.outputs / "DKEntries_1605_4g.csv"
+        self.um.deliver(date=self.date, dest=dest,
+                        write=lambda p: p.write_text("payload", encoding="utf-8"),
+                        contest_type="classic", slate_tag="1605_4g")
+        self.assertEqual(self.um.unrecorded_deliveries(self.date), [])
+
+    # ---- P6: the rename follows the row -------------------------------------
+
+    def test_p6_a_rename_carries_the_manifest_row_with_it(self):
+        dest = self.outputs / "DKEntries.csv"
+        self.um.deliver(date=self.date, dest=dest,
+                        write=lambda p: p.write_text("payload", encoding="utf-8"),
+                        contest_type="classic", slate_tag="1605_4g")
+        before = self._rows()[0]["sha256"]
+        moved = self.outputs / "DKEntries_1605_4g.csv"
+        dest.rename(moved)
+        self.assertTrue(self.um.rename_recorded_delivery(self.date, dest, moved))
+        row = self._rows()[0]
+        self.assertEqual(row["delivered_file"], self.um.repo_relative(moved))
+        self.assertEqual(row["renamed_from"], self.um.repo_relative(dest))
+        self.assertEqual(row["sha256"], before,
+                         "a rename does not change bytes; rehashing here would "
+                         "mask a file that changed underneath")
+        self.assertEqual(self.um.unrecorded_deliveries(self.date), [],
+                         "the renamed file must not read as orphaned")
+
+    def test_p6_a_rename_of_an_unrecorded_file_moves_nothing(self):
+        self.assertFalse(self.um.rename_recorded_delivery(
+            self.date, self.outputs / "a.csv", self.outputs / "b.csv"))
+
+
+class R96PerCallerTests(unittest.TestCase):
+    """The per-path half: each production caller, pinned at its own call site.
+
+    These read source rather than executing a build, deliberately and with the
+    limitation stated: R79(b) already records that a source-text pin un-pins
+    itself under a helper-extraction refactor. The behavioural half lives in
+    R96UnrecordedDeliveryTests above, which exercises the shared door these
+    callers route through; what these add is that each caller actually routes
+    through it, which is the part the shared tests cannot see.
+    """
+
+    def _text(self, rel):
+        return (REPO / rel).read_text(encoding="utf-8")
+
+    def test_p1_the_engine_mirror_delivers_through_the_recorded_door(self):
+        text = self._text("mlb_engine/pipeline/execution_pipeline.py")
+        self.assertIn("_deliver_mirror(", text)
+        self.assertIn("from mlb_engine.entries.upload_manifest import deliver", text)
+        self.assertNotIn("dest.write_bytes(source.read_bytes())", text,
+                         "the mirror must not write the upload name directly")
+
+    def test_p2_late_swap_writes_provisionally_before_it_promotes(self):
+        text = self._text("tools/late_swap.py")
+        provisional = text.index("os.replace(tmp, provisional)")
+        promote = text.index("promote_deferred_run(result)")
+        record = text.index("record = record_delivery(")
+        rename = text.index("os.replace(provisional, dest)")
+        # R29(2)'s invariant survives: something is in outputs/ before promotion.
+        self.assertLess(provisional, promote,
+                        "the file must exist before the pointer moves, or a "
+                        "refusal leaves a run nothing was mirrored from")
+        # R96's addition: the uploadable NAME appears only after the row.
+        self.assertLess(record, rename,
+                        "the name is promoted only once a row names it")
+        self.assertLess(promote, record)
+
+    def test_p3_late_swap_leaves_the_provisional_name_when_recording_fails(self):
+        text = self._text("tools/late_swap.py")
+        self.assertTrue("MANIFEST NOT RECORDED for" in text,
+                        "the raising-recorder branch must still say so out loud")
+        # The promotion sits INSIDE the try, so a raising recorder skips it.
+        head = text[text.index("record = record_delivery("):]
+        body = head[:head.index("except Exception as exc:")]
+        self.assertIn("os.replace(provisional, dest)", body,
+                      "promotion inside the try is what makes a raising "
+                      "recorder leave the DO_NOT_UPLOAD_ name")
+
+    def test_p4_showdown_records_before_it_promotes(self):
+        text = self._text("skills/generate-lineups/scripts/build_slate.py")
+        self.assertIn("promote=False", text)
+        record = text.index("record_delivery(")
+        rename = text.index("os.replace(provisional, dest)")
+        self.assertLess(record, rename)
+        self.assertIn("stage_salary_for_delivery(", text)
+
+    def test_p4_the_showdown_writer_can_withhold_the_promotion(self):
+        from mlb_engine.optimize import showdown as sd
+        import inspect
+        self.assertIn("promote", inspect.signature(sd.write_showdown_entries).parameters)
+
+    def test_p5_the_unrecorded_thesis_writer_is_gone(self):
+        script = REPO / "skills" / "generate-lineups" / "scripts" / "build_showdown_theses.py"
+        self.assertFalse(
+            script.exists(),
+            "P5 wrote a filled DKEntries to an operator-chosen --out with no "
+            "record_delivery anywhere in the file, so it was unrecorded by "
+            "construction. Ben's call 2026-08-11: deleted in favour of "
+            "run_showdown rather than gated, per R31(e)'s own remedy.")
+
+    def test_p6_preserve_prior_slate_is_told_the_date(self):
+        text = self._text("skills/generate-lineups/scripts/build_slate.py")
+        self.assertIn("rename_recorded_delivery", text)
+        self.assertIn("date=args.date,", text,
+                      "without the date preserve_prior_slate cannot find the row "
+                      "its rename would orphan")
+
+    def test_the_archival_scanner_carries_the_reverse_check(self):
+        text = self._text("tools/awaiting_standings.py")
+        self.assertIn("scan_unrecorded_deliveries", text)
+        self.assertIn("UNRECORDED DELIVERIES", text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

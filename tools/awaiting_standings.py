@@ -142,6 +142,39 @@ def _plural(n: int, word: str) -> str:
 # Scanning
 # --------------------------------------------------------------------------
 
+def scan_unrecorded_deliveries(outputs_dir: Path) -> dict[str, list[str]]:
+    """Delivery files under outputs/<date>/ that no manifest row names (R96(3)).
+
+    The reverse check, and it lives here because ARCHIVE is where an unrecorded
+    delivery actually costs something: own-entry harvest fails silently for those
+    contests and, with no staged salary, the slate can only ever be mined
+    ``standings_only`` -- degraded evidence that no re-mine recovers. It was
+    discovered by hand five times across three months before it got a number.
+
+    Note what this scanner already does, which is why the check belongs beside it:
+    it ENROLLS contests off these files, so an unrecorded delivery has always been
+    silently feeding the awaiting list. Now it is named. Returns {date: [paths]},
+    dates with nothing omitted, so an empty dict is the clean state.
+    """
+    out: dict[str, list[str]] = {}
+    if not outputs_dir.is_dir():
+        return out
+    try:
+        from mlb_engine.entries.upload_manifest import unrecorded_deliveries
+    except Exception:  # noqa: BLE001 - the scanner must run without the engine
+        return out
+    for date_dir in sorted(outputs_dir.iterdir()):
+        if not date_dir.is_dir() or date_dir.name.startswith("_"):
+            continue
+        try:
+            missing = unrecorded_deliveries(date_dir.name)
+        except Exception:  # noqa: BLE001
+            continue
+        if missing:
+            out[date_dir.name] = missing
+    return out
+
+
 def scan_entered(outputs_dir: Path) -> tuple[dict[str, dict], dict[str, dict]]:
     """Every Contest ID on a filled entry row in outputs/*/DKEntries*.csv.
 
@@ -359,13 +392,46 @@ def compute_unsettled(entered: dict[str, dict], have: set[str], exceptions: dict
 # Rendering
 # --------------------------------------------------------------------------
 
+def render_unrecorded_section(unrecorded: dict[str, list[str]]) -> list[str]:
+    """The R96(3) reverse check, rendered. Silent when there is nothing to say."""
+    if not unrecorded:
+        return []
+    count = sum(len(v) for v in unrecorded.values())
+    lines = [
+        f"## Unrecorded deliveries — {_plural(count, 'file')} with no manifest row",
+        "",
+        "These `DKEntries*.csv` files sit in `outputs/<date>/` and no row in that",
+        "date's `upload_manifest.json` names them (R96). Each one is outside",
+        "supersession tracking, outside the sha256-at-upload check, and outside every",
+        "manifest-driven tool — including the harvest below, which enrolls their",
+        "contests without being able to say which entries were yours. Where no salary",
+        "file was staged for the slate they can only ever mine `standings_only`.",
+        "",
+        "This is a REPORT, not an action: nothing here is repaired automatically,",
+        "because a delivery's row is a claim about what was entered and only Ben",
+        "knows what he uploaded. A file named `DO_NOT_UPLOAD_*` is not listed; that",
+        "one is already saying what it is. Neither is a date with no",
+        "`upload_manifest.json` at all — the manifest did not exist before 2026-07-25,",
+        "and that is history rather than a defect.",
+        "",
+    ]
+    for date in sorted(unrecorded):
+        lines.append(f"- **{date}**")
+        for path in unrecorded[date]:
+            lines.append(f"  - `{path}`")
+    lines.append("")
+    return lines
+
+
 def render_markdown(by_date: dict, archived_count: int, invalid: dict, exceptions: dict,
                     today: str, failed_pulls: dict[str, str] | None = None,
-                    unsettled: dict | None = None) -> str:
+                    unsettled: dict | None = None,
+                    unrecorded: dict[str, list[str]] | None = None) -> str:
     total = sum(len(v) for v in by_date.values())
     dates_asc = sorted(by_date)  # oldest first -- see module docstring
     failed_pulls = failed_pulls or {}
     unsettled = unsettled or {}
+    unrecorded = unrecorded or {}
 
     lines = [
         f"# Contests awaiting standings — regenerated {today}",
@@ -427,6 +493,8 @@ def render_markdown(by_date: dict, archived_count: int, invalid: dict, exception
             lines.append(f"**{date}** ({_plural(len(ids), 'contest')}): "
                          + ", ".join(f"`{cid}`" for cid, _name in ids))
         lines.append("")
+
+    lines.extend(render_unrecorded_section(unrecorded))
 
     lines.append("## Not on this list — do not pull")
     lines.append("")
@@ -601,14 +669,18 @@ def cmd_scan(args: argparse.Namespace) -> int:
     unsettled = compute_unsettled(entered, have, exceptions, today)
     total = sum(len(v) for v in by_date.values())
 
+    unrecorded = scan_unrecorded_deliveries(root / args.outputs_dir)
     md = render_markdown(by_date, len(archived), invalid, exceptions, today,
-                         failed_pulls=failed_pulls, unsettled=unsettled)
+                         failed_pulls=failed_pulls, unsettled=unsettled,
+                         unrecorded=unrecorded)
+    unrecorded_total = sum(len(v) for v in unrecorded.values())
 
     if args.check:
         print(md)
         print(f"\n[check] {_plural(total, 'contest')} open across {_plural(len(by_date), 'date')}; "
               f"{_plural(sum(len(v) for v in unsettled.values()), 'contest')} held back "
               f"as unsettled; {_plural(len(failed_pulls), 'failed pull')}; "
+              f"{_plural(unrecorded_total, 'unrecorded delivery file')}; "
               f"nothing written", file=sys.stderr)
         return 0
 
@@ -616,6 +688,15 @@ def cmd_scan(args: argparse.Namespace) -> int:
     md_out.parent.mkdir(parents=True, exist_ok=True)
     md_out.write_text(md, encoding="utf-8")
     print(f"wrote {md_out} ({_plural(total, 'contest')}, {_plural(len(by_date), 'date')})")
+    if unrecorded_total:
+        # R96(3): loud on stdout, not only in the file. ARCHIVE pays for this and
+        # a line inside a regenerated markdown report is easy to scroll past.
+        print(f"UNRECORDED DELIVERIES  {_plural(unrecorded_total, 'DKEntries file')} "
+              f"in outputs/ with no manifest row, across "
+              f"{_plural(len(unrecorded), 'date')}; see the report section. Each is "
+              f"outside supersession tracking and every manifest-driven tool. Dates "
+              f"with no manifest at all are not counted: the manifest did not exist "
+              f"before 2026-07-25 and that is history, not a defect.")
 
     if not args.no_html:
         html_out = root / (args.html_out or f"data/standings/standings_pulls_{today}.html")

@@ -67,7 +67,9 @@ from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
     assert_contest_geometry, parse_dk_entry_rows,
 )
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
-from mlb_engine.entries.upload_manifest import record_delivery  # noqa: E402
+from mlb_engine.entries.upload_manifest import (  # noqa: E402
+    record_delivery, stage_salary_for_delivery, unrecorded_name,
+)
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
@@ -812,9 +814,18 @@ def main() -> int:
     except Exception:  # noqa: BLE001 - naming must never block the file
         slate_tag = ""
     dest = dest_dir / lateswap_dest_name(slate_tag, str(result.get("run_id") or ""))
-    tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
+    # R96(2). This wrote straight to `dest` and only recorded further down, past
+    # the promotion decision -- so a refused promotion returned 3 with an
+    # uploadable, unrecorded file sitting in outputs/. That is R29(2)'s window and
+    # it is one of the six paths R96 enumerated. The file now lands provisionally
+    # under DO_NOT_UPLOAD_ and is promoted only once a row exists, which keeps
+    # R29(2)'s own invariant (the mirror exists BEFORE promotion, so a refusal
+    # never leaves the pointer naming a run nothing was mirrored from) while
+    # making the refusal path self-labelling.
+    provisional = unrecorded_name(dest)
+    tmp = provisional.with_name(f".{provisional.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_bytes(out.read_bytes())
-    os.replace(tmp, dest)
+    os.replace(tmp, provisional)
 
     # R29(2): the promotion held back at run_late_swap lands here, once this
     # file is genuinely a delivery. Promoting at certification time meant a
@@ -828,19 +839,22 @@ def main() -> int:
         print("PROMOTION REFUSED after the file was written:", file=sys.stderr)
         for err in result.get("errors") or []:
             print(f"  {err}", file=sys.stderr)
-        print(f"{dest} exists but the latest-run pointer was not moved, so this "
-              f"file is not the recorded delivery and default preflight will "
-              f"hard-fail it. Another session promoted while this swap was "
-              f"solving; decide which portfolio is the delivery before "
-              f"uploading anything.", file=sys.stderr)
+        print(f"{provisional} holds the lineups and is deliberately named so "
+              f"nobody uploads it: the latest-run pointer was not moved, so this "
+              f"file is not the recorded delivery and it never got a manifest "
+              f"row. Another session promoted while this swap was solving; "
+              f"decide which portfolio is the delivery before uploading "
+              f"anything.", file=sys.stderr)
         return 3
     print(f"gates: workflow_valid={result.get('workflow_valid')} "
           f"selection={result.get('selection_certified')} "
           f"allocation={result.get('allocation_certified')}")
     delivered_sha = ""
+    delivered = provisional
     try:
         record = record_delivery(
-            date=args.date, delivered_file=dest, contest_type="classic",
+            date=args.date, delivered_file=dest, hash_source=provisional,
+            contest_type="classic",
             slate_tag=slate_tag, contest_ids=sorted(contest_shapes),
             entries=len(after_rosters), run_id=result.get("run_id"),
             status="candidate",
@@ -850,14 +864,20 @@ def main() -> int:
             notes=f"late swap; parent {args.parent_entries}",
         )
         delivered_sha = str(record.get("sha256") or "")
+        # R96(4): the swap had no salary staging at all, so a late-swapped slate
+        # was mineable only if some other path happened to stage the same date.
+        stage_salary_for_delivery(args.date, str(salary), slate_tag)
+        # R96(2): promote the name only now that a row names it.
+        os.replace(provisional, dest)
+        delivered = dest
     except Exception as exc:  # noqa: BLE001 - bookkeeping must never block the file
-        print(f"MANIFEST NOT RECORDED for {dest.name}: {exc}; default "
-              f"preflight will hard-fail this delivery until a record exists",
-              file=sys.stderr)
-    print(f"wrote {dest}")
+        print(f"MANIFEST NOT RECORDED for {dest.name}: {exc}; the file was NOT "
+              f"promoted and is at {provisional.name}, which names itself rather "
+              f"than waiting for preflight to hard-fail it", file=sys.stderr)
+    print(f"wrote {delivered}")
     if delivered_sha:
         print(f"delivered sha256: {delivered_sha}")
-        print(f"verify at upload: tools/preflight_upload.py --entries {dest} "
+        print(f"verify at upload: tools/preflight_upload.py --entries {delivered} "
               f"--expect-sha256 {delivered_sha[:12]}")
     print("Upload by hand. Nothing here entered a contest or moved money.")
     return 0

@@ -601,7 +601,8 @@ def read_showdown_reserved_rows(path: str | Path, contract: RosterContract = SHO
 def write_showdown_entries(template_path: str | Path, candidate_path: str | Path,
                            assignments: Sequence[Mapping[str, Any]],
                            contract: RosterContract = SHOWDOWN,
-                           require_all_filled: bool = True) -> Dict[str, Any]:
+                           require_all_filled: bool = True,
+                           promote: bool = True) -> Dict[str, Any]:
     """Fill blank reserved rows with roster_ids ([CPT_ID, 5x UTIL_ID]); preserve every
     other cell. Never overwrites the template.
 
@@ -609,6 +610,13 @@ def write_showdown_entries(template_path: str | Path, candidate_path: str | Path
     is not a deliverable, and the delivery path must not be able to produce one
     by accident. Pass False only when deliberately writing a partial file, and
     then do not upload it.
+
+    ``promote`` defaults True for every caller that owns its own destination.
+    R96(2): a caller delivering into ``outputs/<date>/`` passes False, keeps the
+    returned ``candidate_path`` (the ``DO_NOT_UPLOAD_`` staging name this function
+    already writes to), records the manifest row, and promotes the name itself.
+    That way the Showdown delivery cannot exist under an uploadable name before
+    its row does -- the state R96 found on 2026-08-06.
     """
     source, target = Path(template_path).resolve(), Path(candidate_path).resolve()
     if source == target:
@@ -685,8 +693,11 @@ def write_showdown_entries(template_path: str | Path, candidate_path: str | Path
                 "errors": [f"written file did not read back as a valid "
                            f"{contract.name} export: {exc}"],
                 "candidate_path": None, "assignment_log": logs}
-    os.replace(staging, target)
-    return {"passed": True, "errors": [], "candidate_path": str(target),
+    if promote:
+        os.replace(staging, target)
+    return {"passed": True, "errors": [],
+            "candidate_path": str(target if promote else staging),
+            "promoted": bool(promote),
             "assignment_log": logs,
             "reserved_rows": len(parsed["reserved"]), "rows_filled": len(used)}
 

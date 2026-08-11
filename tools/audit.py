@@ -45,7 +45,9 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
 EXPECTED_SUITE_COUNTS = {
     "tests.test_core": 570,
     "tests.test_showdown": 55,
-    "tests.test_upload_integrity": 141,
+    # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
+    # path. A `grew` verdict is the one case where moving a pin is correct.
+    "tests.test_upload_integrity": 162,
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }

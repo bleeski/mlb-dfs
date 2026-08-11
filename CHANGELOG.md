@@ -25,6 +25,125 @@ performance claim.
 
 ---
 
+## 2026-08-11 — R96 closes: a delivery file has a manifest row or it says it does not
+
+Same DEV session as the 2026-08-10 entries below, continued past midnight UTC on
+engine claim `engine_2026-08-11`. The investigation there stopped on two decisions;
+Ben made both and steps 2-4 landed. Audit pin 850 to 871 (`test_upload_integrity`
+141 to 162), a `grew` verdict, which is the one case where moving a pin is right.
+
+### R96(2)(3)(4). All six paths, closed by ordering rather than by another guard
+
+**The shape of the fix.** Every delivery path already wrapped `record_delivery` in
+a try/except so bookkeeping could never break a certified build. That is correct
+and it stays. What was wrong is that the ARTIFACT stayed silent: the file landed
+under its uploadable name with nothing on it saying the row was missing, so
+ARCHIVE, `awaiting_standings`, and the next session all read a normal delivery.
+R3(a) had already made the failure loud on stdout; a terminal line is not a
+property of the file.
+
+So the order changed instead of the guard. `upload_manifest.deliver` writes to
+`DO_NOT_UPLOAD_<name>`, records the row naming the final path, then promotes the
+name. A raising writer, a raising recorder, a crash between them, or a caller that
+returns early all leave the DO_NOT_UPLOAD_ name. `record_delivery` grew
+`hash_source` so the row can name the path the file is about to wear while hashing
+the provisional bytes; a rename preserves bytes, so the hash is the same either
+way. `showdown.write_showdown_entries` already staged under that exact prefix for
+truncated writes, so this generalizes a pattern the tree had rather than inventing
+one.
+
+**Per path.** P1 `mirror_to_outputs` routes through `_deliver_mirror`. P2 late
+swap writes provisionally BEFORE `promote_deferred_run`, which keeps R29(2)'s
+invariant intact (something is in `outputs/` before the pointer moves) while making
+the refusal self-labelling — that refusal returning 3 with an uploadable unrecorded
+file was R29(2)'s predicted window and the one R96 was filed on. P3 the same
+caller's promotion now sits INSIDE the try, so a raising recorder skips it. P4 the
+Showdown path passes `promote=False` and promotes after recording. P5
+`build_showdown_theses.py` is DELETED (Ben, 2026-08-11) in favour of
+`run_showdown`, which is R31(e)'s own alternative remedy: it wrote a filled
+DKEntries to an operator-chosen `--out` with no `record_delivery` anywhere in the
+file, so it was unrecorded by construction, and it appeared in no test, eval or
+doc. Nothing imports it. P6 `preserve_prior_slate` now calls
+`rename_recorded_delivery`, so the row follows the rename instead of being orphaned
+(Ben, 2026-08-11: refusing the rename was the alternative and was rejected, because
+it would block a build mid-slate over bookkeeping and `preserve_prior_slate` fires
+exactly when a second draftgroup is being built under time pressure). The sha256 is
+deliberately not recomputed on a rename: rehashing would mask a file that changed
+underneath.
+
+**The reverse check (3), and what it found immediately.**
+`upload_manifest.unrecorded_deliveries` plus `awaiting_standings`'
+`scan_unrecorded_deliveries`, reported in the standings markdown and loudly on
+stdout. Run against the live tree it names 11 files, which is R36's three from
+2026-07-29 and R96's `DKEntries_1910_4g.csv` as expected, plus two nobody had
+counted: `outputs/2026-08-05/DKEntries_showdown_1905_1g_sd.csv` and
+`outputs/2026-08-09/DKEntries_1410_5g.csv`. A date with NO manifest file reports
+nothing, deliberately — the manifest did not exist before 2026-07-25 and eleven
+such dates are on disk, so listing them would put 23 permanent entries in a report
+whose whole value is being normally empty. This project has already paid twice for
+a warning the operator learns to scroll past (R31's STALE line, R3(a)'s print), and
+an absent manifest is a different fact from a manifest that omits a file.
+
+**Salary staging (4).** `stage_salary_for_delivery` runs on every recorded
+delivery, writing `data/slates/<date>/DKSalaries_<tag>.csv` — tagged, because DK
+runs several draftgroups a date and a bare name from one silently answers for
+another. `build_slate` already staged; the engine mirror and the late-swap path
+never did, which is why the 2026-08-06 1910_4g contests can only ever be
+`standings_only`. That evidence is not recoverable; what this prevents is the next
+one.
+
+**Tests: 21, one per path, not one for the class.** The six paths differ in HOW
+they reach the state, and a single test over the shared helper would pass while any
+individual caller still wrote its file under an uploadable name — which is the
+"makes the remaining path look closed" failure R96 warned about. Eleven behavioural
+tests exercise the shared door (promotion only after the row, a raising recorder
+leaving the self-labelled name, the row naming the upload path while hashing the
+provisional file, a writer that produces nothing, tagged staging, the reverse check
+including its two deliberate silences, and P6 both ways). Ten more pin each caller
+at its own call site. Those ten read source, with the limitation stated in the
+docstring rather than hidden: R79(b) already records that a source-text pin un-pins
+itself under a helper-extraction refactor, so they assert routing, not behaviour,
+and the behavioural half is the eleven above.
+
+**One test amended, not deleted.** `test_late_swap_defers_and_promotes_only_after_the_mirror`
+indexed `os.replace(tmp, dest)`, which no longer exists. It now indexes
+`os.replace(tmp, provisional)` and its docstring says why: R29(2)'s invariant is
+unchanged and is still what that test pins; which name the mirrored file wears is
+R96's business and is pinned separately.
+
+### Filed, not fixed
+
+**R31(d) acquired a price, and R110 grew a part (b).** Both from one incident in
+this session, both recorded on their existing entries rather than given new
+numbers. While this session held `engine_2026-08-11`, a second DEV session took
+`engine_branchfix_2026-08-11`; the scoped name means `mkdir` succeeded and the
+mutex reported nothing, which is exactly the nominal-mutex defect R31(d) has
+carried as an open decision since 2026-08-10. That session's working-tree restore
+wiped three uncommitted edits from this one (`tests/test_core.py`, `tools/audit.py`,
+`CLAUDE.md`). Recovery was cheap and the committed work was untouched, so nothing
+is lost — but this is the first overlap that destroyed work rather than merely
+failing to prevent contention, and it happened with both sessions inside the letter
+of the contract. R31(d)'s note now says so; the decision is still Ben's, and the
+question is better read as "what does an overlap cost" than "how likely is one".
+Separately, `claim.py take` does not clear a stale `RELEASED` marker when
+re-taking a released directory, so this session's legitimate release-then-retake
+made `check` report a correctly-held claim as HELD-with-a-marker — R102's own
+diagnostic firing on a false positive. Filed as R110(b), same one-line class as
+R110(a).
+
+**An environment condition, not an item.** `/sessions` (the mount holding the
+repo) reached 100% with 844K free during this session. Tests were unaffected
+because `TMPDIR=/tmp` sits on a different volume with headroom, which is the
+R42(b) remedy working as intended, but writes to the mount itself are now at risk
+and `rm` reclaims nothing there (R109's asymmetry). One transient symptom worth
+recording because it looked alarming and was not: `skills/generate-lineups/SKILL.md`
+read as 0 bytes for one command and was intact and byte-identical to HEAD
+immediately after, which is consistent with the concurrent session's restore being
+observed mid-write rather than with any corruption. Verified by sha256 against
+HEAD, not assumed.
+
+---
+
 ## 2026-08-10 — R62 closes, and R96's investigation stops the session rather than half-closing six paths
 
 Third DEV session of 2026-08-10, engine claim `engine_2026-08-11`, scope "R96

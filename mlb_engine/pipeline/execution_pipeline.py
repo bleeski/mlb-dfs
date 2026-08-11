@@ -3476,20 +3476,20 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         stem = source.stem
         dest = dest_dir / (f"{stem}_{tag}{source.suffix}" if tag and not stem.endswith(tag)
                            else source.name)
-        dest.write_bytes(source.read_bytes())
-        recorded = _record_upload_manifest(slate_date, dest, result, tag)
-        # R3(a). Generation stays fail-open, because bookkeeping must never break
-        # a certified build. What was wrong was that it also failed SILENT: a
-        # file could land in outputs/ with no manifest row and nothing said so,
-        # which re-opens exactly the "which file do I upload" hole the manifest
-        # was built to close. Say it, loudly, and carry the flag on the payload.
+        # R96(2). Was: write dest, then try to record, and on failure print
+        # loudly and leave the file wearing its uploadable name. R3(a) had
+        # already made that failure loud; what it could not fix is that the
+        # ARTIFACT stayed silent, so anything reading the directory later --
+        # ARCHIVE, awaiting_standings, the next session -- saw a normal delivery.
+        # The order is now write-provisional, record, promote, so an unrecorded
+        # file is named DO_NOT_UPLOAD_* and says so without being asked.
+        outcome = _deliver_mirror(slate_date, dest, source, result, tag, salary_csv)
         if isinstance(result, dict):
-            result["manifest_recorded"] = bool(recorded)
-        if not recorded:
-            print(f"MANIFEST NOT RECORDED  {dest} was delivered with no manifest "
-                  f"row. Preflight will hard-fail it; re-run the build or pass "
-                  f"--no-manifest deliberately.")
-        return str(dest)
+            result["manifest_recorded"] = bool(outcome["recorded"])
+            result["staged_salary"] = outcome.get("staged_salary")
+        if outcome["error"]:
+            print(f"MANIFEST NOT RECORDED  {outcome['error']}")
+        return str(outcome["path"])
     except Exception:  # noqa: BLE001 - a mirror must never fail a certified build
         if isinstance(result, dict):
             result.setdefault("manifest_recorded", False)
@@ -3601,37 +3601,43 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _record_upload_manifest(slate_date: str, dest: Path, result: Mapping[str, Any],
-                            tag: str) -> bool:
-    """One manifest record per delivery, so T-5 never has to guess which file.
+def _deliver_mirror(slate_date: str, dest: Path, source: Path,
+                    result: Mapping[str, Any], tag: str,
+                    salary_csv: Any) -> Dict[str, Any]:
+    """Mirror the promoted export through the R96(2) record-or-self-label door.
 
-    Returns whether the record was written. The caller says so out loud when it
-    was not; see mirror_to_outputs.
+    One manifest record per delivery, so T-5 never has to guess which file, and
+    the salary export staged beside it so the contest stays mineable (R96(4)).
+    The caller says the error out loud; see mirror_to_outputs.
     """
-    try:
-        from mlb_engine.entries.upload_manifest import record_delivery
+    from mlb_engine.entries.upload_manifest import deliver
 
-        contests = (result.get("posture_by_contest") or {})
+    contests = (result.get("posture_by_contest") or {})
+
+    def _write(provisional: Path) -> None:
+        provisional.write_bytes(source.read_bytes())
+
+    def _entries_in(path: Path) -> int:
         # Counted off the delivered file, not off an upstream plan: the count
         # preflight cross-checks has to be a fact about these bytes, because
         # catching a truncated write is exactly what it is for.
         from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
-        entries_in_file = len(parse_dk_entry_rows(dest))
-        record_delivery(
-            date=slate_date,
-            delivered_file=dest,
-            contest_type="classic",
-            slate_tag=tag,
-            contest_ids=sorted(contests),
-            contest_names=sorted(
-                str(v.get("contest_name") or "") for v in contests.values()),
-            entries=entries_in_file,
-            run_id=result.get("run_id"),
-            status="candidate",
-            certification="certified" if result.get("workflow_valid") else "not_certified",
-            projection_tier=manifest_projection_tier(result),
-            strategy_state=manifest_strategy_state(result),
-        )
-        return True
-    except Exception:  # noqa: BLE001 - bookkeeping must never fail a certified build
-        return False
+        return len(parse_dk_entry_rows(path))
+
+    return deliver(
+        date=slate_date,
+        dest=dest,
+        write=_write,
+        salary_csv=salary_csv,
+        contest_type="classic",
+        slate_tag=tag,
+        contest_ids=sorted(contests),
+        contest_names=sorted(
+            str(v.get("contest_name") or "") for v in contests.values()),
+        entries=_entries_in(source),
+        run_id=result.get("run_id"),
+        status="candidate",
+        certification="certified" if result.get("workflow_valid") else "not_certified",
+        projection_tier=manifest_projection_tier(result),
+        strategy_state=manifest_strategy_state(result),
+    )

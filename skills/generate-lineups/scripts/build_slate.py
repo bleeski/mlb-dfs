@@ -391,12 +391,22 @@ def _self_declared_tag(path: Path) -> str:
     return ""
 
 
-def preserve_prior_slate(paths, tag: str) -> list:
+def preserve_prior_slate(paths, tag: str, date: str = "") -> list:
     """Move artifacts from a different draftgroup aside instead of overwriting.
 
     Silent overwriting is the failure; a renamed file that is still on disk is
     recoverable, and the rename is printed so it is never a surprise.
+
+    R96 (P6), Ben's call 2026-08-11: when the moved file is a delivery the manifest
+    names, the ROW FOLLOWS THE RENAME. This used to orphan the row -- the manifest
+    went on naming a path that no longer existed while the renamed file sat there
+    with no row, which is R96's state reached from the far side rather than by a
+    failed write. Refusing the rename was the alternative and was rejected: it
+    would block a build mid-slate over bookkeeping, and preserve_prior_slate fires
+    exactly when a second draftgroup is being built under time pressure. ``date``
+    is optional so existing callers keep working; without it no row is touched.
     """
+    from mlb_engine.entries.upload_manifest import rename_recorded_delivery
     moved = []
     for path in paths:
         path = Path(path)
@@ -421,6 +431,15 @@ def preserve_prior_slate(paths, tag: str) -> list:
         moved.append(str(dest))
         print(f"preserved prior slate artifact: {path.name} -> {dest.name}",
               file=sys.stderr)
+        if date:
+            try:
+                if rename_recorded_delivery(date, path, dest):
+                    print(f"  manifest row followed the rename: {dest.name}",
+                          file=sys.stderr)
+            except Exception as exc:  # noqa: BLE001 - never block a build on this
+                print(f"  manifest row NOT updated for {dest.name}: {exc}; the "
+                      f"row still names {path.name}, which no longer exists",
+                      file=sys.stderr)
     return moved
 
 
@@ -1955,15 +1974,28 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         {"entry_id": row["entry_id"], "roster_ids": list(lineup["roster_ids"])}
         for row, lineup in zip(rows, bank)
     ]
-    write_report = sd.write_showdown_entries(str(entries), str(dest), assignments)
+    # R96(2). Was: write dest, then try to record and swallow the failure, so a
+    # raising recorder left an uploadable Showdown file with no row -- one of the
+    # six paths R96 enumerated, and the shape of the two unrecorded Showdown files
+    # in outputs/2026-08-06/. The write now stops at the DO_NOT_UPLOAD_ staging
+    # name write_showdown_entries already uses, and the name is promoted only once
+    # a row names it. Everything downstream reads `delivered`, never `dest`.
+    from mlb_engine.entries.upload_manifest import (
+        record_delivery, stage_salary_for_delivery, unrecorded_name,
+    )
+    write_report = sd.write_showdown_entries(str(entries), str(dest), assignments,
+                                             promote=False)
     if not write_report.get("passed"):
         print(json.dumps({"status": "showdown_export_failed",
                           "errors": write_report.get("errors")}, indent=1))
         return 3, {}
+    provisional = unrecorded_name(dest)
+    delivered = provisional
+    manifest_error = ""
     try:
-        from mlb_engine.entries.upload_manifest import record_delivery
         record_delivery(
-            date=args.date, delivered_file=dest, contest_type="showdown",
+            date=args.date, delivered_file=dest, hash_source=provisional,
+            contest_type="showdown",
             slate_tag=slate_tag_suffix(salary).lstrip("_"),
             contest_ids=sorted({r["contest_id"] for r in rows}),
             contest_names=sorted({r.get("contest_name", "") for r in rows}),
@@ -1977,9 +2009,18 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             notes="Showdown ships review-grade; it does not pass the three "
                   "certification gates. See CLAUDE.md.",
         )
+        # R96(4): a Showdown slate with no staged salary can only ever be mined
+        # standings_only, which is how the 2026-08-06 SD contests were lost.
+        stage_salary_for_delivery(args.date, str(salary),
+                                  slate_tag_suffix(salary).lstrip("_"))
+        os.replace(provisional, dest)
+        delivered = dest
     except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a build
-        print(f"upload manifest not recorded: {exc}", file=sys.stderr)
-    template = sd.verify_template_preserved(str(entries), str(dest))
+        manifest_error = str(exc)
+        print(f"upload manifest not recorded: {exc}; the file was NOT promoted "
+              f"and is at {provisional.name}, which names itself rather than "
+              f"waiting for preflight to hard-fail it", file=sys.stderr)
+    template = sd.verify_template_preserved(str(entries), str(delivered))
 
     if use_ladder:
         cap_count = ladder_meta.get("captain_cap_count")
@@ -2013,9 +2054,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "contest_type": "showdown",
         "date": args.date,
         "entries": n_entries,
-        "delivered_path": str(dest),
-        "delivered_path_repo": manifest_repo_relative(dest),
-        "delivered_sha256": manifest_sha256(dest),
+        "delivered_path": str(delivered),
+        "delivered_path_repo": manifest_repo_relative(delivered),
+        "delivered_sha256": manifest_sha256(delivered),
+        # R96(2). A brief that cited `dest` while the bytes sat under
+        # DO_NOT_UPLOAD_ would send the operator to a file that does not exist.
+        "manifest_recorded": not manifest_error,
+        "manifest_error": manifest_error,
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
@@ -2499,6 +2544,7 @@ def main() -> int:
                  out_dir / f"DKEntries{suffix}.csv",
                  out_dir / f"build_brief{suffix}.json"],
                 prior_sig["tag"],
+                date=args.date,
             )
     staged_salary = _stage(salary, slate_dir / f"DKSalaries{suffix}.csv")
     staged_entries = _stage(entries, slate_dir / f"DKEntries{suffix}.csv")
