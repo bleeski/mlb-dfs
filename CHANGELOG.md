@@ -115,8 +115,26 @@ writer in the tree emits a `_cptcap6` name, so it arrived by operator copy or by
 P5 — a real delivery file in the directory this item was filed from, from a path
 that is not in the code.
 
-**No new R-number.** Every finding belongs inside R96. R110 remains the next free
-number, confirmed by scanning both the backlog and this file.
+**No new R-number for the delivery finding.** Every part of it belongs inside R96.
+
+### Filed, not fixed
+
+**R110 — `claim.py`'s own remediation advice is not a runnable command.** Found at
+this session's claim release, then reproduced. `_claim_name` appends today's date
+to whatever `release` is given, so the argument must be the BARE resource
+(`release engine`). But `check` prints the DATED directory name, and
+`_incomplete_note` (`tools/claim.py:141-144`) interpolates that dated name into
+the command it tells the operator to run. Pasting it verbatim gives
+`ERROR  no claim at claims/ledger_2026-08-09_r37_pin_2026-08-09_2026-08-11`, exit
+3. That note is the fix R102 added so a hand-written RELEASED marker gets
+completed properly — and it is the one instruction a session in that state will
+copy. Seven claims sit HELD-with-a-RELEASED-marker right now, counted off
+`claim.py check`, which is the shape of an operator who ran the advice, got exit
+3, and wrote the marker by hand instead; they are all stale, so they are Ben's to
+arbitrate and this session left them alone. The same asymmetry explains the doubled names
+in `claims/`: `engine_2026-08-10_2026-08-10` is what `take` produces when it is
+handed an already-dated name. Filed at XS in Workstream 6 next to R31, which is
+the same tool's other reporting defect; whoever takes one should take both.
 
 ---
 
