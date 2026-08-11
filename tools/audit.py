@@ -56,10 +56,10 @@ EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 850
 # "783 != 792" is a puzzle. Suites absent from this map have no precondition
 # and a shortfall in them is genuinely unexplained.
 SUITE_PRECONDITIONS = {
-    "tests.test_paste_lineups": (
-        "data/slates/2026-07-29/DKSalaries.csv and "
-        "data/slates/2026-07-30/DKSalaries_1910_6g.csv (gitignored; "
-        "vendoring them is R62's deferred half)"),
+    # tests.test_paste_lineups was here until 2026-08-10. R62's deferred half
+    # landed: both salary files are vendored under tests/fixtures/slates/ and
+    # tracked, so the suite has no precondition beyond the checkout itself and a
+    # shortfall in it is now genuinely unexplained rather than "stage the slate".
     "tests.test_golden_replay": (
         "data/archive/2026-06-03/ with the DKSalaries export and the BLANK "
         "DKEntries file (tracked in git; absent only in a partial copy of "

@@ -10718,14 +10718,29 @@ class AuditSkipHonestyTests(unittest.TestCase):
     def test_skips_that_keep_the_count_are_still_reported(self):
         """The paste suite's 29: `Ran 75` matches the pin exactly and 29 of
         those tests asserted nothing. The count proves nothing about coverage
-        and the old PASS line never mentioned it."""
+        and the old PASS line never mentioned it.
+
+        R62, 2026-08-10: the paste suite's own precondition is gone -- both
+        salary files are vendored and tracked now -- so this keeps the historical
+        case as the vehicle for the STATE and moves the names-its-precondition
+        assertion to a suite that still has one. Deleting that assertion instead
+        would drop the coverage along with the precondition.
+        """
         audit = self._audit()
         verdict = audit.classify_suite(
             "tests.test_paste_lineups", {"ran": 75, "skipped": 29, "present": True})
         self.assertEqual(verdict["state"], "skipped_in_place")
         self.assertNotIn("update EXPECTED", verdict["advice"].lower())
         self.assertIn("29 were SKIPPED", verdict["advice"])
-        self.assertIn("data/slates/2026-07-29", verdict["advice"])
+        self.assertNotIn("data/slates/2026-07-29", verdict["advice"],
+                         "R62 vendored the paste fixtures; the audit must stop "
+                         "telling the operator to stage a gitignored slate")
+        with_precondition = audit.classify_suite(
+            "tests.test_golden_replay", {"ran": 9, "skipped": 9, "present": True})
+        self.assertEqual(with_precondition["state"], "skipped_in_place")
+        self.assertIn("data/archive/2026-06-03", with_precondition["advice"],
+                      "a skipped_in_place suite that HAS a precondition still "
+                      "names it, not just the count")
 
     def test_an_absent_suite_file_is_named_rather_than_silently_dropped(self):
         """The same defect one level up: the audit used to filter AUDITED_SUITES

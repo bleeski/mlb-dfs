@@ -25,6 +25,101 @@ performance claim.
 
 ---
 
+## 2026-08-10 — R62 closes, and R96's investigation stops the session rather than half-closing six paths
+
+Third DEV session of 2026-08-10, engine claim `engine_2026-08-11`, scope "R96
+delivery path + R62 vendoring". R62 completes and its entry migrates here. R96
+does NOT: its step 1 is the investigation half by design, the investigation found
+six paths where the entry's stop condition allowed two or three, so steps 2-4 did
+not start and R96 stays on the board rewritten in place. Audit pin unchanged at
+850 per-suite; the paste suite's count did not move because the coverage behind it
+was what was missing, which is the whole point of R62(b).
+
+### R62(c). The paste suite's fixtures are vendored, and the pin stops being satisfiable without the coverage
+
+**What moved.** `data/slates/2026-07-29/DKSalaries.csv` and
+`data/slates/2026-07-30/DKSalaries_1910_6g.csv` are vendored byte-identical to
+`tests/fixtures/slates/DKSalaries_frozen_2026-07-29.csv` and
+`DKSalaries_1910_6g_frozen_2026-07-30.csv` (28389 and 55855 bytes, md5
+`f9cc3757…` and `cc660f55…`), on the `tests/fixtures/enrichment/` precedent.
+`tests/test_paste_lineups.py` points its two constants at them and its nine skip
+guards are DELETED, not repointed. `tools/audit.py` drops
+`tests.test_paste_lineups` from `SUITE_PRECONDITIONS`, because the suite now has
+no precondition beyond the checkout itself.
+
+**Why the guards go rather than move.** A `skipUnless` on a tracked fixture lets a
+genuinely missing one skip silently, which is the exact coverage debt R62(b) was
+built to expose. Vendored and guarded is strictly worse than vendored. The
+`TestDataDependenciesAreVendoredOrGuardedTests` meta-test still passes and is
+unweakened: it walks `REPO / "data" / ...` paths, and these are no longer data
+paths at all, so the guard requirement continues to bind every future
+`data/slates/` reader.
+
+**The number that justifies this, measured not assumed.** Replaying the
+pre-change suite against absent salary files — the tracked-files-only condition,
+simulated in `/tmp` so no real surface was touched — gives `Ran 75 ... OK
+(skipped=62)`. Sixty-two of seventy-five tests asserted nothing while the total
+matched `EXPECTED_SUITE_COUNTS` exactly. R62's own entry said 29; that figure
+predated the five unguarded classes getting guards earlier the same day, which
+converted five errors into thirty-three more silent skips. After the change the
+same suite runs 75 with zero skips off tracked files alone. The pin never moved
+in either direction, which is why a count alone could never have caught this.
+
+**One test changed rather than deleted.** `AuditSkipHonestyTests.
+test_skips_that_keep_the_count_are_still_reported` asserted that the paste
+suite's `skipped_in_place` advice names `data/slates/2026-07-29`. That
+precondition no longer exists, so the assertion is inverted — the advice must now
+NOT name a gitignored slate — and the names-its-precondition coverage moves onto
+`tests.test_golden_replay`, which still has one. Deleting the assertion would
+have dropped the coverage along with the precondition.
+
+**Sequencing note, retired.** The 2026-08-04 filing deferred this behind the
+GitHub PAT because it sized the vendoring at ~2.4MB. That was wrong twice over,
+as R62's rewritten entry recorded on 2026-08-10: the real cost is 84 KB in two
+files. Nothing on the board waits on the PAT now.
+
+### R96. Step 1 only: six paths, three classes, and a stop instead of a fix
+
+**What moved.** Nothing in the engine. This is the investigation half, and the
+finding is written into R96's entry in the backlog with the full table; the entry
+stays open holding steps 2-4.
+
+**What was found.** Into `outputs/<date>/` there are three write sites and one
+rename site: `execution_pipeline.mirror_to_outputs` (:3479),
+`late_swap.py` (:816-817), `showdown.write_showdown_entries` (:688, reached by
+`build_slate.py:1958` and `build_showdown_theses.py:154`), and
+`build_slate.preserve_prior_slate` (:420). They reach a filled DKEntries file
+with no manifest row six ways, in three structural classes: the record raised and
+was swallowed (P1 `mirror_to_outputs`, P3 `late_swap`, P4 Showdown — one helper
+closes all three); control left the function between the write and the record (P2,
+R29(2)'s predicted window, which that helper does not close); and the record is
+never attempted or is orphaned afterwards (P5 `build_showdown_theses --out`, P6
+the `preserve_prior_slate` rename).
+
+**Why this stopped the session.** R96's own fix note says to stop past two or
+three paths, because a partial fix makes the remaining path look closed. Six
+qualifies, and the two uncounted paths are the ones that need decisions rather
+than code: P5 is the script R31(e) already flags as fail-open and out of every
+test, eval and doc, whose filed remedy is "gate it **or delete it in favor of
+`run_showdown`**", and deleting a tracked script is not a DEV call; P6 is a policy
+choice between updating an orphaned row and refusing the rename, which behave
+differently for a BUILD mid-slate.
+
+**Two facts the investigation added.** `tools/awaiting_standings.py` contains no
+reference to the manifest at all, so step 3 is greenfield and the scanner today
+enrolls contests off unrecorded files without saying they are unrecorded. And
+`outputs/2026-08-06/` holds a sixth unrecorded file nobody had counted,
+`DKEntries_showdown_2140_1g_sd_cptcap6.csv` (23792 bytes, sha256 `68ee815fcb57…`),
+content-distinct from the recorded `…_2140_1g_sd.csv` (`8650744968c6…`). No
+writer in the tree emits a `_cptcap6` name, so it arrived by operator copy or by
+P5 — a real delivery file in the directory this item was filed from, from a path
+that is not in the code.
+
+**No new R-number.** Every finding belongs inside R96. R110 remains the next free
+number, confirmed by scanning both the backlog and this file.
+
+---
+
 ## 2026-08-10 — R62 (two halves of three) and R85: the gate stops lying about skips, and preflight reads the contest name
 
 Second DEV session of 2026-08-10, engine claim `engine_2026-08-10`, scope

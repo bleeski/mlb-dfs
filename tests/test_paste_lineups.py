@@ -27,7 +27,15 @@ from mlb_engine.intake.paste_lineups import (  # noqa: E402
 from tools.lineups_from_paste import merge_feeds  # noqa: E402
 
 PASTE = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-29_late3.txt"
-SALARY = REPO / "data" / "slates" / "2026-07-29" / "DKSalaries.csv"
+# R62, vendored 2026-08-10. These were `data/slates/<date>/`, which is
+# gitignored, so a tracked-files-only checkout could not run this suite: five
+# classes ERRORED on the missing file and 29 more tests skipped behind a guard
+# nobody could see, which made CLAUDE.md's mandated PASS line unsatisfiable off
+# Ben's machine. Frozen byte-identical copies, 84 KB for the pair, on the
+# `tests/fixtures/enrichment/` precedent. Because they are tracked now, the skip
+# guards are GONE rather than repointed: a guard on a tracked fixture would let a
+# genuinely missing one skip silently, which is the coverage debt this closed.
+SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv"
 # The one ambiguity in the real paste: SEA carries both Will Wilson (IL) and
 # Weston Wilson, and 'W Wilson' cannot choose between them.
 RESOLVE = {"W Wilson": "Weston Wilson"}
@@ -37,7 +45,6 @@ def _text() -> str:
     return PASTE.read_text(encoding="utf-8")
 
 
-@unittest.skipUnless(SALARY.exists(), "the 2026-07-29 salary file is not staged")
 class PasteStructureTests(unittest.TestCase):
     """The paste's real shape, including the trap that would corrupt a build."""
 
@@ -147,7 +154,6 @@ class PasteStructureTests(unittest.TestCase):
             self.assertFalse(name.startswith("("))
 
 
-@unittest.skipUnless(SALARY.exists(), "the 2026-07-29 salary file is not staged")
 class PasteResolutionTests(unittest.TestCase):
     """Abbreviated first names against DK's full names, and the failure rules."""
 
@@ -263,7 +269,6 @@ class PasteResolutionTests(unittest.TestCase):
                 self.assertEqual(game[side]["source"], "operator_paste")
 
 
-@unittest.skipUnless(SALARY.exists(), "the 2026-07-29 salary file is not staged")
 class PasteFeedIsAnOrdinaryFeedTests(unittest.TestCase):
     """The engine must not be able to tell the feed was typed rather than fetched."""
 
@@ -292,7 +297,6 @@ class PasteFeedIsAnOrdinaryFeedTests(unittest.TestCase):
         self.assertIsNone(pool.get("platoon_source"))
 
 
-@unittest.skipUnless(SALARY.exists(), "the 2026-07-29 salary file is not staged")
 class PasteWinsOverTheApiFeedTests(unittest.TestCase):
     """The fallback rule: a pasted side is never fetched and never overwritten."""
 
@@ -724,7 +728,8 @@ class MergeFeedsTeamCodeAndFieldTests(unittest.TestCase):
 
 PLAINTEXT = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-30_1910_6g_plaintext.txt"
 HOME_ONLY = REPO / "tests" / "fixtures" / "paste" / "mlb_com_2026-07-30_home_side_only.txt"
-SALARY_0730 = REPO / "data" / "slates" / "2026-07-30" / "DKSalaries_1910_6g.csv"
+SALARY_0730 = (REPO / "tests" / "fixtures" / "slates"
+               / "DKSalaries_1910_6g_frozen_2026-07-30.csv")  # R62, vendored
 
 
 def _side(feed, game_id, side):
@@ -735,8 +740,6 @@ def _side(feed, game_id, side):
     raise AssertionError(f"{game_id} not in feed")
 
 
-@unittest.skipUnless(SALARY_0730.exists(),
-                     "the 2026-07-30 salary file is not staged")
 class SinglePostedSideAlignmentTests(unittest.TestCase):
     """R32 round 2, the P0: a half-posted game must not swap the sides.
 
@@ -838,8 +841,6 @@ class SinglePostedSideAlignmentTests(unittest.TestCase):
         self.assertFalse([w for w in warnings if "only one lineup block" in w])
 
 
-@unittest.skipUnless(SALARY.exists() and SALARY_0730.exists(),
-                     "the 2026-07-29 and 2026-07-30 salary files are not staged")
 class LinkFreePitcherResolutionTests(unittest.TestCase):
     """R32 round 2, the P1: a plain-text paste must resolve its probables.
 
@@ -890,8 +891,6 @@ class LinkFreePitcherResolutionTests(unittest.TestCase):
         self.assertEqual(hou["id"], "669713", "the MLBAM id still comes off the link")
 
 
-@unittest.skipUnless(SALARY_0730.exists(),
-                     "the 2026-07-30 salary file is not staged")
 class DkStartingColumnTests(unittest.TestCase):
     """R32 round 2: DK's Starting column is a probable source, not a patch.
 
@@ -933,8 +932,6 @@ class DkStartingColumnTests(unittest.TestCase):
                         report["report"]["warnings"])
 
 
-@unittest.skipUnless(SALARY_0730.exists(),
-                     "the 2026-07-30 salary file is not staged")
 class AbsentFromDkPoolPolicyTests(unittest.TestCase):
     """R32 round 2, the P2: one absent name is a call-up, eighteen is a mistake.
 
