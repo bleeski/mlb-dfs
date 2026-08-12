@@ -25,6 +25,122 @@ performance claim.
 
 ---
 
+## 2026-08-12 — greenfield spec, third edition: adjudicated as a delta; five concessions recorded, F-35/A-43 rejected on standing grounds, one rider on R41 (docs only)
+
+Second DEV session of 2026-08-12, engine claim `engine_2026-08-12_gf3`, at
+Ben's request to adjudicate the re-dated root upload element by element and
+adopt what is worth adopting. No code, no tests, no pins moved. Write set:
+`docs/2026-07-27_backlog_v2.md` (what-next note, R41 rider, do-not-build
+paragraph, sources), `docs/2026-08-12_critique_greenfield_spec.md` (new, the
+archived copy, sha256 `ae3ac30e…` matching the root upload byte for byte),
+`DFS_SYSTEM_GREENFIELD_SPEC.md` (Ben's root upload, committed as received),
+this entry. Session-start gate before the edits:
+`PASS  v2.26.0  26 modules  871 tests`, carrying one changelog-debt warning
+that names 6c96474 — the ARCHIVE commit that added
+`tools/fetch_fangraphs_platoon.py` without an entry, which is R107(a)'s open
+adopt-or-delete and is reported here, not repaired. Untracked ARCHIVE
+leavings (standings zips under `data/archive/`, one pulls html, one
+reference `.bak`) sit outside this write set and were left alone.
+
+### Method
+
+The upload's review date is 2026-08-12 and its reviewed commit is 6c96474,
+which is this HEAD — like the 08-10 edition, it read the actual current
+tree, so every cite was checkable. It is the third edition of the document
+adjudicated on 2026-08-01 (R41/R42 entry) and 2026-08-10 (R103–R106 entry),
+so it was adjudicated as a DELTA: diff against the tracked 08-10 copy shows
+78 sections against 76 (new: F-35, A-43), five findings rewritten to concede
+prior rejections or landed repairs (F-02, F-05, F-16, F-20, F-21, plus
+softenings in F-13, F-30, F-31), a new audit-method-and-module-disposition
+front matter, and otherwise label renames around textually identical bodies.
+Everything textually unchanged keeps its R103–R106 disposition without
+re-argument; every NEW claim against this tree was verified in code before
+ruling, per the R36 method.
+
+### Dispositions
+
+- **Concessions recorded, no action.** F-02 now grants the
+  `Portfolio_EV_Proxy` label discipline it previously said was missing;
+  F-05 grants the retirement banners are truthful; F-16 grants the
+  `review_ready`/status repair (R105) and F-20 the paste identity repair
+  (R45 batch); F-21 grants the PO/PLR policy (R104); F-13 grants the
+  coverage floor; F-30 grants the current pins; F-31 grants that no scenario
+  bank exists to leak and re-centers on the prospective ledger, which is
+  R83 plus R10's persist-before-lock clause, both open on the board. The new
+  method section labels the reviewer's runtime claims environment-limited
+  (cold Windows 3.13, no scipy — the same concession the 08-10 adjudication
+  extracted under F-27).
+- **The bulk, standing.** F-01/F-03/F-04/F-06..F-15/F-17..F-19/F-22..F-34
+  and A-01..A-42 are textually the prior edition; the R103–R106 map carries
+  over unchanged, and the rebuild program (dfs_vnext, five planes,
+  SQLite/WAL authority, persisted FSM, signed manifests, provider client,
+  scenario/economics stack) stays rejected per the do-not-build list, gated
+  on R13 and R10. F-33's supersession demand was answered 2026-08-10 and the
+  answer stands.
+- **F-35 (new): rejected, already on the board.** It cites this repo's own
+  2026-08-11 incident (the sibling-claim restore that destroyed three
+  uncommitted files) — recorded here first as R31(d), with R110 carrying the
+  release-loop half and CLAUDE.md carrying the commit-early mitigation as of
+  this morning's doc-truth pass. Its remedy (database leases, fencing
+  tokens, read-only checkout during builds) is the rejected transactional
+  program; making the mutex refuse a held sibling stays R31(d), Ben's call.
+- **A-43 (new): rejected as the program's operating procedure.** Its one
+  hard wall — the system never opens, logs into, pastes into, or submits to
+  DraftKings — restates CLAUDE.md's money-and-entry wall. Its fourteen steps
+  map onto existing mechanisms where they are sound (runs/ input snapshots,
+  the approve gate, preflight, the T-schedule, the archival runbook), and
+  onto rejected infrastructure everywhere else (inbox watcher, FSM,
+  generation-numbered invalidation, DecisionPackage ceremony). "Budget
+  normal critical-path LLM calls at zero" is R63's one-command direction.
+- **F-20's rewritten residual: verified, adopted as a rider on R41.** The
+  claim — `showdown.py` falls back from an empty `Starting` signal to an
+  `all_healthy` pool — is true and is not silent: the fallback is documented
+  in the docstring, stamps `Pool_Basis` on every row
+  (`showdown.py:109-175`), is pinned by `test_showdown.py:111/141`, and
+  reaches the checkpoint via `build_slate.py:1912/2069`. Honest at review
+  grade, which is all Showdown ships. The binding point is certification,
+  so R41 gains the rider: when Showdown comes under the gates, pool basis
+  joins the certification evidence beside the relaxation counts, and an
+  `all_healthy` pool can certify only as what it is.
+- **F-12's new `--no-manifest` sentence: verified true and by design.** The
+  flag is an explicit waiver that WARNS ("nothing on disk states this file
+  is the one to upload", `preflight_upload.py:1212-1215`), and the
+  unwaived default for a delivered file is a HARD FAILURE (R3(b),
+  `:842-844`, `:1224-1227`). Missing, stale, and unreadable feeds warn
+  loudly with the unchecked slots NAMED (`:1042`, `:1044-1050`,
+  `:1092-1096`, `:1235-1237`) while a rostered player absent from a
+  CONFIRMED lineup hard-fails (R4). That asymmetry is the ruled-on policy —
+  absence of evidence is not a scratch, and hard-failing a missing feed
+  would block legitimate pre-post uploads — so the standing F-12
+  disposition holds unchanged.
+- **F-14's `assume_gates` sentence: standing.** The hatch is the sanctioned,
+  artifact-recorded escape from the F4 doctrine (gates are None when nothing
+  checkable says otherwise, and None blocks), not a silent conversion;
+  Finding 2/Finding 3 dispositions and R66/R68 cover the swap-side
+  staleness.
+- **Fact check on the new front matter.** 724 tracked files exact, 267
+  archived standings CSVs exact, 6 test files exact; "56 production files"
+  counts 60 by this session's find (definition-dependent), "19 slate dates"
+  is 21 archive dirs today. The MANIFEST.md staleness claim remains true and
+  remains filed (R76(a)). First edition of this document to substantially
+  survive its own fact check.
+- **R107(c) premise updated:** the root `DFS_SYSTEM_GREENFIELD_SPEC.md` now
+  pairs byte-identical with `docs/2026-08-12_critique_greenfield_spec.md`
+  rather than the 08-10 archive. Whether a root copy should exist at all
+  stays inside R107(c), Ben's.
+
+### Why
+
+Ben asked for accept/reject/modify on every element and the backlog updated
+with anything worth adopting. The third edition's value, like the second's,
+is convergence rather than architecture: it concedes the facts the last
+adjudication checked, its two new sections describe an incident and a wall
+this repo recorded first, and its one verifiable new residual (F-20's
+`all_healthy` fallback) was worth exactly one rider on the item that already
+owns the decision it touches. The queue is unchanged: R37(2) waits on
+ARCHIVE and slates, R10/R40/R60 hold their order, and no rebuild-program
+work is funded while R13 is undecided.
+
 ## 2026-08-12 — doc-truth pass: the contract states its own write set, the mutex admits it is nominal, and two fragments become items
 
 DEV, engine claim `engine_2026-08-12`, at Ben's request to review what the last
