@@ -69,7 +69,7 @@ there was nothing to copy, because `cat >` opens the destination before it
 reads the source. All seven came back from HEAD and no uncommitted edit was
 lost, this time. The step now extracts to the mount and guards each file on
 `[ -s "$STAGE/$f" ]`. Two more limits landed in the same section: GitHub's
-default branch is a stale `master` 33 commits behind `main`, so a plain clone
+default branch is a stale `master` 43 commits behind `main`, so a plain clone
 silently checks out the 2026-08-04 tree, and `sync_check.py` hardcodes `main`
 at three sites and therefore answers about a branch the caller may not be on.
 
@@ -111,6 +111,21 @@ it, and the check that exists to stop a session from clearing a live lock can
 never say no. Now `pgrep -x git`, with the reason stated so nobody reverts it
 to the friendlier-looking form. The locks were then moved aside under a
 timestamped suffix per the documented remedy and the commit went through.
+
+### Two numbers this entry got wrong on the first pass
+
+Both caught by a verification pass over the commit rather than by review of the
+source fragments, which is where they came from. **"33 commits behind"** was
+`43` at 11ffd55: the fragment's number was measured at `3d343a3` on 2026-08-08
+and was eight commits stale by the time it was filed, and the fragment says
+"roughly 33 hours" nine lines below it, which is probably the conflation. The
+corrected text carries the as-of date, because that count grows every session
+and a bare number will be wrong again next week. **"nine skip guards"** was
+eight of nine: R62's audit-honesty half added four guards before the vendoring
+half deleted the eight salary-file ones, and the ninth is a Showdown guard that
+a tracked fixture already satisfies. Both numbers were repeated across files
+before being checked, which is the argument for checking a borrowed figure at
+the point it is copied rather than at the point it is written down.
 
 ### The ledger pin line, corrected off-changelog
 

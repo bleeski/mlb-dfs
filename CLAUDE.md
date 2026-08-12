@@ -184,10 +184,12 @@ Roles; Ben's first message assigns one:
   data/slates/<its date>/, and its own bank cache. Nothing else.
 - ARCHIVE: writes ledger/, data/archive/, data/standings/,
   data/reference/. Runs only outside live build windows.
-- DEV: writes mlb_engine/, tools/, tests/, docs/, skills/, CHANGELOG.md and
-  this file. `claim.py`'s own `WRITE_SETS` still omits CHANGELOG.md and
-  requirements.lock, so `dirt --role DEV` under-reports foreign dirt on the
-  one file the contract most wants serialized (R31(c), open). Never edits
+- DEV: writes mlb_engine/, tools/, tests/, docs/, skills/, CHANGELOG.md,
+  MLB_Classic.md, MANIFEST.md, .gitignore, .gitattributes, requirements.txt,
+  requirements.lock, and this file. `claim.py`'s own `WRITE_SETS` carries
+  that list minus CHANGELOG.md and requirements.lock, so `dirt --role DEV`
+  under-reports foreign dirt on the one file the contract most wants
+  serialized (R31(c), open). Never edits
   engine paths while any slate beacon is lit: builds re-import modules
   between steps, so a mid-slate edit changes a running build. A DEV change
   is not shipped until CHANGELOG.md carries its entry, in the same commit
@@ -203,7 +205,7 @@ still need their role and its mutex; outside a build, when in doubt, ask
 Ben.
 
 Claims are live session state in claims/, gitignored except .gitkeep.
-Take with plain mkdir (atomic, fails when held):
+Take with plain mkdir (atomic, fails when THAT EXACT NAME is held):
 `mkdir claims/<resource>_<utc-date>`, then write owner.json (role, scope,
 taken_utc). Two kinds. Engine, ledger, and inbox are MUTEXES: a failed
 mkdir means held, read owner.json and stop; never delete or take over

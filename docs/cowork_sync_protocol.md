@@ -119,14 +119,16 @@ opening the destination:
   state and print the command that completes it.
 - **A fresh clone cannot run the suite green.** It needs untracked fixtures.
   R62 vendored the paste suite's two salary files under
-  `tests/fixtures/slates/` on 2026-08-10, which removed nine skip guards and
-  that suite's staging precondition; the remaining gap is other suites'
-  fixtures. Until it closes, container runs start from a tarball of the
-  working tree, not from GitHub.
+  `tests/fixtures/slates/` on 2026-08-10, which removed eight of that suite's
+  nine `skipUnless` guards and its entry in `SUITE_PRECONDITIONS`; the ninth
+  is a Showdown guard already satisfied by a tracked fixture. The remaining
+  gap is other suites' fixtures. Until it closes, container runs start from a
+  tarball of the working tree, not from GitHub.
 - **GitHub's DEFAULT branch is `master`, and `master` is stale.** Verified
   against the live remote on 2026-08-11: `git ls-remote --symref` returns
   `ref: refs/heads/master  HEAD`, at `d0212c2` (2026-08-04), fully contained
-  in `main` and 33 commits behind it. A plain `git clone` therefore checks out
+  in `main` and 43 commits behind it as of 2026-08-12 — a count that grows
+  every session, so read the date with it. A plain `git clone` therefore checks out
   the August 4 tree and says nothing, and the repo's landing page shows that
   state. Until Ben changes it (repo Settings, Branches, default to `main`,
   then delete `master`), clone with `-b main`. This is a setting, not code.
