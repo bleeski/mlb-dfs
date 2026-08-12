@@ -56,6 +56,20 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    Hitters are the confirmed nine per posted lineup plus the platoon-projected
    nine per TBD team; pitchers are feed probables plus explicit declarations.
    Every other salary row is absent, not excluded.
+   A PARTIAL side is a third case and it is now stated rather than implied
+   (R60). It is not confirmed, so it routes through the TBD path and its
+   posted hitters stay `Projected_Starter` — but a posted slot is OBSERVED and
+   the two fills below it are PRIORS, so the order is posted starters, then
+   platoon projection, then APPG, and a posted starter is never displaced by
+   either. Ranking the whole roster by APPG is what let a bench bat with a
+   better season take a posted starter's seat while the report read
+   `fallback_top9_appg, 9 hitters`. Any posted starter that still does not
+   reach the pool is NAMED in the pool report; and `tbd_fallback='exclude'`
+   drops the team's seeded rows too, because "team excluded" has to mean
+   excluded. What the seed does NOT do is stamp F2 from the posted slot: F2
+   from batting order belongs to the confirmed path, and whether an
+   incomplete lineup's slot earns it is a strategy question for
+   MLB_Classic.md, not a pool-membership fix.
    **A lineup Ben pastes is the primary source and is never re-fetched (R32).**
    `tools/lineups_from_paste.py` turns an mlb.com/starting-lineups paste into an
    ordinary `lineups_feed.json` tagged `source: operator_paste` per side; the
@@ -106,7 +120,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  871 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  877 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

@@ -25,6 +25,122 @@ performance claim.
 
 ---
 
+## 2026-08-12 — R60: a partial side's posted starters are seeded into the pool ahead of both priors, and "team excluded" now means excluded
+
+Fifth DEV session of 2026-08-12, engine claim `engine_2026-08-12`. Tier 1 item
+1 off the queue rebuilt earlier the same day, and the last open P1 in
+Workstream 3. Write set: `mlb_engine/intake/live_data_adapters.py`,
+`tests/test_core.py`, `tools/audit.py`, `CLAUDE.md`,
+`docs/2026-07-27_backlog_v2.md`, `docs/backlog_inbox/` (one fragment
+consumed), this entry. Gate before: `PASS  v2.26.0  26 modules  871 tests`.
+Gate after: `PASS  v2.26.0  26 modules  877 tests`.
+
+### What was wrong
+
+A side the feed marks `partial` is not confirmed, so it routes through the TBD
+path. That path built its nine from the platoon projection and then filled the
+remainder by ranking the team's whole roster on `AvgPointsPerGame`, and it
+never read the status map's posted `Projected_Starter`s. A posted starter with
+a worse season average than a bench bat therefore lost his seat to the bench
+bat.
+
+Reproduced before the fix, on the four-team pool fixture with T4 posting eight
+hitters at 2.0 APPG against its own bench at 9.0:
+
+```
+T4 hitters in pool: Bench1 Bench2 Bench3 Bench4 Hitter1..Hitter5
+POSTED STARTERS LEFT OUT: T4 Hitter6, T4 Hitter7, T4 Hitter8
+teams_report T4: {'status': 'fallback_top9_appg', 'hitters': 9}
+warnings naming a left-out starter: []
+```
+
+Three posted starters unrosterable, four bench bats in, and a team report that
+reads like a clean nine. This is the defect class the build contract exists to
+prevent: it certifies, and it is invisible in the certified output. The APPG
+spread is not synthetic — a call-up or a defensive starter carries a low season
+average on the night he is in the lineup, and the regular he replaced carries
+the higher one.
+
+A second half surfaced while reading the same block. Under
+`tbd_fallback='exclude'`, the platoon-seeded rows were already in `keep` when
+the exclude branch fired, so the blocker said "team excluded" while five of
+that team's hitters sat in the pool. The report and the pool disagreed at the
+exact moment the operator reads the blocker to decide.
+
+### What shipped
+
+Posted starters on a partial side are collected from the status map, scoped to
+slate teams and ordered by posted slot for determinism, and seeded into the
+TBD fill ahead of the platoon projection, which is ahead of APPG. The ordering
+is the point and it is an ordering of evidence: a posted slot is OBSERVED, the
+two fills below it are PRIORS, and a prior never displaces an observation.
+Team report words moved with it — `posted_partial`,
+`posted_partial_plus_platoon`, `posted_partial_plus_appg_fallback` — because a
+report that calls a mixed nine "platoon" hides which seats were posted. Any
+posted starter that still fails to reach the pool is named with his DK ID.
+Under `exclude`, the seeded rows are dropped and the blocker says how many.
+
+After, same inputs: all eight posted starters in, exactly one bench bat filling
+the ninth seat, status `posted_partial_plus_appg_fallback`.
+
+What deliberately did NOT ship: F2 stamped from the posted slot. The confirmed
+path stamps F2 from batting order; whether an incomplete lineup's slot earns
+the same treatment is a strategy question for MLB_Classic.md, and answering it
+inside a pool-membership fix is how a strategy change ships invisibly. Posted
+seeds carry `batting_order=None`, exactly as the platoon path does.
+
+### The rule, not just the fix
+
+CLAUDE.md build-contract item 1 covered the confirmed nine and the TBD nine
+only, so the partial side had no rule to be wrong against — which is why the
+entry called the rule undefined rather than unimplemented. Item 1 now states
+the partial case: the fill order, that a posted starter is never displaced,
+that omissions are named, that `exclude` means excluded, and that F2 is out of
+scope.
+
+### The staleness gate followed
+
+`platoon_dependent_teams` was derived from which teams the platoon reference
+COVERS. Seeding makes that the wrong question: posted starters can take all
+nine seats, and the covered-but-unused team would then drag a stale-reference
+blocker onto a build whose nine were entirely posted. It now follows what the
+projection actually SUPPLIED, which is the same reasoning item 1 already
+applies to a fully pasted slate reading no reference at all. An excluded team
+is removed from the list with its rows.
+
+### Tests
+
+Six in `tests.test_core.PartialSidePoolTests`, pin 570 → 576. Teeth verified
+by disabling the seeding and the exclude-drop in place: four of the six fail,
+the two that do not being the over-reach guards — a fully confirmed slate is
+untouched, and a side that DOES lean on the projection still blocks on a
+39-day-old reference. Both are supposed to pass either way; that is what makes
+them guards.
+
+One existing assertion moved rather than being deleted:
+`IntakeTrustTests.test_partial_team_is_named_in_the_pool_report` asserted the
+team status word `platoon` on a side where four seats were posted and five came
+from the projection. It now asserts `posted_partial_plus_platoon` and the nine
+count, which is the more truthful statement and the reason the word changed.
+
+### Also in this commit
+
+**R109 gained a dated note** that qualifies its own title: a fourth stale
+`.git/index.lock` blocked this commit, and `rm` cleared it, because the
+session already held Cowork's `allow_cowork_file_delete` for this folder. The
+mount's unlink refusal is the default, not an absolute, and the grant lifts it
+folder-wide for the session — so the remedy reorders to "ask for the grant,
+`mv` only as fallback", and R109's residue sweep is no longer blocked on a
+hand step. No code changed; the note is on the entry.
+
+**R113 filed** in Workstream 4 from BUILD's 2026-08-12 fragment, and the
+fragment consumed: the Showdown caution text reports `captain_lock_relaxed` as
+if it were `captain_cap_relaxed`, on a MIL@SD build where the realized captain
+maximum was 5 of 19 against a cap count of 6 and nothing about the cap was
+relaxed. It joins the false-signal batch at Tier 1 item 4, whose reporting
+surface it shares. Queue updated: R60 struck from Tier 1, R69 named its
+successor and the head of the tier.
+
 ## 2026-08-12 — the what-next queue rebuilt as a six-tier development order: impact against lift, with waits-on-whom as the third axis (docs only)
 
 Fourth DEV session of 2026-08-12, engine claim `engine_2026-08-12_order`, at

@@ -6520,7 +6520,12 @@ class IntakeTrustTests(unittest.TestCase):
                 self._salary(tmp), self._partial_feed(),
                 platoon_json=self._platoon(collected="2026-07-10"))
             report = pool["pool_report"]
-            self.assertEqual(report["teams"]["T4"]["status"], "platoon")
+            # R60 moved this word off "platoon" and it is load-bearing: four of
+            # these nine seats were POSTED and five came from the projection, and
+            # a report that calls the whole team "platoon" hides which is which.
+            self.assertEqual(report["teams"]["T4"]["status"],
+                             "posted_partial_plus_platoon")
+            self.assertEqual(report["teams"]["T4"]["hitters"], 9)
             self.assertTrue(any("T4" in w and "partial" in w and "Projected_Starter" in w
                                 for w in report["warnings"]),
                             report["warnings"])
@@ -6736,6 +6741,196 @@ class IntakeTrustTests(unittest.TestCase):
             self.assertEqual(status["age_basis"], "collected_date")
             # mtime is minutes old here; reading it would have called this fresh.
             self.assertGreater(status["age_days"], 9000)
+
+
+class PartialSidePoolTests(unittest.TestCase):
+    """R60. A partial side's posted starters are observed fact, and the TBD fill
+    never consulted them.
+
+    The side is not confirmed, so it routes through the TBD path, where the fill
+    ranked the whole roster by AvgPointsPerGame. A posted starter having a worse
+    season than a bench bat therefore left the posted starter unrosterable while
+    the bench bat entered the pool, and the team reported nine hitters filled.
+    """
+
+    @staticmethod
+    def _salary(tmp, *, posted_appg=2.0, bench_appg=9.0, team="T4"):
+        """T4's posted starters out-earned by its own bench bats on APPG.
+
+        Not synthetic: a call-up or a defensive starter carries a low season
+        average on the night he is in the lineup, and the bench bat he replaced
+        carries the higher one.
+        """
+        path = Path(tmp) / "salary.csv"
+        pool_salary_csv(path)
+        with path.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        header, body = rows[0], rows[1:]
+        appg, name, abbrev = (header.index("AvgPointsPerGame"),
+                              header.index("Name"), header.index("TeamAbbrev"))
+        for row in body:
+            if row[abbrev] != team:
+                continue
+            if "Hitter" in row[name]:
+                row[appg] = posted_appg
+            elif "Bench" in row[name]:
+                row[appg] = bench_appg
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            writer.writerows(body)
+        return path
+
+    @staticmethod
+    def _partial_feed(hitters=8):
+        feed = pool_lineups_feed()
+        side = feed["games"][1]["home"]        # T4, TBD in the base fixture
+        side["lineup_status"] = "partial"
+        side["lineup"] = [{"name": f"T4 Hitter{i+1}", "order": i + 1, "bat_side": "R"}
+                          for i in range(hitters)]
+        return feed
+
+    @staticmethod
+    def _platoon(slots=0):
+        return {"collected_date": "2026-07-10", "teams": [
+            {"abbrev": "T4", "page_updated": "2026-07-10",
+             "vs_RHP": [{"player": f"T4 Hitter{i+1}", "slot": i + 1}
+                        for i in range(slots)],
+             "vs_LHP": [{"player": f"T4 Hitter{i+1}", "slot": i + 1}
+                        for i in range(slots)]}]}
+
+    def _t4_hitters(self, pool):
+        return sorted(row["Name"] for row in pool["projection_rows"]
+                      if row["Team"] == "T4"
+                      and "P" not in row["Position"].split("/"))
+
+    def test_posted_starters_outrank_bench_bats_on_a_partial_side(self):
+        """Teeth: dropping the seeding puts T4 Hitter6/7/8 out of the pool and
+        all four bench bats in it, which is the reproduction this item was filed
+        on. The APPG spread is what makes the ranking, not the posting, decide.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = lda.build_slate_pool(
+                self._salary(tmp), self._partial_feed(hitters=8),
+                platoon_json=self._platoon(slots=0))
+            names = self._t4_hitters(pool)
+            for i in range(8):
+                self.assertIn(f"T4 Hitter{i+1}", names,
+                              "a POSTED starter is unrosterable")
+            # Exactly one slot is left for the fill, and no posted starter is
+            # displaced to make room for it.
+            self.assertEqual(len(names), 9)
+            self.assertEqual([n for n in names if "Bench" in n], ["T4 Bench1"])
+            report = pool["pool_report"]
+            self.assertEqual(report["teams"]["T4"]["status"],
+                             "posted_partial_plus_appg_fallback")
+            self.assertEqual(report["teams"]["T4"]["hitters"], 9)
+            self.assertFalse([w for w in report["warnings"] if "left out" in w],
+                             report["warnings"])
+
+    def test_posted_starters_are_seeded_ahead_of_the_platoon_projection(self):
+        """The platoon reference is a prior; a posted slot is not. When both
+        name a nine, the posted names take the seats they claim."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feed = pool_lineups_feed()
+            side = feed["games"][1]["home"]
+            side["lineup_status"] = "partial"
+            # Posted side is the four bench bats; the platoon file projects the
+            # nine regulars. Posted wins the four seats it names.
+            side["lineup"] = [{"name": f"T4 Bench{i+1}", "order": i + 1,
+                               "bat_side": "R"} for i in range(4)]
+            pool = lda.build_slate_pool(
+                self._salary(tmp, posted_appg=9.0, bench_appg=2.0), feed,
+                platoon_json=self._platoon(slots=9))
+            names = self._t4_hitters(pool)
+            self.assertEqual(len(names), 9)
+            for i in range(4):
+                self.assertIn(f"T4 Bench{i+1}", names)
+            self.assertEqual(pool["pool_report"]["teams"]["T4"]["status"],
+                             "posted_partial_plus_platoon")
+
+    def test_an_excluded_tbd_team_leaves_no_rows_in_the_pool(self):
+        """R60(b). 'team excluded' has to mean excluded.
+
+        Teeth: before the fix the platoon-seeded rows stayed in the pool while
+        the blocker said the team was out, so the report and the pool disagreed
+        at the moment the operator reads the blocker to decide.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "salary.csv"
+            pool_salary_csv(path)
+            pool = lda.build_slate_pool(
+                path, pool_lineups_feed(), platoon_json=self._platoon(slots=5),
+                tbd_fallback="exclude")
+            report = pool["pool_report"]
+            self.assertEqual(self._t4_hitters(pool), [])
+            self.assertEqual(report["teams"]["T4"]["hitters"], 0)
+            self.assertEqual(report["teams"]["T4"]["status"],
+                             "excluded_no_order_data")
+            hit = [b for b in report["blockers"] if "T4" in b and "excluded" in b]
+            self.assertEqual(len(hit), 1, report["blockers"])
+            self.assertIn("5 row(s) dropped from the pool", hit[0])
+
+    def test_a_posted_starter_that_does_not_reach_the_pool_is_named(self):
+        """The safety net behind the seeding: the failure R60 was filed on was
+        silent, so any posted starter still missing is named with his DK ID."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = lda.build_slate_pool(
+                self._salary(tmp), self._partial_feed(hitters=8),
+                platoon_json=self._platoon(slots=0), tbd_fallback="exclude")
+            named = [w for w in pool["pool_report"]["warnings"]
+                     if "posted starter(s) left out of the pool" in w]
+            self.assertEqual(len(named), 1, pool["pool_report"]["warnings"])
+            for i in range(8):
+                self.assertIn(f"T4 Hitter{i+1}", named[0])
+
+    def test_a_fully_posted_side_is_not_platoon_dependent(self):
+        """The staleness gate follows what the projection SUPPLIED, not what it
+        covers. Posted seeds can take all nine seats, and a stale reference that
+        supplied nothing must not block the build — the same reasoning CLAUDE.md
+        item 2 applies to a fully pasted slate.
+
+        Teeth: deriving platoon_dependent_teams from coverage rather than use
+        puts T4 back in the list and the 39-day blocker fires on a side whose
+        nine were all posted.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            stale = self._platoon(slots=9)
+            stale["collected_date"] = "2026-06-01"      # 39 days before the slate
+            stale["teams"][0]["page_updated"] = "2026-06-01"
+            pool = lda.build_slate_pool(
+                self._salary(tmp), self._partial_feed(hitters=9),
+                platoon_json=stale, stale_platoon_policy="block")
+            report = pool["pool_report"]
+            self.assertEqual(report["teams"]["T4"]["status"], "posted_partial")
+            self.assertEqual(report["platoon_dependent_teams"], [])
+            self.assertFalse([b for b in report["blockers"] if "days old" in b],
+                             report["blockers"])
+            # The guard on the guard: a side that DOES lean on the projection
+            # still blocks on the same reference.
+            leaning = lda.build_slate_pool(
+                self._salary(tmp), self._partial_feed(hitters=4),
+                platoon_json=stale, stale_platoon_policy="block")
+            self.assertEqual(
+                leaning["pool_report"]["platoon_dependent_teams"], ["T4"])
+            self.assertTrue([b for b in leaning["pool_report"]["blockers"]
+                             if "39 days old" in b],
+                            leaning["pool_report"]["blockers"])
+
+    def test_a_confirmed_side_is_untouched_by_the_seeding(self):
+        """Over-reach guard: the confirmed path owns its nine and keeps its F2
+        stamp, and nothing about a fully confirmed slate moves."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp)
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(t4_confirmed=True))
+            report = pool["pool_report"]
+            for team in ("T1", "T2", "T3", "T4"):
+                self.assertEqual(report["teams"][team]["status"], "confirmed")
+            stamped = [row for row in pool["projection_rows"]
+                       if row["Team"] == "T4" and row.get("Batting_Order")]
+            self.assertEqual(len(stamped), 9)
+            self.assertFalse([w for w in report["warnings"] if "seeded" in w],
+                             report["warnings"])
 
 
 class LateSwapIdentityTests(unittest.TestCase):

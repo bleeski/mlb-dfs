@@ -965,25 +965,87 @@ def build_slate_pool(
                 "slate teams absent from the lineups feed: " + ", ".join(missing)
             )
 
-    # TBD teams: platoon projected nine, APPG fallback when platoon cannot fill.
+    # R60: a PARTIAL side's posted starters are observed fact and outrank both
+    # priors below them. The side routes through the TBD path because it is not
+    # confirmed, and until this seeding existed the path never consulted the
+    # status map: the fill ranked the whole roster by APPG, so a posted starter
+    # having a worse season than a bench bat left the posted starter
+    # unrosterable while the bench bat entered the pool. Nothing said so —
+    # the team reported 'fallback_top9_appg, 9 hitters', which is the defect
+    # class this contract exists to prevent, certifying clean and invisible in
+    # the output. Ordered by posted slot so the seed is deterministic when a
+    # side posts more than nine.
+    partial_teams = {
+        rec["team"] for rec in (status.get("partial_lineup_teams") or [])
+        if rec.get("team") in slate_team_set and rec.get("team") not in excluded_teams
+    }
+    posted_partial_by_team: Dict[str, List[str]] = {}
+    if partial_teams:
+        ranked: List[Tuple[str, int, str]] = []
+        for pid, stat in (status.get("status_by_player_id") or {}).items():
+            team = getattr(stat, "team", None)
+            if team not in partial_teams:
+                continue
+            if getattr(stat, "status", None) != PROJECTED_STARTER:
+                continue
+            sp = by_id.get(str(pid))
+            if sp is None or is_pitcher(sp) or sp.team in excluded_teams:
+                continue
+            slot = getattr(stat, "batting_order", None)
+            ranked.append((team, int(slot) if slot is not None else 99, str(pid)))
+        for team, _slot, pid in sorted(ranked):
+            posted_partial_by_team.setdefault(team, []).append(pid)
+
+    # TBD teams: posted starters first, then platoon projected nine, then APPG
+    # fallback when neither can fill.
     platoon_by_team: Dict[str, List[str]] = {}
     for pid in platoon_order:
         sp = by_id.get(pid)
         if sp is not None and not is_pitcher(sp) and sp.team not in excluded_teams:
             platoon_by_team.setdefault(sp.team, []).append(pid)
+    # R60: which teams the platoon projection ACTUALLY supplied, which is no
+    # longer the same question as which teams it covers. Posted seeds can take
+    # every seat, and a team whose projection supplied nothing must not drag the
+    # staleness gate down with it — the same reasoning CLAUDE.md item 2 already
+    # applies to a fully pasted slate.
+    platoon_used_teams: List[str] = []
     for team in tbd_teams:
-        got = platoon_by_team.get(team, [])
-        for pid in got:
+        posted = [pid for pid in posted_partial_by_team.get(team, [])
+                  if pid not in keep][:9]
+        got = [pid for pid in platoon_by_team.get(team, [])
+               if pid not in keep and pid not in posted][: max(0, 9 - len(posted))]
+        seeded = posted + got
+        for pid in seeded:
             keep[pid] = _pool_row(by_id[pid], batting_order=None)
-        n = len(got)
+        if got:
+            platoon_used_teams.append(team)
+        n = len(seeded)
         if n >= 9:
-            teams_report[team] = {"status": "platoon", "hitters": n}
+            teams_report[team] = {
+                "status": "posted_partial_plus_platoon" if posted and got
+                else "posted_partial" if posted else "platoon",
+                "hitters": n,
+            }
+            if posted:
+                warnings.append(
+                    f"{team}: {len(posted)} posted starter(s) seeded from the "
+                    f"partial lineup ahead of projected order"
+                )
             continue
         if tbd_fallback == "exclude":
-            teams_report[team] = {"status": "excluded_no_order_data", "hitters": n}
+            # R60(b): "team excluded" has to mean excluded. The seeded rows used
+            # to survive in the pool while the blocker said the team was out, so
+            # the report and the pool disagreed at the moment the operator reads
+            # the blocker to decide.
+            for pid in seeded:
+                keep.pop(pid, None)
+            if got:
+                platoon_used_teams.remove(team)
+            teams_report[team] = {"status": "excluded_no_order_data", "hitters": 0}
             blockers.append(
                 f"{team}: TBD lineup and platoon data filled only {n}/9; "
-                f"team excluded (tbd_fallback='exclude')"
+                f"team excluded (tbd_fallback='exclude'), "
+                f"{n} row(s) dropped from the pool"
             )
             continue
         candidates = sorted(
@@ -995,21 +1057,40 @@ def build_slate_pool(
             keep[sp.player_id] = _pool_row(sp, batting_order=None)
         filled = min(9, n + len(candidates[: 9 - n]))
         teams_report[team] = {
-            "status": "platoon_plus_appg_fallback" if n > 0 else "fallback_top9_appg",
+            "status": "posted_partial_plus_appg_fallback" if posted
+            else "platoon_plus_appg_fallback" if got
+            else "fallback_top9_appg",
             "hitters": filled,
         }
+        detail = ""
+        if posted:
+            detail += f"{len(posted)} posted starter(s) seeded, "
+        if got:
+            detail += f"platoon filled {len(got)}/9, "
         warnings.append(
-            f"{team}: TBD lineup; {'platoon filled ' + str(n) + '/9, ' if n > 0 else ''}"
+            f"{team}: {'partial' if posted else 'TBD'} lineup; {detail}"
             f"top-AvgPointsPerGame fallback supplied {filled - n} hitters"
+        )
+
+    # R60: the safety net behind the seeding. A posted starter that did not
+    # reach the pool is named with the reason available, because the failure
+    # this item was filed for was silent, not wrong-by-a-lot.
+    for team in sorted(posted_partial_by_team):
+        missed = [pid for pid in posted_partial_by_team[team] if pid not in keep]
+        if not missed:
+            continue
+        named = ", ".join(
+            f"{by_id[pid].name} ({pid})" for pid in missed if pid in by_id
+        )
+        warnings.append(
+            f"{team}: posted starter(s) left out of the pool: {named}"
         )
     # F17: the platoon file's age against THIS slate, escalated only when the
     # build actually leans on it. A stale reference on an all-confirmed slate
     # costs nothing and says nothing; a stale reference supplying the projected
     # nine for a team that may be stacked is the mechanism behind the whole F1
     # class of defect and it was unobservable.
-    platoon_dependent_teams = sorted(
-        t for t in tbd_teams if platoon_by_team.get(t)
-    )
+    platoon_dependent_teams = sorted(set(platoon_used_teams))
     if platoon_age_days is not None and platoon_dependent_teams:
         collected_text = (platoon_report or {}).get("collected_date")
         detail = (
