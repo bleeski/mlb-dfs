@@ -1,13 +1,13 @@
 {
  "files": {
   "expected_stats_batting.csv": {
-   "fetched_at": "2026-07-25T17:21:09.388161+00:00",
-   "rows": 602,
+   "fetched_at": "2026-08-09T19:28:39.572456+00:00",
+   "rows": 621,
    "source": "baseballsavant expected_statistics batter 2026 min=1"
   },
   "expected_stats_pitching.csv": {
-   "fetched_at": "2026-07-25T17:21:09.693608+00:00",
-   "rows": 757,
+   "fetched_at": "2026-08-09T19:28:39.697949+00:00",
+   "rows": 788,
    "source": "baseballsavant expected_statistics pitcher 2026 min=1"
   }
  },
