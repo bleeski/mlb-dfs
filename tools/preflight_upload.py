@@ -135,6 +135,10 @@ STATUS_VALUES = ("candidate", "upload_ready", "blocked", "acknowledged",
 
 CLASSIC_MAX_HITTERS_PER_TEAM = 5
 CLASSIC_MIN_GAMES = 2
+# A posted MLB lineup is nine hitters. R46 round 2 subtracts the posted count
+# from this to learn how many slots on a partially-posted side are still unknown,
+# which is the only arithmetic that can make a projected fill provably wrong.
+POSTED_LINEUP_SLOTS = 9
 CAPTAIN_MULTIPLIER = 1.5
 
 _GAME_INFO_DT_RE = re.compile(
@@ -1035,6 +1039,25 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
     check. That is the classic DFS zero and the evidence to catch it was already
     on disk. ``strict=False`` (--feed-lenient) restores the warning. A team that
     has not posted is untouched either way: TEAM_UNCONFIRMED is not evidence.
+
+    R46 round 2, 2026-08-12. Three sides exist, not two, and each gets its own
+    treatment:
+
+    - CONFIRMED: a rostered player outside the posted nine is a hard fail. R4.
+    - PARTIAL, meaning posted hitters under a non-confirmed status: the posted
+      names ARE observed and are checked against. A miss is a projected fill,
+      which is legal, so it is named with its exposure rather than failed; but
+      an entry rostering more misses than the side has un-posted slots is
+      arithmetically impossible and fails. A declared probable pitcher is a
+      stated fact on a partial side too, so a different arm is a contradiction.
+    - UNPOSTED: nothing to check against. Soft, per R46, and now named.
+
+    The recurrence this fixes: R46 reported the blind spot as a team name and a
+    slot count, which is a pointer to an analysis rather than a finding. On the
+    1840_3g slate a bench catcher rode six of eighteen certified entries and the
+    warning that covered him read "DET (32 slots)". Every case above now names
+    the player and how many entries carry him, because that is the sentence that
+    gets read at T-40.
     """
     try:
         feed = json.loads(feed_path.read_text(encoding="utf-8"))
@@ -1050,47 +1073,108 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                      f"from it is that old too")
     rep.info["feed_file"] = str(feed_path)
     posted: Dict[str, set[str]] = {}
+    posted_hitters: Dict[str, int] = {}
+    declared_probable: Dict[str, str] = {}
     confirmed_teams: set[str] = set()
+    partial_teams: set[str] = set()
     for game in feed.get("games", []) or []:
         for side in ("away", "home"):
             block = game.get(side) or {}
             team = str(block.get("team_abbrev") or "").upper()
             if not team:
                 continue
-            names = {_norm_name(p.get("name")) for p in (block.get("lineup") or [])}
+            lineup = block.get("lineup") or []
+            names = {_norm_name(p.get("name")) for p in lineup}
             pp = (block.get("probable_pitcher") or {}).get("name")
             if pp:
                 names.add(_norm_name(pp))
+                declared_probable[team] = _norm_name(pp)
             posted.setdefault(team, set()).update(names)
-            if str(block.get("lineup_status") or "").lower() == "confirmed":
+            posted_hitters[team] = max(posted_hitters.get(team, 0), len(lineup))
+            status = str(block.get("lineup_status") or "").lower()
+            if status == "confirmed":
                 confirmed_teams.add(team)
+            elif 0 < len(lineup) < POSTED_LINEUP_SLOTS:
+                # R46 round 2. A side with SOME posted hitters and a non-confirmed
+                # status is a THIRD case, and collapsing it into the unposted
+                # branch below is how 2026-08-12 happened: DET posted eight of
+                # nine, the ninth was unrosterable on DK so the paste read
+                # 'partial', and every DET slot skipped the check even though
+                # eight observed names were sitting in `posted` one line up.
+                #
+                # The bound is `< 9` deliberately, and it is the whole distinction
+                # R4 and R46 were protecting. A side listing all nine under a
+                # non-confirmed status is most likely a PROJECTED nine, and a
+                # projection is a labeled prior: a rostered player outside it is
+                # contradicted by a guess, not by an observation, so hard-failing
+                # there would block legal builds. Under nine is different. Those
+                # names came from a real posting in progress, and the arithmetic
+                # below only ever runs against observed slots.
+                partial_teams.add(team)
+    partial_teams -= confirmed_teams
     absent: List[str] = []
     unconfirmed: Dict[str, int] = {}
+    projected: Dict[tuple, int] = {}
+    overdrawn: List[str] = []
     for e in entries:
+        drawn: Dict[str, int] = {}
         for pid in e.cells:
             row = salary.get(pid)
             if not row:
                 continue
             team = str(row.get("TeamAbbrev") or "").upper()
-            if team not in confirmed_teams:
-                # R46: this branch was pure silence, and that silence is the
-                # 2026-08-03 incident. ARI had not posted at build time, so the
-                # feed said tbd, so every ARI slot skipped this check without a
-                # word -- and a platoon-projected bench player (Tyler Locklear)
-                # rode two certified entries to the edge of upload. Nothing on
-                # disk could have caught it at that minute; what was missing is
-                # the statement that the check did not cover those slots. It
-                # stays SOFT: a genuinely unposted team pre-lock is normal, R27
-                # ships on warn by design, and hard-failing here would block
-                # legal builds. It is now loud, and it names what to re-check.
-                unconfirmed[team] = unconfirmed.get(team, 0) + 1
-                continue
-            if _norm_name(row.get("Name")) not in posted.get(team, set()):
-                absent.append(f"{e.entry_id}: {row.get('Name')} ({team}) is not in "
+            name = str(row.get("Name") or "")
+            if _norm_name(name) in posted.get(team, set()):
+                continue                      # observed on the field, any status
+            if team in confirmed_teams:
+                absent.append(f"{e.entry_id}: {name} ({team}) is not in "
                               f"{team}'s confirmed lineup or probables")
+                continue
+            # Not observed, and his team is not confirmed. R46 named the TEAM and
+            # counted its slots; a team name and a slot count still leave the
+            # reader to work out WHO, and on 2026-08-12 nobody did that at T-40.
+            # Name the player and his exposure, every time, for both remaining
+            # cases. It stays SOFT for the reason R46 gives: a genuinely unposted
+            # team pre-lock is normal and R27 ships on warn by design.
+            projected[(name, team)] = projected.get((name, team), 0) + 1
+            if team in partial_teams:
+                if str(row.get("Roster Position") or "").upper() == "P":
+                    if team in declared_probable:
+                        # The probable is a STATED fact even on a partial side,
+                        # so a different arm is a contradiction, not an unknown.
+                        absent.append(f"{e.entry_id}: {name} ({team}) is not "
+                                      f"{team}'s declared probable pitcher")
+                    # With no probable declared the arm is genuinely unknown. It
+                    # is named in `projected` either way, and it never consumes a
+                    # HITTER slot in the arithmetic below.
+                    continue
+                drawn[team] = drawn.get(team, 0) + 1
+            else:
+                unconfirmed[team] = unconfirmed.get(team, 0) + 1
+        for team, n in sorted(drawn.items()):
+            unknown = max(0, POSTED_LINEUP_SLOTS - posted_hitters.get(team, 0))
+            if n > unknown:
+                overdrawn.append(
+                    f"{e.entry_id}: {n} {team} hitter(s) absent from a lineup that "
+                    f"posted {posted_hitters.get(team, 0)} of {POSTED_LINEUP_SLOTS}, "
+                    f"leaving only {unknown} slot(s) genuinely unknown")
     uniq = sorted(set(absent))
     rep.info["feed_absent"] = uniq
     rep.info["feed_unconfirmed_teams"] = dict(sorted(unconfirmed.items()))
+    rep.info["feed_partial_teams"] = {t: posted_hitters.get(t, 0)
+                                      for t in sorted(partial_teams)}
+    rep.info["feed_projected_players"] = {
+        f"{name} ({team})": n for (name, team), n in sorted(projected.items())}
+    if projected:
+        total = len(entries)
+        parts = []
+        for (name, team), n in sorted(projected.items(), key=lambda kv: (-kv[1], kv[0])):
+            where = (f"{team} posted {posted_hitters.get(team, 0)} of "
+                     f"{POSTED_LINEUP_SLOTS}" if team in partial_teams
+                     else f"{team} has not posted")
+            parts.append(f"{name} ({team}) in {n} of {total}, {where}")
+        rep.warn(f"{len(projected)} rostered player(s) absent from a posted lineup, "
+                 f"each filling a projected slot: " + "; ".join(parts[:10]))
     if unconfirmed:
         rep.warn(f"{len(unconfirmed)} rostered team(s) have no confirmed lineup in "
                  f"this feed, so their slots were NOT cross-checked: "
@@ -1101,6 +1185,13 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
     if uniq:
         message = (f"{len(uniq)} rostered player(s) absent from a confirmed posted "
                    f"lineup: " + "; ".join(uniq[:10]))
+        rep.fail(message) if strict else rep.warn(message)
+    if overdrawn:
+        # Arithmetic, not judgment: more unknowns rostered than the posted lineup
+        # leaves unknown cannot be right whatever the projection said.
+        message = (f"{len(overdrawn)} entr{'ies' if len(overdrawn) != 1 else 'y'} "
+                   f"roster more absent players than the posted lineup leaves "
+                   f"unknown: " + "; ".join(sorted(set(overdrawn))[:10]))
         rep.fail(message) if strict else rep.warn(message)
 
 

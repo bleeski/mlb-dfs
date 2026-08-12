@@ -1729,24 +1729,36 @@ def write_three_game_salary(path: Path) -> dict:
     return ids
 
 
-def write_three_game_feed(path: Path, postponed=(), confirmed=None) -> Path:
+def write_three_game_feed(path: Path, postponed=(), confirmed=None,
+                          partial=None, probables=None) -> Path:
     """A lineups feed for the same three games, start times matching the salary.
 
     ``confirmed`` is {team: [player names]}; those sides read ``confirmed`` with
     that posted lineup and every other side stays ``tbd``. R46's check only fires
     against a CONFIRMED side, so a feed of all-tbd sides exercises nothing.
+
+    ``partial`` is the same shape and produces R46-round-2's third case: posted
+    hitters under ``lineup_status: partial``, which is what an mlb.com paste
+    yields when a posted starter has no DK salary row. ``probables`` is
+    {team: name} and attaches a declared probable pitcher to any side.
     """
     posted = {k.upper(): list(v) for k, v in (confirmed or {}).items()}
+    part = {k.upper(): list(v) for k, v in (partial or {}).items()}
+    arms = {k.upper(): v for k, v in (probables or {}).items()}
 
     def side(team):
-        names = posted.get(team.upper())
+        key = team.upper()
+        pp = {"name": arms[key]} if key in arms else None
+        names, status = posted.get(key), "confirmed"
+        if names is None:
+            names, status = part.get(key), "partial"
         if names is None:
             return {"team_abbrev": team, "lineup_status": "tbd",
-                    "lineup": [], "probable_pitcher": None}
-        return {"team_abbrev": team, "lineup_status": "confirmed",
+                    "lineup": [], "probable_pitcher": pp}
+        return {"team_abbrev": team, "lineup_status": status,
                 "lineup": [{"name": n, "batting_order": i + 1}
                            for i, n in enumerate(names)],
-                "probable_pitcher": None}
+                "probable_pitcher": pp}
 
     games = []
     for pk, (_game, (away, home), utc) in enumerate(THREE_GAMES, start=1):
@@ -2030,9 +2042,9 @@ class VerifyExportSlateTruthTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def _feed(self, confirmed) -> Path:
+    def _feed(self, confirmed, **kw) -> Path:
         return write_three_game_feed(self.dir / "lineups_feed.json",
-                                     confirmed=confirmed)
+                                     confirmed=confirmed, **kw)
 
     def _verify(self, *extra, feed: Path):
         return run_verify("--entries", str(self.entries), "--salary", str(self.salary),
@@ -2075,6 +2087,82 @@ class VerifyExportSlateTruthTests(unittest.TestCase):
         ).stdout)
         self.assertNotIn("AAA", payload["info"]["feed_unconfirmed_teams"])
         self.assertEqual(payload["info"]["feed_absent"], [])
+
+    # -- R46 round 2: the partial side, and naming the player ------------------
+    #
+    # 2026-08-12, slate 1840_3g. The operator paste held all nine DET slots but
+    # the ninth had no DK salary row, so lineups_from_paste wrote
+    # lineup_status 'partial'. Every DET slot then skipped this check, a bench
+    # catcher (Eduardo Valencia, higher APPG and $1,100 cheaper than the posted
+    # catcher) won six of eighteen entries on value, and all three gates plus
+    # this preflight passed. The warning that covered him read "DET (32 slots)".
+    # R46 had already made the blind spot loud; what it did not do was assemble
+    # the finding, and a slot count is a pointer to an analysis nobody runs at
+    # T-40. These pin the third case and the naming.
+
+    def _partial_feed(self, names, **kw):
+        return self._feed(None, partial={"AAA": list(names)}, **kw)
+
+    def test_a_partial_side_is_cross_checked_instead_of_skipped(self):
+        # AAA posted eight, none of them Frost. Frost is legal (one slot is still
+        # unknown) but he is NAMED, with his exposure and the posted count.
+        result = self._verify(feed=self._partial_feed(self.aaa_posted[:8]))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("absent from a posted lineup", result.stdout)
+        self.assertIn("AAA Frost (AAA) in 1 of 1", result.stdout)
+        self.assertIn("AAA posted 8 of 9", result.stdout)
+
+    def test_a_partial_side_is_no_longer_reported_as_never_cross_checked(self):
+        payload = json.loads(self._verify(
+            "--json", feed=self._partial_feed(self.aaa_posted[:8])).stdout)
+        self.assertNotIn("AAA", payload["info"]["feed_unconfirmed_teams"])
+        self.assertEqual(payload["info"]["feed_partial_teams"], {"AAA": 8})
+        aaa = {k: v for k, v in payload["info"]["feed_projected_players"].items()
+               if k.endswith("(AAA)")}
+        self.assertEqual(aaa, {"AAA Frost (AAA)": 1})   # Aster is posted here
+
+    def test_a_posted_name_on_a_partial_side_raises_nothing(self):
+        # Every rostered AAA name is among the posted eight, so nothing is named
+        # for AAA's hitters at all.
+        posted = ["AAA Boone", "AAA Crane", "AAA Dunne", "AAA Ellis", "AAA Frost",
+                  "AAA Gable", "AAA Hollis", "AAA Ives"]
+        payload = json.loads(self._verify(
+            "--json", feed=self._partial_feed(posted)).stdout)
+        self.assertEqual(
+            [k for k in payload["info"]["feed_projected_players"] if "AAA" in k],
+            ["AAA Aster (AAA)"])          # the arm only, no declared probable
+
+    def test_more_absent_hitters_than_unknown_slots_is_a_hard_fail(self):
+        # AAA posted eight of nine, so exactly one slot is unknown; this entry
+        # seats two AAA hitters who are not in it. Arithmetic, not judgment.
+        posted = ["AAA Boone", "AAA Crane", "AAA Dunne", "AAA Jarrow",
+                  "AAA Kemp", "AAA Lowry", "AAA Mabry", "AAA Nunn"]
+        result = self._verify(feed=self._partial_feed(posted))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("more absent players than the posted lineup leaves unknown",
+                      result.stdout)
+        self.assertIn("2 AAA hitter(s)", result.stdout)
+        self.assertIn("posted 8 of 9", result.stdout)
+
+    def test_feed_lenient_downgrades_the_overdraw_to_a_warning(self):
+        posted = ["AAA Boone", "AAA Crane", "AAA Dunne", "AAA Jarrow",
+                  "AAA Kemp", "AAA Lowry", "AAA Mabry", "AAA Nunn"]
+        result = self._verify("--feed-lenient", feed=self._partial_feed(posted))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("WARN", result.stdout)
+        self.assertIn("more absent players than the posted lineup leaves unknown",
+                      result.stdout)
+
+    def test_a_declared_probable_is_a_stated_fact_on_a_partial_side(self):
+        # The side is partial, so its hitters are priors, but the arm it named is
+        # not. A different arm contradicts the feed and fails.
+        # aaa_posted[0] is the arm this fixture seats, so post the eight AFTER
+        # him: the side names a different probable and Aster contradicts it.
+        result = self._verify(feed=self._partial_feed(
+            self.aaa_posted[1:9], probables={"AAA": "AAA Quill"}))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("is not AAA's declared probable pitcher", result.stdout)
+        self.assertIn("AAA Aster", result.stdout)
 
     # -- R72(ii): the parent stops being opt-in -------------------------------
 

@@ -25,6 +25,73 @@ performance claim.
 
 ---
 
+## 2026-08-12 — R46 round 2: preflight names the player, and a PARTIAL side stops skipping the check
+
+R46 made the posted-lineup blind spot loud. It did not make it a finding, and on
+the `1840_3g` slate that cost six of eighteen certified entries.
+
+The chain. The operator paste held all nine DET slots; the ninth, Corey Julks,
+has no DK salary row, so `lineups_from_paste.py` wrote `lineup_status: partial`
+with `reason: "mlb.com posted a partial lineup"` — which is false, mlb.com posted
+a complete one. R60's TBD routing then seeded a ninth DET hitter from a 7.9-day
+platoon reference and picked Eduardo Valencia, the bench catcher, who is $1,100
+cheaper and 0.44 APPG better than the posted catcher. The optimizer took him in a
+third of the portfolio on value. `workflow_valid`, `selection_certified`,
+`allocation_certified` and `preflight_upload` all passed, because DK lists him as
+active: he is rosterable, just not playing.
+
+`check_feed` had the evidence. `posted[team]` is populated for every side before
+the confirmed test, so DET's eight observed names were in memory when
+`team not in confirmed_teams` threw them away. What the operator saw instead was
+`DET (32 slots)`, a team name and a slot count, which is a pointer to an analysis
+nobody runs at T-40. Second occurrence of the same mechanism in nine days;
+Locklear on 2026-08-03 was the first.
+
+Three changes, all in `tools/preflight_upload.py`:
+
+- **Three sides, not two.** A side with posted hitters under a non-confirmed
+  status is now PARTIAL and is cross-checked against its posted names. The bound
+  is `0 < posted < 9` deliberately: a side listing all nine under a non-confirmed
+  status is most likely a projected nine, and a projection is a labeled prior, so
+  a rostered player outside it is contradicted by a guess rather than an
+  observation. That distinction is what R4's `test_a_team_that_has_not_posted_stays_soft`
+  was protecting, and it still passes untouched.
+- **Name the player, every time.** Every rostered player absent from a posted
+  lineup is reported by name with the entry count carrying him and his team's
+  posted count, for the partial and the unposted case alike:
+  `Eduardo Valencia (DET) in 6 of 18, DET posted 8 of 9`. Soft, for R46's stated
+  reason. New info keys `feed_projected_players` and `feed_partial_teams`; the
+  R46 slot-count warning stays for genuinely unposted teams.
+- **One arithmetic hard fail.** An entry rostering more absent hitters than its
+  side has un-posted slots cannot be right whatever the projection said. Strict
+  by default, warn under `--feed-lenient`. It would NOT have fired on Valencia
+  (one absent bat against one unknown slot), which is the point: naming does the
+  work and this is the floor. A declared probable pitcher is a stated fact on a
+  partial side too, so a different arm is a contradiction; an arm on a side that
+  declared no probable is an unknown and never consumes a hitter slot.
+
+Verified against the two real files from the slate. The superseded build
+(`fadcd669...`) now prints
+`WARN 1 rostered player(s) absent from a posted lineup, each filling a projected slot: Eduardo Valencia (DET) in 6 of 18, DET posted 8 of 9`.
+The delivered build (`df7cd44e...`) is clean.
+
+`tests.test_upload_integrity` 162 -> 168, six tests pinning the partial side, the
+naming, the arithmetic fail, its lenient downgrade, and the declared probable.
+`write_three_game_feed` grew `partial=` and `probables=`. Pin line updated in
+`tools/audit.py` (883 -> 889), `CLAUDE.md`, the ledger Quick Card, and
+`skills/generate-lineups/SKILL.md` — which read 829, stale across two moves.
+
+Not fixed here, and filed as
+`docs/backlog_inbox/2026-08-12_BUILD_partial-side-lets-a-bench-bat-into-the-pool.md`:
+the false `reason` string in `lineups_from_paste.py`; R60 costing a partial side
+its posted batting order (DET's F2 came from the platoon projection, so Malgeri
+priced 9th while batting 6th); the pool blocker that refuses a confirmed side
+with eight rosterable hitters on a `< 9` test when CLAUDE.md's stated bar is five,
+and whose message lists IL pitchers as reasons a team is short of hitters; and
+`--ignore-pool-blockers` plus `--assume-gates lineup_gate_passed` both failing to
+get past that blocker, which burned two build cycles at T-21. This entry treats
+the symptom at the last gate before upload. Those four are the disease.
+
 ## 2026-08-12 — R110 closes: the claim round trip is closed, `sweep --release` exists, and the ten stale held claims are cleared
 
 Sixth DEV session of 2026-08-12, engine claim `engine_2026-08-12`, ledger claim

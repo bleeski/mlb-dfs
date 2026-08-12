@@ -49,11 +49,12 @@ EXPECTED_SUITE_COUNTS = {
     "tests.test_showdown": 55,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
-    "tests.test_upload_integrity": 162,
+    # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
+    "tests.test_upload_integrity": 168,
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 883
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 889
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,
