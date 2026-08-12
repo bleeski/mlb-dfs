@@ -25,6 +25,110 @@ performance claim.
 
 ---
 
+## 2026-08-12 — R110 closes: the claim round trip is closed, `sweep --release` exists, and the ten stale held claims are cleared
+
+Sixth DEV session of 2026-08-12, engine claim `engine_2026-08-12`, ledger claim
+`ledger_2026-08-12`, at Ben's instruction after he was shown the ten. Write
+set: `tools/claim.py`, `tests/test_core.py`, `tools/audit.py`, `CLAUDE.md`,
+`docs/2026-07-27_backlog_v2.md`,
+`ledger/MLB_Classic_Calibration_Ledger.md` (Quick Card pin line only), this
+entry.
+
+### R110(a): the tool printed a command that did not work
+
+`check` and `sweep` print the DATED directory name, and `_incomplete_note`
+interpolates it into the release command they instruct the operator to run.
+`release` then re-derived the name and appended today's date again, so the
+printed command failed on every claim whose directory is not exactly
+`<resource>`:
+
+```
+$ python tools/claim.py release engine_2026-08-04_full_audit
+ERROR  no claim at claims/engine_2026-08-04_full_audit_2026-08-12
+```
+
+That is the loop. A session in exactly the state the note describes runs the
+note's command, gets exit 3, and hand-writes a `RELEASED` marker instead,
+which does not release. Seven claims sat HELD-with-a-marker because of it.
+
+Fixed by resolving a READ or a RELEASE against disk: an existing
+`claims/<resource>` directory is unambiguous, so it wins, and only when none
+exists does the date get appended. `take` deliberately does NOT use the
+resolver, because its whole guarantee is that the mkdir collides. `_claim_name`
+also stopped appending a date to a name that already ends in one, which is
+what minted `engine_2026-08-10_2026-08-10`. R110(b), `take` clearing a stale
+marker on re-take, was already in the tree.
+
+### `sweep --release`
+
+`sweep` already found stale held claims with the right rule and could not
+complete one, so clearing ten meant ten hand commands. It now takes
+`--release`. Plain `sweep` stays read-only, because releasing is Ben's call
+under the multi-session contract and a session-start report should not mutate
+anything.
+
+Staleness moved off the NAME and onto `owner.json`'s `taken_utc`. The two
+disagree in one direction that costs something: a BUILD session past UTC
+midnight working the previous ET slate holds a live claim whose name reads
+yesterday, and sweeping on the name would clear a live mutex while printing
+that nothing taken today was touched. owner.json is authoritative everywhere
+else in this tool and is now authoritative here; the name is the fallback when
+`taken_utc` is missing or unparseable.
+
+One existing test moved with it. `test_sweep_reports_a_stale_held_claim_and_
+deletes_nothing` built its fixture with `take --date 2020-01-01`, which writes
+`taken_utc=now` and so produced a claim that only LOOKED stale. It now
+backdates `owner.json`, which is what a real abandoned claim looks like. The
+test's intent is unchanged; its fixture stopped being fictional.
+
+### The ten
+
+Cleared at Ben's instruction on 2026-08-12: `engine_2026-08-04_full_audit`,
+`engine_2026-08-10_2026-08-10`, `ledger_2026-08-09_r37_pin_2026-08-09`,
+`ledger_2026-08-09_r37_pin_b_2026-08-09`, `slate_2026-07-29_sealad_sd`,
+`slate_2026-07-30_1910_6g`, `slate_2026-07-30_sealad_sd`,
+`slate_2026-08-01_2010_2g`, `slate_2026-08-01_stltor_sd`,
+`slate_2026-08-03_7g`. Seven carried a marker, three were beacons with none.
+Each scope was checked against the tree before release rather than assumed:
+R51/R91 are filed in both the backlog and the changelog, R101 appears in the
+changelog seven times, and the `r37` pin those two ledger claims were taken for
+has been superseded four times since. No uncommitted work sat in any of their
+write sets. Afterwards the only HELD claims are this session's two, neither
+stale.
+
+### Sequencing deviation, stated rather than buried
+
+R110's entry said it rides R31, on the reasoning that fixing one without the
+other means touching `claim.py` twice. It landed without R31 because Ben
+approved the sweep release and `sweep --release` is useless while the release
+path cannot resolve the names `sweep` prints. R31(b)(c) stays open and will
+touch this file again; that second pass is the known cost of this order.
+
+### Ledger Quick Card
+
+Line 19 read `871 tests` after R60 moved the gate to 877 and this change moved
+it to 883. It is the mandated session-start read, so a stale pin there is a
+shortfall the next session would chase. Corrected under a `ledger` claim, pin
+line only, with the correction noted in the line's own style. No ledger
+sections touched.
+
+### Gate
+
+`tests.test_core` 576 → 582, total 877 → 883. All five gated suites run
+individually and pass at exactly their pins: core 582, showdown 55,
+upload_integrity 162, golden_replay 9, paste_lineups 75. The single-line
+`--run-tests --terse` gate did NOT complete in this session's sandbox: suite
+wall time reached ~144s against a per-call ceiling near 170s that also has to
+cover five subprocess spawns and the static checks, and repeated attempts were
+killed at the cap. That is the case the Quick Card's own sandbox caveat
+prescribes a fallback for, and the fallback is what was run: per-suite, then
+`python tools/audit.py --terse` for pins and inventory, which passed
+(`PASS  v2.26.0  26 modules  ? tests`). Recorded rather than smoothed over,
+because "the gate printed PASS" and "every suite the gate runs passed at its
+pin" are different claims.
+
+---
+
 ## 2026-08-12 — R60: a partial side's posted starters are seeded into the pool ahead of both priors, and "team excluded" now means excluded
 
 Fifth DEV session of 2026-08-12, engine claim `engine_2026-08-12`. Tier 1 item

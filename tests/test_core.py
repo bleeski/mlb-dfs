@@ -7600,7 +7600,17 @@ class ClaimToolTests(unittest.TestCase):
         self.assertEqual(retake.returncode, 0, retake.stdout)
 
     def test_sweep_reports_a_stale_held_claim_and_deletes_nothing(self):
+        # R110, 2026-08-12: the fixture is backdated in owner.json rather than
+        # only in the NAME. `take --date 2020-01-01` writes taken_utc=now, and
+        # staleness reads taken_utc first because the name can lie in the
+        # direction that costs something: a BUILD session past UTC midnight
+        # working the previous ET slate holds a live claim whose name reads
+        # yesterday, and sweeping on the name would clear it.
         self._claim("take", "inbox", "--role", "ARCHIVE", "--date", "2020-01-01")
+        owner = Path(self.root, "claims", "inbox_2020-01-01", "owner.json")
+        payload = json.loads(owner.read_text(encoding="utf-8"))
+        payload["taken_utc"] = "2020-01-01T00:00:00Z"
+        owner.write_text(json.dumps(payload), encoding="utf-8")
         proc = self._claim("sweep")
         self.assertEqual(proc.returncode, 0)
         self.assertIn("STALE", proc.stdout)
@@ -10849,6 +10859,117 @@ class ClaimReleaseMarkerTests(unittest.TestCase):
                                    "--date", "2026-08-10"])
             self.assertEqual(code, 0)
             self.assertIn("free", buf.getvalue())
+
+
+class ClaimStaleSweepTests(unittest.TestCase):
+    """R110(a) plus the sweep that uses it.
+
+    `check` and `sweep` print the DATED directory name and `_incomplete_note`
+    interpolates it into the release command they tell the operator to run, but
+    `release` re-derived the name and appended today's date again. The printed
+    command therefore failed on every claim whose directory is not exactly
+    `<resource>`, which is the loop that leaves a session hand-writing a
+    RELEASED marker: seven claims sat HELD-with-a-marker on 2026-08-12.
+    """
+
+    def _claim(self, root, name, *, role="DEV", taken, marker=False):
+        target = Path(root) / "claims" / name
+        target.mkdir(parents=True)
+        (target / "owner.json").write_text(json.dumps({
+            "role": role, "scope": "", "taken_utc": taken,
+            "released_utc": None,
+        }), encoding="utf-8")
+        if marker:
+            (target / "RELEASED").touch()
+        return target
+
+    def _run(self, argv):
+        import contextlib
+        import io
+        from tools import claim
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = claim.main(argv)
+        return code, buf.getvalue()
+
+    def test_the_command_check_prints_actually_releases_the_claim(self):
+        """Teeth: with `release` re-deriving the name, this exits 3 with
+        'no claim at claims/engine_2026-08-04_full_audit_<today>'. That exact
+        failure is R110's reproduction."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._claim(tmp, "engine_2026-08-04_full_audit",
+                        taken="2026-08-04T18:47:06Z", marker=True)
+            code, out = self._run(["--root", tmp, "check"])
+            self.assertEqual(code, 0)
+            self.assertIn("release engine_2026-08-04_full_audit", out)
+            # The name the tool printed, run verbatim.
+            code, _ = self._run(["--root", tmp, "release",
+                                 "engine_2026-08-04_full_audit"])
+            self.assertEqual(code, 0)
+            code, out = self._run(["--root", tmp, "sweep"])
+            self.assertIn("no stale held claims", out)
+
+    def test_the_bare_resource_name_still_releases(self):
+        """The other end of the round trip must keep working: `release engine`
+        resolves to today's dated directory when no exact match exists."""
+        with tempfile.TemporaryDirectory() as tmp:
+            from tools import claim
+            self._claim(tmp, f"engine_{claim._today()}",
+                        taken="2026-08-12T20:07:03Z")
+            code, _ = self._run(["--root", tmp, "release", "engine"])
+            self.assertEqual(code, 0)
+
+    def test_take_does_not_mint_a_doubled_name(self):
+        """`engine_2026-08-10_2026-08-10` in claims/ is what this produced."""
+        with tempfile.TemporaryDirectory() as tmp:
+            code, _ = self._run(["--root", tmp, "take", "engine_2026-08-10",
+                                 "--role", "DEV"])
+            self.assertEqual(code, 0)
+            names = {p.name for p in (Path(tmp) / "claims").iterdir()}
+            self.assertEqual(names, {"engine_2026-08-10"})
+
+    def test_sweep_release_clears_every_stale_claim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._claim(tmp, "engine_2026-08-04_full_audit",
+                        taken="2026-08-04T18:47:06Z", marker=True)
+            self._claim(tmp, "slate_2026-07-30_1910_6g", role="BUILD",
+                        taken="2026-07-30T21:24:23Z")
+            code, out = self._run(["--root", tmp, "sweep", "--release"])
+            self.assertEqual(code, 0)
+            self.assertIn("released 2 stale held claim(s)", out)
+            _, after = self._run(["--root", tmp, "sweep"])
+            self.assertIn("no stale held claims", after)
+
+    def test_sweep_release_never_touches_a_claim_taken_today(self):
+        """Staleness is owner.json's `taken_utc`, not the name's date.
+
+        Teeth: reading staleness off the name alone releases this claim while
+        the summary line prints that nothing taken today was touched, which is
+        a live session's mutex cleared under a false reassurance.
+        """
+        from tools import claim
+        with tempfile.TemporaryDirectory() as tmp:
+            # Old-looking NAME, taken now.
+            self._claim(tmp, "engine_2026-08-10",
+                        taken=f"{claim._today()}T20:08:28Z")
+            code, out = self._run(["--root", tmp, "sweep", "--release"])
+            self.assertEqual(code, 0)
+            self.assertIn("no stale held claims", out)
+            code, _ = self._run(["--root", tmp, "check", "engine_2026-08-10"])
+            self.assertEqual(code, 2, "a claim taken today must survive a sweep")
+
+    def test_plain_sweep_still_releases_nothing(self):
+        """The reporting form is what a session runs at start; it must stay
+        read-only, because releasing is Ben's call per the contract."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._claim(tmp, "slate_2026-07-30_1910_6g", role="BUILD",
+                        taken="2026-07-30T21:24:23Z")
+            code, out = self._run(["--root", tmp, "sweep"])
+            self.assertEqual(code, 0)
+            self.assertIn("nothing is deleted here", out)
+            code, _ = self._run(["--root", tmp, "check",
+                                 "slate_2026-07-30_1910_6g"])
+            self.assertEqual(code, 2)
 
 
 class AuditSkipHonestyTests(unittest.TestCase):

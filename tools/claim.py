@@ -67,6 +67,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -100,11 +101,38 @@ def _claims_dir(root: Path) -> Path:
     return Path(root) / "claims"
 
 
+_TRAILING_DATE = re.compile(r"_\d{4}-\d{2}-\d{2}$")
+
+
 def _claim_name(resource: str, date: str) -> str:
     resource = str(resource).strip().strip("/")
     if resource.startswith("slate_"):
         return resource  # a slate claim carries its date in its own name
+    if _TRAILING_DATE.search(resource):
+        # R110(a): idempotent. Handed a name that already carries its date,
+        # appending another is what minted `engine_2026-08-10_2026-08-10`.
+        return resource
     return f"{resource}_{date}"
+
+
+def _resolve_claim_name(claims: Path, resource: str, date: str) -> str:
+    """The directory a READ or a RELEASE means, resolved against disk.
+
+    R110(a): `check` and `sweep` print the dated directory name and
+    `_incomplete_note` interpolates it into the release command it tells the
+    operator to run, but `release` re-derived the name and appended today's
+    date again, so the printed command failed on every claim whose name is not
+    exactly `<resource>`. `release engine_2026-08-09_r37_pin` exited 3 with
+    "no claim at claims/engine_2026-08-09_r37_pin_2026-08-12", which is the
+    loop that leaves a session hand-writing a RELEASED marker instead. An
+    existing directory is unambiguous, so it wins; only when none exists does
+    the date get appended. Deliberately NOT used by `take`, whose whole
+    guarantee is that the mkdir collides.
+    """
+    exact = claims / str(resource).strip().strip("/")
+    if exact.is_dir():
+        return exact.name
+    return _claim_name(resource, date)
 
 
 def _read_owner(claim: Path) -> dict:
@@ -144,7 +172,20 @@ def _incomplete_note(name: str) -> str:
             f"`python tools/claim.py release {name}`")
 
 
-def _is_stale(name: str) -> bool:
+def _is_stale(name: str, owner: Optional[dict] = None) -> bool:
+    """Stale means a PREVIOUS session left it, which `taken_utc` answers and the
+    name only approximates.
+
+    The name is a proxy and it can disagree: `take engine_2026-08-10` run today
+    mints a claim whose name reads 08-10 and whose `taken_utc` is now. Sweeping
+    that on the name alone would release a live session's claim while printing
+    that nothing taken today was touched. owner.json is authoritative
+    everywhere else in this tool, so it is authoritative here; the name is the
+    fallback when `taken_utc` is missing or unparseable.
+    """
+    taken = str((owner or {}).get("taken_utc") or "")[:10]
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", taken):
+        return taken < _today()
     dates = re.findall(r"\d{4}-\d{2}-\d{2}", name)
     return bool(dates) and max(dates) < _today()
 
@@ -189,7 +230,7 @@ def cmd_take(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     claims = _claims_dir(args.root)
     if args.resource:
-        name = _claim_name(args.resource, args.date or _today())
+        name = _resolve_claim_name(claims, args.resource, args.date or _today())
         target = claims / name
         if not target.exists():
             print(f"free  {name} (no claim)")
@@ -214,7 +255,8 @@ def cmd_check(args: argparse.Namespace) -> int:
         owner = _read_owner(claim)
         held = _is_held(claim)
         state = "HELD" if held else "released"
-        stale = "  STALE (Ben arbitrates)" if held and _is_stale(claim.name) else ""
+        stale = ("  STALE (Ben arbitrates)"
+                 if held and _is_stale(claim.name, owner) else "")
         print(f"{state:<8} {claim.name}  role={owner.get('role', '?')} "
               f"taken={owner.get('taken_utc', '?')}{stale}")
         if _release_incomplete(claim):
@@ -222,17 +264,22 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_release(args: argparse.Namespace) -> int:
-    name = _claim_name(args.resource, args.date or _today())
-    target = _claims_dir(args.root) / name
-    if not target.exists():
-        print(f"ERROR  no claim at claims/{name}", file=sys.stderr)
-        return 3
+def _do_release(target: Path) -> None:
     owner = _read_owner(target)
     owner.setdefault("role", "?")
     owner["released_utc"] = _utc_now()
     _write_owner(target, owner)
     (target / "RELEASED").touch()
+
+
+def cmd_release(args: argparse.Namespace) -> int:
+    claims = _claims_dir(args.root)
+    name = _resolve_claim_name(claims, args.resource, args.date or _today())
+    target = claims / name
+    if not target.exists():
+        print(f"ERROR  no claim at claims/{name}", file=sys.stderr)
+        return 3
+    _do_release(target)
     print(f"released {name}")
     return 0
 
@@ -243,17 +290,27 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         print("no stale held claims")
         return 0
     stale = [c for c in sorted(claims.glob("*"))
-             if c.is_dir() and _is_held(c) and _is_stale(c.name)]
+             if c.is_dir() and _is_held(c)
+             and _is_stale(c.name, _read_owner(c))]
     if not stale:
         print("no stale held claims")
         return 0
+    release = getattr(args, "release", False)
     for claim in stale:
         owner = _read_owner(claim)
+        if release:
+            _do_release(claim)
+            print(f"released {claim.name}  role={owner.get('role', '?')} "
+                  f"taken={owner.get('taken_utc', '?')}")
+            continue
         print(f"STALE  {claim.name}  role={owner.get('role', '?')} "
               f"taken={owner.get('taken_utc', '?')}  Ben arbitrates; nothing "
               f"is deleted here")
         if _release_incomplete(claim):
             print(_incomplete_note(claim.name))
+    if release:
+        print(f"released {len(stale)} stale held claim(s); "
+              f"nothing was deleted and no claim taken today was touched")
     return 0
 
 
@@ -330,7 +387,12 @@ def main(argv=None) -> int:
     p.add_argument("resource")
     p.add_argument("--date")
 
-    sub.add_parser("sweep", help="report stale held claims; deletes nothing")
+    p = sub.add_parser("sweep", help="report stale held claims; deletes nothing")
+    p.add_argument("--release", action="store_true",
+                   help="complete the release on every stale held claim it "
+                        "reports. Stale means the name's date is before today, "
+                        "so a claim taken today is never touched. Deletes "
+                        "nothing; Ben's call, per the multi-session contract.")
 
     p = sub.add_parser("dirt", help="session-start foreign-dirt gate")
     p.add_argument("--role", required=True, choices=ROLES)
