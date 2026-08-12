@@ -25,6 +25,98 @@ performance claim.
 
 ---
 
+## 2026-08-12 — Gemini pair adjudicated: both rejected wholesale, zero adoptions; the PuLP premise dies a third time (docs only)
+
+Third DEV session of 2026-08-12, engine claim `engine_2026-08-12_gemini`, at
+Ben's request to give two more uploaded critiques the same treatment as the
+GF third edition. No code, no tests, no pins moved. Write set:
+`docs/2026-07-27_backlog_v2.md` (what-next note, do-not-build paragraph,
+sources), `docs/2026-08-12_critique_gemini_spark.md` and
+`docs/2026-08-12_critique_gemini_pro.md` (new, archived copies, sha256
+`ced1581e…` and `f28640be…` matching the uploads byte for byte), this entry.
+Gate at this tree before the edits: `PASS  v2.26.0  26 modules  871 tests`,
+no debt warning. Three stale slate BEACONS from 2026-07-30/08-01 are still
+HELD with no RELEASED marker (`slate_2026-07-30_1910_6g`,
+`slate_2026-07-30_sealad_sd`, `slate_2026-08-01_2010_2g`); beacons never
+block and a stale claim is Ben's to arbitrate, so they are reported and left
+alone.
+
+### What the two documents are
+
+**Pro** (6,110 bytes) is a regeneration of
+`docs/2026-08-01_critique_gemini.md` (6,972 bytes, rejected wholesale in the
+R41/R42 entry for not reading the tree): same structure, same PuLP
+microservice, same Playwright/Redis polling pipeline, same Stokastic-style
+field sim, retitled from "Critical Flaws" to the GF spec's "Greenfield
+Audit" section template. **Spark** (33,299 bytes) is the 07-25 CC program
+re-argued: the iterative PuLP-CBC-loop premise, `bank_cache.parquet`, the
+<25-line CLAUDE.md, the watcher daemon, and the Phase-3 play-by-play sim
+plus duplicate-penalized field-ROI stack, now with sample code.
+
+### Dispositions — rejected wholesale, with the checks that decided it
+
+- **The shared premise is false, third time on the record.** Both diagnose
+  (and Pro also PRESCRIBES) PuLP. `grep -ri pulp` over
+  `mlb_engine tools tests skills` matches nothing; the only repo mentions
+  are the do-not-build line that has said "the repo has never used PuLP"
+  since 07-25 and the archived 08-01 Gemini critique.
+  `scipy.optimize.milp` is CLAUDE.md's pinned authority.
+- **Both cross the absolute walls; rejected categorically.** Pro polls
+  "DraftKings endpoints every 60 seconds" and auto-uploads via headless
+  browser with "No human review step"; Spark's Phase 3 ships a
+  "Playwright / Claude in Chrome live slate watcher & auto-uploader."
+  Scripted DK access and automated entry are the DK wall and the
+  money-and-entry wall, and the GF third edition — adjudicated hours
+  earlier — independently documents DraftKings' terms prohibiting exactly
+  this (its F-01/F-28). Pro's "burn down the local CSV archive structure"
+  would delete the append-only calibration substrate; even the GF spec's
+  migration rule is "no historical input is deleted."
+- **Spark's tree claims, checked.** `session_handoff.md` never existed (no
+  file, no `git log --all` trace). Four of its proposals already exist at
+  the exact paths it names as greenfield work:
+  `mlb_engine/pipeline/build_state_manager.py`,
+  `mlb_engine/optimize/bank_cache.py`, the deterministic
+  `tools/preflight_upload.py`, and the swap-from-bank late path
+  (`run_late_swap` + R101). Its Showdown finding names a slot DK MLB
+  Showdown does not have (FLEX) and a string-keying defect the parser does
+  not exhibit — `showdown.py:120-122` requires the DK integer ID at parse,
+  and the underlying-player collapse is the repaired R45 work the GF third
+  edition conceded the same day. Its Finding 4 mechanism (NaN merge →
+  Statcast baseline keeps benched players in lineups) misnames the layer:
+  the pool is gated at intake (confirmed nine + platoon nine; every other
+  salary row absent, not excluded), `projection_builder.py`'s fillna sites
+  are ceiling multipliers and flag coercions, and its proposed
+  `'Expected'`-admitting mask is WEAKER than the shipped contract. The true
+  kernel of the scratch concern is R60 — P1, queue position 4, filed
+  2026-08-04 with a reproduction.
+- **Spark's sample code un-ships the P0 gates.** Its export writes
+  `portfolio.to_csv` with no reserved-Entry-ID mapping, no contest
+  identity, no manifest, no certification; its "sub-10ms bank swap" is
+  `bank.iloc[:len(portfolio)]`; its Phase-2 "portfolio selection" returns
+  `candidate_pool.iloc[:num_lineups]`, which is not a solve. That is the
+  R51/R52 false-clean family offered as the remedy.
+- **Standing without new argument:** the sim/field-ROI/duplicate-penalty
+  stack stays gated on R13/R10 per the do-not-build list;
+  `bank_cache.parquet`, <25-line CLAUDE.md absolutism, and watcher daemons
+  stay rejected on their 07-25/08-01 reasoning (Cowork's primitive is the
+  scheduled task).
+- **Convergences recorded as data points, not adoptions:** Spark's headless
+  single-command build with atomic JSON state describes `build_slate.py` +
+  `build_state_manager.py` as shipped (R63's direction), and both
+  critiques' LLM-out-of-the-math rule restates CLAUDE.md's
+  "optimizer_v3.py is the lineup source of truth."
+
+### Why
+
+Ben asked for the same treatment the GF third edition got, and these two
+earned less: that document read the tree at HEAD and conceded findings when
+its facts failed; this pair repeats premises the board falsified on 07-25
+and 08-01 without checking either, and its only new content crosses walls
+that are not open to argument. Zero adoptions. The record is the rejection
+with its evidence, archived beside the prior editions, so the next
+regeneration can be diffed against these copies the way today's GF edition
+was diffed against 08-10's.
+
 ## 2026-08-12 — greenfield spec, third edition: adjudicated as a delta; five concessions recorded, F-35/A-43 rejected on standing grounds, one rider on R41 (docs only)
 
 Second DEV session of 2026-08-12, engine claim `engine_2026-08-12_gf3`, at
