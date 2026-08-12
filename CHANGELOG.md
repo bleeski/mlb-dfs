@@ -25,6 +25,105 @@ performance claim.
 
 ---
 
+## 2026-08-12 — doc-truth pass: the contract states its own write set, the mutex admits it is nominal, and two fragments become items
+
+DEV, engine claim `engine_2026-08-12`, at Ben's request to review what the last
+several sessions changed and update whatever went stale behind them. Write set:
+`CLAUDE.md`, `docs/cowork_sync_protocol.md`, `docs/2026-07-27_backlog_v2.md`,
+`.gitignore`, one comment in `tools/audit.py`, this entry. No behavior changed;
+`PASS  v2.26.0  26 modules  871 tests` before and after.
+
+### What was actually stale, and what was not
+
+The pin line was current, which is worth saying because it usually is not: R96
+moved it to 871 in the same commit that moved the constant, and the audit
+prints exactly that. The staleness was elsewhere, in three places where a fact
+had been learned in one session and written down in another session's file.
+
+**CLAUDE.md's DEV write set omitted the two files DEV most owns.** It read
+`mlb_engine/, tools/, tests/, docs/, skills/` while the same document, forty
+lines up, says every DEV change carries a CHANGELOG entry and calls this file
+part of the write set. The foreign-dirt rule is evaluated against that list, so
+the list was licensing a session to treat another session's uncommitted
+changelog edit as none of its business. Now stated, with the pointer that
+`claim.py`'s own `WRITE_SETS` still omits `CHANGELOG.md` and
+`requirements.lock` — R31(c), open, code rather than prose.
+
+**The claims paragraph described a mutex that does not exist as described.**
+"plain mkdir (atomic, fails when held)" is true only of the identical name, and
+R31(d) has recorded since 2026-08-10 that `take engine_myslug` blocks nobody.
+On 2026-08-11 that stopped being a design question: a second DEV session took
+`engine_branchfix_2026-08-11` beside a held `engine_2026-08-11` and its
+working-tree restore destroyed three uncommitted files in the first session's
+write set. The contract now says the mutex is nominal, says to take the bare
+resource name and glob `claims/<resource>*` before writing, and names the
+mitigation that does not need Ben's decision: the blast radius is uncommitted
+work, so commit early. Making `take` refuse a held sibling stays R31(d) and
+stays his call, because it starts blocking sessions that today proceed.
+
+**The sync protocol's write-back loop was documented in the form that broke
+it.** It said to extract to the device VM's `$HOME` and then
+`cat $STAGE/$f > $REPO/$f`. On 2026-08-11 `/sessions` hit 100%, the extraction
+`mkdir` failed, and the loop truncated seven tracked files before discovering
+there was nothing to copy, because `cat >` opens the destination before it
+reads the source. All seven came back from HEAD and no uncommitted edit was
+lost, this time. The step now extracts to the mount and guards each file on
+`[ -s "$STAGE/$f" ]`. Two more limits landed in the same section: GitHub's
+default branch is a stale `master` 33 commits behind `main`, so a plain clone
+silently checks out the 2026-08-04 tree, and `sync_check.py` hardcodes `main`
+at three sites and therefore answers about a branch the caller may not be on.
+
+### R111 and R112 filed; R107 extended, part (b) landed
+
+Two fragments had been sitting unconsumed in `docs/backlog_inbox/`, which is
+the fragment protocol working right up until nobody merges. **R111** carries
+the `sync_check` branch resolution and the `master` default, including the
+warning that `_to_delete/r103.tar.gz` — a working implementation of the fix,
+written in a container against HEAD `89ca350` — must not be applied wholesale,
+because it predates R103-R110 and carries `EXPECTED_TEST_COUNT = 816` as a
+literal that would undo R62's per-suite dict. **R112** carries the BUILD
+finding from the 2026-08-11 1840_3g slate: at 6 entries the auto-bank reached
+the allocator with 3-4 distinct SP pairs where the sliced bank reached it with
+12, and the refusal then named `max_sp_pair_repetition` and
+`max_pitcher_exposure_pct` on a slate whose own feasibility check had just
+passed `pitcher_exposure_capacity` with 12 viable pairs. The scarcity was the
+bank's and the message blamed a control, which is R98's ordering failing to
+apply because the auto-bank had no growth left to offer. Same false-signal
+family as R31 and R99: the operator relaxes a cap that did not need relaxing.
+
+**R107** gained part (c) — `DFS_SYSTEM_GREENFIELD_SPEC.md` in the repo root is
+byte-identical to the tracked `docs/2026-08-10_critique_greenfield_spec.md`,
+verified by sha256, so it is a second copy of a document that already has a
+home — and its part (b) landed: `_stage_repo*.tar.gz` is gitignored. Part (a),
+adopt-or-delete for `tools/fetch_fangraphs_platoon.py`, is still Ben's and is
+now a week old while the ledger Quick Card names the tool as the sanctioned
+platoon-refresh path.
+
+### R109's liveness check reported LIVE on a ten-hour-dead lock
+
+Found by hitting it: `git add` in this session failed on a zero-byte
+`.git/index.lock` and `HEAD.lock`, both stamped 09:43 that morning, which is
+R109's third-and-fourth incident and the reason the remedy is written down. The
+remedy's first step is `pgrep -f "git "`, and it reported a live git process.
+It was reporting the calling shell: the sandbox runs each call as
+`bash -c <command>`, so any `-f` pattern matches the command line containing
+it, and the check that exists to stop a session from clearing a live lock can
+never say no. Now `pgrep -x git`, with the reason stated so nobody reverts it
+to the friendlier-looking form. The locks were then moved aside under a
+timestamped suffix per the documented remedy and the commit went through.
+
+### The ledger pin line, corrected off-changelog
+
+Three DEV fragments in `ledger/inbox/` had asked for the same one-line fix
+since 2026-08-10 and the newest was itself stale by the time it was written.
+The Quick Card's macro line read `782` against a dict summing to 871, and it
+cited `EXPECTED_TEST_COUNT`, which R62 demoted to a sum. Corrected on a bare
+`ledger` claim, that line and nothing else, with the retired paste-suite
+staging precondition recorded next to it and the four per-suite numbers
+brought current. The ledger is untracked and its calibration content is
+ARCHIVE's; this entry records the edit because a DEV session made it, not
+because the ledger belongs here.
+
 ## 2026-08-11 — R96 closes: a delivery file has a manifest row or it says it does not
 
 Same DEV session as the 2026-08-10 entries below, continued past midnight UTC on

@@ -29,8 +29,10 @@ This file carries the contracts and the gotchas. Each procedure lives once:
 - Post-slate archival: docs/cowork_archival_runbook.md
 - Keeping disk, container and GitHub in sync: docs/cowork_sync_protocol.md,
   which wraps `python tools/sync_check.py`. Read it before moving files
-  between the mount and a container, or before believing `git status` on the
-  mount.
+  between the mount and a container, before believing `git status` on the
+  mount, and when a git operation dies on a stale `.git/index.lock` — this
+  mount grants create and truncate but not unlink, so `rm` cannot clear one
+  and the remedy is a timestamped `mv` (R109).
 - What's missing from the standings inbox: skills/mlb-standings-pull-checklist/SKILL.md,
   which wraps `python tools/awaiting_standings.py scan`. Regenerated, never
   hand-maintained.
@@ -182,7 +184,10 @@ Roles; Ben's first message assigns one:
   data/slates/<its date>/, and its own bank cache. Nothing else.
 - ARCHIVE: writes ledger/, data/archive/, data/standings/,
   data/reference/. Runs only outside live build windows.
-- DEV: writes mlb_engine/, tools/, tests/, docs/, skills/. Never edits
+- DEV: writes mlb_engine/, tools/, tests/, docs/, skills/, CHANGELOG.md and
+  this file. `claim.py`'s own `WRITE_SETS` still omits CHANGELOG.md and
+  requirements.lock, so `dirt --role DEV` under-reports foreign dirt on the
+  one file the contract most wants serialized (R31(c), open). Never edits
   engine paths while any slate beacon is lit: builds re-import modules
   between steps, so a mid-slate edit changes a running build. A DEV change
   is not shipped until CHANGELOG.md carries its entry, in the same commit
@@ -202,7 +207,16 @@ Take with plain mkdir (atomic, fails when held):
 `mkdir claims/<resource>_<utc-date>`, then write owner.json (role, scope,
 taken_utc). Two kinds. Engine, ledger, and inbox are MUTEXES: a failed
 mkdir means held, read owner.json and stop; never delete or take over
-another session's claim. Slate claims are BEACONS: BUILD lights one
+another session's claim. **That mutex is NOMINAL and it has now cost
+something.** mkdir only collides on the identical name, so `take
+engine_myslug` mints its own directory and blocks nobody: take the BARE
+resource name, and glob `claims/<resource>*` before writing, not just the
+dated name you would mint. On 2026-08-11 a second DEV session took
+`engine_branchfix_2026-08-11` beside a held `engine_2026-08-11` and its
+working-tree restore destroyed three uncommitted files in the first
+session's write set. The blast radius is UNCOMMITTED work only, so commit
+early and by explicit path; making the mutex refuse a held sibling is
+Ben's call and stays open (R31(d)). Slate claims are BEACONS: BUILD lights one
 before staging (`python tools/claim.py take slate_<date>_<tag> --role
 BUILD --beacon`) so DEV can see that builds are live, and a beacon
 another session already lit means a parallel build, which never stops a

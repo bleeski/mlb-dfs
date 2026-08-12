@@ -84,9 +84,24 @@ DK exports are gitignored runtime data. They move disk-to-container by
 `device_stage_files` and container-to-disk by `SendUserFile` +
 `device_commit_files`. Note that `tar -x` FAILS over the mount ("Cannot open:
 File exists", because the mount cannot unlink), so the write-back is: extract
-to the device VM's `$HOME` (not `/tmp`, which is not writable), then
-`cat $STAGE/$f > $REPO/$f` per file, because `cat >` truncates in place and
-needs no unlink.
+to a directory ON THE MOUNT, then `cat $STAGE/$f > $REPO/$f` per file, because
+`cat >` truncates in place and needs no unlink.
+
+**Guard that loop before you run it, because `cat src > dst` truncates the
+destination before it reads the source.** On 2026-08-11 the device VM's
+`/sessions` filesystem hit 100%, `mkdir` for the extraction directory failed,
+and the loop then emptied seven tracked files — `tools/sync_check.py`,
+`tools/audit.py`, `tests/test_core.py`, `CLAUDE.md`,
+`skills/generate-lineups/SKILL.md`, this file and `CHANGELOG.md` — before
+discovering there was nothing to copy. All seven came back from HEAD; any
+uncommitted edit to them would not have. Two rules, both cheap: extract to the
+mount rather than the VM's `$HOME`, which is a small fixed allowance that fills
+silently, and per file assert the staged source exists and is non-empty BEFORE
+opening the destination:
+
+```
+[ -s "$STAGE/$f" ] && cat "$STAGE/$f" > "$REPO/$f" || echo "SKIP empty/missing $f"
+```
 
 ## Known limits, stated rather than papered over
 
@@ -103,8 +118,23 @@ needs no unlink.
   report a live claim as free. `check` and `sweep` now name any claim in that
   state and print the command that completes it.
 - **A fresh clone cannot run the suite green.** It needs untracked fixtures.
-  Tracking them is open backlog; until then, container runs start from a
-  tarball of the working tree, not from GitHub.
+  R62 vendored the paste suite's two salary files under
+  `tests/fixtures/slates/` on 2026-08-10, which removed nine skip guards and
+  that suite's staging precondition; the remaining gap is other suites'
+  fixtures. Until it closes, container runs start from a tarball of the
+  working tree, not from GitHub.
+- **GitHub's DEFAULT branch is `master`, and `master` is stale.** Verified
+  against the live remote on 2026-08-11: `git ls-remote --symref` returns
+  `ref: refs/heads/master  HEAD`, at `d0212c2` (2026-08-04), fully contained
+  in `main` and 33 commits behind it. A plain `git clone` therefore checks out
+  the August 4 tree and says nothing, and the repo's landing page shows that
+  state. Until Ben changes it (repo Settings, Branches, default to `main`,
+  then delete `master`), clone with `-b main`. This is a setting, not code.
+- **`sync_check.py` hardcodes `main` (R111, open).** Three reads of
+  `refs/heads/main` regardless of what is checked out, so inside a clone —
+  which lands on `master` — it prints `disk main ?` and then gives remedies
+  for a branch the caller is not on. It also tells every caller to "push from
+  Windows", which is wrong for a container holding a working credential.
 - **`.git/index.lock` goes stale here and `rm` cannot clear it (R109).** The
   mount grants create and truncate but not unlink, so an interrupted git
   write leaves a zero-byte lock that blocks every later commit, and git's own
@@ -115,13 +145,16 @@ needs no unlink.
 
   **The remedy, in order.** First confirm the lock is dead rather than a live
   session mid-write: it is zero bytes and its mtime is minutes or hours old,
-  and `pgrep -f "git " ` finds nothing. A live git write is not yours to
-  clear. Then move it aside rather than deleting it, which needs no unlink
-  grant and leaves the evidence in place:
+  and `pgrep -x git` finds nothing. A live git write is not yours to clear.
+  Use `-x`, not `-f "git "`: the sandbox runs each call as `bash -c <command>`,
+  so a `-f` pattern matches the calling shell's own command line and reports
+  LIVE every time (hit 2026-08-12, with both locks ten hours dead). Then move
+  the lock aside rather than deleting it, which needs no unlink grant and
+  leaves the evidence in place:
 
   ```
   ls -la .git/*.lock                       # size and mtime; 0 bytes and old
-  mv .git/index.lock .git/index.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)
+  pgrep -x git || mv .git/index.lock .git/index.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)
   ```
 
   Use a timestamped suffix, never a fixed one. Fixed names collide with the

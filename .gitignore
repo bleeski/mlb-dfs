@@ -72,3 +72,8 @@ claims/*
 
 # BUILD byproduct cache (lineups_from_paste); untracked by design (R-merge 2026-08-04)
 data/reference/paste_cache/
+
+# residue of the disk-to-container tarball bridge in docs/cowork_sync_protocol.md.
+# Environment, never history; the mount cannot delete it, so it is ignored instead
+# of swept, and it stops reading as unexplained dirt at session start (R107(b)).
+_stage_repo*.tar.gz

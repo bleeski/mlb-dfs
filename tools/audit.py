@@ -51,7 +51,7 @@ EXPECTED_SUITE_COUNTS = {
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 850
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 871
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,
