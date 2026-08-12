@@ -25,6 +25,75 @@ performance claim.
 
 ---
 
+## 2026-08-12 — the what-next queue rebuilt as a six-tier development order: impact against lift, with waits-on-whom as the third axis (docs only)
+
+Fourth DEV session of 2026-08-12, engine claim `engine_2026-08-12_order`, at
+Ben's instruction: order the open board by impact against technical lift —
+high-impact/low-lift first, high-lift items adjudicated individually,
+high-lift/limited-impact deprioritized. No code, no tests, no pins moved.
+Write set: `docs/2026-07-27_backlog_v2.md` (the what-next section only;
+every workstream entry untouched), this entry. Gate before the edits:
+`PASS  v2.26.0  26 modules  871 tests`.
+
+### Method
+
+Impact reads off the project's own hierarchy: pool and upload truth, then
+evidence and grading substrate, then false signals that steer the operator
+(the R51/R92 family, the board's most recurrent burn shape), then
+lineup-quality controls, then operator time, then hygiene. Lift reads off
+each entry's carried effort letter. The third axis is stated rather than
+implied: an item waiting on measurement, Ben's data, a decision, or a hand
+step outside Cowork holds no DEV slot whatever its score, so the old queue's
+#1 and #3 (R37(2), R40) move to an explicit externally-gated section with
+their gating facts intact rather than being ranked as if buildable.
+
+### The order it produced
+
+- **Tier 1** (S/XS, DEV-ready): R60 leads — intake truth at one session of
+  lift — followed by R69 and R70 (same class), the false-signal batch
+  (R112+R103+R99+R92+R71, one reporting surface, four burned builds since
+  08-01), the swap-rails batch (R66+R68+R67), R36's F3m+F6m, the claim.py
+  batch (R31(b)(c)+R110+R86), and R80(a)+R88 (key scrub, DK-wall test).
+- **Tier 2**: R48+R83 then R10 — the grading substrate lands before the
+  funded model so the model's result is a graded fact.
+- **Tier 3** (the M-lift adjudications): R98(3)+(4)-tail first (high impact,
+  loudness already landed, absorbs R112's deeper half), R81's armed design
+  pass second (one S pass retires the wrong-slate family R70 patches
+  pointwise), R36 Finding 10's floor + R84 third (truth defect at the money
+  boundary, but its late-swap sizing is UNSIZED pending the owed
+  re-measure).
+- **Tier 4**: the decisions, mostly Ben's, each listed with what it unlocks —
+  R41's two decisions foremost, since they unlock the board's one L build
+  (Showdown certification, roughly a third of entered volume).
+- **Tier 5**: prevention and hygiene, batched between tiers, never instead
+  of them.
+- **Tier 6**, deprioritized by name with the reason: R87 (M plus golden
+  regen for throughput no measurement says we lack), R42(b), R9b, R12, R11,
+  R58(c)(d), R61-tail. The do-not-build list is unchanged and is not a tier.
+
+### One standing hold amended, deliberately
+
+R36's F3m and F6m leave the trip-only pull rule for Tier 1. Both are P1/S,
+both were verified on a real delivery record (a `certified` stamp with the
+odds assumption invisible; a corrupt manifest reading as empty and then
+being replaced away with its supersession history), and both are
+recording-only fixes. Under the impact-lift lens Ben asked for, "wait until
+a build trips it" was mis-pricing the manifest — the file that answers
+"which file do I upload." The other six accepted findings (F8, F7, F12,
+F1m, F14, F2) stay on their trip rule: F1m and F2 are M, F12 is a rare
+path, F8 is bounded by Showdown's review-grade label, and F7's live-burn
+path is already closed by R32's paste-primary rule.
+
+### Why
+
+The old queue answered "what is most valuable"; three of its four items were
+waiting on someone other than a DEV session, so the practical answer every
+session actually needed — what do I build tonight — took reading forty
+entries. The tiers separate score from availability, keep every hold's
+substance (R87's no-ride rule, R13's park, the trip rule for R36's
+remainder), and put the deprioritizations on the record with reasons, so
+pulling one costs a named measurement instead of a mood.
+
 ## 2026-08-12 — Gemini pair adjudicated: both rejected wholesale, zero adoptions; the PuLP premise dies a third time (docs only)
 
 Third DEV session of 2026-08-12, engine claim `engine_2026-08-12_gemini`, at
