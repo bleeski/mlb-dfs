@@ -25,6 +25,37 @@ performance claim.
 
 ---
 
+## 2026-08-13 — Decided, not yet shipped
+
+### Decided: apex over cash is the standing priority for GPP-shaped contests
+Ben. Backlog R37(2), R10, R40.
+
+Ben: "the only way this makes money over the long term is big wins." GPP-shaped
+contests are built for the apex outcome (WTA-style ceiling), not for cash-line
+frequency. Recorded as riders on the three items it actually touches rather
+than as a new number, because it reframes priority on standing work; it does
+not add work.
+
+Not a gap closed: every non-cash, non-satellite shape already scores on pure
+ceiling (`score_lineup_candidate`, `optimizer_v3.py:3453-3456`), so there was
+no floor-seeking bias in GPP/WTA scoring to strip out. What the directive
+actually elevates is R37(2)'s narrow-breadth floor-5 work (the concrete
+apex-construction lever, already scoped to the shapes where the payout sits
+at rank 1) and reaffirms R10 (duplication modeling, the only thing that says
+whether an apex-shaped build actually clears the field) at the top of Tier 2.
+
+One thing the directive does not license: raising `salary_uniqueness_weight`
+or `field_pressure_weight` on the GPP ladder (`CONTEST_SHAPE_PROFILE_WEIGHTS`,
+`optimizer_v3.py:2813-2874`) to chase more differentiation. Ledger 3.17 found
+the opposite, blanket contrarianism does not win; chalk-positive cores plus
+one or two sub-10% pieces do, everywhere except supersatellites, and Ben's own
+measured posture already runs more contrarian than winners in exactly
+single_entry_gpp and satellites. R40 is unmoved for the same reason a standing
+preference is not new evidence: the routing recommendation stays no-not-yet
+until more finishes exist to grade.
+
+---
+
 ## 2026-08-12 — R46 round 2: preflight names the player, and a PARTIAL side stops skipping the check
 
 R46 made the posted-lineup blind spot loud. It did not make it a finding, and on
