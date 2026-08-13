@@ -567,6 +567,7 @@ from mlb_engine.intake.slate_intake_manager import (
     compute_f5_factor, load_f5_park_factors, load_f5_weather_adjustments,
 )
 from mlb_engine.intake import live_data_adapters as lda
+from mlb_engine.intake import slate_intake_manager as sim
 
 
 
@@ -6091,6 +6092,69 @@ class RunSlateExclusionSeamTests(unittest.TestCase):
             self.assertTrue(any("exclusions:" in w
                                 for w in result["checkpoint_plan"]["warnings"]))
 
+    def test_unmatched_exclusion_blocks_the_approve_path(self):
+        """R69(c). The name of the test above, and the docstring on
+        ``_exclusion_block``, both said "blocker" since F15 while the code only
+        appended to warnings -- so approve=True built a portfolio around a player
+        the operator had asked to drop.
+
+        Same treatment as wrong-contest identity, on the same argument: decidable
+        from disk, invisible in the certified output, and fixed by correcting one
+        argument on the same command.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, entries, frame = self._inputs(root)
+            result = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame,
+                excluded_player_ids=["not-in-this-pool"],
+                portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                approve=True, assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+            )
+            self.assertEqual(result["status"], "blocked")
+            self.assertFalse(result["passed"])
+            self.assertTrue(any("match no row in this pool" in e
+                                for e in result["errors"]), result["errors"])
+            self.assertTrue(any("not-in-this-pool" in str(e)
+                                for e in result["errors"]))
+            # Nothing certified on the way out.
+            self.assertFalse(result.get("workflow_valid"))
+
+    def test_a_matched_exclusion_still_approves(self):
+        """Over-reach guard: the gate is scoped to ids that match NOBODY."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, entries, frame = self._inputs(root)
+            dropped = str(frame["Player_ID"].iloc[0])
+            result = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame, excluded_player_ids=[dropped],
+                portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                approve=True, assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+            )
+            self.assertNotEqual(result.get("status"), "blocked")
+            self.assertEqual(result["exclusions"]["blockers"], [])
+
+    def test_an_unrecognized_excluded_cell_does_not_block_approve(self):
+        """The other half of the R69(c) split. Keeping a player whose Excluded
+        cell holds an unrecognized value is the DOCUMENTED reading of that
+        column, so it warns and the build ships; only the operator-typed id
+        gates."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary, entries, frame = self._inputs(root)
+            frame.loc[0, "Excluded"] = "probably not"
+            result = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame,
+                portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                approve=True, assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+            )
+            self.assertNotEqual(result.get("status"), "blocked")
+            self.assertTrue(any("does not recognize" in w
+                                for w in result["exclusions"]["warnings"]))
+
 
 class SalarySuppressionBoundedTiebreakerTests(unittest.TestCase):
     """R56. Suppression may bound the bonus it counts, never the feasible set.
@@ -6298,6 +6362,17 @@ class ExcludedColumnCoercionTests(unittest.TestCase):
         self.assertEqual(len(opt._drop_excluded_rows(frame)), len(frame))
 
     def test_checkpoint_names_unrecognized_cells(self):
+        """R69(c) moved this finding from ``blockers`` to ``warnings``.
+
+        It still reaches the operator with the same text, and it still reaches
+        the checkpoint's warnings line. What changed is the label: keeping a
+        player whose Excluded cell holds an unrecognized value is the DOCUMENTED
+        reading of that column (CLAUDE.md: "blank, NaN, 'False' and unrecognized
+        cells keep them"), so filing it under a key that now hard-gates
+        approve=True would refuse builds for behaving as specified. Its remedy is
+        a file edit, not a flag correction, which is the line the split is drawn
+        on.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             salary = root / "salary.csv"
@@ -6312,8 +6387,12 @@ class ExcludedColumnCoercionTests(unittest.TestCase):
             )
             column = plan["exclusions"]["excluded_column"]
             self.assertEqual(column["unrecognized_kept"], 1)
-            self.assertTrue(any("does not recognize" in b
-                                for b in plan["exclusions"]["blockers"]))
+            self.assertTrue(any("does not recognize" in w
+                                for w in plan["exclusions"]["warnings"]))
+            self.assertEqual(plan["exclusions"]["blockers"], [])
+            # It must still reach the line the operator actually reads.
+            self.assertTrue(any("does not recognize" in w
+                                for w in plan["checkpoint_plan"]["warnings"]))
 
 
 _SOLVER_INPUT_PROBE = r"""
@@ -6931,6 +7010,163 @@ class PartialSidePoolTests(unittest.TestCase):
             self.assertEqual(len(stamped), 9)
             self.assertFalse([w for w in report["warnings"] if "seeded" in w],
                              report["warnings"])
+
+
+class IntakeFailOpenTests(unittest.TestCase):
+    """R69. Three intake reads that failed OPEN: they degraded to silence
+    instead of to a signal, so a disarmed guard and a healthy slate produced
+    byte-identical output.
+
+    The shared teeth across all three: each test pairs the failure case with a
+    HEALTHY control, because a guard that fires on everything is the same
+    defect wearing the other sign.
+    """
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+              "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+              "Status", "Starting"]
+
+    def _salary_file(self, tmp, header=None, rows=60, status_of=None,
+                     name="salary.csv"):
+        path = Path(tmp) / name
+        if status_of is None:
+            def status_of(i):
+                return "IL" if i == 0 else ""
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(header or self.HEADER)
+            for i in range(rows):
+                w.writerow(["OF", f"P{i} ({100 + i})", f"P{i}", str(100 + i),
+                            "OF", "4000", "T1@T2 08/13/2026 07:05PM ET", "T1",
+                            "7.0", status_of(i), "SP" if i == 1 else ""])
+        return path
+
+    # ---- (a) the Status/Starting read ---------------------------------------
+
+    def test_healthy_salary_file_warns_about_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._salary_file(tmp)
+            cov = sim.salary_status_coverage(sim.parse_dk_salary_csv(str(path)))
+            self.assertEqual(cov["warnings"], [])
+            self.assertTrue(cov["status_column_present"])
+            self.assertTrue(cov["starting_column_present"])
+            self.assertEqual(cov["status_non_blank"], 1)
+
+    def test_renamed_status_column_is_named_as_disarming_the_il_drop(self):
+        """The filed scenario: DK renames the column, the schema gate passes it
+        because neither column is required, and every player then reads the
+        clean tier. Teeth: without the fix the shelved player below survives
+        into the pool and NOTHING says so."""
+        with tempfile.TemporaryDirectory() as tmp:
+            header = list(self.HEADER)
+            header[header.index("Status")] = "Injury Status"
+            header[header.index("Starting")] = "Starting Pitcher"
+            path = self._salary_file(tmp, header=header)
+            players = sim.parse_dk_salary_csv(str(path))
+            # The disarm itself, unchanged: the shelved player reads clean.
+            self.assertEqual(sim.salary_status_tier(players[0].status), "clean")
+            cov = sim.salary_status_coverage(players)
+            self.assertFalse(cov["status_column_present"])
+            self.assertFalse(cov["starting_column_present"])
+            self.assertEqual(len(cov["warnings"]), 2)
+            self.assertTrue(any("IL drop is disarmed" in w
+                                for w in cov["warnings"]), cov["warnings"])
+            self.assertTrue(any("opener detection" in w
+                                for w in cov["warnings"]), cov["warnings"])
+            # The near-miss headers are named, because that is the whole fix
+            # on the operator's side.
+            self.assertEqual(cov["near_miss_columns"],
+                             ["Injury Status", "Starting Pitcher"])
+
+    def test_zero_status_coverage_on_a_slate_sized_file_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._salary_file(tmp, rows=60, status_of=lambda i: "")
+            cov = sim.salary_status_coverage(sim.parse_dk_salary_csv(str(path)))
+            self.assertTrue(cov["status_column_present"])
+            self.assertTrue(any("not one of 60 rows" in w
+                                for w in cov["warnings"]), cov["warnings"])
+
+    def test_a_small_pool_with_no_shelved_player_stays_quiet(self):
+        """Over-reach guard. A two-game Showdown pool really can carry no
+        shelved player, so the zero-coverage signal is floored by row count."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._salary_file(
+                tmp, rows=sim.STATUS_COVERAGE_MIN_ROWS - 1,
+                status_of=lambda i: "")
+            cov = sim.salary_status_coverage(sim.parse_dk_salary_csv(str(path)))
+            self.assertEqual(cov["warnings"], [])
+
+    def test_pool_report_carries_the_coverage_block_and_its_warnings(self):
+        """The signal has to land where CLAUDE.md says the operator reads before
+        approving. ``pool_salary_csv`` carries neither column, which is not a
+        contrived fixture: 3 of the 75 real DKSalaries files in data/slates ship
+        without both, the most recent dated 2026-08-01."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "salary.csv"
+            pool_salary_csv(path)
+            report = lda.build_slate_pool(path, pool_lineups_feed())["pool_report"]
+            coverage = report["salary_status_coverage"]
+            self.assertFalse(coverage["status_column_present"])
+            self.assertFalse(coverage["starting_column_present"])
+            self.assertEqual(coverage["rows"], 68)
+            self.assertTrue(any("IL drop is disarmed" in w
+                                for w in report["warnings"]),
+                            report["warnings"])
+            self.assertTrue(any("opener detection" in w
+                                for w in report["warnings"]))
+
+    # ---- (b) the un-ageable platoon reference -------------------------------
+
+    def _unageable_pool(self, tmp, collected, policy, hitters=4):
+        ref = PartialSidePoolTests._platoon(slots=9)
+        if collected is None:
+            ref.pop("collected_date", None)
+        else:
+            ref["collected_date"] = collected
+        return lda.build_slate_pool(
+            PartialSidePoolTests._salary(tmp),
+            PartialSidePoolTests._partial_feed(hitters=hitters),
+            platoon_json=ref, stale_platoon_policy=policy)["pool_report"]
+
+    def test_unknown_platoon_age_blocks_under_the_block_policy(self):
+        """Age unknown is not age zero. Teeth: the age came out None, None
+        compares against no threshold, and the strictest policy was silent."""
+        for collected in ("not-a-date", "", None):
+            with self.subTest(collected=collected):
+                with tempfile.TemporaryDirectory() as tmp:
+                    report = self._unageable_pool(tmp, collected, "block")
+                    self.assertIsNone(report["platoon_age_days"])
+                    self.assertEqual(report["platoon_dependent_teams"], ["T4"])
+                    hit = [b for b in report["blockers"] if "UNKNOWN" in b]
+                    self.assertEqual(len(hit), 1, report["blockers"])
+                    self.assertIn("no parseable collected_date", hit[0])
+
+    def test_unknown_platoon_age_warns_under_the_warn_policy(self):
+        """It reports at the POLICY's severity, which is what build_slate.py and
+        late_swap.py pass, so the build still ships."""
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._unageable_pool(tmp, "not-a-date", "warn")
+            self.assertFalse([b for b in report["blockers"] if "UNKNOWN" in b])
+            self.assertEqual(
+                len([w for w in report["warnings"] if "UNKNOWN" in w]), 1)
+
+    def test_a_reference_the_build_does_not_lean_on_says_nothing(self):
+        """Over-reach guard, and the F17/R60 rule this rides on: the gate follows
+        what the projection SUPPLIED. A fully posted side takes all nine seats,
+        so an unageable reference supplied nothing and must stay silent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._unageable_pool(tmp, "not-a-date", "block", hitters=9)
+            self.assertEqual(report["platoon_dependent_teams"], [])
+            self.assertFalse([b for b in report["blockers"] if "UNKNOWN" in b],
+                             report["blockers"])
+            self.assertFalse([w for w in report["warnings"] if "UNKNOWN" in w])
+
+    def test_a_parseable_date_still_takes_the_days_old_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._unageable_pool(tmp, "2026-06-01", "block")
+            self.assertEqual(report["platoon_age_days"], 39)
+            self.assertFalse([b for b in report["blockers"] if "UNKNOWN" in b])
+            self.assertTrue([b for b in report["blockers"] if "39 days old" in b])
 
 
 class LateSwapIdentityTests(unittest.TestCase):

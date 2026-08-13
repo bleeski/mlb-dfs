@@ -1976,6 +1976,17 @@ def _exclusion_block(
     before the solve, because an exclusion is the one input where a typo is
     silent: a wrong ID excludes nobody, the build proceeds around a player who
     should be gone, and the export gate finds it with no time to rebuild.
+
+    R69(c) splits the two findings this block used to pool under one key, because
+    they are not the same kind of fact and the shared label made both of them
+    lies. ``blockers`` now holds ONLY the unmatched-exclusion finding, which is
+    an operator-supplied identifier that resolves to nothing -- decidable from
+    disk, fixed by correcting the same argument, and hard-gated on approve=True
+    at the call site exactly like contest identity. ``warnings`` holds the
+    Excluded-column finding, which is a data condition in a supplied frame whose
+    remedy is a file edit: keeping unrecognized cells is the DOCUMENTED reading
+    of that column, so reporting it as a blocker described behaviour working as
+    specified.
     """
     from mlb_engine.optimize.optimizer_v3 import excluded_flags
 
@@ -1987,6 +1998,7 @@ def _exclusion_block(
         "unmatched_player_ids": [],
         "excluded_column": {},
         "blockers": [],
+        "warnings": [],
         "note": "excludes are applied to the bank build and to every solve; "
                 "deterministic bookkeeping, never a claim",
     }
@@ -1998,7 +2010,7 @@ def _exclusion_block(
         _, column_report = excluded_flags(projections)
         block["excluded_column"] = column_report
         if column_report.get("unrecognized_kept"):
-            block["blockers"].append(
+            block["warnings"].append(
                 f"{column_report['unrecognized_kept']} Excluded cell(s) hold values "
                 f"this engine does not recognize "
                 f"({column_report['unrecognized_values'][:5]}); those players were "
@@ -3134,10 +3146,15 @@ def run_slate(
     # discovering that at the export gate costs the whole build.
     exclusion_block = _exclusion_block(projections, excluded_player_ids)
     checkpoint["exclusions"] = exclusion_block
-    if exclusion_block.get("blockers"):
+    # R69(c): both findings still reach the plan-mode report, and reach it with
+    # the same text as before. What changed is that only one of them is called a
+    # blocker, and that one now blocks.
+    exclusion_notices = list(exclusion_block.get("blockers") or []) + list(
+        exclusion_block.get("warnings") or [])
+    if exclusion_notices:
         existing = list(checkpoint.get("warnings") or [])
         checkpoint["warnings"] = existing + [
-            f"exclusions: {b}" for b in exclusion_block["blockers"]
+            f"exclusions: {b}" for b in exclusion_notices
         ]
 
     feasibility_report = _feasibility_report(feasibility_inputs, controls)
@@ -3262,6 +3279,31 @@ def run_slate(
     if approve and contest_identity_blockers:
         return {"passed": False, "status": "blocked", "approved": True,
                 "errors": contest_identity_blockers, **base_payload}
+
+    # R69(c). An exclusion that matches nobody is the same shape of failure as
+    # wrong-contest identity, and it gets the same treatment. The docstring at
+    # ``_exclusion_block`` has said since F15 that this is "a blocker at
+    # approve=False", but the code only ever appended to warnings, so approve=True
+    # sailed past a typo'd ID and built a portfolio around a player the operator
+    # had asked to remove. It is decidable from disk in under a second, it is
+    # invisible in the certified output, and the remedy is correcting one
+    # argument on the same command -- which is the whole test the identity gate
+    # above is justified by. No override, for the same reason: an override would
+    # cost more than the fix.
+    #
+    # Scoped to ids the operator TYPED. The Excluded column's unrecognized cells
+    # stay a warning: keeping those players is the documented reading of that
+    # column, and its remedy is a file edit, not a flag.
+    unmatched_exclusions = list(exclusion_block.get("unmatched_player_ids") or [])
+    if approve and unmatched_exclusions:
+        return {"passed": False, "status": "blocked", "approved": True,
+                "errors": [
+                    f"{len(unmatched_exclusions)} excluded player id(s) match no "
+                    f"row in this pool of {len(projections)}: "
+                    f"{unmatched_exclusions[:10]}. An exclusion that matches "
+                    f"nobody removes nobody, so this build would roster a player "
+                    f"you asked to drop. Correct the id(s) or drop the exclusion"
+                ], **base_payload}
 
     if not approve:
         # R28(1): the plan-mode joint-allocation verdict. Everything above this

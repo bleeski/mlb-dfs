@@ -45,7 +45,10 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
 EXPECTED_SUITE_COUNTS = {
     # R60, 2026-08-12: 570 -> 576, the six that pin the partial-side seeding.
     # R110, 2026-08-12: 576 -> 582, the six that pin the claim round trip.
-    "tests.test_core": 582,
+    # R69, 2026-08-13: 582 -> 594, the twelve that pin the intake fail-open
+    # trio -- nine on the salary-status coverage read and the un-ageable platoon
+    # reference, three on the exclusion block/warn split.
+    "tests.test_core": 594,
     "tests.test_showdown": 55,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
@@ -54,7 +57,7 @@ EXPECTED_SUITE_COUNTS = {
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 889
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 901
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,

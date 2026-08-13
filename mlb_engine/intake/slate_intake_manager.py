@@ -300,6 +300,84 @@ def salary_status_tier(status: Any) -> str:
     return "clean"
 
 
+# R69(a). Below this row count an all-blank Status column is an ordinary small
+# pool -- a two-game Showdown slate really can carry no shelved player -- so the
+# zero-coverage signal is only meaningful once the file is slate-sized.
+STATUS_COVERAGE_MIN_ROWS = 40
+
+
+def salary_status_coverage(players: Sequence[Any]) -> Dict[str, Any]:
+    """R69(a). Is DK's availability vocabulary actually reaching the pool?
+
+    ``Status`` and ``Starting`` are read by exact key in ``parse_dk_salary_csv``
+    and NEITHER is in ``REQUIRED_SALARY_FIELDS``, so a renamed or absent column
+    passes the schema gate and then returns "" for every row. Every player reads
+    the clean tier, and three separate mechanisms disarm at once: the IL drop
+    keeps shelved players in the legal pool, opener detection loses its signal,
+    and the DK-probable source stops naming pitchers.
+
+    That is the F1 shelved-stars defect arriving as a DATA condition rather than
+    a projection error, which is precisely the class R60 closed from the other
+    direction -- and it is silent, because a disarmed read and a healthy slate
+    produce byte-identical output.
+
+    Deterministic bookkeeping, never a claim: this reports what the file carries
+    and warns. It does not drop anyone and it does not block, because a DK file
+    that genuinely ships without a Status column is still a legal file, and
+    refusing it would be the forbidden pool reduction wearing a schema hat.
+    """
+    rows = list(players or [])
+    header: List[str] = []
+    for p in rows:
+        raw = getattr(p, "raw", None)
+        if isinstance(raw, Mapping) and raw:
+            header = [str(k) for k in raw.keys()]
+            break
+    status_present = "Status" in header
+    starting_present = "Starting" in header
+    status_non_blank = sum(
+        1 for p in rows if str(getattr(p, "status", "") or "").strip())
+    starting_non_blank = sum(
+        1 for p in rows if str(getattr(p, "starting", "") or "").strip())
+
+    warnings: List[str] = []
+    near = [c for c in header
+            if c not in ("Status", "Starting")
+            and ("status" in c.lower() or "starting" in c.lower())]
+    hint = f"; the header does carry {near}" if near else ""
+    if not status_present:
+        warnings.append(
+            "DK salary file has no 'Status' column, so every player reads the "
+            "clean tier and the IL drop is disarmed: shelved players stay in "
+            "the legal pool and can be taken by the platoon and APPG fallbacks"
+            + hint
+        )
+    elif rows and len(rows) >= STATUS_COVERAGE_MIN_ROWS and status_non_blank == 0:
+        warnings.append(
+            f"DK salary file carries a 'Status' column but not one of "
+            f"{len(rows)} rows holds a non-blank status; either the slate has "
+            f"no shelved player or the column is not the one this engine reads"
+        )
+    if not starting_present:
+        warnings.append(
+            "DK salary file has no 'Starting' column, so DK's own probable "
+            "pitchers cannot be read from it and opener detection has no "
+            "signal" + hint
+        )
+
+    return {
+        "rows": len(rows),
+        "status_column_present": status_present,
+        "starting_column_present": starting_present,
+        "status_non_blank": status_non_blank,
+        "starting_non_blank": starting_non_blank,
+        "near_miss_columns": near,
+        "warnings": warnings,
+        "note": "deterministic column bookkeeping; reports what the file "
+                "carries, never drops a player",
+    }
+
+
 def _extract_game_date(game_info: str) -> str:
     """Extract an ISO game date from the DraftKings Game Info field when present."""
     match = re.search(r"\b(\d{1,2}/\d{1,2}/\d{4})\b", str(game_info or ""))

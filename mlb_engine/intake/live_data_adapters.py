@@ -675,11 +675,17 @@ def build_slate_pool(
     stale on every build.
     """
     from mlb_engine.intake.slate_intake_manager import (
-        parse_dk_salary_csv, salary_status_tier, slate_clock,
+        parse_dk_salary_csv, salary_status_coverage, salary_status_tier,
+        slate_clock,
     )
     from mlb_engine.projections.projection_builder import batting_order_factor
 
     all_players = parse_dk_salary_csv(str(salary_csv))
+
+    # R69(a): whether the Status/Starting read is armed at all, computed on the
+    # raw file before the tiering below consumes it. Appended to the pool
+    # report's warnings once that list exists.
+    status_coverage = salary_status_coverage(all_players)
 
     # F1: DK's own Status column, read before anything selects a player.
     #
@@ -733,6 +739,9 @@ def build_slate_pool(
 
     warnings: List[str] = []
     blockers: List[str] = []
+    # R69(a): a disarmed availability read is the first thing the pool report
+    # says, because every count below it is computed as if the read worked.
+    warnings.extend(status_coverage["warnings"])
     teams_report: Dict[str, Dict[str, Any]] = {}
 
     # R26: a postponed game is excluded on either of two independent signals,
@@ -1107,6 +1116,30 @@ def build_slate_pool(
             )
         elif platoon_age_days > PLATOON_AGE_WARN_DAYS:
             warnings.append(detail)
+    elif platoon_report is not None and platoon_dependent_teams:
+        # R69(b): a reference the build IS leaning on, whose collected_date is
+        # absent or will not parse, used to reach neither branch above -- the
+        # age came out None and None compares against no threshold, so the
+        # policy that exists to stop a stale reference was silent at its
+        # strictest setting. Age unknown is not age zero. It is the one state
+        # where the gate cannot answer its own question, so it reports at the
+        # POLICY's severity rather than assuming the reference is fresh.
+        collected_text = (platoon_report or {}).get("collected_date")
+        detail = (
+            f"platoon reference supplies the projected order for "
+            f"{', '.join(platoon_dependent_teams)} but carries no parseable "
+            f"collected_date (found {collected_text!r}); its age against slate "
+            f"{slate_date.isoformat()} is UNKNOWN and cannot be checked"
+        )
+        if stale_platoon_policy == "block":
+            blockers.append(
+                detail + "; refresh it from FanGraphs RosterResource "
+                "(python tools/fetch_rotowire_lineups.py writes the same schema) "
+                "or pass stale_platoon_policy='warn' to accept the unknown age "
+                "on the record"
+            )
+        else:
+            warnings.append(detail)
 
     for team in sorted(excluded_teams):
         teams_report[team] = {"status": "excluded_postponed", "hitters": 0}
@@ -1352,6 +1385,8 @@ def build_slate_pool(
             "partial_lineup_teams": status.get("partial_lineup_teams") or [],
             "platoon_age_days": platoon_age_days,
             "platoon_dependent_teams": platoon_dependent_teams,
+            # R69(a). Whether DK's Status/Starting read was armed for this file.
+            "salary_status_coverage": status_coverage,
             "slate_date": slate_date.isoformat(),
             "warnings": warnings,
             "blockers": blockers,

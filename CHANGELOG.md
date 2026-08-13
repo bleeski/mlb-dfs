@@ -56,6 +56,99 @@ until more finishes exist to grade.
 
 ---
 
+## 2026-08-13 — R69 closes: three intake reads that failed OPEN now fail loud
+
+Tier 1's head, and it inherits R60's argument directly: each of these three
+degraded to SILENCE rather than to a signal, so a disarmed guard and a healthy
+slate produced byte-identical output. All three were reproduced before they were
+touched, and all three matched what the entry filed.
+
+**(a) A renamed or absent `Status`/`Starting` column disarms the IL drop.**
+`parse_dk_salary_csv` reads both by exact key and neither is in
+`REQUIRED_SALARY_FIELDS`, so a file without them passes the schema gate with
+`missing_columns: []` and then returns `""` for every row. Every player reads the
+clean tier. Three mechanisms disarm at once: shelved players stay in the legal
+pool and can be taken by the platoon and APPG fallbacks (the F1 defect arriving
+as a DATA condition, which is R60's class by another route), opener detection
+loses its signal, and DK's own `Starting` column stops naming probables — the
+first-class probable source CLAUDE.md's build contract names.
+
+New `slate_intake_manager.salary_status_coverage()` reports what the file
+carries; `build_slate_pool` calls it and its warnings lead the pool report, which
+is the surface CLAUDE.md already requires be read before approving. It also lands
+as `pool_report["salary_status_coverage"]`. Three signals: column absent, column
+present but not one row of a slate-sized file non-blank
+(`STATUS_COVERAGE_MIN_ROWS = 40`, because a two-game Showdown pool really can
+carry no shelved player), and the near-miss headers named, since identifying
+`Injury Status` is the whole fix on the operator's side.
+
+It WARNS, it does not block, and it never drops anyone. This is not hypothetical
+and not contrived: 3 of the 75 real `DKSalaries*.csv` files under `data/slates/`
+ship without both columns, most recently 2026-08-01 (192 rows). Refusing those
+would be the forbidden pool reduction wearing a schema hat.
+
+**(b) A platoon reference with no parseable `collected_date` bypassed the
+staleness gate entirely.** The age came out `None`, `None` compares against no
+threshold, and the gate that exists to stop a stale reference was silent at its
+strictest setting. Age unknown is not age zero. Verified across all three
+variants — unparseable string, empty string, key absent — each producing
+`platoon_age_days: None` with the build still leaning on the reference
+(`platoon_dependent_teams: ['T4']`) and zero blockers, zero warnings.
+
+Now reported at the POLICY's own severity: a blocker under
+`stale_platoon_policy='block'`, a warning under `'warn'` (what `build_slate.py`
+and `late_swap.py` pass, so the build still ships). Conditioned on
+`platoon_dependent_teams` exactly like the days-old branch beside it, which
+preserves F17 and R60's rule that the gate follows what the projection SUPPLIED:
+a fully posted side takes all nine seats, so an unageable reference supplied
+nothing and stays silent.
+
+**(c) Exclusion "blockers" only ever warned.** `_exclusion_block`'s docstring has
+said since F15 that an exclusion matching nobody is "a blocker at approve=False";
+the code appended to `checkpoint["warnings"]` and the only approve=True hard gate
+was contest identity. So `approve=True` sailed past a typo'd ID and built a
+portfolio around a player the operator had asked to drop.
+
+Decided as a SPLIT, because the key pooled two findings that are not the same
+kind of fact and the shared label made both of them lies:
+
+- **Unmatched exclusion ids → hard gate on `approve=True`,** beside contest
+  identity and on the identical argument: an operator-supplied identifier that
+  resolves to nothing, decidable from disk in under a second, invisible in the
+  certified output, and fixed by correcting one argument on the same command. No
+  override, for the same reason — an override would cost more than the fix. There
+  is no standing cross-slate exclusion list to false-positive against:
+  `excluded_player_ids` has no CLI surface in `build_slate.py` and reaches
+  `run_slate` only as a per-build argument.
+- **Unrecognized `Excluded` cells → relabelled to `warnings`.** Keeping those
+  players is the DOCUMENTED reading of that column (CLAUDE.md: "blank, NaN,
+  'False' and unrecognized cells keep them"), so filing it under a key that now
+  gates would refuse builds for behaving as specified, and its remedy is a file
+  edit rather than a flag correction. That is the line the split is drawn on.
+
+Both findings still reach the plan-mode report with the same text, so
+`approve=False` output is unchanged in content.
+
+`tests.test_core` 582 -> 594: nine pinning (a) and (b) in a new
+`IntakeFailOpenTests`, three pinning the (c) split. Every one is paired with a
+HEALTHY control, because a guard that fires on everything is the same defect
+wearing the other sign — the healthy salary file warns about nothing, the
+sub-floor pool stays quiet, the fully posted side says nothing, and a matched
+exclusion still approves. `test_checkpoint_names_unrecognized_cells` was
+rewritten: it pinned the mislabel, asserting the message appeared in `blockers`.
+Pin line updated in `tools/audit.py` (889 -> 901), `CLAUDE.md`, the ledger Quick
+Card, and `skills/generate-lineups/SKILL.md`.
+
+Audit evidence: the single-line `--run-tests` macro does not fit this sandbox's
+per-call ceiling (killed at ~178s twice, and a background run reached ~935s
+without landing output), so the Quick Card's documented per-suite fallback
+produced it — `test_core` 594, `test_showdown` 55, `test_upload_integrity` 168,
+`test_golden_replay` 9, `test_paste_lineups` 75, each `state=clean passed=True
+skipped=0` through `audit.classify_suite` itself, summing to 901, with
+`audit.py --terse` PASS on pins and inventory. That per-call ceiling is now
+recorded on the Quick Card line, since the previous session hit the same wall and
+left it as a one-off note.
+
 ## 2026-08-12 — R46 round 2: preflight names the player, and a PARTIAL side stops skipping the check
 
 R46 made the posted-lineup blind spot loud. It did not make it a finding, and on
