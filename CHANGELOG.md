@@ -25,6 +25,100 @@ performance claim.
 
 ---
 
+## 2026-08-14 — R70 closes: the slate dir stops picking a draftgroup for you, and the clock reads its own keys
+
+Backlog R70 (P2, S, Workstream 3), Tier 1's head, migrated out of
+`docs/2026-07-27_backlog_v2.md`. Filed by the 2026-08-04 audit, reproduced
+against the real `data/slates/2026-07-30/` layout before anything was touched.
+Same family as R69 above and the reorder's argument for adjacency held: R69 left
+the intake surface warmer than it found it, and this is the last pointwise
+wrong-slate patch before R81's design pass generalizes the family.
+
+**(a) Content-sniffing kept the LAST schema-passing file per role.** Both
+branches of the loop in `_find_salary_and_entries` assigned into one variable,
+so the winner was whichever file sorted last. Against the real 07-30 dir that
+is `DKSalaries_showdown_1415_1g_sd.csv` + `DKEntries_showdown_1415_1g_sd.csv`,
+a 1-game showdown pair, staged on a 6-game Classic day with no warning.
+
+This is not an edge case and the fix is sized for that: 17 of the dirs under
+`data/slates/` carry more than one salary export, because a day routinely has
+two Classic draftgroups plus its showdowns and they all land in the same folder.
+Neither filename convention nor sort order nor mtime is authority over which
+slate the operator is building — DK writes the bare `DKSalaries.csv` name for
+whichever slate was clicked last, so preferring the conventional name would be
+the same wrong-draftgroup bug in a nicer hat. Every match is now collected and
+more than one per role RAISES `AmbiguousSlateInput`, naming every candidate and
+the flag that resolves it.
+
+A block with no way through teaches the operator to write a driver script that
+bypasses the tool, which is R106's lesson, so the block ships with its channel:
+`--salary-csv`, `--entries-csv`, `--bundle-json`, `--platoon-json`, plus exit 4
+so a driver can tell "name the file" from exit 2's "go download the file". An
+override naming a file that does not exist hard-gates rather than degrading to a
+warning, on R69(c)'s precedent: it is an operator-typed identifier and one
+argument fixes it. `slate_bundle.json` still wins outright when present, because
+`fetch_slate_bundle.py` writes that exact name and a conventional hit is
+unambiguous by construction.
+
+**The platoon half cost more than it looked like.** The fallback took the first
+remaining JSON in the dir with no validation, which on the 07-30 layout is
+`_home_sides_feed.json`, a lineups feed. That fills nothing —
+`build_projected_order` iterates `platoon['teams']` and a feed has `games` — and
+it also suppresses `DEFAULT_PLATOON_REFERENCE`, which `build_slate_pool` loads
+only when `platoon_json is None`. A bad guess is strictly worse than no guess.
+Candidates are now checked for a non-empty `teams` list, a rejected guess falls
+through to `None` so the reference file still loads, and the rejection is named
+in the pool warnings. A file the operator named explicitly blocks instead, same
+precedent as above.
+
+**(b) `--checkpoint` printed `first_lock=None deadline=None
+minutes_remaining=None` on every run.** It read `first_lock_et`,
+`delivery_deadline_et` and `minutes_remaining`; `slate_clock()` emits
+`first_lock_utc`, `deadline_utc` and `minutes_to_deadline`. Three keys, none of
+them real, on the T-schedule's one budgeting instrument, blank exactly when the
+operator reads it at T-20 / T-10 / T-5. Worse, the blank was indistinguishable
+from the one case that genuinely has no clock, a slate with no parseable game
+datetimes, which now says so in words. The line reads the real keys, converts to
+ET on the file's existing UTC-4 convention because the T-schedule is stated in
+ET, and calls out `past_deadline`.
+
+**Two corrections to the filing,** both found by reproducing it first. The entry
+said the 07-30 dir "stages the wrong draftgroup end-to-end"; on that dir
+specifically it does not reach the end, because there is no `slate_bundle.json`
+and staging dies at the bundle check. The end-to-end path needs a dir with a
+bundle AND two Classic pairs, which `data/slates/2026-07-19/` is. The defect and
+its blast radius are unchanged; the reproduction is narrower than the words. The
+entry's other clause, that the platoon pick "suppresses the default
+platoon-reference load", is exactly right — the default load is in
+`build_slate_pool`, not in `stage_slate`, which is why a first read of the tool
+does not show it.
+
+**One rider taken on the way past,** unplanned and recorded as such: the
+"no platoon JSON found" warning promised that TBD teams "will fall back to top-9
+AvgPointsPerGame". That stopped being true when `build_slate_pool` began loading
+`DEFAULT_PLATOON_REFERENCE` for a `None` platoon_json. APPG is the fallback only
+when the reference is absent too, so the warning told the operator their TBD
+teams had no projected order when they had a real one. Same steers-you-wrong
+class as the two defects above and one line away from them, so it is fixed here
+rather than filed. The text is now the module constant
+`NO_PLATOON_IN_DIR_NOTE` so the claim is pinnable.
+
+18 tests, pin 901 to 919 (`tests.test_core` 594 to 612), and CLAUDE.md's quoted
+session-start line moves with it — `AuditSkipHonestyTests` exists to make that
+pair impossible to split, and it caught the omission on the first full run. The
+ambiguity and shape tests build their dirs from R62's vendored frozen exports
+rather than the untracked 07-30 dir, so the suite still runs on a
+tracked-files-only checkout. All 18 were mutation-checked against restored
+pre-fix implementations: 12 fail, and the 6 that pass both ways are doing that
+deliberately — the happy-path regression guard, the over-strict-validation
+guard, the `_is_platoon_shaped` unit, and the pin asserting `slate_clock`'s own
+key names, which is the test that would have caught (b) at write time.
+
+Not touched: `stage_slate` remains a review-and-checkpoint door, not a
+production build door. `build_slate.py` and `run_slate` are unchanged.
+
+---
+
 ## 2026-08-13 — Decided, not yet shipped
 
 ### Decided: apex over cash is the standing priority for GPP-shaped contests

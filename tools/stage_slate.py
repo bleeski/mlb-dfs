@@ -28,11 +28,22 @@ Usage:
                               [--reference-dir data/reference]
                               [--runs-root runs] [--no-enrich]
                               [--checkpoint] [--json]
+                              [--salary-csv P] [--entries-csv P]
+                              [--bundle-json P] [--platoon-json P]
 
   --checkpoint  after staging, call run_slate(approve=False) and print the
                 slate clock, the pool report, and the single Blockers line.
   --json        print a compact JSON summary of the assembled kwargs
                 (ids and counts, never full projection rows).
+
+Exit codes: 0 staged, 1 the checkpoint did not pass, 2 an input is missing or
+malformed, 4 two files match one intake role and the tool will not guess --
+name the one you are building with the matching flag.
+
+A slate dir routinely holds more than one DK export: two Classic draftgroups
+plus the day's showdowns, all downloaded to the same folder. Sniffing cannot
+choose between them, so more than one match per role is a block (R70), never a
+silent pick.
 """
 from __future__ import annotations
 
@@ -49,6 +60,17 @@ if str(REPO_ROOT) not in sys.path:
 
 ENTRIES_HEADER_PREFIX = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee"]
 
+# What actually happens when the slate dir holds no platoon JSON. A constant so
+# the claim is pinnable: the previous wording promised a top-9 AvgPointsPerGame
+# fallback, which stopped being true when build_slate_pool began loading
+# DEFAULT_PLATOON_REFERENCE for a None platoon_json (R70 rider).
+NO_PLATOON_IN_DIR_NOTE = (
+    "no platoon JSON in the slate dir; TBD-lineup teams take "
+    "data/reference/fangraphs_platoon_lineups.json (subject to the R27 "
+    "staleness policy), and top-9 AvgPointsPerGame only if that reference is "
+    "missing too"
+)
+
 
 def _today_et() -> str:
     # ET without a tz-database dependency: UTC-4 (EDT) covers the MLB season,
@@ -62,28 +84,100 @@ def _read_header(path: Path) -> List[str]:
         return next(csv.reader(handle), [])
 
 
-def _find_salary_and_entries(slate_dir: Path) -> Tuple[Optional[Path], Optional[Path]]:
+class AmbiguousSlateInput(ValueError):
+    """More than one file in the slate dir matches one intake role (R70).
+
+    Carries ``role``, ``candidates`` and ``flag`` so a caller can report the
+    named list rather than a count. A sniffer cannot choose between two
+    legitimate DK exports -- on the routine two-classic-slates day both are
+    real slates and only the operator knows which one is being built -- so the
+    ambiguity is stated and the named flag is the channel out of it.
+    """
+
+    def __init__(self, role: str, candidates: List[Path], flag: str) -> None:
+        self.role = role
+        self.candidates = list(candidates)
+        self.flag = flag
+        names = ", ".join(p.name for p in self.candidates)
+        super().__init__(
+            f"{len(self.candidates)} files match the {role} role in "
+            f"{self.candidates[0].parent}: {names}. Name the one you are "
+            f"building with `{flag} <path>`. Staging the wrong draftgroup is "
+            f"silent all the way to the upload file, so this is a block."
+        )
+
+
+def _resolve_override(role: str, slate_dir: Path, override: str | Path, flag: str) -> Path:
+    """An operator-typed path for one intake role. Missing is a block.
+
+    R69's precedent applies: an operator-typed identifier is fixed by
+    correcting one argument, so it hard-gates rather than degrading to a
+    warning. A bare filename resolves inside the slate dir.
+    """
+    path = Path(override)
+    if not path.is_absolute() and not path.exists():
+        path = slate_dir / path.name
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{flag} names a {role} file that does not exist: {override}")
+    return path
+
+
+def _sole(role: str, candidates: List[Path], flag: str) -> Optional[Path]:
+    """Exactly one candidate, or None, or a block naming every candidate."""
+    if not candidates:
+        return None
+    if len(candidates) > 1:
+        raise AmbiguousSlateInput(role, candidates, flag)
+    return candidates[0]
+
+
+def _find_salary_and_entries(
+    slate_dir: Path,
+    *,
+    salary_override: Optional[str | Path] = None,
+    entries_override: Optional[str | Path] = None,
+) -> Tuple[Optional[Path], Optional[Path]]:
     """Content-sniff the slate dir for the DK salary export and the DKEntries
     reserved-entries file, independent of filename convention -- the same
     discipline tests/test_golden_replay.py uses: the entries file by its exact
     4-column header, the salary file by validate_salary_schema.
+
+    R70: this used to keep the LAST match per role, because both branches
+    assigned into one variable inside the loop. Against the real
+    ``data/slates/2026-07-30/`` layout that staged
+    ``DKSalaries_showdown_1415_1g_sd.csv`` + ``DKEntries_showdown_1415_1g_sd.csv``
+    -- a 1-game showdown pair -- on a Classic day, with no warning. Two
+    Classic exports in one dir (``DKSalaries.csv`` +
+    ``DKSalaries_1910_6g.csv``) is the ROUTINE layout, not an edge case: 17 of
+    the dirs under data/slates/ carry more than one salary export. Neither
+    filename convention nor sort order nor mtime is authority over which slate
+    the operator is building, so every match is collected and more than one is
+    a block.
     """
     from mlb_engine.intake.slate_intake_manager import validate_salary_schema
 
-    salary_csv: Optional[Path] = None
-    entries_csv: Optional[Path] = None
+    salary: List[Path] = []
+    entries: List[Path] = []
     for path in sorted(slate_dir.glob("*.csv")):
         header = _read_header(path)
         if not header:
             continue
         if [c.strip() for c in header[:4]] == ENTRIES_HEADER_PREFIX:
-            entries_csv = path
+            entries.append(path)
             continue
         try:
             if validate_salary_schema(str(path)).get("passed"):
-                salary_csv = path
+                salary.append(path)
         except Exception:
             continue
+
+    salary_csv = (_resolve_override("salary", slate_dir, salary_override, "--salary-csv")
+                  if salary_override is not None
+                  else _sole("salary", salary, "--salary-csv"))
+    entries_csv = (_resolve_override("entries", slate_dir, entries_override, "--entries-csv")
+                   if entries_override is not None
+                   else _sole("entries", entries, "--entries-csv"))
     return salary_csv, entries_csv
 
 
@@ -91,42 +185,104 @@ def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _is_platoon_shaped(obj: Any) -> bool:
+    """Does this JSON carry what ``build_projected_order`` actually reads?
+
+    That function iterates ``platoon['teams']`` for entries with ``abbrev``
+    (platoon_order_adapter.py). A lineups-shaped feed has ``games``, not
+    ``teams``, so it fills nothing -- and passing one anyway is worse than
+    passing nothing, because ``build_slate_pool`` loads
+    ``DEFAULT_PLATOON_REFERENCE`` only when ``platoon_json is None``. A bad
+    guess therefore costs the good default (R70).
+    """
+    if not isinstance(obj, Mapping):
+        return False
+    teams = obj.get("teams")
+    return isinstance(teams, list) and bool(teams)
+
+
 def _find_bundle_and_platoon(
     slate_dir: Path,
-) -> Tuple[Optional[Path], Optional[Path], Optional[Path]]:
+    *,
+    bundle_override: Optional[str | Path] = None,
+    platoon_override: Optional[str | Path] = None,
+) -> Tuple[Optional[Path], Optional[Path], Optional[Path], List[str]]:
     """Resolve the three JSON artifacts. Prefer conventional names, then sniff.
 
-    - bundle: ``slate_bundle.json`` if present, else any *.json carrying a
-      ``bundle_version`` or ``lineups`` key.
+    - bundle: ``slate_bundle.json`` if present -- ``fetch_slate_bundle.py``
+      writes that exact name, so a conventional hit is unambiguous by
+      construction -- else any *.json carrying a ``bundle_version`` or
+      ``lineups`` key, where more than one candidate blocks.
     - platoon: any ``*platoon*.json``, else the remaining non-bundle,
-      non-declared JSON.
+      non-declared JSON -- and in both cases only if it is platoon-SHAPED.
+      R70: the unvalidated fallback took the first remaining JSON, which on
+      the real 07-30 dir is ``_home_sides_feed.json``, a lineups feed. It has
+      no ``teams``, so it projected no orders AND suppressed the reference
+      file that would have. A rejected guess falls through to None so
+      ``build_slate_pool`` loads its default, and says which file it rejected.
     - declared_pitchers: ``declared_pitchers.json`` if present (optional; the
       feed's own probables are used when it is absent).
+
+    Returns (bundle, platoon, declared, notes).
     """
+    notes: List[str] = []
     jsons = sorted(slate_dir.glob("*.json"))
     declared = next((p for p in jsons if p.name == "declared_pitchers.json"), None)
 
-    bundle = next((p for p in jsons if p.name == "slate_bundle.json"), None)
-    if bundle is None:
-        for p in jsons:
-            if p in (declared,):
-                continue
-            try:
-                obj = _load_json(p)
-            except Exception:
-                continue
-            if isinstance(obj, Mapping) and ("bundle_version" in obj or "lineups" in obj):
-                bundle = p
-                break
+    if bundle_override is not None:
+        bundle: Optional[Path] = _resolve_override(
+            "slate bundle", slate_dir, bundle_override, "--bundle-json")
+    else:
+        bundle = next((p for p in jsons if p.name == "slate_bundle.json"), None)
+        if bundle is None:
+            sniffed = []
+            for p in jsons:
+                if p == declared:
+                    continue
+                try:
+                    obj = _load_json(p)
+                except Exception:
+                    continue
+                if isinstance(obj, Mapping) and ("bundle_version" in obj or "lineups" in obj):
+                    sniffed.append(p)
+            bundle = _sole("slate bundle", sniffed, "--bundle-json")
 
-    platoon = next((p for p in jsons if "platoon" in p.name.lower()), None)
-    if platoon is None:
-        for p in jsons:
-            if p in (bundle, declared):
-                continue
+    if platoon_override is not None:
+        platoon: Optional[Path] = _resolve_override(
+            "platoon", slate_dir, platoon_override, "--platoon-json")
+        try:
+            obj = _load_json(platoon)
+        except Exception as exc:
+            raise ValueError(f"--platoon-json is unreadable ({platoon.name}): {exc}") from exc
+        if not _is_platoon_shaped(obj):
+            # Operator-typed identifier: one argument fixes it, so it blocks.
+            raise ValueError(
+                f"--platoon-json {platoon.name} carries no non-empty 'teams' "
+                f"list, so build_projected_order would fill no orders from it. "
+                f"Point it at a FanGraphs platoon-lineups JSON, or omit the "
+                f"flag to use data/reference/fangraphs_platoon_lineups.json.")
+        return bundle, platoon, declared, notes
+
+    named = [p for p in jsons if "platoon" in p.name.lower()]
+    pool = named or [p for p in jsons if p not in (bundle, declared)]
+    platoon = None
+    rejected: List[str] = []
+    for p in pool:
+        try:
+            obj = _load_json(p)
+        except Exception:
+            rejected.append(f"{p.name} (unreadable)")
+            continue
+        if _is_platoon_shaped(obj):
             platoon = p
             break
-    return bundle, platoon, declared
+        rejected.append(f"{p.name} (no 'teams' list)")
+    if platoon is None and rejected:
+        notes.append(
+            "no platoon-shaped JSON in the slate dir; rejected " +
+            ", ".join(rejected) +
+            ". Falling through to data/reference/fangraphs_platoon_lineups.json.")
+    return bundle, platoon, declared, notes
 
 
 def stage_slate(
@@ -136,6 +292,10 @@ def stage_slate(
     runs_root: Optional[str | Path] = REPO_ROOT / "runs",
     enrich: bool = True,
     declared_pitchers: Optional[Mapping[str, str]] = None,
+    salary_csv_override: Optional[str | Path] = None,
+    entries_csv_override: Optional[str | Path] = None,
+    bundle_json_override: Optional[str | Path] = None,
+    platoon_json_override: Optional[str | Path] = None,
 ) -> Dict[str, Any]:
     """Stage ``data/slates/<date>/`` into ready-to-splat ``run_slate`` kwargs.
 
@@ -157,7 +317,11 @@ def stage_slate(
 
     warnings: List[str] = []
 
-    salary_csv, entries_csv = _find_salary_and_entries(slate_dir)
+    salary_csv, entries_csv = _find_salary_and_entries(
+        slate_dir,
+        salary_override=salary_csv_override,
+        entries_override=entries_csv_override,
+    )
     if salary_csv is None:
         raise FileNotFoundError(
             f"no DKSalaries CSV found in {slate_dir} (a DraftKings salary export "
@@ -171,7 +335,12 @@ def stage_slate(
             f"DraftKings and drop it in that folder."
         )
 
-    bundle_path, platoon_path, declared_path = _find_bundle_and_platoon(slate_dir)
+    bundle_path, platoon_path, declared_path, json_notes = _find_bundle_and_platoon(
+        slate_dir,
+        bundle_override=bundle_json_override,
+        platoon_override=platoon_json_override,
+    )
+    warnings.extend(json_notes)
     if bundle_path is None:
         raise FileNotFoundError(
             f"no slate_bundle.json found in {slate_dir}. Run "
@@ -195,11 +364,15 @@ def stage_slate(
             platoon_json = _load_json(platoon_path)
         except Exception as exc:
             warnings.append(f"platoon JSON unreadable ({platoon_path.name}): {exc}")
-    else:
-        warnings.append(
-            "no platoon JSON found; TBD-lineup teams will fall back to top-9 "
-            "AvgPointsPerGame with a warning"
-        )
+    elif not json_notes:
+        # R70 rider, found while fixing the sniff: this used to say TBD teams
+        # "will fall back to top-9 AvgPointsPerGame", which stopped being true
+        # when build_slate_pool started loading DEFAULT_PLATOON_REFERENCE
+        # whenever platoon_json is None. Top-9 APPG is the fallback only if
+        # that reference file is also absent. Telling the operator their TBD
+        # teams have no projected order when they do is the same
+        # steers-you-wrong class as the two defects above.
+        warnings.append(NO_PLATOON_IN_DIR_NOTE)
 
     if declared_pitchers is None and declared_path is not None:
         try:
@@ -343,6 +516,46 @@ def _print_staging(staged: Mapping[str, Any]) -> None:
             print(f"    - {w}")
 
 
+def _et(iso_utc: Optional[str]) -> Optional[str]:
+    """UTC ISO -> 'HH:MM ET'. ET without a tz-database dependency: UTC-4 (EDT)
+    covers the MLB season, the same convention as ``_today_et`` above.
+    """
+    if not iso_utc:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(iso_utc).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (dt.astimezone(timezone.utc) - timedelta(hours=4)).strftime("%H:%M ET")
+
+
+def _format_clock(clock: Mapping[str, Any]) -> str:
+    """The T-schedule's one budgeting instrument, read off the keys
+    ``slate_clock()`` actually emits.
+
+    R70(b): this printed ``first_lock=None deadline=None minutes_remaining=None``
+    on every run, because it read ``first_lock_et`` / ``delivery_deadline_et``
+    / ``minutes_remaining`` and the function returns ``first_lock_utc`` /
+    ``deadline_utc`` / ``minutes_to_deadline``. Three keys, none of them real,
+    and the blank was indistinguishable from a slate with no parseable game
+    times -- which is the one case that genuinely has no clock and now says so.
+    """
+    if not clock:
+        return "  slate_clock: absent from the checkpoint payload"
+    if not clock.get("available", True):
+        return (f"  slate_clock: unavailable -- "
+                f"{clock.get('note') or 'no parseable game datetimes'} "
+                f"(source={clock.get('source')})")
+    mins = clock.get("minutes_to_deadline")
+    line = (f"  slate_clock: first_lock={_et(clock.get('first_lock_utc'))} "
+            f"deliver_by={_et(clock.get('deadline_utc'))} "
+            f"(T-{clock.get('buffer_minutes')}) "
+            f"minutes_to_deadline={mins}")
+    if clock.get("past_deadline"):
+        line += "  PAST DEADLINE: present the best certified file now"
+    return line
+
+
 def _run_checkpoint(kwargs: Mapping[str, Any]) -> int:
     from mlb_engine.pipeline.execution_pipeline import run_slate
 
@@ -353,10 +566,7 @@ def _run_checkpoint(kwargs: Mapping[str, Any]) -> int:
     print(f"  passed={plan.get('passed')}  status={plan.get('status')}")
     if plan.get("errors"):
         print(f"  errors: {plan['errors']}")
-    if clock:
-        print(f"  slate_clock: first_lock={clock.get('first_lock_et') or clock.get('first_lock')} "
-              f"deadline={clock.get('delivery_deadline_et') or clock.get('deadline')} "
-              f"minutes_remaining={clock.get('minutes_remaining')}")
+    print(_format_clock(clock))
     feas = ck.get("feasibility") or {}
     binding = feas.get("binding_constraints") or []
     ck_warnings = ck.get("warnings") or []
@@ -377,6 +587,18 @@ def main() -> int:
                         help="after staging, run run_slate(approve=False) and print the checkpoint")
     parser.add_argument("--json", action="store_true",
                         help="print a compact JSON summary of the assembled kwargs")
+    # R70: the sniffer blocks when two files match one role, because a slate
+    # dir routinely holds two Classic draftgroups plus the day's showdowns and
+    # nothing in the filenames says which one is being built. These four are
+    # the channel out of that block.
+    parser.add_argument("--salary-csv", default=None,
+                        help="name the DKSalaries export when the slate dir holds more than one")
+    parser.add_argument("--entries-csv", default=None,
+                        help="name the DKEntries reserved-entries file when the dir holds more than one")
+    parser.add_argument("--bundle-json", default=None,
+                        help="name the slate bundle when the dir holds more than one candidate")
+    parser.add_argument("--platoon-json", default=None,
+                        help="name the FanGraphs platoon-lineups JSON (must carry a 'teams' list)")
     args = parser.parse_args()
 
     try:
@@ -386,7 +608,17 @@ def main() -> int:
             reference_dir=args.reference_dir,
             runs_root=args.runs_root,
             enrich=not args.no_enrich,
+            salary_csv_override=args.salary_csv,
+            entries_csv_override=args.entries_csv,
+            bundle_json_override=args.bundle_json,
+            platoon_json_override=args.platoon_json,
         )
+    except AmbiguousSlateInput as exc:
+        # Exit 4: the inputs are legal and the tool refuses to guess between
+        # them. Distinct from exit 2 (an input is missing or malformed) so a
+        # driver can tell "name the file" from "go download the file".
+        print(f"stage_slate: {exc}", file=sys.stderr)
+        return 4
     except (FileNotFoundError, ValueError) as exc:
         print(f"stage_slate: {exc}", file=sys.stderr)
         return 2

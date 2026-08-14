@@ -48,7 +48,11 @@ EXPECTED_SUITE_COUNTS = {
     # R69, 2026-08-13: 582 -> 594, the twelve that pin the intake fail-open
     # trio -- nine on the salary-status coverage read and the un-ageable platoon
     # reference, three on the exclusion block/warn split.
-    "tests.test_core": 594,
+    # R70, 2026-08-14: 594 -> 612, the eighteen that pin stage_slate's role
+    # resolution -- six on ambiguity blocking with a named channel out, seven on
+    # the platoon shape check and the no-platoon note, five on the checkpoint
+    # clock read.
+    "tests.test_core": 612,
     "tests.test_showdown": 55,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.

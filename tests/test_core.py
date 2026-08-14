@@ -11514,5 +11514,242 @@ class TestDataDependenciesAreVendoredOrGuardedTests(unittest.TestCase):
         self.assertEqual(offenders, [], "\n" + "\n".join(offenders))
 
 
+from tools import stage_slate as stage_slate_mod
+
+
+class StageSlateRoleResolutionTests(unittest.TestCase):
+    """R70(a): stage_slate kept the LAST schema-passing file per role.
+
+    Against the real ``data/slates/2026-07-30/`` layout that staged the 1-game
+    showdown salary+entries pair on a Classic day, silently, end to end. The
+    two salary exports here are the tracked frozen fixtures R62 vendored --
+    real DK content, one of them literally the 07-30 6-game Classic file -- so
+    the ambiguity is reproduced without depending on an untracked slate dir.
+    """
+
+    FIXTURES = REPO / "tests" / "fixtures" / "slates"
+    ENTRIES_HEADER = "Entry ID,Contest Name,Contest ID,Entry Fee,Contest Entries\n"
+
+    def _dir(self, salary_names, entries_names=("DKEntries.csv",)):
+        import shutil
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(d, ignore_errors=True))
+        src = sorted(self.FIXTURES.glob("DKSalaries_*.csv"))
+        self.assertGreaterEqual(
+            len(src), 2, "R62 vendored two frozen salary exports; this test needs both")
+        for i, name in enumerate(salary_names):
+            shutil.copy(src[i % len(src)], d / name)
+        for name in entries_names:
+            (d / name).write_text(self.ENTRIES_HEADER + ",,,,\n", encoding="utf-8")
+        return d
+
+    def test_two_salary_exports_block_and_name_both(self):
+        d = self._dir(["DKSalaries.csv", "DKSalaries_1910_6g.csv"])
+        with self.assertRaises(stage_slate_mod.AmbiguousSlateInput) as ctx:
+            stage_slate_mod._find_salary_and_entries(d)
+        exc = ctx.exception
+        self.assertEqual(exc.role, "salary")
+        self.assertEqual(exc.flag, "--salary-csv")
+        self.assertEqual(
+            sorted(p.name for p in exc.candidates),
+            ["DKSalaries.csv", "DKSalaries_1910_6g.csv"],
+            "the block must name every candidate; a count is not actionable")
+        self.assertIn("DKSalaries_1910_6g.csv", str(exc))
+        self.assertIn("--salary-csv", str(exc))
+
+    def test_the_conventional_name_is_not_quietly_preferred(self):
+        # Preferring bare DKSalaries.csv would be the same wrong-draftgroup
+        # bug wearing a nicer hat: DK writes that name for whichever slate was
+        # clicked last, so it is not evidence about which one is being built.
+        d = self._dir(["DKSalaries.csv", "DKSalaries_1910_6g.csv"])
+        with self.assertRaises(stage_slate_mod.AmbiguousSlateInput):
+            stage_slate_mod._find_salary_and_entries(d)
+
+    def test_two_entries_files_block_on_their_own_flag(self):
+        d = self._dir(["DKSalaries.csv"],
+                      entries_names=("DKEntries.csv", "DKEntries_1910_6g.csv"))
+        with self.assertRaises(stage_slate_mod.AmbiguousSlateInput) as ctx:
+            stage_slate_mod._find_salary_and_entries(d)
+        self.assertEqual(ctx.exception.role, "entries")
+        self.assertEqual(ctx.exception.flag, "--entries-csv")
+
+    def test_the_block_has_a_channel_out_of_it(self):
+        # A tool that refuses without offering a way through teaches the
+        # operator to write a driver script that bypasses it (R106's lesson).
+        # Both overrides deliberately name the file that sorts FIRST. The old
+        # code kept the LAST match, so a test that asked for the last one would
+        # pass against the bug it exists to catch.
+        d = self._dir(["DKSalaries.csv", "DKSalaries_1910_6g.csv"],
+                      entries_names=("DKEntries.csv", "DKEntries_1910_6g.csv"))
+        salary, entries = stage_slate_mod._find_salary_and_entries(
+            d, salary_override="DKSalaries.csv",
+            entries_override="DKEntries.csv")
+        self.assertEqual(salary.name, "DKSalaries.csv")
+        self.assertEqual(entries.name, "DKEntries.csv")
+
+    def test_one_pair_still_resolves_with_no_flags(self):
+        d = self._dir(["DKSalaries.csv"])
+        salary, entries = stage_slate_mod._find_salary_and_entries(d)
+        self.assertEqual(salary.name, "DKSalaries.csv")
+        self.assertEqual(entries.name, "DKEntries.csv")
+
+    def test_an_override_naming_a_missing_file_blocks(self):
+        # Operator-typed identifier, R69's precedent: one argument fixes it, so
+        # it hard-gates instead of degrading to a warning and staging something
+        # else.
+        d = self._dir(["DKSalaries.csv"])
+        with self.assertRaises(FileNotFoundError) as ctx:
+            stage_slate_mod._find_salary_and_entries(d, salary_override="DKSalaries_typo.csv")
+        self.assertIn("--salary-csv", str(ctx.exception))
+
+
+class StageSlatePlatoonShapeTests(unittest.TestCase):
+    """R70(a), platoon half: the unvalidated fallback took the first remaining
+    JSON in the dir, which on the real 07-30 layout is a lineups feed.
+
+    That costs twice. It fills no projected orders, because
+    ``build_projected_order`` iterates ``platoon['teams']`` and a feed has
+    ``games``; and it suppresses ``DEFAULT_PLATOON_REFERENCE``, which
+    ``build_slate_pool`` loads only when ``platoon_json is None``. A bad guess
+    is strictly worse than no guess.
+    """
+
+    BUNDLE = {"bundle_version": 1, "lineups": {"games": [{"away": {}, "home": {}}]}}
+    FEED_SHAPED = {"date": "2026-07-30", "source": "mlb-api",
+                   "games": [{"away": {}, "home": {}}]}
+
+    def _dir(self, files):
+        import shutil
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(d, ignore_errors=True))
+        (d / "slate_bundle.json").write_text(json.dumps(self.BUNDLE), encoding="utf-8")
+        for name, obj in files.items():
+            (d / name).write_text(json.dumps(obj), encoding="utf-8")
+        return d
+
+    def test_a_lineups_feed_is_rejected_rather_than_accepted(self):
+        d = self._dir({"_home_sides_feed.json": self.FEED_SHAPED})
+        bundle, platoon, _declared, notes = stage_slate_mod._find_bundle_and_platoon(d)
+        self.assertEqual(bundle.name, "slate_bundle.json")
+        self.assertIsNone(
+            platoon,
+            "a feed with no 'teams' must not be accepted as the platoon file")
+        self.assertTrue(notes, "the rejection must reach the operator")
+        self.assertIn("_home_sides_feed.json", notes[0])
+        self.assertIn("teams", notes[0])
+
+    def test_rejection_leaves_none_so_the_reference_default_still_loads(self):
+        # This is the whole point of the fix: None is the exact condition
+        # build_slate_pool checks before loading DEFAULT_PLATOON_REFERENCE.
+        d = self._dir({"_home_sides_feed.json": self.FEED_SHAPED,
+                       "api_feed_v2.json": self.FEED_SHAPED})
+        _b, platoon, _d, notes = stage_slate_mod._find_bundle_and_platoon(d)
+        self.assertIsNone(platoon)
+        self.assertIn("fangraphs_platoon_lineups.json", notes[0],
+                      "say which file the fallthrough lands on")
+
+    def test_the_real_platoon_reference_is_accepted(self):
+        # Guards the other direction: validation strict enough to reject the
+        # curated reference file would be a worse bug than the one being fixed.
+        import shutil
+        ref = REPO / "data" / "reference" / "fangraphs_platoon_lineups.json"
+        d = self._dir({})
+        shutil.copy(ref, d / "fangraphs_platoon_lineups.json")
+        _b, platoon, _dec, notes = stage_slate_mod._find_bundle_and_platoon(d)
+        self.assertIsNotNone(platoon)
+        self.assertEqual(platoon.name, "fangraphs_platoon_lineups.json")
+        self.assertEqual(notes, [])
+
+    def test_an_empty_teams_list_is_not_platoon_shaped(self):
+        self.assertFalse(stage_slate_mod._is_platoon_shaped({"teams": []}))
+        self.assertFalse(stage_slate_mod._is_platoon_shaped({"games": []}))
+        self.assertFalse(stage_slate_mod._is_platoon_shaped([]))
+        self.assertTrue(stage_slate_mod._is_platoon_shaped({"teams": [{"abbrev": "DET"}]}))
+
+    def test_the_no_platoon_note_names_the_reference_the_engine_actually_loads(self):
+        # R70 rider. The note used to promise a top-9 AvgPointsPerGame fallback.
+        # build_slate_pool loads DEFAULT_PLATOON_REFERENCE whenever
+        # platoon_json is None, so APPG is the fallback only when the reference
+        # is absent too -- and a TBD team with a real projected order looked
+        # identical to one guessed from season averages.
+        note = stage_slate_mod.NO_PLATOON_IN_DIR_NOTE
+        self.assertIn("fangraphs_platoon_lineups.json", note)
+        self.assertNotRegex(
+            note, r"will fall back to top-9",
+            "the unconditional APPG-fallback claim is the defect")
+        from mlb_engine.intake.platoon_order_adapter import DEFAULT_PLATOON_REFERENCE
+        self.assertIn(Path(DEFAULT_PLATOON_REFERENCE).name, note,
+                      "the note must name the file the engine really loads")
+
+    def test_a_named_platoon_json_without_teams_blocks(self):
+        d = self._dir({"my_platoon.json": self.FEED_SHAPED})
+        with self.assertRaises(ValueError) as ctx:
+            stage_slate_mod._find_bundle_and_platoon(d, platoon_override="my_platoon.json")
+        self.assertIn("teams", str(ctx.exception))
+
+    def test_two_sniffed_bundle_candidates_block(self):
+        import shutil
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(d, ignore_errors=True))
+        (d / "api_feed_a.json").write_text(json.dumps(self.BUNDLE), encoding="utf-8")
+        (d / "api_feed_b.json").write_text(json.dumps(self.BUNDLE), encoding="utf-8")
+        with self.assertRaises(stage_slate_mod.AmbiguousSlateInput) as ctx:
+            stage_slate_mod._find_bundle_and_platoon(d)
+        self.assertEqual(ctx.exception.flag, "--bundle-json")
+
+
+class StageSlateClockReadTests(unittest.TestCase):
+    """R70(b): ``--checkpoint`` printed
+    ``first_lock=None deadline=None minutes_remaining=None`` on every run.
+
+    It read ``first_lock_et`` / ``delivery_deadline_et`` / ``minutes_remaining``;
+    ``slate_clock()`` emits ``first_lock_utc`` / ``deadline_utc`` /
+    ``minutes_to_deadline``. Three keys, none of them real, on the T-schedule's
+    one budgeting instrument.
+    """
+
+    def _real_clock(self):
+        from mlb_engine.intake.slate_intake_manager import slate_clock
+        frozen = sorted((REPO / "tests" / "fixtures" / "slates").glob("DKSalaries_1910_6g_*.csv"))
+        self.assertTrue(frozen, "R62's frozen 07-30 6-game export is the clock fixture")
+        return slate_clock(str(frozen[0]))
+
+    def test_the_keys_the_old_code_read_do_not_exist(self):
+        # The pin that would have caught this at write time, and catches a
+        # rename on either side from here on.
+        clock = self._real_clock()
+        self.assertTrue(clock.get("available"), clock.get("note"))
+        for absent in ("first_lock_et", "delivery_deadline_et", "minutes_remaining"):
+            self.assertNotIn(absent, clock)
+        for present in ("first_lock_utc", "deadline_utc", "minutes_to_deadline",
+                        "past_deadline", "buffer_minutes"):
+            self.assertIn(present, clock)
+
+    def test_the_line_carries_the_real_first_lock_and_no_none(self):
+        line = stage_slate_mod._format_clock(self._real_clock())
+        self.assertIn("19:10 ET", line,
+                      "the frozen export is the 1910 slate; the clock must say so")
+        self.assertNotIn("None", line)
+        self.assertIn("minutes_to_deadline=", line)
+
+    def test_an_unavailable_clock_says_so_instead_of_printing_none(self):
+        line = stage_slate_mod._format_clock({
+            "available": False, "source": "none", "buffer_minutes": 5,
+            "note": "no parseable game datetimes; clock unavailable"})
+        self.assertIn("unavailable", line)
+        self.assertIn("no parseable game datetimes", line)
+        self.assertNotIn("None", line)
+
+    def test_past_deadline_reaches_the_line(self):
+        clock = dict(self._real_clock())
+        clock["past_deadline"] = True
+        self.assertIn("PAST DEADLINE", stage_slate_mod._format_clock(clock))
+        clock["past_deadline"] = False
+        self.assertNotIn("PAST DEADLINE", stage_slate_mod._format_clock(clock))
+
+    def test_an_absent_clock_block_is_distinguishable_from_a_broken_read(self):
+        self.assertIn("absent", stage_slate_mod._format_clock({}))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
