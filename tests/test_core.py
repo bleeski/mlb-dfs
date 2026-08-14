@@ -11593,6 +11593,67 @@ class StageSlateRoleResolutionTests(unittest.TestCase):
         self.assertEqual(salary.name, "DKSalaries.csv")
         self.assertEqual(entries.name, "DKEntries.csv")
 
+    def test_a_bare_override_resolves_in_the_slate_dir_not_the_cwd(self):
+        # The blocker this pins: resolving CWD-first let `--salary-csv
+        # DKSalaries.csv` run from the repo root stage the root's own stray
+        # DKSalaries.csv against another date's bundle, printing a provenance
+        # line identical to a correct in-dir resolution. R70's defect returning
+        # through R70's remedy.
+        import os
+        import shutil
+        d = self._dir(["DKSalaries.csv"])
+        decoy_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(decoy_dir, ignore_errors=True))
+        shutil.copy(sorted(self.FIXTURES.glob("DKSalaries_*.csv"))[0],
+                    decoy_dir / "DKSalaries.csv")
+        cwd = os.getcwd()
+        os.chdir(decoy_dir)
+        self.addCleanup(lambda: os.chdir(cwd))
+        salary, _entries = stage_slate_mod._find_salary_and_entries(
+            d, salary_override="DKSalaries.csv")
+        self.assertEqual(
+            salary.resolve().parent, d.resolve(),
+            "a bare override must resolve inside the slate dir, not the CWD")
+
+    def test_an_out_of_dir_input_cannot_wear_a_bare_filename(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(d, ignore_errors=True))
+        outside = Path(tempfile.mkdtemp()) / "DKSalaries.csv"
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_text("x", encoding="utf-8")
+        self.addCleanup(lambda: __import__("shutil").rmtree(outside.parent, ignore_errors=True))
+        self.assertEqual(stage_slate_mod._provenance(outside, d), str(outside))
+        inside = d / "DKSalaries.csv"
+        inside.write_text("x", encoding="utf-8")
+        self.assertEqual(stage_slate_mod._provenance(inside, d), "DKSalaries.csv")
+
+    def test_swapped_role_flags_are_named_rather_than_staged(self):
+        d = self._dir(["DKSalaries.csv"])
+        with self.assertRaises(ValueError) as ctx:
+            stage_slate_mod._find_salary_and_entries(d, salary_override="DKEntries.csv")
+        self.assertIn("swapped", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            stage_slate_mod._find_salary_and_entries(
+                d, salary_override="DKSalaries.csv", entries_override="DKSalaries.csv")
+        self.assertIn("DKEntries", str(ctx.exception))
+
+    def test_naming_both_roles_does_not_scan_the_dir(self):
+        # An undecodable CSV elsewhere in the dir must not fail a resolution
+        # that did not depend on reading it.
+        d = self._dir(["DKSalaries.csv"])
+        (d / "junk.csv").write_bytes(b"\xff\xfe\x00rubbish\x00")
+        salary, entries = stage_slate_mod._find_salary_and_entries(
+            d, salary_override="DKSalaries.csv", entries_override="DKEntries.csv")
+        self.assertEqual(salary.name, "DKSalaries.csv")
+        self.assertEqual(entries.name, "DKEntries.csv")
+
+    def test_an_undecodable_csv_is_skipped_not_fatal_when_sniffing(self):
+        d = self._dir(["DKSalaries.csv"])
+        (d / "junk.csv").write_bytes(b"\xff\xfe\x00rubbish\x00")
+        salary, entries = stage_slate_mod._find_salary_and_entries(d)
+        self.assertEqual(salary.name, "DKSalaries.csv")
+        self.assertEqual(entries.name, "DKEntries.csv")
+
     def test_an_override_naming_a_missing_file_blocks(self):
         # Operator-typed identifier, R69's precedent: one argument fixes it, so
         # it hard-gates instead of degrading to a warning and staging something
@@ -11749,6 +11810,43 @@ class StageSlateClockReadTests(unittest.TestCase):
 
     def test_an_absent_clock_block_is_distinguishable_from_a_broken_read(self):
         self.assertIn("absent", stage_slate_mod._format_clock({}))
+
+    def test_et_is_correct_in_EST_not_just_in_the_season(self):
+        # The July fixture above cannot catch this: UTC-4 is right in EDT and an
+        # hour wrong in EST, so a postseason slate was told its first lock was
+        # an hour later than it is. R65 built repo_env for exactly this class.
+        from mlb_engine.repo_env import now_et
+        for iso in ("2026-08-14T23:05:00+00:00", "2026-11-04T00:08:00+00:00"):
+            expected = now_et(datetime.fromisoformat(iso)).strftime("%H:%M ET")
+            self.assertEqual(stage_slate_mod._et(iso), expected)
+        self.assertEqual(stage_slate_mod._et("2026-11-04T00:08:00+00:00"), "19:08 ET")
+
+    def test_stage_slate_no_longer_hardcodes_a_utc_offset(self):
+        src = (REPO / "tools" / "stage_slate.py").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "timedelta(hours=4)", src,
+            "ET goes through repo_env; a hardcoded UTC-4 is R65's named bug")
+
+    def test_an_unparseable_timestamp_is_labeled_not_printed_as_none(self):
+        # Returning None here reproduced the exact all-Nones symptom R70(b)
+        # removed, on an available=True clock.
+        line = stage_slate_mod._format_clock({
+            "available": True, "first_lock_utc": "2026-07-30 19:10 ET",
+            "deadline_utc": "nonsense", "minutes_to_deadline": 12.0,
+            "buffer_minutes": 5})
+        self.assertNotIn("None", line)
+        self.assertIn("unparseable", line)
+
+    def test_the_checkpoint_door_matches_its_sibling_doors_on_the_r27_gate(self):
+        # Making the reference actually load must not make this review-only door
+        # stricter than the build door it previews. late_swap and build_slate
+        # both pass 'warn'.
+        import inspect
+        sig = inspect.signature(stage_slate_mod.stage_slate)
+        self.assertEqual(sig.parameters["stale_platoon_policy"].default, "warn")
+        src = inspect.getsource(stage_slate_mod.stage_slate)
+        self.assertIn("stale_platoon_policy=stale_platoon_policy", src,
+                      "the policy must reach build_slate_pool, not be inherited")
 
 
 if __name__ == "__main__":

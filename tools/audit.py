@@ -48,11 +48,13 @@ EXPECTED_SUITE_COUNTS = {
     # R69, 2026-08-13: 582 -> 594, the twelve that pin the intake fail-open
     # trio -- nine on the salary-status coverage read and the un-ageable platoon
     # reference, three on the exclusion block/warn split.
-    # R70, 2026-08-14: 594 -> 612, the eighteen that pin stage_slate's role
-    # resolution -- six on ambiguity blocking with a named channel out, seven on
-    # the platoon shape check and the no-platoon note, five on the checkpoint
-    # clock read.
-    "tests.test_core": 612,
+    # R70, 2026-08-14: 594 -> 621, the twenty-seven that pin stage_slate's role
+    # resolution -- eleven on ambiguity blocking, its named channel out, and the
+    # resolution ORDER (a bare override resolves in the slate dir, never the
+    # CWD; the first cut resolved CWD-first and re-opened R70 through R70's own
+    # remedy), seven on the platoon shape check and the no-platoon note, nine on
+    # the checkpoint clock read including the EST case a July fixture cannot see.
+    "tests.test_core": 621,
     "tests.test_showdown": 55,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.

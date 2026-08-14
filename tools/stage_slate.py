@@ -73,9 +73,13 @@ NO_PLATOON_IN_DIR_NOTE = (
 
 
 def _today_et() -> str:
-    # ET without a tz-database dependency: UTC-4 (EDT) covers the MLB season,
-    # matching tools/fetch_slate_bundle.py._today_et.
-    return (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%Y-%m-%d")
+    # R65's one ET authority. This was a hardcoded UTC-4 until 2026-08-14,
+    # citing fetch_slate_bundle's own approximation -- which R65 had already
+    # migrated, leaving this the last copy. UTC-4 flips the DATE for any
+    # instant between 04:00 and 05:00 UTC, so a late-night session could stage
+    # tomorrow's folder.
+    from mlb_engine.repo_env import today_et
+    return today_et()
 
 
 def _read_header(path: Path) -> List[str]:
@@ -112,15 +116,44 @@ def _resolve_override(role: str, slate_dir: Path, override: str | Path, flag: st
 
     R69's precedent applies: an operator-typed identifier is fixed by
     correcting one argument, so it hard-gates rather than degrading to a
-    warning. A bare filename resolves inside the slate dir.
+    warning.
+
+    A relative path resolves against THE SLATE DIR FIRST, and the directory the
+    operator typed is preserved. The first cut of this function did neither: it
+    tested ``Path(override).exists()`` -- which is CWD-relative -- before
+    falling back, and then flattened the fallback to ``.name``. Run from the
+    repo root, where a stray ``DKSalaries.csv`` and ``DKEntries.csv`` from
+    2026-07-27 sit beside a ``slate_bundle.json`` from 07-21,
+    ``--salary-csv DKSalaries.csv --date 2026-07-19`` staged the ROOT files
+    against the 07-19 bundle and printed ``salary=DKSalaries.csv``, a line
+    byte-identical to a correct in-dir resolution. That is R70's own defect
+    re-entering through R70's remedy, so the resolution order is part of the
+    fix and not an implementation detail.
     """
-    path = Path(override)
-    if not path.is_absolute() and not path.exists():
-        path = slate_dir / path.name
-    if not path.exists():
-        raise FileNotFoundError(
-            f"{flag} names a {role} file that does not exist: {override}")
-    return path
+    typed = Path(override)
+    candidates = [typed] if typed.is_absolute() else [slate_dir / typed, typed]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        f"{flag} names a {role} file that does not exist: {override} "
+        f"(looked in {slate_dir} first, then the working directory)")
+
+
+def _provenance(path: Path, slate_dir: Path) -> str:
+    """How a resolved input is named in ``sources`` and in the printed line.
+
+    In-dir files show their basename, which is what the operator recognizes.
+    Anything else shows its FULL path, because a file from outside the slate
+    dir wearing a bare filename is exactly how the wrong draftgroup travels
+    unnoticed.
+    """
+    try:
+        if path.resolve().parent == slate_dir.resolve():
+            return path.name
+    except OSError:
+        pass
+    return str(path)
 
 
 def _sole(role: str, candidates: List[Path], flag: str) -> Optional[Path]:
@@ -157,27 +190,54 @@ def _find_salary_and_entries(
     """
     from mlb_engine.intake.slate_intake_manager import validate_salary_schema
 
+    def _is_entries(path: Path) -> bool:
+        try:
+            header = _read_header(path)
+        except Exception:
+            return False
+        return bool(header) and [c.strip() for c in header[:4]] == ENTRIES_HEADER_PREFIX
+
+    salary_csv = entries_csv = None
+    if salary_override is not None:
+        salary_csv = _resolve_override("salary", slate_dir, salary_override, "--salary-csv")
+        if _is_entries(salary_csv):
+            raise ValueError(
+                f"--salary-csv {salary_csv.name} is a DKEntries file, not a salary "
+                f"export (its header starts '{', '.join(ENTRIES_HEADER_PREFIX)}'). "
+                f"The two flags are swapped.")
+    if entries_override is not None:
+        entries_csv = _resolve_override("entries", slate_dir, entries_override, "--entries-csv")
+        if not _is_entries(entries_csv):
+            raise ValueError(
+                f"--entries-csv {entries_csv.name} does not start with "
+                f"'{', '.join(ENTRIES_HEADER_PREFIX)}', so it is not a DKEntries "
+                f"reserved-entries file. The two flags may be swapped.")
+    if salary_csv is not None and entries_csv is not None:
+        # Both roles named: nothing needs sniffing, and scanning anyway lets an
+        # undecodable CSV elsewhere in the dir raise a codec error that names no
+        # file for a resolution that did not depend on it.
+        return salary_csv, entries_csv
+
     salary: List[Path] = []
     entries: List[Path] = []
     for path in sorted(slate_dir.glob("*.csv")):
-        header = _read_header(path)
-        if not header:
-            continue
-        if [c.strip() for c in header[:4]] == ENTRIES_HEADER_PREFIX:
-            entries.append(path)
-            continue
         try:
+            header = _read_header(path)
+            if not header:
+                continue
+            if [c.strip() for c in header[:4]] == ENTRIES_HEADER_PREFIX:
+                entries.append(path)
+                continue
             if validate_salary_schema(str(path)).get("passed"):
                 salary.append(path)
         except Exception:
+            # Unreadable or undecodable: it is not a candidate for either role.
             continue
 
-    salary_csv = (_resolve_override("salary", slate_dir, salary_override, "--salary-csv")
-                  if salary_override is not None
-                  else _sole("salary", salary, "--salary-csv"))
-    entries_csv = (_resolve_override("entries", slate_dir, entries_override, "--entries-csv")
-                   if entries_override is not None
-                   else _sole("entries", entries, "--entries-csv"))
+    if salary_csv is None:
+        salary_csv = _sole("salary", salary, "--salary-csv")
+    if entries_csv is None:
+        entries_csv = _sole("entries", entries, "--entries-csv")
     return salary_csv, entries_csv
 
 
@@ -296,6 +356,7 @@ def stage_slate(
     entries_csv_override: Optional[str | Path] = None,
     bundle_json_override: Optional[str | Path] = None,
     platoon_json_override: Optional[str | Path] = None,
+    stale_platoon_policy: str = "warn",
 ) -> Dict[str, Any]:
     """Stage ``data/slates/<date>/`` into ready-to-splat ``run_slate`` kwargs.
 
@@ -381,12 +442,32 @@ def stage_slate(
             warnings.append(f"declared_pitchers.json unreadable: {exc}")
 
     # THE intake front door (CLAUDE.md per-slate loop step 1).
+    #
+    # stale_platoon_policy is passed EXPLICITLY, matching the two other scripted
+    # doors (late_swap.py:578, build_slate.py:1325) per R27. Before the platoon
+    # validation above, a dir holding only a lineups feed had that feed mistaken
+    # for the platoon file, so DEFAULT_PLATOON_REFERENCE never loaded and R27's
+    # age gate never fired here at all. Now it loads -- which means inheriting
+    # the engine default 'block' would have made this checkpoint STRICTER than
+    # the build door it previews, as a side effect of fixing something else. The
+    # reference is routinely a few days old; a hard blocker at T-10 on a
+    # review-only door is not the same call the build makes.
     pool = build_slate_pool(
         salary_csv=str(salary_csv),
         lineups_feed=lineups_feed,
         platoon_json=platoon_json,
         declared_pitchers=declared_pitchers,
+        stale_platoon_policy=stale_platoon_policy,
     )
+
+    # An input from outside the slate dir is legal -- an operator may point at
+    # another folder deliberately -- but it is never silent.
+    for role, path in (("salary", salary_csv), ("entries", entries_csv),
+                       ("bundle", bundle_path), ("platoon", platoon_path)):
+        if path is not None and _provenance(path, slate_dir) != path.name:
+            warnings.append(
+                f"{role} file is OUTSIDE {slate_dir}: {path}. Confirm it is the "
+                f"same slate as the rest of these inputs.")
 
     reference = Path(reference_dir)
     savant_batting = reference / "expected_stats_batting.csv"
@@ -462,11 +543,12 @@ def stage_slate(
         "weather": bundle.get("weather"),
         "sources": {
             "slate_dir": str(slate_dir),
-            "salary_csv": salary_csv.name,
-            "entries_csv": entries_csv.name,
-            "slate_bundle": bundle_path.name,
-            "platoon_json": platoon_path.name if platoon_path else None,
-            "declared_pitchers": declared_path.name if declared_path else None,
+            "salary_csv": _provenance(salary_csv, slate_dir),
+            "entries_csv": _provenance(entries_csv, slate_dir),
+            "slate_bundle": _provenance(bundle_path, slate_dir),
+            "platoon_json": _provenance(platoon_path, slate_dir) if platoon_path else None,
+            "declared_pitchers": (
+                _provenance(declared_path, slate_dir) if declared_path else None),
         },
         "warnings": warnings,
     }
@@ -517,16 +599,30 @@ def _print_staging(staged: Mapping[str, Any]) -> None:
 
 
 def _et(iso_utc: Optional[str]) -> Optional[str]:
-    """UTC ISO -> 'HH:MM ET'. ET without a tz-database dependency: UTC-4 (EDT)
-    covers the MLB season, the same convention as ``_today_et`` above.
+    """UTC ISO -> 'HH:MM ET' through the repo's one ET authority.
+
+    ``repo_env.now_et`` exists because a hardcoded UTC-4 is an hour wrong in
+    EST months (R65 names that exact bug in fetch_slate_bundle). The first cut
+    of this helper hardcoded UTC-4 anyway, citing ``_today_et`` below as the
+    convention -- but that helper was the un-migrated leftover R65 left behind,
+    so the new code inherited a stale precedent. A postseason slate was told
+    its first lock was an hour later than it is, on the T-schedule's one
+    budgeting instrument, while ``minutes_to_deadline`` stayed right: the wall
+    clock and the numeric budget disagreed by 60 minutes.
+
+    An unparseable timestamp returns a LABEL, not None. None printed as
+    ``first_lock=None``, which is the exact symptom R70(b) removed.
     """
     if not iso_utc:
         return None
+    from mlb_engine.repo_env import now_et
     try:
         dt = datetime.fromisoformat(str(iso_utc).replace("Z", "+00:00"))
     except ValueError:
-        return None
-    return (dt.astimezone(timezone.utc) - timedelta(hours=4)).strftime("%H:%M ET")
+        return "unparseable"
+    if dt.tzinfo is None:
+        return "unparseable(naive)"
+    return now_et(dt).strftime("%H:%M ET")
 
 
 def _format_clock(clock: Mapping[str, Any]) -> str:
@@ -599,6 +695,9 @@ def main() -> int:
                         help="name the slate bundle when the dir holds more than one candidate")
     parser.add_argument("--platoon-json", default=None,
                         help="name the FanGraphs platoon-lineups JSON (must carry a 'teams' list)")
+    parser.add_argument("--stale-platoon-policy", default="warn", choices=("warn", "block"),
+                        help="R27 age gate on the platoon reference; 'warn' matches the "
+                             "other scripted doors (default), 'block' is the engine default")
     args = parser.parse_args()
 
     try:
@@ -612,6 +711,7 @@ def main() -> int:
             entries_csv_override=args.entries_csv,
             bundle_json_override=args.bundle_json,
             platoon_json_override=args.platoon_json,
+            stale_platoon_policy=args.stale_platoon_policy,
         )
     except AmbiguousSlateInput as exc:
         # Exit 4: the inputs are legal and the tool refuses to guess between

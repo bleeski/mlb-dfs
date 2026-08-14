@@ -103,12 +103,61 @@ class as the two defects above and one line away from them, so it is fixed here
 rather than filed. The text is now the module constant
 `NO_PLATOON_IN_DIR_NOTE` so the claim is pinnable.
 
-18 tests, pin 901 to 919 (`tests.test_core` 594 to 612), and CLAUDE.md's quoted
+**Round two, same day: the first cut of this fix shipped a blocker and an
+adversarial pass caught it before any slate used it.** Three findings, all real,
+all fixed here.
+
+`_resolve_override` resolved a relative path against the CWD before the slate
+dir, and then flattened the fallback to `.name`. The repo root holds a stray
+`DKSalaries.csv` and `DKEntries.csv` from 2026-07-27 beside a `slate_bundle.json`
+from 07-21, so run from the repo root — where the tool is documented to run —
+`--date 2026-07-19 --salary-csv DKSalaries.csv --entries-csv DKEntries.csv`
+staged the JULY 27 files against the 07-19 bundle and printed
+`salary=DKSalaries.csv`, a line byte-identical to a correct in-dir resolution.
+57 rows and 51 hitters where the real slate has 40 and 36, surfacing downstream
+as "cannot fill a stack" blockers that read like ordinary IL noise. That is
+R70's own defect re-entering through R70's remedy, on the 17 dirs where the
+flags are now mandatory. The resolution order is therefore part of the fix:
+slate dir first, the typed directory preserved, and `_provenance` prints the
+FULL path plus a warning whenever an input sits outside the slate dir, because
+an out-of-dir file wearing a bare filename is how the wrong draftgroup travels
+unnoticed.
+
+The ET conversion hardcoded UTC-4, citing this file's own `_today_et` as the
+convention — but that helper was the last un-migrated copy of the exact bug
+`repo_env` was built for (R65 names it in `fetch_slate_bundle`). Verified: a
+2026-11-04 first lock of 19:08 ET printed as 20:08, an hour late on the
+T-schedule's one budgeting instrument, while `minutes_to_deadline` stayed
+correct — so the wall clock and the numeric budget disagreed by 60 minutes. Both
+helpers now go through `repo_env`, and the July fixture that could never catch
+this is joined by an EST case. `_et` also returned `None` on an unparseable
+timestamp, which reproduced R70(b)'s all-Nones symptom on an `available: True`
+clock; it returns a label now.
+
+Third, an interaction the platoon fix created rather than found. Before it, a
+dir holding only a lineups feed had that feed mistaken for the platoon file, so
+`DEFAULT_PLATOON_REFERENCE` never loaded and R27's age gate never fired at this
+door at all. Now it loads — and `stage_slate` was inheriting the engine default
+`stale_platoon_policy='block'` while `late_swap.py:578` and
+`build_slate.py:1325` both pass `'warn'`. That would have made a review-only
+checkpoint STRICTER than the build door it previews, as a side effect of fixing
+something else, and the reference is routinely several days old. It now passes
+`'warn'` explicitly to match its siblings, with `--stale-platoon-policy` to ask
+for the engine default.
+
+Smaller, same pass: an override is checked against the role it claims, so
+swapped flags are named instead of staged (`--entries-csv <a salary file>` used
+to sail through); the dir is not scanned at all when both roles are named, so an
+undecodable CSV elsewhere cannot fail a resolution that never read it; and the
+sniff loop skips an unreadable file per role rather than letting a codec error
+escape with no filename.
+
+27 tests, pin 901 to 928 (`tests.test_core` 594 to 621), and CLAUDE.md's quoted
 session-start line moves with it — `AuditSkipHonestyTests` exists to make that
 pair impossible to split, and it caught the omission on the first full run. The
 ambiguity and shape tests build their dirs from R62's vendored frozen exports
 rather than the untracked 07-30 dir, so the suite still runs on a
-tracked-files-only checkout. All 18 were mutation-checked against restored
+tracked-files-only checkout. The first 18 were mutation-checked against restored
 pre-fix implementations: 12 fail, and the 6 that pass both ways are doing that
 deliberately — the happy-path regression guard, the over-strict-validation
 guard, the `_is_platoon_shaped` unit, and the pin asserting `slate_clock`'s own
@@ -116,6 +165,14 @@ key names, which is the test that would have caught (b) at write time.
 
 Not touched: `stage_slate` remains a review-and-checkpoint door, not a
 production build door. `build_slate.py` and `run_slate` are unchanged.
+
+**One thing this leaves open,** filed rather than fixed because it is a design
+question and not a bug: the block forces the operator to name salary and entries
+independently, and nothing at stage time checks the two are the same draftgroup.
+That is how 2026-08-13's cross-draftgroup pair
+(`DKSalaries_2207_2g.csv` + `DKEntries_1507_3g.csv`) was born. `preflight_upload`
+catches it, but this is the checkpoint door and it should. It belongs to R81's
+fingerprint contract, whose entry now carries the requirement.
 
 ---
 
