@@ -34,45 +34,6 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-*2026-08-14 (second session), DEV, claim `engine_2026-08-14_edge_audit`:
-**portfolio-edge audit** at Ben's directive, write scope deliberately this file
-plus `.audit/` only — no code, no CHANGELOG edit (that entry is owed by the
-next DEV session; the audit trail is `.audit/AUDIT.md`, the queue for the next
-session is `.audit/NEXT_IMPLEMENTATION_RUN.md`). Session-start gate: all five
-suites at their pins, 928/928 (V1; the one-call macro dies at the sandbox
-ceiling ~178s, the Quick Card's per-suite fallback produced the evidence).
-Preflight on the newest delivery exits 0 (V1). **The three unmerged fragments
-are MERGED as R114, R115, and R116+R117** — fragment files left in place and
-marked consumed (the audit's write scope excludes deleting them; sweep owed).
-Two fragment diagnoses were corrected against the tree before filing, per the
-R36 discipline: the candidate-reuse default the 08-13 fragment cites lives on
-the LEGACY allocator path only, and production adds NO reuse row at all when
-the control is unset (`contest_allocator.py:2232-2233`); and the 1310_6g
-bank's arm poverty is ceiling-ordered budget truncation plus a growth target
-that collapses to `requested_n` (`optimizer_v3.py:3863`), not a missing arm
-axis — the jobs do vary pairs. **The ed4 root review
-(`DFS_GREENFIELD_REVIEW_2026-08-12_ed4.md`) is ADJUDICATED**: first external
-review to actually run the gate; its §2 scale-invariance finding verified in
-tree (Floor is uniform 0.58 of Base with no per-row path,
-`projection_builder.py:103`; the objective is linear in one column,
-`optimizer_v3.py:714-723`; so `target='floor'` IS mean-maximization and
-enrichment is the only GPP/cash differentiator) and adopted as R119; its §3
-variance-basis sentence is added to Do-not-build this commit; everything else
-it declines itself in its own §6. **R118 is the audit's one strategic filing:**
-`field_miner` computes each contest's {player → realized FPTS} map and strips
-it at the archive boundary (`field_miner.py:1961`), which is the
-counterfactual-replay substrate discarded on every mine. Retained, plus one
-deterministic replay tool, the 271-contest archive grades construction policy,
-duplication, and the floor-5/routing questions against REAL fields without
-waiting on live tranches. Tier 2 is reordered R118 → R48+R83 → R10 on that
-logic; Tier 1's head is now R114 beside the false-signal batch (which gains
-R119); R115 heads Tier 3 beside R98(3). R120 (a delivered upload-ready file
-whose `runs/` dir does not exist on the mount) and R117 (paste drops the
-probable's continuation line; F4 neutral for 100% of hitters is silent) are
-filed small. No R-numbers moved; no items closed (nothing landed as code, so
-nothing migrates). V-tags, method, three greenfield designs, and the target
-architecture are in `.audit/AUDIT.md`.*
-
 *2026-08-14, DEV, engine claim `engine_2026-08-14`: **R70 is CLOSED and
 migrated** to CHANGELOG.md, taken in tier order as Tier 1's head. Both halves
 landed. Three things worth carrying forward. First, the fix needed a CHANNEL,
@@ -325,43 +286,26 @@ underneath it.*
    argument intact rather than restating it: R69 and R70 both closed
    surfaces that degraded to silence, and the batch below is the same defect
    class on the refusal-and-brief surface instead of the intake surface.
-4. **The preflight-evidence batch: R114 + R67** (P1 + P2, S each, WS5) — the
-   mandatory gate hard-fails legal certified files it cannot see the evidence
-   for: R114, declared pitchers never reach preflight or verify_export, so a
-   certified bullpen-game file fails 12x and the only way through is
-   `--force` (live 2026-08-12, 2210_2g); R67 is the same blindness on the
-   feed side. A gate that fails known-good files trains the operator to
-   force past it, which is the worst habit a money-boundary gate can teach.
-5. **The false-signal batch, one session: R113 + R112 + R103 + R99 + R92 +
-   R71 + R119** (P2, XS-S each, WS4) — refusals and brief fields honest
-   line-by-line that steer wrong: a captain-LOCK relaxation reported as a
-   captain-CAP relaxation, bank scarcity blamed on controls, `+0 targeted
-   candidates` reading as a dry pool on a pinned pair, `salary_cross_check:
-   false` on clean slates, bank warnings that cannot fire, a pct>1 slip
-   disabling a cap in solver and validator at once, and (R119) a brief that
-   points at `enrichment['value_guard']` which is never written and cannot
-   say whether GPP and cash selection were even different objects. Five
-   builds since 08-01 burned on this family; every fix is small and they
-   share the reporting surface.
-6. **R116** (P1, S, WS4) — the production allocator has NO candidate-reuse
-   cap unless overridden; the first certified 2207_2g build concentrated 11
-   apex entries into 4 distinct lineups, and the rebuild with the cap at 2
-   bought 7 distinct for 0.98% of fit score. Default the cap from the
-   allocator's own `minimum_cap` arithmetic and put `distinct_lineups` in
-   the brief at approve time.
-7. **The swap-rails batch: R66 + R68** (P2, S each, WS4/WS5) — silent
-   `large_wta` scoring on the swap API, and a downgrade guard inert on
+4. **The false-signal batch, one session: R113 + R112 + R103 + R99 + R92 +
+   R71** (P2, XS-S each, WS4) — refusals and brief fields honest line-by-line
+   that steer wrong: a captain-LOCK relaxation reported as a captain-CAP
+   relaxation, bank scarcity blamed on controls, `+0 targeted candidates`
+   reading as a dry pool on a pinned pair, `salary_cross_check: false` on
+   clean slates, bank warnings that cannot fire, a pct>1 slip disabling a cap
+   in solver and validator at once. Five builds since 08-01 burned on this
+   family; every fix is small and they share the reporting surface.
+5. **The swap-rails batch: R66 + R68 + R67** (P2, S each, WS4/WS5) — silent
+   `large_wta` scoring on the swap API, a downgrade guard inert on
    DK-redownloaded parent files (a strictly worse swap ships without
-   `--accept-downgrade`). R67 moved up into the preflight-evidence batch.
-8. **R36 F3m + F6m** (P1, S each, WS5; elevated off the trip-only rule by
+   `--accept-downgrade`), and a preflight that hard-fails a legal
+   bullpen-game file at T-5.
+6. **R36 F3m + F6m** (P1, S each, WS5; elevated off the trip-only rule by
    this reorder) — `assumed_gates` reaches neither the brief nor the manifest
    while the record stamps `certified` (verified on a real 07-29 delivery),
    and a corrupt manifest reads as empty and is then os.replaced away with
    every prior record's supersession history. The manifest is the answer to
    "which file do I upload"; both fixes are recording-only, no gate change.
-   **R120 rides this batch** (same manifest surface): a delivered
-   upload-ready file names a `runs/` dir that does not exist on the mount.
-9. **The claim.py batch: R31(b)(c), R86 rides** (XS-S, WS6) — one file.
+7. **The claim.py batch: R31(b)(c), R86 rides** (XS-S, WS6) — one file.
    **R110 left this batch by landing early on 2026-08-12**, out of order and
    knowingly: Ben approved clearing the ten stale claims, and `sweep
    --release` is useless while the release path cannot resolve the names
@@ -369,53 +313,37 @@ underneath it.*
    predicted, a second pass over `claim.py`, and what remains is (b)(c): (c)
    under-reports foreign dirt on the one file the contract most wants
    serialized. R31(d) stays Ben's and is NOT in this batch.
-10. **R80(a) + R88** (XS + S, WS6) — the scrub fork that can persist a key
+8. **R80(a) + R88** (XS + S, WS6) — the scrub fork that can persist a key
    into `slate_bundle.json` warnings, and the allowlist test that mechanizes
    the DK wall. Minutes of lift against the two failure classes this repo
    treats as absolute.
 
 ## Tier 2 — the measurement loop. The strategy payoff everything else is gated on, in this order.
 
-11. **R118** (P1, M, WS7/WS2) — retain the per-player FPTS map the miner
-    already computes and strips (`field_miner.py:1961`), and ship the
-    counterfactual replay tool. This moves to the head of the tier because
-    it multiplies everything under it: it converts the 271-contest archive
-    into the grading substrate R10's duplication bar, R37(2)'s floor-5
-    question, and R40's routing question currently wait on live tranches
-    for — same frozen inputs, alternate construction policy, scored against
-    the REAL archived field, deterministically. Self-validating: replaying
-    every archived own entry must reproduce its recorded points and rank.
-12. **R48 + R83** (S each, WS2) — the per-contest leverage table and the
+9. **R48 + R83** (S each, WS2) — the per-contest leverage table and the
    per-run factor-audit persist plus hash-bound enrichment inputs: the
-   grading substrate R10's bar reads against. R48's backfill re-mine is the
-   same idempotent pass R118's retention backfill runs; land them together.
-13. **R10** (P1, M, WS2) — the funded modeling item, unblocked
+   grading substrate R10's bar reads against. Landing these first makes R10's
+   result a graded fact rather than a story.
+10. **R10** (P1, M, WS2) — the funded modeling item, unblocked
     satellite-only, graded on duplication as well as ownership, live builds
     consuming precomputed artifacts only. The one M-lift item whose impact
     lands in the cell that is 4,201 of 4,879 of Ben's MLB entries.
 
 ## Tier 3 — funded M-lift build-integrity work, adjudicated individually per Ben's 2026-08-12 instruction, in order.
 
-14. **R115** (P1, M, WS4) — SP-pair coverage: the bank freezes at
-    `requested_n`, exit-10 cannot engage past the 2x heuristic, ceiling-
-    ordered job truncation concentrates arms, and no control can floor arm
-    diversity — the 08-13 slate lost its whole window to this and the
-    1507_3g session monkey-patched the engine mid-slate for want of the
-    control. Lands beside R98(3), which owns the budget half of the same
-    failure; R112's reporting sliver rides the false-signal batch.
-15. **R98(3) + (4)-tail** (P1, M, WS4) — derive the bank budget from entry
+11. **R98(3) + (4)-tail** (P1, M, WS4) — derive the bank budget from entry
     count and job-list size instead of leftover clock; let a CERTIFIED brief
     distinguish a deliberate cap from a starved one; absorb R112's deeper
     half (bank-observed vs `feasibility.inputs` counts in the refusal) here.
     Adjudication: high impact — fourth recorded instance of the starved-bank
     family, and it certifies — but (1)/(2) already made the failure loud,
     so it follows Tier 1 rather than preceding it.
-16. **R81** (M, WS3; the design pass is S and ARMED) — the slate-fingerprint
+12. **R81** (M, WS3; the design pass is S and ARMED) — the slate-fingerprint
     contract at every intake boundary. Adjudication: one S-lift design pass
     retires the wrong-slate FAMILY that Tier 1's R70 patches pointwise; run
     the pass next session that touches intake, size the build from its
     output.
-17. **R36 Finding 10's floor + R84** (P1 M + S, WS5/WS4) — top-K compatible
+13. **R36 Finding 10's floor + R84** (P1 M + S, WS5/WS4) — top-K compatible
     candidates per entry, never diagnose from post-filter sets, name any
     entry the prefilter emptied; R84's per-entry compatible-in/kept counts
     land with it as the visibility half. Adjudication: "proven infeasible"
@@ -435,11 +363,6 @@ underneath it.*
   the strip fix is moot.
 - **R107(a)** — adopt-or-delete `tools/fetch_fangraphs_platoon.py`, a week
   old with the Quick Card naming the tool the whole time.
-- **Quick Card split (ARCHIVE, S; adopted 2026-08-14 from ed4 §5)** — item 1
-  of the Card is one 900-word paragraph carrying four dated self-corrections;
-  split the command-and-pin line from the correction history (a `0a` section
-  read only when the gate misbehaves). It is the most-read paragraph in the
-  project and the hardest to read; ARCHIVE's file, ledger claim required.
 - **R34-tail** (three wrong `upload_ready` records in a provenance file),
   **R25-tail** (minimal-repair fast path), **R111(b)** (one GitHub setting:
   default branch to `main`), **Sync-tail** (the PAT; nothing blocks on it,
@@ -458,15 +381,10 @@ trail); **R108** (the `dk_tokens` module; moves the module-count pin);
 **R111(a)** (sync_check resolves the real branch); **R76** (doc-truth batch —
 MANIFEST.md's stale seed keeps being cited by every external review, cheap to
 retire); **R77** (dead code carrying the forbidden pool reduction one call
-site away; the audit adds two named residents: `tools/_operator_patch_20260813_crossgame.py`
-+ `tools/_run_patched_build.py`, run-scoped to a closed slate and carrying a
-stale hardcoded mount path); **R75** (Savant same-name collapse); **R109**'s
-sync_check half (the residue sweep waits on Ben's delete grant); **R78** (env
-floors and the pandas-3 fixture breakage); **R44** and **R38** (archival
-operator time); **R89** (consolidated blockers line, chmod final/);
-**R117** (paste drops the probable's `RHP|LHP` continuation line and an F4
-that applied to nothing reads like one that applied evenly — rides any
-session touching `lineups_from_paste.py` or the R69 family).
+site away); **R75** (Savant same-name collapse); **R109**'s sync_check half
+(the residue sweep waits on Ben's delete grant); **R78** (env floors and the
+pandas-3 fixture breakage); **R44** and **R38** (archival operator time);
+**R89** (consolidated blockers line, chmod final/).
 
 ## Tier 6 — deprioritized: high lift or unmeasured impact, explicitly per Ben's 2026-08-12 instruction. Not deleted; the bar to pull one is a named measurement.
 
@@ -476,29 +394,7 @@ made rare); **R9b** (M; R9a already took the always-loaded win); **R12** and
 **R11** (operator-time class); **R58(d)** (one weather window on DH slates
 only); **R58(c)** (same scope, and blocked on R90's fixture besides);
 **R61-tail** (P3, no reproduction exists). The do-not-build list is unchanged
-and is not a tier. This tier is the board's DEFERRED list: everything here
-is explicitly low impact relative to lift, and the bar to pull one remains a
-named measurement.
-
-## Kept as-is (2026-08-14 audit): components verified worth their place
-
-Recorded so the next review does not re-litigate them. `scipy.optimize.milp`
-with the three-gate certification chain (V1: 928/928 at every per-suite pin;
-golden replay green on a tracked-files-only checkout). The paste-primary
-intake and `build_slate_pool` front door (R32; the paste suite's 75 tests run
-real since R62). The enrichment stack as the projection layer's
-differentiation: F1 devigged-and-de-parked implied totals with clip and named
-degradation, F4 opposing-SP xwOBA x platoon priors, F5 park/weather, xwOBA
-Base correction, xISO/K-rate ceiling multipliers — all wired and non-neutral
-on the newest delivered run (V2: 37/36/35/4 non-neutral counts in its brief),
-which matters because enrichment is the only GPP/cash differentiator (R119).
-`preflight_upload` as the sole pre-upload rule (V1 exit 0 on the newest
-delivery; its two blind spots are R114/R67, fixes not replacements).
-`field_miner` and the append-only archive discipline (271 mined contests
-with self-checked ownership recomputes). The claims protocol with R31(d)
-open. The workstream board itself: five external critiques adjudicated
-without a rebuild, and the one reviewer who ran the gate (ed4) converged on
-the board's own priorities — that record is working.
+and is not a tier.
 
 ## Externally gated — holds no DEV slot; unchanged in substance from the old queue.
 
@@ -700,19 +596,6 @@ a restated priority.
   not actually won anything. This item stays the top of Tier 2 on that logic,
   unchanged in scope (satellite-only) and unchanged in gate (beat flat-12,
   graded, before any production column flips).
-- **Note 2026-08-14 (audit), the flat-tier mechanism is sharper than "flat
-  tier defaults":** `Ownership_Tier` is unconditionally defaulted to `"Mid"`
-  (`slate_intake_manager.py:1353`; `execution_pipeline.py:2603,2776,3053`)
-  and never set from data, so `ownership_sum` is a constant 120.0 for every
-  10-man lineup — the field-pressure ownership term cancels in ranking,
-  `has_duplication_signal` is ALWAYS true (the penalty always applies), and
-  `high_owned_one_offs` / `low_owned_hitter_count` are structurally zero
-  (`optimizer_v3.py:2763,2951-2956,3370-3408`). The only live duplication
-  signals today are meta-lineup overlap, the >=49800 salary band, and the
-  5-stack term. Two consequences: the `Projected_Ownership_Pct` seam this
-  item fills is real and single (`:2952-2955`), and R118's replay gives this
-  item its duplication grading target from the archive without waiting on
-  new tranches.
 
 ### R48. `field_miner` emits a per-contest leverage table (P2, S) | new 2026-08-04, from ARCHIVE fragment `2026-08-04_ARCHIVE_miner-leverage-table.md`, merged 2026-08-04
 
@@ -772,29 +655,6 @@ Route every inbound abbrev through `to_dk_abbrev` at parse time (merge_feeds, Ro
 - **Why (c) is blocked rather than just unbuilt:** that parser is regex over live third-party HTML with no frozen real-page fixture (R65 shipped the parse FLOOR but declined the fixture; it sits on R90 with the hand step named). Changing its extraction surface without a fixture of the page it parses is how a silent-empty regression ships, and silent-empty is the exact failure R65's floor exists to catch. Do (c) after R90's RotoWire fixture, or accept the risk deliberately.
 - **What remains, (d):** `fetch_slate_bundle.py:278` — the second same-venue game reuses the first leg's weather window, unmarked. Independent surface, no interaction with (a) or (b). Carries a small decision: give the second leg its own window, or widen the first leg's window to the latest same-venue start (the filed fix says the latter). Either way, mark it rather than leaving the reuse silent.
 - **Scope of the remainder:** both affect a doubleheader slate only, and neither is in the wrong-lineup-reaches-the-pool class (a) and (b) were, which is why the priority drops from P1 to P2. (c) degrades a TBD team's projected order on a DH; (d) degrades one game's weather input.
-
-### R117. Paste drops the probable-pitcher continuation line, and a matchup factor that applied to nothing is silent (P2, S) | new 2026-08-14, merged from BUILD fragment 2026-08-13, ask 6
-
-- **What:** the mlb.com paste renders a probable as `Jacob deGrom` newline
-  `RHP 8-7, 3.87 ERA, 144 SO`; `lineups_from_paste.py` reports all four
-  sides "the paste left this side's probable unnamed", falls back to DK's
-  `Starting` column (which carries no handedness), and F4's platoon half
-  computes 1.0 for 36 of 36 hitters — the build certified. Hand-patching the
-  four hands produced a 0.94-1.04 F4 spread and the IDENTICAL distinct-lineup
-  set, so this is a correctness-and-reporting defect, not a portfolio-quality
-  one; sized small on that measurement.
-- **Fix, two parts:** (a) parse the `RHP|LHP <record>, <ERA>, <SO>`
-  continuation line so pasted probables attach with hand; (b) "F4 neutral
-  for 100% of scored hitters" becomes loud (the R69 family): a factor that
-  applied to nothing must not read like one that applied evenly. Fragment
-  ask 7 (derive the slate tag before lighting the beacon so claims and
-  artifacts agree) is recorded here as its rider.
-- **Audit fields.** Moves: robustness. Evidence: V2 (fragment + delivered
-  run's F4 distribution: 36 non-neutral after the hand patch). Acceptance: a
-  fixture paste with continuation lines yields hands and a non-degenerate F4;
-  the degenerate case warns. Falsifier: if DK `Starting` reliably carries
-  hand elsewhere, (a) shrinks to the loudness half. FOSS: stdlib. Owner:
-  none. Rollback: parser change is additive; loudness is one warning.
 
 ### R75. The DK↔Savant crosswalk joins on normalized name only; same-name players collapse to one row (P2, S) | audit 2026-08-04, verified in tree
 
@@ -905,123 +765,6 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
   golden regen. R73(f) budgets `solver_probe`, a different entry point. R92 is
   the same "report that cannot inform" family on the bank's warning lines.
 
-### R115. SP-pair coverage: the bank freezes at `requested_n`, the resume path cannot engage, and no control can floor arm diversity (P1, M) | new 2026-08-14, merged from BUILD fragment `2026-08-13_BUILD_bank-cache-freezes-at-first-slice.md` + ledger fragments 2026-08-13 (1507_3g); mechanisms verified in tree by the audit
-
-- **What, three verified mechanisms behind the 08-13 1310_6g lost window (11
-  blocked runs, `runs/20260813T162034Z_40da1d56` onward):** (1)
-  `build_diverse_candidate_bank`'s growth target collapses to `requested_n`
-  (`optimizer_v3.py:3863`: `coverage_target or candidate_bank_size_requested
-  or requested_n`), so a bank already holding >= requested_n candidates never
-  grows — the cache file's size and mtime sat unchanged across runs 2-7 at
-  `--max-seconds 30` while the job list read 75/720. (2) `build_slate.py:1534`
-  gates exit-10 on `len(candidates) < n_entries*2`; at 66 candidates against
-  13 entries the documented resume path is unreachable however unexhausted
-  the jobs. (3) jobs are ceiling-ordered (`bank_cache.py:744-750`) and
-  budget-truncated, so a truncated slice concentrates in the top pairs by
-  combined pitcher ceiling — 4 distinct starters on a 6-game slate. The
-  fragment's "jobs vary stacks, not arms" diagnosis is CORRECTED: pairs are
-  the primary job axis (`bank_cache.py:752-756`); truncation is the cause.
-  Downstream the joint MILP reports slice properties as slate properties
-  (R112's family), and on 1507_3g the operator monkey-patched the engine
-  mid-slate (`tools/_operator_patch_20260813_crossgame.py`: `cross_game_only`
-  forced off in `enumerate_sp_pairs` and `bank_cache`, plus a synthesized
-  per-pair LOWER bound no engine control expresses).
-- **Why P1:** one whole slate window lost (the fragment's own cost line), and
-  a run-scoped engine patch is the operator routing around a missing control
-  — both silent-quality shapes, on the surface R98 and R112 already name.
-- **Fix, ordered:** (a) bank growth honors an explicit coverage target above
-  `requested_n` while the job list is unexhausted, or the exit-10 gate reads
-  `job_list_exhausted` rather than the 2x heuristic — one of the two, so
-  "grow the bank, re-run, it resumes" is true again. (b) a distinct-SP-pair
-  coverage floor as a real control (the ledger fragment's
-  `min_sp_pair_representation` ask), and `cross_game_only` exposed as a
-  stated control carrying its anti-correlation warning, retiring the
-  monkey-patch. (c) per-pair bank candidate counts in the brief beside
-  `feasibility.checks` (rides the false-signal batch with R112). Absorb
-  R98(3)'s budget derivation where the two meet; they are halves of one
-  failure. Done when: replaying the 1310_6g inputs either reaches
-  `n_entries` distinct SP pairs in the bank or refuses in words that name
-  the bank, and exit-10 engages on an unexhausted job list.
-- **Audit fields.** Moves: portfolio quality, robustness, speed. Evidence:
-  V2 (blocked-run manifests; fragment; the three mechanism lines read in
-  tree). Falsifier: if a 30s budget genuinely cannot push that pool past 66
-  candidates, (a)'s premise fails and the remedy is R98(3)'s budget work
-  alone. FOSS basis: existing vendored scipy/numpy, stdlib; $0. Owner
-  action: none. Rollback: new control defaults off; gate change is one
-  conditional.
-
-### R116. The production allocator has no candidate-reuse cap unless overridden; the first certified build concentrates (P1, S) | new 2026-08-14, merged from BUILD fragment `2026-08-13_BUILD_candidate-reuse-default-concentrates-portfolios.md`; root cause corrected in tree by the audit
-
-- **What:** the fragment's cited default (`contest_allocator.py:1012-1023`,
-  reuse keyed to contest count) is real code but the LEGACY
-  `assign_lineups_to_contests` path, self-labeled compatibility-only
-  (`:916`). Production `select_and_assign_entries` adds a reuse constraint
-  ONLY when `max_candidate_reuse` is explicitly set (`:2232-2233` — `if
-  max_reuse is not None`, else no row at all); `STRATEGY_DEFAULTS` sets it on
-  no posture; nothing outside tests passes `reuse_strategy`. So the MILP
-  legitimately reuses its best candidates: the first certified 2207_2g build
-  put 4 distinct lineups across 11 apex entries; the rebuild with
-  `max_candidate_reuse: 2` delivered 7 distinct on the identical bank for
-  0.98% of aggregate fit (both runs' diagnostics verified; delivered run
-  `20260814T011858Z_d2d53e40` shows the cap binding at 2).
-- **Why P1:** silent portfolio concentration on exactly the GPP/apex shapes
-  Ben's 2026-08-13 directive names. Nothing certifies wrong, and nothing in
-  the brief says `distinct_lineups`; preflight's duplicate-groups line
-  arrives after certification. R71(b)'s inert `reuse_strategy` is this
-  item's adjacent fact and stays in the false-signal batch.
-- **Fix:** (1) default `max_candidate_reuse` per posture from the
-  allocator's own `minimum_cap` arithmetic (`ceil(entries / distinct
-  compatible candidates)`), promoted from floor to default — note the R98(2)
-  inversion explicitly in that comment block: a reuse cap's engine-computed
-  floor DE-concentrates, unlike the exposure caps, so the R98(2) warning
-  does not generalize to it. `single_entry` is unaffected (formula returns 1
-  at one entry). (2) `distinct_lineups` and `candidate_reuse_counts` in the
-  brief's exposure block at approve time. Fragment asks 3-5 (binding/slack
-  per control, structural exposure floors beside realized, ceiling-per-dollar
-  zero-exposure list) ride R84, whose surface they are.
-- **Audit fields.** Moves: portfolio quality, leverage. Evidence: V2 (both
-  2207_2g runs; allocator source; STRATEGY_DEFAULTS grep). Acceptance: a
-  test pinning >= ceil(entries/candidates) distinct lineups on an
-  11-entry/7-candidate synthetic without overrides, and the 2207_2g replay
-  reproducing >= 7 distinct. Falsifier: if R118 replays across >= 8 archived
-  slates show concentrated portfolios matching diversified ones on
-  top-decile and seat rates, the default reverts to none and only the
-  reporting half ships. FOSS: existing. Owner: none. Rollback: remove the
-  default, keep the brief fields.
-
-### R119. Brief-truth adoptions from the ed4 review, plus one dangling enrichment key (P2, XS-S) | new 2026-08-14, audit adjudication of `DFS_GREENFIELD_REVIEW_2026-08-12_ed4.md`
-
-- **The adjudication, for the record:** ed4 is the first external review to
-  RUN the gate rather than argue at it, and the first whose central claim
-  survives verification. Verified in tree by this audit: Floor is uniform
-  0.58 of Base with no per-row path (`projection_builder.py:103`), the
-  single-lineup objective is linear in one chosen column
-  (`optimizer_v3.py:714-723`), and GPP/WTA scoring consumes ceiling alone
-  (`:3453-3456`). Corollary, now on the record where before it was implicit:
-  `target='floor'` IS mean-maximization on every slate, and per-row
-  enrichment is the ONLY thing separating a GPP build from a cash build
-  (ed4 measured 25/25 identical lineups without enrichment, 4/25 with).
-  Everything else in ed4 declines itself (§6) on standing grounds; nothing
-  else enters the board.
-- **Adopt (a), recording only:** an `objective_differentiation` block in the
-  brief beside `enrichment.signal_applied` — `floor_basis`, `ceiling_basis`,
-  `cash_and_gpp_selection_identical` — so an undifferentiated build says so
-  in one boolean instead of being derivable from nothing.
-- **Adopt (b), landed with this audit's commit:** the sim-gate variance-basis
-  sentence in Do-not-build (see that section). The Quick Card split (ed4 §5)
-  is ARCHIVE's and is listed in Tier 4.
-- **Adopt (c), same surface, found by this audit:** the brief warns
-  "value_guard clipped 2 hitter Base value(s); see `enrichment['value_guard']`"
-  while no such key exists in the enrichment dict (delivered run
-  `20260814T011858Z_d2d53e40`; the golden baseline pins
-  `value_guard_clipped: null`). Write the key or fix the pointer; pin by
-  value. Same family as R99/R92, which is why this item batches with them.
-- **Audit fields.** Moves: robustness, autonomy. Evidence: V2 (tree reads +
-  run artifacts; ed4's own reproduction appendix). Acceptance: brief carries
-  the block on an enriched and an unenriched fixture build; the value_guard
-  pointer resolves. Falsifier: none needed — recording only. FOSS: none.
-  Owner: none. Rollback: drop the block.
-
 ### R103. A pinned same-game pitcher pair yields zero candidates at any budget (P2, S) | R47(b)'s remainder, filed 2026-08-09 as R102, renumbered 2026-08-10
 
 **Renumbered, and the reason is a one-writer violation worth recording.** This
@@ -1075,18 +818,6 @@ BOTH the backlog and the CHANGELOG; the backlog alone is not the counter.
 ### R84. Allocation observability: per-control slack and per-entry coverage counts (S) | audit 2026-08-04
 
 On every successful solve, emit achieved-vs-bound per control ("max_player_exposure: 8/9, binding on pid X") in `allocation_solver_report`; record per-entry compatible-in/kept counts from the prefilter (makes R36 Finding 10's starvation impossible to miss); and have tools/late_swap.py print the whole-file achieved exposures pre-solve so near-binding caps are visible before they block rather than only through `classify_swap_failure` after.
-
-**Riders 2026-08-14 (audit, from the 2207_2g fragment's asks 3-5, this
-item's exact surface):** mark each resolved control BINDING or SLACK beside
-its realized value (an echoed override that changed nothing currently reads
-exactly like one that shaped the build — verified: the second 2207_2g build
-passed five tightened controls and delivered identical constructions);
-print the structural exposure floors beside realized exposure
-(`ceil(2*entries/distinct SPs)` and the hitter equivalent — the machinery
-exists in `_feasibility_findings`/`STRUCTURAL_FLOOR_CONTROLS`; a full review
-round went to treating an arithmetic floor as a control failure); and rank
-zero-exposure bats by ceiling per dollar, not raw ceiling, so a dominated
-absence stops reading as a defect.
 
 ### R87. Solver throughput under the golden gate (M, decision first) | audit 2026-08-04
 
@@ -1186,14 +917,6 @@ Three scipy-native levers, each of which moves golden bytes and therefore sequen
   arithmetic floor, "inherent overlap floor 7 (5-stack + shared SP pair)" —
   and `max_player_exposure_pct` 0.50. Pitcher exposure stayed at the 0.43
   default and every SP landed at exactly 2/6.
-- **Rider 2026-08-14 (audit, from the 1310_6g fragment's asks 1 and 3):**
-  the unexhausted-job-list sentence must ride EVERY refusal solved against
-  that bank, not only the first, and the bank-observed SP counts must sit
-  beside `feasibility.inputs` in the same payload. Verified live: blocked
-  runs `20260813T162123Z`/`162422Z` said "5 distinct SP pairs" / "4 distinct
-  starters" while the same brief's pool checks read 60 viable pairs / 12
-  viable SPs and passed. The mechanics land with R115; this rider is the
-  reporting half.
 
 ## Workstream 5 — Delivery, manifest, and preflight evidence
 
@@ -1232,54 +955,6 @@ Every line-number claim was verified against the tree before ruling, because thi
 **ALREADY ON THE BOARD, no new item:** Finding 16 = R10. Finding 18 = R1(c) plus the parked `ticket_count` rows. Finding 19 = R22 plus R25's shard question. Finding 20 = R25's minimal-repair fast path, still open and explicitly out of scope on 07-29. Finding 21 = the honest frame for Findings 1/3/14 and worth its own design pass before any of them is built piecemeal. Finding 22 = R12's `loop_state.json`. Finding 23 = R10 plus the archival runbook.
 
 **Two things the critique found that no prior review named, both mine:** three files under `outputs/2026-07-29/` have no manifest row at all, and R29(2) introduced a fourth path to that state — a promotion refused after the mirror returns 3 before `record_delivery`. Default preflight hard-fails an unrecorded file, so it fails closed, but leaving a file in `outputs/` that looks like a delivery is untidy at best. It should be written as `DO_NOT_UPLOAD_*` or removed. Filed here, not fixed.
-
-### R114. preflight_upload and verify_export cannot see declared pitchers, so a certified bullpen-game file fails the mandatory gate (P1, S) | new 2026-08-14, merged from BUILD fragment `2026-08-12_BUILD_preflight-ignores-declared-pitchers.md`
-
-- **What:** preflight evidences a rostered pitcher against the lineups feed's
-  posted nine plus probable-if-present only; the run's `declared_pitchers`
-  never reach it. Live case 2026-08-12 (2210_2g, run
-  `20260813T005233Z_1b5d3a4a`): KC ran a bullpen game, DK tagged Lynch `PO`
-  and Black `PLR`, Black was declared `viable_bulk_or_alt_sp` per the R104
-  policy, the build certified all three gates — and `preflight_upload.py`
-  exited 2 with 12x "Mason Black (KC) is not in KC's confirmed lineup or
-  probables". `verify_export.py` fails identically. The only path through is
-  `--force` / exit 4 on a failure the operator KNOWS is spurious.
-- **Why P1:** CLAUDE.md makes this gate the one pre-upload rule. A gate that
-  hard-fails legal, certified files teaches the operator to force past it,
-  and the habit transfers to the night the failure is real. This is the
-  recurring "preflight opener/bulk false positive" with a number at last.
-- **Fix:** preflight and verify_export read `declared_pitchers` from the
-  run's brief/diagnostics (or accept an explicit passthrough flag for the
-  no-run case), and report a declared arm as an acknowledged WARN naming the
-  declaration and its role, never a FAIL. An undeclared missing arm still
-  fails. Batch with R67, the same blindness on the feed-confirmation side.
-  Done when: the archived 2210_2g pair replays exit 0 with a named WARN, and
-  a genuinely undeclared arm still exits 2.
-- **Audit fields.** Moves: robustness, autonomy. Evidence: V2 (fragment +
-  run record + gate source). Falsifier: if declarations already reach an
-  input preflight reads, the fix collapses to reading it. FOSS: stdlib.
-  Owner: none. Rollback: one commit; gate returns to prior behavior.
-
-### R120. A delivered upload-ready file names a run directory that does not exist on the mount (P2, S) | new 2026-08-14, audit session
-
-- **What:** `outputs/2026-08-13/upload_manifest.json`'s 1310_6g row is
-  `upload_ready` with `run_id 20260813T164738Z_8ca54fa4` — no such directory
-  exists under `runs/` (302 run dirs checked). Separately, the 2207_2g run's
-  `manifest.json` records `inputs.*.source_path` under a DIFFERENT session's
-  container mount. Build-contract item 4 makes `runs/<run_id>/final/` the
-  immutable certified artifact; this delivery's diagnostics, projections and
-  inputs are unrecoverable from the mount. Related record fact for ARCHIVE:
-  the 1507_3g ledger fragment names `b8a3ef7c…` as the delivered file while
-  the manifest shows it superseded by `59a69f4a…` four minutes later — the
-  manifest wins.
-- **Fix:** the mirror/record step verifies `runs/<run_id>` exists under the
-  repo root at delivery time and refuses (or copies the run dir in) when it
-  does not; manifest paths recorded repo-relative. Recording only, no gate
-  semantics change. Rides the R36 F3m/F6m manifest batch.
-- **Audit fields.** Moves: robustness (evidence integrity). Evidence: V2
-  (manifests read; runs/ enumerated). Falsifier: if the run dir surfaces
-  under an archival move the audit missed, downgrade to a doc note. FOSS:
-  stdlib. Owner: none. Rollback: drop the check.
 
 ### R89. Checkpoint and artifact UX (S) | audit 2026-08-04
 
@@ -1509,65 +1184,6 @@ Everything here feeds the evidence loop that Workstream 2 grades against.
 None of it touches the certified path; all of it decides how much of what
 was played can ever be learned from.
 
-### R118. Retain the per-player FPTS map and replay portfolios against archived fields (P1, M) | new 2026-08-14, audit session; the audit's one strategic filing
-
-- **What:** every mined contest computes `fpts_by_norm` — the exact
-  {player → realized DK FPTS} map for that contest's whole field — and the
-  archive step strips it (`field_miner.py:1961`; `fpts`/`FPTS` appears in no
-  other module). The raw standings export carries per-player `%Drafted` and
-  `FPTS` for the entire field (verified: `data/archive/2026-08-06/contest-standings-193296906.csv`
-  header), so the 271-contest, 21-date archive can already answer "how did
-  the field construct" but not "what would THIS lineup have scored and
-  finished" — despite holding every input required. No tool joins
-  `runs/<run_id>` candidates or delivered CSVs to archived standings
-  (verified absent; the only `runs/<id>/final` consumers are verify_export
-  and late_swap).
-- **Why P1 ("destroys evidence" clause, plus the substrate everything in
-  Tier 2 waits on):** the strip discards evidence on every mine. Retained,
-  one deterministic replay tool converts the archive into the grading
-  substrate the board's three open strategy questions currently wait on live
-  tranches for: R37(2)(a)'s floor-5 question, R40's routing question, and
-  R10's duplication bar. `runs/` holds frozen inputs and
-  `final/projections.csv` for 302 runs, so policy A/B is leakage-free —
-  same information, different construction policy, scored against the REAL
-  archived field: realized FPTS sum, rank and percentile in that field,
-  seat-cleared where `paid_places` is known, and EXACT duplicate count
-  against the field's actual lineups (no field model needed — the field is
-  archived).
-- **Fix:** (1) stop stripping `fpts_by_norm`/`own_by_norm` — a sidecar
-  `fpts_<contest_id>.json` beside each `mined_*.json`, or keep the keys; one
-  idempotent re-mine backfills (~10 min in the container, the R48 pattern,
-  and R48's leverage table rides the same pass). (2) `tools/replay_portfolio.py`:
-  inputs a lineup set (delivered DKEntries CSV, `final/assignments.csv`, or a
-  candidate bank) plus contest id(s); outputs per lineup the realized sum,
-  field rank/percentile, would-have-cleared where paid line is known,
-  duplicate count vs field lineups; a coverage report NAMES any player absent
-  from the slate's union player table, and a lineup with an unresolved
-  player is reported partial, never guessed (union across same-slate
-  contests covers most; the residual is named). (3) Self-validation gate:
-  replaying every archived own entry reproduces its recorded points and
-  rank exactly (`entries[]` already carries points + players_norm, so the
-  join is closed-loop).
-- **Truthful labels, non-negotiable on this item:** a replay is an observed-
-  outcome counterfactual conditioned on ONE archived field. It is never ROI,
-  win rate, or a probability claim, and a policy that wins replays is graded
-  "supported in the shapes replayed", not proven — the field it beat is last
-  slate's field. Conditioning follows the house rule: by contest archetype
-  and field-size bucket, never pooled.
-- **Audit fields.** Moves: edge, leverage, portfolio quality — via evidence
-  rather than via a new objective. Evidence: V2 (`field_miner.py:1961`;
-  archive contents; absence of any replay consumer — all verified
-  2026-08-14). Acceptance: self-validation exact on >= 95% of own entries
-  with the remainder named (unparsed rows exist in the mine), plus one
-  worked policy A/B — the 2207_2g reuse-cap pair — with duplicates counted
-  against the real field. Falsifier: if union player tables cannot resolve
-  >= 90% of a typical replay lineup's players, exact replay narrows to
-  entered slates only and the item is re-scoped. FOSS basis: stdlib +
-  vendored pandas/numpy (BSD-3), local, $0. Owner action: none (the fresh
-  entry-history export that would light up `paid_places` stays R30's
-  separate data half). Rollback: sidecars are additive; the tool is
-  read-only over the archive.
-
 ### R30. Miner gap the money backfill exposed — DATA half only (P2, XS) | new 2026-07-29, from an ARCHIVE fragment; (a) tool half and (b) landed 2026-08-05, (c) landed 2026-08-08
 
 - **What:** three archival-path defects, ordered by what blocks what. None of them touches the certified path, which is why none was taken in the 07-29 evening DEV session.
@@ -1682,15 +1298,6 @@ The open tail is **R61-tail** below.
 Everything on the 07-25 list stands, with the CC review adding urgency to two of them: no Monte Carlo field-ROI engine or play-by-play simulator until R13 scales stakes and R10's ownership is calibrated (CC's Phase 3 proposes both now, on top of a projection base it misidentified); no PuLP migration or remediation (the repo has never used PuLP; CC's central performance claim is false against this tree); no `bank_cache.parquet` (a dependency for no measured problem); no promote-command ceremony or dual-track state machine beyond R3's manifest fields; no watcher daemons (Cowork's primitive is the scheduled task); no under-30-line CLAUDE.md absolutism (the contracts stay); no four-contract module extraction beyond R1's enum (RC 1.12's own caveat agrees); no live payout-table parsing (the DK wall is absolute; the curated archetype CSV is the vehicle for contest knowledge); no per-slate codebase reviews (this file is the live backlog; the next review-shaped document should be written when this list is substantially landed, not before).
 
 - The `mlb-game-odds` skill's own key resolution (R29(5) residual): unfixable from a Cowork session; needs a hand edit outside Cowork.
-
-**Sim-gate precondition, adopted 2026-08-14 from the ed4 review (§3), one
-sentence so the gate cannot mislead the session that eventually opens it:**
-the sim ladder additionally requires a per-player variance basis. Uniform
-Floor and enriched-Ceiling marginals give CV in [0.26, 0.40] driven by power
-alone; `slate_sim.py`'s static tail was structural — sigma a constant
-multiple of mu — not a volume artifact, so reopening the ladder without a
-variance basis reproduces the v2.20.0 retirement. R13 and R10 remain the
-funding gates; this is the third, technical precondition.
 
 The 2026-08-01 GF-spec adjudication (R41/R42 changelog entry) adds, same
 logic: no greenfield parallel package or phased rebuild program while R13 is
