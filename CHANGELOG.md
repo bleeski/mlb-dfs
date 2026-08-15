@@ -25,6 +25,131 @@ performance claim.
 
 ---
 
+## 2026-08-15 — The false-signal batch closes: R113 + R112 + R103 + R99 + R92 + R71(a) + R119
+
+Tier 1's false-signal batch, migrated out of `docs/2026-07-27_backlog_v2.md`.
+Six items CLOSED in full (R113, R112, R103, R99, R92, R119); R71 closes only
+its part (a), and its entry stays open on (b)(c)(d), rewritten to hold just
+the remainder. One theme across all seven: the underlying computation was
+already correct, but the line reporting it either couldn't fire, blamed the
+wrong control, or pointed at a key that didn't exist. Five real builds since
+2026-08-01 burned on this family, which is why it batched as one session
+instead of landing pointwise.
+
+**R99, the salary/feed clock cross-check.** The stderr disagreement gate read
+`pool_report.get("salary_cross_check")`; no producer in this codebase has ever
+written that key onto `pool_report`, so the gate returned `None` and could
+never fire, on a clean slate or a genuinely disagreeing one. The brief's
+`slate_clock.salary_cross_check` field was already reading the right object
+(`clock`, from `slate_intake_manager.slate_clock`). Extracted
+`salary_cross_check_note(clock)` as a pure helper so both sites read the same
+object, and rewrote the message off the cross-check's real fields
+(`feed_first_lock_game_id`/`salary_first_lock_game_id`/`drift_minutes`)
+instead of `first_lock_local`/`feed_first_lock_local`, two keys that never
+existed on this dict either.
+
+**R92, the bank_warnings dead reads.** `build_slate.py` guarded two warnings on
+`bank_report.get("jobs_failed")` and `bank_report.get("budget_exhausted")`;
+`extend_bank` has never returned either key (`budget_exhausted` exists only on
+`optimizer_v3`'s unrelated augmentation report), so both guards were `None`
+and neither warning has ever fired. Replaced with the keys R55(b) actually
+added for this: `jobs_raised`/`raised_by_reason` (the solve raised and proved
+nothing, a defect) and `jobs_unanswered`/`unanswered_by_status` (returned no
+lineup and proved no infeasibility, also retryable). Left as warnings, not
+escalated to a checkpoint blocker: the entry raised that as an open decision
+and this session did not have grounds to make it strategy rather than
+reporting.
+
+**R71(a) only, the pct>1 units slip.** `_cap_count` clamped `pct > 1` to 1.0 in
+both the solver's copy (`contest_allocator.py`) and the export validator's
+(`dk_entries_manager.py`): a `--controls-override` typo like
+`max_player_exposure_pct: 45` (45 for 0.45) silently disabled the cap in both
+places at once, consistently and invisibly. Both copies now raise `ValueError`
+on `pct > 1.0` instead of clamping. Parts (b) (`reuse_strategy` inert on the
+production path), (c) (a wrong-draftgroup error misclassified by string
+prefix), and (d) (legacy signature-extraction exceptions degrading to unique
+ids) are unchanged and the entry stays open on them, rewritten below to drop
+(a) from its own text.
+
+**R119, the ed4 adoptions still owed.** Adoption (a) (`objective_differentiation`,
+recording only) and (c) (the `value_guard` pointer) land; (b) already landed
+with the audit's own commit. `objective_differentiation.cash_and_gpp_selection_identical`
+is `not signal_applied` -- a corollary, not a lineup-by-lineup diff: Floor is a
+uniform 0.58 of `Base_Projection` (no per-row path), so ranking by Floor always
+equals ranking by Base_Projection, and Ceiling only diverges from Base_Projection
+where enrichment moved a `Ceiling_Multiplier` off its uniform neutral default.
+`summarize_enrichment`'s returned dict never had a `value_guard` key even though
+its own `warnings` list (copied verbatim from the raw enrichment dict) could say
+"see enrichment['value_guard']" -- the raw dict had the key, the summarized one
+the brief actually carries did not. Now it does.
+
+**R113, the Showdown cap/lock conflation.** `captain_cap_relaxed` (thesis
+apportionment running out of eligible captains under the exposure cap) and
+`captain_lock_relaxed` (the solver dropping a thesis's assigned captain because
+no feasible lineup existed with it locked) were summed into one `relaxed_slots`
+number and reported as "captain cap relaxed" regardless of which one fired,
+always pointing at `captain_exposure.by_player` -- a table that cannot show a
+lock substitution, because a lock event is not an exposure event.
+`solve_ladder` now records `lock_relaxation_detail` (thesis, requested captain,
+substituted captain) at both sites `captain_lock_relaxed` increments, and
+`build_slate.py` gained `showdown_relaxation_caution`, a pure helper that
+writes one clause per counter that actually fired -- the cap clause keeps the
+`by_player` pointer, the lock clause names the thesis and the substitution
+instead. `captain_exposure` in the brief now also carries `cap_relaxed_slots`
+and `lock_relaxed_slots` split out; `relaxed_slots` (the sum) is unchanged,
+because the "clean when the relaxation counts are zero" contract only cares
+whether either fired.
+
+**R112, the bank blamed as a control.** Both halves of the entry, plus its
+2026-08-14 rider. `_diagnose_binding_constraints` now takes an optional
+`feasibility_inputs` (the slate-level `viable_sp_pairs`/`viable_sp_count`
+`_slate_feasibility` already computes) and appends a same-line `BANK-LIMITED`
+clause to the `max_sp_pair_repetition`/`max_pitcher_exposure_pct` findings when
+the slate itself supports more than this bank sampled -- the bank-observed
+count and `feasibility.inputs`' count now sit in the one string a truncated
+read would still see. Threaded from `run_slate`, which already computes
+`_slate_feasibility` for the checkpoint, through `run_initial_build` ->
+`execute_portfolio` -> `select_and_assign_entries` -> both call sites of
+`_diagnose_binding_constraints` (the `errors` list and
+`solver_report["binding_constraints"]`), including the one re-entry on a
+proven-infeasible primary-stack floor. Late-swap's `execute_portfolio` call is
+untouched (the parameter defaults to `None`), so its refusals do not yet carry
+this; that is a disclosed scope narrowing, not an oversight. **The rider**:
+the "job list not exhausted" flag now rides EVERY binding-constraint line in
+`errors`, not only a remedy trailing the whole list -- two findings in one
+solve used to bury the caveat after both arithmetic lines, where a reader
+taking only `errors[0]` (T-5's "present with zero diagnostic narration")
+would never reach it. `_infeasibility_remedies`'s trailing remedy text is
+unchanged; the per-line flag is a short bracketed tag, not a duplicate of it.
+Considered and declined: R112's fix (2) (flooring the auto-bank's own SP-pair
+coverage at `n_entries`). The entry's own "Done when" is an OR --
+either the bank reaches that coverage, or the refusal is honest about why it
+didn't -- and fix (1) alone satisfies the second branch, so (2) is a genuine
+strategy change (raising the bank's construction target) left for a session
+that wants to spend it deliberately, not folded in here.
+
+**R103, the pinned same-game pair.** `bank_cache.extend_bank` derives its
+same-game filter to keep a FRESH bank from spending jobs on an
+anti-correlated pair. When both P slots are pinned (`locked_slot_assignments`),
+`pair_space` is already narrowed to that one pair -- a fact about a file DK
+already accepted, not a candidate for diversity -- but the filter ran anyway
+and dropped it whenever the two pitchers shared a `Game_ID`, leaving
+`usable_pairs` empty and the slice reporting `+0 targeted candidates` on an
+entry that was never repairable for a pool reason. The filter now short-circuits
+to keep the pair whenever both P slots are pinned, and the report carries a
+new `pinned_pair_same_game_kept` flag so a `+0` slice names the pin instead of
+reading as a dry pool. The one-pin case is untouched: an open second slot
+still needs the filter, so it cannot pair the pinned arm with his own
+opponent, which is a real diversity concern and not a fixed fact.
+
+Gate: `PASS v2.26.0 26 modules 962 tests` (`tests.test_core` 621 -> 640,
+`tests.test_showdown` 55 -> 56). Nineteen new tests in `test_core` plus one in
+`test_showdown`, covering all seven items; the R103 same-game bypass and the
+R71(a) rejection were each mutation-checked by hand (reverting the change
+reddened exactly the test written for it, restored immediately after).
+`CLAUDE.md`'s session-start line moves with the pin, as `AuditSkipHonestyTests`
+requires.
+
 ## 2026-08-15 — R114 + R67 close: the upload gate stops failing arms the build legally rostered
 
 Backlog R114 (P1, S, Workstream 5) and R67 (P2, S), Tier 1's head, both

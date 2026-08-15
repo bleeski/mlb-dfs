@@ -583,6 +583,7 @@ def _diagnose_binding_constraints(
     signatures: Sequence[Tuple[str, ...]],
     largest_contest_entries: int,
     controls: Dict[str, Any],
+    feasibility_inputs: Optional[Mapping[str, Any]] = None,
 ) -> List[str]:
     """Name the controls that cannot be satisfied by this bank, arithmetically.
 
@@ -591,6 +592,13 @@ def _diagnose_binding_constraints(
     exists. It cannot prove infeasibility on its own (the MILP already did
     that), and it never guesses. When it finds nothing it says so, which is
     itself the useful answer: the interaction, not any single cap, is binding.
+
+    ``feasibility_inputs`` (R112) is the slate-level capacity
+    (``viable_sp_pairs``/``viable_sp_count`` from ``_slate_feasibility``),
+    optional and advisory. When the bank-observed bucket count binding here is
+    LOWER than what the slate itself can support, the finding names the bank
+    as the true limiter in the same line -- omitting it costs nothing; a bank
+    that already matches or exceeds the slate's capacity states no such claim.
     """
     findings: List[str] = []
     total = int(entries_count)
@@ -610,10 +618,19 @@ def _diagnose_binding_constraints(
     if pair_cap is not None:
         buckets = len(set(sp_pairs))
         if buckets * int(pair_cap) < total:
-            findings.append(
+            finding = (
                 f"max_sp_pair_repetition: {buckets} distinct SP pairs x cap "
                 f"{int(pair_cap)} = {buckets * int(pair_cap)} < {total} entries"
             )
+            viable_pairs = (feasibility_inputs or {}).get("viable_sp_pairs")
+            if viable_pairs is not None and int(viable_pairs) > buckets:
+                finding += (
+                    f" -- BANK-LIMITED: feasibility.inputs.viable_sp_pairs says "
+                    f"the slate itself has {int(viable_pairs)} viable SP pairs; "
+                    f"this bank sampled only {buckets}, so grow the bank before "
+                    f"relaxing this cap"
+                )
+            findings.append(finding)
 
     distinct_signatures = len(set(signatures))
     max_reuse = controls.get("max_candidate_reuse")
@@ -635,10 +652,19 @@ def _diagnose_binding_constraints(
         arms = {pid for pair in sp_pairs for pid in pair}
         # Two pitcher slots per lineup.
         if len(arms) * pitcher_cap < total * 2:
-            findings.append(
+            finding = (
                 f"max_pitcher_exposure_pct: {len(arms)} distinct starters x cap "
                 f"{pitcher_cap} = {len(arms) * pitcher_cap} < {total * 2} pitcher slots"
             )
+            viable_sps = (feasibility_inputs or {}).get("viable_sp_count")
+            if viable_sps is not None and int(viable_sps) > len(arms):
+                finding += (
+                    f" -- BANK-LIMITED: feasibility.inputs.viable_sp_count says "
+                    f"the slate itself has {int(viable_sps)} viable starters; "
+                    f"this bank sampled only {len(arms)}, so grow the bank "
+                    f"before relaxing this cap"
+                )
+            findings.append(finding)
     return findings
 
 
@@ -889,12 +915,28 @@ def _prefilter_candidates(
 
 
 def _cap_count(total: int, pct: Optional[float]) -> Optional[int]:
+    """Resolve a fractional exposure cap (e.g. 0.45) to a count.
+
+    R71(a). This used to clamp ``pct > 1`` to 1.0 rather than reject it, which
+    silently DISABLES the cap on a plain units slip: ``max_player_exposure_pct:
+    45`` (45 typed for 0.45) clamped to 1.0 and capped nobody. Every legitimate
+    cap in this codebase is a fraction in (0, 1]; a value above 1 is not a
+    looser cap someone meant, it is the same mistake every time, so it raises
+    here instead of the mirrored ``dk_entries_manager._cap_count`` disagreeing
+    silently with what the solver actually enforced.
+    """
     if pct is None:
         return None
     value = float(pct)
     if value <= 0:
         return None
-    return max(1, int(math.floor(total * min(1.0, value) + 1e-9)))
+    if value > 1.0:
+        raise ValueError(
+            f"exposure cap {value!r} is > 1.0; caps are fractions of the "
+            f"requested count (0.45 for 45%), not percentages -- a bare 45 "
+            f"used to silently disable this cap"
+        )
+    return max(1, int(math.floor(total * value + 1e-9)))
 
 
 def assign_lineups_to_contests(
@@ -1884,6 +1926,7 @@ def select_and_assign_entries(
     *,
     bank_report: Optional[Mapping[str, Any]] = None,
     fixed_exposure: Optional[Mapping[str, Any]] = None,
+    feasibility_inputs: Optional[Mapping[str, Any]] = None,
     _floor_state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
@@ -1922,6 +1965,13 @@ def select_and_assign_entries(
     every step (see :func:`_resolve_primary_stack_floor`), and it is reported
     under ``primary_stack_floor``. Absent means absent: no candidate is
     excluded and the result carries no floor block.
+
+    ``feasibility_inputs`` (R112) is ``_slate_feasibility``'s return: the
+    slate's viable SP count/pairs, independent of what this bank happened to
+    sample. Advisory and read on the same proven-infeasible path as
+    ``bank_report``: it lets a binding-constraint finding name the bank as the
+    limiter when the slate itself could support more than this bank sampled.
+    Omitting it costs nothing.
 
     ``_floor_state`` is private. It carries the ladder position and the
     relaxation record across the one re-entry this function makes into itself,
@@ -2395,10 +2445,24 @@ def select_and_assign_entries(
             ]
         else:
             binding = _diagnose_binding_constraints(
-                E, stacks, sp_pairs, signatures, largest_contest, controls
+                E, stacks, sp_pairs, signatures, largest_contest, controls,
+                feasibility_inputs=feasibility_inputs,
+            )
+            # R112 rider (2026-08-14). This flag rides EVERY finding line below,
+            # not only a remedy trailing the whole list: two separate blocked
+            # runs against the same still-slicing bank (20260813T162123Z /
+            # 162422Z) each showed a different bank-observed count as if it
+            # were a fresh diagnosis of the SLATE, and a reader who only sees
+            # errors[0] (the T-5 "present with zero diagnostic narration" case)
+            # would never reach the trailing remedy that explains why.
+            bank_flag = (
+                " [BANK JOB LIST NOT EXHAUSTED -- see remedies below before "
+                "relaxing any control]"
+                if (bank_report or {}).get("job_list_exhausted") is False else ""
             )
             if binding:
-                errors = [f"entry-level joint MILP proven infeasible: {b}" for b in binding]
+                errors = [f"entry-level joint MILP proven infeasible: {b}{bank_flag}"
+                          for b in binding]
             else:
                 errors = [
                     "entry-level joint MILP proven infeasible: no single control is "
@@ -2410,7 +2474,7 @@ def select_and_assign_entries(
                             "max_primary_stack_exposure_pct", "max_sp_pair_repetition",
                             "max_shared_players", "max_candidate_reuse",
                         )) if controls.get(k) is not None
-                    )
+                    ) + bank_flag
                 ]
             # R98(2). Appended, never substituted: the arithmetic above is what
             # the solver proved and it stays first among the facts. What follows
@@ -2444,6 +2508,7 @@ def select_and_assign_entries(
                 return select_and_assign_entries(
                     _all_candidates, entry_requirements, portfolio_controls,
                     bank_report=bank_report, fixed_exposure=fixed_exposure,
+                    feasibility_inputs=feasibility_inputs,
                     _floor_state={
                         "rung_index": rung_idx + 1,
                         "relaxations": int(floor_report.get("relaxations") or 0) + 1,
@@ -2453,7 +2518,8 @@ def select_and_assign_entries(
 
         solver_report["binding_constraints"] = (
             [] if timed_out else _diagnose_binding_constraints(
-                E, stacks, sp_pairs, signatures, largest_contest, controls)
+                E, stacks, sp_pairs, signatures, largest_contest, controls,
+                feasibility_inputs=feasibility_inputs)
         )
         return {
             "passed": False, "assignments": [], "selection_certified": False,

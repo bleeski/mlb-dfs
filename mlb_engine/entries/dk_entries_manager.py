@@ -742,13 +742,24 @@ def _cap_count(total: int, pct: Optional[float]) -> Optional[int]:
 
     Semantics are aligned with ``contest_allocator._cap_count`` so the solved
     model and the post-export validator can never disagree on a cap value.
+
+    R71(a). ``pct > 1`` raises rather than clamping to 1.0: a clamp silently
+    disables the cap on a units slip (``45`` typed for ``0.45``), and it would
+    do so here without the solver-side copy agreeing it was disabled, which is
+    the exact disagreement this validator exists to catch.
     """
     if pct is None:
         return None
     value = float(pct)
     if value <= 0:
         return None
-    return max(1, int(math.floor(total * min(1.0, value) + 1e-9)))
+    if value > 1.0:
+        raise ValueError(
+            f"exposure cap {value!r} is > 1.0; caps are fractions of the "
+            f"requested count (0.45 for 45%), not percentages -- a bare 45 "
+            f"used to silently disable this cap"
+        )
+    return max(1, int(math.floor(total * value + 1e-9)))
 
 
 def _game_cap_count(total: int, pct: float) -> int:

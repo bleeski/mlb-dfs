@@ -54,8 +54,20 @@ EXPECTED_SUITE_COUNTS = {
     # CWD; the first cut resolved CWD-first and re-opened R70 through R70's own
     # remedy), seven on the platoon shape check and the no-platoon note, nine on
     # the checkpoint clock read including the EST case a July fixture cannot see.
-    "tests.test_core": 621,
-    "tests.test_showdown": 55,
+    # R99+R92+R71(a)+R119+R113+R112+R103, 2026-08-15: 621 -> 640, the
+    # false-signal batch's nineteen: salary_cross_check reading one object at
+    # both sites (4), bank_warnings reading keys extend_bank actually returns
+    # (2), _cap_count rejecting a pct>1 units slip in both copies (2),
+    # summarize_enrichment writing the value_guard key it points at plus the
+    # objective_differentiation corollary (2), the Showdown cap/lock caution
+    # split (1, its solve_ladder half pins in test_showdown), a proven-infeasible
+    # refusal naming the bank as the limiter against feasibility.inputs plus the
+    # not-exhausted flag riding every binding line (5), and a hard-pinned
+    # same-game SP pair surviving the diversity filter (3).
+    "tests.test_core": 640,
+    # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
+    # naming the thesis and the substituted captain.
+    "tests.test_showdown": 56,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -71,8 +83,9 @@ EXPECTED_SUITE_COUNTS = {
     "tests.test_paste_lineups": 75,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
-# 901 while the dict already summed to 928.
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 942
+# 901 while the dict already summed to 928, which is the exact staleness this
+# line's own rule warns about -- the dict is the source of truth either way.
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 962
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,

@@ -1278,10 +1278,37 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         and not counts["pitcher_ceiling_differentiated"])
     return {
         "signal_applied": bool(signal),
+        # R119(a), ed4 adoption, recording only. Floor is a UNIFORM 0.58 of
+        # Base_Projection (projection_builder.py, no per-row path), so ranking
+        # by Floor is always identical to ranking by Base_Projection; Ceiling is
+        # Base_Projection times a PER-ROW Ceiling_Multiplier that only differs
+        # from the uniform neutral default where enrichment (xwOBA/xISO/K-rate/
+        # F1/F4/F5) actually moved it. target='floor' (cash) is therefore mean-
+        # maximization on every slate, and enrichment is the only thing that can
+        # make a ceiling-scored GPP/WTA build differ from it (ed4 measured
+        # 25/25 identical lineups without enrichment, 4/25 with).
+        # cash_and_gpp_selection_identical is that corollary of signal_applied,
+        # not a lineup-by-lineup diff of an actual cash vs. GPP solve.
+        "objective_differentiation": {
+            "floor_basis": "Floor = Base_Projection x uniform 0.58; ranks "
+                           "identically to Base_Projection on every slate",
+            "ceiling_basis": "Ceiling = Base_Projection x per-row "
+                             "Ceiling_Multiplier; ranks like Base_Projection "
+                             "only where enrichment moved a multiplier off the "
+                             "uniform neutral default",
+            "cash_and_gpp_selection_identical": not bool(signal),
+            "note": "target='floor' is mean-maximization on every slate (ed4, "
+                    "adopted as R119); a corollary of signal_applied above, "
+                    "never a probability or performance claim.",
+        },
         "requested_but_unapplied": requested_but_unapplied,
         "degraded": bool(degraded_reason),
         "degraded_reason": degraded_reason,
         "reference_data": reference_status,
+        # R119(c): this warning (built above from the raw enrichment dict) can
+        # say "see enrichment['value_guard']" -- write the key here too, or the
+        # brief's own enrichment block has no such key for the reader to see.
+        "value_guard": enrichment.get("value_guard"),
         "counts": counts,
         "f4_league_mean_est_woba": f4_report.get("league_mean_est_woba"),
         "f1_odds": f1_report.get("odds"),
@@ -1300,6 +1327,36 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
                 "size of the input maps. Never ROI, win rate, or a probability "
                 "claim.",
     }
+
+
+def salary_cross_check_note(clock: dict) -> str | None:
+    """The stderr disagreement line for a clock's feed/salary cross-check, or
+    None when there is nothing to report.
+
+    R99. This used to read a DIFFERENT object than the brief's
+    ``slate_clock.salary_cross_check`` field: the brief correctly reads
+    ``clock.get("salary_cross_check")`` (the dict ``slate_clock`` actually
+    returns, keyed ``checked``/``agrees``/... per
+    ``slate_intake_manager.slate_clock``), while this stderr gate used to read
+    ``pool_report.get("salary_cross_check")`` -- a key no producer in this
+    codebase ever writes, so it was always None and the gate could never fire,
+    on a clean slate or a genuinely disagreeing one. Both sites now read the
+    same ``clock`` object, so a missing cross-check (nothing to compare, the
+    common case) and an agreeing one both stay silent, and only a real
+    ``agrees is False`` prints -- with the real field names the cross-check
+    actually returns, not the ``first_lock_local``/``feed_first_lock_local``
+    keys the old message referenced (neither exists on this dict either).
+    """
+    cross_check = clock.get("salary_cross_check")
+    if not cross_check or cross_check.get("agrees") is not False:
+        return None
+    return (
+        f"clock: feed-derived first lock "
+        f"({cross_check.get('feed_first_lock_game_id')}) disagrees with the "
+        f"authoritative salary file ({cross_check.get('salary_first_lock_game_id')} "
+        f"at {cross_check.get('salary_first_lock_utc')}, drift "
+        f"{cross_check.get('drift_minutes')} min); salary file adopted."
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -1363,10 +1420,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
 
     # A salary/feed clock disagreement means two sources describe different
     # slates, so say which one this build adopted rather than picking silently.
-    if report.get("salary_cross_check") is False:
-        print(f"clock: salary file says {clock.get('first_lock_local')}, the "
-              f"lineups feed says {clock.get('feed_first_lock_local')}; adopted "
-              f"{clock.get('source', 'salary')}", file=sys.stderr)
+    # R99: reads `clock`, the same object the brief's salary_cross_check field
+    # reads -- `report` (pool_report) never carries this key, so the old gate
+    # here could never fire.
+    _cross_check_note = salary_cross_check_note(clock)
+    if _cross_check_note:
+        print(_cross_check_note, file=sys.stderr)
 
     n_entries = args.entries or count_reserved(entries)
 
@@ -1568,13 +1627,25 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                                  "payload_report": dict(cache.last_payload_report)},
             "bank_warnings": [
                 w for w in [
-                    (f"{bank_report.get('jobs_failed')} cache jobs failed"
-                     if bank_report.get("jobs_failed") else None),
                     ("the job list was not exhausted; this bank is a slice, not "
                      "the full search" if not bank_report.get("job_list_exhausted")
                      else None),
-                    (f"budget exhausted after {bank_report.get('elapsed_s')}s"
-                     if bank_report.get("budget_exhausted") else None),
+                    # R92: `extend_bank` has never returned `jobs_failed` or
+                    # `budget_exhausted` -- those two guards read keys only
+                    # `optimizer_v3`'s unrelated augmentation report uses, so
+                    # they were dead: `.get` returned None and the `if` never
+                    # fired. The real keys are `jobs_raised`/`raised_by_reason`
+                    # (R55(b), a defect: the solve raised and proved nothing)
+                    # and `jobs_unanswered`/`unanswered_by_status` (returned no
+                    # lineup and proved no infeasibility either) -- both
+                    # retryable, neither the same as a dry pool.
+                    (f"{bank_report.get('jobs_raised')} cache job(s) raised an "
+                     f"exception instead of answering ({dict(bank_report.get('raised_by_reason') or {})})"
+                     if bank_report.get("jobs_raised") else None),
+                    (f"{bank_report.get('jobs_unanswered')} cache job(s) returned "
+                     f"no lineup and proved no infeasibility "
+                     f"({dict(bank_report.get('unanswered_by_status') or {})})"
+                     if bank_report.get("jobs_unanswered") else None),
                     # F13/F15: both were previously invisible in the run record.
                     (f"{bank_report.get('jobs_timed_out')} cache jobs hit the solver "
                      f"time limit and are retryable on another slice"
@@ -1881,6 +1952,56 @@ def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict]:
                             f"split evenly between the two sides")
 
 
+def showdown_relaxation_caution(
+    cap_count,
+    cap_relaxed: int,
+    lock_relaxed: int,
+    lock_relaxation_detail,
+    share_cap,
+    overlap_relaxed: int,
+    both_relaxed: int,
+) -> str:
+    """The Showdown ladder's relaxation NOTEs, one clause per counter that
+    actually fired, each naming its own mechanism.
+
+    R113. A captain-CAP relaxation (the thesis-apportionment step ran out of
+    eligible captains under ``max_cpt_exposure_pct`` and fell back to any
+    captain) and a captain-LOCK relaxation (the solver could not build a
+    feasible lineup with the thesis's assigned captain and dropped the lock,
+    substituting a different one) are different events with different
+    remedies. They used to be summed into one number and reported as "captain
+    cap relaxed" no matter which one fired, always pointing at
+    ``captain_exposure.by_player`` -- a table that cannot show a lock
+    substitution, because a lock event is not an exposure event. Each clause
+    below fires only off its own counter.
+    """
+    notes = ""
+    if cap_relaxed:
+        notes += (f" NOTE: the {cap_count}-lineup captain cap relaxed on "
+                  f"{cap_relaxed} slot(s) because the pool couldn't support it "
+                  "without leaving a reserved row blank -- check "
+                  "captain_exposure.by_player before uploading.")
+    if lock_relaxed:
+        detail = "; ".join(
+            f"thesis {d.get('thesis', '?')}: {d.get('requested', '?')} -> {d.get('actual', '?')}"
+            for d in (lock_relaxation_detail or [])
+        ) or "no detail captured"
+        notes += (f" NOTE: the captain LOCK relaxed on {lock_relaxed} slot(s) -- "
+                  "the thesis's assigned captain could not produce a feasible "
+                  f"lineup under the overlap bound, so the solver substituted a "
+                  f"different one ({detail}). This is not a cap event; "
+                  "captain_exposure.by_player will not show it.")
+    if overlap_relaxed:
+        notes += (f" NOTE: the {share_cap}-player overlap bound relaxed on "
+                  f"{overlap_relaxed} slot(s); those lineups are still distinct "
+                  f"but share more than {share_cap} players with an earlier one.")
+    if both_relaxed:
+        notes += (f" NOTE: {both_relaxed} slot(s) needed BOTH the overlap bound "
+                  "and the captain lock dropped at once; those are the least "
+                  "controlled lineups in the bank (R54).")
+    return notes
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
@@ -2025,8 +2146,16 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     if use_ladder:
         cap_count = ladder_meta.get("captain_cap_count")
         captain_counts = report.get("captain_exposure") or {}
-        relaxed_slots = ((ladder_meta.get("captain_cap_relaxed") or 0)
-                         + (solve_diag.get("captain_lock_relaxed") or 0))
+        # R113. Two different mechanisms, kept separate rather than pre-summed:
+        # cap_relaxed is the thesis-apportionment step running out of eligible
+        # captains under the exposure cap; lock_relaxed is the SOLVER dropping
+        # a thesis's assigned captain because no feasible lineup existed with
+        # it locked. relaxed_slots (the sum) is kept for the "clean" verdict
+        # below, which only cares whether ANY relaxation happened.
+        cap_relaxed = ladder_meta.get("captain_cap_relaxed") or 0
+        lock_relaxed = solve_diag.get("captain_lock_relaxed") or 0
+        lock_relaxation_detail = list(solve_diag.get("lock_relaxation_detail") or [])
+        relaxed_slots = cap_relaxed + lock_relaxed
         overlap_relaxed = solve_diag.get("overlap_relaxed") or 0
         # R54(a)/(b)/(c). Both new facts, on both paths.
         both_relaxed = solve_diag.get("both_relaxed") or 0
@@ -2036,6 +2165,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
         relaxed_slots = cpt_diagnostics.get("relaxed_slots") or 0
+        # R113 does not apply to this path: build_showdown_bank has one cap
+        # mechanism (a rotating cpt_exclude list), no separate per-thesis lock,
+        # so there is nothing to split.
+        cap_relaxed = relaxed_slots
+        lock_relaxed = 0
+        lock_relaxation_detail = []
         overlap_relaxed = cpt_diagnostics.get("overlap_relaxed_slots") or 0
         both_relaxed = cpt_diagnostics.get("both_relaxed_slots") or 0
         ignored_locks = list(cpt_diagnostics.get("ignored_locks") or [])
@@ -2086,6 +2221,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "realized_max_pct": realized_cpt_pct,
             "by_player": captain_exposure,
             "relaxed_slots": relaxed_slots,
+            # R113. Split so a reader can tell which control actually gave way:
+            # by_player can only ever show a cap event.
+            "cap_relaxed_slots": cap_relaxed,
+            "lock_relaxed_slots": lock_relaxed,
+            "lock_relaxation_detail": lock_relaxation_detail,
         },
         "diversity": {
             "max_shared_players": share_cap,
@@ -2133,20 +2273,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                     "exposure cap, and the roster-overlap bound passed, but this "
                     "is not the Classic three-gate certification. Review before "
                     "uploading."
-                    + (f" NOTE: the {cap_count}-lineup captain cap relaxed on "
-                       f"{relaxed_slots} slot(s) because the pool couldn't "
-                       "support it without leaving a reserved row blank -- check "
-                       "captain_exposure.by_player before uploading."
-                       if relaxed_slots else "")
-                    + (f" NOTE: the {share_cap}-player overlap bound relaxed on "
-                       f"{overlap_relaxed} slot(s); those lineups are still "
-                       f"distinct but share more than {share_cap} players with an "
-                       "earlier one."
-                       if overlap_relaxed else "")
-                    + (f" NOTE: {both_relaxed} slot(s) needed BOTH the overlap "
-                       "bound and the captain cap dropped at once; those are the "
-                       "least controlled lineups in the bank (R54)."
-                       if both_relaxed else "")
+                    # R113: cap and lock relaxations are named separately, each
+                    # off its own counter, rather than summed into one sentence
+                    # that always blamed the cap.
+                    + showdown_relaxation_caution(
+                        cap_count, cap_relaxed, lock_relaxed, lock_relaxation_detail,
+                        share_cap, overlap_relaxed, both_relaxed,
+                    )
                     # R54(c). Loudest of the four, because it is not a relaxation
                     # the solver chose: it is an instruction that did not arrive.
                     + (f" NOTE: {len(ignored_locks)} lock(s) named a player the "

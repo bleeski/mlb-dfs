@@ -713,9 +713,25 @@ def extend_bank(
         text = str(gid).strip().lower()
         return bool(text) and text not in ("nan", "none", "nat", "<na>")
 
+    # R103. When both P slots are pinned, `pair_space` is already the one pair
+    # this repair job must use -- a fact about a file DK already accepted, not
+    # a candidate for bank diversity. The same-game filter below exists to keep
+    # a FRESH bank from wasting jobs on an anti-correlated pair; it has nothing
+    # to say about a pair that is no longer a choice. Without this, a pinned
+    # same-game pair (both P slots locked to one matchup) was silently
+    # filtered to an empty job list and the slice reported "+0 targeted
+    # candidates" on an entry that was never repairable for a pool reason.
+    both_pinned = len(pinned_sps) >= 2
+    pinned_pair_same_game_kept = False
     usable_pairs = []
     unknown_game_pairs = 0
     for a, b in pair_space:
+        if both_pinned:
+            ga, gb = game_of.get(a), game_of.get(b)
+            if _known(ga) and _known(gb) and ga == gb:
+                pinned_pair_same_game_kept = True
+            usable_pairs.append((a, b))
+            continue
         ga, gb = game_of.get(a), game_of.get(b)
         if not _known(ga) or not _known(gb):
             unknown_game_pairs += 1
@@ -895,6 +911,11 @@ def extend_bank(
         "superseded_jobs_dropped": superseded,
         "cache_was_corrupt_on_load": bool(getattr(cache, "corrupt_on_load", False)),
         "unknown_game_pairs_kept": unknown_game_pairs,
+        # R103. Named so a +0-candidate slice on a fully-pinned entry reads as
+        # the pin it is, not as a dry pool: True means both P slots were
+        # pinned to a same-game pair and the same-game filter was bypassed to
+        # keep it, because the file already fixed this pair as a fact.
+        "pinned_pair_same_game_kept": pinned_pair_same_game_kept,
         "free_hitter_slots": free_hitter_slots,
         "stack_min_relaxed_to": stack_relaxed_to,
         # F13: named so a thin slice reads as the clock rather than as a pool

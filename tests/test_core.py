@@ -11849,5 +11849,256 @@ class StageSlateClockReadTests(unittest.TestCase):
                       "the policy must reach build_slate_pool, not be inherited")
 
 
+class FalseSignalBatchTests(unittest.TestCase):
+    """R99 + R92 + R71(a) + R119 + R113 + R112 + R103, one session.
+
+    Tier 1's false-signal batch: refusals and brief fields honest line-by-line
+    that steer wrong. Five real builds since 2026-08-01 burned on this family;
+    every fix here is small and they share the reporting surface.
+    """
+
+    @staticmethod
+    def _module():
+        return BuildSlateScriptTests._module()
+
+    # -- R99: the stderr gate and the brief field now read the same clock ---
+
+    def test_salary_cross_check_note_silent_with_no_cross_check(self):
+        mod = self._module()
+        self.assertIsNone(mod.salary_cross_check_note({"salary_cross_check": None}))
+        self.assertIsNone(mod.salary_cross_check_note({}))
+
+    def test_salary_cross_check_note_silent_when_agreeing(self):
+        mod = self._module()
+        clock = {"salary_cross_check": {"checked": True, "agrees": True,
+                                        "feed_first_lock_game_id": "1",
+                                        "salary_first_lock_game_id": "1"}}
+        self.assertIsNone(mod.salary_cross_check_note(clock))
+
+    def test_salary_cross_check_note_prints_a_real_disagreement(self):
+        mod = self._module()
+        clock = {"salary_cross_check": {
+            "checked": True, "agrees": False,
+            "feed_first_lock_game_id": "away@home-2",
+            "salary_first_lock_game_id": "away@home-1",
+            "salary_first_lock_utc": "2026-08-11T23:10:00+00:00",
+            "drift_minutes": 245.0,
+        }}
+        note = mod.salary_cross_check_note(clock)
+        self.assertIsNotNone(note)
+        self.assertIn("away@home-2", note)
+        self.assertIn("away@home-1", note)
+        self.assertIn("245.0", note)
+
+    def test_the_stderr_gate_no_longer_reads_the_never_set_pool_report_key(self):
+        # R99's actual bug: pool_report never carries a salary_cross_check key
+        # anywhere in this codebase, so the old gate could never fire, on a
+        # clean slate or a genuinely disagreeing one. (The narrower "is False:"
+        # match, not a bare substring: this docstring's own prose mentions
+        # `pool_report.get("salary_cross_check")` narratively, which a plain
+        # substring check would flag as if it were still live code.)
+        src = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(encoding="utf-8")
+        self.assertNotIn('if report.get("salary_cross_check") is False:', src)
+        self.assertIn("salary_cross_check_note(clock)", src)
+
+    # -- R92: bank_warnings reads keys extend_bank actually returns ----------
+
+    def test_bank_warnings_no_longer_reads_the_two_dead_keys(self):
+        src = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(encoding="utf-8")
+        self.assertNotIn('bank_report.get("jobs_failed")', src)
+        self.assertNotIn('bank_report.get("budget_exhausted")', src)
+        self.assertIn('bank_report.get("jobs_raised")', src)
+        self.assertIn('bank_report.get("jobs_unanswered")', src)
+
+    def test_extend_bank_never_actually_returns_the_dead_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = diverse_projection_frame()
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            report = bank_cache.extend_bank(cache, frame, time_budget_s=10)
+            self.assertNotIn("jobs_failed", report)
+            self.assertNotIn("budget_exhausted", report)
+            self.assertIn("jobs_raised", report)
+            self.assertIn("jobs_unanswered", report)
+            self.assertIn("raised_by_reason", report)
+            self.assertIn("unanswered_by_status", report)
+
+    # -- R71(a): a units slip no longer disables the cap in silence ---------
+
+    def test_cap_count_rejects_a_units_slip_in_both_copies(self):
+        from mlb_engine.allocate.contest_allocator import _cap_count as solve_side
+        from mlb_engine.entries.dk_entries_manager import _cap_count as export_side
+        for total, pct in ((18, 45), (10, 1.5), (4, 100)):
+            with self.assertRaises(ValueError):
+                solve_side(total, pct)
+            with self.assertRaises(ValueError):
+                export_side(total, pct)
+
+    def test_cap_count_still_accepts_the_legal_boundary(self):
+        from mlb_engine.allocate.contest_allocator import _cap_count as solve_side
+        from mlb_engine.entries.dk_entries_manager import _cap_count as export_side
+        self.assertEqual(solve_side(18, 1.0), 18)
+        self.assertEqual(export_side(18, 1.0), 18)
+        self.assertIsNone(solve_side(18, None))
+        self.assertIsNone(solve_side(18, 0))
+
+    # -- R119: the value_guard pointer resolves, and the objective block ----
+
+    def test_summarize_enrichment_writes_the_value_guard_key_it_points_at(self):
+        mod = self._module()
+        raw = {
+            "value_guard": {"applied": True, "clipped_count": 2, "percentile": 0.9},
+            "warnings": ["value_guard clipped 2 hitter Base value(s); "
+                        "see enrichment['value_guard']"],
+        }
+        out = mod.summarize_enrichment({}, raw, {}, None)
+        self.assertEqual(out["value_guard"], raw["value_guard"])
+        self.assertIn("see enrichment['value_guard']", " ".join(out["warnings"]))
+
+    def test_objective_differentiation_is_the_signal_applied_corollary(self):
+        mod = self._module()
+        unenriched = mod.summarize_enrichment({}, {"value_guard": None}, {}, None)
+        self.assertFalse(unenriched["signal_applied"])
+        self.assertTrue(
+            unenriched["objective_differentiation"]["cash_and_gpp_selection_identical"])
+        enriched = mod.summarize_enrichment(
+            {}, {"value_guard": None}, {"non_neutral_f4": 3, "hitters_scored": 10}, None)
+        self.assertTrue(enriched["signal_applied"])
+        self.assertFalse(
+            enriched["objective_differentiation"]["cash_and_gpp_selection_identical"])
+        self.assertIn("floor_basis", enriched["objective_differentiation"])
+        self.assertIn("ceiling_basis", enriched["objective_differentiation"])
+
+    # -- R113: cap and lock relaxations are named off their own counters ----
+
+    def test_showdown_relaxation_caution_names_the_right_mechanism(self):
+        mod = self._module()
+        cap_only = mod.showdown_relaxation_caution(6, 2, 0, [], 4, 0, 0)
+        self.assertIn("captain cap relaxed on 2 slot(s)", cap_only)
+        self.assertIn("captain_exposure.by_player", cap_only)
+        self.assertNotIn("LOCK", cap_only)
+
+        lock_only = mod.showdown_relaxation_caution(
+            6, 0, 1, [{"thesis": "pitchers_duel", "requested": "Dustin May",
+                       "actual": "Brandon Lockridge"}], 4, 0, 0)
+        self.assertIn("captain LOCK relaxed on 1 slot(s)", lock_only)
+        self.assertIn("pitchers_duel: Dustin May -> Brandon Lockridge", lock_only)
+        self.assertIn("not a cap event", lock_only)
+        self.assertNotIn("captain cap relaxed", lock_only)
+
+        neither = mod.showdown_relaxation_caution(6, 0, 0, [], 4, 0, 0)
+        self.assertEqual(neither, "")
+
+        everything = mod.showdown_relaxation_caution(
+            6, 1, 1, [{"thesis": "t1", "requested": "A", "actual": "B"}], 4, 2, 1)
+        self.assertIn("captain cap relaxed on 1", everything)
+        self.assertIn("captain LOCK relaxed on 1", everything)
+        self.assertIn("overlap bound relaxed on 2", everything)
+        self.assertIn("BOTH the overlap", everything)
+
+    # -- R112: a refusal names the bank as the limiter when the slate has ---
+    # -- more capacity than the bank sampled ---------------------------------
+
+    @staticmethod
+    def _shared_pair_candidates(n, primary="AAA"):
+        return [
+            candidate(f"c{i}", ["SPA", "SPB"] + [f"{i}-{j}" for j in range(2, 10)],
+                      100.0 - i, primary=primary)
+            for i in range(n)
+        ]
+
+    def test_binding_constraint_names_the_bank_as_limiter(self):
+        cands = self._shared_pair_candidates(3)
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6), {"max_sp_pair_repetition": 1},
+            feasibility_inputs={"viable_sp_pairs": 12})
+        self.assertFalse(result["passed"])
+        line = next(e for e in result["errors"] if "max_sp_pair_repetition" in e)
+        self.assertIn("BANK-LIMITED", line)
+        self.assertIn("12 viable SP pairs", line)
+        self.assertIn("sampled only 1", line)
+
+    def test_binding_constraint_is_silent_when_the_bank_matches_the_slate(self):
+        cands = self._shared_pair_candidates(3)
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6), {"max_sp_pair_repetition": 1},
+            feasibility_inputs={"viable_sp_pairs": 1})
+        line = next(e for e in result["errors"] if "max_sp_pair_repetition" in e)
+        self.assertNotIn("BANK-LIMITED", line)
+
+    def test_binding_constraint_omits_the_clause_with_no_feasibility_inputs(self):
+        cands = self._shared_pair_candidates(3)
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6), {"max_sp_pair_repetition": 1})
+        line = next(e for e in result["errors"] if "max_sp_pair_repetition" in e)
+        self.assertNotIn("BANK-LIMITED", line)
+
+    def test_the_bank_not_exhausted_flag_rides_every_binding_line(self):
+        """R112 rider: two findings in one solve must BOTH carry the flag, not
+        just a remedy trailing the whole list that a truncated read would miss."""
+        cands = self._shared_pair_candidates(3, primary="AAA")
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6),
+            {"max_sp_pair_repetition": 1, "max_primary_stack_exposure_pct": 0.34},
+            bank_report={"job_list_exhausted": False, "jobs_attempted": 10,
+                        "jobs_total": 500})
+        binding_lines = [e for e in result["errors"] if "proven infeasible:" in e]
+        self.assertGreaterEqual(len(binding_lines), 2, result["errors"])
+        for line in binding_lines:
+            self.assertIn("BANK JOB LIST NOT EXHAUSTED", line)
+
+    def test_feasibility_inputs_threads_from_run_slate_to_the_allocator(self):
+        """Plumbing check: run_slate already computes _slate_feasibility; it
+        must reach select_and_assign_entries so a real build's refusal can
+        carry the BANK-LIMITED clause with the checkpoint's own numbers."""
+        pipeline_src = (REPO / "mlb_engine" / "pipeline" / "execution_pipeline.py").read_text(encoding="utf-8")
+        self.assertIn("feasibility_inputs=feasibility_inputs", pipeline_src)
+        alloc_src = (REPO / "mlb_engine" / "allocate" / "contest_allocator.py").read_text(encoding="utf-8")
+        self.assertIn("feasibility_inputs=feasibility_inputs", alloc_src)
+
+    # -- R103: a hard-pinned same-game SP pair is a fact, not a diversity ---
+    # -- candidate, so it survives the same-game filter ----------------------
+
+    def test_a_pinned_same_game_pair_is_not_filtered_to_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = diverse_projection_frame()
+            p_t1 = frame[(frame["Position"] == "P") & (frame["Team"] == "T1")].iloc[0]["Player_ID"]
+            p_t2 = frame[(frame["Position"] == "P") & (frame["Team"] == "T2")].iloc[0]["Player_ID"]
+            pins = {"P1": str(p_t1), "P2": str(p_t2)}
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            report = bank_cache.extend_bank(
+                cache, frame, time_budget_s=20, locked_slot_assignments=pins)
+            self.assertTrue(report["pinned_pair_same_game_kept"],
+                            "the pinned pair's own game must be reported")
+            self.assertGreater(report["jobs_total"], 0,
+                               "a hard-pinned same-game pair produced +0 jobs, "
+                               "reading as a dry pool instead of a fixed fact")
+            self.assertGreater(report["built_this_slice"], 0)
+
+    def test_a_cross_game_pin_is_unaffected_and_unflagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = diverse_projection_frame()
+            p_t1 = frame[(frame["Position"] == "P") & (frame["Team"] == "T1")].iloc[0]["Player_ID"]
+            p_t3 = frame[(frame["Position"] == "P") & (frame["Team"] == "T3")].iloc[0]["Player_ID"]
+            pins = {"P1": str(p_t1), "P2": str(p_t3)}
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            report = bank_cache.extend_bank(
+                cache, frame, time_budget_s=20, locked_slot_assignments=pins)
+            self.assertFalse(report["pinned_pair_same_game_kept"])
+            self.assertGreater(report["built_this_slice"], 0)
+
+    def test_a_single_pin_leaves_the_same_game_filter_untouched(self):
+        """The one-pin case still needs the filter: the open slot must not be
+        allowed to pair the pinned arm with his own opponent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = diverse_projection_frame()
+            p_t1 = frame[(frame["Position"] == "P") & (frame["Team"] == "T1")].iloc[0]["Player_ID"]
+            pins = {"P1": str(p_t1)}
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            report = bank_cache.extend_bank(
+                cache, frame, time_budget_s=20, locked_slot_assignments=pins)
+            self.assertFalse(report["pinned_pair_same_game_kept"])
+            self.assertGreater(report["built_this_slice"], 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

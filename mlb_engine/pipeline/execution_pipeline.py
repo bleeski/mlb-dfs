@@ -311,6 +311,11 @@ def execute_portfolio(
     metadata: Optional[Dict[str, Any]] = None,
     additional_input_paths: Optional[Sequence[str | Path]] = None,
     compute_bank_coverage: bool = True,
+    # R112: the slate-level capacity _slate_feasibility already computed at the
+    # checkpoint, threaded through so a proven-infeasible refusal can name the
+    # bank as the limiter when the slate itself supports more than the bank
+    # sampled. Advisory; omitting it costs nothing.
+    feasibility_inputs: Optional[Mapping[str, Any]] = None,
     # F11. Explicit rather than smuggled through ``metadata``: metadata goes into
     # the run manifest, and these carry frozenset-keyed pair counts that a
     # manifest cannot serialise. They belong in diagnostics.json only.
@@ -359,7 +364,7 @@ def execute_portfolio(
     # whether the honest remedy is another slice or a control change.
     allocation = select_and_assign_entries(
         candidates, entry_requirements, controls, bank_report=bank_diagnostics,
-        fixed_exposure=fixed_exposure)
+        fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs)
     if not allocation.get("passed"):
         diagnostics = {
             "run_id": run["run_id"], "mode": mode, "allocation": allocation,
@@ -3427,6 +3432,9 @@ def run_slate(
         portfolio_controls=controls,
         confirmed_hitter_ids=confirmed_hitter_ids, confirmed_teams=confirmed_teams,
         pitcher_roles=pitcher_roles, excluded_player_ids=excluded_player_ids,
+        # R112: the checkpoint's own feasibility inputs, so a proven-infeasible
+        # refusal from this build can name the bank as the limiter.
+        feasibility_inputs=feasibility_inputs,
         metadata={**(metadata or {}), "front_door": "run_slate",
                   "front_door_version": VERSION,
                   "workflow_gate_evidence": gate_evidence,

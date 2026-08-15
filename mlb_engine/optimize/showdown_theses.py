@@ -499,6 +499,24 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     out: List[Optional[Dict[str, Any]]] = []
     overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
     ignored_locks: List[str] = []
+    # R113. `captain_lock_relaxed` (this counter) and `captain_cap_relaxed`
+    # (from the thesis-apportionment step, a different mechanism entirely) used
+    # to be summed into one number the brief called "captain cap relaxed" no
+    # matter which one fired. Naming WHICH thesis lost its assigned captain, and
+    # to whom, is what a caution pointing at this event actually needs -- the
+    # count alone reads the same as a cap event, and `captain_exposure.by_player`
+    # cannot show a lock substitution because it is not an exposure event.
+    name_by_key = dict(zip(df["Player_Key"], df["Name"]))
+    lock_relaxation_detail: List[Dict[str, str]] = []
+
+    def _record_lock_relaxation(thesis: Mapping[str, Any], solved: Mapping[str, Any]) -> None:
+        requested = thesis.get("cpt")
+        actual = (solved.get("captain") or {}).get("player_key")
+        lock_relaxation_detail.append({
+            "thesis": str(thesis.get("name") or thesis.get("template") or "?"),
+            "requested": name_by_key.get(requested, requested) if requested else "none",
+            "actual": name_by_key.get(actual, actual) if actual else "?",
+        })
 
     for thesis in theses:
         work = df.copy()
@@ -522,6 +540,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                                        max_shared_players=max_shared_players, **kw)
             if lu is not None:
                 cpt_relaxed += 1
+                _record_lock_relaxation(thesis, lu)
         # R54(b). The fourth rung, which the BANK ladder had and this one did
         # not: a thesis solvable only under both relaxations returned None and
         # left a blank reserved row -- write-blocked at T-5 -- on a pool the bank
@@ -534,6 +553,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                 both_relaxed += 1
                 overlap_relaxed += 1
                 cpt_relaxed += 1
+                _record_lock_relaxation(thesis, lu)
         if lu is None:
             infeasible += 1
         else:
@@ -551,6 +571,11 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "max_shared_players": max_shared_players,
             "overlap_relaxed": overlap_relaxed,
             "captain_lock_relaxed": cpt_relaxed,
+            # R113. One entry per lock relaxation, naming the thesis and the
+            # requested-vs-actual captain, so a caution citing this counter can
+            # say WHO was substituted instead of pointing at an exposure table
+            # that cannot show a lock event.
+            "lock_relaxation_detail": list(lock_relaxation_detail),
             "both_relaxed": both_relaxed,
             "ignored_locks": list(ignored_locks),
             "infeasible": infeasible,

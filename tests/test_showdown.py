@@ -514,6 +514,26 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         self.assertLessEqual(diag["both_relaxed"], diag["overlap_relaxed"])
         self.assertLessEqual(diag["both_relaxed"], diag["captain_lock_relaxed"])
 
+    def test_lock_relaxation_detail_names_the_thesis_and_substituted_captain(self):
+        """R113. The caution built from this counter has to say WHICH thesis
+        lost its assigned captain and to WHOM -- a count alone reads exactly
+        like a captain-CAP relaxation, and ``captain_exposure.by_player``
+        cannot show a lock substitution because it is not an exposure event.
+        """
+        df = _synth()
+        theses = [{"cpt": "AA_Star|AA", "name": f"t{i}"} for i in range(8)]
+        diag = {}
+        st.solve_ladder(df, theses, max_shared_players=4, time_limit=4, diagnostics=diag)
+        self.assertGreaterEqual(diag["captain_lock_relaxed"], 1)
+        detail = diag["lock_relaxation_detail"]
+        self.assertEqual(len(detail), diag["captain_lock_relaxed"])
+        for entry in detail:
+            self.assertTrue(entry["thesis"].startswith("t"), entry)
+            self.assertEqual(entry["requested"], "AA_Star|AA")
+            self.assertNotIn(entry["actual"], ("AA_Star|AA", "?"),
+                             "a lock relaxation that kept the requested captain "
+                             "or recorded no substitute pins nothing real")
+
     def test_a_thesis_lock_outside_the_pool_reaches_the_ladder_diagnostics(self):
         """R54(c), the ladder half: the ignored lock has to survive the trip from
         one solve into the diagnostics dict the brief reads."""
