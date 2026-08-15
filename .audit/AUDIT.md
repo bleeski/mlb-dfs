@@ -322,6 +322,44 @@ moved out of it. Do-not-build: one added precondition sentence (sim-gate
 variance basis), no removals. Owner engineering required by any ticket:
 none. Paid dependencies: none.
 
+## Addendum — 2026-08-14 evening pass: the five concurrent BUILD fragments
+
+Ben directed a sweep of build-session suggestions after the main audit
+committed. Three concurrent BUILD sessions (1810_3g, 1915_1g_sd, 1910_10g)
+had filed five fragments in `docs/backlog_inbox/` during the audit. All five
+reviewed; four load-bearing mechanisms re-verified in tree before filing
+(`build_slate.py:1837-1838`; `showdown_theses.py:62/70/109/484`;
+`execution_pipeline.py:387`). Incorporated under claim
+`engine_2026-08-14_edge_audit2`:
+
+- **New: R121-R125** (audit total now twelve new tickets, at its cap).
+  R121 fabricated-clock discipline (two sessions, one day; the second
+  instance caused a five-control relaxation against a floored bank).
+  R122 Showdown prior_note truthful-labels violation + handedness
+  resolution. R123 ladder per-player exposure cap + captain-relaxation
+  beneficiary + stakes-aware assignment. R124 delivery guarantee
+  (UNCERTIFIED_ vs DO_NOT_UPLOAD_; three verify_export-clean files existed
+  6.5 min before a nearly-skipped lock). R125 autonomy defaults,
+  decision-first on two of three parts.
+- **Extended:** R117 (elevated P1 into Tier 1: root cause found, null id +
+  empty hand kill both F4 terms; repair moved stacks off Oracle Park),
+  R98(3) (floored-bank JSON hint leads with the non-converging remedy;
+  SKILL.md's `--max-seconds 14` floors by construction), R115 (closed-form
+  SP-pair inequality named in refusals), R114 (evidence-source label on the
+  acknowledged WARN), R89 (single-pass blocker collection, rides R124),
+  R11 (rewritten around the two-tier QA design; Tier 1 is deterministic
+  and free).
+- **Tier 4 gains two dated decisions:** FanGraphs manual-by-decision
+  (reverse or reaffirm — both stale references are the two manual ones)
+  and R125's fallback/ladder halves.
+- Fragment files left in place marked consumed (write scope unchanged);
+  the two `ledger/inbox/` fragments remain ARCHIVE's, their backlog asks
+  now fully carried by R115/R116.
+
+Self-note: the adversarial-qa fragment's constraints (QA never gates
+delivery; two-iteration cap; DKSalaries wins; no manufactured criticism)
+were adopted verbatim — they are the same walls this audit ran under.
+
 ## Contract notes for the next session
 
 This commit deliberately carries no CHANGELOG.md entry (audit write scope:

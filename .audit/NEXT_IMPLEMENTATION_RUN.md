@@ -70,8 +70,21 @@ the declaration source, never claims verification it does not have).
 
 ## Queue after this run (do not start these; recorded for continuity)
 
+Updated 2026-08-14 evening after the five-fragment merge (R121-R125).
+
 1. False-signal batch (R113+R112+R103+R99+R92+R71+R119) — one session, WS4.
 2. R116 (production reuse-cap default + distinct_lineups in brief) — S.
-3. R118 (FPTS retention + replay_portfolio) — the Tier 2 head; its
+3. R117 (paste probable continuation line; F4-inert loud — elevated P1,
+   third recurrence; R122's handedness half consumes the same parse) — S.
+4. R121 (slate_clock tool + T-minus stderr line + SKILL.md same-turn
+   measurement rule; also retire the `--max-seconds 14` guidance per the
+   R98(3) extension) — S.
+5. R118 (FPTS retention + replay_portfolio) — the Tier 2 head; its
    acceptance gate includes the 2207_2g reuse A/B with exact duplication
    counts against the archived field.
+6. Then Tier 3: R115, R124 (the UNCERTIFIED_ mirror half can land alone),
+   R98(3)+extension.
+
+Two Showdown items (R122, R123) batch naturally with any WS1 session. Tier 4
+now carries three dated decisions for Ben (FanGraphs automation; R125's
+posture fallback and Classic relaxation ladder).
