@@ -45,6 +45,11 @@ import json
 import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+# R116. The shape vocabulary, read for one question: is this whole solve cash?
+# `contest_shapes` imports nothing from the engine, so this is the acyclic
+# direction the module was written for.
+from mlb_engine.contest_shapes import OBJECTIVE_CLASS_BY_SHAPE
+
 VERSION = "v1.12"
 
 CONTEST_TYPES = {"cash", "se_gpp", "portfolio_gpp", "wta", "satellite"}
@@ -684,6 +689,95 @@ STRATEGY_CAP_CONTROLS = frozenset({
     "max_player_exposure_pct", "max_pitcher_exposure_pct",
     "max_primary_stack_exposure_pct", "max_candidate_reuse",
 })
+
+# R116, 2026-08-15. `max_candidate_reuse` sits in STRATEGY_CAP_CONTROLS above
+# and the R98(2) warning does NOT generalize to it, which is the whole reason
+# this default is safe to promote while the exposure defaults are not. Read the
+# direction: an engine-computed floor on an EXPOSURE cap raises a ceiling, which
+# lets one player, arm, or stack take more of the portfolio -- it concentrates.
+# An engine-computed floor on the REUSE cap is the same arithmetic pointed the
+# other way. `ceil(entries / distinct lineups)` is the SMALLEST reuse budget
+# that still fits every entry, so adopting it spreads the entries across as many
+# distinct lineups as the bank can supply. It de-concentrates. The number is
+# still a consequence of the bank rather than a property of the slate; the
+# difference is that being wrong about the bank here costs breadth the operator
+# can buy back with one override, where being wrong about it there silently
+# spends the portfolio on one player.
+CASH_OBJECTIVE_CLASS = "cash"
+
+
+def default_candidate_reuse_cap(entry_total: int, distinct_lineups: int) -> int:
+    """The smallest reuse budget that still seats every entry.
+
+    R116. This is the legacy path's `minimum_cap` arithmetic (:1062) promoted
+    from a feasibility floor to the production default, keyed on DISTINCT
+    LINEUPS rather than candidate objects because the reuse rows are keyed by
+    signature: two candidate dicts holding the same roster share one budget.
+
+    Feasibility is by construction, not by hope. `distinct * ceil(total /
+    distinct) >= total`, so the reuse rows alone can always seat the file, and a
+    round-robin deal over signatures never repeats one inside a contest whose
+    entry count is at most `distinct` -- which is the per-contest uniqueness
+    rule's own precondition, already diagnosed at :643. One entry returns 1, so
+    the `single_entry` posture is untouched.
+    """
+    total = max(0, int(entry_total))
+    distinct = max(1, int(distinct_lineups))
+    if total <= 0:
+        return 1
+    return max(1, int(math.ceil(total / distinct)))
+
+
+def candidate_reuse_cap_rungs(entry_total: int, distinct_lineups: int) -> List[int]:
+    """The engine default's relaxation ladder, tightest first.
+
+    R116. Two rungs and then nothing, deliberately. The all-or-nothing version
+    of this fix was written first and the archived 06-03 grid falsified it
+    inside one run: 18 entries against 29 distinct lineups defaults to a cap of
+    1, that proved infeasible against the production exposure caps on a 4-game
+    bank, and dropping straight to no cap handed back exactly the unbounded
+    solve the item exists to remove. The measured portfolio there holds 11
+    distinct lineups at a max repeat of 2, so rung 2 fits it and rung 1 does
+    not -- the middle rung is the difference between a bounded portfolio and
+    the status quo reported politely.
+
+    Two and not `log2(n)`: every rung is a full MILP solve and the T-schedule
+    prices that. Doubling means the ladder covers 1->2 and 2->4, which is the
+    range the 2207_2g and 06-03 evidence both live in, and the third solve is
+    the refusal-avoiding drop rather than another guess.
+
+    A rung at or above ``entry_total`` binds nothing -- one signature could take
+    every entry -- so it is dropped rather than solved as a duplicate of the
+    no-cap solve that follows it.
+    """
+    total = max(0, int(entry_total))
+    first = default_candidate_reuse_cap(total, distinct_lineups)
+    rungs: List[int] = []
+    for cap in (first, first * 2):
+        if total and cap >= total:
+            break
+        if cap not in rungs:
+            rungs.append(int(cap))
+    return rungs
+
+
+def _is_cash_only(entries: Sequence[Mapping[str, Any]]) -> bool:
+    """True when every entry in this solve is ranked on the cash objective.
+
+    R116. Cash is the one family that WANTS the same lineup behind every entry:
+    the objective is a floor against a fixed cut line, so the second-best lineup
+    is strictly worse in every seat and spreading across it buys variance nobody
+    asked for. The de-concentration default is therefore skipped when the whole
+    solve is cash, and applied whenever a single non-cash entry is present --
+    the portfolio is one file and the mixed case is a GPP portfolio that happens
+    to carry a cash row.
+    """
+    shapes = [str(e.get("contest_shape") or "").strip() for e in entries]
+    if not shapes or any(not s for s in shapes):
+        return False
+    return all(
+        OBJECTIVE_CLASS_BY_SHAPE.get(s) == CASH_OBJECTIVE_CLASS for s in shapes
+    )
 
 
 def _infeasibility_remedies(
@@ -1928,6 +2022,7 @@ def select_and_assign_entries(
     fixed_exposure: Optional[Mapping[str, Any]] = None,
     feasibility_inputs: Optional[Mapping[str, Any]] = None,
     _floor_state: Optional[Mapping[str, Any]] = None,
+    _reuse_state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
@@ -1973,9 +2068,17 @@ def select_and_assign_entries(
     limiter when the slate itself could support more than this bank sampled.
     Omitting it costs nothing.
 
-    ``_floor_state`` is private. It carries the ladder position and the
-    relaxation record across the one re-entry this function makes into itself,
-    after the MILP PROVES the floor infeasible. Never pass it from outside.
+    ``controls['max_candidate_reuse']`` (R116, v1.15) is how many entries may
+    share one lineup SIGNATURE across the whole file. Absent, it now DEFAULTS to
+    :func:`default_candidate_reuse_cap` rather than to no row at all, on every
+    portfolio that is not entirely cash. An explicit value still wins verbatim,
+    including an explicit value looser than the default, and the result names
+    which of the two it used under ``candidate_reuse.cap_source``.
+
+    ``_floor_state`` and ``_reuse_state`` are private. They carry the ladder
+    position, the relaxation record, and the dropped-default flag across the
+    re-entries this function makes into itself after the MILP PROVES the
+    corresponding control infeasible. Never pass either from outside.
     """
     candidates = list(candidates)
     # Kept whole for the floor re-entry below: `candidates` is rebound by the
@@ -2279,12 +2382,57 @@ def select_and_assign_entries(
     # `total = E` here, which is the file's denominator only when the solve was
     # handed every complete row -- true on an initial build, false on every
     # scoped or partly-locked swap.
+    #
+    # R116, 2026-08-15. Until this landed the production MILP added NO reuse row
+    # unless an operator typed the control, `STRATEGY_DEFAULTS` set it on no
+    # posture, and nothing outside tests passed one -- so the solver legitimately
+    # spent the whole file on its few best candidates. The first certified
+    # 2207_2g build put 4 distinct lineups across 11 apex entries; the rebuild
+    # with the cap at 2 delivered 7 distinct for 0.98% of aggregate fit. The
+    # default below is that rebuild's number, derived rather than typed.
+    #
+    # `cap_source` is the honesty half. An operator value is used verbatim and
+    # never recomputed, an engine value is labelled as engine-computed wherever
+    # it is reported, and only an engine value is droppable by the relaxation
+    # below -- an operator who typed a cap gets a refusal naming it, not a
+    # quietly widened portfolio.
+    distinct_lineup_count = len(sig_groups)
+    reuse_cap_source = "operator" if controls.get("max_candidate_reuse") is not None else None
+    reuse_cap_skipped: Optional[str] = None
+    reuse_rungs = candidate_reuse_cap_rungs(total, distinct_lineup_count)
+    reuse_rung_index = int((_reuse_state or {}).get("rung_index") or 0)
+    if reuse_cap_source is None:
+        if _is_cash_only(entries):
+            reuse_cap_skipped = "cash_only_portfolio"
+        elif reuse_rung_index >= len(reuse_rungs):
+            # Off the end of the ladder: every rung was proven infeasible and
+            # the solve runs unbounded, which is pre-R116 behaviour reached
+            # deliberately and counted rather than by never having tried.
+            reuse_cap_skipped = "engine_default_exhausted"
+        else:
+            controls["max_candidate_reuse"] = reuse_rungs[reuse_rung_index]
+            reuse_cap_source = "engine_default"
     max_reuse = controls.get("max_candidate_reuse")
     if max_reuse is not None:
         # Keyed by signature: duplicate candidate objects with identical rosters
         # share one reuse budget instead of each receiving their own.
         for group in sig_groups.values():
             add({x_idx(e, k): 1.0 for e in range(E) for k in group}, -np.inf, int(max_reuse))
+    # Known before the solve, so it rides the REFUSAL as well as the delivery.
+    # A refusal that does not state which reuse cap was active, and how many
+    # rungs the engine already spent getting there, reads as a fact about the
+    # slate when it is a fact about the engine's own last guess.
+    reuse_state_report: Dict[str, Any] = {
+        "entries": E,
+        "entry_denominator": total,
+        "distinct_lineups_available": distinct_lineup_count,
+        "cap_applied": int(max_reuse) if max_reuse is not None else None,
+        "cap_source": reuse_cap_source or "none",
+        "cap_skipped_reason": reuse_cap_skipped,
+        "engine_default_rungs": list(reuse_rungs),
+        "relaxations": len(list((_reuse_state or {}).get("relaxation_steps") or [])),
+        "relaxation_steps": list((_reuse_state or {}).get("relaxation_steps") or []),
+    }
 
     # R61: headroom, not the raw cap. A key already sitting in the untouchable
     # rows spends the cap before this solve chooses anything, and
@@ -2484,6 +2632,39 @@ def select_and_assign_entries(
             # 1.8% explored.
             errors = errors + _infeasibility_remedies(bank_report, binding)
 
+        # R116. The engine's own default goes FIRST, before the floor ladder
+        # steps and before the refusal is written. The ordering is the point: a
+        # primary-stack floor is a strategy control Ben decided on archive
+        # evidence, and the reuse cap here is a number this function computed
+        # thirty lines ago from the bank it happened to be handed. Relaxing the
+        # engine's guess before anyone's decision is the only order that keeps
+        # "the default de-concentrates" from turning into "the default cost you
+        # the delivery". The same two rules the floor ladder follows apply: never
+        # on a timeout, and the step is COUNTED, never silent.
+        if (not timed_out) and reuse_cap_source == "engine_default":
+            next_rung = (reuse_rungs[reuse_rung_index + 1]
+                         if reuse_rung_index + 1 < len(reuse_rungs) else None)
+            return select_and_assign_entries(
+                _all_candidates, entry_requirements, portfolio_controls,
+                bank_report=bank_report, fixed_exposure=fixed_exposure,
+                feasibility_inputs=feasibility_inputs,
+                _floor_state=_floor_state,
+                _reuse_state={
+                    "rung_index": reuse_rung_index + 1,
+                    "relaxation_steps": list((_reuse_state or {}).get("relaxation_steps") or []) + [{
+                        "from": int(max_reuse) if max_reuse is not None else None,
+                        "to": next_rung,
+                        "reason": (
+                            "entry-level joint MILP proven infeasible with the "
+                            "ENGINE-DEFAULTED candidate-reuse cap active; the "
+                            "engine's own default steps before any control the "
+                            "operator or a posture chose"
+                        ),
+                        "trigger": "proven_infeasible_with_engine_default_reuse_cap",
+                    }],
+                },
+            )
+
         # R37. The one re-entry. A PROVEN infeasibility with the floor active is
         # the case the ladder exists for, and relaxing beats refusing because a
         # refusal here leaves every reserved row blank. Never on a timeout: the
@@ -2509,6 +2690,11 @@ def select_and_assign_entries(
                     _all_candidates, entry_requirements, portfolio_controls,
                     bank_report=bank_report, fixed_exposure=fixed_exposure,
                     feasibility_inputs=feasibility_inputs,
+                    # R116: the reuse state rides the floor's re-entry too, or a
+                    # ladder step would silently re-add the default this solve
+                    # already proved infeasible and buy an extra round trip per
+                    # rung.
+                    _reuse_state=_reuse_state,
                     _floor_state={
                         "rung_index": rung_idx + 1,
                         "relaxations": int(floor_report.get("relaxations") or 0) + 1,
@@ -2527,6 +2713,7 @@ def select_and_assign_entries(
             "allocation_solver_status": solver_status,
             "allocation_solver_report": solver_report,
             "errors": errors,
+            "candidate_reuse": dict(reuse_state_report),
             **({"primary_stack_floor": floor_report}
                if floor_report.get("status") != "not_requested" else {}),
         }
@@ -2565,6 +2752,32 @@ def select_and_assign_entries(
     reuse_counts = Counter(a["candidate_id"] for a in assignments)
     for assignment in assignments:
         assignment["reused_across_contests"] = reuse_counts[assignment["candidate_id"]] > 1
+    # R116. What the DELIVERED set actually holds, counted off the assignments
+    # rather than asserted from the constraint, on the R37 precedent. The cap is
+    # a claim about the output, so the output is where it gets checked.
+    # `distinct_lineups` is counted on the SIGNATURE, not the candidate id: two
+    # candidate objects carrying the same nine hitters and two arms are one
+    # lineup to DraftKings and to the field, and counting ids would report a
+    # diversified portfolio that duplicates on upload.
+    assigned_signatures = Counter(a["lineup_signature"] for a in assignments)
+    reuse_block: Dict[str, Any] = {"candidate_reuse": {
+        **reuse_state_report,
+        "distinct_lineups": len(assigned_signatures),
+        "max_signature_repeat": max(assigned_signatures.values()) if assigned_signatures else 0,
+    }}
+    reuse_warnings: List[str] = []
+    if reuse_block["candidate_reuse"]["relaxations"]:
+        _n_distinct = len(assigned_signatures)
+        reuse_warnings.append(
+            f"max_candidate_reuse: the engine-computed default relaxed "
+            f"{reuse_block['candidate_reuse']['relaxations']} time(s) after the joint "
+            f"MILP proved it infeasible against this bank, landing on "
+            f"{reuse_block['candidate_reuse']['cap_applied'] if max_reuse is not None else 'no cap'}"
+            f". The delivered set holds {_n_distinct} distinct lineup"
+            f"{'' if _n_distinct == 1 else 's'} across {E} entries, with one lineup used "
+            f"{max(assigned_signatures.values())} time(s). A portfolio is not clean "
+            f"because the gates passed; it is clean when the relaxation counts are zero"
+        )
     # R61. Added to the result ONLY when offsets were supplied, so a build that
     # passes no `fixed_exposure` gets a result dict with exactly the v1.12 keys.
     # That is what makes "byte-identical when absent" checkable rather than
@@ -2639,6 +2852,7 @@ def select_and_assign_entries(
     return {
         **fixed_report,
         **floor_block,
+        **reuse_block,
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,
@@ -2647,7 +2861,7 @@ def select_and_assign_entries(
         "allocation_solver_status": solver_status,
         "allocation_solver_report": solver_report,
         "allocation_optimality": solver_report["optimality"],
-        "warnings": control_warnings + floor_warnings + (
+        "warnings": control_warnings + floor_warnings + reuse_warnings + (
             [f"allocation accepted from a time-limited incumbent at gap "
              f"{'unknown' if mip_gap is None else format(float(mip_gap), '.4f')}; "
              f"every constraint verified, optimality not proven"]
@@ -2664,6 +2878,11 @@ def select_and_assign_entries(
             "max_primary_stack_count": stack_cap,
             "max_sp_pair_repetition": pair_cap,
             "max_shared_players": controls.get("max_shared_players"),
+            # R116: the resolved value, default included. This block is what a
+            # reader consults to answer "what actually constrained this solve",
+            # and the one control that could now be set by the engine rather
+            # than the caller was the one control missing from it.
+            "max_candidate_reuse": int(max_reuse) if max_reuse is not None else None,
             "max_game_exposure_pct_by_game": game_caps or None,
         },
         "summary": f"Entry-level joint MILP assigned {E} exact Entry IDs",

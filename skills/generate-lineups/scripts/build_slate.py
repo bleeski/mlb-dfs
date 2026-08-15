@@ -1792,6 +1792,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     delivered = result.get("delivered_path") or result.get("output_path")
     checks = verify_classic(salary, Path(delivered))
     exposure = portfolio_exposure(salary, Path(delivered))
+    # R116. The concentration facts join the exposure block, which is where a
+    # reader already goes to ask how concentrated this portfolio is. Two
+    # provenances on purpose: `distinct_lineups`/`max_lineup_repeat` above are
+    # counted off the delivered file, `candidate_reuse` below is what the
+    # allocator says it enforced, and `candidate_reuse_counts` is the per-
+    # candidate tally it has emitted since v1.9 and nothing ever read. They
+    # should agree; a brief where they do not is the interesting one.
+    exposure["candidate_reuse"] = result.get("candidate_reuse")
+    exposure["candidate_reuse_counts"] = result.get("candidate_reuse_counts")
     brief = {
         "status": "certified" if checks["passed"] else "verify_failed",
         "contest_type": "classic",
@@ -2309,6 +2318,13 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     with salary_csv.open(encoding="utf-8-sig", newline="") as fh:
         salary = {r["ID"]: r for r in csv.DictReader(fh)}
     primary, pitchers, pairs, n = collections.Counter(), collections.Counter(), set(), 0
+    # R116. Counted off the DELIVERED bytes, on the same sorted-roster signature
+    # the allocator keys its reuse rows with
+    # (`contest_allocator._candidate_player_signature`), so the brief carries an
+    # independent check of the cap rather than the allocator's own word for it.
+    # DK writes a roster in slot order and two entries holding the same ten
+    # players can differ in that order, which is why the tuple is sorted.
+    rosters: collections.Counter = collections.Counter()
     with entries_csv.open(encoding="utf-8-sig", newline="") as fh:
         for row in csv.reader(fh):
             if len(row) < 14 or not row[0].strip().isdigit():
@@ -2323,12 +2339,15 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
             for p in ids[:2]:
                 pitchers[salary[p]["Name"]] += 1
             pairs.add(frozenset(ids[:2]))
+            rosters[tuple(sorted(ids))] += 1
     pct = lambda c: {k: f"{v}/{n}" for k, v in c.most_common()}
     return {
         "lineups": n,
         "primary_stacks": pct(primary),
         "pitcher_exposure": pct(pitchers),
         "distinct_sp_pairs": len(pairs),
+        "distinct_lineups": len(rosters),
+        "max_lineup_repeat": max(rosters.values()) if rosters else 0,
         "note": "counts across the delivered portfolio; deterministic review "
                 "proxies, never ROI, win rate, or probability",
     }

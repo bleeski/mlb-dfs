@@ -64,7 +64,17 @@ EXPECTED_SUITE_COUNTS = {
     # refusal naming the bank as the limiter against feasibility.inputs plus the
     # not-exhausted flag riding every binding line (5), and a hard-pinned
     # same-game SP pair surviving the diversity filter (3).
-    "tests.test_core": 640,
+    # R116, 2026-08-15: 640 -> 653, the thirteen that pin the candidate-reuse
+    # default -- ten on the allocator (the minimum_cap arithmetic, the two-rung
+    # ladder and the rung that binds nothing, the concentration reproduced on
+    # the cash path, the default de-concentrating a GPP file, one non-cash entry
+    # making the whole file a GPP portfolio, an operator cap winning verbatim,
+    # per-signature budgeting, the infeasible default delivering instead of
+    # refusing, an operator cap still refusing, and the clock never walking the
+    # ladder) and three on the brief (distinct lineups off the delivered bytes,
+    # DK slot order not inventing diversity, both pipeline return paths carrying
+    # the block).
+    "tests.test_core": 653,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -85,7 +95,7 @@ EXPECTED_SUITE_COUNTS = {
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this
 # line's own rule warns about -- the dict is the source of truth either way.
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 962
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 975
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,

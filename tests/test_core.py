@@ -4,6 +4,7 @@ import csv
 import inspect
 import datetime as dtmod
 import json
+import math
 import os
 import subprocess
 import sys
@@ -28,7 +29,8 @@ from mlb_engine.pipeline.build_state_manager import (
     slate_context_refresh_plan, update_run_certification,
 )
 from mlb_engine.allocate.contest_allocator import (
-    ContestCard, _entry_candidate_compatible, contest_cards_from_reserved_grid,
+    ContestCard, _entry_candidate_compatible, candidate_reuse_cap_rungs,
+    contest_cards_from_reserved_grid, default_candidate_reuse_cap,
     resolve_candidate_bank_plan, resolve_phase0_mode, select_and_assign_entries,
     select_and_assign_portfolio, uncovered_locked_team_players,
 )
@@ -12098,6 +12100,247 @@ class FalseSignalBatchTests(unittest.TestCase):
                 cache, frame, time_budget_s=20, locked_slot_assignments=pins)
             self.assertFalse(report["pinned_pair_same_game_kept"])
             self.assertGreater(report["built_this_slice"], 0)
+
+
+class CandidateReuseDefaultTests(unittest.TestCase):
+    """R116: the production allocator's candidate-reuse cap now has a default.
+
+    Before this, `select_and_assign_entries` added a reuse row only when an
+    operator typed `max_candidate_reuse`, no posture set it, and nothing outside
+    tests passed one -- so the MILP legitimately spent a whole file on its best
+    few candidates. The first certified 2207_2g build put 4 distinct lineups
+    across 11 apex entries.
+
+    What is pinned here is the MECHANISM in both directions: that the default
+    de-concentrates, that an operator value still wins verbatim, that cash is
+    left alone, and that the default RELAXES rather than costing a delivery --
+    while an operator's own cap still refuses, because relaxing that one would
+    be the engine quietly overruling a decision.
+    """
+
+    # Eleven single-entry contests: the per-contest uniqueness rule cannot force
+    # any diversity here, so every distinct lineup delivered is the reuse cap's
+    # doing and nothing else's.
+    ENTRIES = [{"entry_id": f"e{n}", "contest_id": f"C{n}",
+                "contest_shape": "large_field_gpp"} for n in range(11)]
+
+    @staticmethod
+    def _bank(n=7):
+        return [candidate(f"c{i}", [f"p{i}_{j}" for j in range(10)], 150 - i)
+                for i in range(n)]
+
+    def test_the_default_is_the_minimum_cap_arithmetic(self):
+        self.assertEqual(default_candidate_reuse_cap(11, 7), 2)
+        self.assertEqual(default_candidate_reuse_cap(20, 500), 1)
+        self.assertEqual(default_candidate_reuse_cap(1, 500), 1,
+                         "one entry must return 1: the single_entry posture is "
+                         "untouched by this default")
+        self.assertEqual(default_candidate_reuse_cap(0, 3), 1)
+        self.assertEqual(default_candidate_reuse_cap(5, 0), 5,
+                         "a zero denominator must not divide by zero")
+
+    def test_the_ladder_is_two_rungs_and_drops_a_rung_that_binds_nothing(self):
+        self.assertEqual(candidate_reuse_cap_rungs(11, 7), [2, 4])
+        self.assertEqual(candidate_reuse_cap_rungs(18, 29), [1, 2],
+                         "the archived 06-03 grid's ladder; rung 2 is the one "
+                         "that certifies and rung 1 is the one that does not")
+        self.assertEqual(candidate_reuse_cap_rungs(2, 1), [],
+                         "a cap at or above the entry count binds nothing, so "
+                         "solving it would duplicate the no-cap solve")
+
+    def test_without_the_default_the_whole_file_lands_on_one_lineup(self):
+        """The defect, reproduced. Cash is the one family that skips the
+        default, so it doubles as the pre-R116 control condition."""
+        entries = [dict(e, contest_shape="cash") for e in self.ENTRIES]
+        result = select_and_assign_entries(self._bank(), entries, {})
+        block = result["candidate_reuse"]
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(block["distinct_lineups"], 1)
+        self.assertEqual(block["max_signature_repeat"], 11)
+        self.assertEqual(block["cap_skipped_reason"], "cash_only_portfolio")
+        self.assertIsNone(block["cap_applied"])
+
+    def test_the_default_de_concentrates_an_uncontrolled_gpp_portfolio(self):
+        result = select_and_assign_entries(self._bank(), self.ENTRIES, {})
+        block = result["candidate_reuse"]
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(block["cap_source"], "engine_default")
+        self.assertEqual(block["cap_applied"], 2)
+        self.assertEqual(block["relaxations"], 0)
+        self.assertGreaterEqual(block["distinct_lineups"], math.ceil(11 / 2))
+        self.assertLessEqual(block["max_signature_repeat"], 2)
+        self.assertEqual(result["direct_constraints"]["max_candidate_reuse"], 2,
+                         "the resolved cap must reach the constraints block a "
+                         "reader consults to ask what bound this solve")
+
+    def test_one_non_cash_entry_makes_the_whole_file_a_gpp_portfolio(self):
+        entries = [dict(e, contest_shape="cash") for e in self.ENTRIES]
+        entries[3] = dict(entries[3], contest_shape="large_field_gpp")
+        block = select_and_assign_entries(self._bank(), entries, {})["candidate_reuse"]
+        self.assertEqual(block["cap_source"], "engine_default")
+        self.assertIsNone(block["cap_skipped_reason"])
+
+    def test_an_operator_cap_wins_verbatim_including_a_looser_one(self):
+        result = select_and_assign_entries(
+            self._bank(), self.ENTRIES, {"max_candidate_reuse": 11})
+        block = result["candidate_reuse"]
+        self.assertEqual(block["cap_source"], "operator")
+        self.assertEqual(block["cap_applied"], 11)
+        self.assertEqual(block["distinct_lineups"], 1,
+                         "an explicit cap must not be tightened by the default")
+
+    def test_the_cap_is_budgeted_per_signature_not_per_candidate_object(self):
+        """Two candidate objects on the same ten players are ONE lineup to
+        DraftKings and to the field, so they share one reuse budget.
+
+        Budgeting them separately is the failure worth pinning: with six ids on
+        three rosters the denominator would read 6, the default would fall to 1,
+        and a portfolio of three lineups would be reported as six distinct.
+        """
+        rosters = [[f"r{i}_{j}" for j in range(10)] for i in range(3)]
+        bank = [candidate(f"c{i}{tag}", list(rosters[i]), 100 - i)
+                for i in range(3) for tag in ("a", "b")]
+        entries = [dict(e) for e in self.ENTRIES[:6]]
+        block = select_and_assign_entries(bank, entries, {})["candidate_reuse"]
+        self.assertEqual(block["distinct_lineups_available"], 3,
+                         "six candidate objects on three rosters are three lineups")
+        self.assertEqual(block["cap_applied"], 2, "ceil(6 entries / 3 lineups)")
+        self.assertLessEqual(block["max_signature_repeat"], 2)
+        self.assertEqual(block["distinct_lineups"], 3)
+
+    # -- the delivery guarantee ------------------------------------------- #
+
+    @staticmethod
+    def _overlap_trap():
+        """Seven candidates sharing nine of ten players. Any two DISTINCT
+        lineups overlap at 9, so `max_shared_players=4` makes every
+        diversified portfolio infeasible while one repeated lineup is legal."""
+        common = [f"pc{j}" for j in range(9)]
+        return [candidate(f"c{i}", common + [f"uniq{i}"], 150 - i) for i in range(7)]
+
+    def test_an_infeasible_default_relaxes_and_delivers_rather_than_refusing(self):
+        result = select_and_assign_entries(
+            self._overlap_trap(), self.ENTRIES, {"max_shared_players": 4})
+        block = result["candidate_reuse"]
+        self.assertTrue(result["passed"],
+                        f"the engine's own default cost a delivery: {result.get('errors')}")
+        self.assertGreaterEqual(block["relaxations"], 1)
+        self.assertEqual(block["cap_skipped_reason"], "engine_default_exhausted")
+        self.assertEqual(len(block["relaxation_steps"]), len(block["engine_default_rungs"]))
+        self.assertTrue(
+            any("max_candidate_reuse" in w and "relaxed" in w
+                for w in (result.get("warnings") or [])),
+            f"a relaxation that is not counted in the warnings is a silent "
+            f"strategy change: {result.get('warnings')}")
+
+    def test_an_operator_cap_that_cannot_fit_still_refuses(self):
+        """The engine relaxes its own guess and nobody else's. A typed cap that
+        the bank cannot satisfy is a fact the operator has to see."""
+        result = select_and_assign_entries(
+            self._overlap_trap(), self.ENTRIES,
+            {"max_shared_players": 4, "max_candidate_reuse": 2})
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("max_candidate_reuse" in e for e in result["errors"]),
+                        result["errors"])
+
+    def test_the_default_never_relaxes_on_a_timeout(self):
+        """The rule that a compute limit may not move a strategy control. A
+        time-limited solve reports the clock; it does not buy a wider portfolio
+        on the way past."""
+        result = select_and_assign_entries(
+            self._overlap_trap(), self.ENTRIES,
+            {"max_shared_players": 4, "time_limit": 1e-9})
+        self.assertFalse(result["passed"], "fixture is wrong: the clock must bite here")
+        report = result.get("allocation_solver_report") or {}
+        self.assertEqual(report.get("status"), "time_limit", result.get("errors"))
+        self.assertEqual(result["candidate_reuse"]["relaxations"], 0,
+                         "a compute limit walked the engine down its own "
+                         "relaxation ladder; the refusal now describes a "
+                         "portfolio the clock chose")
+        self.assertEqual(result["candidate_reuse"]["cap_applied"], 2,
+                         "the refusal must name the cap that was active when "
+                         "the clock ran out: rung 0, ceil(11/7)")
+
+
+class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
+    """R116 fix 2: the brief says how concentrated the delivered file is.
+
+    Nothing in the brief said `distinct_lineups`, and preflight's duplicate
+    groups line arrives AFTER certification -- so the 2207_2g concentration was
+    only findable by re-joining the export by hand. The count here is taken off
+    the delivered bytes on the same sorted-roster signature the allocator keys
+    its reuse rows with, so the brief carries a check of the cap and not just
+    the allocator's word for it.
+    """
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r116", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _files(self, tmp, rosters):
+        salary = Path(tmp) / "DKSalaries.csv"
+        with salary.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(["Position", "Name + ID", "Name", "ID", "Roster Position",
+                        "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame"])
+            for pid in sorted({p for r in rosters for p in r}):
+                team = "AAA" if pid.startswith("h") else "BBB"
+                w.writerow(["OF", f"n{pid} ({pid})", f"n{pid}", pid, "OF",
+                            "4000", "AAA@BBB", team, "8.0"])
+        entries = Path(tmp) / "DKEntries.csv"
+        with entries.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+                        "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"])
+            for i, roster in enumerate(rosters):
+                w.writerow([str(100 + i), "Contest", "1", "$1"] + list(roster))
+        return salary, entries
+
+    def test_the_exposure_block_counts_distinct_lineups_off_the_delivered_file(self):
+        module = self._module()
+        base = [f"h{j}" for j in range(10)]
+        other = [f"h{j}" for j in range(9)] + ["h99"]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._files(tmp, [base, list(base), other])
+            block = module.portfolio_exposure(salary, entries)
+        self.assertEqual(block["lineups"], 3)
+        self.assertEqual(block["distinct_lineups"], 2)
+        self.assertEqual(block["max_lineup_repeat"], 2)
+
+    def test_slot_order_does_not_invent_a_distinct_lineup(self):
+        """DK writes a roster in slot order and two entries holding the same ten
+        players can differ in that order. Counting the raw row would report the
+        duplicate as diversity, which is the reading this item exists to fix."""
+        module = self._module()
+        base = [f"h{j}" for j in range(10)]
+        shuffled = base[2:] + base[:2]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._files(tmp, [base, shuffled])
+            block = module.portfolio_exposure(salary, entries)
+        self.assertEqual(block["distinct_lineups"], 1)
+        self.assertEqual(block["max_lineup_repeat"], 2)
+
+    def test_the_pipeline_hands_the_reuse_block_to_whoever_writes_the_brief(self):
+        """`candidate_reuse_counts` has been in the allocation result since v1.9
+        and no caller could reach it without re-opening the run directory."""
+        source = (Path(__file__).resolve().parents[1] / "mlb_engine" / "pipeline"
+                  / "execution_pipeline.py").read_text(encoding="utf-8")
+        self.assertEqual(
+            source.count('"candidate_reuse": allocation.get("candidate_reuse")'), 2,
+            "both the deferred and the promoted return paths must carry it, or a "
+            "late swap's brief loses the fact the build's brief has")
+        brief_source = (Path(__file__).resolve().parents[1] / "skills"
+                        / "generate-lineups" / "scripts" / "build_slate.py"
+                        ).read_text(encoding="utf-8")
+        self.assertIn('exposure["candidate_reuse"] = result.get("candidate_reuse")',
+                      brief_source)
+        self.assertIn('exposure["candidate_reuse_counts"]', brief_source)
 
 
 if __name__ == "__main__":

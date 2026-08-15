@@ -25,6 +25,94 @@ performance claim.
 
 ---
 
+## 2026-08-15 — R116: the production allocator gets a candidate-reuse default
+
+Tier 1's head, migrated out of `docs/2026-07-27_backlog_v2.md`. CLOSED, both
+halves.
+
+**The gap.** `select_and_assign_entries` added a reuse constraint only when
+`max_candidate_reuse` was explicitly set (`contest_allocator.py:2282-2283`, `if
+max_reuse is not None`, else no row at all). `STRATEGY_DEFAULTS` sets it on no
+posture and nothing outside tests passed `reuse_strategy`, so the MILP
+legitimately spent a whole file on its best few candidates: the first certified
+2207_2g build put 4 distinct lineups across 11 apex entries, and the rebuild
+with the cap at 2 delivered 7 distinct for 0.98% of aggregate fit. Nothing
+certified wrong. Nothing in the brief said `distinct_lineups`, and preflight's
+duplicate-groups line arrives after certification.
+
+**Fix 1, the default.** `default_candidate_reuse_cap(entries, distinct
+lineups)` is the legacy path's `minimum_cap` arithmetic (`:1062`) promoted from
+a feasibility floor to the production default, keyed on distinct SIGNATURES
+rather than candidate objects because the reuse rows are signature-keyed: two
+candidate dicts holding the same roster are one lineup to DraftKings and share
+one budget. It is feasible by construction (`distinct * ceil(total/distinct) >=
+total`, and a round-robin deal never repeats inside a contest whose entry count
+is at most `distinct`, which is the per-contest uniqueness rule's own
+precondition). One entry returns 1, so `single_entry` is untouched. R98(2)'s
+warning is noted in the comment block and explicitly does NOT generalize here,
+because the direction is opposite: an engine-computed floor on an EXPOSURE cap
+raises a ceiling and concentrates, while the same arithmetic on the REUSE cap
+is the smallest budget that seats every entry and therefore spreads them.
+
+**Cash is the one family that skips it,** read off
+`contest_shapes.OBJECTIVE_CLASS_BY_SHAPE` rather than a local list. A cash
+objective is a floor against a fixed cut line, so the second-best lineup is
+strictly worse in every seat. One non-cash entry makes the whole file a GPP
+portfolio, because the portfolio is one file.
+
+**The all-or-nothing first cut was falsified by the golden grid, in the same
+run.** 18 entries against 29 distinct lineups defaults to a cap of 1; that
+proved infeasible against the production exposure caps on a 4-game bank, and
+dropping straight to no cap handed back exactly the unbounded solve the item
+exists to remove — the fix degrading silently to the status quo whenever its
+most aggressive rung does not fit. So the default relaxes down a two-rung
+ladder (`c`, `2c`, then nothing), each step counted and named, and the archived
+06-03 grid now lands on rung 2 with a cap of 2 enforced and 11 distinct lineups
+across 18 entries. Two rungs and not `log2(n)` because every rung is a full
+MILP solve and the T-schedule prices that; a rung at or above the entry count
+binds nothing and is dropped rather than solved as a duplicate.
+
+**The ladder relaxes the engine's guess and nobody else's.** An operator-typed
+cap is used verbatim, including one looser than the default, is never
+recomputed, and still REFUSES when the bank cannot satisfy it — naming itself
+in the error. Same two rules the R37 floor ladder follows: never on a timeout,
+and the step is counted. The reuse step runs BEFORE the floor ladder, because
+a primary-stack floor is a decision Ben made on archive evidence and this cap
+is a number the allocator computed thirty lines earlier from the bank it
+happened to be handed.
+
+**Fix 2, the brief.** `candidate_reuse` (distinct lineups, cap, `cap_source`,
+the rungs, relaxation steps) and the `candidate_reuse_counts` that has been in
+the allocation result since v1.9 and no caller could reach now ride
+`execute_portfolio`'s return on both the promoted and the deferred paths, and
+land in the brief's `exposure` block. `portfolio_exposure` independently counts
+`distinct_lineups` and `max_lineup_repeat` off the DELIVERED bytes on the same
+sorted-roster signature, so the brief carries a check of the cap and not just
+the allocator's word for it; DK writes rosters in slot order, so the tuple is
+sorted or a duplicate reads as diversity. The refusal payload carries the reuse
+block too: a refusal that does not say which cap was active, and how many rungs
+the engine already spent, reads as a fact about the slate when it is a fact
+about the engine's last guess.
+
+**The golden baseline moved and the move was measured before it was
+re-frozen.** `test_assignment_matches_baseline` failed on the production
+replay. Total fit is identical at 2555.9321, the multiset of delivered lineups
+is identical, distinct (11) and max repeat (2) are identical, and `aggregates`,
+`meta` and `pure_verdict` are unchanged; 15 of 18 entries are re-dealt across
+the same eleven lineups. That is a tie-break vertex change from adding a
+constraint row, not a portfolio change, which is what made re-freezing the
+right call rather than a way to make a red gate green.
+
+Gate 962 -> 975 (`tests.test_core` 640 -> 653). Eight mutations were run by
+hand against the new tests: never applying the default, deleting the ladder's
+middle rung, relaxing on a timeout, making an operator cap relaxable, counting
+the denominator on candidate objects, giving cash the default, keeping DK slot
+order in the delivered-file key, and dropping the brief block. The first cut of
+the distinct-lineups test survived its mutation because with identical rosters
+the candidate ids are interchangeable by construction and no fixture can force
+them apart; it was rewritten to pin the per-signature BUDGET, which can fail.
+Fragment asks 3-5 still ride R84. **R117 is the new head of Tier 1.**
+
 ## 2026-08-15 — The false-signal batch closes: R113 + R112 + R103 + R99 + R92 + R71(a) + R119
 
 Tier 1's false-signal batch, migrated out of `docs/2026-07-27_backlog_v2.md`.

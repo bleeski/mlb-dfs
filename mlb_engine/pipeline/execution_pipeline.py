@@ -532,6 +532,12 @@ def execute_portfolio(
             "projections_path": str(projection_path),
             "diagnostics_path": str(diagnostic_path),
             "bank_coverage": bank_coverage,
+            # R116. Rides beside bank_coverage for the same reason it does: the
+            # fact lives in diagnostics.json, and a caller writing a brief should
+            # not have to re-open the run directory to state how many distinct
+            # lineups it just delivered and what capped them.
+            "candidate_reuse": allocation.get("candidate_reuse"),
+            "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
             "workflow_valid": True,
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
@@ -550,6 +556,9 @@ def execute_portfolio(
         "projections_path": str(projection_path),
         "diagnostics_path": str(diagnostic_path),
         "bank_coverage": bank_coverage,
+        # R116, see the deferred branch above.
+        "candidate_reuse": allocation.get("candidate_reuse"),
+        "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
         "workflow_valid": bool(promotion["passed"]),
         "selection_certified": certification["selection_certified"],
         "allocation_certified": certification["allocation_certified"],
