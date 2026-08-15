@@ -59,11 +59,20 @@ EXPECTED_SUITE_COUNTS = {
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
-    "tests.test_upload_integrity": 168,
+    # R114 + R67, 2026-08-15: 168 -> 182, the fourteen that pin the two ways a
+    # legally rostered ARM read as a contradiction -- eleven on the declared arm
+    # (acknowledged not failed, the sha256-matched brief, the intersection on
+    # disagreeing briefs, --declare-pitcher and its bare-id default, the refusal
+    # to clear a hitter, usage errors, and verify_export answering the same) and
+    # three on the bullpen game (bats-only evidences no arm, its hitters still
+    # bind, a side that named an arm is untouched).
+    "tests.test_upload_integrity": 182,
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 901
+# The sum, not a second number to keep in step: R70 left this comment reading
+# 901 while the dict already summed to 928.
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 942
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,

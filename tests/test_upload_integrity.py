@@ -2164,6 +2164,197 @@ class VerifyExportSlateTruthTests(unittest.TestCase):
         self.assertIn("is not AAA's declared probable pitcher", result.stdout)
         self.assertIn("AAA Aster", result.stdout)
 
+    # -- R114 + R67: the two ways a legal ARM read as a contradiction ---------
+    #
+    # Both live, both the same mistake -- reading a posted BATTING lineup as
+    # evidence about pitching.
+    #
+    # R114, 2026-08-12, slate 2210_2g, run 20260813T005233Z_1b5d3a4a. KC's nine
+    # were confirmed and Daniel Lynch IV was the named probable; the build also
+    # rostered Mason Black on an explicit declaration (viable_bulk_or_alt_sp,
+    # the R104 vocabulary). All three certification gates passed and preflight
+    # exited 2 twelve times on "Mason Black (KC) is not in KC's confirmed
+    # lineup or probables", because declared_pitchers reached the optimizer and
+    # the brief and stopped there. The only way through was --force, i.e. exit
+    # 4 on a failure the operator knew was spurious.
+    #
+    # (The fragment that filed R114 described KC as running a bullpen game.
+    # The feed on disk says otherwise -- lineup_status confirmed, probable
+    # Daniel Lynch IV -- so the live case is the DECLARED case, not the
+    # null-probable one. R67 is the null-probable case and it is separately
+    # pinned below; the mechanism and the failure text R114 reported were
+    # exactly right.)
+
+    def _brief(self, declared, sha=None, name="build_brief.json") -> Path:
+        path = self.dir / name
+        path.write_text(json.dumps({
+            "delivered_path": str(self.entries),
+            "delivered_sha256": sha or _sha256(self.entries),
+            "declared_pitchers": declared,
+        }), encoding="utf-8")
+        return path
+
+    def _preflight(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    # The two feeds below are a minimal pair: the same confirmed nine hitters,
+    # differing only in whether the side named a probable. Every rostered AAA
+    # HITTER is in that nine, so the only AAA name left to argue about is the
+    # arm -- which is the whole subject here.
+    AAA_NINE = [f"AAA {s}" for s in SURNAMES[1:]]
+
+    def _confirmed_with_arm(self):
+        """AAA confirmed, naming an arm that is NOT the one this fixture seats."""
+        return self._feed({"AAA": self.AAA_NINE}, probables={"AAA": "AAA Quill"})
+
+    def test_an_undeclared_arm_absent_from_a_confirmed_lineup_still_fails(self):
+        """The control for everything below. Nothing here weakens R4."""
+        result = self._preflight("--feed", str(self._confirmed_with_arm()))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+        self.assertIn("AAA Aster", result.stdout)
+
+    def test_a_declared_arm_is_acknowledged_rather_than_failed(self):
+        self._brief({self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"})
+        result = self._preflight("--feed", str(self._confirmed_with_arm()))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("FAIL", result.stdout)
+
+    def test_the_acknowledgement_names_the_role_and_its_evidence_class(self):
+        """Pinned by VALUE, not by key presence (R91). The whole point of the
+        warning is the sentence the operator reads at T-5: which player, how
+        many entries, under what declaration, on whose word."""
+        self._brief({self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"})
+        result = self._preflight("--feed", str(self._confirmed_with_arm()))
+        self.assertIn(
+            "1 rostered pitcher(s) absent from the posted lineup but DECLARED "
+            "by the build, acknowledged rather than failed: AAA Aster (AAA) in "
+            "1 of 1, declared viable_bulk_or_alt_sp. Evidence: "
+            "operator_declared. A declaration is the build's own statement of "
+            "the role, not confirmation from the feed", result.stdout)
+
+    def test_the_declaration_is_read_from_the_sibling_brief_by_sha256(self):
+        self._brief({self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"})
+        payload = json.loads(self._preflight(
+            "--feed", str(self._confirmed_with_arm()), "--json").stdout)
+        self.assertEqual(payload["info"]["feed_declared_pitchers"],
+                         {self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"})
+        self.assertIn("build_brief.json",
+                      payload["info"]["declared_pitchers_source"])
+        self.assertEqual(payload["info"]["feed_acknowledged_pitchers"],
+                         {"AAA Aster (AAA)": {"role": "viable_bulk_or_alt_sp",
+                                              "entries": 1,
+                                              "evidence": "operator_declared"}})
+
+    def test_a_brief_describing_other_bytes_is_not_read(self):
+        """outputs/2026-08-12/ held eight briefs for four deliveries, and the
+        newest and the alphabetically first both belonged to a different slate
+        with no declarations. Any resolution weaker than the hash reads the
+        wrong slate's facts and this check goes quiet again."""
+        self._brief({self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"},
+                    sha="0" * 64)
+        result = self._preflight("--feed", str(self._confirmed_with_arm()))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_briefs_that_disagree_fall_back_to_what_they_all_carry(self):
+        """Every id dropped restores a hard failure and every id kept removes
+        one, so a contradictory record resolves toward the closed gate."""
+        self._brief({self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"})
+        self._brief({}, name="build_brief_second.json")
+        result = self._preflight("--feed", str(self._confirmed_with_arm()))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("2 briefs record these bytes and they disagree on "
+                      "declared_pitchers", result.stdout)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_declare_pitcher_states_the_same_fact_with_no_run_to_read(self):
+        result = self._preflight(
+            "--feed", str(self._confirmed_with_arm()),
+            "--declare-pitcher", f"{self.ids['AAA Aster']}=declared_probable_sp")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("declared declared_probable_sp", result.stdout)
+
+    def test_a_declaration_cannot_clear_a_benched_hitter(self):
+        """--declare-pitcher must not become an off switch for R4. A
+        declaration is a statement about an arm; pointed at a hitter it is
+        reported and NOT applied."""
+        result = self._preflight(
+            "--feed", str(self._feed({"AAA": self.aaa_posted})),
+            "--declare-pitcher", f"{self.ids['AAA Frost']}=viable_bulk_or_alt_sp")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("1 declared id(s) are not pitcher-position rows, so the "
+                      "declaration was NOT applied and the posted-lineup check "
+                      "ran normally: AAA Frost (AAA) in 1 of 1, declared "
+                      "viable_bulk_or_alt_sp. A declaration names an arm; it "
+                      "cannot clear a hitter", result.stdout)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_a_malformed_declaration_is_a_usage_error_not_a_crash(self):
+        for bad in ("=viable_bulk_or_alt_sp", "notanid", ""):
+            with self.subTest(bad=bad):
+                result = self._preflight("--declare-pitcher", bad)
+                self.assertEqual(result.returncode, 3,
+                                 result.stdout + result.stderr)
+                self.assertIn("--declare-pitcher wants a DK player ID",
+                              result.stderr)
+
+    def test_a_bare_id_means_what_it_means_to_build_slate(self):
+        """Same flag name, same grammar, same default. The operator who
+        declared the arm to the build types the same thing here."""
+        result = self._preflight("--feed", str(self._confirmed_with_arm()),
+                                 "--declare-pitcher", self.ids["AAA Aster"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("declared declared_probable_sp", result.stdout)
+
+    def test_verify_export_reads_the_declaration_too(self):
+        """R52's failure class: two checkers, one file, different answers. The
+        swap verifier inherits the build's declared arms or it contradicts
+        preflight on the delivery preflight just cleared."""
+        self._brief({self.ids["AAA Aster"]: "viable_bulk_or_alt_sp"})
+        feed = self._confirmed_with_arm()
+        self.assertEqual(self._preflight("--feed", str(feed)).returncode, 0)
+        result = self._verify(feed=feed)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("declared viable_bulk_or_alt_sp", result.stdout)
+
+    # -- R67: a bullpen game posts nine bats and no starter -------------------
+
+    def _bats_only_feed(self):
+        """AAA confirmed with all nine HITTERS and no probable: the arm this
+        fixture seats is absent from a posting that never claimed to name one."""
+        return self._feed({"AAA": self.AAA_NINE})
+
+    def test_a_confirmed_lineup_naming_no_arm_cannot_contradict_one(self):
+        result = self._preflight("--feed", str(self._bats_only_feed()))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "1 rostered pitcher(s) on a team whose lineup is confirmed but "
+            "names no probable, so the posting evidences bats only: AAA Aster "
+            "(AAA) in 1 of 1. Evidence: posted_lineup, hitters only. A bullpen "
+            "game posts nine bats and no starter, and this check cannot "
+            "contradict an arm it has no fact about", result.stdout)
+
+    def test_a_bats_only_team_still_binds_every_one_of_its_hitters(self):
+        """R67 must not become a second way to skip R4. AAA posts nine with no
+        probable; Frost is not among them and he is a hitter, so he fails
+        exactly as he did before."""
+        result = self._preflight("--feed", str(self._feed({"AAA": self.aaa_posted})))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("AAA Frost", result.stdout)
+        self.assertIn("absent from a confirmed posted lineup", result.stdout)
+
+    def test_a_team_that_did_name_an_arm_still_fails_a_different_one(self):
+        """The bats-only path keys off the missing probable, not off the
+        position, so a confirmed side WITH an arm is untouched by R67."""
+        result = self._preflight("--feed", str(self._confirmed_with_arm()))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("AAA Aster", result.stdout)
+        payload = json.loads(self._preflight(
+            "--feed", str(self._confirmed_with_arm()), "--json").stdout)
+        self.assertEqual(payload["info"]["feed_bats_only_arms"], {})
+
     # -- R72(ii): the parent stops being opt-in -------------------------------
 
     def _manifest_chain(self, parent_path: Path, child_path: Path) -> Path:

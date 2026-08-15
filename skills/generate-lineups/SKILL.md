@@ -456,6 +456,23 @@ a flag is a check that does not run at T-5:
   his team's CONFIRMED lineup is a hard failure; `--feed-lenient` demotes it to a
   warning. A team that has not posted stays soft. The feed's age prints next to
   the verdict and warns past 90 minutes, so a stale all-clear is visibly stale.
+- `--brief`: the build brief for this delivery, matched among the sibling
+  `build_brief*.json` files by `delivered_sha256`. It is read for one field,
+  `declared_pitchers`, so an arm the build rostered on a declaration is an
+  acknowledged WARN naming the role instead of a hard failure (R114). An
+  **undeclared** missing arm still fails. Two things follow for you. A declared
+  arm no longer needs `--force`, so if you find yourself reaching for it on a
+  "not in X's confirmed lineup or probables" line, check the brief resolved
+  first: exit 4 on a spurious failure is the habit that eats the real one. And
+  the WARN says `Evidence: operator_declared`, which is the truthful label — the
+  build's own statement, not confirmation from the feed. Where there is no run
+  to read, `--declare-pitcher <id>[=role]` states it by hand, same grammar as
+  `build_slate.py`'s flag.
+
+A confirmed lineup with **no probable** is a bullpen game, and its posting
+evidences bats only (R67). Those hitters bind exactly as before; the arm is
+named soft rather than contradicted, because nine posted bats say nothing about
+who starts.
 
 One optional flag closes the identity loop the report's sha256 line opens:
 `--expect-sha256 <hex>` (12+ chars of the brief's `delivered_sha256`)

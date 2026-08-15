@@ -25,6 +25,122 @@ performance claim.
 
 ---
 
+## 2026-08-15 — R114 + R67 close: the upload gate stops failing arms the build legally rostered
+
+Backlog R114 (P1, S, Workstream 5) and R67 (P2, S), Tier 1's head, both
+migrated out of `docs/2026-07-27_backlog_v2.md`. Batched because they are one
+mistake wearing two hats: reading a posted BATTING lineup as evidence about
+pitching. Reproduced against the archived artifact before anything was touched.
+
+**The live case.** 2026-08-12, slate 2210_2g, run `20260813T005233Z_1b5d3a4a`.
+The build rostered Mason Black on an explicit declaration
+(`viable_bulk_or_alt_sp`, the R104 vocabulary), all three certification gates
+passed, and `preflight_upload.py` exited 2 twelve times on "Mason Black (KC) is
+not in KC's confirmed lineup or probables". `verify_export.py` failed
+identically, because it imports this check rather than reimplementing it. The
+only way through was `--force`, which is exit 4 on a failure the operator knew
+was spurious. That is the part that matters: CLAUDE.md makes this the one
+pre-upload rule, and a gate that hard-fails legal, certified files teaches the
+operator to force past it. The habit is what transfers to the night the failure
+is real.
+
+**R114, the declared arm.** `declared_pitchers` reached the optimizer and the
+brief and stopped there, so the gate re-derived "absent" from a feed that never
+carried the fact. Both tools now read it and report a declared arm as an
+acknowledged WARN naming the role. An **undeclared** missing arm still exits 2,
+unchanged; no other check moved, and the 0/2/3/4 contract is untouched.
+
+R114's own falsifier turned out to be the right one — "if declarations already
+reach an input preflight reads, the fix collapses to reading it." They do: the
+brief has recorded `declared_pitchers` all along. No engine change was needed
+and none was made.
+
+Three decisions inside that are not obvious from the diff:
+
+- **The brief is matched by `delivered_sha256`, not by name or mtime.**
+  `outputs/2026-08-12/` holds eight briefs for four deliveries, and both the
+  newest and the alphabetically first belong to a different slate whose
+  declarations are empty. Any resolution weaker than the hash reads the wrong
+  slate's facts and the check goes quiet again — the same class of failure as
+  the original blindness, arriving through the fix.
+- **The acknowledgement applies to a pitcher-position row only.** Pointed at a
+  hitter, a declaration is reported and NOT applied. Otherwise
+  `--declare-pitcher` becomes an off switch for R4, which is the scratch-zero
+  this check exists to catch, and the gate would ship its own bypass.
+- **Disagreeing briefs resolve to their intersection.** Every id dropped there
+  restores a hard failure and every id kept removes one, so a contradictory
+  record resolves toward the closed gate.
+
+`--declare-pitcher <id>[=role]` states the fact by hand where there is no run to
+read, deliberately the same grammar as `build_slate.py`'s flag of the same name,
+bare-id default (`declared_probable_sp`) included.
+
+**R67, the bullpen game.** `confirmed_teams` keyed off `lineup_status` alone, so
+a confirmed nine with a null `probable_pitcher` evidenced the arm too and any
+pitcher rostered off DK's `Starting` column failed. Those teams are now
+bats-only: their hitters bind exactly as before — pinned, because a second way
+to skip R4 is the obvious way to get this wrong — and the arm is named soft.
+`--feed-lenient` was the only prior escape and it loosened everything.
+
+**Truthful labels.** Both paths WARN rather than pass in silence, and each names
+its evidence class, because the two facts are not equally strong. A posted
+lineup is observed; a declaration is the operator's own statement, so it reads
+`Evidence: operator_declared`. R114's live case had a hand-patched probable
+alongside the declaration, which made the check pass on operator-supplied input:
+the right fact that night, and still not independent confirmation. The warning
+says which one it has.
+
+**One correction to the filing,** found by reproducing it first. R114's entry
+described KC as running a bullpen game. The feed on disk says otherwise —
+`lineup_status: confirmed`, probable Daniel Lynch IV — so the live case is the
+DECLARED case, and the null-probable case R114 described is R67, which had been
+sitting open since the 2026-08-04 audit. The mechanism and the failure text the
+fragment reported were exactly right; only the cause was misattributed. The two
+entries were already batched, so the fix set does not change.
+
+Gate: `PASS v2.26.0 26 modules 942 tests` (`tests.test_upload_integrity` 168 ->
+182, `grew`). The 2210_2g replay pair is the acceptance evidence — as delivered,
+exit 0 with the named WARN; identical bytes with the declaration unreachable,
+exit 2 with the original twelve failures. Each new test was mutation-checked:
+disabling the acknowledgement reddens five, disabling bats-only reddens one.
+`CLAUDE.md`'s session-start line and `EXPECTED_SUITE_COUNTS` move together, as
+`AuditSkipHonestyTests` requires; the `EXPECTED_TEST_COUNT` comment was stale at
+901 against a dict summing to 928 and is now the sum it claims to be.
+
+## 2026-08-14 — Portfolio-edge audit: R114-R125 filed, eight BUILD fragments merged, ed4 adjudicated
+
+Record of two commits (`29d87c9`, `94db2af`) that shipped without one, which is
+the debt `audit.changelog_debt` flagged at the next session's start. Written now
+rather than backdated: the rule is that a change is not shipped until its entry
+exists, and the honest repair is an entry that says what happened and when it
+was written, not one pretending to have been there.
+
+Docs-only both times — `docs/2026-07-27_backlog_v2.md` and `.audit/` — on claims
+`engine_2026-08-14_edge_audit_2026-08-14` and `engine_2026-08-14_edge_audit2`.
+No code, tests, or contracts moved.
+
+**Filed R114-R120,** then R121-R125 on the continuation, twelve new numbers
+against the audit's stated cap of twelve. **Merged eight BUILD fragments** filed
+by concurrent build sessions, with four mechanisms re-verified in tree before
+filing (`build_slate.py:1837-1838`; `showdown_theses.py:62/70/109`;
+`execution_pipeline.py:387`; `solve_ladder` at `showdown_theses.py:484`) —
+diagnoses corrected in the tree where the fragment's reading did not survive
+the read. **Adjudicated the ed4 greenfield review:** R119 adopted, a sim-gate
+variance precondition added, everything else declined.
+
+**Tiers reordered** R118 -> R48+R83 -> R10, on the audit's central finding: the
+miner computes each archived contest's player->FPTS map and strips it at the
+archive boundary (`field_miner.py:1961`), so the learning loop discards the one
+artifact that would grade it. Retaining it and shipping a deterministic
+counterfactual replay converts a 271-contest archive of real fields into the
+substrate the board's three open strategy questions currently wait on live
+tranches for. The verdict was "do not rebuild; instrument, default the reuse
+cap, fix the two gate blindnesses, and grade" — R114 above is one of those two
+gate blindnesses.
+
+Full record, including verification levels and the pre-audit backlog snapshot:
+`.audit/AUDIT.md`.
+
 ## 2026-08-14 — R70 closes: the slate dir stops picking a draftgroup for you, and the clock reads its own keys
 
 Backlog R70 (P2, S, Workstream 3), Tier 1's head, migrated out of

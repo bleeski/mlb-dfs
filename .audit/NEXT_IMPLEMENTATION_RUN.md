@@ -66,7 +66,15 @@ Constraints, absolute: no DraftKings fetching or automation; no uploads; no
 edits outside the DEV write set; truthful labels everywhere (WARN text names
 the declaration source, never claims verification it does not have).
 
-- [ ] Landed by session ____ on ____ (fill at completion)
+- [x] Landed by session `engine_2026-08-15_r114` on 2026-08-15. R114 + R67 both
+  closed and migrated to CHANGELOG.md, which also carries the entry the two
+  audit sessions deferred; changelog debt clear. Gate 928 -> 942
+  (`test_upload_integrity` 168 -> 182, `grew`). Two notes for the next run.
+  R114's falsifier held: the brief had recorded `declared_pitchers` all along,
+  so no engine change was needed. And the fragment misattributed the cause —
+  it called the live 2210_2g case a bullpen game, the feed says confirmed with
+  a named probable, so the live case was R114's declared case and R67's bullpen
+  case was a separate open item. Batching them was right for the wrong reason.
 
 ## Queue after this run (do not start these; recorded for continuity)
 

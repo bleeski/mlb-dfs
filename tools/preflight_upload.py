@@ -43,6 +43,13 @@ operator remembers a flag is a check that does not run at T-5:
               (R4); --feed-lenient restores the old warning. A team that has not
               posted stays soft. The feed's age is printed next to the verdict,
               so a stale all-clear is visibly stale.
+  --brief     the build brief for this delivery, matched to these bytes by
+              delivered_sha256 among the sibling build_brief*.json files. It is
+              read for ONE field, declared_pitchers, so a legally rostered
+              declared arm is acknowledged instead of failed (R114). Nothing
+              else in the brief affects any verdict, and a brief that cannot be
+              found costs one info line. --declare-pitcher ID=role passes the
+              same fact by hand when there is no run to read.
 
 Optional, never blocking on its own absence:
   --parent    diff contest assignment against the file this one refines
@@ -1030,8 +1037,115 @@ def check_parent(entries: Sequence[EntryRow], parent_path: Path, rep: Report) ->
 FEED_STALE_MINUTES = 90
 
 
+DEFAULT_DECLARED_ROLE = "declared_probable_sp"
+
+
+def parse_declared_pitcher_args(values: Sequence[str]) -> Dict[str, str]:
+    """``--declare-pitcher 43815489=viable_bulk_or_alt_sp`` -> {id: role}.
+
+    Deliberately the same grammar as ``build_slate.py``'s flag of the same
+    name, bare-id default included: the operator who declared an arm to the
+    BUILD types the same thing here, and one flag spelled two ways in two tools
+    is a defect waiting for a T-10.
+
+    The role is kept verbatim and never validated against a vocabulary. The
+    engine owns that list (``dk_entries_manager.ALLOWED_PITCHER_ROLES``) and
+    this tool imports no engine module by design, so a copy here would be a
+    second definition of one rule that can drift out of agreement with the
+    first. What the role has to do is NAME itself in the warning, and any
+    non-empty string does that.
+    """
+    out: Dict[str, str] = {}
+    for raw in values or ():
+        text = str(raw).strip()
+        pid, _, role = text.partition("=")
+        pid, role = _digits(pid), role.strip()
+        if not pid:
+            raise ValueError(
+                f"--declare-pitcher wants a DK player ID, optionally ID=role, "
+                f"got {raw!r}. Example: 43815489=viable_bulk_or_alt_sp. A bare "
+                f"id means {DEFAULT_DECLARED_ROLE}, the same default the engine "
+                f"and build_slate.py apply")
+        out[pid] = role or DEFAULT_DECLARED_ROLE
+    return out
+
+
+def resolve_declared_pitchers(entries_path: Path, entries_sha256: str,
+                              explicit: Optional[str], rep: Report,
+                              ) -> Dict[str, str]:
+    """Read ``declared_pitchers`` off the build brief for THESE bytes.
+
+    R114. The build records the declaration; this gate never saw it. On
+    2026-08-12 (2210_2g, run 20260813T005233Z_1b5d3a4a) Mason Black was
+    rostered on a declaration, all three certification gates passed, and this
+    tool exited 2 twelve times on "not in KC's confirmed lineup or probables".
+    The only way through was --force, which is exit 4 on a failure the operator
+    knew was spurious -- and a gate that hard-fails legal files teaches the
+    operator to force past it.
+
+    The brief is matched by ``delivered_sha256``, not by name or by mtime.
+    ``outputs/2026-08-12/`` held eight briefs for four deliveries; the newest
+    and the alphabetically first both belong to a DIFFERENT slate whose
+    declarations are empty, so any resolution weaker than the hash silently
+    reads the wrong slate's facts and this check goes quiet again.
+
+    Several briefs may record one delivery (a rebuild that re-delivers the same
+    bytes). Agreement is the normal case. Where they DISAGREE the intersection
+    wins, because every id dropped here restores a hard failure and every id
+    kept removes one: on a contradictory record the safe direction is the one
+    that keeps the gate closed.
+    """
+    if explicit:
+        briefs = [Path(explicit)]
+        how = "given by --brief"
+    else:
+        briefs = sorted(entries_path.resolve().parent.glob("build_brief*.json"))
+        how = "matched by delivered_sha256 among sibling build_brief*.json"
+    matched: List[Tuple[Path, Dict[str, str]]] = []
+    for path in briefs:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            if explicit:
+                rep.warn(f"--brief {path} unreadable ({exc}); declared pitchers "
+                         f"were not read and a declared arm will fail as absent")
+            continue
+        if not isinstance(data, dict):
+            continue
+        if not explicit:
+            recorded = str(data.get("delivered_sha256") or "").strip().lower()
+            if not recorded or recorded != entries_sha256:
+                continue
+        raw = data.get("declared_pitchers") or {}
+        if not isinstance(raw, Mapping):
+            continue
+        matched.append((path, {_digits(k): str(v) for k, v in raw.items()
+                               if _digits(k) and str(v).strip()}))
+    if not matched:
+        rep.info["declared_pitchers_source"] = f"none found ({how})"
+        return {}
+    resolved = dict(matched[0][1])
+    for path, other in matched[1:]:
+        if other != resolved:
+            disagreement = sorted(
+                set(resolved) ^ set(other)) or sorted(
+                k for k in resolved if resolved.get(k) != other.get(k))
+            rep.warn(
+                f"{len(matched)} briefs record these bytes and they disagree on "
+                f"declared_pitchers ({', '.join(disagreement[:6])}); only the "
+                f"declarations ALL of them carry are acknowledged, so a "
+                f"contradicted id still fails as absent. Briefs: "
+                + ", ".join(p.name for p, _ in matched))
+            resolved = {k: v for k, v in resolved.items() if other.get(k) == v}
+    rep.info["declared_pitchers_source"] = (
+        f"{matched[0][0].name} ({how})" if len(matched) == 1
+        else f"{len(matched)} briefs, intersection ({how})")
+    return resolved
+
+
 def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
-               feed_path: Path, strict: bool, rep: Report) -> None:
+               feed_path: Path, strict: bool, rep: Report,
+               declared_pitchers: Optional[Mapping[str, str]] = None) -> None:
     """A rostered player missing from his team's CONFIRMED lineup is a hard fail.
 
     R4. It was a warning unless --feed AND --feed-strict were both passed, so a
@@ -1058,6 +1172,33 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
     warning that covered him read "DET (32 slots)". Every case above now names
     the player and how many entries carry him, because that is the sentence that
     gets read at T-40.
+
+    R114 + R67, 2026-08-15. Two ways a legally rostered ARM read as a
+    contradiction, both of them the same mistake: treating a posted batting
+    lineup as evidence about pitching.
+
+    - R114, DECLARED. ``declared_pitchers`` is how the build rosters a second
+      arm (``viable_bulk_or_alt_sp`` and the rest of the R104 vocabulary). The
+      declaration reached the optimizer and the brief and stopped there, so
+      this check re-derived "absent" from a feed that never had the fact. A
+      declared arm is now an acknowledged WARN naming the role, never a FAIL.
+      The acknowledgement is deliberately narrow: it applies to a
+      pitcher-position row only. A declaration is a statement about an arm, and
+      letting one silence a benched HITTER would hand the operator a flag that
+      turns off R4 -- which is the zero this check exists to catch.
+    - R67, BULLPEN GAME. ``confirmed_teams`` keyed off ``lineup_status`` alone,
+      so a confirmed nine with a null ``probable_pitcher`` evidenced the arm
+      too, and any pitcher rostered off DK's ``Starting`` column failed. A
+      posted batting lineup evidences BATS. Those teams are now bats-only:
+      their hitters are checked exactly as before and their arms are named
+      soft.
+
+    Both paths WARN rather than pass in silence, and both name their evidence
+    class, because the two facts are not equally strong. A posted lineup is
+    observed; a declaration is the operator's own statement. R114's live case
+    had a hand-patched probable alongside the declaration, which made the
+    check pass on operator-supplied input -- the right fact that night, and
+    still not independent confirmation. The warning says which one it has.
     """
     try:
         feed = json.loads(feed_path.read_text(encoding="utf-8"))
@@ -1072,10 +1213,14 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                      f"{feed.get('fetched_at')}); a confirmed-lineup all-clear "
                      f"from it is that old too")
     rep.info["feed_file"] = str(feed_path)
+    declared = {_digits(k): str(v) for k, v in (declared_pitchers or {}).items()
+                if _digits(k) and str(v).strip()}
+    rep.info["feed_declared_pitchers"] = dict(sorted(declared.items()))
     posted: Dict[str, set[str]] = {}
     posted_hitters: Dict[str, int] = {}
     declared_probable: Dict[str, str] = {}
     confirmed_teams: set[str] = set()
+    confirmed_bats_only: set[str] = set()
     partial_teams: set[str] = set()
     for game in feed.get("games", []) or []:
         for side in ("away", "home"):
@@ -1112,10 +1257,17 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                 # below only ever runs against observed slots.
                 partial_teams.add(team)
     partial_teams -= confirmed_teams
+    # R67. Computed from the whole feed rather than inside the block loop: a
+    # doubleheader puts one team in two blocks, and a team is bats-only when NO
+    # block for it named an arm, not when the last one happened not to.
+    confirmed_bats_only = confirmed_teams - set(declared_probable)
     absent: List[str] = []
     unconfirmed: Dict[str, int] = {}
     projected: Dict[tuple, int] = {}
     overdrawn: List[str] = []
+    acknowledged: Dict[tuple, int] = {}
+    bats_only_arms: Dict[tuple, int] = {}
+    misdeclared: Dict[tuple, int] = {}
     for e in entries:
         drawn: Dict[str, int] = {}
         for pid in e.cells:
@@ -1126,7 +1278,28 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
             name = str(row.get("Name") or "")
             if _norm_name(name) in posted.get(team, set()):
                 continue                      # observed on the field, any status
+            is_pitcher = str(row.get("Roster Position") or "").upper() == "P"
+            role = declared.get(pid)
+            if role and not is_pitcher:
+                # A declaration names an ARM. Applying one to a hitter would
+                # turn --declare-pitcher into an off switch for R4, so it is
+                # reported and NOT applied; the normal checks below still run.
+                misdeclared[(name, team, role)] = misdeclared.get(
+                    (name, team, role), 0) + 1
+                role = None
+            if role:
+                # R114. Declared, therefore legal, therefore not a contradiction
+                # -- and still not observed, which is what the warning says.
+                acknowledged[(name, team, role)] = acknowledged.get(
+                    (name, team, role), 0) + 1
+                continue
             if team in confirmed_teams:
+                if is_pitcher and team in confirmed_bats_only:
+                    # R67. The nine are posted and the arm is not among the
+                    # facts they carry.
+                    bats_only_arms[(name, team)] = bats_only_arms.get(
+                        (name, team), 0) + 1
+                    continue
                 absent.append(f"{e.entry_id}: {name} ({team}) is not in "
                               f"{team}'s confirmed lineup or probables")
                 continue
@@ -1159,6 +1332,39 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                     f"posted {posted_hitters.get(team, 0)} of {POSTED_LINEUP_SLOTS}, "
                     f"leaving only {unknown} slot(s) genuinely unknown")
     uniq = sorted(set(absent))
+    total = len(entries)
+    rep.info["feed_acknowledged_pitchers"] = {
+        f"{name} ({team})": {"role": role, "entries": n, "evidence": "operator_declared"}
+        for (name, team, role), n in sorted(acknowledged.items())}
+    rep.info["feed_bats_only_arms"] = {
+        f"{name} ({team})": n for (name, team), n in sorted(bats_only_arms.items())}
+    if acknowledged:
+        rep.warn(
+            f"{len(acknowledged)} rostered pitcher(s) absent from the posted "
+            f"lineup but DECLARED by the build, acknowledged rather than failed: "
+            + "; ".join(f"{name} ({team}) in {n} of {total}, declared {role}"
+                        for (name, team, role), n in
+                        sorted(acknowledged.items(), key=lambda kv: (-kv[1], kv[0])))
+            + ". Evidence: operator_declared. A declaration is the build's own "
+              "statement of the role, not confirmation from the feed")
+    if misdeclared:
+        rep.warn(
+            f"{len(misdeclared)} declared id(s) are not pitcher-position rows, so "
+            f"the declaration was NOT applied and the posted-lineup check ran "
+            f"normally: "
+            + "; ".join(f"{name} ({team}) in {n} of {total}, declared {role}"
+                        for (name, team, role), n in sorted(misdeclared.items()))
+            + ". A declaration names an arm; it cannot clear a hitter")
+    if bats_only_arms:
+        rep.warn(
+            f"{len(bats_only_arms)} rostered pitcher(s) on a team whose lineup is "
+            f"confirmed but names no probable, so the posting evidences bats only: "
+            + "; ".join(f"{name} ({team}) in {n} of {total}"
+                        for (name, team), n in
+                        sorted(bats_only_arms.items(), key=lambda kv: (-kv[1], kv[0])))
+            + ". Evidence: posted_lineup, hitters only. A bullpen game posts nine "
+              "bats and no starter, and this check cannot contradict an arm it "
+              "has no fact about")
     rep.info["feed_absent"] = uniq
     rep.info["feed_unconfirmed_teams"] = dict(sorted(unconfirmed.items()))
     rep.info["feed_partial_teams"] = {t: posted_hitters.get(t, 0)
@@ -1166,7 +1372,6 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
     rep.info["feed_projected_players"] = {
         f"{name} ({team})": n for (name, team), n in sorted(projected.items())}
     if projected:
-        total = len(entries)
         parts = []
         for (name, team), n in sorted(projected.items(), key=lambda kv: (-kv[1], kv[0])):
             where = (f"{team} posted {posted_hitters.get(team, 0)} of "
@@ -1319,9 +1524,22 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     if args.parent:
         check_parent(entries, Path(args.parent), rep)
 
+    # R114. Hand-passed declarations win over the recorded ones: --declare-pitcher
+    # exists for the file that never had a run, and an operator who passes it
+    # against a file that does have one is stating something the brief does not.
+    hand = parse_declared_pitcher_args(getattr(args, "declare_pitcher", None) or ())
+    if hand:
+        declared_pitchers = hand
+        rep.info["declared_pitchers_source"] = "--declare-pitcher"
+    else:
+        declared_pitchers = resolve_declared_pitchers(
+            entries_path, rep.info["entries_sha256"],
+            getattr(args, "brief", None), rep)
+
     feed_path = Path(args.feed) if args.feed else resolve_feed_for_slate(entries, salary, rep)
     if feed_path is not None and feed_path.exists():
-        check_feed(entries, salary, feed_path, not args.feed_lenient, rep)
+        check_feed(entries, salary, feed_path, not args.feed_lenient, rep,
+                   declared_pitchers=declared_pitchers)
     elif feed_path is not None:
         rep.warn(f"feed {feed_path} does not exist; posted-lineup cross-check skipped")
     else:
@@ -1353,6 +1571,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--feed-strict", action="store_true",
                     help=argparse.SUPPRESS)  # R4: strict is the default; kept so
                     # an existing invocation or script does not die on the flag.
+    ap.add_argument("--brief", help="build brief holding declared_pitchers for "
+                                    "this delivery; auto-matched by "
+                                    "delivered_sha256 among sibling "
+                                    "build_brief*.json files")
+    ap.add_argument("--declare-pitcher", action="append", metavar="ID=ROLE",
+                    help="state a declared arm by hand when there is no brief "
+                         "to read, for example "
+                         "43815489=viable_bulk_or_alt_sp. Repeatable. A "
+                         "declared pitcher absent from the posted lineup is an "
+                         "acknowledged warning, never a failure; an undeclared "
+                         "one still fails")
     ap.add_argument("--expect-contest-type", choices=["classic", "showdown"],
                     help="fail if the file's geometry is not this")
     ap.add_argument("--expect-entries", type=int,

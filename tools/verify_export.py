@@ -92,9 +92,9 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
 from preflight_upload import (  # noqa: E402
     EntryRow, Report, advisory, check_feed, check_legality, check_manifest,
     check_pool_membership, check_row_shape, check_status, load_entries,
-    load_salary, parse_embedded_pool, parse_game_info_datetime,
-    resolve_feed_for_slate, resolve_salary_from_promoted_run, sha256_of,
-    verdict_exit_code,
+    load_salary, parse_declared_pitcher_args, parse_embedded_pool,
+    parse_game_info_datetime, resolve_declared_pitchers, resolve_feed_for_slate,
+    resolve_salary_from_promoted_run, sha256_of, verdict_exit_code,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -416,6 +416,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                          "warns instead of failing (R4/R46 default is to fail)")
     ap.add_argument("--expect-entries", type=int)
     ap.add_argument("--expect-contest-type", choices=["classic", "showdown"])
+    ap.add_argument("--brief", help="build brief holding declared_pitchers for "
+                                    "this delivery; auto-matched by "
+                                    "delivered_sha256 among sibling "
+                                    "build_brief*.json files")
+    ap.add_argument("--declare-pitcher", action="append", metavar="ID=ROLE",
+                    help="state a declared arm by hand when there is no brief "
+                         "to read, for example "
+                         "43815489=viable_bulk_or_alt_sp. Repeatable. A "
+                         "declared pitcher absent from the posted lineup is an "
+                         "acknowledged warning, never a failure; an undeclared "
+                         "one still fails")
     ap.add_argument("--lineups",
                     help="lineups feed JSON; auto-resolved from the salary file's "
                          "directory or data/slates/<date>/ when omitted")
@@ -438,6 +449,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     rep = Report()
     try:
         entries_path = Path(args.entries)
+        # Parsed HERE rather than at the point of use: a malformed ID=ROLE is a
+        # usage error and the exit-code contract says usage errors are 3, which
+        # only this block returns.
+        hand_declared = parse_declared_pitcher_args(args.declare_pitcher or ())
         contest, slots, entries, raw_rows, entry_id_rows = load_entries(entries_path)
 
         if args.salary:
@@ -511,8 +526,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # tool -- the tool whose whole subject is a file changed close to lock -- never
     # cross-checked a seated player against a team's posted lineup. Same feed this
     # tool already resolves for the lock derivation.
+    #
+    # R114: the declarations ride along for the same reason. This tool verifies
+    # late-swap output, and a swap inherits the build's declared arms; reading
+    # them in preflight only would have left the two checkers disagreeing on one
+    # file, which is the failure class R52 already found here once.
+    if hand_declared:
+        declared_pitchers = hand_declared
+        rep.info["declared_pitchers_source"] = "--declare-pitcher"
+    else:
+        declared_pitchers = resolve_declared_pitchers(
+            entries_path, rep.info["entries_sha256"], args.brief, rep)
     if feed_path is not None and feed_path.exists():
-        check_feed(entries, salary, feed_path, not args.feed_lenient, rep)
+        check_feed(entries, salary, feed_path, not args.feed_lenient, rep,
+                   declared_pitchers=declared_pitchers)
     elif feed_path is not None:
         rep.warn(f"feed {feed_path} does not exist; posted-lineup cross-check skipped")
 
