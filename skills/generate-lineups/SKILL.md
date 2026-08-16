@@ -41,6 +41,24 @@ the certified output, so nobody reviewing the file can see it happened.
 eligibility. Never correct it against real-world rosters. If the salary file and a
 data feed disagree, the salary file wins.
 
+**Diagnose from the artifact, never from documentation.** The brief carries an
+enrichment self-report: `signal_applied`, `requested_but_unapplied`, `degraded`,
+`degraded_reason`, `f1_league_mean_implied_total`, `f1_odds`. That is the record
+of what the build actually did. On 2026-08-16 a session read the `--odds` help
+string ("when omitted, totals are fetched if THE_ODDS_API_KEY is set, else F1
+stays 1.0"), concluded F1 was neutral, told Ben the portfolio had no game
+environment in it, and spent his pre-lock window on a rebuild. The brief on disk
+read `f1_league_mean_implied_total: 4.125` with 15 of 15 games priced;
+`resolve_odds_api_key` in `mlb_engine/repo_env.py` had already resolved the key
+from `REPO/.env`. A help string describes what the flag is for. Only the artifact
+says what happened. `python tools/qa_portfolio.py` prints this section first for
+exactly this reason: read it before forming any theory about a build.
+
+**Read the clock from the clock.** `slate_clock.minutes_to_deadline` in the
+brief, or `TZ=America/New_York date`. The same session estimated elapsed time
+from how many turns it had taken, concluded it was at T-2, and nearly stood down
+a build that had 28 minutes left. Turn count is not a clock.
+
 ## Multi-session check, before anything else
 
 CLAUDE.md carries the multi-session contract; a build session is BUILD,
@@ -81,9 +99,51 @@ genuinely cannot finish the download; reach for it only after the locked
 install has failed. Never hand-`pip install` around a failed probe: an
 unpinned resolve is the drift the lock exists to end.
 
-## The fast path
+## The fast path: let the supervisor take its own retries
 
-Almost every request is this one command:
+Ben has delegated build decisions (CLAUDE.md, Autonomy). Start here:
+
+```bash
+python <repo>/tools/autobuild.py \
+  --salary <DKSalaries.csv> --entries <DKEntries.csv> \
+  --lineups <feed.json> --postures '<id>=<posture>,...' \
+  --per-build-seconds 20 --stop-after-minutes 12
+```
+
+It runs `build_slate.py` in a loop and takes the decisions a human was taking
+by hand: grow the bank on exit 10, apply a feasibility remedy the engine named
+and classified structural, override a pool blocker whose shape is classified
+benign and assert `lineup_gate_passed` on that same evidence. It stops on
+anything it cannot classify, and every decision lands in
+`outputs/<date>/autobuild_decisions.json`. Exit 0 certified, 3 refused with
+reasons, 4 bad input, 5 out of time.
+
+A stop is a real question, not a formality: an exposure cap has no engine-named
+floor, and a team matching under 5 of 9 salary hitters is a crosswalk failure,
+not an unpriced callup. Read the decision log before overriding by hand.
+
+## Then poke holes in it
+
+Two iterations at most, and only with time on the clock:
+
+```bash
+python <repo>/tools/qa_portfolio.py --entries <delivered.csv> \
+  --salary <DKSalaries.csv> --brief outputs/<date>/build_brief<suffix>.json
+```
+
+Section 1 is what the build applied, from the artifact. Section 2 checks stacks
+against market implied totals and arms and bats against Savant expected stats.
+Section 3 is the dual-objective frontier. FanGraphs 403s scripted pulls, so a
+FanGraphs refresh needs a browser session (Claude in Chrome), which is
+post-slate work, not a pre-lock step.
+
+A finding is a question, not a verdict. Heavy exposure to a low implied total
+is a leverage play or an oversight and the tool says it cannot tell which; you
+decide, say which, and if you rebuild, do it once. Stop at two iterations even
+if the second one still shows findings, because a third is fitting the
+portfolio to the last thing you looked at.
+
+## The single build, when you want it directly
 
 ```bash
 python <repo>/skills/generate-lineups/scripts/build_slate.py \
@@ -130,6 +190,18 @@ before lock, run them first and pass the results in:
 
 - **mlb-lineups** for confirmed lineups, batting order, and pitcher handedness.
   Save the JSON and pass `--lineups <path>`.
+
+  **Do not hand-roll this feed.** `build_slate.py` reads a specific shape: one
+  entry per GAME in `games`, each holding `away` and `home` objects with
+  `team_abbrev`, `probable_pitcher`, `lineup_status`, and a `lineup` list of
+  `{order, id, name, position, bat_side}`. `fetch_lineups_feed` in
+  `tools/fetch_slate_bundle.py` is the reference implementation; copy its output
+  shape or call it. A feed shaped one-entry-per-SIDE is rejected as
+  `supplied_feed_rejected` with `covered: 0`, which reads exactly like a feed for
+  the wrong slate and sent a 2026-08-16 session hunting a nonexistent date bug.
+  Two crosswalk facts that cost calls the same day: the MLB API says `AZ` where
+  DK says `ARI`, and `bat_side` is not on the schedule payload at all, it is
+  backfilled from `/people` in chunks of 100.
 - **mlb-game-odds** for moneylines, run lines, and totals. Save it and pass
   `--odds <path>`. Odds now DO change the build: they are the input to F1, the
   game-environment factor. When `--odds` is omitted the script fetches totals

@@ -2704,6 +2704,16 @@ def main() -> int:
     # solver_probe.py already default to; Showdown gets distinct filenames so
     # the two contest types can never collide on the same date again.
     suffix = "_showdown" if contest == "showdown" else ""
+    # A REPLAY IS NOT A DELIVERY (2026-08-16). --past-slate-replay exists for
+    # replays and evals, and it used to write the live delivered filename, so
+    # re-running a locked slate to exercise the build overwrote the certified
+    # export a human had already been handed. The run/ copy survives, but the
+    # path every brief, manifest and handoff cites does not, and the same
+    # filename-keyed clobber has cost this project a delivery once before from a
+    # parallel session. A replay now carries its own name and can never land on
+    # the delivery path.
+    if getattr(args, "past_slate_replay", False):
+        suffix += "_replay"
     # The contest-type suffix separates Classic from Showdown but not one Classic
     # draftgroup from another on the same date. Compare game sets and move the
     # prior draftgroup's staged inputs, brief, and delivered file aside rather

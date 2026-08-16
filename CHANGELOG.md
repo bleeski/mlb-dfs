@@ -25,6 +25,72 @@ performance claim.
 
 ---
 
+## 2026-08-16 — R134: a supervisor takes the retries a human was taking by hand
+
+DEV, claim `engine_2026-08-16`. Ben, this date: "I want you to have the freedom
+to use your intelligence to override, relax and constrain to generate lineups
+without my intervention," then an adversarial QA pass over the result, no more
+than two iterations, time permitting.
+
+The 1335_8g build stopped twice for a human and neither stop needed one. The
+first was a pool blocker: DET showed 8 rosterable hitters because DK never
+priced a called-up starter, which is the `unrostered_starters` case CLAUDE.md
+already calls non-fatal. The second was a feasibility floor the engine itself
+labels ARITHMETIC, printing `remedy: raise max_shared_players to >= 7` next to
+the sentence "raising the control to the named floor removes an impossibility
+and changes nothing else." The engine had classified both. Nothing was missing
+except something willing to act on the classification.
+
+**`tools/autobuild.py`.** Policy, not mechanism; `build_slate.py` stays one
+deterministic build that certifies or refuses with reasons. The supervisor reads
+the reasons, decides, records why in `outputs/<date>/autobuild_decisions.json`,
+and stops on anything it cannot classify. It grows the bank on exit 10, applies
+a feasibility remedy only when the engine named it AND classified it structural,
+and overrides a pool blocker only when its shape matches a benign pattern. It
+will not touch an exposure cap (no engine-named floor, so raising one
+concentrates the entered set and is a strategy change), will not reduce the
+player pool, and will not override a blocker it cannot classify, a
+name-crosswalk failure under 5 of 9 included. `assert_classification_in_sync`
+reads `STRUCTURAL_FEASIBILITY_CHECKS` off `build_slate.py` at startup and
+refuses to run on drift, because the whole policy rests on that split.
+
+**`tools/build_asserted.py`.** `--assume-gates` only fills a gate that is
+undetermined; `execution_pipeline` honours it where `gates.get(name) is None`,
+so a gate that evaluated False keeps its evidence. Correct, and it left the
+verified-benign case with no instrument. `run_slate` already had one:
+caller-supplied `workflow_gates` override derived values and land in
+`caller_asserted_gates`, so the artifact states that a human asserted the gate
+rather than implying the check ran. This wrapper supplies them and changes
+nothing else. Because `lineup_gate_passed` derives from the pool report, the
+supervisor asserts it on the same evidence as the pool override, or not at all.
+
+**`tools/qa_portfolio.py`.** Adversarial review of a delivered portfolio,
+report and never a gate. Section 1 prints what the build actually applied from
+the brief's own enrichment self-report; it exists because a session this date
+claimed F1 was neutral, having inferred it from a `--odds` help string, and
+rebuilt under deadline while the brief in hand read
+`f1_league_mean_implied_total: 4.125`. Section 2 checks stacks against market
+implied totals and arms and bats against Savant expected stats. Section 3
+reports the dual-objective frontier as two deterministic review proxies:
+washout exposure is the largest share of the entered set materially exposed to
+one axis, apex concentration is the heaviest primary stack, and they move
+together by construction, so a build picks a point on that frontier rather than
+maximizing both. Counting any game a lineup merely touched read 100% on an
+8-game slate, which is arithmetic, not a finding; material exposure is 3+
+players.
+
+**`build_slate.py`: a replay is not a delivery.** `--past-slate-replay` wrote
+the live delivered filename, so re-running a locked slate to exercise the build
+overwrote a certified export already handed to a human. Found by testing the
+supervisor against 1335_8g, which clobbered that afternoon's delivery; the
+`runs/` copy survived and the delivery path did not. Replays now carry a
+`_replay` suffix and cannot land on the delivery path.
+
+Suites: golden_replay 9, upload_integrity 218, showdown 56, paste_lineups 75,
+and 653 of test_core's 657 all pass. `DeterminismTests` exceeds a single sandbox
+call, which the ledger Quick Card already documents; unverified here, not
+suspected.
+
 ## 2026-08-16 — R128: duplicate-lineup reporting gets contest context
 
 DEV, claim `engine_2026-08-16`. Head of Tier 1's QA-hardening batch after R129

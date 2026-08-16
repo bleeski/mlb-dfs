@@ -26,6 +26,10 @@ it against real-world rosters.
 ## Where the procedures live
 This file carries the contracts and the gotchas. Each procedure lives once:
 - Per-slate loop, start to upload: skills/generate-lineups/SKILL.md
+- Supervised build that takes its own retries: `python tools/autobuild.py`,
+  policy described under Autonomy below.
+- Adversarial review of a delivered portfolio, and the dual-objective
+  frontier: `python tools/qa_portfolio.py`. Report, never a gate.
 - Post-slate archival: docs/cowork_archival_runbook.md
 - Keeping disk, container and GitHub in sync: docs/cowork_sync_protocol.md,
   which wraps `python tools/sync_check.py`. Read it before moving files
@@ -49,6 +53,45 @@ This file carries the contracts and the gotchas. Each procedure lives once:
   history from before that date sits under "Imported record" at the bottom.
   Slate outcomes go to the ledger and per-build records to that run's brief;
   neither goes here.
+
+## Autonomy (Ben, 2026-08-16)
+Ben's instruction: use your intelligence to override, relax and constrain
+without his intervention, then try to poke holes in the result. Build
+decisions are yours. Do not ask permission for a call you can make on
+evidence you can gather; ask only for a fact only Ben has.
+
+What you may do unattended, because the engine has already classified it:
+- Grow the bank, always. It is search effort, never strategy, and it is the
+  first remedy for every refusal against an unexhausted job list.
+- Apply a feasibility remedy the engine NAMED and classified structural
+  (`STRUCTURAL_FEASIBILITY_CHECKS`), to the named value and no further.
+- Override a pool blocker whose shape you have classified benign, and assert
+  `lineup_gate_passed` on that same evidence, since the gate derives from the
+  pool report. Both together or neither.
+- Choose postures, stack plans, and where to sit on the frontier below.
+
+What stays hard, and is not reopened by this section:
+- The money-and-entry wall and the manual-DK rule.
+- Truthful labels. Ben wrote that rule; autonomy does not license a
+  probability claim, and the proxies below are proxies.
+- The preflight before upload, and blank reserved rows.
+- Any reduction of the legal player pool, for any reason.
+- An exposure cap. It has no engine-named floor, so raising one concentrates
+  the entered set: that is a strategy change and it is Ben's.
+- A pool blocker you cannot classify, a name-crosswalk failure (under 5 of 9
+  hitters matched) above all. Stop and ask.
+
+`tools/autobuild.py` is that policy as code and records every decision in
+`outputs/<date>/autobuild_decisions.json`. Reach for it first; it is not a
+replacement for judgment, and a stop it reports is a real question.
+
+**The dual objective.** Ben wants large wins and no total washout. These are
+one frontier, not two maxima: concentration is what wins a winner-take-all
+ticket and is exactly what loses every entry at once. `tools/qa_portfolio.py`
+reports both ends as deterministic review proxies. Note that in a one-ticket
+satellite a non-winning finish and a last-place finish pay the same, so the
+washout objective binds at the PORTFOLIO level (correlated failure across
+entries), not within a lineup. Say so rather than quietly building for floor.
 
 ## Build contract
 The steps are in SKILL.md. These five hold whatever path a build takes:
