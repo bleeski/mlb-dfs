@@ -25,6 +25,74 @@ performance claim.
 
 ---
 
+## 2026-08-16 — Fragment-merge pass: R126–R133 filed, two false merge claims corrected, four fragments swept
+
+Docs only, no code touched. DEV, claim `engine_2026-08-16`. Session-start gate
+per-suite at every pin: `test_core` 653, `test_showdown` 56,
+`test_upload_integrity` 182, `test_golden_replay` 9, `test_paste_lineups` 75,
+summing to the 975 the contract pins. The one-call `--run-tests` macro was
+killed past 178s and produced no verdict, which per the Quick Card is not a red
+gate.
+
+**What moved.** BUILD's 2026-08-15 `2138_2g` fragment enters as the
+QA-hardening batch at the head of Tier 1, at Ben's direction — R129
+(re-promote path), R128 (duplicate reporting split by contest), R127
+(neutral-default enrichment naming plus the split `signal_applied`), R126
+(apex and washout as first-class metrics), R130 (bank growth reporting), R131
+(four smalls). Two 2026-08-14 fragments that no session had ever picked up
+enter as R132 (control self-escalation, Tier 3 behind R115 and ahead of R124)
+and an R42(b) extension. The 2026-08-12 partial-side fragment enters as R133
+in Workstream 3, which stops claiming no open P1. R98(3) gains the two
+remainders the 08-14 floored-bank fragment had left partially merged.
+
+**Why it is filed this way, and the one remedy that is declined.** Every claim
+in the 08-15 fragment was checked in tree before filing. Four held exactly:
+Dobnak is in none of the 212 rows of `fangraphs_season_pitching.csv`;
+`signal_applied` is a single `any()` over both sides
+(`build_slate.py:1270-1278`); `duplicate_lineup_groups` is a flat count with no
+contest partition (`preflight_upload.py:1426`); `superseded` hard-fails at
+`preflight_upload.py:874` with `--no-manifest` the only escape and no promote
+tool on disk. One did not. P4 reads the bank cache as keyed on date and
+proposes keying it on the resolved controls; the cache is keyed on date plus a
+pool signature and already carries R101's conditions signature over
+projections, exclusions and stack bounds, while the controls that were varied
+are allocator-side and applied after the bank exists. The non-reproducibility
+came from the bank GROWING across seven builds on one date, which the
+fragment's own P7 says without connecting it to P4. Keying on controls would
+mint a thin bank per control change — the second failure that same night,
+`entry-level joint MILP proven infeasible`. R130 is therefore a reporting item
+and the proposed remedy is declined on the entry, because the wrong fix here
+is the attractive one and a later session would otherwise re-derive it.
+
+**Two of this board's own merge claims were false, and that is the part worth
+carrying.** The 2026-08-15 queue note says seven 08-14 fragments were merged;
+five were, and the two filed at 20:35 that evening arrived after the merge
+session finished. The 2026-08-14 note says the 08-12 partial-side fragment
+"stays consumed by R60" and was re-affirmed inside the 08-15 sweep note — it
+cannot be, because R60 closed on 08-12 and the fragment reports a defect in
+what R60 shipped, which this file's own R46-round-2 entry of the same day
+states in plain text. A closed item's number is not a lid on later reports
+against it, and "checked, still consumed" is not a check. Both notes are left
+as written history with a dated inline correction. R13's "Awaiting Ben ... NOT
+written" paragraph is corrected the same way: Ben decided on 2026-08-09, two
+other entries already said so, and only that paragraph was stale.
+
+**Swept, and what was deliberately kept.** Four fragments deleted after
+verifying their substance reached the board: adversarial-QA (R11's rewrite),
+delivery-guarantee (R124/R125/R117 and the Tier 4 FanGraphs decision),
+fabricated-clock (R121), Showdown platoon (R122/R123). Five stay on disk as the
+sole carrier of something — the four merged here keep their evidence until
+their items land, and the 08-09 curated-archetypes fragment holds Ben's dated
+decision, the nine-family table and four cautions that exist nowhere else, and
+is ARCHIVE's to execute. The mount refuses `unlink`; the Cowork delete grant
+lifted it, per R109's dated note.
+
+**Not done.** No code, no test-count change, no ledger edit. The three
+`ledger/inbox/` fragments remain ARCHIVE's, including the 08-15 DEV note asking
+for a Quick Card item 1 amendment on the audit macro being load-conditional
+rather than permanently unfittable — this session's own macro kill is a third
+data point for it.
+
 ## 2026-08-15 — R116: the production allocator gets a candidate-reuse default
 
 Tier 1's head, migrated out of `docs/2026-07-27_backlog_v2.md`. CLOSED, both
