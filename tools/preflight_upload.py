@@ -816,6 +816,42 @@ def is_delivered_file(entries_path: Path) -> bool:
         return False
 
 
+def match_manifest_record(records: Sequence[Any], digest: str,
+                          name: str) -> Optional[Dict[str, Any]]:
+    """The manifest row that describes THESE bytes AT THIS PATH (R129).
+
+    Both readers of the manifest in this file used to ask a narrower question --
+    "the first row whose sha256 equals these bytes" -- and that was an adequate
+    proxy only while one set of bytes had exactly one row. ``tools/promote_run.py``
+    makes two rows for one sha256 ORDINARY: a run's original delivery, later
+    superseded, and the re-promotion that brought the same bytes back. Two live
+    defects fell out of first-wins the moment re-promotion existed, both observed
+    on a copy of the real 2026-08-15 manifest:
+
+    1. ``check_manifest`` read the OLD superseded row and reported a file that is
+       current as superseded, which is the exact block R129 exists to make
+       escapable, now firing on the escape.
+    2. ``stamp_manifest_status`` wrote ``upload_ready`` onto that same old row --
+       a SUPERSEDED record resurrected to the answer to "which file do I upload".
+       That is the lost-supersession failure R36 F6m names, arriving through a
+       different door than the concurrency one it was filed for.
+
+    One matcher, used by both, so the two cannot drift: prefer rows that name this
+    filename, then prefer a row that is not superseded, then take the newest,
+    because rows are appended in order. With nothing live for this path the newest
+    superseded row is the honest answer and the caller's block still fires.
+    """
+    same_bytes = [r for r in records
+                  if isinstance(r, dict) and str(r.get("sha256") or "") == digest]
+    same_path = [r for r in same_bytes
+                 if Path(str(r.get("delivered_file") or "")).name == name]
+    pool = same_path or same_bytes
+    if not pool:
+        return None
+    live = [r for r in pool if str(r.get("status") or "") != "superseded"]
+    return (live or pool)[-1]
+
+
 def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
                    manifest_path: Path, rep: Report, delivered: bool = False) -> None:
     try:
@@ -838,11 +874,7 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
     records = manifest if isinstance(manifest, list) else manifest.get("deliveries", [])
     digest = sha256_of(entries_path)
     name = entries_path.name
-    match = None
-    for rec in records:
-        if str(rec.get("sha256") or "") == digest:
-            match = rec
-            break
+    match = match_manifest_record(records, digest, name)
     if match is None:
         by_name = [r for r in records if Path(str(r.get("delivered_file") or "")).name == name]
         if by_name:
@@ -872,8 +904,20 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
         rep.fail(f"manifest records {recorded_entries} entries, file holds "
                  f"{len(entries)}; a short file is a truncated write")
     if str(match.get("status") or "") == "superseded":
+        # R129. The block is right and it stays. What it lacked was the way out:
+        # it named only the path that beat this file, so an operator holding a
+        # measurably better superseded variant had no legal move and reached for
+        # --no-manifest, which waives the cross-check on a file that DOES have a
+        # record. The run id is the operator's actual next move, so the message
+        # carries it and the command that uses it.
+        run_id = str(match.get("run_id") or "")
+        remedy = (f" To deliver these bytes anyway, re-promote the run that made "
+                  f"them: python tools/promote_run.py --run-id {run_id}"
+                  if run_id else
+                  " The record carries no run_id, so there is no run to re-promote "
+                  "from; rebuild rather than waiving the manifest")
         rep.fail(f"manifest marks this file superseded by "
-                 f"{match.get('superseded_by')}; do not upload it")
+                 f"{match.get('superseded_by')}; do not upload it.{remedy}")
     recorded = {str(c) for c in (match.get("contest_ids") or [])}
     actual = {e.contest_id for e in entries}
     if recorded and recorded != actual:
@@ -910,7 +954,8 @@ def status_for_verdict(verdict: str) -> str:
 
 
 def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
-                          status: str, failures: Sequence[str], rep: Report) -> None:
+                          status: str, failures: Sequence[str], rep: Report,
+                          entries_name: str = "") -> None:
     """Write the preflight verdict onto the matching manifest record.
 
     R3(c). "Upload-ready", "blocked" and "acknowledged" lived only in the
@@ -925,6 +970,12 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
     function, and the honest response is to record the verdict and leave the
     status alone rather than write a value the next reader will hard-fail on.
 
+    R129. The row is resolved by ``match_manifest_record`` rather than by the
+    first sha256 hit, and a ``superseded`` row keeps its status. ``entries_name``
+    is what lets the matcher prefer the row for THIS path when one set of bytes
+    has more than one row; omitted, it degrades to the old sha256-only pool, which
+    is why every existing caller keeps working.
+
     Deliberately narrow: it only ever updates a record whose sha256 already
     equals these bytes, it never creates one, and a write failure is a warning.
     No engine import; the manifest is plain JSON.
@@ -934,12 +985,22 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
     except (OSError, ValueError):
         return
     records = payload if isinstance(payload, list) else payload.get("deliveries", [])
-    target = next((r for r in records
-                   if isinstance(r, dict) and r.get("sha256") == entries_sha256), None)
+    target = match_manifest_record(records, str(entries_sha256), str(entries_name))
     if target is None:
         return
     record_status = status_for_verdict(status)
-    if record_status in STATUS_VALUES:
+    if str(target.get("status") or "") == "superseded":
+        # R129. A supersession is a fact about this record's relationship to a
+        # LATER delivery; a preflight verdict is a fact about bytes. Overwriting
+        # the first with the second is how a superseded row came back as
+        # 'upload_ready' and as 'blocked', and after either write the supersession
+        # block can never fire for that file again. The verdict is not lost: it
+        # lands under 'preflight' below, where the two facts sit side by side.
+        rep.info["manifest_status_held_superseded"] = True
+        rep.warn(f"this file's manifest record is superseded; the preflight "
+                 f"verdict {status!r} was recorded on it but the status stays "
+                 f"'superseded'. Re-promote its run to deliver these bytes")
+    elif record_status in STATUS_VALUES:
         target["status"] = record_status
     else:  # pragma: no cover - structurally unreachable; the guard is the point
         rep.warn(f"preflight verdict {status!r} maps to {record_status!r}, which "
@@ -1631,7 +1692,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     manifest_file = report["info"].get("manifest_file")
     if manifest_file:
         stamp_manifest_status(Path(manifest_file), report["info"]["entries_sha256"],
-                              verdict, report["failures"], rep)
+                              verdict, report["failures"], rep,
+                              entries_name=Path(args.entries).name)
 
     if args.json:
         print(json.dumps(report, indent=1, default=str))

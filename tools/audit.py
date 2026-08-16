@@ -88,14 +88,21 @@ EXPECTED_SUITE_COUNTS = {
     # to clear a hitter, usage errors, and verify_export answering the same) and
     # three on the bullpen game (bats-only evidences no arm, its hitters still
     # bind, a side that named an arm is untouched).
-    "tests.test_upload_integrity": 182,
+    # R129 + R36 F6m(1), 2026-08-16: 182 -> 207, the twenty-five that pin the way
+    # back out of a supersession -- eight on CORRUPT being its own manifest state
+    # (absent is not corrupt, the quarantine holds the exact bytes, a quarantine
+    # that fails refuses instead of overwriting, verify_manifest stops passing),
+    # eight on promote_run (the truthful appended row, the run's final/ left
+    # untouched, run-scoped by default, and four refusals), and nine on matching a
+    # row to a file now that one sha256 can carry several rows.
+    "tests.test_upload_integrity": 207,
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this
 # line's own rule warns about -- the dict is the source of truth either way.
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 975
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 1000
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,

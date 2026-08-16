@@ -25,6 +25,110 @@ performance claim.
 
 ---
 
+## 2026-08-16 — R129 + R36 F6m(1): supersession gets a way back, and a corrupt manifest stops erasing itself
+
+DEV, claim `engine_2026-08-16`. Head of Tier 1's QA-hardening batch, taken in
+tier order, with F6m(1) landed first because R129's entry says the new row has
+to survive the corrupt-manifest handling and never lands before it. Gate 975 ->
+1000 (`test_upload_integrity` 182 -> 207); CLAUDE.md's session-start line and
+the ledger Quick Card pin moved with it, the latter on a `ledger` claim, pin
+line only.
+
+**R129 — the one-way door.** Manifest supersession was correct in both
+directions and had no legal transition between them. A session that built five
+variants on 2026-08-15 `2138_2g` and picked the third had, by the time it
+picked, marked the third superseded, and `preflight_upload.py` correctly
+hard-failed it. The only escapes were `--no-manifest`, which waives the
+cross-check on a file that DOES have a record and therefore misrepresents it,
+and rebuilding, which could not reproduce because the bank had grown underneath
+(R130). The effect was worse than one lost delivery: it penalized exploring
+alternatives, since the more variants a session builds the more certainly its
+best one is superseded. Filed twice from opposite directions — a better variant
+that could not be delivered, and an earlier certified run that could not be
+restored (R98(3)'s restore remainder, which this closes) — one missing
+operation.
+
+`tools/promote_run.py --run-id <id>` is that operation. It copies the run's
+immutable `runs/<id>/final/DKEntries.csv` and APPENDS an ordinary delivery row
+carrying `re_promoted_from`, through the same `upload_manifest.deliver` door
+every build uses, so the DO_NOT_UPLOAD_ ordering and the supersession of
+whatever was current both come for free. No waiver, no status outside the closed
+set, no prior row edited beyond the supersession any delivery performs. Three
+things the entry asked for, all in: the preflight refusal now names the `run_id`
+and the command rather than only the path that beat the file; the default
+destination is run-scoped (`DKEntries_<tag>_<run8>.csv`) so the canonical path
+is not the only place a certified file can live, with `--canonical` opt-in; and
+it sits after F6m(1). Refusals: a run with no `final/` export, a `final/` export
+whose sha256 no longer matches the run manifest (promoting that would launder a
+mutated "immutable" artifact), and a run no manifest row names without an
+explicit `--date`/`--tag`. An UNCERTIFIED run promotes as `not_certified` with a
+loud line rather than being refused, because refusing there puts this tool back
+in the business of process preventing a lineup.
+
+**One correction to the entry as filed.** It specifies `status: current`. There
+is no `current` in `STATUS_VALUES`, and writing one would trip R34's own guard
+and hard-fail the next read — the exact defect R34 exists to prevent. The row
+lands `candidate`, which is precisely "the file exists and nothing has checked
+it yet"; preflight stamps `upload_ready` on those bytes afterward.
+
+**Two defects found while testing the fix, both caused by it.** Re-promotion
+makes two manifest rows for one sha256 ORDINARY, and both readers in
+`preflight_upload.py` took the FIRST row matching the digest — adequate only
+while bytes and rows were one-to-one. On a copy of the real 2026-08-15 manifest:
+(1) `check_manifest` read the OLD superseded row and reported the re-promoted
+file, which is current, as superseded, so the escape hatch tripped the block it
+was built to escape; (2) `stamp_manifest_status` wrote `upload_ready` onto that
+same superseded row — an obsolete record resurrected to the answer to "which
+file do I upload", which is the lost-supersession failure R36 F6m names,
+arriving through a door that is not the concurrency one it was filed for. It
+also overwrote `superseded` with `blocked` on a repeat preflight, after which
+the supersession check could never fire for that file again. Both now go through
+one `match_manifest_record` (prefer this path, then prefer a live row, then take
+the newest, since rows are appended in order), and a `superseded` row keeps its
+status while the verdict is recorded beside it. One matcher for both readers,
+because two implementations of one rule is this project's named no-op failure
+class.
+
+**R36 F6m(1) — corrupt is now its own state.** `read_manifest` answered ABSENT
+and CORRUPT with the same empty manifest, and the next `record_delivery`
+os.replaced the unreadable original away with every prior record's supersession
+history. Reproduced before the fix on a two-row manifest holding one superseded
+record: one row survived, the history did not. An absent file still reads empty,
+which is true; a file that exists and does not parse (bad JSON, bad UTF-8, valid
+JSON of the wrong shape, or unreadable) reads empty plus a `corrupt` block
+naming the path, the error and the byte count, so every existing reader is
+unchanged and a reader that cares now has the difference.
+`record_delivery` quarantines the bytes to `upload_manifest.corrupt.<utc>.json`
+first — a copy, never a move, because this mount grants create and truncate but
+not unlink (R109) — and stamps `recovered_from_corrupt` on the fresh manifest
+saying where they went and that no prior record survives in it. A quarantine
+that fails raises `CorruptManifestError`, which the delivery path already
+degrades to "MANIFEST NOT RECORDED" with the file keeping its DO_NOT_UPLOAD_
+name: nothing is written over bytes that could not be preserved.
+`verify_manifest` stops returning `passed: True, checked: 0` on a corrupt
+manifest, which read as "nothing recorded, nothing wrong" on the one file
+preflight cross-checks against.
+
+**Not done here.** F6m's append-only-plus-derived-index redesign and its
+concurrency half, and F6m(2)'s `salary_sha256`; R36 F3m; and R128, the batch's
+second item, which shares the preflight surface but adds a brief-side change.
+F6m's entry stays on the board rewritten to hold only those. R129's dependency
+on R36 F6m's corrupt handling is now discharged either way.
+
+**Five hand-run mutations, and one of them earned its keep.** Reverting the
+matcher to first-wins, dropping the live-row preference, dropping the
+same-path preference, skipping the quarantine, collapsing corrupt back into
+empty, and letting the stamp overwrite `superseded`. The same-path preference —
+the guard that fixes the live bug — initially SURVIVED its mutation: the fixture
+happened to order rows so the newest same-bytes row was also the right one, so
+both branches agreed and the assertion could not fail. That is R65's shape again
+(a guard split across two pinned units with an unpinned join) and it was written
+down as a fix that could not fail until the mutation was actually run. The test
+it produced is the sharper one anyway, because it states the case the path
+filter uniquely buys: identical bytes at two paths, one current and one
+superseded and still on disk, where matching on bytes alone hands the obsolete
+file the live row and preflight PASSES it at T-5.
+
 ## 2026-08-16 — Fragment-merge pass: R126–R133 filed, two false merge claims corrected, four fragments swept
 
 Docs only, no code touched. DEV, claim `engine_2026-08-16`. Session-start gate

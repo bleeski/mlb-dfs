@@ -3071,5 +3071,423 @@ class R96PerCallerTests(unittest.TestCase):
         self.assertIn("UNRECORDED DELIVERIES", text)
 
 
+class CorruptManifestIsItsOwnStateTests(unittest.TestCase):
+    """R36 F6m(1). CORRUPT and ABSENT were the same answer, and the write erased.
+
+    ``read_manifest`` answered both states with an empty manifest, so the next
+    ``record_delivery`` os.replaced the unreadable original away and every prior
+    record's supersession history went with it. Reproduced before the fix on a
+    two-row manifest holding one superseded record: one row survived, the history
+    did not.
+    """
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.date = "2026-08-15"
+        self.outputs = self.root / "outputs" / self.date
+        self.outputs.mkdir(parents=True)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _payload(self):
+        return json.dumps({"version": "1.1", "date": self.date, "deliveries": [
+            {"delivered_file": f"outputs/{self.date}/DKEntries_a.csv",
+             "sha256": "aa" * 32, "contest_type": "classic", "slate_tag": "t",
+             "status": "superseded",
+             "superseded_by": f"outputs/{self.date}/DKEntries_b.csv"},
+            {"delivered_file": f"outputs/{self.date}/DKEntries_b.csv",
+             "sha256": "bb" * 32, "contest_type": "classic", "slate_tag": "t",
+             "status": "upload_ready"}]})
+
+    def _corrupt(self):
+        text = self._payload()[:120]
+        (self.outputs / self.um.MANIFEST_NAME).write_text(text, encoding="utf-8")
+        return text
+
+    def _new_delivery(self, name="DKEntries_c.csv"):
+        path = self.outputs / name
+        path.write_text("bytes\n", encoding="utf-8")
+        return path
+
+    def test_an_absent_manifest_is_not_reported_as_corrupt(self):
+        read = self.um.read_manifest(self.date)
+        self.assertEqual(read["deliveries"], [])
+        self.assertNotIn("corrupt", read,
+                         "never-existed is a different fact from unreadable, and "
+                         "collapsing them is the whole defect")
+
+    def test_a_corrupt_manifest_reports_the_error_and_the_byte_count(self):
+        text = self._corrupt()
+        read = self.um.read_manifest(self.date)
+        self.assertEqual(read["deliveries"], [])
+        self.assertIn("corrupt", read)
+        self.assertEqual(read["corrupt"]["bytes"], len(text))
+        self.assertIn("JSONDecodeError", read["corrupt"]["error"])
+
+    def test_valid_json_of_the_wrong_shape_is_corrupt_not_empty(self):
+        (self.outputs / self.um.MANIFEST_NAME).write_text('"a string"', encoding="utf-8")
+        read = self.um.read_manifest(self.date)
+        self.assertIn("corrupt", read)
+        self.assertIn("not an object", read["corrupt"]["error"])
+
+    def test_recording_over_a_corrupt_manifest_quarantines_the_exact_bytes(self):
+        text = self._corrupt()
+        self.um.record_delivery(date=self.date, delivered_file=self._new_delivery(),
+                                contest_type="classic", slate_tag="t")
+        quarantined = sorted(self.outputs.glob("upload_manifest.corrupt.*.json"))
+        self.assertEqual(len(quarantined), 1, "the unreadable bytes must survive")
+        self.assertEqual(quarantined[0].read_text(encoding="utf-8"), text)
+        fresh = json.loads((self.outputs / self.um.MANIFEST_NAME).read_text())
+        self.assertEqual(fresh["recovered_from_corrupt"]["quarantined_to"],
+                         self.um.repo_relative(quarantined[0]))
+        self.assertIn("NO prior delivery record survives",
+                      fresh["recovered_from_corrupt"]["note"])
+        self.assertEqual(len(fresh["deliveries"]), 1)
+
+    def test_a_clean_manifest_carries_no_recovery_block(self):
+        (self.outputs / self.um.MANIFEST_NAME).write_text(self._payload(), encoding="utf-8")
+        self.um.record_delivery(date=self.date, delivered_file=self._new_delivery(),
+                                contest_type="showdown", slate_tag="sd")
+        fresh = json.loads((self.outputs / self.um.MANIFEST_NAME).read_text())
+        self.assertNotIn("recovered_from_corrupt", fresh)
+        self.assertEqual(len(fresh["deliveries"]), 3, "the prior rows survive")
+
+    def test_an_unquarantinable_manifest_refuses_rather_than_overwrites(self):
+        text = self._corrupt()
+        original = self.um.quarantine_corrupt_manifest
+
+        def refuse(date):
+            raise self.um.CorruptManifestError("quarantine device full")
+
+        self.um.quarantine_corrupt_manifest = refuse
+        self.addCleanup(setattr, self.um, "quarantine_corrupt_manifest", original)
+        with self.assertRaises(self.um.CorruptManifestError):
+            self.um.record_delivery(date=self.date,
+                                    delivered_file=self._new_delivery(),
+                                    contest_type="classic", slate_tag="t")
+        self.assertEqual((self.outputs / self.um.MANIFEST_NAME).read_text(encoding="utf-8"),
+                         text, "the corrupt original is left exactly as it was")
+
+    def test_deliver_leaves_the_self_labelling_name_when_the_manifest_cannot_be_saved(self):
+        self._corrupt()
+        original = self.um.quarantine_corrupt_manifest
+        self.um.quarantine_corrupt_manifest = lambda date: (_ for _ in ()).throw(
+            self.um.CorruptManifestError("quarantine device full"))
+        self.addCleanup(setattr, self.um, "quarantine_corrupt_manifest", original)
+        dest = self.outputs / "DKEntries_1905_7g.csv"
+        out = self.um.deliver(date=self.date, dest=dest,
+                              write=lambda p: p.write_text("payload", encoding="utf-8"),
+                              contest_type="classic", slate_tag="1905_7g")
+        self.assertFalse(out["recorded"])
+        self.assertIn("MANIFEST NOT RECORDED", out["error"])
+        self.assertFalse(dest.exists(), "an unrecorded file never wears the upload name")
+        self.assertTrue(self.um.unrecorded_name(dest).is_file())
+
+    def test_verify_manifest_fails_on_a_corrupt_manifest(self):
+        self._corrupt()
+        check = self.um.verify_manifest(self.date)
+        self.assertFalse(check["passed"],
+                         "passed=True with checked=0 reads as 'nothing recorded, "
+                         "nothing wrong' on the file preflight cross-checks against")
+        self.assertIn("unreadable", check["problems"][0])
+
+
+class RePromoteRunTests(unittest.TestCase):
+    """R129. Supersession was a one-way door; ``tools/promote_run.py`` is the way back.
+
+    Two independent filings, opposite directions: a better variant that could not
+    be delivered because a later build in the same session superseded it
+    (2026-08-15 2138_2g), and an earlier certified run that could not be restored
+    (2026-08-14). One missing operation, exercised here end to end against a run
+    tree built by hand.
+    """
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.date = "2026-08-15"
+        self.outputs = self.root / "outputs" / self.date
+        self.outputs.mkdir(parents=True)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _entries_csv(self, entry_ids):
+        header = (["Entry ID", "Contest Name", "Contest ID", "Entry Fee"]
+                  + ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"])
+        rows = [header]
+        for i, eid in enumerate(entry_ids):
+            rows.append([eid, "MLB $2.5K Solo Shot (Night)", "193774256", "$5"]
+                        + [str(1000 + i * 10 + s) for s in range(10)])
+        return "\n".join(",".join(c for c in row) for row in rows) + "\n"
+
+    def _make_run(self, run_id, entry_ids=("111", "222"), workflow_valid=True,
+                  tamper=False):
+        run_dir = self.root / "runs" / run_id
+        (run_dir / "final").mkdir(parents=True)
+        (run_dir / "inputs").mkdir(parents=True)
+        (run_dir / "inputs" / "DKSalaries.csv").write_text("Position,Name\n", encoding="utf-8")
+        export = run_dir / "final" / "DKEntries.csv"
+        export.write_text(self._entries_csv(entry_ids), encoding="utf-8")
+        digest = self.um.sha256_file(export)
+        if tamper:
+            export.write_text(self._entries_csv(tuple(entry_ids) + ("333",)),
+                              encoding="utf-8")
+        (run_dir / "manifest.json").write_text(json.dumps({
+            "run_id": run_id, "status": "promoted",
+            "certification": {"workflow_valid": workflow_valid,
+                              "selection_certified": workflow_valid,
+                              "allocation_certified": workflow_valid},
+            "artifacts": {"final/DKEntries.csv": {"sha256": digest,
+                                                 "role": "dk_export"}},
+        }), encoding="utf-8")
+        return run_dir
+
+    def _promote(self, *argv):
+        import promote_run
+        return promote_run.main(["--repo-root", str(self.root), *argv])
+
+    def _rows(self):
+        return self.um.read_manifest(self.date).get("deliveries", [])
+
+    def _seed_row(self, run_id, name, status="upload_ready", sha=None):
+        path = self.outputs / name
+        if not path.exists():
+            path.write_text("seeded\n", encoding="utf-8")
+        rows = self._rows()
+        rows.append({"delivered_file": self.um.repo_relative(path),
+                     "sha256": sha or self.um.sha256_file(path),
+                     "contest_type": "classic", "slate_tag": "2138_2g",
+                     "contest_ids": ["193774256"], "entries": 2,
+                     "run_id": run_id, "status": status,
+                     "certification": "certified"})
+        self.um._write(self.um.manifest_path(self.date),
+                       {"version": "1.1", "date": self.date, "deliveries": rows})
+
+    # ---- the operation itself --------------------------------------------
+
+    def test_a_superseded_run_can_be_delivered_again_with_a_truthful_row(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        run_dir = self._make_run(run_id)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded",
+                       sha=self.um.sha256_file(run_dir / "final" / "DKEntries.csv"))
+        self._seed_row("20260815T214500Z_bbbbbbbb", "DKEntries_2138_2g_later.csv")
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        rows = self._rows()
+        new = rows[-1]
+        self.assertEqual(new["re_promoted_from"], run_id)
+        self.assertEqual(new["status"], "candidate",
+                         "'current' is not in the closed status set; a row nothing "
+                         "has checked yet is exactly what 'candidate' means")
+        self.assertEqual(new["entries"], 2, "counted off the delivered bytes")
+        # The row that WAS current is superseded by this one, and the run's own
+        # earlier row keeps its history rather than being edited.
+        beaten = [r for r in rows if r["run_id"] == "20260815T214500Z_bbbbbbbb"][0]
+        self.assertEqual(beaten["status"], "superseded")
+        self.assertEqual(beaten["superseded_by"], new["delivered_file"])
+        self.assertEqual(rows[0]["status"], "superseded")
+
+    def test_the_run_final_export_is_the_source_and_is_left_untouched(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        run_dir = self._make_run(run_id)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        before = (run_dir / "final" / "DKEntries.csv").read_bytes()
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        self.assertEqual((run_dir / "final" / "DKEntries.csv").read_bytes(), before,
+                         "immutability of runs/<id>/final/ is the contract this "
+                         "whole operation rests on")
+        delivered = self.root / self._rows()[-1]["delivered_file"]
+        self.assertEqual(delivered.read_bytes(), before)
+
+    def test_the_default_destination_is_run_scoped_and_canonical_is_opt_in(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        self.assertTrue(self._rows()[-1]["delivered_file"].endswith(
+            "DKEntries_2138_2g_aaaaaaaa.csv"),
+            "the canonical path must not be the only place a certified file lives")
+        self.assertEqual(self._promote("--run-id", run_id, "--canonical"), 0)
+        self.assertTrue(self._rows()[-1]["delivered_file"].endswith(
+            "DKEntries_2138_2g.csv"))
+
+    def test_a_dry_run_writes_nothing(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        before = len(self._rows())
+        self.assertEqual(self._promote("--run-id", run_id, "--dry-run"), 0)
+        self.assertEqual(len(self._rows()), before)
+
+    # ---- the refusals ----------------------------------------------------
+
+    def test_a_run_with_no_final_export_is_refused(self):
+        self.assertEqual(self._promote("--run-id", "20260815T000000Z_nosuchrun"), 2)
+
+    def test_a_final_export_that_no_longer_matches_its_run_record_is_refused(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id, tamper=True)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        self.assertEqual(self._promote("--run-id", run_id), 2,
+                         "promoting bytes that drifted from the run record would "
+                         "launder a mutated 'immutable' artifact")
+
+    def test_a_run_no_manifest_row_names_needs_the_slate_said_out_loud(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self.assertEqual(self._promote("--run-id", run_id), 2)
+        self.assertEqual(self._promote("--run-id", run_id, "--date", self.date,
+                                       "--tag", "2138_2g"), 0)
+
+    def test_an_uncertified_run_promotes_as_not_certified_rather_than_being_refused(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id, workflow_valid=False)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        self.assertEqual(self._promote("--run-id", run_id), 0,
+                         "refusing here would put this tool back in the business "
+                         "of process preventing a lineup")
+        self.assertEqual(self._rows()[-1]["certification"], "not_certified")
+
+
+class ManifestRecordMatchingTests(unittest.TestCase):
+    """R129. One sha256 with more than one row is ordinary once re-promotion exists.
+
+    Both readers in ``preflight_upload.py`` took the FIRST row matching the
+    sha256. That was adequate while bytes and rows were one-to-one; a re-promoted
+    run has two rows for one digest, and first-wins then read the OLD superseded
+    one. Two live defects on a copy of the real 2026-08-15 manifest: a current
+    file reported as superseded, and ``stamp_manifest_status`` writing
+    ``upload_ready`` onto a SUPERSEDED row, which is the lost-supersession failure
+    R36 F6m names arriving through a different door.
+    """
+
+    def setUp(self):
+        import preflight_upload
+        self.pf = preflight_upload
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def _rows(self):
+        return [
+            {"delivered_file": "outputs/2026-08-15/DKEntries_2138_2g.csv",
+             "sha256": "cc" * 32, "status": "superseded", "run_id": "old_run"},
+            {"delivered_file": "outputs/2026-08-15/DKEntries_2138_2g.csv",
+             "sha256": "dd" * 32, "status": "superseded", "run_id": "beaten_run"},
+            {"delivered_file": "outputs/2026-08-15/DKEntries_2138_2g_cc.csv",
+             "sha256": "cc" * 32, "status": "candidate", "run_id": "old_run"},
+        ]
+
+    def _re_promoted_rows(self):
+        """Run 'old_run' delivered to the canonical path, beaten, then re-promoted
+        to a run-scoped path. Both rows carry the SAME bytes and one is live."""
+        return [
+            {"delivered_file": "outputs/2026-08-15/DKEntries_2138_2g.csv",
+             "sha256": "cc" * 32, "status": "superseded", "run_id": "old_run",
+             "superseded_by": "outputs/2026-08-15/DKEntries_2138_2g_cc.csv"},
+            {"delivered_file": "outputs/2026-08-15/DKEntries_2138_2g_cc.csv",
+             "sha256": "cc" * 32, "status": "upload_ready", "run_id": "old_run"},
+        ]
+
+    def test_the_live_row_for_this_path_wins_over_an_older_superseded_one(self):
+        match = self.pf.match_manifest_record(
+            self._rows(), "cc" * 32, "DKEntries_2138_2g_cc.csv")
+        self.assertEqual(match["status"], "candidate")
+        self.assertEqual(match["delivered_file"],
+                         "outputs/2026-08-15/DKEntries_2138_2g_cc.csv")
+
+    def test_a_live_row_elsewhere_does_not_absolve_the_path_that_lost(self):
+        """The mutation that found this: dropping the same-path preference reddened
+        nothing, so it was written down as a fix that could not fail.
+
+        These bytes exist at two paths. The run-scoped copy is current; the
+        canonical copy is superseded and still sitting on disk holding the same
+        bytes. Matching on bytes alone hands the canonical file the LIVE row and
+        preflight passes an obsolete file at T-5, which is the exact state the
+        manifest exists to make impossible. The question is about a path, so the
+        match has to be about a path.
+        """
+        rows = self._re_promoted_rows()
+        canonical = self.pf.match_manifest_record(
+            rows, "cc" * 32, "DKEntries_2138_2g.csv")
+        self.assertEqual(canonical["status"], "superseded")
+        self.assertEqual(canonical["delivered_file"],
+                         "outputs/2026-08-15/DKEntries_2138_2g.csv")
+        promoted = self.pf.match_manifest_record(
+            rows, "cc" * 32, "DKEntries_2138_2g_cc.csv")
+        self.assertEqual(promoted["status"], "upload_ready")
+
+    def test_two_rows_for_one_path_and_one_sha_resolve_to_the_live_one(self):
+        """Re-promoting onto --canonical is how a path ends up with a superseded
+        row and a live row for identical bytes; first-wins reads the dead one."""
+        rows = self._re_promoted_rows()
+        rows[1] = dict(rows[1],
+                       delivered_file="outputs/2026-08-15/DKEntries_2138_2g.csv")
+        match = self.pf.match_manifest_record(rows, "cc" * 32, "DKEntries_2138_2g.csv")
+        self.assertEqual(match["status"], "upload_ready")
+
+    def test_a_path_with_only_a_superseded_row_still_matches_it(self):
+        match = self.pf.match_manifest_record(
+            self._rows(), "dd" * 32, "DKEntries_2138_2g.csv")
+        self.assertEqual(match["status"], "superseded",
+                         "the block has to keep firing for the file that lost")
+
+    def test_an_unknown_filename_falls_back_to_the_bytes_and_prefers_live(self):
+        match = self.pf.match_manifest_record(self._rows(), "cc" * 32, "")
+        self.assertEqual(match["status"], "candidate")
+
+    def test_bytes_no_row_carries_return_nothing(self):
+        self.assertIsNone(self.pf.match_manifest_record(self._rows(), "ee" * 32, "x.csv"))
+
+    def test_stamping_never_overwrites_a_superseded_status(self):
+        path = self.root / "upload_manifest.json"
+        path.write_text(json.dumps({"deliveries": self._rows()}), encoding="utf-8")
+        rep = self.pf.Report()
+        self.pf.stamp_manifest_status(path, "dd" * 32, "upload_ready", [], rep,
+                                      entries_name="DKEntries_2138_2g.csv")
+        row = json.loads(path.read_text())["deliveries"][1]
+        self.assertEqual(row["status"], "superseded",
+                         "a supersession is a fact about a LATER delivery; a "
+                         "verdict is a fact about bytes, and the second must not "
+                         "erase the first")
+        self.assertEqual(row["preflight"]["verdict"], "upload_ready",
+                         "the verdict is recorded beside the status, not lost")
+        self.assertTrue(any("superseded" in w for w in rep.warnings))
+
+    def test_stamping_a_live_row_still_writes_the_status(self):
+        path = self.root / "upload_manifest.json"
+        path.write_text(json.dumps({"deliveries": self._rows()}), encoding="utf-8")
+        rep = self.pf.Report()
+        self.pf.stamp_manifest_status(path, "cc" * 32, "upload_ready", [], rep,
+                                      entries_name="DKEntries_2138_2g_cc.csv")
+        rows = json.loads(path.read_text())["deliveries"]
+        self.assertEqual(rows[2]["status"], "upload_ready")
+        self.assertEqual(rows[0]["status"], "superseded",
+                         "the old row for the same bytes is not touched")
+
+    def test_the_superseded_refusal_names_the_run_to_re_promote(self):
+        text = (REPO / "tools" / "preflight_upload.py").read_text(encoding="utf-8")
+        self.assertIn("tools/promote_run.py --run-id", text,
+                      "the message named only the path that beat this file, which "
+                      "is not a next move; the run id is")
+        self.assertIn("no run_id, so there is no run to re-promote", text,
+                      "a row with no run id has no re-promote path and must say so "
+                      "rather than print a command that cannot work")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

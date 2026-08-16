@@ -60,6 +60,16 @@ def _valid_status(status: object) -> str:
 MANIFEST_NAME = "upload_manifest.json"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+
+class CorruptManifestError(RuntimeError):
+    """A manifest file exists on disk and cannot be parsed (R36 F6m).
+
+    Raised only from the write path, and only when the corrupt bytes could not be
+    preserved. A caller that sees this has NOT had its delivery recorded, which is
+    the fail-closed state ``deliver`` already handles: the file keeps its
+    ``DO_NOT_UPLOAD_`` name and the error text says why.
+    """
+
 # R96(2). The name a delivery file wears until a manifest row exists for it.
 # Fail-open bookkeeping was the whole defect: every delivery path wrapped
 # ``record_delivery`` in a try/except so a certified build could never be broken
@@ -109,16 +119,85 @@ def manifest_path(date: str) -> Path:
 
 
 def read_manifest(date: str) -> Dict[str, Any]:
+    """The manifest for ``date``, with CORRUPT distinguished from ABSENT (R36 F6m).
+
+    This function used to answer both states with the same empty manifest. That
+    erased the difference between "no delivery has ever been recorded here" and
+    "the record exists and cannot be read", and the consequence was not merely a
+    bad read: the next ``record_delivery`` wrote its one row over the top and
+    every prior record's supersession history went with it. An obsolete file then
+    sits at ``upload_ready`` as the apparent answer to "which file do I upload".
+
+    An absent file still reads as empty, which is true. A file that EXISTS and
+    does not parse reads as empty deliveries plus a ``corrupt`` block naming the
+    path, the error and the byte count. Every existing reader goes on reading
+    ``deliveries`` unchanged; a reader that cares about the difference now has it,
+    and the write path refuses to overwrite bytes it could not preserve.
+    """
     path = manifest_path(date)
+    empty: Dict[str, Any] = {"version": VERSION, "date": str(date), "deliveries": []}
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"version": VERSION, "date": str(date), "deliveries": []}
+        raw = path.read_bytes()
+    except OSError as exc:
+        if path.exists():
+            # Present but unreadable: still corrupt from every caller's point of
+            # view, and the quarantine attempt below will fail loudly rather than
+            # let a write destroy it.
+            empty["corrupt"] = {"path": str(path), "error": f"{type(exc).__name__}: {exc}",
+                                "bytes": None}
+        return empty
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        empty["corrupt"] = {"path": str(path), "error": f"{type(exc).__name__}: {exc}",
+                            "bytes": len(raw)}
+        return empty
     if isinstance(data, list):  # tolerate a bare list written by an older caller
         return {"version": VERSION, "date": str(date), "deliveries": data}
+    if not isinstance(data, dict):
+        # Valid JSON, wrong shape. Nothing here can be read as deliveries and the
+        # next write would replace it, so it is corrupt by the same argument.
+        empty["corrupt"] = {"path": str(path),
+                            "error": f"manifest is a {type(data).__name__}, not an object",
+                            "bytes": len(raw)}
+        return empty
     data.setdefault("deliveries", [])
     data.setdefault("date", str(date))
     return data
+
+
+def quarantine_corrupt_manifest(date: str) -> str:
+    """Copy an unreadable manifest aside before anything writes over it (R36 F6m).
+
+    Create-only, UTC-stamped, and never a move: this mount grants create and
+    truncate but not unlink (R109), and moving the file would be one more way to
+    lose it. Returns the repo-relative quarantine path.
+
+    Raises ``CorruptManifestError`` when the bytes cannot be read or the copy
+    cannot be written, because at that point the only honest options are to leave
+    the original alone and refuse. Losing a supersession history is the failure
+    this whole function exists to prevent; refusing to record one delivery is
+    recoverable and the caller self-labels it.
+    """
+    source = manifest_path(date)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest = source.with_name(f"{source.stem}.corrupt.{stamp}.json")
+    try:
+        payload = source.read_bytes()
+    except OSError as exc:
+        raise CorruptManifestError(
+            f"{source} is unreadable ({exc}) and its bytes could not be preserved; "
+            f"nothing was written over it") from exc
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex}.tmp")
+        tmp.write_bytes(payload)
+        os.replace(tmp, dest)
+    except OSError as exc:
+        raise CorruptManifestError(
+            f"{source} is corrupt and could not be quarantined ({exc}); it was "
+            f"left as it is rather than overwritten") from exc
+    return repo_relative(dest)
 
 
 def _write(path: Path, payload: Mapping[str, Any]) -> None:
@@ -146,6 +225,7 @@ def record_delivery(
     strategy_state: Optional[Mapping[str, Any]] = None,
     notes: str = "",
     hash_source: Optional[str | Path] = None,
+    re_promoted_from: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
@@ -158,10 +238,33 @@ def record_delivery(
     The record has to name the upload path, and the file cannot wear the upload
     path until the record exists, so one of the two has to be told where to look.
     A rename preserves bytes, so the hash is the same either way.
+
+    R129. ``re_promoted_from`` names the run whose immutable ``final/`` produced
+    these bytes when the row is a re-promotion rather than a fresh build. It is a
+    recorded fact, not a waiver: the row is an ordinary appended delivery and it
+    supersedes the current one the same way any other delivery does.
+
+    R36 F6m. A manifest that exists and cannot be parsed is QUARANTINED before
+    this function writes, and the fresh manifest says where the old bytes went.
+    Raises ``CorruptManifestError`` when the quarantine fails, which the delivery
+    path already degrades to "MANIFEST NOT RECORDED" with the file keeping its
+    ``DO_NOT_UPLOAD_`` name.
     """
     path = Path(delivered_file)
     source = Path(hash_source) if hash_source is not None else path
     manifest = read_manifest(date)
+    corrupt = manifest.pop("corrupt", None)
+    if corrupt:
+        quarantined = quarantine_corrupt_manifest(date)
+        manifest["recovered_from_corrupt"] = {
+            "quarantined_to": quarantined,
+            "error": corrupt.get("error"),
+            "bytes": corrupt.get("bytes"),
+            "recovered_utc": datetime.now(timezone.utc).isoformat(),
+            "note": ("the prior manifest could not be parsed; its bytes are at "
+                     "quarantined_to and NO prior delivery record survives in this "
+                     "file. Records below start from this delivery."),
+        }
     record = {
         "delivered_file": repo_relative(path),
         "sha256": sha256_file(source) if source.exists() else None,
@@ -187,6 +290,8 @@ def record_delivery(
         "recorded_utc": datetime.now(timezone.utc).isoformat(),
         "notes": notes,
     }
+    if re_promoted_from:
+        record["re_promoted_from"] = str(re_promoted_from)
     key = (record["contest_type"], record["slate_tag"])
     for prior in manifest["deliveries"]:
         if (prior.get("contest_type"), prior.get("slate_tag")) != key:
@@ -388,7 +493,17 @@ def verify_manifest(date: str) -> Dict[str, Any]:
     """
     problems: List[str] = []
     checked = 0
-    for record in read_manifest(date).get("deliveries", []):
+    manifest = read_manifest(date)
+    if manifest.get("corrupt"):
+        # R36 F6m. This used to return passed=True with checked=0, which reads as
+        # "nothing recorded, nothing wrong" on the one file preflight cross-checks
+        # against. An unreadable record is the worst state, not the empty one.
+        return {"passed": False, "checked": 0, "date": str(date),
+                "problems": [f"{manifest['corrupt']['path']}: manifest is unreadable "
+                             f"({manifest['corrupt']['error']}); no delivery on this "
+                             f"date has verifiable provenance until it is quarantined "
+                             f"and re-recorded"]}
+    for record in manifest.get("deliveries", []):
         if record.get("status") == "superseded":
             continue
         target = REPO_ROOT / str(record.get("delivered_file") or "")
