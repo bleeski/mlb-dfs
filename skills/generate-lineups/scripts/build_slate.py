@@ -2314,6 +2314,11 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     re-join the export against the salary file by hand to write the brief.
     """
     import collections
+    # R128. One implementation of the within/across split, imported rather than
+    # restated, so the brief and the preflight cannot drift into disagreeing
+    # about the same delivered file. Lazily, because build_slate has no other
+    # module-level dependency on tools/ and a live build should not pay for one.
+    from tools.preflight_upload import partition_duplicate_lineups
 
     with salary_csv.open(encoding="utf-8-sig", newline="") as fh:
         salary = {r["ID"]: r for r in csv.DictReader(fh)}
@@ -2325,6 +2330,7 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     # DK writes a roster in slot order and two entries holding the same ten
     # players can differ in that order, which is why the tuple is sorted.
     rosters: collections.Counter = collections.Counter()
+    contest_rows: list[tuple[str, tuple[str, ...]]] = []
     with entries_csv.open(encoding="utf-8-sig", newline="") as fh:
         for row in csv.reader(fh):
             if len(row) < 14 or not row[0].strip().isdigit():
@@ -2333,6 +2339,11 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
             if any(p not in salary for p in ids):
                 continue
             n += 1
+            # R128. Column 2 is the Contest ID, column 1 the name; the delivered
+            # file has carried both since DK wrote it, so the brief can say
+            # which duplication it found without a second input.
+            contest_rows.append((row[2].strip() or row[1].strip(),
+                                 tuple(sorted(ids))))
             teams = collections.Counter(salary[p]["TeamAbbrev"] for p in ids[2:])
             team, size = teams.most_common(1)[0]
             primary[f"{team} ({size})"] += 1
@@ -2341,6 +2352,7 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
             pairs.add(frozenset(ids[:2]))
             rosters[tuple(sorted(ids))] += 1
     pct = lambda c: {k: f"{v}/{n}" for k, v in c.most_common()}
+    split = partition_duplicate_lineups(contest_rows)
     return {
         "lineups": n,
         "primary_stacks": pct(primary),
@@ -2348,8 +2360,21 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
         "distinct_sp_pairs": len(pairs),
         "distinct_lineups": len(rosters),
         "max_lineup_repeat": max(rosters.values()) if rosters else 0,
+        # R128. `max_lineup_repeat` above is contest-blind by construction and
+        # stays that way: it answers "how many copies of one lineup did we
+        # deliver", which is a real question. It is not the duplication
+        # question, and reading it as one is how a portfolio with zero waste
+        # inside any contest reads as repeating itself.
+        "duplicates_within_contest": split["duplicates_within_contest"],
+        "duplicates_across_contests": split["duplicates_across_contests"],
+        "contests_in_file": split["contests_in_file"],
         "note": "counts across the delivered portfolio; deterministic review "
-                "proxies, never ROI, win rate, or probability",
+                "proxies, never ROI, win rate, or probability. "
+                "duplicates_within_contest is the finding (one contest holding "
+                "a lineup twice pays twice into one prize pool); "
+                "duplicates_across_contests is information, since separate "
+                "contests have separate prize pools. They count different "
+                "objects and do not sum to a total",
     }
 
 

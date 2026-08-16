@@ -3489,5 +3489,323 @@ class ManifestRecordMatchingTests(unittest.TestCase):
                       "rather than print a command that cannot work")
 
 
+OF_DEPTH_SURNAMES = ["Kerr", "Lomax", "Mundy", "Nash", "Oakes", "Pike"]
+
+
+def write_deep_of_salary(path: Path) -> list[str]:
+    """`write_classic_salary` plus six extra OF per team. Returns a legal lineup.
+
+    The stock fixture gives each team one C/1B/2B/3B/SS and four OF, which
+    leaves exactly THREE distinct legal lineups. R128's shape needs ten, and a
+    fixture that cannot build ten distinct lineups cannot express the bug: the
+    partition would be tested against a file with almost nothing to partition.
+    """
+    rows = [SALARY_HEADER]
+    pid = 1000
+    for game, teams in ((GAME_A, ("AAA", "BBB")), (GAME_B, ("CCC", "DDD"))):
+        for team in teams:
+            for i, (pos, roster) in enumerate(SLOT_SPEC):
+                pid += 1
+                rows.append(_salary_row(pid, f"{team} {SURNAMES[i]}", team, game,
+                                        pos, roster, 4000, "",
+                                        "SP" if roster == "P" else str(i)))
+            for j, sur in enumerate(OF_DEPTH_SURNAMES):
+                pid += 1
+                rows.append(_salary_row(pid, f"{team} {sur}", team, game, "OF",
+                                        "OF", 3000, "", str(10 + j)))
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    players = {p.player_id: p for p in parse_dk_salary_csv(str(path))}
+
+    def pick(team, slot, taken):
+        return next(p.player_id for p in players.values()
+                    if p.team == team and slot in p.positions
+                    and p.player_id not in taken)
+
+    lineup = [pick("AAA", "P", set()), pick("CCC", "P", set())]
+    for slot in ("C", "1B", "2B", "3B", "SS"):
+        lineup.append(pick("AAA", slot, set(lineup)))
+    for _ in range(3):
+        lineup.append(pick("CCC", "OF", set(lineup)))
+    return lineup
+
+
+def distinct_lineups(salary_path: Path, base: list[str], k: int) -> list[list[str]]:
+    """k distinct legal lineups, varying only the three CCC outfielders."""
+    import itertools
+    players = {p.player_id: p for p in parse_dk_salary_csv(str(salary_path))}
+    ofs = sorted(pid for pid, p in players.items()
+                 if p.team == "CCC" and "OF" in p.positions)
+    out = [base[:7] + list(combo)
+           for combo in itertools.islice(itertools.combinations(ofs, 3), k)]
+    assert len(out) == k and len({frozenset(v) for v in out}) == k
+    return out
+
+
+class DuplicateLineupContextTests(unittest.TestCase):
+    """R128. Duplication inside a contest and duplication across contests are
+    two facts, and the preflight reported their union under one name that reads
+    as a finding.
+
+    Every fixture here is built so that the old flat count and the new split
+    DISAGREE. That is the whole discipline: a fixture where each contest holds
+    one entry, or where the two numbers happen to coincide, passes under both
+    implementations, and a guard that cannot fail is not a guard (R65).
+    """
+
+    @staticmethod
+    def _pf():
+        import importlib
+        return importlib.import_module("preflight_upload")
+
+    def _advisory(self, tmp, plan, salary=None):
+        """plan is [(contest_id, contest_name, lineup)]; returns the advisory."""
+        pf = self._pf()
+        salary_path = Path(tmp) / "DKSalaries.csv"
+        if salary is None:
+            salary = write_deep_of_salary(salary_path)
+        entries_path = Path(tmp) / "DKEntries.csv"
+        rows, eid = [], 4700000000
+        for contest_id, name, lineup in plan:
+            eid += 1
+            rows.append([str(eid), name, contest_id, "$1"] + list(lineup)
+                        + ["", "1. instructions"])
+        write_entries(entries_path, CLASSIC_HEADER, rows)
+        contest, _slots, entries, _raw, _n = pf.load_entries(entries_path)
+        return pf.advisory(contest, entries, pf.load_salary(salary_path))
+
+    def _2138_2g_plan(self, lineups):
+        """The delivered 2026-08-15 shape: seven lineups mirrored across two
+        identical Pocket Cup satellites, plus five single-entry contests whose
+        five lineups form two duplicate pairs and a singleton.
+
+        Both satellites carry the SAME contest NAME and different contest IDs,
+        because that is what identical satellites actually look like on DK. A
+        partition keyed on the name collapses them into one bucket and reports
+        seven within-contest duplicates that do not exist.
+        """
+        seven, x, y, z = lineups[:7], lineups[7], lineups[8], lineups[9]
+        plan = [(cid, "MLB $5 Pocket Cup", lu)
+                for cid in ("193774256", "193774257") for lu in seven]
+        plan += [(f"1937750{i}", f"MLB Solo Shot {i}", lu)
+                 for i, lu in enumerate([x, x, y, y, z])]
+        return plan
+
+    def test_the_2138_2g_shape_reads_zero_within_and_nine_across(self):
+        """The delivered file from 2026-08-15, and the one extra entry that
+        proves the zero was computed.
+
+        The shape's honest answer for `within` is 0, so this test on its own
+        cannot tell a working partition from one that returns 0 unconditionally
+        -- checked by hand, and a mutation hardwiring `within = 0` passed the
+        first cut of this test. The second half moves the number on the same
+        fixture, which is the assertion that makes the first half mean
+        something (R65).
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            lineups = distinct_lineups(salary_path, base, 10)
+            plan = self._2138_2g_plan(lineups)
+            adv = self._advisory(tmp, plan, salary=base)
+            # One more entry in the first satellite, duplicating a lineup that
+            # satellite already holds. Nothing else about the file changes.
+            worse = self._advisory(tmp, plan + [("193774256", "MLB $5 Pocket Cup",
+                                                 lineups[0])], salary=base)
+        self.assertEqual(adv["entries"], 19)
+        self.assertEqual(adv["contests_in_file"], 7)
+        self.assertEqual(adv["distinct_lineups"], 10)
+        self.assertEqual(adv["duplicates_within_contest"], 0,
+                         "no contest holds the same lineup twice; this portfolio "
+                         "wastes nothing and must not read as if it does")
+        self.assertEqual(adv["duplicates_across_contests"], 9)
+        self.assertEqual(adv["duplicate_lineup_groups"], 9,
+                         "the flat count is unchanged; the split is what is new")
+        self.assertEqual(worse["duplicates_within_contest"], 1,
+                         "one duplicated entry inside one satellite must move "
+                         "this number, or the zero above is hardwired")
+        self.assertEqual(worse["duplicates_across_contests"], 9,
+                         "within-contest waste does not change what crosses a "
+                         "contest boundary")
+        self.assertEqual(worse["duplicate_lineup_groups"], 9,
+                         "the flat count cannot see the difference at all, which "
+                         "is the defect in one line")
+
+    def test_identical_satellites_sharing_a_name_are_still_two_contests(self):
+        """Mutation guard: key the partition on contest NAME and this fixture
+        reports seven within-contest duplicates instead of zero."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            lineups = distinct_lineups(salary_path, base, 10)
+            plan = self._2138_2g_plan(lineups)
+            adv = self._advisory(tmp, plan, salary=base)
+        names = {name for _cid, name, _lu in plan}
+        self.assertLess(len(names), 7, "fixture must reuse a contest name or it "
+                                       "cannot catch a name-keyed partition")
+        self.assertEqual(adv["duplicates_within_contest"], 0)
+
+    def test_duplication_inside_one_contest_is_the_finding(self):
+        """Mutation guard: make `across` mirror the flat count and this fails.
+        One contest holds a lineup twice, so it is in the flat count, but it
+        spans no contest boundary and across must stay 0."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            a, b = distinct_lineups(salary_path, base, 2)
+            adv = self._advisory(tmp, [("111", "Cup", a), ("111", "Cup", a),
+                                       ("222", "Shot", b)], salary=base)
+        self.assertEqual(adv["duplicates_within_contest"], 1)
+        self.assertEqual(adv["duplicates_across_contests"], 0)
+        self.assertEqual(adv["duplicate_lineup_groups"], 1)
+
+    def test_three_copies_in_one_contest_is_one_group_not_two(self):
+        """Mutation guard: count copies (or c-1) instead of groups and this
+        reads 3 (or 2). The unit is the group, matching the flat count it
+        replaces, so the two numbers stay comparable."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            a, = distinct_lineups(salary_path, base, 1)
+            adv = self._advisory(tmp, [("111", "Cup", a)] * 3, salary=base)
+        self.assertEqual(adv["duplicates_within_contest"], 1)
+        self.assertEqual(adv["distinct_lineups"], 1)
+
+    def test_the_two_numbers_do_not_sum_to_the_flat_count(self):
+        """The trap for whoever simplifies this into a partition. One signature
+        held twice by each of two contests is: two within-contest groups, one
+        signature crossing a boundary, and one flat group. 2 + 1 != 1, and all
+        three readings are correct about different questions."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            a, = distinct_lineups(salary_path, base, 1)
+            adv = self._advisory(tmp, [("111", "Cup", a), ("111", "Cup", a),
+                                       ("222", "Cup B", a), ("222", "Cup B", a)],
+                                 salary=base)
+        self.assertEqual(adv["duplicates_within_contest"], 2)
+        self.assertEqual(adv["duplicates_across_contests"], 1)
+        self.assertEqual(adv["duplicate_lineup_groups"], 1)
+        self.assertNotEqual(
+            adv["duplicates_within_contest"] + adv["duplicates_across_contests"],
+            adv["duplicate_lineup_groups"],
+            "nothing may present these as summing to the flat count")
+
+    def test_a_single_contest_file_can_never_report_across_duplication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            a, b = distinct_lineups(salary_path, base, 2)
+            adv = self._advisory(tmp, [("111", "Cup", a), ("111", "Cup", a),
+                                       ("111", "Cup", b)], salary=base)
+        self.assertEqual(adv["contests_in_file"], 1)
+        self.assertEqual(adv["duplicates_across_contests"], 0)
+        self.assertEqual(adv["duplicates_within_contest"], 1)
+
+    def test_blank_contest_columns_degrade_to_the_old_flat_reading(self):
+        """A hand-assembled file can leave both columns empty. Everything lands
+        in one bucket, which is the OLD reading, not a wrong new one."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            a, b = distinct_lineups(salary_path, base, 2)
+            adv = self._advisory(tmp, [("", "", a), ("", "", a), ("", "", b)],
+                                 salary=base)
+        self.assertEqual(adv["contests_in_file"], 1)
+        self.assertEqual(adv["duplicates_within_contest"],
+                         adv["duplicate_lineup_groups"])
+
+    def test_the_printed_block_says_which_duplication_it_found(self):
+        """The T-5 surface. `duplicate lineup groups: 9` unqualified is what
+        nearly cost a good portfolio, so the bare phrasing must be gone."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            lineups = distinct_lineups(salary_path, base, 10)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            rows, eid = [], 4700000000
+            for contest_id, name, lineup in self._2138_2g_plan(lineups):
+                eid += 1
+                rows.append([str(eid), name, contest_id, "$1"] + list(lineup)
+                            + ["", "1. instructions"])
+            write_entries(entries_path, CLASSIC_HEADER, rows)
+            out = run_preflight("--entries", str(entries_path),
+                                "--salary", str(salary_path)).stdout
+        self.assertIn("duplicate lineups WITHIN a contest: 0", out)
+        self.assertIn("same lineup in MORE THAN ONE contest: 9 of 10", out)
+        self.assertIn("across 7 contests", out)
+        self.assertIn("information, not a finding", out)
+        self.assertNotIn("duplicate lineup groups:", out,
+                         "the unqualified line is the defect, not a fallback")
+
+    def test_verify_export_reports_the_same_split_from_the_same_helper(self):
+        """Both tools call one `advisory()`. Forking a second implementation
+        into verify_export is the outcome this repo does not want, so the shared
+        call is pinned rather than assumed."""
+        source = (REPO / "tools" / "verify_export.py").read_text(encoding="utf-8")
+        self.assertIn("advisory(contest, entries, salary)", source)
+        self.assertNotIn("duplicates_within_contest", source,
+                         "verify_export must inherit the split, never restate it")
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            lineups = distinct_lineups(salary_path, base, 10)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            rows, eid = [], 4700000000
+            for contest_id, name, lineup in self._2138_2g_plan(lineups):
+                eid += 1
+                rows.append([str(eid), name, contest_id, "$1"] + list(lineup)
+                            + ["", "1. instructions"])
+            write_entries(entries_path, CLASSIC_HEADER, rows)
+            proc = run_verify("--entries", str(entries_path),
+                              "--salary", str(salary_path), "--json")
+        adv = json.loads(proc.stdout)["advisory"]
+        self.assertEqual(adv["duplicates_within_contest"], 0)
+        self.assertEqual(adv["duplicates_across_contests"], 9)
+        self.assertEqual(adv["contests_in_file"], 7)
+
+    def test_the_brief_and_the_preflight_agree_on_one_delivered_file(self):
+        """Cross-tool, on DK-shaped bytes. The brief reads the delivered file
+        directly and the preflight reads it through `advisory`; two readers of
+        one file that disagree about how much of it duplicates is worse than
+        either number alone."""
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r128", path)
+        build_slate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build_slate)
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            lineups = distinct_lineups(salary_path, base, 10)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            rows, eid = [], 4700000000
+            for contest_id, name, lineup in self._2138_2g_plan(lineups):
+                eid += 1
+                rows.append([str(eid), name, contest_id, "$1"] + list(lineup)
+                            + ["", "1. instructions"])
+            write_entries(entries_path, CLASSIC_HEADER, rows)
+            block = build_slate.portfolio_exposure(salary_path, entries_path)
+            pf = self._pf()
+            contest, _slots, parsed, _raw, _n = pf.load_entries(entries_path)
+            adv = pf.advisory(contest, parsed, pf.load_salary(salary_path))
+        for key in ("duplicates_within_contest", "duplicates_across_contests",
+                    "contests_in_file", "distinct_lineups"):
+            self.assertEqual(block[key], adv[key],
+                             f"brief and preflight disagree on {key}")
+        self.assertEqual(block["duplicates_within_contest"], 0)
+        self.assertEqual(block["duplicates_across_contests"], 9)
+
+    def test_the_helper_carries_the_reason_the_split_is_not_a_filter(self):
+        """The across number is what says whether a satellite bank is being
+        reused deliberately. A later reader who thinks it is noise has the
+        rationale in front of them."""
+        source = (REPO / "tools" / "preflight_upload.py").read_text(encoding="utf-8")
+        self.assertIn("SPLIT, not a filter", source)
+        self.assertIn("no_duplicates_within_contest", source,
+                      "the brief half rides the allocator's own vocabulary")
+        self.assertIn("allow_cross_contest_reuse", source)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

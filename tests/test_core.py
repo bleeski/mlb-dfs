@@ -12283,7 +12283,9 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
-    def _files(self, tmp, rosters):
+    def _files(self, tmp, rosters, contest_ids=None):
+        """R128: `contest_ids` is one contest per roster, defaulting to a
+        single-contest file so every caller predating the split is unchanged."""
         salary = Path(tmp) / "DKSalaries.csv"
         with salary.open("w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh)
@@ -12293,13 +12295,14 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
                 team = "AAA" if pid.startswith("h") else "BBB"
                 w.writerow(["OF", f"n{pid} ({pid})", f"n{pid}", pid, "OF",
                             "4000", "AAA@BBB", team, "8.0"])
+        ids = list(contest_ids) if contest_ids else ["1"] * len(rosters)
         entries = Path(tmp) / "DKEntries.csv"
         with entries.open("w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh)
             w.writerow(["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
                         "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"])
-            for i, roster in enumerate(rosters):
-                w.writerow([str(100 + i), "Contest", "1", "$1"] + list(roster))
+            for i, (roster, cid) in enumerate(zip(rosters, ids)):
+                w.writerow([str(100 + i), "Contest", cid, "$1"] + list(roster))
         return salary, entries
 
     def test_the_exposure_block_counts_distinct_lineups_off_the_delivered_file(self):
@@ -12325,6 +12328,78 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
             block = module.portfolio_exposure(salary, entries)
         self.assertEqual(block["distinct_lineups"], 1)
         self.assertEqual(block["max_lineup_repeat"], 2)
+
+    def test_the_brief_splits_duplication_the_way_the_preflight_does(self):
+        """R128, brief half. Seven lineups mirrored across two contests, and
+        the brief said `max_lineup_repeat: 2` with no way to tell whether that
+        repetition was inside a contest or across two of them."""
+        module = self._module()
+        rosters, ids = [], []
+        for j in range(7):
+            lineup = [f"h{i}" for i in range(9)] + [f"h{20 + j}"]
+            rosters += [lineup, list(lineup)]
+            ids += ["193774256", "193774257"]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._files(tmp, rosters, ids)
+            block = module.portfolio_exposure(salary, entries)
+        self.assertEqual(block["lineups"], 14)
+        self.assertEqual(block["distinct_lineups"], 7)
+        self.assertEqual(block["max_lineup_repeat"], 2)
+        self.assertEqual(block["contests_in_file"], 2)
+        self.assertEqual(block["duplicates_within_contest"], 0,
+                         "each contest holds seven distinct lineups")
+        self.assertEqual(block["duplicates_across_contests"], 7)
+
+    def test_the_brief_calls_a_within_contest_duplicate_the_finding(self):
+        """Mutation guard: one contest holding a lineup twice is the waste, and
+        it must not read the same as the mirrored-satellite case above."""
+        module = self._module()
+        base = [f"h{j}" for j in range(10)]
+        other = [f"h{j}" for j in range(9)] + ["h99"]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._files(tmp, [base, list(base), other],
+                                          ["1", "1", "2"])
+            block = module.portfolio_exposure(salary, entries)
+        self.assertEqual(block["duplicates_within_contest"], 1)
+        self.assertEqual(block["duplicates_across_contests"], 0)
+
+    def test_the_brief_and_the_preflight_share_one_implementation(self):
+        """Two readers of one delivered file that disagree about how much of it
+        duplicates is worse than either number alone, so the brief imports the
+        preflight's helper instead of restating the partition."""
+        source = (Path(__file__).resolve().parents[1] / "skills"
+                  / "generate-lineups" / "scripts" / "build_slate.py"
+                  ).read_text(encoding="utf-8")
+        self.assertIn(
+            "from tools.preflight_upload import partition_duplicate_lineups",
+            source)
+        module = self._module()
+        base = [f"h{j}" for j in range(10)]
+        other = [f"h{j}" for j in range(9)] + ["h99"]
+        rosters = [base, list(base), other, list(other)]
+        ids = ["1", "1", "1", "2"]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._files(tmp, rosters, ids)
+            block = module.portfolio_exposure(salary, entries)
+        from tools.preflight_upload import partition_duplicate_lineups
+        direct = partition_duplicate_lineups(
+            zip(ids, (tuple(sorted(r)) for r in rosters)))
+        for key in ("duplicates_within_contest", "duplicates_across_contests",
+                    "contests_in_file", "distinct_lineups"):
+            self.assertEqual(block.get(key, direct[key]), direct[key],
+                             f"brief and helper disagree on {key}")
+        self.assertEqual(direct["duplicates_within_contest"], 1)
+        self.assertEqual(direct["duplicates_across_contests"], 1)
+
+    def test_the_brief_note_refuses_to_present_the_two_as_a_total(self):
+        module = self._module()
+        base = [f"h{j}" for j in range(10)]
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._files(tmp, [base, list(base)], ["1", "2"])
+            block = module.portfolio_exposure(salary, entries)
+        self.assertIn("do not sum to a total", block["note"])
+        self.assertIn("is the finding", block["note"])
+        self.assertIn("is information", block["note"])
 
     def test_the_pipeline_hands_the_reuse_block_to_whoever_writes_the_brief(self):
         """`candidate_reuse_counts` has been in the allocation result since v1.9

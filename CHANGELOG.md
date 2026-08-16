@@ -25,6 +25,77 @@ performance claim.
 
 ---
 
+## 2026-08-16 — R128: duplicate-lineup reporting gets contest context
+
+DEV, claim `engine_2026-08-16`. Head of Tier 1's QA-hardening batch after R129
+closed, taken in the batch's stated order. Gate 1000 -> 1015 (`test_core` 653
+-> 657, `test_upload_integrity` 207 -> 218); CLAUDE.md's session-start line and
+the ledger Quick Card pin moved with it, the latter on a `ledger` claim, pin
+line only.
+
+**What.** The preflight printed `duplicate lineup groups: 9` on the delivered
+2026-08-15 `2138_2g` file and BUILD nearly rejected a good portfolio over it
+with no time at T-5 to go write a script. Zero of those nine were inside a
+contest: seven were the same seven lineups mirrored across two identical Pocket
+Cup satellites, and the other two were pairs among five single-entry contests.
+`advisory()` counted duplicate lineup signatures across the whole file with no
+contest partition, and the print site said the number without saying what kind
+of duplication it was.
+
+**Why it is a defect and not a display quibble.** Duplication inside one
+contest is waste: two entries pay twice into one prize pool for one outcome,
+and it is exactly what the allocator's `no_duplicates_within_contest` exists to
+prevent. Duplication across contests is free, frequently deliberate, and the
+allocator permits it by default under `allow_cross_contest_reuse`. The engine
+has held both of those names since well before this entry; the preflight was
+reporting their union under a third name that reads as a finding. It fires on
+the one surface the project calls the pre-upload rule, at the moment the
+operator has the least time to check it by hand.
+
+**Fix.** One helper, `preflight_upload.partition_duplicate_lineups`, takes
+`(contest_key, lineup_signature)` per filled entry and returns
+`duplicates_within_contest`, `duplicates_across_contests`, `distinct_lineups`,
+`contests_in_file`, and the flat `duplicate_lineup_groups`. `advisory()` calls
+it, so `verify_export.py` inherits the split through the shared call it already
+made rather than growing a second implementation. `build_slate.portfolio_
+exposure` imports the same helper for the brief instead of restating the
+partition, because two readers of one delivered file that disagree about how
+much of it duplicates would be worse than either number alone. The Entry ID row
+already carries its contest, so the partition took no new input; the key is
+contest ID with the name as fallback, since identical satellites share a name
+and a name-keyed partition collapses them.
+
+**A split, not a filter.** The across-contest number is reported, not
+suppressed: it is the number that says whether a satellite bank is being reused
+deliberately. It reads as information and says so in the line itself. The two
+numbers do NOT sum to the flat count and nothing may present them as if they
+did — a signature held twice by each of two contests is two within-contest
+groups, one signature crossing a boundary, and one flat group. All three
+readings are correct about different questions, which is why one number could
+not answer the operator's.
+
+**Retained.** `duplicate_lineup_groups` stays in both tools' JSON. Nothing in
+tree reads it (checked this session), but it is a published key and dropping one
+to save a line is not a trade worth making.
+
+**What the work corrected about the entry as filed.** The entry cited
+`preflight_upload.py:1426` and `:1655`; both moved when R129 landed earlier the
+same day, and the real sites were `advisory()` at 1468, the flat count at
+1486-1487, and the unqualified print at 1716-1717. The entry also scoped the fix
+to the preflight and the brief without noting that `verify_export.py:574` calls
+the same `advisory()`, which is what made this one fix rather than two.
+
+**The test that could not fail, caught in this session's own suite.** The
+2138_2g shape's honest answer for `duplicates_within_contest` is 0, so the
+headline reproduction test asserting `within == 0` passed against a mutation
+that hardwired the value to 0. Hand mutation-checking found it; the test now
+appends one duplicated entry to one satellite on the same fixture and asserts
+the number moves to 1, which is what makes the zero mean anything. Seven
+mutations were run by hand against the finished guard (contest-blind `within`,
+`within` counting copies instead of groups, `across` mirroring the flat count,
+`across` firing on every signature, a name-keyed partition, the dropped flat
+key, and the return of the unqualified print line) and all seven were caught.
+
 ## 2026-08-16 — R129 + R36 F6m(1): supersession gets a way back, and a corrupt manifest stops erasing itself
 
 DEV, claim `engine_2026-08-16`. Head of Tier 1's QA-hardening batch, taken in

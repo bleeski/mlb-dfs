@@ -59,7 +59,9 @@ Optional, never blocking on its own absence:
               it at T-5 (R20a)
 
 Advisory prints (never affect the exit code): exposure, lineup-overlap
-histogram, duplicate-lineup groups, first lock.
+histogram, first lock, and lineup duplication split by contest (R128) --
+duplicates WITHIN a contest is the finding, duplicates ACROSS contests is
+information, and the two count different objects and never sum to a total.
 
 Usage:
     python tools/preflight_upload.py --entries outputs/<date>/DKEntries.csv \\
@@ -1465,6 +1467,65 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
 # advisory
 # --------------------------------------------------------------------------
 
+def partition_duplicate_lineups(rows: Iterable[Tuple[str, Any]]) -> Dict[str, int]:
+    """Split lineup duplication into the finding and the information (R128).
+
+    ``rows`` is one ``(contest_key, lineup_signature)`` pair per filled entry.
+    The signature is whatever the caller keys a lineup on; this function only
+    compares them, so the preflight's person-normalised frozenset and the
+    brief's sorted player-ID tuple both work.
+
+    Two duplications wear one word today and they are not the same fact.
+    Duplication INSIDE one contest is waste: the entries pay twice into one
+    prize pool for one outcome, and it is exactly what the allocator's
+    ``no_duplicates_within_contest`` exists to prevent. Duplication ACROSS
+    contests is free, often deliberate, and the allocator permits it by
+    default under ``allow_cross_contest_reuse``. Reporting the union under a
+    name that reads as a finding is what let a correct portfolio look broken
+    at T-5 on 2026-08-15: nine groups printed, zero of them inside a contest,
+    and the nine were seven lineups mirrored across two identical satellites.
+
+    This is a SPLIT, not a filter. The across-contest number is retained and
+    reported because it is the number that says whether a satellite bank is
+    being reused deliberately; suppressing it would trade one blind spot for
+    another.
+
+    The two numbers do NOT sum to ``duplicate_lineup_groups`` and must never be
+    presented as if they did. They count different objects. Within counts
+    (contest, signature) pairs a contest holds more than once, so one signature
+    duplicated in two different contests contributes 2. Across counts
+    signatures appearing in more than one contest, so that same signature
+    contributes 1. The flat count would call it 1 group. All three readings are
+    correct about different questions, which is the whole reason one number
+    could not answer the operator's.
+    """
+    by_contest: Dict[str, List[Any]] = collections.defaultdict(list)
+    for contest_key, sig in rows:
+        by_contest[contest_key].append(sig)
+    within = 0
+    contests_by_sig: Dict[Any, set] = collections.defaultdict(set)
+    all_sigs: collections.Counter = collections.Counter()
+    for contest_key, sigs in by_contest.items():
+        counts = collections.Counter(sigs)
+        within += sum(1 for c in counts.values() if c > 1)
+        all_sigs.update(counts)
+        for sig in counts:
+            contests_by_sig[sig].add(contest_key)
+    return {
+        "distinct_lineups": len(all_sigs),
+        "contests_in_file": len(by_contest),
+        "duplicates_within_contest": within,
+        "duplicates_across_contests": sum(
+            1 for keys in contests_by_sig.values() if len(keys) > 1),
+        # Retained deliberately. Nothing in tree reads it today (checked
+        # 2026-08-16), but it is a published key in both this tool's --json and
+        # verify_export's, and dropping a key from a JSON contract to save a
+        # line is not a trade worth making. It is the flat, contest-blind count
+        # the two numbers above supersede.
+        "duplicate_lineup_groups": sum(1 for c in all_sigs.values() if c > 1),
+    }
+
+
 def advisory(contest: str, entries: Sequence[EntryRow],
              salary: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
     filled = [e for e in entries if not e.is_blank]
@@ -1483,8 +1544,14 @@ def advisory(contest: str, entries: Sequence[EntryRow],
     for pid, row in salary.items():
         persons[pid] = f"{_norm_name(row.get('Name'))}|{str(row.get('TeamAbbrev') or '').upper()}"
     sets = [frozenset(persons.get(pid, pid) for pid in e.cells if pid) for e in filled]
-    dupe_groups = [ids for ids, c in collections.Counter(sets).items() if c > 1]
-    out["duplicate_lineup_groups"] = len(dupe_groups)
+    # R128. The contest each entry belongs to is already in the row; the DK
+    # template writes it beside the Entry ID, so the partition needs no new
+    # input. Contest ID is the key and the name is the fallback, because a
+    # hand-assembled file can leave the ID blank while the name still separates
+    # the contests; when both are blank every entry lands in one bucket, which
+    # degrades to exactly the old flat reading rather than to a wrong one.
+    out.update(partition_duplicate_lineups(
+        (e.contest_id or e.contest_name or "", sig) for e, sig in zip(filled, sets)))
     if n > 1:
         overlaps = collections.Counter()
         for i in range(n):
@@ -1714,7 +1781,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             top = ", ".join(f"{x['player']} {x['pct']}%" for x in adv["top_exposure"][:5])
             print(f"  top exposure: {top}")
         if adv.get("duplicate_lineup_groups"):
-            print(f"  duplicate lineup groups: {adv['duplicate_lineup_groups']}")
+            # R128. Same trigger as before, so no file that prints nothing
+            # today starts printing; what changed is that the operator is told
+            # WHICH duplication this is. The within line prints even at zero,
+            # because "zero inside a contest" is the reassurance the T-5 reader
+            # needs and inferring it from silence is what nearly cost a good
+            # portfolio on 2026-08-15.
+            n_contests = adv.get("contests_in_file", 1)
+            plural = "s" if n_contests != 1 else ""
+            print(f"  duplicate lineups WITHIN a contest: "
+                  f"{adv.get('duplicates_within_contest', 0)}"
+                  f"  (the finding: one contest holding a lineup twice pays "
+                  f"twice into one prize pool)")
+            print(f"  same lineup in MORE THAN ONE contest: "
+                  f"{adv.get('duplicates_across_contests', 0)} of "
+                  f"{adv.get('distinct_lineups', 0)} distinct lineups, across "
+                  f"{n_contests} contest{plural}  (information, not a finding: "
+                  f"separate contests have separate prize pools, so reuse is "
+                  f"free and often deliberate)")
         if adv.get("overlap_histogram"):
             print(f"  lineup overlap histogram: {adv['overlap_histogram']}")
         if info.get("feed_file"):

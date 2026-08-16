@@ -74,7 +74,12 @@ EXPECTED_SUITE_COUNTS = {
     # ladder) and three on the brief (distinct lineups off the delivered bytes,
     # DK slot order not inventing diversity, both pipeline return paths carrying
     # the block).
-    "tests.test_core": 653,
+    # R128, 2026-08-16: 653 -> 657, the four that pin the brief half of the
+    # within/across split -- the mirrored-satellite shape reading zero waste,
+    # a within-contest duplicate still reading as the finding, the brief
+    # importing the preflight's one helper rather than restating the
+    # partition, and the note refusing to present the two numbers as a total.
+    "tests.test_core": 657,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -95,7 +100,18 @@ EXPECTED_SUITE_COUNTS = {
     # eight on promote_run (the truthful appended row, the run's final/ left
     # untouched, run-scoped by default, and four refusals), and nine on matching a
     # row to a file now that one sha256 can carry several rows.
-    "tests.test_upload_integrity": 207,
+    # R128, 2026-08-16: 207 -> 218, the eleven that pin duplicate reporting
+    # having contest context -- the 2026-08-15 2138_2g shape reading zero
+    # within and nine across (plus the extra entry that proves the zero was
+    # computed rather than hardwired, which the first cut of that test did not
+    # catch), identical satellites sharing a NAME still counting as two
+    # contests, within-contest duplication as the finding, three copies being
+    # one group, the two numbers refusing to sum to the flat count, a
+    # single-contest file, blank contest columns degrading to the old flat
+    # reading, the printed T-5 block, verify_export inheriting the split
+    # through the shared advisory(), the brief agreeing on one delivered file,
+    # and the rationale for why this is a split and not a filter.
+    "tests.test_upload_integrity": 218,
     "tests.test_golden_replay": 9,
     "tests.test_paste_lineups": 75,
 }
