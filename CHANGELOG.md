@@ -25,6 +25,69 @@ performance claim.
 
 ---
 
+## 2026-08-16 — Fragment-merge and queue re-order: R135–R141 filed from the leverage ideation bundle, R11's double listing resolved, R132 split on the autonomy boundary
+
+DEV, claim `engine_2026-08-16`, docs only, no code. Ben: review the fragment
+inbox, slot what survives, then re-order the queue on impact, difficulty and
+critical path.
+
+**The bundle.** The one unmerged fragment
+(`docs/backlog_inbox/2026-08-16_unassigned_leverage-and-contrarian-ideation.md`)
+enters as seven numbered items and three riders, every cited measurement
+re-verified against the ledger and the tree first, per the R36 discipline:
+`ownership_prior.py` v0.1 exists untracked and unwired with
+`grade_against_actuals` at `:219` and a header that says "start the
+predict-then-grade loop on slate one"; 3.17's 104/116 sub-10% carry, 51%-vs-13%
+winner rate, chalk splits (+4.9/+9.5/+8.6/+1.1/−13.2) and $250/$200/$100
+salary-leave medians; 3.18's 9.1-vs-15.4 captain tranche with the 64-contest
+at-share caveat carried onto the entry; 3.19's 15,402 users, 2,211 regulars,
+132/148 winners-were-regulars. Filed: **R135** (ownership shadow loop, Tier 2
+beside R118 — every slate without a prediction file is a slate that can never
+grade anything), **R136** (qa_portfolio leverage panel, Tier 1's QA batch
+directly behind R126, same report block), **R137** (market-vs-crowd divergence
+screen, Tier 5, with MLB_Classic.md 14's quota arithmetic priced on the
+entry), **R138** (one-stack-family-per-game SKILL.md practice, XS, rides
+R131's session), **R139** (Showdown captain-leverage ladder — report rides
+R136, control waits on D3), **R140** (opponent-conditioned field profiles for
+recurring satellite families, Tier 2 tail, behind R118+R48 whose outputs it
+consumes), **R141** (late-swap leverage pass, Tier 5, behind R135). Riders,
+not numbers: R10 gains its two control halves (leverage-carry inside the
+primary stack; replay-calibrated duplication budget — both wait on the prior
+beating flat-12, unchanged); R37(2)(b) gains the field-share-adaptive
+generalization, gated on R48; Tier 4 gains **D1–D3** (salary-leave
+act-or-record; supersatellite posture, the one measured anti-chalk cell;
+captain ladder defaults). The fragment's frame is the board's own — broad
+contrarianism stays rejected on 3.17 — and nothing jumps the Tier 2 spine.
+The fragment is retained on disk until its items land, per the sweep rule.
+
+**The re-order.** R134 landed after the queue's last note, so three entries
+were corrected against it rather than left describing a tree that no longer
+exists. **R126:** qa_portfolio now computes the frontier proxies at review
+time, so the remainder is the pipeline/brief half plus the per-game zeroing
+histogram — unchanged in kind, cheaper in practice. **R11:** moved to Tier
+1's tail and its Tier 5/Tier 6 double listing collapsed to one entry; the
+Tier 5 note's claim that its R114/R116/R117 gate had fully cleared was false
+on R117, which is open — corrected on the entry (the R133 lesson: a note
+asserting a state it did not check). The move stands on the chassis R134
+built, the six items two hand-runs found, and Ben's R134 directive naming an
+adversarial QA pass the standing follow-up to unattended builds. **R132:**
+split on the 2026-08-16 autonomy contract — the small-slate-defaults S
+variant and ladder rungs over engine-derived floors and guesses are
+DEV-ready (the R37/R116 precedent); any rung raising an exposure cap is
+R125(c)'s Tier 4 decision, which the supervisor's landing makes the
+highest-leverage minutes on the board. One order swap inside Tier 1: **R117
+ahead of R133** — selection impact over label truth, and R117's parse half is
+R122's Showdown handedness input. Everything else holds its 2026-08-12
+adjudicated position; the full reasoning is the queue note of this date.
+
+Not merged, deliberately: the two 2026-08-13 ledger fragments and the
+2026-08-15 audit-macro fragment are ARCHIVE's (their backlog asks were
+already carried as R115/R116); the 08-09 curated-archetypes fragment stays
+ARCHIVE's to execute. Gate this session, per-suite: 657 + 56 + 218 + 9 + 75
+= 1015, zero skips; `audit.py --terse` PASS v2.26.0 26 modules; and
+DeterminismTests fit a single call at 20.2s — the load-dependent ceiling the
+08-15 ledger-inbox fragment describes, measured from the green side.
+
 ## 2026-08-16 — R134: a supervisor takes the retries a human was taking by hand
 
 DEV, claim `engine_2026-08-16`. Ben, this date: "I want you to have the freedom
