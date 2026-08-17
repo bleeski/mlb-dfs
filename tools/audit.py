@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import importlib.util
 import json
 import py_compile
@@ -79,7 +80,16 @@ EXPECTED_SUITE_COUNTS = {
     # a within-contest duplicate still reading as the finding, the brief
     # importing the preflight's one helper rather than restating the
     # partition, and the note refusing to present the two numbers as a total.
-    "tests.test_core": 657,
+    # R142, 2026-08-17: 657 -> 667, the ten that pin the skill-cache drift
+    # check -- an in-sync copy, Cowork's JSON re-quoting of the description
+    # (which would otherwise report every installed skill drifted forever), a
+    # stale body, a stale trigger description, the pointer body that differs by
+    # design while its description is still compared, an uninstalled repo skill,
+    # an unreachable cache reporting silent rather than clean, and the wiring
+    # landing in warnings and never errors. Plus two on the install-length
+    # limit, which is checked against the repo alone and so still reports where
+    # the cache is invisible, and one of which asserts against the live tree.
+    "tests.test_core": 667,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -339,6 +349,21 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
             f"CHANGELOG.md was last written; a change is not shipped until its "
             f"entry exists. Newest: {debt['commits'][0]}")
 
+    drift = skill_cache_drift(root)
+    checks["skill_cache"] = drift
+    if drift["oversized"]:
+        named = "; ".join(f"{d['skill']} {d['chars']}>{d['limit']}"
+                          for d in drift["oversized"])
+        warnings.append(
+            f"skill description too long to install as written: {named}. It "
+            f"gets shortened by hand at install time, which is permanent drift")
+    if drift["available"] and drift["drifted"]:
+        named = "; ".join(f"{d['skill']} ({', '.join(d['reasons'])})"
+                          for d in drift["drifted"])
+        warnings.append(
+            f"installed skill snapshot behind the repo: {named}. Re-save with "
+            f"save_skill(overwrite=True) from skills/<name>/SKILL.md")
+
     return {
         "project_version": PROJECT_VERSION,
         "layout_version": LAYOUT_VERSION,
@@ -564,6 +589,138 @@ def changelog_debt(root: Path) -> Dict[str, Any]:
     out["available"] = True
     out["unrecorded_commits"] = len(commits)
     out["commits"] = commits
+    return out
+
+
+# R142. Cowork installs a skill as a SNAPSHOT of its SKILL.md, not a live read
+# of the repo, and nothing warns when the two diverge. Measured 2026-08-16: the
+# installed `generate-lineups` was 85 commits and 351 lines behind the repo,
+# missing the autobuild path, the paste intake, the preflight exit codes and the
+# Showdown thesis ladder, and its trigger still called Showdown certified.
+#
+# The installed BODY is now a pointer at the repo file (see the sentinel below),
+# so a body diff is expected there and is not drift. What a pointer cannot carry
+# is the TRIGGER DESCRIPTION: that lives in the save_skill argument, is what
+# routes a prompt to the skill at all, and is invisible to a session that only
+# reads the repo. So the description is compared always, the body only for a
+# cached copy that still claims to be a full copy.
+POINTER_SENTINEL = "skill-cache: pointer"
+SKILL_CACHE_ENV = "MLB_SKILL_CACHE_DIR"
+# Cowork refuses a description past this, so a repo skill written longer than it
+# CANNOT be installed as written and someone shortens it by hand at install
+# time. That is drift the moment it is created and it never converges: found
+# 2026-08-17 on mlb-standings-pull-checklist at 1073 characters, which is why
+# this is checked at the source instead of only reported downstream.
+SKILL_DESCRIPTION_LIMIT = 1024
+
+
+def _skill_frontmatter(text: str) -> Dict[str, str]:
+    """name/description out of a SKILL.md, tolerating both quoting styles.
+
+    The repo writes `description: Build a ...` bare; Cowork rewrites it
+    `description: "Build a ..."` with JSON escaping. Comparing the raw lines
+    reports drift on every skill forever, which is worse than not checking.
+    """
+    out: Dict[str, str] = {}
+    if not text.startswith("---"):
+        return out
+    end = text.find("\n---", 3)
+    if end == -1:
+        return out
+    for line in text[3:end].splitlines():
+        if ":" not in line or line.startswith((" ", "\t", "#")):
+            continue
+        key, _, value = line.partition(":")
+        value = value.strip()
+        if len(value) > 1 and value[0] == '"' and value[-1] == '"':
+            try:
+                value = json.loads(value)
+            except ValueError:
+                value = value[1:-1]
+        out[key.strip()] = value
+    return out
+
+
+def _skill_body(text: str) -> str:
+    if not text.startswith("---"):
+        return text
+    end = text.find("\n---", 3)
+    return text if end == -1 else text[end + 4:].lstrip("\n")
+
+
+def skill_cache_dir(root: Path) -> Optional[Path]:
+    """The installed-skill cache, or None when it is not reachable.
+
+    In a Cowork sandbox the mount holds the repo and `.claude/skills/` as
+    siblings. From Ben's own PowerShell the cache lives under an AppData path
+    keyed by session GUIDs and is not derivable from the repo, so the check
+    goes quiet rather than guessing at a path or reporting a false clean.
+    """
+    override = os.environ.get(SKILL_CACHE_ENV)
+    if override:
+        path = Path(override)
+        return path if path.is_dir() else None
+    # resolve() first: run_audit is called with a relative root in tests and by
+    # hand, and Path('.').parent is Path('.'), which silently looks like "no
+    # cache" instead of looking one level up from the repo.
+    candidate = root.resolve().parent / ".claude" / "skills"
+    return candidate if candidate.is_dir() else None
+
+
+def skill_cache_drift(root: Path) -> Dict[str, Any]:
+    """Installed skill snapshots that no longer match the repo they came from.
+
+    WARNING only, and silent when it cannot see the cache. Modeled on
+    changelog_debt: an audit that fails on its own bookkeeping is worse than one
+    that stays quiet. Reports per skill so the message names what to re-save.
+    """
+    out: Dict[str, Any] = {"available": False, "checked": 0, "drifted": [],
+                           "oversized": []}
+    # The length check reads only the repo, so it runs even where the cache is
+    # unreachable: a description too long to install is a defect in the repo.
+    for repo_skill in sorted((root / "skills").glob("*/SKILL.md")):
+        try:
+            desc = _skill_frontmatter(
+                repo_skill.read_text(encoding="utf-8")).get("description", "")
+        except OSError:
+            continue
+        if len(desc) > SKILL_DESCRIPTION_LIMIT:
+            out["oversized"].append({"skill": repo_skill.parent.name,
+                                     "chars": len(desc),
+                                     "limit": SKILL_DESCRIPTION_LIMIT})
+
+    cache = skill_cache_dir(root)
+    if cache is None:
+        return out
+    out["available"] = True
+    out["cache_dir"] = str(cache)
+
+    for repo_skill in sorted((root / "skills").glob("*/SKILL.md")):
+        name = repo_skill.parent.name
+        cached = cache / name / "SKILL.md"
+        if not cached.is_file():
+            continue  # not installed; not this check's business
+        try:
+            cached_text = cached.read_text(encoding="utf-8")
+            repo_text = repo_skill.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        out["checked"] += 1
+
+        reasons: List[str] = []
+        cached_desc = _skill_frontmatter(cached_text).get("description", "")
+        repo_desc = _skill_frontmatter(repo_text).get("description", "")
+        if cached_desc != repo_desc:
+            reasons.append("trigger description")
+
+        cached_body = _skill_body(cached_text)
+        if POINTER_SENTINEL not in cached_body:
+            digest = lambda s: hashlib.sha256(  # noqa: E731
+                s.strip().encode("utf-8")).hexdigest()
+            if digest(cached_body) != digest(_skill_body(repo_text)):
+                reasons.append("body")
+        if reasons:
+            out["drifted"].append({"skill": name, "reasons": reasons})
     return out
 
 

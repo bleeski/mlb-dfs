@@ -25,6 +25,63 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R142: the installed skill stops being a copy, and the audit says when a snapshot has fallen behind
+
+DEV, claim `engine_2026-08-17`, plus a `ledger` claim for the pin line only.
+Ben: if we update the skill in the future, how do we make sure you have the
+latest version.
+
+**The failure.** Cowork installs a skill by COPYING its SKILL.md. The copy
+never re-reads the repo and nothing warns when they diverge. Measured
+2026-08-16: the installed `generate-lineups` was the 2026-07-24 snapshot, 85
+commits and 351 lines behind, missing the autobuild path, projection
+enrichment, R32 paste intake, the preflight-before-presenting section and the
+Showdown thesis ladder outright, with a trigger description that still called
+Showdown certified. A session following it would have shipped a Showdown file
+labeled upload-ready. Nothing in the repo could see this, because the repo copy
+was fine.
+
+**Fix one: the installed body is now a pointer.** `generate-lineups` and
+`mlb-standings-pull-checklist` were re-saved as ~50-line files that name the
+repo path, say to read `CLAUDE.md` and the repo SKILL.md in full, and carry
+only the handful of walls that must hold even if the repo is unreachable (never
+automate DK, truthful labels, never reduce the pool, run the preflight; for the
+checklist, never fetch DK, take the inbox claim, the inbox is flat). Drift
+becomes structurally impossible: there is no second copy to go stale. The full
+copy bought nothing, because every command in it is `<repo>/tools/...` and its
+first instruction is to read CLAUDE.md, so it was never usable without the
+mount anyway.
+
+**Fix two: `skill_cache_drift` in `tools/audit.py`.** The pointer cannot carry
+the TRIGGER DESCRIPTION, which lives in the save_skill argument, decides
+whether a prompt reaches the skill at all, and is invisible to a session
+reading only the repo. So the audit compares it at session start. Modeled on
+`changelog_debt`: WARNING only, never an error, and it degrades to silence
+rather than to a false clean. A cached body carrying the `skill-cache: pointer`
+sentinel is not compared, because a difference that is by design would make the
+check permanently yellow and a permanently yellow gate is one nobody reads.
+Cowork's JSON re-quoting of the description is normalized for the same reason.
+
+**What the check found on its first live run.** `mlb-standings-pull-checklist`
+was drifted on both body and description, and the description drift had a root
+cause worth its own guard: the repo's was 1073 characters against Cowork's
+1024-character install limit, so it could never be installed as written and had
+been shortened by hand at install. That is drift created at birth that never
+converges. The repo description is rewritten to 993 and the audit now warns
+when any repo skill exceeds the limit. That half reads only the repo, so unlike
+the cache comparison it still reports from Ben's own PowerShell.
+
+**The honest limit.** The cache is a sibling of the repo inside a Cowork
+sandbox and reachable there. From Ben's PowerShell it sits under an AppData
+path keyed by session GUIDs and is not derivable from the repo, so
+`skill_cache_dir` returns None and the comparison stays quiet. It fires where
+the drift matters, which is where the skill loads.
+
+Tests: ten in `tests.test_core.SkillCacheDriftTests`; `test_core` 657 -> 667,
+total 1015 -> 1025. `MLB_SKILL_CACHE_DIR` overrides the cache path for tests.
+Pin line updated in CLAUDE.md, the ledger Quick Card, and
+`skills/generate-lineups/SKILL.md`.
+
 ## 2026-08-16 — SKILL.md's audit pin corrected (928 → 1015) and its pin instruction pointed at the per-suite dict (docs only)
 
 DEV, claim `engine_2026-08-17`, docs only, no code. Ben: review the

@@ -12418,5 +12418,185 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
         self.assertIn('exposure["candidate_reuse_counts"]', brief_source)
 
 
+class SkillCacheDriftTests(unittest.TestCase):
+    """R142: an installed skill snapshot that no longer matches the repo.
+
+    Cowork installs a skill by COPYING its SKILL.md; the copy never re-reads
+    the repo and nothing warns when they diverge. Measured 2026-08-16: the
+    installed `generate-lineups` was 85 commits and 351 lines behind, missing
+    the autobuild path, the paste intake and the preflight exit codes, and its
+    trigger still described Showdown as certified.
+
+    Two things this must get right or it is worse than nothing. It must stay
+    quiet where the cache is unreachable (Ben's own PowerShell), because a
+    check that cannot see the thing must not report it clean. And it must not
+    warn forever on a difference that is by design, because a gate that is
+    always yellow is a gate nobody reads.
+
+    Nothing here touches the real cache or the real repo.
+    """
+
+    def _audit(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "audit.py"
+        spec = importlib.util.spec_from_file_location("audit_skillcache", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    BODY = "# Do the thing\n\nStep one.\nStep two.\n"
+
+    def _tree(self, tmp, *, cache_desc, repo_desc, cache_body=None,
+              repo_body=None, install=True):
+        """A throwaway repo plus a throwaway skill cache beside it."""
+        root = Path(tmp) / "repo"
+        cache = Path(tmp) / "cache"
+        (root / "skills" / "demo").mkdir(parents=True)
+        (root / "skills" / "demo" / "SKILL.md").write_text(
+            f"---\nname: demo\ndescription: {repo_desc}\n---\n\n"
+            + (repo_body if repo_body is not None else self.BODY),
+            encoding="utf-8")
+        if install:
+            (cache / "demo").mkdir(parents=True)
+            (cache / "demo" / "SKILL.md").write_text(
+                f"---\nname: \"demo\"\ndescription: {json.dumps(cache_desc)}\n---\n\n"
+                + (cache_body if cache_body is not None else self.BODY),
+                encoding="utf-8")
+        else:
+            cache.mkdir(parents=True)
+        return root, cache
+
+    def _drift(self, module, root, cache):
+        with unittest.mock.patch.dict(
+                os.environ, {module.SKILL_CACHE_ENV: str(cache)}):
+            return module.skill_cache_drift(root)
+
+    def test_an_in_sync_copy_reports_no_drift(self):
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, cache = self._tree(tmp, cache_desc="use me", repo_desc="use me")
+            out = self._drift(module, root, cache)
+        self.assertTrue(out["available"])
+        self.assertEqual(1, out["checked"])
+        self.assertEqual([], out["drifted"])
+
+    def test_coworks_json_quoting_alone_is_not_drift(self):
+        """The repo writes `description: text`; Cowork rewrites it
+        `description: "text"` with JSON escaping. Comparing raw lines would
+        report every installed skill as drifted forever, on the first run."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, cache = self._tree(
+                tmp,
+                cache_desc='say "go" now, then stop',
+                repo_desc='say "go" now, then stop')
+            raw = (cache / "demo" / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn('\\"go\\"', raw, "fixture must exercise the escaping")
+            out = self._drift(module, root, cache)
+        self.assertEqual([], out["drifted"])
+
+    def test_a_stale_body_is_named(self):
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, cache = self._tree(tmp, cache_desc="d", repo_desc="d",
+                                     cache_body="# Old\n\nStep one.\n")
+            out = self._drift(module, root, cache)
+        self.assertEqual([{"skill": "demo", "reasons": ["body"]}], out["drifted"])
+
+    def test_a_stale_trigger_description_is_named(self):
+        """The description is what routes a prompt to the skill at all. A
+        session that reads only the repo cannot see that it is wrong."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, cache = self._tree(tmp, cache_desc="old trigger",
+                                     repo_desc="new trigger")
+            out = self._drift(module, root, cache)
+        self.assertEqual([{"skill": "demo", "reasons": ["trigger description"]}],
+                         out["drifted"])
+
+    def test_a_pointer_body_is_not_drift_but_its_description_still_is(self):
+        """Once the installed body is a pointer at the repo file, the bodies
+        differ permanently and on purpose. The description is the one thing a
+        pointer cannot keep in sync, so it must still be compared."""
+        module = self._audit()
+        pointer = f"# Demo\n\n<!-- {module.POINTER_SENTINEL} -->\nRead the repo copy.\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            root, cache = self._tree(tmp, cache_desc="same", repo_desc="same",
+                                     cache_body=pointer)
+            self.assertEqual([], self._drift(module, root, cache)["drifted"])
+            root2, cache2 = self._tree(Path(tmp) / "b", cache_desc="stale",
+                                       repo_desc="fresh", cache_body=pointer)
+            out = self._drift(module, root2, cache2)
+        self.assertEqual([{"skill": "demo", "reasons": ["trigger description"]}],
+                         out["drifted"])
+
+    def test_a_repo_skill_that_is_not_installed_is_skipped(self):
+        """Not every skill in the repo is installed, and one that is not is
+        not this check's business."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, cache = self._tree(tmp, cache_desc="x", repo_desc="y",
+                                     install=False)
+            out = self._drift(module, root, cache)
+        self.assertTrue(out["available"])
+        self.assertEqual(0, out["checked"])
+        self.assertEqual([], out["drifted"])
+
+    def test_an_unreachable_cache_is_silent_not_clean(self):
+        """From Ben's PowerShell the cache sits under an AppData path keyed by
+        session GUIDs and is not derivable from the repo. Guessing a path or
+        printing a clean line would both be lies; `available: False` is the
+        honest answer and produces no warning."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _ = self._tree(tmp, cache_desc="a", repo_desc="b")
+            out = self._drift(module, root, Path(tmp) / "no-such-cache")
+        self.assertFalse(out["available"])
+        self.assertEqual([], out["drifted"])
+        self.assertEqual(0, out["checked"])
+
+    def test_a_description_too_long_to_install_is_named_even_with_no_cache(self):
+        """Cowork refuses a description past 1024 characters, so one written
+        longer than that cannot be installed as written; somebody shortens it
+        by hand and the copy is drifted the moment it exists. Found on
+        mlb-standings-pull-checklist at 1073. This reads only the repo, so it
+        must report from Ben's PowerShell too, where the cache is invisible."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _ = self._tree(tmp, cache_desc="x",
+                                 repo_desc="y" * (module.SKILL_DESCRIPTION_LIMIT + 1))
+            out = self._drift(module, root, Path(tmp) / "no-such-cache")
+        self.assertFalse(out["available"], "cache is unreachable in this case")
+        self.assertEqual([{"skill": "demo",
+                           "chars": module.SKILL_DESCRIPTION_LIMIT + 1,
+                           "limit": module.SKILL_DESCRIPTION_LIMIT}],
+                         out["oversized"])
+
+    def test_every_repo_skill_description_fits_the_install_limit(self):
+        """The live repo, not a fixture. A skill that cannot be installed as
+        written is a defect whether or not anyone has tried lately."""
+        module = self._audit()
+        root = Path(__file__).resolve().parents[1]
+        over = [(p.parent.name, len(module._skill_frontmatter(
+                    p.read_text(encoding="utf-8")).get("description", "")))
+                for p in sorted((root / "skills").glob("*/SKILL.md"))]
+        self.assertTrue(over, "no skills found; the glob is wrong")
+        self.assertEqual(
+            [], [o for o in over if o[1] > module.SKILL_DESCRIPTION_LIMIT],
+            f"over the {module.SKILL_DESCRIPTION_LIMIT}-char install limit")
+
+    def test_drift_is_wired_as_a_warning_and_never_an_error(self):
+        """`errors` fails the audit and blocks a session. A stale snapshot is
+        real but it is not a reason to refuse to build a slate."""
+        source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
+                  ).read_text(encoding="utf-8")
+        wiring = source.split("drift = skill_cache_drift(root)", 1)
+        self.assertEqual(2, len(wiring), "run_audit must call skill_cache_drift")
+        tail = wiring[1].split("return {", 1)[0]
+        self.assertIn("warnings.append(", tail)
+        self.assertNotIn("errors.append(", tail)
+        self.assertIn('checks["skill_cache"] = drift', tail)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
