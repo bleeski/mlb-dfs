@@ -25,6 +25,78 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R143 + R144: the salary file is the first source for batting order, and session start reads what changed
+
+DEV, claim `engine_2026-08-17`, plus a `ledger` claim for the pin line only.
+Two asks from Ben the same day.
+
+### R143 — DKSalaries first, a paste second, an API pull third, per side
+
+Ben's instruction: "the first source of truth for starting lineups / batting
+orders should be the DraftKings salary CSV, second anything I paste, third an
+API call. If all lineups are posted in the CSV we don't need my paste, and if
+the paste handles everything don't spend time or tokens on an API call."
+
+**The fact that made this worth doing.** DK publishes the batting order in the
+salary file. The `Starting` column carries 1-9 per posted side, beside the
+Player_ID this repo already calls authoritative. Classic read that column only
+as a CROSSWALK CHECK (`live_data_adapters` blocker: DK marks nine, pool holds
+under five) and sourced its hitters from the feed. Measured on
+`data/slates/2026-08-16/DKSalaries.csv`: **15 of 16 sides carried a complete
+1-9** in the authoritative file while the build went to a paste or a 25-second
+API call for the same fact. Only Showdown had ever read it as a source.
+
+**What landed.** `merge_dk_starting_into_feed` runs inside `build_slate_pool`,
+before the status map, so no caller can bypass the ranking — the front door is
+the only place a precedence rule holds. It only ever ADDS or UPGRADES a
+confirmed side; a side DK has not posted still comes from whatever the caller
+supplied, which is what makes the ranking per SIDE rather than per slate. Games
+absent from the feed entirely are synthesized from `Game Info`, which is what
+lets a fully posted slate build with an empty feed. `match_dk_id` now
+short-circuits on a supplied DK id, so a DK-sourced side cannot fail the name
+crosswalk at all. `dk_order_coverage` is the single definition of "covered",
+shared by the pool and by `build_slate.py`, which skips the fetch outright when
+it reports every side covered.
+
+**Measured, salary file only, empty feed:** 15 confirmed sides, 8 games
+synthesized, 144 hitters and 14 pitchers kept, `sides_left_to_feed: ['DET']`
+(DK had not posted Detroit), remaining blockers all legitimate — PIT's PLR arm
+awaiting Ben's explicit call, and DET with no probable.
+
+**Three limits, chosen rather than discovered.** Only a COMPLETE 1-9 counts; a
+partial DK side is a projection and falls through untouched, same reasoning as
+R60. DK ships no handedness, so the merge keeps `bat_side` from a feed that has
+it and names the sides where none does in `f4_handedness_unavailable`, because
+a silently zeroed F4 is a failure this repo has already paid for. And DK's
+probables are SP/P only: R104 settled that a PO opener is not a declared
+starter, and CLAUDE.md makes a PLR an explicit call, so neither is promoted by
+a merge acting on a team's behalf.
+
+**Where DK and a paste disagree on the same posted side,** DK wins per Ben's
+ranking and the difference is NAMED in `dk_batting_order.disagreements`. It is
+not silently resolved: the CSV is a point-in-time download and a paste carries
+no timestamp, so neither can be proven fresher, and the operator gets the fact
+instead of a guess. R32's "the paste is the primary source" is narrowed to
+"outranks any API pull," which is what it always meant against the API.
+
+### R144 — session start reads the newest CHANGELOG headings
+
+Ben asked every session to review the changelog at start so nothing acts on
+stale information. Adopted, bounded. The file is 5,864 lines and roughly
+119,000 tokens; reading it whole would spend most of a context window before
+any work and would be dropped under deadline within a week. Session start now
+reads the newest fifteen HEADINGS (~400 tokens) and reads a full entry only
+before touching an area a heading names.
+
+Pushed back on one half of the ask and said so in CLAUDE.md: "nothing gets
+overwritten" is step 1 plus the claims mutex, not a changelog job. The
+changelog step is about STALENESS, which is the half it does serve — a session
+that sees R142's heading knows not to paste a full skill copy back in.
+
+Tests: nine in `tests.test_core.DkBattingOrderPrecedenceTests`; `test_core`
+667 -> 676, total 1025 -> 1034. All five gated suites re-run green
+(676 / 56 / 218 / 9 / 75).
+
 ## 2026-08-17 — R142: the installed skill stops being a copy, and the audit says when a snapshot has fallen behind
 
 DEV, claim `engine_2026-08-17`, plus a `ledger` claim for the pin line only.

@@ -336,6 +336,232 @@ def salary_game_times(salary_players: Any) -> Dict[str, datetime]:
 
 
 # ---------------------------------------------------------------------------
+# R143: the salary file is the FIRST source for batting order
+# ---------------------------------------------------------------------------
+# Ben, 2026-08-17: DK's salary CSV first, a paste second, an API call third, and
+# do not spend a fetch on a side an earlier source already covers.
+#
+# DK publishes the batting order in the `Starting` column, 1-9 per posted side,
+# next to the Player_ID the build already treats as authoritative. Until now
+# Classic read that column only as a CROSSWALK CHECK (see the blocker further
+# down) and sourced its hitters from the feed instead, so on 2026-08-16 fifteen
+# of sixteen posted sides carried a complete 1-9 in the authoritative file while
+# the build went to a paste or the API for the same fact.
+#
+# Taking DK first also removes the name crosswalk for those sides: the order
+# arrives already keyed by DK Player_ID, so a Kike/Enrique Hernandez mismatch
+# cannot happen on a side DK posted.
+#
+# Two limits, both deliberate:
+#   * ONLY a complete 1-9 counts. A partial DK side is a projection, it stays
+#     out of the confirmed set, and the side falls through to the feed exactly
+#     as before.
+#   * DK ships no handedness. So this MERGES over a feed side rather than
+#     replacing it, keeping `bat_side` where the feed has it; a side DK covers
+#     and no feed does is named in `f4_handedness_unavailable`, because F4
+#     platoon silently zeroing is the failure this repo has already paid for.
+DK_ORDER_SLOTS = 9
+
+
+def dk_confirmed_sides(salary_players: Any) -> Dict[str, List[Dict[str, Any]]]:
+    """DK team -> its batting order from the salary file, complete sides only.
+
+    A side is returned only when the ``Starting`` column supplies every slot 1
+    through 9 exactly once. Anything short of that is a partial posting and is
+    not a confirmed lineup, so it is not returned at all.
+    """
+    players = _load_salary_players(salary_players)
+    by_team: Dict[str, Dict[int, Dict[str, Any]]] = {}
+    for pid, record in players.items():
+        team = str(_record_get(record, "team") or "").strip().upper()
+        token = str(_record_get(record, "starting") or "").strip()
+        if not team or not token.isdigit():
+            continue
+        slot = int(token)
+        if not 1 <= slot <= DK_ORDER_SLOTS:
+            continue
+        slots = by_team.setdefault(team, {})
+        if slot in slots:
+            # Two players on one slot is a malformed file, not a lineup. Drop
+            # the whole side rather than pick one and call it confirmed.
+            slots[slot] = None  # type: ignore[assignment]
+            continue
+        slots[slot] = {"order": slot, "dk_id": str(pid),
+                       "name": str(_record_get(record, "name") or "")}
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for team, slots in by_team.items():
+        if len(slots) != DK_ORDER_SLOTS or any(v is None for v in slots.values()):
+            continue
+        out[team] = [slots[i] for i in range(1, DK_ORDER_SLOTS + 1)]
+    return out
+
+
+# SP/P only. PO is an opener and R104 settled that he is not a declared
+# starter; PLR is a projected long reliever and CLAUDE.md makes rostering one an
+# explicit call, not something a merge decides on a team's behalf. Neither
+# belongs in an automatic probable.
+DK_STARTING_PROBABLE_TOKENS = frozenset({"SP", "P"})
+
+
+def dk_declared_probables(salary_players: Any) -> Dict[str, str]:
+    """DK team -> Player_ID of the arm DK's ``Starting`` column marks SP/P."""
+    players = _load_salary_players(salary_players)
+    out: Dict[str, str] = {}
+    for pid, record in sorted(players.items(), key=lambda kv: str(kv[0])):
+        team = str(_record_get(record, "team") or "").strip().upper()
+        token = str(_record_get(record, "starting") or "").strip().upper()
+        if team and token in DK_STARTING_PROBABLE_TOKENS and team not in out:
+            out[team] = str(pid)
+    return out
+
+
+def dk_order_coverage(salary_csv: str | Path) -> Tuple[List[str], List[str]]:
+    """(teams DK has posted a full 1-9 for, teams it has not) from a salary CSV.
+
+    One definition of "covered", shared by the pool and by any caller deciding
+    whether a fetch is worth making, so the build cannot skip a fetch on one
+    rule and then find the pool applying another.
+    """
+    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+    rows = parse_dk_salary_csv(str(salary_csv))
+    covered = set(dk_confirmed_sides({p.player_id: p for p in rows}))
+    teams = {str(p.team).strip().upper() for p in rows if p.team}
+    return sorted(covered), sorted(teams - covered)
+
+
+def merge_dk_starting_into_feed(
+    feed: Optional[Mapping[str, Any]],
+    salary_players: Any,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Put DK's own posted orders into the feed ahead of whatever else is in it.
+
+    Returns ``(feed, report)``. The feed keeps every side DK does not cover, so
+    a paste or an API pull still supplies the rest; this only ever ADDS
+    confirmed sides or upgrades one the feed had. Games absent from the feed
+    entirely are synthesized from the salary file's ``Game Info``, which is what
+    lets a fully posted slate build with no paste and no fetch at all.
+
+    ``report`` carries ``dk_sides`` (teams sourced from DK), ``upgraded``
+    (sides the feed also had), ``disagreements`` (same side, different names:
+    DK wins per Ben's order and the difference is NAMED, never silently
+    resolved), ``f4_handedness_unavailable`` and ``sides_left_to_feed``.
+    """
+    players = _load_salary_players(salary_players)
+    sides = dk_confirmed_sides(players)
+    probables = dk_declared_probables(players)
+    out_feed: Dict[str, Any] = dict(feed or {})
+    games = [dict(g) for g in (out_feed.get("games") or [])]
+    report: Dict[str, Any] = {
+        "dk_sides": sorted(sides), "upgraded": [], "disagreements": [],
+        "f4_handedness_unavailable": [], "sides_left_to_feed": [],
+        "games_synthesized": [], "source": "dk_salary_starting",
+    }
+    if not sides:
+        report["sides_left_to_feed"] = sorted(
+            {str(_record_get(r, "team") or "").strip().upper()
+             for r in players.values()} - {""})
+        out_feed["games"] = games
+        return out_feed, report
+
+    # Which game each DK team belongs to, and when it starts, off the salary
+    # file alone -- the same columns the pool already treats as authoritative.
+    team_game: Dict[str, str] = {}
+    for record in players.values():
+        team = str(_record_get(record, "team") or "").strip().upper()
+        gid = str(_record_get(record, "game_id") or "").strip().upper()
+        if team and gid and team not in team_game:
+            team_game[team] = gid
+    game_times = _salary_game_times(players)
+
+    def _side_of(game: Mapping[str, Any], team: str) -> Optional[str]:
+        for key in ("away", "home"):
+            side = game.get(key) or {}
+            if to_dk_abbrev(side.get("team_abbrev")) == team:
+                return key
+        return None
+
+    covered: set = set()
+    for game in games:
+        for team, order in sides.items():
+            key = _side_of(game, team)
+            if key is None:
+                continue
+            covered.add(team)
+            side = dict(game.get(key) or {})
+            existing = {str(h.get("name") or "").strip().lower(): h
+                        for h in (side.get("lineup") or [])}
+            if existing:
+                report["upgraded"].append(team)
+                dk_names = {h["name"].strip().lower() for h in order}
+                only_feed = sorted(set(existing) - dk_names)
+                only_dk = sorted(dk_names - set(existing))
+                if only_feed or only_dk:
+                    report["disagreements"].append({
+                        "team": team, "resolved_to": "dk_salary_starting",
+                        "in_feed_not_dk": only_feed, "in_dk_not_feed": only_dk})
+            merged = []
+            for hitter in order:
+                prior = existing.get(hitter["name"].strip().lower(), {})
+                row = {"order": hitter["order"], "name": hitter["name"],
+                       "dk_id": hitter["dk_id"]}
+                # Everything DK does not ship, kept from whatever did.
+                for extra in ("id", "position", "bat_side"):
+                    if prior.get(extra) not in (None, ""):
+                        row[extra] = prior[extra]
+                if not row.get("bat_side"):
+                    row["bat_side"] = ""
+                merged.append(row)
+            if not any(h.get("bat_side") for h in merged):
+                report["f4_handedness_unavailable"].append(team)
+            side["lineup"] = merged
+            side["lineup_status"] = "confirmed"
+            side["lineup_source"] = "dk_salary_starting"
+            if probables.get(team) and not side.get("probable_pitcher"):
+                side["probable_pitcher"] = {"dk_id": probables[team]}
+            game[key] = side
+
+    # Games DK posted that the feed never mentioned: build them from salary.
+    for team, order in sorted(sides.items()):
+        if team in covered:
+            continue
+        gid = team_game.get(team)
+        if not gid or "@" not in gid:
+            continue
+        away, _, home = gid.partition("@")
+        game = next((g for g in games
+                     if f"{to_dk_abbrev((g.get('away') or {}).get('team_abbrev'))}@"
+                        f"{to_dk_abbrev((g.get('home') or {}).get('team_abbrev'))}" == gid),
+                    None)
+        if game is None:
+            start = game_times.get(gid)
+            game = {"game_pk": None, "venue": None, "status": "Scheduled",
+                    "game_date_utc": start.astimezone(timezone.utc).isoformat()
+                    if start else "",
+                    "away": {"team_abbrev": away}, "home": {"team_abbrev": home}}
+            games.append(game)
+            report["games_synthesized"].append(gid)
+        key = "away" if team == away else "home"
+        side = dict(game.get(key) or {})
+        side["team_abbrev"] = team
+        side["lineup"] = [{"order": h["order"], "name": h["name"],
+                           "dk_id": h["dk_id"], "bat_side": ""} for h in order]
+        side["lineup_status"] = "confirmed"
+        side["lineup_source"] = "dk_salary_starting"
+        if probables.get(team):
+            side["probable_pitcher"] = {"dk_id": probables[team]}
+        report["f4_handedness_unavailable"].append(team)
+        game[key] = side
+        covered.add(team)
+
+    report["upgraded"] = sorted(set(report["upgraded"]))
+    report["f4_handedness_unavailable"] = sorted(
+        set(report["f4_handedness_unavailable"]))
+    report["sides_left_to_feed"] = sorted(set(team_game) - covered)
+    out_feed["games"] = games
+    return out_feed, report
+
+
+# ---------------------------------------------------------------------------
 # MLB Stats API lineups feed -> late-swap and confirmation contracts
 # ---------------------------------------------------------------------------
 
@@ -384,7 +610,14 @@ def build_status_map_from_lineups_feed(
     partial_lineup_teams: List[Dict[str, Any]] = []
     unmatched: List[Dict[str, str]] = []
 
-    def match_dk_id(name: str, dk_team: str) -> Optional[str]:
+    def match_dk_id(name: str, dk_team: str,
+                    dk_id: Optional[str] = None) -> Optional[str]:
+        # R143: a row that already carries a DK Player_ID skips the name
+        # crosswalk entirely. DK's own `Starting` column supplies the id with
+        # the order, so the side it posted cannot fail on a name variant the
+        # way a paste or an API row can.
+        if dk_id and str(dk_id) in players:
+            return str(dk_id)
         hits = salary_by_name_team.get((normalize_name(name), dk_team), [])
         if len(hits) == 1:
             return hits[0]
@@ -433,7 +666,8 @@ def build_status_map_from_lineups_feed(
                      "lineup_status": posted or "unknown"}
                 )
             for hitter in lineup_rows:
-                dk_id = match_dk_id(hitter.get("name"), dk_team)
+                dk_id = match_dk_id(hitter.get("name"), dk_team,
+                                    hitter.get("dk_id"))
                 if dk_id is None:
                     continue
                 order = hitter.get("order")
@@ -448,8 +682,12 @@ def build_status_map_from_lineups_feed(
                     if order is not None:
                         confirmed_order[dk_id] = int(order)
             probable = side.get("probable_pitcher") or None
-            if probable and probable.get("name"):
-                dk_id = match_dk_id(probable.get("name"), dk_team)
+            # R143: a probable identified by DK Player_ID needs no name at all.
+            # Requiring one here is what made a DK-sourced side arrive with 9
+            # confirmed bats and no arm, which blocks every team on the slate.
+            if probable and (probable.get("name") or probable.get("dk_id")):
+                dk_id = match_dk_id(probable.get("name"), dk_team,
+                                    probable.get("dk_id"))
                 if dk_id is not None:
                     status_by_player_id[dk_id] = PlayerLineupStatus(
                         player_id=dk_id, name=str(probable.get("name") or ""), team=dk_team,
@@ -717,6 +955,14 @@ def build_slate_pool(
 
     by_id = {p.player_id: p for p in players}
     salary_map = {p.player_id: p for p in players}
+    # R143, Ben 2026-08-17: the salary file is the FIRST source for batting
+    # order, a paste is second, an API pull is third. This runs before the
+    # status map so every entry path gets it -- the front door is the only
+    # place a precedence rule cannot be bypassed by a caller. It only ever adds
+    # or upgrades a confirmed side; sides DK has not posted still come from
+    # whatever the caller supplied.
+    lineups_feed, dk_order_report = merge_dk_starting_into_feed(
+        lineups_feed, salary_map)
     status = build_status_map_from_lineups_feed(lineups_feed, salary_map)
 
     confirmed_teams = set(status["confirmed_teams"])
@@ -1163,11 +1409,11 @@ def build_slate_pool(
             f"({'; '.join(reasons)}); team excluded"
         )
 
-    # DK's Starting column is the authoritative confirmed order, in the
-    # authoritative file, and only Showdown ever read it. Use it as a check on
-    # the feed crosswalk rather than as a second source of truth: a team DK
-    # marks with nine batting slots while the feed matched almost nothing is a
-    # proven name/team join failure, not thin data.
+    # Backstop for the crosswalk. Since R143 a complete DK 1-9 is SOURCED above
+    # rather than merely checked here, so this should now be unreachable for a
+    # posted side; it stays because it fires on the remaining way a DK-posted
+    # team can arrive thin (status drops, exclusions), and a check that has
+    # become hard to trip is not a check worth deleting.
     starting_by_team: Dict[str, int] = {}
     for p in players:
         if p.team and str(p.starting).isdigit() and 1 <= int(p.starting) <= 9:
@@ -1368,6 +1614,10 @@ def build_slate_pool(
             "hitters_kept": len(team_by_player_id),
             "pitchers_kept": len(pitcher_roles),
             "teams": teams_report,
+            # R143: which sides came from DK's own file, which the caller's
+            # feed still had to cover, and where DK and the feed disagreed.
+            # A session reads this to know whether a fetch was needed at all.
+            "dk_batting_order": dk_order_report,
             # R26: the bucket that stayed empty on 2026-07-28. One key, so a
             # caller checks postponement exclusions without walking teams.
             "excluded_postponed_teams": sorted(excluded_teams),

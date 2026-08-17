@@ -2741,7 +2741,20 @@ def main() -> int:
         code, brief = run_showdown(args, slate_dir, staged_salary, staged_entries)
     else:
         feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
-        if args.lineups:
+        # R143, Ben 2026-08-17: the salary file is the first source for batting
+        # order, so a slate DK has fully posted needs no paste and no fetch.
+        # Measured on the network-free path, this is the difference between one
+        # 25-second API call inside the build window and none at all.
+        from mlb_engine.intake.live_data_adapters import dk_order_coverage
+        dk_covered, dk_uncovered = dk_order_coverage(staged_salary)
+        dk_covers_slate = bool(dk_covered) and not dk_uncovered and not args.lineups
+        if dk_covers_slate:
+            feed = {"games": []}
+            feed_note = {"source": "dk_salary_starting", "fetched": False,
+                         "dk_sides": len(dk_covered),
+                         "note": "DK posted every side in the salary file; no "
+                                 "paste and no API call were needed"}
+        elif args.lineups:
             feed = json.loads(Path(args.lineups).read_text(encoding="utf-8"))
             # A supplied feed overwrote the staged one unconditionally, so a feed
             # for the wrong day or a hand-edited one destroyed the good copy and

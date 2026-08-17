@@ -12418,6 +12418,183 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
         self.assertIn('exposure["candidate_reuse_counts"]', brief_source)
 
 
+class DkBattingOrderPrecedenceTests(unittest.TestCase):
+    """R143, Ben 2026-08-17: DKSalaries first, a paste second, an API third.
+
+    DK publishes the batting order in the `Starting` column, 1-9 beside the
+    Player_ID the build already treats as authoritative. Classic read that
+    column only as a crosswalk CHECK and sourced hitters from the feed, so on
+    2026-08-16 fifteen of sixteen posted sides carried a complete order in the
+    authoritative file while the build fetched the same fact over the network.
+
+    The ranking is PER SIDE. A slate where DK posted five sides and a paste
+    covers eight must take DK for those five and the paste for the other three.
+    """
+
+    def _adapters(self):
+        from mlb_engine.intake import live_data_adapters as lda
+        return lda
+
+    def _players(self, orders, probables=None):
+        """orders: {team: [name, ...] in slot order}. Returns {pid: obj}."""
+        from mlb_engine.intake.slate_intake_manager import SalaryPlayer
+        out, pid = {}, 1000
+        for team, names in orders.items():
+            for slot, name in enumerate(names, start=1):
+                out[str(pid)] = SalaryPlayer(
+                    player_id=str(pid), name=name, team=team, positions=("OF",),
+                    salary=3000.0, game_info=f"{team}@OPP 08/16/2026 07:05PM ET",
+                    game_id=f"{team}@OPP", starting=str(slot))
+                pid += 1
+        for team, name in (probables or {}).items():
+            out[str(pid)] = SalaryPlayer(
+                player_id=str(pid), name=name, team=team, positions=("SP",),
+                salary=9000.0, game_info=f"{team}@OPP 08/16/2026 07:05PM ET",
+                game_id=f"{team}@OPP", starting="SP")
+            pid += 1
+        return out
+
+    NINE = [f"H{i}" for i in range(1, 10)]
+
+    def test_a_complete_dk_nine_is_a_confirmed_side_sourced_from_the_csv(self):
+        lda = self._adapters()
+        players = self._players({"NYY": self.NINE})
+        feed, report = lda.merge_dk_starting_into_feed({}, players)
+        self.assertEqual(["NYY"], report["dk_sides"])
+        side = feed["games"][0]["away"]
+        self.assertEqual("confirmed", side["lineup_status"])
+        self.assertEqual("dk_salary_starting", side["lineup_source"])
+        self.assertEqual(list(range(1, 10)), [h["order"] for h in side["lineup"]])
+        self.assertTrue(all(h["dk_id"] for h in side["lineup"]),
+                        "every DK-sourced hitter carries its DK Player_ID, "
+                        "which is what removes the name crosswalk")
+
+    def test_a_partial_dk_side_is_not_confirmed_and_falls_through(self):
+        """Eight posted slots is a projection. Calling it confirmed would be
+        the labels rule broken at the front door, same as R60's partial side."""
+        lda = self._adapters()
+        players = self._players({"NYY": self.NINE[:8]})
+        _, report = lda.merge_dk_starting_into_feed({}, players)
+        self.assertEqual([], report["dk_sides"])
+        self.assertIn("NYY", report["sides_left_to_feed"])
+
+    def test_precedence_is_per_side_not_per_slate(self):
+        """DK covers one side, the feed covers the other. Both are used."""
+        lda = self._adapters()
+        players = self._players({"NYY": self.NINE, "BOS": self.NINE[:3]})
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "BOS", "lineup_status": "confirmed",
+                     "lineup": [{"order": 1, "name": "B1", "bat_side": "L"}]},
+            "home": {"team_abbrev": "OPP", "lineup_status": "unknown",
+                     "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, players)
+        self.assertEqual(["NYY"], report["dk_sides"])
+        bos = next(g["away"] for g in feed["games"]
+                   if g["away"].get("team_abbrev") == "BOS")
+        self.assertEqual("confirmed", bos["lineup_status"])
+        self.assertEqual([{"order": 1, "name": "B1", "bat_side": "L"}],
+                         bos["lineup"], "the feed's side is untouched")
+
+    def test_dk_wins_a_same_side_disagreement_and_it_is_named(self):
+        """Neither source can be proven fresher: the CSV is a point-in-time
+        download and a paste carries no timestamp. DK wins per Ben's order and
+        the difference is reported rather than silently resolved."""
+        lda = self._adapters()
+        players = self._players({"NYY": self.NINE})
+        stale = [{"order": i, "name": n, "bat_side": "R"} for i, n in
+                 enumerate(["ZZ_Scratched"] + self.NINE[1:], start=1)]
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                     "lineup": stale},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, players)
+        self.assertEqual(["NYY"], report["upgraded"])
+        self.assertEqual(1, len(report["disagreements"]))
+        d = report["disagreements"][0]
+        self.assertEqual("dk_salary_starting", d["resolved_to"])
+        self.assertEqual(["zz_scratched"], d["in_feed_not_dk"])
+        self.assertEqual(["h1"], d["in_dk_not_feed"])
+        names = [h["name"] for h in feed["games"][0]["away"]["lineup"]]
+        self.assertEqual(self.NINE, names, "DK's order is what survives")
+
+    def test_the_merge_keeps_handedness_the_feed_had(self):
+        """DK ships no bat_side and F4 platoon needs it. Where a feed covers
+        the same side, its handedness rides along rather than being discarded."""
+        lda = self._adapters()
+        players = self._players({"NYY": self.NINE})
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                     "lineup": [{"order": i, "name": n, "bat_side": "L"}
+                                for i, n in enumerate(self.NINE, start=1)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, players)
+        self.assertTrue(all(h["bat_side"] == "L"
+                            for h in feed["games"][0]["away"]["lineup"]))
+        self.assertEqual([], report["f4_handedness_unavailable"])
+
+    def test_a_dk_only_side_names_its_missing_handedness(self):
+        """The cost of skipping the fetch is stated, never silent. A zeroed F4
+        that nobody was told about is the failure this repo has already paid
+        for once."""
+        lda = self._adapters()
+        _, report = lda.merge_dk_starting_into_feed(
+            {}, self._players({"NYY": self.NINE}))
+        self.assertEqual(["NYY"], report["f4_handedness_unavailable"])
+
+    def test_dk_probables_are_sp_only_never_the_opener_or_the_long_reliever(self):
+        """R104 settled that a PO opener is not a declared starter, and
+        CLAUDE.md makes rostering a PLR an explicit call. Neither may be
+        promoted to a probable by a merge acting on the team's behalf."""
+        from mlb_engine.intake.slate_intake_manager import SalaryPlayer
+        lda = self._adapters()
+        players = {
+            "1": SalaryPlayer(player_id="1", name="Opener", team="NYY",
+                              positions=("RP",), salary=5000.0, starting="PO"),
+            "2": SalaryPlayer(player_id="2", name="Bulk", team="BOS",
+                              positions=("RP",), salary=5000.0, starting="PLR"),
+            "3": SalaryPlayer(player_id="3", name="Ace", team="TOR",
+                              positions=("SP",), salary=9000.0, starting="SP"),
+        }
+        self.assertEqual({"TOR": "3"}, lda.dk_declared_probables(players))
+
+    def test_coverage_is_one_definition_shared_by_pool_and_caller(self):
+        """build_slate.py skips the fetch on this answer and the pool sources
+        hitters on the same one. Two rules here means a build that skipped a
+        fetch it needed."""
+        lda = self._adapters()
+        salary = (Path(__file__).resolve().parents[1] / "data" / "slates"
+                  / "2026-08-16" / "DKSalaries.csv")
+        if not salary.exists():
+            self.skipTest("2026-08-16 salary file not staged")
+        covered, uncovered = lda.dk_order_coverage(salary)
+        self.assertEqual(15, len(covered))
+        self.assertEqual(["DET"], uncovered)
+        self.assertFalse(bool(covered) and not uncovered,
+                         "one uncovered side means the fetch still happens")
+
+    def test_a_fully_posted_slate_builds_a_pool_with_no_feed_at_all(self):
+        """The whole point of Ben's ask: no paste, no API call. Against the
+        real 2026-08-16 file with an empty feed."""
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        salary = (Path(__file__).resolve().parents[1] / "data" / "slates"
+                  / "2026-08-16" / "DKSalaries.csv")
+        if not salary.exists():
+            self.skipTest("2026-08-16 salary file not staged")
+        out = build_slate_pool(str(salary), {}, stale_platoon_policy="warn",
+                               now=datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc))
+        report = out["pool_report"]["dk_batting_order"]
+        self.assertEqual(15, len(report["dk_sides"]))
+        self.assertEqual(8, len(report["games_synthesized"]),
+                         "games absent from an empty feed come off Game Info")
+        confirmed = [t for t, v in out["pool_report"]["teams"].items()
+                     if str(v.get("status")) == "confirmed"]
+        self.assertEqual(15, len(confirmed))
+        self.assertGreaterEqual(out["pool_report"]["hitters_kept"], 135)
+
+
 class SkillCacheDriftTests(unittest.TestCase):
     """R142: an installed skill snapshot that no longer matches the repo.
 

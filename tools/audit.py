@@ -89,7 +89,14 @@ EXPECTED_SUITE_COUNTS = {
     # landing in warnings and never errors. Plus two on the install-length
     # limit, which is checked against the repo alone and so still reports where
     # the cache is invisible, and one of which asserts against the live tree.
-    "tests.test_core": 667,
+    # R143, 2026-08-17: 667 -> 676, the nine that pin the lineup-source
+    # ranking -- a complete DK 1-9 sourced and stamped confirmed, a partial
+    # DK side falling through, the ranking applying PER SIDE, a same-side
+    # disagreement resolving to DK and being NAMED, handedness kept from a
+    # feed that has it and named absent when none does, probables staying
+    # SP/P against PO and PLR, one shared definition of coverage, and the
+    # whole point: a fully posted slate building with no feed at all.
+    "tests.test_core": 676,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,

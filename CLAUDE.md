@@ -99,6 +99,25 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    Hitters are the confirmed nine per posted lineup plus the platoon-projected
    nine per TBD team; pitchers are feed probables plus explicit declarations.
    Every other salary row is absent, not excluded.
+   **Lineup sources rank, and the ranking is PER SIDE (R143, Ben 2026-08-17):
+   the DKSalaries CSV first, a paste second, an API pull third.** DK publishes
+   the batting order in the `Starting` column, 1-9 next to the Player_ID this
+   file already calls authoritative, so a side DK has posted is sourced from
+   the salary file and stamped confirmed, and no paste or fetch is spent on it.
+   Only a COMPLETE 1-9 counts; a partial DK side is a projection and falls
+   through to the feed unchanged. `merge_dk_starting_into_feed` runs inside the
+   front door so no caller can bypass the ranking, and it only ever adds or
+   upgrades a side. `dk_order_coverage` is the one definition of "covered",
+   shared by the pool and by any caller deciding whether to fetch; when it
+   reports every side covered, `build_slate.py` makes no API call at all.
+   Two consequences to state rather than discover. DK ships no handedness, so a
+   side DK covers and no feed does is named in `f4_handedness_unavailable` and
+   its F4 platoon component is unavailable, not silently zero; supply a feed if
+   F4 matters more than the fetch costs. And where DK and a paste disagree on
+   the same posted side, DK wins per the ranking and the difference is NAMED in
+   `dk_batting_order.disagreements`, never silently resolved: the CSV is a
+   point-in-time download and a paste has no timestamp, so neither can be
+   proven fresher and the operator gets the fact instead of a guess.
    A PARTIAL side is a third case and it is now stated rather than implied
    (R60). It is not confirmed, so it routes through the TBD path and its
    posted hitters stay `Projected_Starter` — but a posted slot is OBSERVED and
@@ -113,7 +132,10 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    from batting order belongs to the confirmed path, and whether an
    incomplete lineup's slot earns it is a strategy question for
    MLB_Classic.md, not a pool-membership fix.
-   **A lineup Ben pastes is the primary source and is never re-fetched (R32).**
+   **A lineup Ben pastes outranks any API pull and is never re-fetched (R32).**
+   R143 narrowed this: the paste is second, not first, behind a complete DK
+   1-9 for the same side. It is still primary over the API and over every side
+   DK has not posted, which on a pre-lock slate is most of them.
    `tools/lineups_from_paste.py` turns an mlb.com/starting-lineups paste into an
    ordinary `lineups_feed.json` tagged `source: operator_paste` per side; the
    API feed is fallback for uncovered sides only, via `--merge-feed`. A pasted
@@ -163,7 +185,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    below. Say what is dirty, and whose it is where a claim names an owner,
    before touching anything.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1025 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1034 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -181,6 +203,18 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.
 4. Read the ledger Quick Card: ledger/MLB_Classic_Calibration_Ledger.md
    section 0 plus section headers. The full read is post-slate work.
+
+5. `grep '^## ' CHANGELOG.md | head -15`: the newest fifteen HEADINGS, which
+   is roughly 400 tokens. Read the heading list, not the entries. Before
+   touching any area a heading names, read that entry in full. This is the
+   answer to "am I about to act on something that moved last week", and it is
+   the step that would have caught the 2026-08-16 skill snapshot 85 commits
+   behind. Ben asked for a full changelog review at session start (2026-08-17);
+   the file is 5,800 lines and ~119,000 tokens, so reading it whole would spend
+   most of a context window before any work and would be skipped under deadline
+   within a week. Headings survive; the full read does not. Note this step is
+   about STALENESS only. The other half of Ben's ask, nothing gets overwritten,
+   is step 1 plus the claims mutex, not this.
 
 Never repair audit or test infrastructure during a live slate. If version or
 inventory checks fail while the suite passes in full, build and flag it.
