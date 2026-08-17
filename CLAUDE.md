@@ -181,9 +181,29 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    authorized_entry_ids, never a rebuild. A locked game admits no new players.
 
 ## Session start
-1. `git status`: apply the foreign-dirt rule in the multi-session contract
-   below. Say what is dirty, and whose it is where a claim names an owner,
-   before touching anything.
+1. `git status --short; git log --oneline -12`: one call answering both halves
+   of "what am I walking into". `git status` gets the foreign-dirt rule in the
+   multi-session contract below; say what is dirty, and whose it is where a
+   claim names an owner, before touching anything. `git log` is how a session
+   learns what MOVED, including a session on another machine that has only
+   just pulled. The subjects carry the R-numbers, so this is the recency index
+   and CHANGELOG.md is the reasoning behind it: before touching any area a
+   subject names, read that entry in full.
+   Git is the mechanism here, not a document (Ben, 2026-08-17). A changelog
+   heading read was tried the same day and dropped: it cost the same ~310
+   tokens, could not answer "since when", and needed its own call, while this
+   rides the `git status` call that already runs. Two consequences worth
+   stating. A commit subject is only as good as the contract that writes it,
+   so a vague subject breaks this step, not just the log. And git tells a
+   clone nothing it has not PULLED, which makes step 0 below the real
+   prerequisite.
+0. Before all of it, if this session is not on Ben's own disk: `git fetch` and
+   check you are current. Sessions COMMIT and Ben PUSHES
+   (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub;
+   `python tools/sync_check.py` names the gap. Two live traps as of
+   2026-08-17: the disk carried 13 commits GitHub did not, and GitHub's
+   DEFAULT branch is `master`, which is stale by weeks. A fresh clone lands on
+   `master` and gets an old tree. Work on `main`.
 2. `python tools/audit.py --run-tests --terse` must print
    `PASS  v2.26.0  26 modules  1034 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
@@ -203,18 +223,6 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.
 4. Read the ledger Quick Card: ledger/MLB_Classic_Calibration_Ledger.md
    section 0 plus section headers. The full read is post-slate work.
-
-5. `grep '^## ' CHANGELOG.md | head -15`: the newest fifteen HEADINGS, which
-   is roughly 400 tokens. Read the heading list, not the entries. Before
-   touching any area a heading names, read that entry in full. This is the
-   answer to "am I about to act on something that moved last week", and it is
-   the step that would have caught the 2026-08-16 skill snapshot 85 commits
-   behind. Ben asked for a full changelog review at session start (2026-08-17);
-   the file is 5,800 lines and ~119,000 tokens, so reading it whole would spend
-   most of a context window before any work and would be skipped under deadline
-   within a week. Headings survive; the full read does not. Note this step is
-   about STALENESS only. The other half of Ben's ask, nothing gets overwritten,
-   is step 1 plus the claims mutex, not this.
 
 Never repair audit or test infrastructure during a live slate. If version or
 inventory checks fail while the suite passes in full, build and flag it.

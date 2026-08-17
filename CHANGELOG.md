@@ -79,19 +79,39 @@ no timestamp, so neither can be proven fresher, and the operator gets the fact
 instead of a guess. R32's "the paste is the primary source" is narrowed to
 "outranks any API pull," which is what it always meant against the API.
 
-### R144 — session start reads the newest CHANGELOG headings
+### R144 — session start learns what moved from git, not from a document
 
 Ben asked every session to review the changelog at start so nothing acts on
-stale information. Adopted, bounded. The file is 5,864 lines and roughly
-119,000 tokens; reading it whole would spend most of a context window before
-any work and would be dropped under deadline within a week. Session start now
-reads the newest fifteen HEADINGS (~400 tokens) and reads a full entry only
-before touching an area a heading names.
+stale information. Landed twice the same day; the second version is the one
+that stands.
 
-Pushed back on one half of the ask and said so in CLAUDE.md: "nothing gets
-overwritten" is step 1 plus the claims mutex, not a changelog job. The
-changelog step is about STALENESS, which is the half it does serve — a session
-that sees R142's heading knows not to paste a full skill copy back in.
+First cut read the newest fifteen CHANGELOG headings. Reading the file whole
+was never on: 5,864 lines and roughly 119,000 tokens would spend most of a
+context window before any work and would be dropped under deadline within a
+week.
+
+Ben then asked whether a clone has a better mechanism, and it does. Session
+start step 1 is now `git status --short; git log --oneline -12`, one call
+doing both halves. Measured, the two indexes cost the same (~306 vs ~320
+tokens for twelve), so the heading read bought nothing and cost an extra call:
+git rides the `git status` that already runs, answers "since when" against any
+ref, and is the same mechanism a session on another machine uses after a pull.
+The commit subjects carry the R-numbers, so CHANGELOG.md keeps its job as the
+REASONING behind a change rather than the index of it. The rule survives
+unchanged: before touching an area a subject names, read that entry in full.
+
+Two dependencies this exposes and CLAUDE.md now states. A commit subject is
+only as good as the contract that writes it, so a vague subject breaks session
+start and not merely the log. And **git tells a clone nothing it has not
+pulled**, which is the real answer to Ben's question: as of 2026-08-17 the disk
+carried 13 commits GitHub did not (nothing pushed since 08-14), and GitHub's
+default branch is still `master`, stale by weeks, so a fresh clone lands on an
+early-August tree. A new step 0 makes fetch-and-check the prerequisite for
+off-disk sessions and names both traps.
+
+Pushed back on one half of the original ask and said so in CLAUDE.md: "nothing
+gets overwritten" is the foreign-dirt rule plus the claims mutex, not a
+changelog job. This step is about STALENESS, which is the half it serves.
 
 Tests: nine in `tests.test_core.DkBattingOrderPrecedenceTests`; `test_core`
 667 -> 676, total 1025 -> 1034. All five gated suites re-run green
