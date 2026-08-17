@@ -25,6 +25,45 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R149 filed: the installed skill is six moves behind and R142's own check cannot see the cache that holds it (docs only)
+
+DEV, claim `engine_2026-08-17`, docs only, no code. Ben, immediately after
+R147: "do you have the latest version of the skill?"
+
+**No, and the checking mattered more than the answer.** The `generate-lineups`
+body loaded in this session is a 730-line FULL snapshot against the repo's 849,
+with no `skill-cache: pointer` sentinel, so it is not the pointer R142 re-saved.
+Its audit pin reads `928 tests` — the value the 2026-08-16 entry names as the
+one BEFORE that date's correction — so the snapshot predates R142 itself.
+Missing: the `autobuild.py` fast path, the `qa_portfolio` adversarial pass, the
+"diagnose from the artifact, never from documentation" rule with its
+read-the-clock half, and R143. Correct and current: the trigger description,
+byte-identical to the repo's, which is the part that decides whether a prompt
+reaches the skill at all, plus R32 paste intake, the preflight exit codes, and
+the Showdown review-grade labelling that was the 2026-07-24 snapshot's worst
+failure.
+
+**And R142's audit half could not have caught it.** `skill_cache_dir` derives
+the cache as a sibling of the repo. In a cloud Cowork session the repo is on
+the Windows mount and the cache is in the CONTAINER at
+`/root/.claude/skills/synced/`, so the device-side audit reported
+`available: false` and stayed quiet — its silent-rather-than-false-clean rule
+working as designed and blind anyway. Pointed at the real path with
+`MLB_SKILL_CACHE_DIR` it reported `drifted: ["body"]` on the first run. The
+honest limit R142 wrote down was Ben's PowerShell; the limit that bit is a
+second cache nobody knew was there. `mlb-standings-pull-checklist` is not in
+that cache at all, so its half of R142 is unverifiable from here.
+
+Filed as **R149**, P1 into Tier 1 at 15a rather than Tier 5: a session loading
+that body builds without the supervisor and without R143 and has nothing
+telling it so. It sits at the tier's tail rather than its head because the
+pointer re-save mitigates it today with no code. The pointer body was rebuilt
+to R142's spec (59 lines, sentinel present, description unchanged at 815 of
+1024 chars) and handed to Ben to save, verified first against
+`skill_cache_drift` in a throwaway cache: `drifted: []`. Nothing in the repo
+changed but this entry and the backlog, because the artifact that needs fixing
+is not in the repo.
+
 ## 2026-08-17 — R147: a failed fetch says which of three things stopped it, and stops resetting the freshness number it was added to serve
 
 DEV, claim `engine_2026-08-17`, plus a `ledger` claim for the pin line only.
