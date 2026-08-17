@@ -101,6 +101,23 @@ MANUAL_TARGETS = {
     "fangraphs_season_pitching.csv": FANGRAPHS_PITCHING_URL,
 }
 
+# R127(b). What each CSV actually FEEDS, in the words of the thing it moves.
+# The stale warning used to read "season rates are drifting", which names a
+# property of the file and nothing about the build: on 2026-08-15 it led BUILD
+# to report that a 30-day-old file had not touched the build, when it feeds the
+# pitcher K-rate ceiling and is exactly what would have caught the arm that
+# kept the neutral multiplier and took 9 of 19 lineups. TRACKED_JSON already
+# carried a `feeds` string; the CSVs did not.
+CSV_FEEDS: Dict[str, str] = {
+    "expected_stats_batting.csv":
+        "the xwOBA Base correction and the xISO hitter ceiling multipliers",
+    "expected_stats_pitching.csv":
+        "the xwOBA Base correction on pitcher rows and the F4 opposing-SP quality term",
+    "fangraphs_season_pitching.csv":
+        "the K-rate pitcher ceiling multipliers, the only factor that separates arms "
+        "in a ceiling-scored build",
+}
+
 FANGRAPHS_ROSTER_RESOURCE_URL = (
     "https://www.fangraphs.com/roster-resource/depth-charts"
 )
@@ -237,8 +254,9 @@ def reference_status(reference_dir: Path = REFERENCE_DIR,
         }
         if not exists:
             out["warnings"].append(
-                f"{name}: missing from data/reference/; the enrichment it feeds is "
-                f"OFF for this build. Run tools/refresh_reference_data.py"
+                f"{name}: missing from data/reference/; it feeds "
+                f"{CSV_FEEDS.get(name, 'projection enrichment')}, which is OFF "
+                f"for this build. Run tools/refresh_reference_data.py"
                 + (f" or export it manually from {MANUAL_TARGETS[name]}"
                    if name in MANUAL_TARGETS else "")
             )
@@ -248,7 +266,11 @@ def reference_status(reference_dir: Path = REFERENCE_DIR,
                    else "run tools/refresh_reference_data.py")
             out["warnings"].append(
                 f"{name}: {out['files'][name]['age_days']} days old "
-                f"(limit {max_age_days}); season rates are drifting, {how}"
+                f"(limit {max_age_days}); it feeds "
+                f"{CSV_FEEDS.get(name, 'projection enrichment')}. A stale file "
+                f"is also an INCOMPLETE one: any player it never listed takes "
+                f"the neutral default and is named in "
+                f"enrichment['neutral_default']. {how[0].upper()}{how[1:]}"
             )
     for name, spec in TRACKED_JSON.items():
         path = reference_dir / name

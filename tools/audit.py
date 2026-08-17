@@ -127,7 +127,23 @@ EXPECTED_SUITE_COUNTS = {
     # fetch no longer resets fetch_age_hours, which is what kept R145's
     # stale-contact warning from ever firing. One that the reason reaches the
     # --terse line the session-start step actually reads.
-    "tests.test_core": 698,
+    # R127, 2026-08-17: 698 -> 716, the eighteen that pin neutral-default
+    # visibility. Nine on the engine's named list: the 2026-08-15 2138_2g
+    # reproduction (an arm absent from the FanGraphs file named, with its
+    # reason, rather than counted), the warning carrying the player and the
+    # consequence, the falsifier where the same fixture with full coverage
+    # names nobody, the list being THIS BUILD'S POOL rather than the salary
+    # file's unmatched rows (the crosswalk reports over the whole salary file
+    # and most of those arms are unrosterable), an absent input reporting one
+    # fact with a count instead of a roster of names, matched-but-sub-floor
+    # carrying its own reason, the same treatment on the hitter ceiling and the
+    # Base correction, and two on the per-side split including the stale-id map
+    # that must leave both sides dark. Nine on the brief: signal per side
+    # rather than one boolean, the disagreement warning and its falsifier,
+    # a missing split reporting None rather than guessing False, the named list
+    # reaching the brief, the Projection_Mode distribution and its absent case,
+    # and two on the reference warnings naming the factor they feed.
+    "tests.test_core": 716,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,

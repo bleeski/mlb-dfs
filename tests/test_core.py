@@ -3052,6 +3052,190 @@ class ProjectionEnrichmentWiringTests(unittest.TestCase):
                     apply_value_sanity_guard=False, fangraphs_pitching_csv=str(fgp))
 
 
+class NeutralDefaultVisibilityTests(unittest.TestCase):
+    """R127(a). A factor that fell back to its neutral default must be NAMED.
+
+    The reproduction is the 2026-08-15 2138_2g slate: an arm absent from the
+    FanGraphs season pitching file kept the neutral 1.42 ceiling multiplier,
+    outranked a better strikeout arm that WAS in the file, and took 9 of 19
+    lineups. The only signal in the brief was a count, and a count names no
+    player, no reason, and no consequence. Every assertion below pins a VALUE
+    rather than the presence of a key (R91).
+    """
+
+    # Four filler arms so the pool clears XWOBA_WIRING_MIN_POOL bookkeeping and
+    # the K-rate percentile has a population; only Pitcher A and Pitcher C are
+    # in the salary file.
+    FILLERS = [("Filler One", 18, 100.0, 7.0), ("Filler Two", 18, 100.0, 8.0),
+               ("Filler Three", 18, 100.0, 9.0), ("Filler Four", 18, 100.0, 6.0)]
+
+    def _rows(self):
+        return [{"Player_ID": raw[3], "AvgPointsPerGame": 10.0} for raw in salary_rows()]
+
+    def _assemble(self, root, fg_rows, drop_pitcher_ids=()):
+        salary = root / "salary.csv"
+        write_salary(salary)
+        rows = [r for r in self._rows() if r["Player_ID"] not in set(drop_pitcher_ids)]
+        kwargs = {}
+        if fg_rows is not None:
+            fgp = root / "fg.csv"
+            write_fangraphs_pitching(fgp, fg_rows)
+            kwargs["fangraphs_pitching_csv"] = str(fgp)
+        return epi._assemble_projection_frame(
+            str(salary), rows, "emergency_proxy", None, None, None,
+            apply_value_sanity_guard=False, **kwargs)
+
+    def test_a_declared_starter_missing_from_the_reference_is_named_not_counted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _frame, enrich = self._assemble(
+                Path(tmp), [("Pitcher A", 18, 100.0, 11.0)] + self.FILLERS)
+            block = enrich["neutral_default"]["pitcher_ceiling"]
+            self.assertTrue(block["applied"])
+            self.assertEqual(block["in_pool"], 2)
+            self.assertEqual(block["at_neutral"], 1)
+            self.assertEqual(
+                [(p["name"], p["player_id"], p["reason"]) for p in block["players"]],
+                [("Pitcher C", "10002", "absent_from_fangraphs_season_pitching")])
+            self.assertEqual(block["neutral"], 1.42)
+
+    def test_the_named_miss_reaches_the_warnings_with_the_player_in_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _frame, enrich = self._assemble(
+                Path(tmp), [("Pitcher A", 18, 100.0, 11.0)] + self.FILLERS)
+            # Carried twice on purpose: the brief merges enrichment["warnings"],
+            # a caller echoes neutral_default["warnings"] to stderr without
+            # string-matching the merged pile.
+            nd_warnings = enrich["neutral_default"]["warnings"]
+            self.assertEqual(len(nd_warnings), 1)
+            self.assertIn("Pitcher C", nd_warnings[0])
+            self.assertIn("absent_from_fangraphs_season_pitching", nd_warnings[0])
+            self.assertIn("1 of 2 declared starter(s)", nd_warnings[0])
+            self.assertIn("can change selection", nd_warnings[0])
+            self.assertIn(nd_warnings[0], enrich["warnings"])
+
+    def test_full_coverage_names_nobody_and_raises_nothing(self):
+        """The falsifier: same fixture with the missing arm added to the file."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _frame, enrich = self._assemble(
+                Path(tmp),
+                [("Pitcher A", 18, 100.0, 11.0), ("Pitcher C", 18, 100.0, 7.0)]
+                + self.FILLERS)
+            block = enrich["neutral_default"]["pitcher_ceiling"]
+            self.assertEqual(block["at_neutral"], 0)
+            self.assertEqual(block["players"], [])
+            self.assertEqual(enrich["neutral_default"]["warnings"], [])
+
+    def test_the_list_is_this_builds_pool_not_the_salary_file(self):
+        """The crosswalk's own `unmatched_rows` is computed over the whole salary
+        file, so it cannot be the operator's list: most of those arms are absent
+        from the pool and unrosterable. Dropping Pitcher C from the projection
+        rows must drop him from the named list too, even though he is still an
+        unmatched row in the salary file."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _frame, enrich = self._assemble(
+                Path(tmp), [("Pitcher A", 18, 100.0, 11.0)] + self.FILLERS,
+                drop_pitcher_ids=("10002",))
+            block = enrich["neutral_default"]["pitcher_ceiling"]
+            self.assertEqual(block["in_pool"], 1)
+            self.assertEqual(block["at_neutral"], 0)
+            self.assertEqual(block["players"], [])
+
+    def test_an_absent_input_is_one_fact_with_a_count_never_a_roster_of_names(self):
+        """"The file is missing" is one fact about the build, not N facts about
+        N players. Listing the pool under it buries the case the list exists for:
+        the factor RAN and skipped somebody."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _frame, enrich = self._assemble(Path(tmp), None)
+            block = enrich["neutral_default"]["pitcher_ceiling"]
+            self.assertFalse(block["applied"])
+            self.assertEqual(block["players"], [])
+            self.assertEqual(block["in_pool"], 2)
+            self.assertEqual(block["at_neutral"], 2)
+            self.assertEqual(block["unavailable_reason"],
+                             "no_fangraphs_pitching_csv_supplied")
+            self.assertEqual(len(enrich["neutral_default"]["warnings"]), 1)
+            self.assertIn("no FanGraphs pitching CSV supplied",
+                          enrich["neutral_default"]["warnings"][0])
+
+    def test_matched_but_unmeasurable_carries_its_own_reason(self):
+        """A pitcher IN the file whose sample is under the floor also lands on
+        the neutral, and that is a different data condition with a different
+        remedy than being absent. Same value, different reason."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _frame, enrich = self._assemble(
+                Path(tmp),
+                # Pitcher C at 1.0 IP is far under XWOBA_PA_MIN batters faced.
+                [("Pitcher A", 18, 100.0, 11.0), ("Pitcher C", 1, 1.0, 7.0)]
+                + self.FILLERS)
+            block = enrich["neutral_default"]["pitcher_ceiling"]
+            self.assertEqual(
+                [(p["name"], p["reason"]) for p in block["players"]],
+                [("Pitcher C", "matched_but_sub_floor_sample_or_non_starter")])
+
+    def test_hitter_ceiling_and_base_correction_report_the_same_way(self):
+        """The treatment generalizes to the other per-player file joins rather
+        than being a special case for one factor."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            bat = root / "bat.csv"
+            write_savant_batting(bat, [
+                ("SS, AAA", 700001, 200, 0.300, 0.360, 0.250, 0.450)])
+            _frame, enrich = epi._assemble_projection_frame(
+                str(salary), self._rows(), "emergency_proxy", str(bat), None, None,
+                apply_value_sanity_guard=False)
+            hit = enrich["neutral_default"]["hitter_ceiling"]
+            self.assertTrue(hit["applied"])
+            self.assertEqual(hit["in_pool"], 16)
+            # One of sixteen hitters is in the Savant export; the other fifteen
+            # are named as absent rather than counted.
+            self.assertEqual(hit["at_neutral"], 15)
+            self.assertNotIn(ids["AAA SS"], [p["player_id"] for p in hit["players"]])
+            self.assertEqual(
+                {p["reason"] for p in hit["players"]},
+                {"absent_from_expected_stats_batting"})
+            base = enrich["neutral_default"]["xwoba_base"]
+            self.assertTrue(base["applied"])
+            self.assertEqual(base["neutral"], 1.0)
+            self.assertEqual(base["at_neutral"], 17)  # 18 pool rows, one corrected
+
+    def test_the_side_split_answers_for_each_side_separately(self):
+        """R127(b). The 2138_2g shape: hitter-side signal, pitcher side entirely
+        at neutral. One boolean over both sides answered for the side that had
+        signal and spoke for the side that did not."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; write_salary(salary)
+            bat = root / "bat.csv"
+            write_savant_batting(bat, [
+                ("SS, AAA", 700001, 200, 0.300, 0.360, 0.250, 0.450)])
+            _frame, enrich = epi._assemble_projection_frame(
+                str(salary), self._rows(), "emergency_proxy", str(bat), None, None,
+                apply_value_sanity_guard=False)
+            self.assertTrue(enrich["by_side"]["hitters"]["signal_applied"])
+            self.assertFalse(enrich["by_side"]["pitchers"]["signal_applied"])
+            self.assertEqual(enrich["by_side"]["pitchers"]["rows"], 2)
+            self.assertEqual(enrich["by_side"]["pitchers"]["ceiling_multiplier_moved"], 0)
+            self.assertEqual(enrich["by_side"]["hitters"]["rows"], 16)
+            self.assertEqual(enrich["by_side"]["hitters"]["ceiling_multiplier_moved"], 1)
+
+    def test_the_side_split_is_measured_per_row_not_from_the_input_map(self):
+        """A stale-id map is requested-but-unapplied. An F4 map keyed to ids that
+        are not on this slate must leave both sides dark."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; write_salary(salary)
+            _frame, enrich = epi._assemble_projection_frame(
+                str(salary), self._rows(), "emergency_proxy", None, None, None,
+                apply_value_sanity_guard=False,
+                f4_by_player_id={"999999": 1.25, "999998": 0.80})
+            self.assertEqual(enrich["f4"]["requested"], 2)
+            self.assertEqual(enrich["f4"]["applied_count"], 0)
+            self.assertFalse(enrich["by_side"]["hitters"]["signal_applied"])
+            self.assertFalse(enrich["by_side"]["pitchers"]["signal_applied"])
+            self.assertEqual(enrich["by_side"]["hitters"]["factor_cells_moved"], 0)
+
+
 class FeasibilityAndDiverseBankTests(unittest.TestCase):
     """v2.25.0: coverage-guaranteed bank and feasibility-aware control resolution."""
 
@@ -4342,6 +4526,137 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         self.assertTrue(summary["degraded"])
         self.assertFalse(summary["signal_applied"])
         self.assertTrue(any("DEGRADED" in w for w in summary["warnings"]))
+
+    # --- R127(b): one boolean covered two sides with different answers -------
+
+    @staticmethod
+    def _two_sided(hitters_signal: bool, pitchers_signal: bool) -> dict:
+        """The engine's by_side block for a 40-hitter / 4-pitcher slate."""
+        return {
+            "hitters": {"rows": 40, "ceiling_multiplier_moved": 38,
+                        "factor_cells_moved": 80, "base_corrected": 40,
+                        "signal_applied": hitters_signal},
+            "pitchers": {"rows": 4, "ceiling_multiplier_moved": 3,
+                         "factor_cells_moved": 0, "base_corrected": 0,
+                         "signal_applied": pitchers_signal},
+        }
+
+    def test_the_brief_reports_signal_per_side_not_as_one_boolean(self):
+        """The 2138_2g reproduction: signal_applied was True on hitter-side
+        signal while all four pitchers sat at F1 = F4 = F5 = 1.0, and BUILD read
+        the single True and reported the build fully enriched."""
+        mod = self._module()
+        summary = mod.summarize_enrichment(
+            {"enabled": True, "warnings": []},
+            {"xwoba": {"non_neutral_applied": 40, "match_rate": 0.9},
+             "ceiling": {"differentiated_rows": 38},
+             "by_side": self._two_sided(True, False),
+             "warnings": []},
+            {"hitters_scored": 40, "non_neutral_f4": 40}, None,
+        )
+        self.assertTrue(summary["signal_applied"])
+        self.assertEqual(summary["signal_applied_by_side"],
+                         {"hitters": True, "pitchers": False})
+
+    def test_a_side_disagreement_raises_a_warning_naming_the_dark_side(self):
+        mod = self._module()
+        summary = mod.summarize_enrichment(
+            {"enabled": True, "warnings": []},
+            {"xwoba": {"non_neutral_applied": 40, "match_rate": 0.9},
+             "by_side": self._two_sided(True, False), "warnings": []},
+            {"hitters_scored": 40, "non_neutral_f4": 40}, None,
+        )
+        hits = [w for w in summary["warnings"]
+                if "reached hitters but NOT pitchers" in w]
+        self.assertEqual(len(hits), 1)
+        self.assertIn("all 4 pitchers in the pool", hits[0])
+        self.assertIn("signal_applied_by_side", hits[0])
+
+    def test_both_sides_enriched_raises_no_disagreement_warning(self):
+        """The falsifier: the warning is about the DISAGREEMENT, not about a
+        pitcher count being small."""
+        mod = self._module()
+        summary = mod.summarize_enrichment(
+            {"enabled": True, "warnings": []},
+            {"xwoba": {"non_neutral_applied": 40, "match_rate": 0.9},
+             "by_side": self._two_sided(True, True), "warnings": []},
+            {"hitters_scored": 40, "non_neutral_f4": 40}, None,
+        )
+        self.assertEqual(summary["signal_applied_by_side"],
+                         {"hitters": True, "pitchers": True})
+        self.assertEqual([w for w in summary["warnings"] if "but NOT" in w], [])
+
+    def test_a_missing_side_split_reports_none_rather_than_guessing(self):
+        """An older caller or a degraded unenriched frame carries no by_side.
+        None means the engine did not report it; False would claim both sides
+        were measured and found dark, which is a different statement."""
+        mod = self._module()
+        summary = mod.summarize_enrichment({"enabled": True}, {}, {}, None)
+        self.assertIsNone(summary["signal_applied_by_side"])
+
+    def test_the_brief_carries_the_engines_named_neutral_default_list(self):
+        mod = self._module()
+        block = {"pitcher_ceiling": {"applied": True, "in_pool": 4, "at_neutral": 1,
+                                     "neutral": 1.42,
+                                     "players": [{"player_id": "30065",
+                                                  "name": "Randy Dobnak",
+                                                  "team": "MIN", "position": "P",
+                                                  "reason": "absent_from_fangraphs_season_pitching"}]}}
+        summary = mod.summarize_enrichment(
+            {"enabled": True, "warnings": []},
+            {"neutral_default": block, "warnings": []}, {}, None)
+        named = summary["neutral_default"]["pitcher_ceiling"]["players"]
+        self.assertEqual([p["name"] for p in named], ["Randy Dobnak"])
+        self.assertEqual(named[0]["reason"], "absent_from_fangraphs_season_pitching")
+
+    def test_the_brief_states_the_projection_mode_distribution(self):
+        """`Projection_Mode = emergency_proxy` on every row is a fact about what
+        the build was standing on, and it was visible nowhere but
+        projections.csv."""
+        import pandas as _pd
+        mod = self._module()
+        frame = _pd.DataFrame({"Projection_Mode": ["emergency_proxy"] * 38 + ["full"] * 2})
+        summary = mod.summarize_enrichment(
+            {"enabled": True, "warnings": []}, {"warnings": []}, {}, None,
+            projections=frame)
+        self.assertEqual(summary["projection_mode"],
+                         {"rows": 40, "distribution": {"emergency_proxy": 38, "full": 2}})
+
+    def test_projection_mode_is_none_when_no_frame_is_supplied(self):
+        mod = self._module()
+        summary = mod.summarize_enrichment({"enabled": True}, {}, {}, None)
+        self.assertIsNone(summary["projection_mode"])
+
+    def test_a_stale_reference_warning_names_what_it_feeds(self):
+        """R127(b). "season rates are drifting" names a property of the file and
+        nothing about the build, and it led BUILD to report that a 30-day-old
+        file had not touched a build the file's own factor decided. The warning
+        now names the factor and points at the per-player list."""
+        import tools.refresh_reference_data as rrd
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("expected_stats_batting.csv", "expected_stats_pitching.csv",
+                         "fangraphs_season_pitching.csv"):
+                (root / name).write_text("x\n", encoding="utf-8")
+            old = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            (root / "reference_manifest.json").write_text(json.dumps(
+                {"files": {n: {"fetched_at": old} for n in rrd.REQUIRED_COLUMNS}}),
+                encoding="utf-8")
+            warnings = rrd.reference_status(reference_dir=root)["warnings"]
+            fg = [w for w in warnings if w.startswith("fangraphs_season_pitching.csv")]
+            self.assertEqual(len(fg), 1)
+            self.assertIn("it feeds the K-rate pitcher ceiling multipliers", fg[0])
+            self.assertIn("enrichment['neutral_default']", fg[0])
+            self.assertNotIn("season rates are drifting", fg[0])
+
+    def test_a_missing_reference_warning_names_the_factor_that_is_off(self):
+        import tools.refresh_reference_data as rrd
+        with tempfile.TemporaryDirectory() as tmp:
+            warnings = rrd.reference_status(reference_dir=Path(tmp))["warnings"]
+            fg = [w for w in warnings if w.startswith("fangraphs_season_pitching.csv")]
+            self.assertEqual(len(fg), 1)
+            self.assertIn("it feeds the K-rate pitcher ceiling multipliers", fg[0])
+            self.assertIn("which is OFF for this build", fg[0])
 
     def test_fetch_lineups_feed_shape_carries_handedness_fields(self):
         """extract_batter_hands and extract_opposing_probables both read fields

@@ -1,5 +1,12 @@
 # Next implementation run (paste this into a fresh Cowork session on the mlb-dfs folder)
 
+> **Stale as a queue since 2026-08-15, and kept only as the record of that run.**
+> The authority for what to take next is the "What do we tackle next" section of
+> `docs/backlog.md` (renamed from `docs/2026-07-27_backlog_v2.md` on 2026-08-17),
+> which is maintained every session; the "Queue after this run" list at the
+> bottom of this file is not. Read the backlog first and treat anything here that
+> disagrees with it as superseded.
+
 You are DEV for this session. Read CLAUDE.md and follow the session-start
 protocol exactly (git status with the foreign-dirt rule; the audit gate —
 note the one-call macro exceeds the sandbox call ceiling, use the Quick
@@ -11,7 +18,7 @@ engine_<utc-date>_r114 --role DEV`. Run with `TMPDIR=/tmp` and
 
 ## Task: land the head of Tier 1 — the preflight-evidence batch (R114 + R67)
 
-Work from the entries in `docs/2026-07-27_backlog_v2.md` (Workstream 5, R114;
+Work from the entries in `docs/backlog.md` (Workstream 5, R114;
 Workstream 5, R67). If a live slate beacon is lit, stop and report instead of
 editing engine paths. If R114+R67 have already migrated to CHANGELOG.md,
 take the next eligible queue item instead (current order: false-signal batch

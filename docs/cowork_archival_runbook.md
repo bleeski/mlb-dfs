@@ -11,9 +11,13 @@ files.
 1. Never log, echo, or write API keys. `THE_ODDS_API_KEY` stays in the
    environment; if a command fails for a missing key, report the failure, not
    the key.
-2. Never edit tracked engine files. The only files Cowork edits are the
-   untracked companions: `MLB_Classic_Calibration_Ledger.md`,
-   `MLB_Classic_Backlog.md`, and `field_opponent_registry.json`.
+2. Never edit tracked engine files. The files this runbook edits are
+   `ledger/MLB_Classic_Calibration_Ledger.md` and
+   `field_opponent_registry.json`. (Until 2026-08-17 this line also named
+   `MLB_Classic_Backlog.md` as an untracked companion; that file has been the
+   superseded v1 board since 2026-07-27 and now lives in `docs/legacy/`. The
+   live board is `docs/backlog.md`, it is TRACKED, and only DEV writes it —
+   every other role records by dropping a fragment in `docs/backlog_inbox/`.)
 3. Ledger edits are edit-in-place and append-only in the archive. Never drop an
    invariant section. Diff the structure before saving; if a section
    disappears, the commit note must say why.

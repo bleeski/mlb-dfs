@@ -42,7 +42,7 @@ This file carries the contracts and the gotchas. Each procedure lives once:
   hand-maintained.
 - Showdown mechanics: skills/generate-lineups/references/showdown.md
 - Any tool's flags: `python tools/<tool>.py --help`
-- What to build next: docs/2026-07-27_backlog_v2.md, the single live backlog.
+- What to build next: docs/backlog.md, the single live backlog.
   OPEN work only; its "What do we tackle next" section is the answer every
   session gives to that question. Do not write a new review document.
 - What already changed and why: CHANGELOG.md, newest first, DEV writes it.
@@ -224,7 +224,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    and gets an old tree. Nothing here will remind you. Work on `main`, and fix
    the default in GitHub Settings → Branches.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1056 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1074 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

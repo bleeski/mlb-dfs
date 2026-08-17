@@ -13,9 +13,14 @@ record" at the bottom of CHANGELOG.md, amendments included.
 Same item grammar as v2: What, Why, Fix; priorities P0 (corrupts what gets
 uploaded or lets an invalid file certify), P1 (silently degrades lineup
 quality or destroys evidence), P2 (wastes time or tokens); effort S/M/L.
-Supersedes `docs/2026-07-27_backlog_v2.md`'s open remainder in place — same
-file, renamed header, item numbers preserved (no renumbering, ever; R-numbers
-are cited in commits, tests, and the ledger).
+Supersedes the v1 board (`docs/legacy/MLB_Classic_Backlog.md`, the B-1..B-14
+era) and, from 2026-07-27, its own open remainder in place — item numbers
+preserved (no renumbering, ever; R-numbers are cited in commits, tests, and
+the ledger). **Renamed `docs/2026-07-27_backlog_v2.md` -> `docs/backlog.md` on
+2026-08-17**, R127's commit: the dated name read as a July artifact three
+weeks of amendments later, and a file whose whole job is answering "what
+next" should not be named after the day it was opened. Same file, same
+numbers, `git log --follow` carries the history.
 
 Organized by WORKSTREAM as of 2026-08-10 (Ben's instruction): after the queue,
 every open entry sits in the workstream whose surface a DEV session would
@@ -33,6 +38,37 @@ Any session may read this; only DEV edits it. The full amendment history
 lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
+
+*2026-08-17 (second session), DEV, claim `engine_2026-08-17`: **R127 is CLOSED
+and migrated** to CHANGELOG.md, taken as the head of Tier 1 in tier order. Its
+landing record and the three corrections the work made to the entry as filed
+are in the queue's item 7 above and in the changelog entry. Gate 1056 -> 1074
+(`test_core` 698 -> 716, `grew`), CLAUDE.md's quoted clean line moved with it —
+`AuditSkipHonestyTests` pins those two together and caught the drift in the same
+run, which is that guard working. **Housekeeping in the same commit, at Ben's
+instruction, and it is the reason this note is longer than the R-number
+warrants.** This board carried three files a session could mistake for it.
+`docs/2026-07-27_backlog_v2.md` is now **`docs/backlog.md`**; the dated name was
+three weeks stale as a description of the file and there is no second live board
+to disambiguate it from. `.audit/BACKLOG.before-audit.md` is RETIRED (moved to
+`_to_delete/`, untracked in the same commit): a 2026-08-13 pre-audit snapshot,
+100 KB behind the live file, whose own first line read "This is the single live
+backlog" — two tracked files claiming that is the exact confusion the rename
+exists to end, and `.audit/AUDIT.md` already records what the snapshot was for.
+`docs/MLB_Classic_Backlog.md` moves to **`docs/legacy/`** beside the other
+2026-07-27 split artifacts; it is KEPT rather than deleted because it is the
+only record of B-1 through B-14 anywhere in the repo (verified: zero B-item
+references in CHANGELOG.md, whose Imported record starts at the R-numbers), and
+B-8's ownership-model reasoning is the direct ancestor of R10. Pointers updated
+in the same commit: CLAUDE.md, `docs/next_session_prompts.md`,
+`docs/cowork_archival_runbook.md` (whose rule 2 named the v1 backlog as an
+UNTRACKED companion Cowork may edit — stale on both counts since 2026-07-27),
+and a dated addendum in `.audit/AUDIT.md` rather than an edit to its body, which
+is a record of what was true on 2026-08-14. One pointer NOT updated and it is
+ARCHIVE's: `ledger/MLB_Classic_Calibration_Ledger.md` line 10 cites
+`MLB_Classic_Backlog.md` for its "same footing" comparison. The claim is still
+true and the file still exists; only ARCHIVE edits the ledger, so it is left for
+the next ARCHIVE session rather than taken on a DEV claim.*
 
 *2026-08-16 (fifth session), DEV, claim `engine_2026-08-16`, fragment-merge and
 full queue re-order at Ben's instruction (impact, difficulty, critical path), no
@@ -667,15 +703,26 @@ underneath it.*
    reason the previous note gave for ordering it there and it held: duplicate
    reporting now splits into `duplicates_within_contest` and
    `duplicates_across_contests`, one helper serving the preflight, verify_export
-   and the brief. **R127** (P1, S, WS4) is now the batch's head, the
-   truthful-labels pair and the only one carrying a selection defect: an arm
-   absent from the K-rate reference keeps the neutral 1.420 multiplier and
-   outranked a better strikeout arm in 9 of 19 lineups. It is a P1 and the
-   defect is in selection rather than reporting, so it gets its own
-   reproduction rather than riding the momentum of the two reporting fixes
-   before it. **R126** (P1, S, WS2) is the objective itself, moved up one
-   slot because it is the only item on this board that measures what Ben said
-   he is optimizing for. **R136** (P2, S, WS2; entered the batch 2026-08-16 from
+   and the brief. **R127 — CLOSED 2026-08-17**, migrated to
+   CHANGELOG.md, taken in batch order as the batch's head and the only entry in
+   it carrying a selection defect. Both halves landed. Three things the work
+   corrected about the entry as filed. The entry proposed keying the named list
+   off `pitcher_ceiling.unmatched_rows`, and that list is computed over the
+   WHOLE SALARY FILE: most of its arms are absent from the pool and
+   unrosterable, so the shipped list is resolved against the assembled FRAME
+   instead, which per build-contract step 1 is exactly the declared-starter set.
+   Second, the generalization has a boundary and it is now stated on the record
+   rather than discovered: an absent input file reports `applied: false` with a
+   count and NO list, because "the file is missing" is one fact about the build
+   and not one fact per player — the same reasoning the paste intake uses at
+   `SLATE_ABSENT_BLOCK_RATIO`. Third, (b)'s `signal_applied` was left a bool
+   rather than split into a dict: every truthiness consumer of a dict reads True
+   the moment the key exists, which is a worse failure than the one being fixed.
+   The per-side answer ships beside it as `signal_applied_by_side`, and the
+   DISAGREEMENT raises its own warning, since the disagreement is what BUILD got
+   wrong. **R126** (P1, S, WS2) is now the head of this batch and of Tier 1: it
+   is the objective itself, and the only item on this board that measures what
+   Ben said he is optimizing for. **R136** (P2, S, WS2; entered the batch 2026-08-16 from
    the leverage fragment) rides directly behind R126: the field-facing leverage
    panel on the same qa_portfolio report block — chalk-sum, sub-10% carry
    counts, captain own-tier histogram, salary-leave vs archived winner
@@ -1784,12 +1831,6 @@ exists in `_feasibility_findings`/`STRUCTURAL_FLOOR_CONTROLS`; a full review
 round went to treating an arithmetic floor as a control failure); and rank
 zero-exposure bats by ceiling per dollar, not raw ceiling, so a dominated
 absence stops reading as a defect.
-
-### R127. A factor that falls back to its neutral default on a rostered player is invisible, and one boolean claims enrichment for both sides (P1, S) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment
-
-- **What:** two halves of one defect, verified in tree 2026-08-16. **(a)** A pitcher absent from `data/reference/fangraphs_season_pitching.csv` silently keeps the neutral ceiling multiplier of 1.420. Randy Dobnak is in none of that file's 212 rows; J.T. Ginn, who is in it, earned 1.389 off a 21.1% K rate. Dobnak's actual 2026 K rate is 12.4% (4.75 K/9 over 36 IP), so the build ranked the worse strikeout arm ABOVE the better one and rostered him in 9 of 19 lineups at an inflated ceiling. A K%-anchored fit on the other three arms evaluates to 1.220 at 12.4%, so the overstatement is roughly 2.1 points. The only signal in the brief was `enrichment.counts.pitcher_ceiling_differentiated: 3` against 4 rostered arms — a number that names no player, no reason, and no consequence. **(b)** `enrichment.signal_applied` is a single `any()` over hitter AND pitcher counts (`build_slate.py:1270-1278`), so it reported `true` on a slate where all four pitchers had F1 = F4 = F5 = 1.0 and the ceiling multiplier was the only thing separating arms — with (a)'s hole in it. Every row on that slate was also `Projection_Mode = emergency_proxy`, visible nowhere but `projections.csv`.
-- **Why:** (a) is the rare enrichment defect that changes SELECTION rather than reporting, and it is silent by construction: a neutral default is indistinguishable in the output from a factor that ran and found nothing to move. (b) is a truthful-labels violation, which CLAUDE.md calls non-negotiable, and it did the damage truthful-labels violations do — BUILD read `signal_applied: true` and told Ben the build was fully enriched. Neither pitcher F1 = 1.0 (deliberate, avoids double-counting the opposing team total) nor pitcher F5 = 1.0 (no wind cleared the venue threshold) is a bug; the defect is one boolean covering two sides with very different answers.
-- **Fix:** (a) emit a named list, not a count — `enrichment.pitcher_ceiling_neutral_default: [{name, player_id, reason: "absent_from_fangraphs_season_pitching"}]` — and raise it as a WARNING to stderr and the brief whenever a listed player is in the declared-starter set, which is the case where it changes selection. Generalize the treatment to any factor that falls back to a neutral default on a ROSTERED player; the assembly point is `execution_pipeline`'s enrichment block, the brief writer is `build_slate.py`. (b) split the flag to `signal_applied: {"hitters": ..., "pitchers": ...}` or add `pitcher_factors_applied` beside the counts; surface the `Projection_Mode` distribution in the brief so `emergency_proxy: 40/40` is readable without opening `projections.csv`; and reword the stale-reference warning to name what it FEEDS and which players on THIS slate it failed to cover. That last clause is the one to get right: the current text ("30.2 days old; season rates are drifting") led BUILD to report that the stale file had not touched the build, when it feeds the pitcher K-rate ceiling and is exactly what would have caught Dobnak. **The same clause is R98(3)'s past-limit-reference remainder** (a past-limit reference feeding a team that then lands a primary stack earns a brief line) — one implementation, two filings, and the 08-14 evidence for it is the platoon file at 10.0 days fabricating a TEX order that took 19 roster slots across 15 lineups on a team that never posted. Interacts with the Tier 4 FanGraphs decision: reversing manual-by-decision would have kept this file fresh, but a fresh file still says nothing about a pitcher who is not in it, so (a) is needed either way.
 
 ### R130. Seven builds on one date share one bank, and the brief never says the bank grew underneath them (P2, S) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment — remedy revised, see below
 

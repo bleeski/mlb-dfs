@@ -25,6 +25,115 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R127: a factor that fell back to its neutral default is now NAMED, and one boolean stops answering for two sides
+
+DEV, claim `engine_2026-08-17`. Tier 1's head, taken in tier order. Both halves
+of the entry landed.
+
+**(a) The defect changed selection, and its only signal was a count.** On the
+2026-08-15 2138_2g slate an arm absent from `fangraphs_season_pitching.csv` kept
+the neutral 1.42 ceiling multiplier, outranked a strikeout arm that WAS in the
+file, and took 9 of 19 lineups. The brief said
+`pitcher_ceiling_differentiated: 3` against 4 rostered arms — a number that
+names no player, no reason, and no consequence. `_assemble_projection_frame` now
+emits `enrichment["neutral_default"]`: per factor, the pool players whose factor
+took its neutral default, each with a reason
+(`absent_from_fangraphs_season_pitching`,
+`matched_but_sub_floor_sample_or_non_starter`, and the hitter-side and
+Base-correction equivalents). A named declared starter also raises a warning,
+which now reaches stderr at build time and not only the brief read afterwards.
+
+Three decisions the work made that the entry did not carry, each because
+implementing it surfaced the question:
+
+*The list is the FRAME, not the salary file.* The entry proposed keying it off
+the crosswalk's `unmatched_rows`, which is computed over the whole salary
+export. Most of those arms are absent from the pool and unrosterable, so that
+list would have buried the one name that mattered in a roll call of every arm
+DraftKings priced. Resolving against the assembled frame makes the emitted list
+the declared-starter set exactly, because build-contract step 1 already says
+pitchers in the pool are feed probables plus explicit declarations. A test pins
+this by dropping the missing arm from the projection rows: he stays an unmatched
+row in the salary file and correctly leaves the list.
+
+*An absent input is one fact, not N.* Where the factor's file was not supplied
+at all the block reports `applied: false` with a count and no player list.
+Listing the pool under "the file is missing" buries the case the list exists
+for — the factor RAN and skipped somebody — and it is the same reasoning
+`SLATE_ABSENT_BLOCK_RATIO` uses on the paste intake: past a threshold it stops
+being N facts about N players and becomes one fact about the build.
+
+*F1, F4 and F5 are deliberately out of scope, and the note says so.* They are
+per-GAME and per-TEAM factors that already name the teams they could not price;
+expanding those to one line per hitter restates a single fact nine times. The
+generalization the entry asked for is over the per-player FILE JOINS, and the
+boundary is stated in the block's own note rather than left for a later session
+to rediscover.
+
+**(b) `signal_applied` was one boolean over two sides with different answers.**
+It read `true` on that same slate on hitter-side signal while all four pitchers
+sat at F1 = F4 = F5 = 1.0 with the ceiling multiplier the only thing separating
+arms — and BUILD read the single `true` and told Ben the build was fully
+enriched. That is a truthful-labels violation, which CLAUDE.md calls
+non-negotiable.
+
+The entry offered a dict or a sibling field. **It ships as a sibling field, and
+the dict is declined with a reason**: every truthiness consumer of
+`signal_applied` would read True the moment the key exists, which is a quieter
+and worse version of the failure being fixed. `signal_applied` keeps its meaning
+and its consumers; `signal_applied_by_side` carries the per-side answer,
+measured per row off the assembled frame (`enrichment["by_side"]`) rather than
+from the size of any input map; and a DISAGREEMENT between the sides raises its
+own warning naming the dark side, because the disagreement is the case a reader
+gets wrong. When the engine did not report a split the field is `None`, never
+`False` — "not measured" and "measured and dark" are different statements.
+
+Also in (b): the brief states the `Projection_Mode` distribution, previously
+visible nowhere but `projections.csv` (`emergency_proxy: 40/40` was true on that
+slate and unreadable). And the reference-staleness warnings name what the file
+FEEDS. "30.2 days old; season rates are drifting" describes a property of the
+file and nothing about the build, and it is what led BUILD to report that the
+stale file had not touched a build its own factor decided; the CSVs now carry a
+`CSV_FEEDS` string the way `TRACKED_JSON` already did, and the stale text points
+at `enrichment['neutral_default']` for the players this slate's copy failed to
+cover. **This closes R98(3)'s past-limit-reference remainder**, which the R127
+entry named as one implementation under two filings.
+
+Gate 1056 -> 1074 (`test_core` 698 -> 716, `grew`), and CLAUDE.md's quoted clean
+line moved with it — `AuditSkipHonestyTests` pins the audit's clean output and
+that sentence together, and caught the drift in the same run. Every new guard
+was mutation-checked before being claimed (R91, and the mutation-check rule):
+six mutations, each killing its own test — listing the pool under an absent
+input, dropping the `at_neutral` filter, dropping the warning, sourcing the list
+from the salary file instead of the frame, collapsing the per-side split back to
+one boolean, and reverting the stale-reference wording.
+
+**Backlog housekeeping, same commit, Ben's instruction.** Three files could be
+mistaken for the live board. `docs/2026-07-27_backlog_v2.md` is now
+`docs/backlog.md` — same file, same item numbers, `git log --follow` carries the
+history; the dated name described the day it was opened, not the file, three
+weeks of amendments later. `.audit/BACKLOG.before-audit.md` is retired
+(untracked, moved to `_to_delete/`): a 2026-08-13 pre-audit snapshot 100 KB
+behind the live file whose own first line read "This is the single live
+backlog", which is the confusion the rename exists to end;
+`.audit/AUDIT.md` already records what it was for and gains a dated addendum
+rather than an edit to its body. `docs/MLB_Classic_Backlog.md` moves to
+`docs/legacy/` beside the other 2026-07-27 split artifacts and is KEPT: it is
+the only record of B-1 through B-14 in the repo (verified — zero B-item
+references here, the Imported record starts at the R-numbers), and B-8's
+ownership-model reasoning is the direct ancestor of R10. Pointers in CLAUDE.md,
+`docs/next_session_prompts.md` and `docs/cowork_archival_runbook.md` moved with
+them; the runbook's rule 2 was separately stale, naming the v1 backlog as an
+untracked companion Cowork may edit, which it has not been since 2026-07-27.
+The ledger's line 10 citation is left for ARCHIVE, whose file it is.
+
+Touched: `mlb_engine/pipeline/execution_pipeline.py`,
+`skills/generate-lineups/scripts/build_slate.py`,
+`tools/refresh_reference_data.py`, `tools/audit.py`, `tests/test_core.py`,
+`CLAUDE.md`, `docs/backlog.md`, `docs/legacy/MLB_Classic_Backlog.md`,
+`docs/next_session_prompts.md`, `docs/cowork_archival_runbook.md`,
+`.audit/AUDIT.md`.
+
 ## 2026-08-17 — R149 filed: the installed skill is six moves behind and R142's own check cannot see the cache that holds it (docs only)
 
 DEV, claim `engine_2026-08-17`, docs only, no code. Ben, immediately after

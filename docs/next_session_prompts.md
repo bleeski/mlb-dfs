@@ -18,7 +18,7 @@ R104+R45+R105+R54"); a claim you cannot take stops the session. Check claims/
 for lit slate beacons — builds re-import modules between steps, so never edit
 engine paths while one is lit.
 
-The work is queue position 1 in docs/2026-07-27_backlog_v2.md, Workstream 1:
+The work is queue position 1 in docs/backlog.md, Workstream 1:
 four items, one session, all S. Read each entry in full before starting; the
 entries carry line cites, live burn records, and the agreed fix shapes.
 
@@ -104,7 +104,7 @@ Commit with a descriptive message when tracked files change.
 Role: DEV. Session start, then take the engine claim (scope: "R10 satellite
 prior"). Run this AFTER the Showdown batch (Prompt A) unless Ben reorders.
 
-Authority: the R10 entry in docs/2026-07-27_backlog_v2.md Workstream 2, in
+Authority: the R10 entry in docs/backlog.md Workstream 2, in
 full — the gate decision (2026-07-31), the satellite-only scope limit, and
 the grading bar are all binding. The short form, which does not replace the
 entry: fit per (satellite family, field-size bucket) from the mined archive

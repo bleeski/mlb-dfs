@@ -2448,6 +2448,86 @@ def _is_blank(value: Any) -> bool:
         return False
 
 
+# --------------------------------------------------------------------------- #
+# Neutral-default visibility (R127)
+# --------------------------------------------------------------------------- #
+# A factor that falls back to its neutral default is INDISTINGUISHABLE in the
+# output from a factor that ran and found nothing to move. That is not a
+# reporting nicety: on 2026-08-15 an arm absent from the FanGraphs season
+# pitching file kept the neutral 1.42 ceiling multiplier, outranked a better
+# strikeout arm that was in the file, and took 9 of 19 lineups. The only signal
+# was `pitcher_ceiling_differentiated: 3` against 4 rostered arms -- a number
+# that named no player, no reason, and no consequence.
+#
+# Two rules hold this block honest. Names are drawn from THIS BUILD'S POOL, not
+# the salary file: per the build contract the frame's pitcher rows are feed
+# probables plus explicit declarations, so a pitcher named here is a declared
+# starter and the miss can change selection. And a factor whose INPUT IS ABSENT
+# reports as one fact with a count, never as a list -- "the file is missing" is
+# one fact about the build, not N facts about N players, and listing the pool
+# under it buries the case where the factor ran and skipped somebody.
+NEUTRAL_TOLERANCE = 1e-9
+
+NEUTRAL_DEFAULT_NOTE = (
+    "Players in THIS BUILD'S POOL whose factor took its neutral default rather "
+    "than a value the factor computed for them. A neutral default is "
+    "indistinguishable in the output from a factor that ran and found nothing "
+    "to move, so the players are named rather than counted. Where the factor's "
+    "input file was absent entirely the block reports `applied: false` with a "
+    "count and no list, because that is one fact about the build rather than "
+    "one fact per player. Deterministic record of what the engine did; never a "
+    "probability, ROI, or win-rate claim. F1, F4 and F5 are deliberately absent "
+    "here: they are per-GAME and per-TEAM factors that already name the teams "
+    "they could not price, and expanding those to one line per hitter restates "
+    "a single fact N times."
+)
+
+
+def _pitcher_mask(frame) -> "pd.Series":
+    """True for rows whose DK position tokens include P, matching the value guard."""
+    return frame["Position"].astype(str).str.split("/").apply(
+        lambda toks: "P" in [t.strip() for t in toks])
+
+
+def _neutral_default_block(frame, mask, at_neutral_ids, reason_by_id,
+                           factor: str, neutral: float, applied: bool,
+                           unavailable_reason: str | None) -> "Dict[str, Any]":
+    """One factor's neutral-default record over the pool rows ``mask`` selects."""
+    in_pool = int(mask.sum())
+    if not applied:
+        return {
+            "factor": factor,
+            "neutral": neutral,
+            "applied": False,
+            "in_pool": in_pool,
+            "at_neutral": in_pool,
+            "unavailable_reason": unavailable_reason,
+            "players": [],
+        }
+    players: list[Dict[str, Any]] = []
+    for idx in frame.index[mask]:
+        pid = str(frame.at[idx, "Player_ID"])
+        if pid not in at_neutral_ids:
+            continue
+        players.append({
+            "player_id": pid,
+            "name": str(frame.at[idx, "Name"]),
+            "team": str(frame.at[idx, "Team"]) if "Team" in frame.columns else "",
+            "position": str(frame.at[idx, "Position"]),
+            "reason": reason_by_id.get(pid, "unknown"),
+        })
+    players.sort(key=lambda p: (p["reason"], p["name"], p["player_id"]))
+    return {
+        "factor": factor,
+        "neutral": neutral,
+        "applied": True,
+        "in_pool": in_pool,
+        "at_neutral": len(players),
+        "unavailable_reason": None,
+        "players": players,
+    }
+
+
 def _assemble_projection_frame(
     salary_csv: str | Path,
     projection_rows: Any,
@@ -2510,10 +2590,27 @@ def _assemble_projection_frame(
     mirroring the xwOBA guard; omit the file to build with uniform pitcher
     ceilings on purpose. Deterministic labeled prior, never a probability
     claim.
+
+    Two records are assembled last, after every factor block has run (R127).
+    ``enrichment["neutral_default"]`` NAMES the pool players whose factor took
+    its neutral default instead of a value computed for them, per factor and
+    with a reason each, because a neutral default is indistinguishable in the
+    output from a factor that ran and found nothing to move. The names come
+    from the FRAME, not the salary file: the frame's pitcher rows are feed
+    probables plus explicit declarations, so a pitcher listed there is a
+    declared starter whose neutral ceiling can change selection, and that case
+    also raises a warning. A factor whose input file was absent entirely
+    reports ``applied: false`` with a count and no list -- that is one fact
+    about the build rather than one fact per player.
+    ``enrichment["by_side"]`` counts, per side and per row, what any factor
+    actually moved off neutral. One boolean over both sides reported
+    enrichment on a slate where every pitcher sat at F1 = F4 = F5 = 1.0 and the
+    ceiling multiplier was the only thing separating arms.
     """
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
     from mlb_engine.projections.projection_builder import (
         build_projections, apply_xwoba_correction, batting_order_factor,
+        XISO_CEILING_NEUTRAL,
     )
     from mlb_engine.projections.xwoba_base_correction import (
         build_dk_keyed_corrections, build_dk_keyed_ceiling_multipliers,
@@ -2543,6 +2640,17 @@ def _assemble_projection_frame(
                        "lacking an explicit F5" if f5_map else "no F5 map supplied"},
         "warnings": [],
     }
+
+    # R127. Per-factor bookkeeping for the neutral-default report assembled at
+    # the end. Declared here so the report can be built whether or not each
+    # factor's input file was supplied -- an absent input is a state to report,
+    # not a reason for the key to go missing.
+    xwoba_non_neutral_ids: set[str] = set()
+    xwoba_neutral_reasons: Dict[str, str] = {}
+    hitter_ceiling_reasons: Dict[str, str] = {}
+    hitter_ceiling_neutral_ids: set[str] = set()
+    pitcher_ceiling_reasons: Dict[str, str] = {}
+    pitcher_ceiling_neutral_ids: set[str] = set()
 
     assembled: list[Dict[str, Any]] = []
     # Parallel to ``assembled``: True where Base was derived from
@@ -2665,6 +2773,21 @@ def _assemble_projection_frame(
             applied_rows = _xwoba_audit[_xwoba_audit["applied"]]
             non_neutral = applied_rows[abs(applied_rows["xwoba_correction"] - 1.0) > 1e-9]
             xwoba_summary["non_neutral_applied"] = int(len(non_neutral))
+            xwoba_non_neutral_ids = {
+                str(p).strip() for p in non_neutral["Player_ID"].astype(str)}
+            # R127. Three distinct ways a row keeps an uncorrected Base, and they
+            # are not the same finding: an operator-supplied Base was DELIBERATELY
+            # left alone (R57), where an absent Savant row is a coverage hole.
+            for _rec in _xwoba_audit.to_dict("records"):
+                _pid = str(_rec.get("Player_ID") or "").strip()
+                if _pid in xwoba_non_neutral_ids:
+                    continue
+                if not bool(_rec.get("matched")):
+                    xwoba_neutral_reasons[_pid] = "absent_from_expected_stats_csv"
+                elif not bool(_rec.get("applied")):
+                    xwoba_neutral_reasons[_pid] = "operator_supplied_base_not_corrected"
+                else:
+                    xwoba_neutral_reasons[_pid] = "matched_but_sample_too_thin_to_move"
             xwoba_summary["rows_corrected"] = int(_xwoba_audit["applied"].sum())
             xwoba_summary["rows_skipped_operator_base"] = int(
                 len(_xwoba_audit) - int(_xwoba_audit["applied"].sum()))
@@ -2691,6 +2814,20 @@ def _assemble_projection_frame(
                 mult = float(frame.at[idx, "Ceiling_Multiplier"])
                 frame.at[idx, "Notes"] = (
                     str(frame.at[idx, "Notes"]) + f"; xiso_ceiling: {mult:.2f}").lstrip("; ")
+            # R127. Two ways a pool hitter ends at the uniform neutral: no row in
+            # the Savant export at all, or a row whose sample was too thin to
+            # move off it. They are different data conditions and different
+            # remedies, so they are different reasons.
+            _xiso_neutral = float(XISO_CEILING_NEUTRAL)
+            for idx in frame.index:
+                pid = str(frame.at[idx, "Player_ID"])
+                mult = ceiling_mults.get(pid)
+                if mult is None:
+                    hitter_ceiling_neutral_ids.add(pid)
+                    hitter_ceiling_reasons[pid] = "absent_from_expected_stats_batting"
+                elif abs(float(mult) - _xiso_neutral) < NEUTRAL_TOLERANCE:
+                    hitter_ceiling_neutral_ids.add(pid)
+                    hitter_ceiling_reasons[pid] = "matched_but_sample_too_thin_to_move"
             enrichment["ceiling"] = {
                 "matched": ceiling_report.get("matched", 0),
                 "unmatched": ceiling_report.get("unmatched", 0),
@@ -2723,6 +2860,13 @@ def _assemble_projection_frame(
         if "Ceiling_Multiplier" not in frame.columns:
             frame["Ceiling_Multiplier"] = None
         applied_pitchers = 0
+        # R127. `unmatched_rows` is computed over the whole salary file, so it
+        # cannot be the list the operator reads: most of those arms are not in
+        # this build's pool. The reasons are keyed by id here and resolved
+        # against the frame at the end, which is what makes the emitted list the
+        # DECLARED starters and nobody else.
+        _unmatched_ids = {str(r.get("id")) for r in (pitcher_report.get("unmatched_rows") or [])}
+        _k_neutral = float(XISO_CEILING_NEUTRAL)
         for idx in frame.index:
             pid = str(frame.at[idx, "Player_ID"])
             if pid in pitcher_mults:
@@ -2731,6 +2875,15 @@ def _assemble_projection_frame(
                 frame.at[idx, "Notes"] = (
                     str(frame.at[idx, "Notes"]) + f"; k_rate_ceiling: {mult:.2f}").lstrip("; ")
                 applied_pitchers += 1
+                if abs(mult - _k_neutral) < NEUTRAL_TOLERANCE:
+                    pitcher_ceiling_neutral_ids.add(pid)
+                    pitcher_ceiling_reasons[pid] = (
+                        "matched_but_sub_floor_sample_or_non_starter")
+            else:
+                pitcher_ceiling_neutral_ids.add(pid)
+                pitcher_ceiling_reasons[pid] = (
+                    "absent_from_fangraphs_season_pitching" if pid in _unmatched_ids
+                    else "not_in_salary_file_pitcher_crosswalk")
         enrichment["pitcher_ceiling"] = {
             "matched": pitcher_report.get("matched", 0),
             "unmatched": pitcher_report.get("unmatched", 0),
@@ -2785,6 +2938,101 @@ def _assemble_projection_frame(
     else:
         enrichment["value_guard"] = {"applied": False,
                                      "note": "value-sanity guard opted out for this build"}
+
+    # --- Neutral-default report and the per-side signal split (R127) ---------
+    # Assembled last, so it sees every factor block's outcome. Everything below
+    # is measured off the frame the solver is about to receive, never off the
+    # size of an input map: a stale-id map is requested-but-unapplied, and the
+    # brief used to read that as enrichment.
+    pitchers = _pitcher_mask(frame)
+    hitters = ~pitchers
+    neutral_default = {
+        "pitcher_ceiling": _neutral_default_block(
+            frame, pitchers, pitcher_ceiling_neutral_ids, pitcher_ceiling_reasons,
+            factor="Ceiling_Multiplier (K-rate)", neutral=float(XISO_CEILING_NEUTRAL),
+            applied=bool(fangraphs_pitching_csv),
+            unavailable_reason="no_fangraphs_pitching_csv_supplied"),
+        "hitter_ceiling": _neutral_default_block(
+            frame, hitters, hitter_ceiling_neutral_ids, hitter_ceiling_reasons,
+            factor="Ceiling_Multiplier (xISO)", neutral=float(XISO_CEILING_NEUTRAL),
+            applied=bool(savant_batting_csv),
+            unavailable_reason="no_savant_batting_csv_supplied"),
+        "xwoba_base": _neutral_default_block(
+            frame, pd.Series(True, index=frame.index),
+            set(xwoba_neutral_reasons), xwoba_neutral_reasons,
+            factor="Base xwOBA correction", neutral=1.0,
+            applied=bool(savant_batting_csv or savant_pitching_csv),
+            unavailable_reason="no_savant_expected_stats_csv_supplied"),
+        "note": NEUTRAL_DEFAULT_NOTE,
+    }
+    enrichment["neutral_default"] = neutral_default
+
+    # The pitcher warning is the one that changes SELECTION. Every pitcher row in
+    # the frame is a feed probable or an explicit declaration (build contract
+    # step 1), so a name here is a declared starter the operator can act on --
+    # which is exactly the condition the entry names for raising this.
+    _pc = neutral_default["pitcher_ceiling"]
+    _nd_warnings: list[str] = []
+    if _pc["applied"] and _pc["players"]:
+        _named = ", ".join(
+            f"{p['name']} [{p['reason']}]" for p in _pc["players"][:8])
+        _more = "" if len(_pc["players"]) <= 8 else f", +{len(_pc['players']) - 8} more"
+        _nd_warnings.append(
+            f"pitcher_ceiling: {_pc['at_neutral']} of {_pc['in_pool']} declared "
+            f"starter(s) kept the neutral {_pc['neutral']:.2f} ceiling multiplier "
+            f"({_named}{_more}). An unmeasured arm therefore ranks level with a "
+            "measured average one, which can change selection. See "
+            "enrichment['neutral_default']."
+        )
+    elif not _pc["applied"] and _pc["in_pool"]:
+        _nd_warnings.append(
+            f"pitcher_ceiling: no FanGraphs pitching CSV supplied, so all "
+            f"{_pc['in_pool']} declared starter(s) carry the uniform neutral "
+            f"{_pc['neutral']:.2f} ceiling and ceiling-scored builds cannot "
+            "separate arms."
+        )
+    # Carried in two places on purpose: `enrichment["warnings"]` is what the
+    # brief merges, and this list is what a caller echoes to stderr without
+    # string-matching the merged pile to find its own warnings back.
+    neutral_default["warnings"] = list(_nd_warnings)
+    enrichment["warnings"].extend(_nd_warnings)
+
+    # (b) One boolean covering two sides answered for the side with signal and
+    # spoke for the side without. The split is measured per side off the frame.
+    def _side_moved(mask) -> Dict[str, Any]:
+        idx = {str(frame.at[i, "Player_ID"]) for i in frame.index[mask]}
+        mult = pd.to_numeric(frame["Ceiling_Multiplier"], errors="coerce") \
+            if "Ceiling_Multiplier" in frame.columns else None
+        ceiling_moved = 0
+        if mult is not None:
+            moved = mask & mult.notna() & (
+                (mult - float(XISO_CEILING_NEUTRAL)).abs() > NEUTRAL_TOLERANCE)
+            ceiling_moved = int(moved.sum())
+        factors_moved = 0
+        for fcol in ("F1", "F3", "F4", "F5"):
+            if fcol not in frame.columns:
+                continue
+            vals = pd.to_numeric(frame[fcol], errors="coerce")
+            factors_moved += int((mask & vals.notna()
+                                  & ((vals - 1.0).abs() > NEUTRAL_TOLERANCE)).sum())
+        base_moved = len(idx & xwoba_non_neutral_ids)
+        return {
+            "rows": int(mask.sum()),
+            "ceiling_multiplier_moved": ceiling_moved,
+            "factor_cells_moved": factors_moved,
+            "base_corrected": base_moved,
+            "signal_applied": bool(ceiling_moved or factors_moved or base_moved),
+        }
+
+    enrichment["by_side"] = {
+        "hitters": _side_moved(hitters),
+        "pitchers": _side_moved(pitchers),
+        "note": "Counted per row off the assembled frame, not off the size of the "
+                "input maps. `signal_applied` per side is true only where some "
+                "factor moved at least one row of that side off its neutral. One "
+                "boolean over both sides reported enrichment on a slate where "
+                "every pitcher sat at F1=F4=F5=1.0 (R127).",
+    }
 
     projections, _audit = build_projections(frame, mode=projection_mode, source_metadata=source_metadata)
     if "Ownership_Tier" not in projections.columns:

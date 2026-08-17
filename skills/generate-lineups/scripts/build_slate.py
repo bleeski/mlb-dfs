@@ -1187,13 +1187,26 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
 def summarize_enrichment(reference_status: dict, enrichment: dict,
                          f4_report: dict, degraded_reason,
                          f1_report: dict | None = None,
-                         f5_report: dict | None = None) -> dict:
+                         f5_report: dict | None = None,
+                         projections=None) -> dict:
     """Condense the enrichment record into the block the brief carries.
 
     The one question this has to answer at a glance is whether this build had
     signal or was APPG in a ceiling costume. ``signal_applied`` is that answer:
     it is True only when at least one factor moved at least one player off
     neutral.
+
+    R127 added the second question that one answer could not carry. On the
+    2026-08-15 2138_2g slate ``signal_applied`` was True on hitter-side signal
+    while all four pitchers sat at F1 = F4 = F5 = 1.0 with the ceiling
+    multiplier the only thing separating arms -- and BUILD read the single True
+    and reported the build fully enriched. ``signal_applied_by_side`` is the
+    per-side measurement (from the engine's own per-row count, not from the
+    size of the input maps), and a DISAGREEMENT between the sides raises a
+    warning, because the disagreement is the case a reader gets wrong.
+    ``neutral_default`` carries the engine's named list of pool players whose
+    factor took its neutral default, and ``projection_mode`` states the mode
+    distribution that was previously visible only in projections.csv.
     """
     enrichment = enrichment or {}
     xwoba = enrichment.get("xwoba") or {}
@@ -1267,6 +1280,34 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         warnings.append(
             f"{key}: a map was supplied but reached zero rows; the ids in it do "
             f"not match this slate's pool. That factor is OFF for this build.")
+    # R127(b). The per-side split, and the warning for the case the single
+    # boolean got wrong. `by_side` is the engine's per-row measurement; when it
+    # is absent (an older caller, or a degraded unenriched frame) the per-side
+    # answer is None rather than a guess, and nothing below fabricates one.
+    by_side = enrichment.get("by_side") or {}
+    signal_by_side = None
+    if by_side:
+        signal_by_side = {
+            side: bool((by_side.get(side) or {}).get("signal_applied"))
+            for side in ("hitters", "pitchers")
+        }
+        for side, has in signal_by_side.items():
+            rows = int((by_side.get(side) or {}).get("rows") or 0)
+            if not has and rows:
+                other = "pitchers" if side == "hitters" else "hitters"
+                if signal_by_side.get(other):
+                    warnings.append(
+                        f"enrichment reached {other} but NOT {side}: all {rows} "
+                        f"{side} in the pool sit at every factor's neutral "
+                        f"default. signal_applied is true on the {other} side "
+                        f"alone; read signal_applied_by_side before calling this "
+                        f"build enriched.")
+
+    # R127(a). The engine names the pool players whose factor fell back to its
+    # neutral default. Surfaced here as its own brief key so the reader does not
+    # have to infer it from a count, which is the failure the entry describes.
+    neutral_default = enrichment.get("neutral_default") or {}
+
     signal = any(counts[k] for k in (
         "xwoba_non_neutral", "hitter_ceiling_differentiated",
         "pitcher_ceiling_differentiated", "f4_non_neutral", "f1_non_neutral",
@@ -1276,8 +1317,29 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         requested_but_unapplied and not counts["xwoba_non_neutral"]
         and not counts["hitter_ceiling_differentiated"]
         and not counts["pitcher_ceiling_differentiated"])
+    # R127(b). `Projection_Mode = emergency_proxy` on every row is a fact about
+    # what the build was standing on, and it was visible nowhere but
+    # projections.csv. Read off the delivered frame, so it is a count and not a
+    # restatement of the mode that was requested.
+    projection_mode = None
+    if projections is not None and getattr(projections, "empty", True) is False \
+            and "Projection_Mode" in getattr(projections, "columns", []):
+        modes = projections["Projection_Mode"].astype(str)
+        projection_mode = {
+            "rows": int(len(modes)),
+            "distribution": {str(k): int(v) for k, v in
+                             sorted(modes.value_counts().items())},
+        }
+
     return {
         "signal_applied": bool(signal),
+        # R127(b): the per-side answer beside the any-side one. `signal_applied`
+        # keeps its meaning and its consumers; this is the field that says WHICH
+        # side had signal, and None means the engine did not report it rather
+        # than that both sides were dark.
+        "signal_applied_by_side": signal_by_side,
+        "neutral_default": neutral_default,
+        "projection_mode": projection_mode,
         # R119(a), ed4 adoption, recording only. Floor is a UNIFORM 0.58 of
         # Base_Projection (projection_builder.py, no per-row path), so ranking
         # by Floor is always identical to ranking by Base_Projection; Ceiling is
@@ -1521,6 +1583,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
         )
+
+    # R127. A factor that fell back to its neutral default on a DECLARED STARTER
+    # changes selection, so it reaches stderr at build time and not only the
+    # brief the operator reads afterwards. The engine hands back its own list
+    # rather than making this re-derive it from the merged warning pile.
+    for _nd_warning in ((enrichment.get("neutral_default") or {}).get("warnings") or []):
+        print(f"enrichment warning: {_nd_warning}", file=sys.stderr)
 
     # Decide the strategy from a measurement, never from a guess. The rule that
     # matters: an infrastructure limit may reduce search effort, never the legal
@@ -1865,7 +1934,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "controls_override_applied": args.controls_override,
         "enrichment": summarize_enrichment(
             reference["status"], enrichment, f4_report, degraded_reason,
-            f1_report, f5_report),
+            f1_report, f5_report, projections=projections),
     }
     return (0 if checks["passed"] else 3), brief
 

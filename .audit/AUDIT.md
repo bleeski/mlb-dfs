@@ -8,6 +8,14 @@ is no root `BACKLOG.md` — CLAUDE.md names this file) and `.audit/`.
 Pre-audit snapshot: `.audit/BACKLOG.before-audit.md`, sha256
 `f501779b…` identical to the live file at capture.
 
+> **2026-08-17 addendum (R127's commit), so the paths above still resolve.** The
+> live backlog was renamed `docs/2026-07-27_backlog_v2.md` -> `docs/backlog.md`;
+> same file, same item numbers, history under `git log --follow`. The pre-audit
+> snapshot named above was retired in the same commit — it was 100 KB behind the
+> live file and its own first line claimed to BE the live backlog, which is the
+> ambiguity the rename ends. Nothing in the body below is edited: it is a record
+> of what was true on 2026-08-14.
+
 ## Executive verdict
 
 The system is sound where it is deterministic and starved where it is
