@@ -255,7 +255,49 @@ The script now ages a disk-cached feed itself: anything older than
 `--feed-max-age-minutes` (default 90) is refetched, and the brief records which
 feed was used and how old it was.
 
-## When Ben pastes lineups, that paste is the source (R32)
+## Lineup sources rank, and the ranking is PER SIDE (R143, Ben 2026-08-17)
+
+**The DKSalaries CSV first, a paste second, an API pull third.** DK publishes the
+batting order in the `Starting` column, 1-9 next to the Player_ID this project
+already calls authoritative, so a side DK has posted needs no paste and no fetch.
+Measured on the 2026-08-16 file: 15 of 16 sides carried a complete 1-9 while the
+build went to a paste or a 25-second API call for the same fact.
+
+You do not wire this up. `merge_dk_starting_into_feed` runs inside
+`build_slate_pool`, the required intake front door, so every path gets the
+ranking and no caller can bypass it. It only ever ADDS a confirmed side or
+upgrades one, which is what makes the ranking per side rather than per slate.
+`build_slate.py` calls `dk_order_coverage` before deciding to fetch and makes no
+API call at all when DK covers every side; the brief says
+`"DK posted every side in the salary file; no paste and no API call were needed"`.
+
+Four things to read off it rather than rediscover:
+
+- **Only a COMPLETE 1-9 counts.** A partial DK side is a projection, so it falls
+  through to the feed untouched and routes through the TBD path (same reasoning
+  as R60).
+- **DK ships no handedness, and that is the cost of the zero-fetch path.** The
+  merge keeps `bat_side` from a feed that has it and names sides where none does
+  in `dk_batting_order.f4_handedness_unavailable`. On a slate DK covers whole,
+  nothing supplies handedness, so the **F4 platoon component is neutral for every
+  hitter** and the brief reads `f4_platoon_applied: 0`. That is stated, not
+  silent, and it is a real tradeoff: the API call R143 stopped spending was
+  buying handedness as well as batting order.
+- **So still ask Ben for a paste when there is time.** It costs nothing in
+  precedence, since DK outranks it on order either way, and it carries
+  `(R)/(L)/(S)`, which is what keeps F4 alive. The zero-fetch path is for when
+  there is no paste, not a reason to stop asking for one.
+- **Where DK and a paste disagree on the same posted side,** DK wins and the
+  difference is NAMED in `dk_batting_order.disagreements`. Never resolve it
+  yourself: the CSV is a point-in-time download and a paste has no timestamp, so
+  neither can be proven fresher, and the operator gets the fact instead of a
+  guess. Surface it when the disputed name matters to the build.
+
+## When Ben pastes lineups, that paste outranks any API pull (R32)
+
+R143 narrowed this: the paste is second, behind a complete DK 1-9 for the SAME
+side. It is still primary over the API and over every side DK has not posted,
+which on a pre-lock slate is most of them, and everything below is unchanged.
 
 If the prompt contains a copy/paste from https://www.mlb.com/starting-lineups,
 **do not fetch lineups.** The paste is ground truth for every team in it. Write it
@@ -727,7 +769,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1046 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1056 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

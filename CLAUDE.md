@@ -205,13 +205,26 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    argv, a remote URL, `.git/config`, or any output. `--no-fetch` opts out and
    says so. If the fetch cannot run, the reading falls back to the stale ref
    and is LABELLED, never presented as clean.
+   **A failed fetch names WHICH of three things stopped it (R147): no network,
+   a rejected credential, or unknown.** It read "check the token scope or
+   expiry" for every failure until 2026-08-17, which sent a session at a
+   working PAT while the real cause was a sandbox with no outbound network at
+   all. Read the reason before touching the token. A cloud Cowork session's
+   device VM is that sandbox: DNS resolves, TCP to GitHub does not, and the
+   proxy answers CONNECT with 403 even for a public repo, so the fetch there
+   never succeeds and `behind` stays a fallback reading. The container reaches
+   GitHub normally.
    What no fetch can fix: sessions COMMIT and Ben PUSHES
    (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub and
-   the audit names that too. One live trap as of 2026-08-17: GitHub's DEFAULT
-   branch is `master`, stale since 08-04, so a fresh clone lands on it and
-   gets an old tree. Work on `main`.
+   the audit names that too. And `default_branch_mismatch` reads this clone's
+   LOCAL `origin/HEAD`, which is a cached copy of GitHub's default from
+   whenever `set-head` last ran, not the setting itself: on this disk it
+   points at `main`, so the check is silent and will stay silent. GitHub's own
+   default is still `master`, stale since 08-04, so a FRESH clone lands on it
+   and gets an old tree. Nothing here will remind you. Work on `main`, and fix
+   the default in GitHub Settings → Branches.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1046 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1056 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

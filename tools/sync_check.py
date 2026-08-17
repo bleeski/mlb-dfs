@@ -121,6 +121,80 @@ def find_token(environ=None) -> tuple[str | None, str | None]:
     return None, None
 
 
+# R147, 2026-08-17: a git remote call that fails is not evidence of a bad
+# credential. Both this tool and tools/audit.py hard-coded "check the token
+# scope" for ANY non-zero return, so a cloud Cowork session's device VM -- which
+# has no outbound network at all, and whose proxy answers CONNECT with 403 even
+# for a public repo needing no credential -- reported a working fine-grained PAT
+# as the problem. The remedy that message names is regenerating a token that was
+# never broken.
+#
+# git's stderr can echo the remote URL, so it is classified here and never
+# surfaced. The return value is one of three fixed strings.
+GIT_FAIL_NETWORK = "no network reachable from this environment"
+GIT_FAIL_CREDENTIAL = "credential rejected: check the token scope or expiry"
+GIT_FAIL_UNKNOWN = "git refused and the reason did not classify"
+
+# The two lists are kept DISJOINT in what they can match, which is the property
+# that matters; testing network first is only a backstop for the day one of them
+# grows a marker the other already covers. What actually keeps them disjoint is
+# the exclusion noted below: a proxy refusing CONNECT reports "Received HTTP code
+# 403 from proxy after CONNECT" and a scope failure reports "The requested URL
+# returned error: 403", so both carry a 403 and only the tail separates them.
+# Every marker is matched against a lowercased stderr.
+_GIT_NETWORK_MARKERS = (
+    "could not resolve host",
+    "temporary failure in name resolution",
+    "network is unreachable",
+    "no route to host",
+    "connection refused",
+    "connection timed out",
+    "operation timed out",
+    "failed to connect to",
+    "from proxy",
+    "after connect",
+    "proxy connect",
+    "ssl",
+    "gnutls",
+)
+# Deliberately NOT a network marker, and this is the one that nearly shipped:
+# "unable to access" is git's generic prefix for BOTH failures. Adding it here
+# would classify every credential failure as a network failure and re-open this
+# defect pointing the other way, which is why the two sample messages in
+# tests.test_core.GitFreshnessTests share that prefix on purpose.
+_GIT_CREDENTIAL_MARKERS = (
+    "authentication failed",
+    "invalid username or password",
+    "could not read username",
+    "could not read password",
+    "terminal prompts disabled",
+    "repository not found",
+    "permission denied",
+    "403 forbidden",
+    "401 unauthorized",
+    "returned error: 401",
+    "returned error: 403",
+    "access denied",
+    "support for password authentication was removed",
+)
+
+
+def classify_git_failure(stderr: str) -> str:
+    """Name what stopped a git remote call, without echoing git's own stream.
+
+    Three buckets, because three different things are owed: reach the network,
+    fix the credential, or look at it by hand. An empty or unrecognized stderr
+    classifies as unknown rather than as either of the other two, since naming
+    the wrong cause is the defect this function exists to close.
+    """
+    text = str(stderr or "").lower()
+    if any(marker in text for marker in _GIT_NETWORK_MARKERS):
+        return GIT_FAIL_NETWORK
+    if any(marker in text for marker in _GIT_CREDENTIAL_MARKERS):
+        return GIT_FAIL_CREDENTIAL
+    return GIT_FAIL_UNKNOWN
+
+
 def classify_dirt(porcelain: str, changed_names: str) -> dict:
     """Split `git status --porcelain` into real content changes and stat noise.
 
@@ -210,7 +284,10 @@ def collect(root: Path = REPO, environ=None, probe_remote: bool = True) -> dict:
                     state["remote_head"] = proc.stdout.split()[0]
                     state["remote_reachable"] = True
                 else:
-                    state["errors"].append("ls-remote failed: check the token scope")
+                    # R147: say which of the three it is. Never echo proc.stderr
+                    # itself; it can carry the remote URL.
+                    state["errors"].append(
+                        "ls-remote failed: " + classify_git_failure(proc.stderr))
             except (OSError, subprocess.SubprocessError):
                 state["errors"].append("ls-remote could not run")
     return state

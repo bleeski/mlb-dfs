@@ -1,3 +1,20 @@
-numpy>=2.0
-pandas>=2.2
-scipy>=1.13
+# R78(a) first half, landed 2026-08-17 under R147. The floors were open-ended
+# while requirements.lock pins numpy 2.2.6 / pandas 2.3.3 / scipy 1.15.3, so a
+# cold install resolved pandas 3.0.2 and the Excluded-column guard tests ERROR
+# in FIXTURE setup: `frame.loc[1, "Excluded"] = "False"` no longer coerces a
+# bool column. Re-measured 2026-08-17 in a container on that stack: five tests,
+# not the four R78 recorded on 2026-08-04 (RunSlateExclusionSeamTests grew one).
+# Engine code is unaffected and a failing suite blocks at session start, so this
+# is loud rather than silent -- and losing five assertions on the column
+# CLAUDE.md calls the forbidden pool reduction arriving as a data condition is
+# still not a thing to meet at T-20.
+#
+# pandas is the cap with a measured failure behind it; numpy and scipy are
+# capped to the same major boundary because R78's fix line already decided all
+# three and an untested major is not a thing to resolve into during a slate.
+# The rest of R78 stays OPEN: the three fixture sites still want object dtype,
+# requirements.lock's hashes are still cp310-only, and the audit's dependency
+# gate is still import-only rather than installed-vs-lock.
+numpy>=2.0,<3
+pandas>=2.2,<3
+scipy>=1.13,<2

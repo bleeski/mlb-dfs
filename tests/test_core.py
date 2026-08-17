@@ -12644,9 +12644,22 @@ class GitFreshnessTests(unittest.TestCase):
         # an instruction fails on its own documentation.
         body = fetch.split('"""', 2)[-1]
         for leak in ("{token", "token}", "https://", "remote.origin.url",
-                     "git\", \"config", "print(", "stderr)", "done.stdout",
-                     "done.stderr"):
+                     "git\", \"config", "print(", "done.stdout"):
             self.assertNotIn(leak, body, f"possible credential leak: {leak}")
+        # R147 TIGHTENS this rather than relaxing it. The body must now READ
+        # git's stderr, because a failure has to be classified instead of
+        # blamed on the token. It must still never SURFACE it. So the stream
+        # gets exactly one appearance, only as the classifier's argument, and
+        # the classifier's whole return set is three fixed strings. The
+        # behavioural half is
+        # test_a_classified_reason_never_carries_the_stream_it_read; a blanket
+        # ban would have been the weaker guard, since it says nothing about
+        # what the classifier does with what it reads.
+        self.assertEqual(1, body.count("done.stderr"),
+                         "the stream is read once, for classification, or not "
+                         "at all")
+        self.assertIn("classify_git_failure(done.stderr)", body,
+                      "the only permitted reader is the classifier")
 
     def test_freshness_is_wired_as_a_warning_and_never_an_error(self):
         """An out-of-date clone is a real problem and still not a reason to
@@ -12659,6 +12672,166 @@ class GitFreshnessTests(unittest.TestCase):
         self.assertIn("warnings.append(", tail)
         self.assertNotIn("errors.append(", tail)
         self.assertIn('checks["git_freshness"] = fresh', tail)
+
+    # -- R147: a failed remote call names what actually stopped it ----------
+    # Measured 2026-08-17, thirty minutes after R146 shipped: from a cloud
+    # Cowork session's device VM the audit reported "fetch failed: check the
+    # token scope or expiry" against a PAT that was present, in scope and
+    # working. That VM has no outbound network at all -- its proxy answers
+    # CONNECT with 403 for a PUBLIC repo needing no credential -- and both
+    # tools hard-coded the credential explanation for every non-zero return.
+    # The remedy the message named was regenerating a good token.
+
+    def _sync(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "sync_check.py"
+        spec = importlib.util.spec_from_file_location("sync_classify", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_a_proxy_refusing_connect_is_a_network_failure_not_a_bad_token(self):
+        """The exact stderr measured on the device VM."""
+        sync = self._sync()
+        self.assertEqual(
+            sync.GIT_FAIL_NETWORK,
+            sync.classify_git_failure(
+                "fatal: unable to access 'https://github.com/o/r.git/': "
+                "Received HTTP code 403 from proxy after CONNECT"))
+
+    def test_a_credential_403_is_still_a_credential_failure(self):
+        """The other half of the pair, sharing its prefix on purpose. Both
+        messages open with git's generic "unable to access '<url>':" and both
+        carry a 403; only the tail separates them, so any rule keyed on the
+        prefix gets one of the two wrong. Mutation-checked: adding "unable to
+        access" to the network markers, which is the edit that nearly shipped,
+        fails here and nowhere else."""
+        sync = self._sync()
+        self.assertEqual(
+            sync.GIT_FAIL_CREDENTIAL,
+            sync.classify_git_failure(
+                "fatal: unable to access 'https://github.com/o/r.git/': "
+                "The requested URL returned error: 403"))
+
+    def test_an_unreachable_or_unresolvable_host_is_a_network_failure(self):
+        sync = self._sync()
+        for stream in ("fatal: unable to access 'x': Could not resolve host: "
+                       "github.com",
+                       "ssh: connect to host github.com port 22: Network is "
+                       "unreachable",
+                       "fatal: unable to access 'x': Failed to connect to "
+                       "github.com port 443: Connection timed out"):
+            self.assertEqual(sync.GIT_FAIL_NETWORK,
+                             sync.classify_git_failure(stream), stream)
+
+    def test_a_rejected_credential_is_named_as_one(self):
+        sync = self._sync()
+        for stream in ("fatal: Authentication failed for 'https://github.com/o/r.git/'",
+                       "fatal: could not read Username for 'https://github.com': "
+                       "terminal prompts disabled",
+                       "remote: Repository not found."):
+            self.assertEqual(sync.GIT_FAIL_CREDENTIAL,
+                             sync.classify_git_failure(stream), stream)
+
+    def test_every_marker_classifies_into_its_own_bucket(self):
+        """The two lists have to stay disjoint in what they can match, and two
+        sample messages cannot show that. A marker filed in the wrong list, or
+        one the other list already covers as a substring, is invisible until
+        the day it decides a real failure."""
+        sync = self._sync()
+        for marker in sync._GIT_NETWORK_MARKERS:
+            self.assertEqual(sync.GIT_FAIL_NETWORK,
+                             sync.classify_git_failure(f"fatal: {marker}"),
+                             f"network marker misfiled: {marker}")
+        for marker in sync._GIT_CREDENTIAL_MARKERS:
+            self.assertEqual(sync.GIT_FAIL_CREDENTIAL,
+                             sync.classify_git_failure(f"fatal: {marker}"),
+                             f"credential marker misfiled: {marker}")
+
+    def test_an_unreadable_reason_claims_neither_cause(self):
+        """`--quiet` can swallow the stream, and inventing a cause is the whole
+        defect. Unknown is an honest third answer, not a fallback to either."""
+        sync = self._sync()
+        for stream in ("", None, "fatal: something new in git 3.0"):
+            self.assertEqual(sync.GIT_FAIL_UNKNOWN,
+                             sync.classify_git_failure(stream), repr(stream))
+
+    def test_a_classified_reason_never_carries_the_stream_it_read(self):
+        """git's stderr can echo the remote URL, and a token-in-URL remote
+        would put the credential in it. The classifier reads the stream; the
+        three strings it can return are the only things that leave."""
+        sync = self._sync()
+        poisoned = ("fatal: unable to access 'https://x-access-token:"
+                    "github_pat_LEAKED@github.com/bleeski/mlb-dfs.git/': "
+                    "Received HTTP code 403 from proxy after CONNECT")
+        reason = sync.classify_git_failure(poisoned)
+        self.assertEqual(sync.GIT_FAIL_NETWORK, reason)
+        for fragment in ("github_pat_LEAKED", "x-access-token", "https://",
+                         "bleeski", "github.com"):
+            self.assertNotIn(fragment, reason)
+
+    def test_both_tools_classify_through_the_one_function(self):
+        """Two readers of the same failure that disagree about its cause would
+        be worse than either alone (the R128 rule). audit imports it from
+        sync_check the same way it already imports find_token."""
+        root = Path(__file__).resolve().parents[1] / "tools"
+        audit_src = (root / "audit.py").read_text(encoding="utf-8")
+        sync_src = (root / "sync_check.py").read_text(encoding="utf-8")
+        self.assertIn("from sync_check import classify_git_failure", audit_src)
+        self.assertIn("classify_git_failure(proc.stderr)", sync_src)
+        self.assertNotIn('"fetch failed: check the token scope', audit_src)
+        self.assertNotIn('"ls-remote failed: check the token scope"', sync_src)
+        self.assertEqual(1, sync_src.count("def classify_git_failure"))
+
+    def test_a_failed_fetch_does_not_reset_the_contact_age(self):
+        """R146's fetch falsified R145's freshness number. A fetch that dies
+        still touches .git/FETCH_HEAD and truncates it to zero bytes, so every
+        failure reported fetch_age_hours 0.0 -- fresh contact that never
+        happened -- and the stale-contact warning, gated on age > 24, could
+        never fire on the one clone that cannot reach the remote at all."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = self._pair(tmp)
+            ref = work / ".git" / "refs" / "remotes" / "origin" / "main"
+            self.assertTrue(ref.exists(), "the clone tracks a loose remote ref")
+            old = datetime.now(timezone.utc).timestamp() - 48 * 3600
+            os.utime(ref, (old, old))
+            fetch_head = work / ".git" / "FETCH_HEAD"
+
+            fetch_head.write_text("", encoding="utf-8")
+            failed = module.git_freshness(work, allow_fetch=False)
+            self.assertIsNotNone(failed["fetch_age_hours"])
+            self.assertGreater(
+                failed["fetch_age_hours"], 24,
+                "a zero-byte FETCH_HEAD is a dead fetch, not contact")
+
+            # And the zero-byte rule has to MEAN something: a fetch that
+            # reached the remote writes a line per ref even when everything is
+            # already up to date, and that one still counts as contact. Without
+            # this half, ignoring FETCH_HEAD outright would pass the assertion
+            # above while discarding the only signal a push does not give.
+            fetch_head.write_text(
+                "0000000000000000000000000000000000000000\t\tbranch 'main'\n",
+                encoding="utf-8")
+            reached = module.git_freshness(work, allow_fetch=False)
+            self.assertLess(reached["fetch_age_hours"], 1.0)
+
+    def test_the_classified_reason_reaches_the_session_start_line(self):
+        """The reason is worth nothing in JSON nobody opens. --terse is the
+        command CLAUDE.md pins, and a stale contact this run could not refresh
+        rides out on it, naming the cause."""
+        module = self._audit()
+        result = {
+            "passed": True, "project_version": "vTEST", "errors": [],
+            "warnings": ["last contact with the remote was 48.0h ago and this "
+                         "run could not fetch (fetch failed: no network "
+                         "reachable from this environment), so 'behind: 0' is "
+                         "only as current as that"],
+            "checks": {"tests": {}},
+        }
+        line = module.terse_output(result, Path(__file__).resolve().parents[1])
+        self.assertIn("no network reachable from this environment", line)
+        self.assertNotIn("token", line)
 
 
 class DkBattingOrderPrecedenceTests(unittest.TestCase):

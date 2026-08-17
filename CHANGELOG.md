@@ -25,6 +25,122 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R147: a failed fetch says which of three things stopped it, and stops resetting the freshness number it was added to serve
+
+DEV, claim `engine_2026-08-17`, plus a `ledger` claim for the pin line only.
+Found by reviewing R142-R146 rather than by a build: Ben asked for a read of
+what changed, and the first live run of R146 disagreed with R146's own
+measurement.
+
+**R146 measured `remote_reachable: true` and thirty minutes later the same
+check failed.** The audit reported `fetch failed: check the token scope or
+expiry` against the same fine-grained PAT, unchanged and unexpired. The
+credential was never the problem. A cloud Cowork session's device VM has no
+outbound network: DNS resolves, TCP to GitHub is unreachable, and the proxy
+answers CONNECT with 403 for `github.com/git/git`, a PUBLIC repo that needs no
+credential at all. The identical `git ls-remote` from the container returns the
+ref. R146's premise, "this sandbox can fetch", is true of a container and false
+of the device VM, and nothing in the code could tell them apart because
+`audit.py` and `sync_check.py` both hard-coded the credential explanation for
+every non-zero return.
+
+This is the reverse of the failure R146 fixed and it costs the same way. R146's
+own reasoning was that hedging a real measurement "trains the reader to
+discount the warnings that matter"; a message that names the wrong cause is
+worse than a hedge, because it names a remedy. The remedy this one named was
+regenerating a working token.
+
+**`sync_check.classify_git_failure`.** One function, three fixed strings, both
+tools importing it the way `audit.py` already imports `find_token`. Two readers
+of one failure that disagree about its cause would be worse than either alone,
+which is R128's rule. git's stderr can echo the remote URL, so it is classified
+and never surfaced. Unknown is an honest third answer rather than a fallback
+into either of the other two, since inventing a cause is the whole defect.
+
+The marker lists are kept DISJOINT in what they can match, and the near-miss is
+worth recording because it shipped in the first cut: `unable to access` is
+git's generic prefix for BOTH failures. `unable to access '<url>': Received
+HTTP code 403 from proxy after CONNECT` is the network one and `unable to
+access '<url>': The requested URL returned error: 403` is the credential one.
+Both carry a 403, only the tail separates them, and a marker on the shared
+prefix classifies every credential failure as a network failure, re-opening
+this defect pointing the other way. The two test messages share that prefix on
+purpose.
+
+**The bug underneath it: R146 falsified R145's freshness number.** A fetch that
+dies still touches `.git/FETCH_HEAD`, and truncates it to zero bytes. So every
+failed fetch reset `fetch_age_hours` to 0.0, reporting contact that never
+happened, and the stale-contact warning R145 wrote is gated on `age > 24` and
+therefore could never fire on the one clone that cannot reach the remote at
+all. A zero-byte `FETCH_HEAD` is not contact: a fetch that reaches the remote
+writes a line per ref even when everything is already up to date. With the age
+honest, R145's warning works as written and carries the classified reason onto
+the `--terse` line, which is the surface a session actually reads.
+
+**A test tightened, not retired.** `test_the_token_never_reaches_argv_a_url_or_git_config`
+banned `done.stderr` outright in the fetch body, and the body must now read it
+to classify. Deleting the ban would have retired a real assertion, so the rule
+is sharper instead: exactly one appearance, only as the classifier's argument,
+plus a behavioural test that feeds a URL carrying a `github_pat_` and asserts
+the returned reason carries none of it. A blanket ban was the weaker guard all
+along, since it said nothing about what a reader does with what it reads.
+
+**Mutation-checked, and one of the checks failed.** Six mutations run by hand:
+credential markers tested first, the zero-byte skip removed, the classifier
+hardwired to NETWORK, the old string restored, `unable to access` added to the
+network list, `ssl` misfiled into the credential list. Five were caught. The
+first was NOT, because with the lists disjoint the order genuinely does not
+matter for any message either list matches, while the test docstring claimed it
+did. The docstring was the thing that was wrong; it now claims disjointness,
+which is the real property, and a sweep of both marker lists pins it. A test
+asserting a state it did not check is the R133 lesson.
+
+**Two more from the same review, both shipped here.**
+`skills/generate-lineups/SKILL.md` never got R143. Its pin line was current, so
+the file had been touched, but its intake section still opened with the R32
+paste rule and said nothing about the `Starting` column, `dk_order_coverage`,
+or the fetch skip. No wrong build follows, since `merge_dk_starting_into_feed`
+runs inside the front door and DK wins regardless. What follows is that a
+session reading the file CLAUDE.md names as the home of the per-slate procedure
+still asks Ben for a paste on a slate DK has fully posted, which is the exact
+cost R143 exists to remove. The new section also states the tradeoff R143's own
+entry left implicit: DK ships no handedness, `fetch_handedness` is keyed on
+MLBAM ids inside `fetch_lineups`, and the zero-fetch path skips it, so a slate
+DK covers whole builds with the F4 platoon component neutral for every hitter
+and `f4_platoon_applied: 0` in the brief. The instrument was already honest;
+the procedure now says to keep asking for a paste anyway, because it costs
+nothing in precedence and carries the `(R)/(L)/(S)` that keeps F4 alive.
+
+And `requirements.txt` gets its floors capped. This one is **not new**: R78(a)
+recorded it on 2026-08-04, reproduced in a container, and its fix line already
+named the exact edit (`numpy>=2.0,<3`, `pandas>=2.2,<3`, `scipy>=1.13,<2`). It
+is landed here because the same stack turned up again while verifying the gate
+and a one-line cap should not wait behind the rest of the item. Re-measured on
+pandas 3.0.2: FIVE tests error in fixture setup, not the four R78 recorded, since
+`RunSlateExclusionSeamTests` grew one. `frame.loc[1, "Excluded"] = "False"` no
+longer coerces a bool column, so the class guarding the forbidden pool reduction
+errors before asserting anything. Engine code is unaffected and a failing suite
+blocks, so it is loud. R78 stays OPEN on its remaining halves: the three fixture
+sites still want object dtype, the lock's hashes are still cp310-only, and the
+audit's dependency gate is still import-only rather than installed-vs-lock.
+
+**Open, and stated rather than left implicit.** `default_branch_mismatch` reads
+this clone's LOCAL `origin/HEAD`, which is a cached copy of GitHub's default
+from whenever `set-head` last ran. On this disk it points at `main`, so the
+check reports `null` and will keep reporting `null`, while R145's entry and
+CLAUDE.md both said the audit would keep naming the trap until Ben fixed it. It
+will not. The trap is a fresh clone landing on GitHub's server-side default,
+which no existing clone can see without a credentialed `ls-remote` — and on the
+device VM that is exactly the call that cannot run. CLAUDE.md now says so.
+Filed as R148 alongside the per-hitter handedness gap.
+
+Gate: `test_core` 688 -> 698, total 1046 -> 1056; per-suite 698 / 56 / 218 / 9
+/ 75, measured in the container against `requirements.lock` versions with
+`data/archive/2026-06-03/` staged. Two failures there and both are the
+checkout, not the tree: the gitignored-data guard needs a real `.git`, and
+`PreflightFeedDefaultTests` needs `data/slates/2026-07-25/`. Pin line updated
+in CLAUDE.md, `skills/generate-lineups/SKILL.md`, and the ledger Quick Card.
+
 ## 2026-08-17 — R146: the credential was already in `.env`, and now `behind` is a measurement instead of a hedge
 
 DEV, claim `engine_2026-08-17`. Ben chose a fetch token over a scheduled push

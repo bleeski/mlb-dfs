@@ -115,7 +115,19 @@ EXPECTED_SUITE_COUNTS = {
     # fallback under `python tools/sync_check.py`: the first cut imported
     # mlb_engine without REPO on sys.path, so it worked when imported and
     # no-opped in the invocation the docstring documents.
-    "tests.test_core": 688,
+    # R147, 2026-08-17: 688 -> 698, the ten that pin a CLASSIFIED remote
+    # failure. Six on the classifier itself: a proxy refusing CONNECT reading
+    # as network, a scope 403 sharing that message's prefix and still reading
+    # as credential, unreachable and unresolvable hosts, a rejected
+    # credential, an unreadable stream claiming neither cause, and a sweep of
+    # both marker lists so a misfiled marker is caught before the day it
+    # decides a real failure. One that the reason a classifier returns can
+    # never carry the stream it read, since git's stderr can echo a URL. One
+    # that both tools classify through the single function. One that a FAILED
+    # fetch no longer resets fetch_age_hours, which is what kept R145's
+    # stale-contact warning from ever firing. One that the reason reaches the
+    # --terse line the session-start step actually reads.
+    "tests.test_core": 698,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -814,7 +826,7 @@ def _try_git_fetch(root: Path, timeout: int = 20) -> Dict[str, Any]:
     out: Dict[str, Any] = {"fetched": False, "reason": None}
     try:
         sys.path.insert(0, str(root / "tools"))
-        from sync_check import find_token  # type: ignore
+        from sync_check import classify_git_failure, find_token  # type: ignore
     except Exception:
         out["reason"] = "sync_check unavailable"
         return out
@@ -842,7 +854,10 @@ def _try_git_fetch(root: Path, timeout: int = 20) -> Dict[str, Any]:
             out.update(fetched=True, credential=name)
         else:
             # stderr can echo a URL; never surface it, and never the token.
-            out["reason"] = "fetch failed: check the token scope or expiry"
+            # R147: it is CLASSIFIED instead. This line read "check the token
+            # scope or expiry" for every failure, so a sandbox with no network
+            # at all blamed a PAT that was present, in scope and working.
+            out["reason"] = "fetch failed: " + classify_git_failure(done.stderr)
     except subprocess.TimeoutExpired:
         out["reason"] = f"fetch exceeded {timeout}s"
     except (OSError, subprocess.SubprocessError):
@@ -900,13 +915,25 @@ def git_freshness(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
 
     # The remote-tracking ref moves on fetch OR push, and .git/FETCH_HEAD is
     # touched by fetch alone. Either one is evidence of contact; take the newer.
+    #
+    # R147: a FAILED fetch touches FETCH_HEAD too, and truncates it to zero
+    # bytes. So R146's fetch attempt was resetting fetch_age_hours to 0.0 on
+    # every failure, and the one number R145 built to say what `behind: 0` is
+    # WORTH was itself reporting contact that never happened -- which also kept
+    # the stale-contact warning below (age > 24) from ever firing on a clone
+    # that cannot reach the remote at all. A zero-byte FETCH_HEAD is not
+    # contact: a fetch that reaches the remote writes a line per ref even when
+    # everything is already up to date.
     newest = 0.0
     for rel in ("FETCH_HEAD", f"refs/remotes/{upstream}"):
         path = root / ".git" / rel
         try:
-            newest = max(newest, path.stat().st_mtime)
+            stat_result = path.stat()
         except OSError:
             continue
+        if rel == "FETCH_HEAD" and stat_result.st_size == 0:
+            continue
+        newest = max(newest, stat_result.st_mtime)
     if newest:
         out["fetch_age_hours"] = round(
             (datetime.now(timezone.utc).timestamp() - newest) / 3600.0, 1)
