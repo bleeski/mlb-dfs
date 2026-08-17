@@ -25,6 +25,79 @@ performance claim.
 
 ---
 
+## 2026-08-17 — Greenfield spec, fifth edition: it audited the retired workbench; one rider on R123 and one sim-gate clause (docs only)
+
+DEV, claim `engine_greenfield_spec_2026-08-17`. Ben uploaded a 1,912-line
+`DFS_SYSTEM_GREENFIELD_SPEC.md` (review date 2026-08-17: a 50-finding static
+audit, F-001–F-050, plus a Section-3 target architecture) with the
+instruction to accept, reject or modify each element and fold the remainder
+into the backlog. Archived verbatim at
+`docs/2026-08-17_critique_greenfield_spec.md` beside the four prior
+editions, per the diff protocol ed4's filename note depends on.
+
+**The controlling fact is its own header: it reviewed
+`C:\Users\benja\Documents\MLB_DFS_Workbench` at `28aeaa8`, not this repo.**
+That is the pre-migration workspace MANIFEST.md's 2026-07-16 seed left
+behind: its engine lineage froze at `legacy/v2_15_1` (this tree is v2.26.0),
+and every load-bearing path in its defect log — an `engines/adapters/`
+Showdown adapter that never reads its rules file and hard-codes `OPTIMAL`
+into manifests, `metric_projection.py`, `portfolio_waterfall.py`,
+`stack_adjacency.py`, PowerShell certifiers reading `Downloads/`,
+`prompts/*.md` — has zero references in this tree (`grep -ri workbench`
+matches nothing either). Its two empirical premises are true of that tree
+and false of this one: "no results history, no calibration corpus" is
+answered by the 271-contest archive and R135's first graded slate, both of
+which predate the review, and "production claims outrun implementation" is
+answered by the truthful-labels law, which the spec independently reinvents
+as its own taxonomy (`DIAGNOSTIC`, never `EV_CERTIFIED`). Its verdict — do
+not promote the workbench engines; preserve inputs as fixtures; build the
+successor beside them behind an independent check — is a description of the
+migration this repo already is.
+
+**Dispositions across the 50 findings.** 21 name failure modes this tree
+already guards (bounded solves with `optimality='time_limited'` and the gap
+in the refusal; the Excluded-column affirmative-token law, the exact inverse
+of F-018's truthy-string trap; counted relaxations; blank-reserved-row
+blocks and the complete-entry immutability refusal; paste blockers R32;
+`authorized_entry_ids`; R127's NAMED neutral defaults; the walls). 10 are
+open board items under existing numbers (F-008/F-033→R87+R115,
+F-015→R90, F-019→R81, F-025→R76+R149, F-032→R115+R130, F-035→R71+R84,
+F-043→R118+R48+R83, F-045→R91, F-047→R120+R124). 18 fold into the rebuild
+program rejected on standing grounds since 08-01 (CP-SAT default — the
+fifth solver-migration proposal, still no measured problem — artifact
+store, SQLite DAG orchestrator with leases, signed Merkle manifests, model
+cards, CI/SBOM, requirement-to-test register, live contest-economics
+ingestion against the DK wall), re-affirmed in Do-not-build's new paragraph.
+**1 is adopted as modified: F-009, verified in tree.** `showdown.py:408`
+computes `cap = max(1, floor(pct * n_target)) if max_cpt_exposure_pct else
+None`, so an explicit `0.0` is falsy and silently means UNCAPPED (`None` is
+the documented disable), and a small-n floor-to-zero is silently raised to
+1 while diagnostics carry only the requested pct (`:461`), never the
+effective integer cap. Filed as a rider on R123, whose acceptance now
+requires the effective cap beside the pct, a named raised-to-1 event, and a
+refusal on `0.0`. **One Section-3 element is adopted as modified: §3.10's
+scenario-bank discipline**, one clause appended to Do-not-build's sim-gate
+precondition (selection and grading on separate seeded banks; settlement
+ranks own entries jointly) so the gated ladder cannot open onto Monte-Carlo
+self-grading. Compliance citations (Fair Play Commitment, CSV-upload flow)
+and the LLM-boundary table are convergence data points on walls and
+directions this repo wrote first.
+
+Verification behind the rulings: `time_limited` at `optimizer_v3.py:1036`,
+`authorized_entry_ids` at `late_swap_manager.py:270`, per-run
+`final/projections.csv` at `execution_pipeline.py:349`,
+`tools/ownership_pred.py` present, the falsy-zero at `showdown.py:405-408`
+against its `:461` diagnostics. Suite replicated green in the cloud
+container at this tree: `PASS  v2.26.0  26 modules  1120 tests  4 skipped
+{test_core 762/762 (4 skipped) skipped_in_place}` — the 4 are the
+environment-gated skips, and one meta-guard run without `.git` first
+produced the expected tracked-files false positive, resolved by snapshotting
+the tree into a throwaway index, not by touching the guard. Files in this
+commit: `docs/backlog.md` (what-next note, R123 rider, sim-gate clause,
+Do-not-build paragraph), `docs/2026-08-17_critique_greenfield_spec.md`
+(new, the archived edition), this entry. No engine, tool, test, or skill
+surface moved.
+
 ## 2026-08-17 — R135: the predict-then-grade ownership loop starts, and the join it needs is the part that had to be built
 
 DEV, claim `engine_2026-08-17`. Tier 1's head after R126 closed, taken with

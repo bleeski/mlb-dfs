@@ -39,6 +39,26 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-17 (fifth session), DEV, claim `engine_greenfield_spec_2026-08-17`:
+**the fifth greenfield edition arrived and was adjudicated the same day; the
+queue does not move.** Its controlling fact is its own header: it audited
+`C:\Users\benja\Documents\MLB_DFS_Workbench` at `28aeaa8` — the pre-migration
+workspace whose engine lineage froze at `legacy/v2_15_1` when MANIFEST.md's
+2026-07-16 seed left it — so its 50 findings name paths with zero references
+in this tree, and its "no results history, no calibration corpus" premise is
+answered by the 271-contest archive and R135's first graded slate, both of
+which predate it. Yield, consistent with the series (ed4 §0's table): one
+rider on R123 (F-009's zero-cap trap, verified live: `showdown.py:408`'s
+falsy check turns an explicit `0.0` captain cap into UNCAPPED, and the
+effective integer cap never surfaces beside the pct), and one clause on the
+sim-gate precondition (§3.10's scenario-bank separation plus joint own-entry
+settlement). Everything else is shipped here, open here under existing
+numbers (R41, R71, R75, R76, R81, R84, R87, R90, R91, R115, R118, R123,
+R124, R130, R132, R149), or rejected on the standing grounds under
+Do-not-build, where this adjudication's paragraph now sits. Edition archived
+at `docs/2026-08-17_critique_greenfield_spec.md`; full reasoning in
+CHANGELOG.md's entry of this date. **R136 remains this tier's head.***
+
 *2026-08-17 (fourth session), DEV, claim `engine_2026-08-17`: **R135 is CLOSED
 and migrated** to CHANGELOG.md, and **R151 was filed and closed in the same
 session**, which is the one thing here worth reading before the R-number. R135
@@ -1274,6 +1294,17 @@ the batch's named rider and did not get pulled.
   deal into contests in ladder order; the $1 Solo Shot (100x the satellite
   fee) received ladder slot 19 in both v1 and v3. Order assignment by
   contest stakes/shape, or print thesis→contest in the brief before upload.
+- **Rider 2026-08-17, from the GF fifth edition's F-009, verified in tree:**
+  the captain-cap arithmetic has two silent behaviors nothing reports.
+  `showdown.py:408` computes `cap = max(1, floor(pct * n_target)) if
+  max_cpt_exposure_pct else None`, so an explicit `0.0` is falsy and aliases
+  to UNCAPPED — `None` is the documented disable, so `0.0` deserves a refusal
+  naming the infeasibility (every lineup needs a captain), never a silent
+  no-cap. And at small n the floor lands on 0 and is silently raised to 1, an
+  event the brief never states: diagnostics carry the requested pct (`:461`)
+  but never the effective integer cap. Fold into (a)/(b)'s acceptance: the
+  brief and diagnostics state the effective cap beside the pct, a raised-to-1
+  event is named, and `0.0` is refused with the reason.
 - **Audit fields.** Moves: portfolio quality, leverage. Evidence: V2
   (fragment; signature verified; captain counts from the delivered brief).
   Acceptance: synthetic ladder test pinning the cap + its counted
@@ -2726,7 +2757,13 @@ Floor and enriched-Ceiling marginals give CV in [0.26, 0.40] driven by power
 alone; `slate_sim.py`'s static tail was structural — sigma a constant
 multiple of mu — not a volume artifact, so reopening the ladder without a
 variance basis reproduces the v2.20.0 retirement. R13 and R10 remain the
-funding gates; this is the third, technical precondition.
+funding gates; this is the third, technical precondition. A fourth clause,
+adopted 2026-08-17 from the fifth edition's §3.10, same one-sentence class:
+when the ladder opens, selection and grading run on SEPARATE scenario banks
+with logged seeds — a portfolio graded on the worlds that selected it has
+not been graded — and settlement ranks all own entries in the same simulated
+contest JOINTLY, because summed standalone lineup values overstate a
+portfolio whose entries compete with one another.
 
 The 2026-08-01 GF-spec adjudication (R41/R42 changelog entry) adds, same
 logic: no greenfield parallel package or phased rebuild program while R13 is
@@ -2818,6 +2855,39 @@ Convergences kept as data points, not adoptions: Spark's headless
 single-command build with atomic JSON state describes `build_slate.py` +
 `build_state_manager.py` as shipped, and both critiques' LLM-out-of-the-math
 rule is CLAUDE.md's own.
+
+The 2026-08-17 fifth edition (a 1,912-line, 50-finding static audit plus
+target architecture, uploaded and adjudicated the same day, archived at
+`docs/2026-08-17_critique_greenfield_spec.md`) adds one rider and one
+sim-gate clause, recorded above, and its headline fact is about itself: it
+audited the WRONG TREE — `C:\Users\benja\Documents\MLB_DFS_Workbench` at
+`28aeaa8`, the pre-migration workspace whose engine lineage this repo
+superseded when MANIFEST.md's 2026-07-16 seed left `legacy/v2_15_1` behind.
+Every load-bearing path in its defect log (an `engines/adapters/` Showdown
+adapter that never reads its rules file, `metric_projection.py`,
+`portfolio_waterfall.py`, `stack_adjacency.py`, PowerShell certifiers,
+`prompts/*.md`) has zero references in this tree, and its "no results
+history, no calibration corpus" premise is answered by the 271-contest
+archive and R135's first graded slate. Where its findings map onto live
+surfaces the board already holds them: bounded solves and
+`optimality='time_limited'` shipped, neutral defaults NAMED (R127), corrupt
+manifests QUARANTINED (R129), override flags into the brief (R36 F3m, Tier
+1), Showdown certification R41, caps and captain reporting R123, bank
+honesty R115/R130/R132, test depth R79/R90/R91, intake identity R75/R81.
+The rebuild program it re-argues — CP-SAT as default (the fifth
+solver-migration proposal against a pinned authority with no measured
+problem), a content-addressed artifact store, an SQLite DAG orchestrator
+with leases, signed Merkle manifests, model cards, CI/SBOM, a
+requirement-to-test register — is rejected on the standing grounds above,
+unchanged since 08-01 and re-affirmed 08-10 and 08-12. Its compliance
+boundary (stop at a certified file, never automate DraftKings, Fair Play
+Commitment cited) restates CLAUDE.md's walls minus this repo's stricter
+no-DK-reads rule, and its label taxonomy (`DIAGNOSTIC`, never
+`EV_CERTIFIED`) is the truthful-labels law reinvented; both kept as
+convergence data points. Its own strongest recommendation — do not promote
+the workbench engines, preserve inputs as fixtures, build the successor
+beside them behind an independent check — is a description of the migration
+this repo already is.
 
 The 2026-08-04 audit adds, same logic: no module-split program and no engine
 rewrite argued from the giant-file line counts alone — the audit found the
