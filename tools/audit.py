@@ -105,7 +105,17 @@ EXPECTED_SUITE_COUNTS = {
     # the wiring landing in warnings and never errors. The seventh is the
     # non-numeric degrade, which VendoredPylibsTests found by patching
     # subprocess.run out from under it.
-    "tests.test_core": 683,
+    # R146, 2026-08-17: 683 -> 687, the four that pin the credential path
+    # -- a token only in .env being found (it was there and valid the
+    # whole time while find_token read os.environ alone), an explicit
+    # environ still winning over it, the staleness hedge dropping once a
+    # fetch has made `behind` a measurement, and the one that cannot be
+    # relaxed: the token reaching git through GIT_ASKPASS only, never
+    # argv, a URL, .git/config, or any printed stream. A fifth pins the
+    # fallback under `python tools/sync_check.py`: the first cut imported
+    # mlb_engine without REPO on sys.path, so it worked when imported and
+    # no-opped in the invocation the docstring documents.
+    "tests.test_core": 688,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -260,7 +270,8 @@ def check_dependencies(root: Path) -> Dict[str, Any]:
     }
 
 
-def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
+def run_audit(root: Path, run_tests: bool = False,
+              allow_fetch: bool = True) -> Dict[str, Any]:
     errors: List[str] = []
     warnings: List[str] = []
     checks: Dict[str, Any] = {}
@@ -342,7 +353,7 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
     # the suite made these calls the last ones and broke that test, which is
     # the test doing its job. Order is the fix; rewriting the older test to
     # accommodate a newer check would have retired a real assertion.
-    fresh = git_freshness(root)
+    fresh = git_freshness(root, allow_fetch=allow_fetch)
     checks["git_freshness"] = fresh
 
     test_result = None
@@ -389,10 +400,15 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
                 f"{fresh['ahead']} commit(s) on {fresh['branch']} are not on "
                 f"{fresh['upstream']}; sessions commit and Ben pushes, so this "
                 f"is a push Ben owes, and until then no clone can see them")
-        if age is not None and age > 24 and not fresh["behind"]:
+        # Only hedge when the fetch did NOT happen. After a successful fetch
+        # `behind` is a measurement and saying it might be stale would be
+        # false caution, which trains the reader to discount the real warnings.
+        if not fresh["fetched"] and age is not None and age > 24 \
+                and not fresh["behind"]:
             warnings.append(
-                f"last contact with the remote was {age}h ago, so 'behind: 0' "
-                f"is only as current as that; this clone cannot fetch")
+                f"last contact with the remote was {age}h ago and this run "
+                f"could not fetch ({fresh['fetch_reason']}), so 'behind: 0' is "
+                f"only as current as that")
         if fresh["default_branch_mismatch"]:
             warnings.append(
                 f"origin/HEAD is {fresh['default_branch_mismatch']} but the "
@@ -781,7 +797,60 @@ def skill_cache_drift(root: Path) -> Dict[str, Any]:
 # and `git fetch` dies on "could not read Username" -- so the honest move is not
 # to guarantee freshness but to make the uncertainty visible. Three facts, all
 # readable offline, all warnings.
-def git_freshness(root: Path) -> Dict[str, Any]:
+def _try_git_fetch(root: Path, timeout: int = 20) -> Dict[str, Any]:
+    """Update the remote-tracking refs, if a credential is reachable.
+
+    R146. Without this, ``behind`` is measured against a ref that moves only
+    when Ben pushes, so a clone reports ``behind: 0`` when it means "I cannot
+    know". With it, ``behind`` is a measurement.
+
+    The token is passed to git through GIT_ASKPASS and an env var and NEVER
+    lands in argv, in ``.git/config``, in a remote URL, or in any output --
+    same discipline as tools/sync_check.py, and the reason a token-in-the-URL
+    remote is not used. Bounded and non-fatal: a build at T-20 must not hang or
+    die on a network call, so a failure here is reported as "not fetched" and
+    the stale-ref reading is used, honestly labelled.
+    """
+    out: Dict[str, Any] = {"fetched": False, "reason": None}
+    try:
+        sys.path.insert(0, str(root / "tools"))
+        from sync_check import find_token  # type: ignore
+    except Exception:
+        out["reason"] = "sync_check unavailable"
+        return out
+    try:
+        name, token = find_token()
+    except Exception:
+        name, token = None, None
+    if not token:
+        out["reason"] = "no credential in env or .env"
+        return out
+
+    askpass = root / ".git" / "audit_askpass"
+    try:
+        askpass.write_text(
+            '#!/bin/sh\ncase "$1" in *[Uu]sername*) echo x-access-token;; '
+            '*) echo "$AUDIT_GIT_TOKEN";; esac\n', encoding="utf-8")
+        askpass.chmod(0o700)
+        env = dict(os.environ)
+        env.update({"AUDIT_GIT_TOKEN": token, "GIT_ASKPASS": str(askpass),
+                    "GIT_TERMINAL_PROMPT": "0"})
+        done = subprocess.run(["git", "fetch", "--quiet", "origin"],
+                              cwd=str(root), capture_output=True, text=True,
+                              timeout=timeout, env=env)
+        if done.returncode == 0:
+            out.update(fetched=True, credential=name)
+        else:
+            # stderr can echo a URL; never surface it, and never the token.
+            out["reason"] = "fetch failed: check the token scope or expiry"
+    except subprocess.TimeoutExpired:
+        out["reason"] = f"fetch exceeded {timeout}s"
+    except (OSError, subprocess.SubprocessError):
+        out["reason"] = "fetch could not run"
+    return out
+
+
+def git_freshness(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
     """How far the clone is from the last remote state it actually saw.
 
     ``ahead`` needs a push (Ben's action, per docs/cowork_sync_protocol.md);
@@ -795,7 +864,12 @@ def git_freshness(root: Path) -> Dict[str, Any]:
     """
     out: Dict[str, Any] = {"available": False, "ahead": 0, "behind": 0,
                            "fetch_age_hours": None, "branch": None,
-                           "default_branch_mismatch": None}
+                           "default_branch_mismatch": None,
+                           "fetched": False, "fetch_reason": None}
+    if allow_fetch:
+        attempt = _try_git_fetch(root)
+        out["fetched"] = attempt["fetched"]
+        out["fetch_reason"] = attempt["reason"]
 
     def _git(*args: str) -> Optional[str]:
         try:
@@ -900,9 +974,14 @@ def main() -> None:
     parser.add_argument("--run-tests", action="store_true", help="run the full suite and verify the count")
     parser.add_argument("--terse", action="store_true", help="one-line PASS/FAIL summary")
     parser.add_argument("--output", help="write full JSON result to this path")
+    parser.add_argument("--no-fetch", action="store_true",
+                        help="skip the git fetch that makes 'behind' a "
+                             "measurement; the stale-ref reading is used and "
+                             "labelled as such")
     args = parser.parse_args()
 
-    result = run_audit(Path(args.root), run_tests=args.run_tests)
+    result = run_audit(Path(args.root), run_tests=args.run_tests,
+                       allow_fetch=not args.no_fetch)
 
     if args.terse:
         print(terse_output(result, Path(args.root)))

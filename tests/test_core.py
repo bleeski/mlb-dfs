@@ -12561,12 +12561,99 @@ class GitFreshnessTests(unittest.TestCase):
         self.assertFalse(out["available"])
         self.assertEqual((0, 0), (out["ahead"], out["behind"]))
 
+    def test_a_credential_only_in_dotenv_is_found(self):
+        """R146. A valid fine-grained PAT sat in REPO/.env under GH_PAT while
+        find_token read os.environ alone, so every run reported "no usable
+        token" and GitHub's head went unmeasured against a credential that was
+        present and working. repo_env already resolves THE_ODDS_API_KEY from
+        .env for exactly this reason."""
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "sync_check.py"
+        spec = importlib.util.spec_from_file_location("sync_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        fake = "x" * (module.MIN_TOKEN_LEN + 40)
+        with unittest.mock.patch.dict(os.environ, {}, clear=False):
+            for name in module.TOKEN_ENV_VARS:
+                os.environ.pop(name, None)
+            with unittest.mock.patch(
+                    "mlb_engine.repo_env.resolve_secret",
+                    side_effect=lambda n, *a, **k: fake if n == "GH_PAT" else None):
+                name, token = module.find_token()
+        self.assertEqual("GH_PAT", name)
+        self.assertEqual(fake, token)
+
+    def test_the_dotenv_fallback_works_when_run_as_a_script(self):
+        """The first cut imported mlb_engine without putting REPO on sys.path,
+        so `python tools/sync_check.py` -- the invocation its own docstring
+        documents -- hit ImportError and the fallback silently no-opped. It
+        passed when the function was imported from the repo root and failed
+        when the script was run. Run the script."""
+        root = Path(__file__).resolve().parents[1]
+        if not (root / ".env").exists():
+            self.skipTest("no .env on this machine")
+        done = subprocess.run(
+            [sys.executable, str(root / "tools" / "sync_check.py"), "--no-remote"],
+            capture_output=True, text=True, cwd="/", timeout=120)
+        source = (root / "tools" / "sync_check.py").read_text(encoding="utf-8")
+        self.assertIn("sys.path.insert(0, str(REPO))", source,
+                      "the repo root must be on sys.path before the import")
+        self.assertNotIn("no usable token", done.stdout,
+                         "a credential in .env must be found by the script path")
+
+    def test_an_explicit_environ_still_wins_over_dotenv(self):
+        """The .env fallback is a fallback. A caller that passes an environ is
+        stating what to use, and a test that pins 'no token' must keep meaning
+        it even on a machine whose .env has one."""
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "sync_check.py"
+        spec = importlib.util.spec_from_file_location("sync_explicit", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual((None, None), module.find_token(environ={}))
+
+    def test_a_fetch_makes_behind_a_measurement_and_drops_the_hedge(self):
+        """With no fetch, `behind: 0` can mean "I cannot know", so a stale
+        contact is hedged. After a fetch it is a measurement, and hedging it
+        would be false caution -- which trains the reader to discount the real
+        warnings."""
+        module = self._audit()
+        source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
+                  ).read_text(encoding="utf-8")
+        self.assertIn('if not fresh["fetched"] and age is not None', source,
+                      "the staleness hedge must be conditional on the fetch")
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = self._pair(tmp)
+            out = module.git_freshness(work, allow_fetch=False)
+        self.assertFalse(out["fetched"])
+        self.assertTrue(out["available"], "no fetch still measures the refs")
+
+    def test_the_token_never_reaches_argv_a_url_or_git_config(self):
+        """The one rule that cannot be relaxed. The token goes to git through
+        GIT_ASKPASS and an env var, so it stays out of `ps`, out of shell
+        history, out of .git/config and out of any remote URL."""
+        source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
+                  ).read_text(encoding="utf-8")
+        fetch = source.split("def _try_git_fetch", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("GIT_ASKPASS", fetch)
+        self.assertIn("GIT_TERMINAL_PROMPT", fetch)
+        self.assertIn('["git", "fetch", "--quiet", "origin"]', fetch,
+                      "the remote is named, never a URL carrying a credential")
+        # Scan the CODE. The docstring says ".git/config" and "remote URL"
+        # describing what is avoided, and a scanner that cannot tell prose from
+        # an instruction fails on its own documentation.
+        body = fetch.split('"""', 2)[-1]
+        for leak in ("{token", "token}", "https://", "remote.origin.url",
+                     "git\", \"config", "print(", "stderr)", "done.stdout",
+                     "done.stderr"):
+            self.assertNotIn(leak, body, f"possible credential leak: {leak}")
+
     def test_freshness_is_wired_as_a_warning_and_never_an_error(self):
         """An out-of-date clone is a real problem and still not a reason to
         refuse to build a slate."""
         source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
                   ).read_text(encoding="utf-8")
-        wiring = source.split("fresh = git_freshness(root)", 1)
+        wiring = source.split("fresh = git_freshness(root", 1)
         self.assertEqual(2, len(wiring), "run_audit must call git_freshness")
         tail = wiring[1].split("drift = skill_cache_drift(root)", 1)[0]
         self.assertIn("warnings.append(", tail)

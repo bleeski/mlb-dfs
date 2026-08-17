@@ -197,15 +197,21 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    so a vague subject breaks this step, not just the log. And git tells a
    clone nothing it has not PULLED, which makes step 0 below the real
    prerequisite.
-0. Before all of it, if this session is not on Ben's own disk: `git fetch` and
-   check you are current. Sessions COMMIT and Ben PUSHES
-   (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub;
-   `python tools/sync_check.py` names the gap. Two live traps as of
-   2026-08-17: the disk carried 13 commits GitHub did not, and GitHub's
-   DEFAULT branch is `master`, which is stale by weeks. A fresh clone lands on
-   `master` and gets an old tree. Work on `main`.
+0. Step 1's `git log` is only as current as the clone, and since R146 the
+   audit in step 2 FETCHES before measuring, so `behind` is a measurement
+   rather than a hedge. The credential is `GH_PAT` in `REPO/.env`
+   (`sync_check.find_token` resolves it there as well as from the
+   environment); it reaches git through `GIT_ASKPASS` only and never touches
+   argv, a remote URL, `.git/config`, or any output. `--no-fetch` opts out and
+   says so. If the fetch cannot run, the reading falls back to the stale ref
+   and is LABELLED, never presented as clean.
+   What no fetch can fix: sessions COMMIT and Ben PUSHES
+   (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub and
+   the audit names that too. One live trap as of 2026-08-17: GitHub's DEFAULT
+   branch is `master`, stale since 08-04, so a fresh clone lands on it and
+   gets an old tree. Work on `main`.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1041 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1046 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

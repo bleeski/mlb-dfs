@@ -96,6 +96,28 @@ def find_token(environ=None) -> tuple[str | None, str | None]:
         value = env.get(name) or ""
         if len(value) >= MIN_TOKEN_LEN:
             return name, value
+    # R146. The environment is not the only place a secret lives here. A
+    # fine-grained PAT sat in REPO/.env under GH_PAT from before 2026-08-17
+    # while this function read os.environ alone, so every run reported "no
+    # usable token" and GitHub's head went unmeasured against a credential
+    # that was present and valid. Same shape as THE_ODDS_API_KEY, which
+    # repo_env already resolves from .env for exactly this reason; an explicit
+    # `environ` still wins, so a caller can override.
+    if environ is None:
+        # Run as `python tools/sync_check.py`, sys.path[0] is tools/ and the
+        # repo root is absent, so the import fails and the fallback silently
+        # no-ops in the exact invocation the docstring documents. Put REPO on
+        # the path first. Found by running the script rather than the function.
+        if str(REPO) not in sys.path:
+            sys.path.insert(0, str(REPO))
+        try:
+            from mlb_engine.repo_env import resolve_secret
+        except ImportError:
+            return None, None
+        for name in TOKEN_ENV_VARS:
+            value = resolve_secret(name) or ""
+            if len(value) >= MIN_TOKEN_LEN:
+                return name, value
     return None, None
 
 

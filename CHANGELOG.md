@@ -25,6 +25,59 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R146: the credential was already in `.env`, and now `behind` is a measurement instead of a hedge
+
+DEV, claim `engine_2026-08-17`. Ben chose a fetch token over a scheduled push
+reminder, and asked how to set one up.
+
+**He had already set one up.** A valid fine-grained PAT (`github_pat_` prefix,
+93 chars) was sitting in `REPO/.env` under `GH_PAT` from before today.
+`sync_check.find_token` read `os.environ` alone, nothing loads `.env` into the
+environment, and so every run reported "no usable token in
+GH_PAT/GH_TOKEN/GITHUB_TOKEN" against a credential that was present, in scope,
+and working. R145 shipped four hours earlier reasoning from "this clone cannot
+fetch", which was true of the code and false of the repo.
+
+This is the same shape as R143 and it is now two for two in one day: a fact
+already in a file we control, unused, while the tooling reported its absence.
+`mlb_engine/repo_env.resolve_secret` has resolved `THE_ODDS_API_KEY` from
+`.env` for exactly this reason since R42(a). `find_token` now falls back to it,
+and an explicitly passed `environ` still wins so a caller can pin "no token".
+
+**Measured immediately after wiring:** `remote_reachable: true`, GitHub head
+`0a57203`, matching disk. First time this sandbox has read GitHub's true state.
+
+**`_try_git_fetch` in `tools/audit.py`.** The audit now fetches before it
+measures, so `behind` answers "am I current" rather than "I cannot know". The
+staleness hedge is dropped on a successful fetch, because hedging a real
+measurement is false caution and false caution trains the reader to discount
+the warnings that matter. `--no-fetch` opts out; a failed or absent fetch falls
+back to the stale ref and SAYS SO in `fetch_reason`.
+
+**Credential discipline, tested rather than asserted.** The token reaches git
+through `GIT_ASKPASS` and one env var. It never enters argv (so not `ps`, not
+shell history), never a remote URL, never `.git/config`, and no git stream is
+echoed, since stderr on a failed fetch can carry the URL. The failure message
+is a fixed string naming scope or expiry. `test_the_token_never_reaches_argv_a_url_or_git_config`
+scans the function body for each of those shapes; it scans the BODY, not the
+docstring, after the first cut failed on its own prose describing what it
+avoids. Bounded at 20s and non-fatal: a build at T-20 must not hang or die on a
+network call.
+
+**What a token still cannot do.** It does not push. Sessions commit and Ben
+pushes, unchanged. And `origin/HEAD` is still `origin/master`, stale since
+08-04, so a fresh clone continues to land on an early-August tree until that
+default is changed in GitHub; the audit says so on every run.
+
+One more bug, found by running the script instead of the function: the first cut
+imported `mlb_engine` without putting REPO on `sys.path`, so it resolved the
+token when `find_token` was imported from the repo root and silently no-opped
+under `python tools/sync_check.py`, the invocation its own docstring documents.
+Pinned by a test that runs the script from `/`.
+
+Tests: five more in `tests.test_core.GitFreshnessTests` (twelve total);
+`test_core` 683 -> 688, total 1041 -> 1046.
+
 ## 2026-08-17 — R145: the audit says how stale this clone is, because `git log` never will
 
 DEV, claim `engine_2026-08-17`. Ben, on R144's new session-start step: "how can
