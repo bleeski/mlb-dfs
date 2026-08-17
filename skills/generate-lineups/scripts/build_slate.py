@@ -1870,6 +1870,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # should agree; a brief where they do not is the interesting one.
     exposure["candidate_reuse"] = result.get("candidate_reuse")
     exposure["candidate_reuse_counts"] = result.get("candidate_reuse_counts")
+    # R126. Apex and washout join the SAME block rather than opening a new
+    # section, because "is this portfolio concentrated in a way the gates do not
+    # catch" is the question this block already half-answered. The engine
+    # computes it (it is the only place the entered set and the Ceiling column
+    # are both in hand); build_slate's job is to carry it into the brief and say
+    # it once out loud where the operator reads before approving.
+    exposure["frontier"] = result.get("portfolio_frontier")
+    print(f"frontier: {format_frontier_line(exposure['frontier'])}", file=sys.stderr)
     brief = {
         "status": "certified" if checks["passed"] else "verify_failed",
         "contest_type": "classic",
@@ -2373,6 +2381,40 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        == "even_split_no_market_input" else "")),
     }
     return (0 if template.get("passed") else 3), brief
+
+
+def format_frontier_line(frontier: dict | None) -> str:
+    """One review line for R126's block: apex, then what binds the washout.
+
+    A separate function because a print built inline is a print nothing can
+    test, and the two facts worth reading here are the ones a session at T-10
+    skips if they take a paragraph. Wording is deliberate: `retains` and
+    `intact` describe the counterfactual, never a chance of anything.
+    """
+    if not frontier or not frontier.get("available"):
+        reason = (frontier or {}).get("unavailable_reason") or "not computed"
+        return f"UNAVAILABLE ({reason})"
+    apex = frontier.get("apex") or {}
+    parts = [
+        f"apex total {apex.get('ceiling_total')} "
+        f"mean {apex.get('ceiling_mean')} "
+        f"best {apex.get('ceiling_best')} (entry {apex.get('best_entry_id')})"
+    ]
+    wash = frontier.get("washout") or {}
+    if wash.get("available"):
+        n = frontier.get("entries")
+        parts.append(
+            f"washout binds on {wash.get('binding_game')}: zeroing its bats "
+            f"retains {wash.get('worst_ceiling_retained_pct')}% of portfolio "
+            f"ceiling with {wash.get('entries_fully_intact_at_binding_game')}"
+            f"/{n} entries untouched")
+    else:
+        parts.append(f"washout UNAVAILABLE ({wash.get('unavailable_reason')})")
+    if frontier.get("unpriced_roster_players"):
+        parts.append(
+            f"{len(frontier['unpriced_roster_players'])} rostered player(s) "
+            f"carry no Ceiling, so the totals are SHORT")
+    return " | ".join(parts) + " [review proxies, not probabilities]"
 
 
 def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:

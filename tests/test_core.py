@@ -12733,6 +12733,417 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
         self.assertIn('exposure["candidate_reuse_counts"]', brief_source)
 
 
+class PortfolioFrontierTests(unittest.TestCase):
+    """R126: apex and washout are the stated objective and nothing measured them.
+
+    Ben named the objective on 2026-08-15 -- "dually optimize apex lineups with
+    preventing a total washout across the portfolio" -- and `washout` had zero
+    matches across the engine, tools and skills while `apex` existed only as a
+    posture-tier name. BUILD hand-rolled both in a scratch script to pick among
+    five 2138_2g variants, so the numbers that chose a delivery were neither
+    reproducible run to run nor comparable across slates.
+
+    The fixture below is that slate's shape in miniature: two games, and two
+    portfolios with the SAME apex and the SAME retained percent that differ only
+    in whether any entry survives the binding game. That pair is the whole item.
+    """
+
+    G1, G2 = "AAA@BBB", "CCC@DDD"
+    TEAMS = (("AAA", G1), ("BBB", G1), ("CCC", G2), ("DDD", G2))
+
+    @staticmethod
+    def _frontier():
+        from mlb_engine.pipeline.execution_pipeline import compute_portfolio_frontier
+        return compute_portfolio_frontier
+
+    def _projections(self, **overrides):
+        rows = []
+        for team, game in self.TEAMS:
+            for i in range(9):
+                rows.append({"Player_ID": f"{team}h{i}", "Team": team,
+                             "Game_ID": game, "Position": "OF",
+                             "Ceiling": 10.0 + i})
+            rows.append({"Player_ID": f"{team}p", "Team": team, "Game_ID": game,
+                         "Position": "P", "Ceiling": 20.0})
+        frame = pd.DataFrame(rows)
+        drop = overrides.get("drop") or []
+        if drop:
+            frame = frame.drop(columns=list(drop))
+        return frame
+
+    @staticmethod
+    def _entry(entry_id, bats, arms=("AAAp", "CCCp")):
+        return {"entry_id": str(entry_id), "sp_ids": list(arms),
+                "lineup_ids": list(arms) + list(bats)}
+
+    def _concentrated(self, n=6):
+        """Every entry draws four bats from each game: the rejected 2138_2g
+        shape, where one cold game touches all of them."""
+        bats = [f"AAAh{j}" for j in range(4)] + [f"CCCh{j}" for j in range(4)]
+        return [self._entry(100 + i, bats) for i in range(n)]
+
+    def _spread(self, n=6):
+        """Half the entries take their bats from one game, half from the other:
+        the delivered shape, where a cold game leaves entries untouched."""
+        out = []
+        for i in range(n // 2):
+            out.append(self._entry(200 + i, [f"AAAh{j}" for j in range(4)]
+                                   + [f"BBBh{j}" for j in range(4)]))
+        for i in range(n - n // 2):
+            out.append(self._entry(210 + i, [f"CCCh{j}" for j in range(4)]
+                                   + [f"DDDh{j}" for j in range(4)]))
+        return out
+
+    # ---------------------------------------------------------------- apex
+
+    def test_apex_is_summed_off_the_runs_own_ceiling_column(self):
+        block = self._frontier()(self._projections(), self._concentrated(2))
+        apex = block["apex"]
+        # Four bats at 10+11+12+13 from each game, two arms at 20: 46+46+40.
+        self.assertEqual(132.0, apex["ceiling_best"])
+        self.assertEqual(264.0, apex["ceiling_total"])
+        self.assertEqual(132.0, apex["ceiling_mean"])
+
+    def test_apex_moves_when_a_ceiling_moves(self):
+        """Mutation guard. The numbers above are readable enough to hardwire,
+        and a hardwired apex is worse than none: it would agree with the fixture
+        forever while measuring nothing. Move one Ceiling, the total must move."""
+        proj = self._projections()
+        proj.loc[proj["Player_ID"] == "AAAh0", "Ceiling"] = 40.0
+        block = self._frontier()(proj, self._concentrated(2))
+        self.assertEqual(324.0, block["apex"]["ceiling_total"],
+                         "+30 on one bat held by both entries is +60 on the total")
+
+    def test_the_best_entry_is_named_and_the_tie_break_is_stable(self):
+        """Ceilings come off a uniform multiplier over a small set of base
+        values, so exact ties are routine rather than exotic (determinism.py).
+        A tie must resolve to the same entry every run."""
+        entries = self._concentrated(4)
+        first = self._frontier()(self._projections(), entries)["apex"]
+        again = self._frontier()(self._projections(), list(reversed(entries)))["apex"]
+        self.assertEqual(first["ceiling_best"], again["ceiling_best"])
+        self.assertEqual(first["best_entry_id"], again["best_entry_id"],
+                         "a reordered assignment list renamed the best entry")
+
+    def test_the_measurement_is_over_entries_not_distinct_lineups(self):
+        """Two entries holding one lineup die together, so the washout objective
+        binds on the entered set. Counting distinct lineups would report a
+        six-entry portfolio built from one lineup as a single exposure."""
+        block = self._frontier()(self._projections(), self._concentrated(6))
+        self.assertEqual(6, block["entries"])
+        self.assertEqual(792.0, block["apex"]["ceiling_total"])
+        self.assertEqual(60, block["roster_players"])
+
+    # ------------------------------------------------------------- washout
+
+    def test_zeroing_a_games_hitters_keeps_the_arms(self):
+        """The definition Ben's fragment offered, and it is deliberate: an arm in
+        a game that goes badly for hitters is the one roster spot that may
+        benefit. An implementation that zeroed the arm too would report a lower
+        retained percent for a reason the metric does not mean."""
+        block = self._frontier()(self._projections(), self._concentrated(1))
+        rows = {row["game"]: row for row in block["washout"]["by_game"]}
+        # Zero AAA@BBB's bats: 46 of 132 lost. AAAp is in that game and stays.
+        self.assertEqual(round(100.0 * 86.0 / 132.0, 1),
+                         rows[self.G1]["ceiling_retained_pct"])
+
+    def test_the_histogram_is_one_bucket_per_entry_and_sums_to_the_entries(self):
+        block = self._frontier()(self._projections(), self._spread(6))
+        for row in block["washout"]["by_game"]:
+            self.assertEqual(6, sum(count for _, count in row["bats_histogram"]),
+                             f"{row['game']} histogram does not cover every entry")
+        rows = {row["game"]: row for row in block["washout"]["by_game"]}
+        self.assertEqual([[0, 3], [8, 3]], rows[self.G1]["bats_histogram"])
+
+    def test_the_2138_2g_pair_is_separated_by_intact_entries_not_by_apex(self):
+        """The reproduction, and the reason the histogram is not garnish. Both
+        portfolios pass the same gates, post the SAME apex and retain the SAME
+        percent of portfolio ceiling; the only thing that distinguishes them is
+        that one has entries the binding game cannot touch."""
+        proj = self._projections()
+        conc = self._frontier()(proj, self._concentrated(6))
+        spread = self._frontier()(proj, self._spread(6))
+        self.assertEqual(conc["apex"]["ceiling_total"],
+                         spread["apex"]["ceiling_total"],
+                         "fixture is wrong: apex must not separate these two")
+        self.assertEqual(conc["washout"]["worst_ceiling_retained_pct"],
+                         spread["washout"]["worst_ceiling_retained_pct"],
+                         "fixture is wrong: retained percent must not separate them")
+        self.assertEqual(0, conc["washout"]["entries_fully_intact_at_binding_game"])
+        self.assertEqual(3, spread["washout"]["entries_fully_intact_at_binding_game"])
+        self.assertEqual(6, conc["washout"]["by_game"][0]["entries_materially_exposed"])
+        self.assertEqual(3, spread["washout"]["by_game"][0]["entries_materially_exposed"])
+
+    def test_a_game_the_portfolio_draws_no_bat_from_is_not_a_row(self):
+        """A game nobody is exposed to retains 100% with every entry intact,
+        which is arithmetic rather than a finding, and it would push the real
+        binding game out of by_game[0]."""
+        bats = [f"AAAh{j}" for j in range(8)]
+        block = self._frontier()(self._projections(), [self._entry(1, bats)])
+        self.assertEqual([self.G1], [row["game"] for row in block["washout"]["by_game"]])
+        self.assertEqual(1, block["washout"]["games_measured"])
+
+    def test_by_game_is_ordered_worst_first_and_deterministically(self):
+        """The binding game is by_game[0], so the ordering carries the headline.
+        The heavier game here is the alphabetically LATER one on purpose: with
+        the two aligned, `touched` is already sorted by game id and dropping the
+        sort entirely would still name the right game, which is a guard that
+        cannot fail."""
+        block = self._frontier()(self._projections(),
+                                 [self._entry(1, [f"CCCh{j}" for j in range(6)]
+                                              + [f"AAAh{j}" for j in range(2)])])
+        rows = block["washout"]["by_game"]
+        self.assertEqual(self.G2, block["washout"]["binding_game"])
+        self.assertEqual([self.G2, self.G1], [row["game"] for row in rows])
+        self.assertLessEqual(rows[0]["ceiling_retained_pct"],
+                             rows[1]["ceiling_retained_pct"])
+        self.assertEqual(6, rows[0]["max_bats_in_one_entry"])
+        self.assertEqual(2, rows[1]["max_bats_in_one_entry"])
+
+    def test_material_exposure_counts_the_threshold_entry(self):
+        """`entries_materially_exposed` shares qa_portfolio's threshold so the
+        two reports describe the same object. Counted at exactly three bats,
+        because a `>` slip is invisible on any fixture that only ever draws two
+        or four."""
+        from mlb_engine.pipeline.execution_pipeline import FRONTIER_MATERIAL_BATS
+        self.assertEqual(3, FRONTIER_MATERIAL_BATS)
+        entries = [
+            self._entry(1, [f"AAAh{j}" for j in range(3)]
+                        + [f"CCCh{j}" for j in range(5)]),
+            self._entry(2, [f"AAAh{j}" for j in range(2)]
+                        + [f"CCCh{j}" for j in range(6)]),
+        ]
+        rows = {row["game"]: row
+                for row in self._frontier()(self._projections(),
+                                            entries)["washout"]["by_game"]}
+        self.assertEqual([[2, 1], [3, 1]], rows[self.G1]["bats_histogram"])
+        self.assertEqual(1, rows[self.G1]["entries_materially_exposed"],
+                         "three bats is material; two is not")
+        self.assertEqual(2, rows[self.G2]["entries_materially_exposed"])
+
+    def test_the_washout_note_names_the_cross_slate_comparability_limit(self):
+        """The metric is bounded below by the arms plus the other games' bats,
+        so it falls as the slate shrinks. Comparability across slates is one of
+        the two problems this item exists to fix, so the block has to say which
+        of its numbers does not have it rather than leave it to be discovered."""
+        note = self._frontier()(self._projections(),
+                                self._spread(6))["washout"]["note"]
+        self.assertIn("NOT comparable across slates", note)
+        self.assertIn("entries_fully_intact is comparable", note)
+
+    # ------------------------------------------------------- honest degrade
+
+    def test_no_ceiling_column_reports_one_fact_and_no_list(self):
+        """R127's boundary, applied on purpose. A missing input is one fact
+        about the build, not one fact per player, and a zero-valued apex block
+        would read as a portfolio with no ceiling."""
+        block = self._frontier()(self._projections(drop=["Ceiling"]),
+                                 self._concentrated(2))
+        self.assertFalse(block["available"])
+        self.assertIn("no Ceiling column", block["unavailable_reason"])
+        self.assertNotIn("apex", block)
+        self.assertNotIn("unpriced_roster_players", block)
+
+    def test_no_game_column_keeps_apex_and_names_the_washout_gap(self):
+        block = self._frontier()(self._projections(drop=["Game_ID"]),
+                                 self._concentrated(2))
+        self.assertTrue(block["available"])
+        self.assertEqual(264.0, block["apex"]["ceiling_total"])
+        self.assertFalse(block["washout"]["available"])
+        self.assertIn("no game column", block["washout"]["unavailable_reason"])
+
+    def test_a_rostered_player_with_no_ceiling_is_named_never_zeroed(self):
+        """The R127 lesson in the small: a silent zero here reads as a
+        low-ceiling portfolio instead of a missing join, and the apex totals of
+        two runs would differ for a reason neither states."""
+        proj = self._projections()
+        proj = proj[proj["Player_ID"] != "AAAh0"]
+        block = self._frontier()(proj, self._concentrated(1))
+        self.assertEqual(["AAAh0"], block["unpriced_roster_players"])
+        self.assertIn("SHORT", block["unpriced_note"])
+        self.assertEqual(122.0, block["apex"]["ceiling_total"],
+                         "the total is short by exactly the unpriced ceiling")
+
+    def test_nothing_to_measure_says_so_rather_than_reporting_zeroes(self):
+        empty = self._frontier()(self._projections(), [])
+        self.assertFalse(empty["available"])
+        self.assertEqual(0, empty["entries"])
+        self.assertIn("no assignments", empty["unavailable_reason"])
+        not_a_frame = self._frontier()(None, self._concentrated(1))
+        self.assertFalse(not_a_frame["available"])
+        self.assertIn("projections DataFrame", not_a_frame["unavailable_reason"])
+
+    def test_the_diagnostic_can_never_kill_a_run(self):
+        """`_bank_coverage`'s rule, and the reason this is wrapped: a review
+        proxy that raises turns a certified delivery into a crash."""
+        from mlb_engine.pipeline import execution_pipeline as ep
+
+        class Hostile:
+            columns = ["Player_ID", "Ceiling"]
+
+            def iterrows(self):
+                raise RuntimeError("boom")
+
+        block = ep._portfolio_frontier(Hostile(), self._concentrated(1))
+        self.assertFalse(block["available"])
+        self.assertIn("boom", block["unavailable_reason"])
+        self.assertTrue(block["is_review_proxy"])
+
+    def test_the_labels_never_become_a_probability_claim(self):
+        """The house rule, checked on the keys and on every string that is NOT a
+        note. The exemption is the point rather than a loophole: the notes are
+        where the words appear NEGATED ("neither is a probability, a win rate"),
+        and a naive substring sweep over the whole block fails on its own
+        disclaimer, which is how this guard was wrong on its first cut."""
+        block = self._frontier()(self._projections(), self._spread(6))
+        banned = ("win rate", "cash rate", "roi", "probability", "chance",
+                  "expected value", "profit")
+        notes = ("note", "unavailable_reason", "unpriced_note")
+
+        def sweep(value, key=""):
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    for word in banned:
+                        self.assertNotIn(word, str(k).lower(),
+                                         f"key {k!r} claims {word!r}")
+                    sweep(v, str(k))
+            elif isinstance(value, list):
+                for item in value:
+                    sweep(item, key)
+            elif isinstance(value, str) and key not in notes:
+                for word in banned:
+                    self.assertNotIn(word, value.lower(),
+                                     f"{key!r} claims {word!r}")
+
+        sweep(block)
+        self.assertIn("deterministic review proxies", block["note"])
+        self.assertIn("not an observed outcome", block["note"])
+        self.assertTrue(block["is_review_proxy"])
+
+    # ------------------------------------------------------------- wiring
+
+    def test_both_pipeline_return_paths_and_the_run_record_carry_the_block(self):
+        """R116's lesson repeated: a block on one return path only is a block a
+        late swap's brief loses, and the run record is where the question is
+        asked weeks later without the projections frame in hand."""
+        source = (Path(__file__).resolve().parents[1] / "mlb_engine" / "pipeline"
+                  / "execution_pipeline.py").read_text(encoding="utf-8")
+        self.assertEqual(
+            source.count('"portfolio_frontier": portfolio_frontier'), 3,
+            "the deferred return, the promoted return, and diagnostics.json must "
+            "each carry it")
+        self.assertIn("portfolio_frontier = _portfolio_frontier(projections, assignments)",
+                      source)
+
+    def test_the_brief_carries_the_frontier_inside_the_exposure_block(self):
+        """Not a new section. The question it answers -- is this portfolio
+        concentrated in a way the gates do not catch -- is the one the exposure
+        block already half-answered."""
+        module = PortfolioConcentrationInTheBriefTests._module()
+        source = (Path(__file__).resolve().parents[1] / "skills"
+                  / "generate-lineups" / "scripts" / "build_slate.py"
+                  ).read_text(encoding="utf-8")
+        self.assertIn('exposure["frontier"] = result.get("portfolio_frontier")',
+                      source)
+        self.assertTrue(hasattr(module, "format_frontier_line"))
+
+    def test_the_review_line_states_both_ends_and_labels_them(self):
+        module = PortfolioConcentrationInTheBriefTests._module()
+        block = self._frontier()(self._projections(), self._spread(6))
+        line = module.format_frontier_line(block)
+        self.assertIn("apex total 792.0", line)
+        self.assertIn(f"washout binds on {self.G1}", line)
+        self.assertIn("3/6 entries untouched", line)
+        self.assertIn("review proxies, not probabilities", line)
+
+    def test_the_review_line_says_unavailable_rather_than_printing_zeroes(self):
+        module = PortfolioConcentrationInTheBriefTests._module()
+        self.assertIn("UNAVAILABLE", module.format_frontier_line(None))
+        blank = self._frontier()(self._projections(drop=["Ceiling"]),
+                                 self._concentrated(1))
+        line = module.format_frontier_line(blank)
+        self.assertIn("UNAVAILABLE", line)
+        self.assertIn("no Ceiling column", line)
+
+    def test_the_review_line_flags_a_short_total(self):
+        """An apex the reader will compare across builds must not silently be
+        short by a missing join."""
+        module = PortfolioConcentrationInTheBriefTests._module()
+        proj = self._projections()
+        block = self._frontier()(proj[proj["Player_ID"] != "AAAh0"],
+                                 self._concentrated(1))
+        self.assertIn("carry no Ceiling", module.format_frontier_line(block))
+        self.assertIn("SHORT", module.format_frontier_line(block))
+
+    def test_qa_portfolio_reads_the_runs_frontier_instead_of_shadowing_it(self):
+        """R128's lesson on a new surface. qa_portfolio reads a delivered CSV and
+        a salary file, neither of which carries a Ceiling, so its own axes cannot
+        be the washout number the build used. It now reports the artifact's
+        block first and keeps its share counts as a labeled independent check."""
+        from tools.qa_portfolio import frontier_from_brief
+        block = self._frontier()(self._projections(), self._spread(6))
+        lines = frontier_from_brief({"exposure": {"frontier": block}})
+        text = "\n".join(lines)
+        self.assertIn("APEX (run's own Ceiling column): total 792.0", text)
+        self.assertIn(f"WASHOUT binds on {self.G1}", text)
+        self.assertIn("3/6 entries untouched", text)
+        self.assertIn("bats-per-entry", text)
+        self.assertIn("not comparable across slates", text)
+
+    def test_qa_portfolio_says_absent_rather_than_inventing_the_block(self):
+        """A build that predates R126, or one that entered somewhere other than
+        run_slate, has no frontier in its brief. Saying so is the whole
+        requirement: silently falling through to the structural axes is how a
+        reader concludes the run measured something it never did."""
+        from tools.qa_portfolio import frontier_from_brief
+        absent = "\n".join(frontier_from_brief({}))
+        self.assertIn("absent from this brief", absent)
+        blank = self._frontier()(self._projections(drop=["Ceiling"]),
+                                 self._concentrated(1))
+        unavailable = "\n".join(
+            frontier_from_brief({"exposure": {"frontier": blank}}))
+        self.assertIn("unavailable", unavailable)
+        self.assertIn("no Ceiling column", unavailable)
+
+    def test_qa_portfolio_labels_its_own_axes_as_the_independent_check(self):
+        """The two are different units and must not read as disagreeing: the
+        run's is a ceiling counterfactual, these are share-of-portfolio counts."""
+        source = (Path(__file__).resolve().parents[1] / "tools"
+                  / "qa_portfolio.py").read_text(encoding="utf-8")
+        self.assertIn("INDEPENDENT STRUCTURAL CHECK", source)
+        self.assertIn("frontier = frontier_from_brief(brief) + section_frontier",
+                      source)
+
+    def test_the_two_game_counts_are_reconciled_in_words_not_left_to_be_found(self):
+        """Measured on the archived 06-03 grid the same session this landed: the
+        run reports 16/18 materially exposed to SD@PHI, qa_portfolio's axis
+        reports 18/18, and both are right -- the axis counts every roster spot
+        in the game, the run counts bats only because it keeps the arms. Two
+        numbers under one word on one screen with nothing explaining the gap is
+        how a reader concludes one of them is broken."""
+        from tools import qa_portfolio
+        lines = qa_portfolio.section_frontier(
+            {"9": {"Roster Position": "P", "Name": "Arm", "TeamAbbrev": "AAA",
+                   "Game Info": "AAA@BBB 01:00PM ET"},
+             **{str(i): {"Roster Position": "OF", "Name": f"n{i}",
+                         "TeamAbbrev": "AAA", "Game Info": "AAA@BBB 01:00PM ET"}
+                for i in range(9)}},
+            ["Entry ID", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"],
+            [["1", "9", "0", "1", "2", "3", "4", "5", "6", "7"]])
+        text = "\n".join(lines)
+        self.assertIn("counts EVERY roster spot in a game, arms included", text)
+        self.assertIn("keeps the arms on purpose", text)
+
+    def test_qa_portfolio_flags_a_short_apex_before_it_is_compared(self):
+        from tools.qa_portfolio import frontier_from_brief
+        proj = self._projections()
+        block = self._frontier()(proj[proj["Player_ID"] != "AAAh0"],
+                                 self._concentrated(2))
+        text = "\n".join(frontier_from_brief({"exposure": {"frontier": block}}))
+        self.assertIn("APEX IS SHORT", text)
+        self.assertIn("Do not compare this apex to another build's", text)
+
+
 class GitFreshnessTests(unittest.TestCase):
     """R145: session start reads `git log`, and a stale log looks current.
 

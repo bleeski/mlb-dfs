@@ -4,6 +4,16 @@ VERSION is the authoritative version constant for this module.
 Initial builds and late swaps share one immutable, hash-bound production path.
 The exact final DKEntries file is re-read to derive all post-export gates.
 
+v1.17 changes (R126):
+- ``compute_portfolio_frontier`` measures both ends of the stated dual
+  objective over the ENTERED set, off the run's own ``Ceiling`` column: apex
+  (portfolio ceiling total, mean, best single entry) and washout (per game,
+  zero that game's hitters, keep the arms, report the percent of portfolio
+  ceiling retained plus a histogram over entries of bats drawn from it). The
+  block reaches ``diagnostics.json`` and BOTH success return paths as
+  ``portfolio_frontier``. A counterfactual over data already in hand, so it
+  costs no solve; wrapped so it can never block a run.
+
 v1.16 changes (R98(2)):
 - ``run_initial_build`` passes its merged ``bank_diagnostics`` to
   ``select_and_assign_entries`` as ``bank_report``. A proven-infeasible joint
@@ -172,7 +182,7 @@ from mlb_engine.swap.late_swap_manager import (
     load_latest_valid_parent_run, validate_late_swap_delta,
 )
 
-VERSION = "v1.16"
+VERSION = "v1.17"
 
 # --- v1.6 projection-enrichment constants -----------------------------------
 # XWOBA_WIRING_MIN_POOL: a supplied xwOBA correction that matches ZERO players
@@ -376,6 +386,12 @@ def execute_portfolio(
     bank_coverage = _bank_coverage(projections, candidates) if compute_bank_coverage else None
 
     assignments = allocation["assignments"]
+    # R126. Both ends of the stated objective, over the set that is actually
+    # being entered rather than over the bank. Computed here because this is the
+    # first point where the entered set exists and the projections are still in
+    # hand; a caller writing the brief would otherwise have to re-join the export
+    # against projections.csv, which is exactly what BUILD did by hand.
+    portfolio_frontier = _portfolio_frontier(projections, assignments)
     assignment_path = run_dir / "final" / "assignments.csv"
     _write_assignments(assignment_path, assignments)
     assignment_record = register_artifact(run_dir, assignment_path, "assignments")
@@ -478,6 +494,10 @@ def execute_portfolio(
         "final_export_validation": final_validation,
         "late_swap_delta": delta,
         "bank_coverage": bank_coverage,
+        # R126. In the immutable run record, beside bank_coverage, because "how
+        # concentrated was the set we entered" is a question asked weeks later
+        # and the answer has to survive without the projections frame.
+        "portfolio_frontier": portfolio_frontier,
         "diagnostic_source_file": str(final_export.relative_to(run_dir)),
         "diagnostic_source_sha256": final_hash,
         "assignment_sha256": assignment_record["sha256"],
@@ -538,6 +558,10 @@ def execute_portfolio(
             # lineups it just delivered and what capped them.
             "candidate_reuse": allocation.get("candidate_reuse"),
             "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
+            # R126, same reasoning, and the same requirement that BOTH return
+            # paths carry it: a late swap that lost the block would report a
+            # refined portfolio with no concentration facts at all.
+            "portfolio_frontier": portfolio_frontier,
             "workflow_valid": True,
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
@@ -559,6 +583,8 @@ def execute_portfolio(
         # R116, see the deferred branch above.
         "candidate_reuse": allocation.get("candidate_reuse"),
         "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
+        # R126, see the deferred branch above.
+        "portfolio_frontier": portfolio_frontier,
         "workflow_valid": bool(promotion["passed"]),
         "selection_certified": certification["selection_certified"],
         "allocation_certified": certification["allocation_certified"],
@@ -1615,6 +1641,227 @@ def compute_game_script_coverage(projections: Any, candidates: Sequence[Mapping[
         }
     except Exception:
         return {}
+
+
+# R126. A lineup is only materially exposed to a game it draws real bats from.
+# The same threshold qa_portfolio uses for its own axes, kept identical on
+# purpose so a reader comparing the two reports is comparing the same object.
+FRONTIER_MATERIAL_BATS = 3
+
+
+def compute_portfolio_frontier(
+    projections: Any, assignments: Sequence[Mapping[str, Any]]
+) -> Dict[str, Any]:
+    """Both ends of Ben's dual objective over the ENTERED set, off ``Ceiling``.
+
+    R126. Ben named the objective on 2026-08-15 -- "dually optimize apex
+    lineups with preventing a total washout across the portfolio" -- and until
+    now neither term existed anywhere in the engine, the brief, or the skill.
+    BUILD hand-rolled both in a scratch script to choose among five variants of
+    the 2138_2g slate, which means the numbers that decided a delivery were not
+    reproducible run to run and not comparable across slates. Computing them
+    here makes them an artifact of the run instead of a chat message.
+
+    APEX is the portfolio's ceiling total, its mean per entry, and its best
+    single entry, summed off this run's own ``Ceiling`` column.
+
+    WASHOUT is a per-game counterfactual: zero that game's HITTERS, keep the
+    arms, and report the percent of portfolio ceiling retained, plus a
+    histogram over entries of how many bats each draws from that game. The arms
+    are kept deliberately -- an arm in a game that goes badly for hitters is
+    the one roster spot that may benefit from it -- and the histogram is the
+    part that earned its place, because on 2138_2g it was the only thing
+    separating two builds that passed identical gates: the rejected build drew
+    4-5 bats from one game in EVERY entry, the delivered build ranged from 0 to
+    8 across the same nineteen.
+
+    Measured over the ENTERED set, one row per entry rather than per distinct
+    lineup. Two entries holding the same lineup die together, and correlated
+    failure across ENTRIES is what the washout objective binds on (CLAUDE.md's
+    dual-objective note says so, and it is why this is not a floor metric).
+
+    A counterfactual over data already in hand: no solve, no network, nothing
+    that can delay a build. Deterministic review proxies throughout. ``Ceiling``
+    is a projection input, not an observed outcome, so nothing here is a
+    probability, a win rate, a cash rate, or a payout estimate.
+    """
+    n = len(assignments or [])
+    out: Dict[str, Any] = {
+        "entries": n,
+        "available": False,
+        "unavailable_reason": None,
+        "is_review_proxy": True,
+    }
+    if not n:
+        out["unavailable_reason"] = "no assignments to measure"
+        return out
+    if not hasattr(projections, "columns"):
+        out["unavailable_reason"] = "the frontier requires a projections DataFrame"
+        return out
+    cols = set(projections.columns)
+    if "Player_ID" not in cols or "Ceiling" not in cols:
+        # R127's boundary, applied deliberately: a missing INPUT is one fact
+        # about the build, not one fact per player, so it reports a reason and
+        # no list. The alternative -- a zero-valued apex block -- reads as a
+        # portfolio with no ceiling, which is the failure R127 exists to stop.
+        out["unavailable_reason"] = (
+            "this run's projections carry no Ceiling column, so no ceiling "
+            "proxy exists for it")
+        return out
+
+    game_col = next((c for c in ("Game_ID", "GameId", "Game") if c in cols), None)
+    pos_col = next((c for c in ("Position", "Assigned_Position", "Roster_Position")
+                    if c in cols), None)
+    ceiling: Dict[str, float] = {}
+    game_of: Dict[str, str] = {}
+    pitchers: set = set()
+    for _, r in projections.iterrows():
+        pid = str(r.get("Player_ID") or "").strip()
+        if not pid:
+            continue
+        # Classification first, ceiling second. An unparseable Ceiling must not
+        # also cost the row its game and its position: a player who fell out of
+        # `ceiling` while staying out of `pitchers` would be counted as a bat in
+        # whatever game key an empty cell produced.
+        if game_col is not None:
+            game_of[pid] = str(r.get(game_col) or "").strip()
+        if pos_col is not None:
+            toks = {t.strip().upper() for t in str(r.get(pos_col) or "").split("/")}
+            if toks & {"P", "SP", "RP"}:
+                pitchers.add(pid)
+        try:
+            ceiling[pid] = float(r.get("Ceiling"))
+        except (TypeError, ValueError):
+            continue
+    # `sp_ids` is the assignment's own statement of which two ids are arms,
+    # which beats inferring it from a Position token; the Position read above is
+    # the fallback for a frame whose assignments predate that field.
+    for a in assignments:
+        for pid in (a.get("sp_ids") or []):
+            pitchers.add(str(pid).strip())
+
+    rosters: List[Tuple[str, List[str]]] = []
+    unpriced: set = set()
+    for a in assignments:
+        ids = [str(x).strip() for x in (a.get("lineup_ids") or []) if str(x).strip()]
+        rosters.append((str(a.get("entry_id") or ""), ids))
+        unpriced.update(p for p in ids if p not in ceiling)
+
+    totals = [(sum(ceiling.get(p, 0.0) for p in ids), eid) for eid, ids in rosters]
+    ceiling_total = sum(t for t, _ in totals)
+    # Tie-break on the entry id so a slate of identical-ceiling entries names
+    # the same one every run. Ceilings here come off a uniform multiplier over a
+    # small set of base values, so exact ties are routine (determinism.py).
+    best = max(totals)
+    worst = min(totals)
+    out["available"] = True
+    out["apex"] = {
+        "ceiling_total": round(ceiling_total, 2),
+        "ceiling_mean": round(ceiling_total / n, 2),
+        "ceiling_best": round(best[0], 2),
+        "best_entry_id": best[1],
+        "ceiling_worst": round(worst[0], 2),
+        "worst_entry_id": worst[1],
+    }
+    out["roster_players"] = sum(len(ids) for _, ids in rosters)
+    out["unpriced_roster_players"] = sorted(unpriced)
+    if unpriced:
+        out["unpriced_note"] = (
+            f"{len(unpriced)} rostered player(s) carry no Ceiling in this run's "
+            "projections, so every total here is SHORT by their ceiling. Named "
+            "rather than zeroed, because a silent zero reads as a low-ceiling "
+            "portfolio instead of a missing join")
+
+    if game_col is None:
+        out["washout"] = {
+            "available": False,
+            "unavailable_reason": (
+                "this run's projections carry no game column, so the per-game "
+                "counterfactual cannot be built"),
+        }
+        out["note"] = _FRONTIER_NOTE
+        return out
+
+    by_game: List[Dict[str, Any]] = []
+    # Only games the portfolio draws a BAT from. A game nobody is exposed to
+    # retains 100% with every entry intact, which is arithmetic rather than a
+    # finding, and it would dilute the ordering below.
+    touched = sorted({game_of.get(p, "") for _, ids in rosters for p in ids
+                      if p not in pitchers and game_of.get(p, "")})
+    for g in touched:
+        bats: List[int] = []
+        retained = 0.0
+        for _eid, ids in rosters:
+            drawn = 0
+            for p in ids:
+                if p not in pitchers and game_of.get(p, "") == g:
+                    drawn += 1
+                    continue  # zeroed: this is the counterfactual
+                retained += ceiling.get(p, 0.0)
+            bats.append(drawn)
+        hist: Dict[int, int] = {}
+        for k in bats:
+            hist[k] = hist.get(k, 0) + 1
+        by_game.append({
+            "game": g,
+            "ceiling_retained_pct": (round(100.0 * retained / ceiling_total, 1)
+                                     if ceiling_total else None),
+            "entries_fully_intact": hist.get(0, 0),
+            "entries_materially_exposed": sum(
+                1 for k in bats if k >= FRONTIER_MATERIAL_BATS),
+            "max_bats_in_one_entry": max(bats),
+            "bats_histogram": [[k, hist[k]] for k in sorted(hist)],
+        })
+    # Worst first, then the game id, so the binding game is by_game[0] and the
+    # ordering does not move between runs on a tie.
+    by_game.sort(key=lambda d: (d["ceiling_retained_pct"]
+                                if d["ceiling_retained_pct"] is not None else 0.0,
+                                d["game"]))
+    binding = by_game[0] if by_game else None
+    out["washout"] = {
+        "available": bool(by_game),
+        "games_measured": len(by_game),
+        "by_game": by_game,
+        "binding_game": binding["game"] if binding else None,
+        "worst_ceiling_retained_pct": (binding["ceiling_retained_pct"]
+                                      if binding else None),
+        "entries_fully_intact_at_binding_game": (binding["entries_fully_intact"]
+                                                 if binding else None),
+        "note": (
+            "each row zeroes that game's HITTERS and keeps every arm, so "
+            "ceiling_retained_pct is bounded below by the arms plus the other "
+            "games' bats and it FALLS as the slate shrinks: a 2-game slate "
+            "cannot retain what a 10-game slate does and the two numbers are "
+            "NOT comparable across slates. entries_fully_intact is comparable, "
+            "and it is the number that separated the two 2138_2g builds -- a "
+            "portfolio where every entry draws bats from the binding game has "
+            "nothing left when that game goes cold, whatever its retained "
+            "percent"),
+    }
+    out["note"] = _FRONTIER_NOTE
+    return out
+
+
+_FRONTIER_NOTE = (
+    "apex and washout are deterministic review proxies over the entered set, "
+    "computed off this run's own Ceiling column. Ceiling is a projection input, "
+    "not an observed outcome, so neither is a probability, a win rate, a cash "
+    "rate, or a payout estimate. The two move together by construction: "
+    "concentration raises apex and raises washout exposure on the same axis, so "
+    "a build chooses a point on that frontier rather than maximizing both"
+)
+
+
+def _portfolio_frontier(
+    projections: Any, assignments: Sequence[Mapping[str, Any]]
+) -> Dict[str, Any]:
+    """Diagnostic only: never raises, never blocks (the `_bank_coverage` rule)."""
+    try:
+        return compute_portfolio_frontier(projections, assignments)
+    except Exception as exc:  # noqa: BLE001 - a review proxy must not kill a run
+        return {"available": False,
+                "unavailable_reason": f"frontier diagnostic unavailable: {exc}",
+                "is_review_proxy": True}
 
 
 def build_checkpoint_plan(

@@ -228,6 +228,69 @@ def section_adversarial(
 
 # ---------------------------------------------------------------- section 3
 
+def frontier_from_brief(brief: dict) -> List[str]:
+    """R126's block, read from the artifact rather than recomputed here.
+
+    The run computes apex and washout off its own ``Ceiling`` column, which this
+    tool does not have: it reads a delivered CSV and a salary file, and neither
+    carries a projection. So the run's numbers lead, and the structural axes
+    below stay as an INDEPENDENT check off the delivered bytes.
+
+    They are not two answers to one question and must not be read as
+    disagreeing: the run's washout is a ceiling counterfactual (zero a game's
+    bats, keep the arms, what percent of portfolio ceiling survives), the axes
+    below are share-of-portfolio counts. Different units, same objective. What
+    section 1 exists to enforce applies here too -- when the artifact states a
+    number, the artifact wins over anything this tool infers.
+    """
+    frontier = ((brief.get("exposure") or {}).get("frontier")) or {}
+    if not frontier:
+        return ["THE RUN'S OWN FRONTIER: absent from this brief. Either the "
+                "build predates R126 or it entered somewhere other than "
+                "run_slate; the structural axes below are all there is."]
+    if not frontier.get("available"):
+        return [f"THE RUN'S OWN FRONTIER: unavailable "
+                f"({frontier.get('unavailable_reason')})"]
+    apex = frontier.get("apex") or {}
+    out = [
+        f"APEX (run's own Ceiling column): total {apex.get('ceiling_total')}, "
+        f"mean {apex.get('ceiling_mean')} per entry, best single entry "
+        f"{apex.get('ceiling_best')} ({apex.get('best_entry_id')}), worst "
+        f"{apex.get('ceiling_worst')}."
+    ]
+    if frontier.get("unpriced_roster_players"):
+        out.append(
+            f"APEX IS SHORT: {len(frontier['unpriced_roster_players'])} rostered "
+            f"player(s) carry no Ceiling, so every total above understates. Do "
+            f"not compare this apex to another build's until the join is fixed.")
+    wash = frontier.get("washout") or {}
+    if wash.get("available"):
+        out.append(
+            f"WASHOUT binds on {wash.get('binding_game')}: zeroing that game's "
+            f"bats and keeping the arms retains "
+            f"{wash.get('worst_ceiling_retained_pct')}% of portfolio ceiling, "
+            f"with {wash.get('entries_fully_intact_at_binding_game')}/"
+            f"{frontier.get('entries')} entries untouched.")
+        for row in (wash.get("by_game") or [])[:6]:
+            out.append(
+                f"  {row.get('game')}: retains {row.get('ceiling_retained_pct')}%, "
+                f"{row.get('entries_materially_exposed')}/{frontier.get('entries')} "
+                f"entries materially exposed, bats-per-entry "
+                f"{row.get('bats_histogram')}")
+        out.append(
+            "The histogram is the part to read. A portfolio whose every entry "
+            "draws bats from the binding game has nothing left when that game "
+            "goes cold, and the retained percent alone will not say so -- on "
+            "2026-08-15's 2138_2g the rejected and delivered builds posted the "
+            "SAME apex and the SAME retained percent.")
+        out.append(
+            "ceiling_retained_pct falls as the slate shrinks, so it is not "
+            "comparable across slates; entries untouched is.")
+    else:
+        out.append(f"WASHOUT: unavailable ({wash.get('unavailable_reason')})")
+    return out
+
+
 def section_frontier(
     sal: Dict[str, dict], hdr: List[str], body: List[List[str]]
 ) -> List[str]:
@@ -267,8 +330,20 @@ def section_frontier(
         for s in sps:
             axes["starting_pitcher"][s] += 1
 
-    out = ["Both proxies are deterministic properties of the entered set, not "
-           "probabilities and not outcome estimates."]
+    out = ["INDEPENDENT STRUCTURAL CHECK off the delivered bytes, in "
+           "share-of-portfolio counts rather than ceiling. Deterministic "
+           "properties of the entered set, not probabilities and not outcome "
+           "estimates.",
+           # R126, stated rather than left to be read as a bug. On the archived
+           # 06-03 grid the run reported 16/18 materially exposed to SD@PHI and
+           # this axis reports 18/18, and both are right about what they count.
+           "The 'game' axis below counts EVERY roster spot in a game, arms "
+           "included, so it can exceed the run's own count, which zeroes bats "
+           "only and keeps the arms on purpose. Whether an arm in a game "
+           "belongs in a washout count at all is open (an arm can benefit from "
+           "the script that kills the bats); until it is decided, read the "
+           "run's number as the bat exposure and this one as the roster "
+           "footprint."]
     worst = []
     for axis, ct in axes.items():
         if not ct:
@@ -327,7 +402,11 @@ def main() -> int:
 
     applied = section_applied(brief)
     findings = section_adversarial(brief, sal, hdr, body, bat, pit)
-    frontier = section_frontier(sal, hdr, body)
+    # R126. The run's own measurement leads and this tool's structural axes
+    # follow as an independent check. Recomputing a second washout number here
+    # off data that carries no Ceiling would put two answers on one screen with
+    # nothing saying which one the build actually used.
+    frontier = frontier_from_brief(brief) + section_frontier(sal, hdr, body)
 
     if a.as_json:
         print(json.dumps({

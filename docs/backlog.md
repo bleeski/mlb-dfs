@@ -39,6 +39,51 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-17 (third session), DEV, claim `engine_2026-08-17`: **R126 is CLOSED
+and migrated** to CHANGELOG.md, taken in tier order as the head of Tier 1 and of
+the QA-hardening batch. **R136 is the new head of this tier**, with its
+sequencing note corrected on the entry. Four things worth carrying forward, and
+the first is the one that changes how the metric is read. **The retained percent
+cannot separate the two builds this item was filed to separate.** On the fixture
+reproducing 2138_2g's shape, the concentrated and spread portfolios post the
+SAME apex (792.0) and the SAME retained percent (65.2%) and differ only in
+`entries_fully_intact`, 0 against 3. Retained percent is bounded below by the
+arms plus the other games' bats, so it falls as the slate shrinks and a 2-game
+number is not comparable to a 10-game one — which is one of the two problems the
+entry names in its own "Why". The histogram and the intact count are the
+comparable half, the block's note says so, and a test pins that sentence. This
+is not a correction to the entry so much as a reordering of its own emphasis:
+BUILD wrote "the histogram is the part that earned its place, so it is not
+optional garnish" and building it showed that claim was stronger than it read.
+**Second, a landed tool was about to shadow the new block.** R134's
+`qa_portfolio` already prints a "DUAL-OBJECTIVE FRONTIER" from share-of-portfolio
+counts, because it reads a delivered CSV and a salary file and neither carries a
+`Ceiling`. Two numbers under one word on one screen with nothing saying which the
+build used is the R128 lesson on a new surface, so `frontier_from_brief` now
+reads the artifact and leads with it and the structural axes are relabelled the
+independent check. Worth noting for any session that touches that file: it had
+ZERO tests before this one. **Third, the reconciliation surfaced a real
+question, filed as R150 rather than answered on this claim.** The two game counts
+differ — 16/18 against 18/18 on the archived 06-03 grid — because qa_portfolio's
+axis counts every roster spot in a game and the run counts bats only. Both are
+right, and whether an arm belongs in a washout count at all is a correlation
+belief (an arm can benefit from the script that kills the bats) and therefore
+Ben's. **Fourth, R127's boundary generalized in BOTH directions and the split is
+now on the record:** a missing `Ceiling` COLUMN is one fact about the build and
+reports a reason with no list, a missing rostered PLAYER is one fact per player
+and is named, because a silent zero there reads as a low-ceiling portfolio rather
+than a missing join. Also carried: one guard was wrong on its first cut in R65's
+shape from the other direction — the label sweep asserted no banned word appears
+anywhere in the block and failed on the block's own disclaimer ("neither is a
+probability, a win rate") — and twelve hand-run mutations all caught, including
+the sort whose fixture had to be rebuilt because the worst game was also the
+alphabetically first, which made dropping the sort invisible. Gate 1074 -> 1101
+(`test_core` 716 -> 743, `grew`). `skills/generate-lineups/SKILL.md`'s PASS line
+was separately stale at 1056, two moves behind since R127 moved the count and
+did not carry it; both it and CLAUDE.md moved here, and the ledger Quick Card's
+pin line moved under the same DEV-held `ledger` claim its five same-date
+predecessors used.*
+
 *2026-08-17 (second session), DEV, claim `engine_2026-08-17`: **R127 is CLOSED
 and migrated** to CHANGELOG.md, taken as the head of Tier 1 in tier order. Its
 landing record and the three corrections the work made to the entry as filed
@@ -720,13 +765,31 @@ underneath it.*
    the moment the key exists, which is a worse failure than the one being fixed.
    The per-side answer ships beside it as `signal_applied_by_side`, and the
    DISAGREEMENT raises its own warning, since the disagreement is what BUILD got
-   wrong. **R126** (P1, S, WS2) is now the head of this batch and of Tier 1: it
-   is the objective itself, and the only item on this board that measures what
-   Ben said he is optimizing for. **R136** (P2, S, WS2; entered the batch 2026-08-16 from
-   the leverage fragment) rides directly behind R126: the field-facing leverage
-   panel on the same qa_portfolio report block — chalk-sum, sub-10% carry
-   counts, captain own-tier histogram, salary-leave vs archived winner
-   medians — so one session extends the block R126 defines. **R130** (P2, S, WS4) is reporting only; its proposed
+   wrong. **R126 — CLOSED 2026-08-17**, migrated to CHANGELOG.md, taken
+   in batch order as the batch's and the tier's head because it is the objective
+   itself and the only item on this board that measures what Ben said he is
+   optimizing for. Apex and washout are computed in the pipeline off the run's
+   own `Ceiling` column, written to `diagnostics.json` and both success return
+   paths, and carried into the brief inside R116's exposure block with one review
+   line at build time. Four things the work established. The histogram is not
+   garnish and the retained percent is nearly useless alone: on the fixture
+   reproducing 2138_2g the concentrated and spread portfolios post the SAME apex
+   and the SAME retained percent, differing only in `entries_fully_intact`, 0
+   against 3 — and retained percent is a slate-size artifact that is not
+   comparable across slates, which is one of the two problems the item existed to
+   fix. `qa_portfolio` was about to shadow the block with a share-count number of
+   its own, so it now reads the artifact and leads with it (the R128 lesson on a
+   new surface) — and that surfaced R150, because the two game counts genuinely
+   differ (16/18 against 18/18 on the archived 06-03 grid) over whether an arm in
+   a game is washout exposure or a hedge. R127's boundary applied in BOTH
+   directions: a missing `Ceiling` column reports one fact and no list, a missing
+   PLAYER is named per player. Gate 1074 -> 1101 (`test_core` 716 -> 743);
+   twelve mutations run by hand, all twelve caught, and one guard rewritten
+   because a naive label sweep failed on the block's own disclaimer.
+   **R136** (P2, S, WS2) is the new head of this batch, and its
+   "one session takes both" sequencing is WITHDRAWN on the entry: R126 landed in
+   the pipeline and the brief, R136 is a qa_portfolio panel needing R135's
+   still-unwired prior file, so they are not one surface. **R130** (P2, S, WS4) is reporting only; its proposed
    remedy is declined on the entry. **R131** (P2, XS, WS6) is the smalls, one
    of which is Ben's rather than DEV's. The batch shared two surfaces with work
    already here — R129 with R98(3)'s restore remainder, which closed with it on
@@ -795,6 +858,10 @@ underneath it.*
    into `slate_bundle.json` warnings, and the allowlist test that mechanizes
    the DK wall. Minutes of lift against the two failure classes this repo
    treats as absolute.
+15b. **R150, new 2026-08-17** (P2, XS + one decision, WS6) — not a tier slot
+   of its own. Two surfaces now count one lineup's exposure to one game and
+   disagree by construction, and the decision is Ben's because it is a
+   correlation belief. Rides R136 or R11.
 15a. **R149, new 2026-08-17** (P1, S, WS6) — the installed skill is six moves
    behind and the drift check that exists to catch that is structurally blind
    in a cloud session. Enters the tier rather than Tier 5 on the same
@@ -1192,7 +1259,9 @@ is the funded modeling item; R48 is its grading substrate (an archival
 emission, kept here because its purpose is this stream); R13 is the umbrella
 decision the do-not-build list keys on. R126, R135, R136 and R137 joined
 2026-08-16 as the review-and-evidence layer: none of them moves a control,
-and each makes the next control decision gradeable instead of argued.
+and each makes the next control decision gradeable instead of argued. **R126
+CLOSED 2026-08-17** and migrated; R150 was filed off its landing and is Ben's
+decision, not a control move either.
 
 ### R37(2). The five-stack half: floor 5 at narrow breadth, then the 4-2-x cap (P1, M, staged) | stage 1 landed 2026-08-09
 
@@ -1390,20 +1459,6 @@ a restated priority.
 - **[Corrected 2026-08-16 (DEV): Ben DECIDED this on 2026-08-09 and this line never caught up.** The decision is recorded in `docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`, which is retained on disk as its sole carrier — it holds the nine-family table, the observed `ticket_count` values, and four cautions that exist nowhere else (three families are multi-valued and must not be written single-valued; the `SUPERSat` matcher gap worth 17 entries; check `competing_patterns` before adding nine patterns at once; two rows are GOLF-only and are not this engine's domain). Two other entries on this board already say Ben decided — R10's step 1 and Tier 4's R1c-tail — so only this paragraph was stale. What remains is ARCHIVE executing it, not Ben deciding it. The text below is left as written history.]
 - **Awaiting Ben, carried from the same fragment and NOT written:** nine recurring satellite/qualifier families Ben demonstrably enters, by name substring, with the `Places_Paid` values actually observed (for a satellite, `Places_Paid` IS the ticket count awarded). The table is in ledger 3.14. ARCHIVE did not add them to `dk_contest_archetypes.csv` because a curated `ticket_count` reaches `resolve_contest_shape` immediately, where 1 routes to `wta_ticket_satellite` and anything else takes the ticket-line blend: that reranks lineups on contests entered tonight, which makes it a strategy change and Ben's dated decision rather than an archival write. Same reasoning for BUILD's suggested `Solo Shot` row. What DID land is the pure observed-history half, in `data/reference/contest_library.json` (`mlb $1.25k solo shot (early)|1.00`, field 1486, paid 350, breadth 0.2355), which is trust-order-2 and outranks name inference the next time that exact contest and fee recurs without changing any shape mapping. Given that the satellite volume is now an open question rather than something to cut, this input is more likely to matter than it looked: if the satellites are staying, routing them to the right objective is exactly the work that pays.
 
-### R126. Apex and washout are the stated objective and nothing measures either (P1, S) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment
-
-- **What:** Ben named the goal on 2026-08-15 — "dually optimize apex lineups with preventing a total washout across the portfolio" — and neither term exists anywhere in the engine, the brief, or the skill. Verified 2026-08-16: `washout` has zero matches across `mlb_engine/`, `tools/` and `skills/`; `apex` appears only as the name of `posture_allocator`'s Tier A, which is a contest-classification band and not a portfolio measurement. BUILD hand-rolled both in a scratch script for the 2138_2g slate, so the numbers that decided which of five variants shipped are not reproducible run to run and not comparable across slates.
-- **Why:** this is the item that makes every other portfolio comparison possible, and it has already proved it. On 2138_2g one variant posted the highest apex on the slate (2365) and passed every gate; the delivered build passed the same gates. The only thing that separated them was the game-split histogram: the rejected build put 4-5 bats from ONE game into every single lineup (`[(4, 11), (5, 8)]`), the delivered build spread across the slate (`[(0, 2), (3, 5), (4, 4), (5, 6), (8, 2)]`). A portfolio whose lineups all die with the same game is exactly the washout Ben named, and today nothing in the pipeline can see it. Note what this is not: it is a deterministic review proxy computed off the run's own `Ceiling` column, not a win-probability or a payout estimate, and the entry that implements it must keep that label.
-- **Fix:** compute both in the pipeline and write them to the brief; have `build_slate.py` print them in the review block. BUILD's starting definitions, offered as such and worth keeping unless a better one shows up: **apex** is portfolio ceiling total, mean, and best single lineup, summed off the run's own `Ceiling` column; **washout** is, for each game, zero that game's HITTERS, keep the arms, and report the percent of portfolio ceiling retained, plus a histogram of how many bats each lineup draws from each game. The histogram is the part that earned its place, so it is not optional garnish. Two design notes for whoever takes it. The per-game zeroing is a counterfactual over data already in hand, so it costs no solve and cannot delay a build; and the metric belongs beside the exposure block R116 just built, not in a new section, because the question it answers ("is this portfolio concentrated in a way the gates do not catch") is the same question that block already half-answers. The SKILL.md half is R131(d) so the definition survives outside a chat prompt.
-- **Note 2026-08-16 (DEV):** R134 landed `tools/qa_portfolio.py` with the
-  frontier proxies (washout exposure, apex concentration) computed at REVIEW
-  time, after this entry was filed. The remainder here is unchanged in kind —
-  the metrics belong in the pipeline and the brief beside R116's exposure
-  block, plus the per-game zeroing histogram — and cheaper in practice: the
-  definitions now have a landed implementation to align with rather than a
-  chat prompt. R136 is the field-facing panel on the same report block; land
-  them adjacent.
-
 ### R135. Start the predict-then-grade ownership shadow loop with the v0.1 structural prior (P2, S; no engine change) | new 2026-08-16, from the leverage ideation fragment; module verified in tree
 
 - **What:** `mlb_engine/field/ownership_prior.py` (v0.1, untracked, unwired)
@@ -1445,10 +1500,25 @@ a restated priority.
   1), and salary-leave distribution against the archived winner medians
   (3.17: winners $250, field $200, us $100). Never a gate; deterministic;
   labels per the house rule.
-- **Sequencing:** directly behind R126 in Tier 1's QA batch — same report
-  surface, one session takes both. Uses R135's prior file when present and
-  degrades to ABSENT-with-a-note, never to a silent zero (the R127 lesson,
-  filed the same session).
+- **Sequencing:** head of Tier 1's QA batch now that R126 has closed. Uses
+  R135's prior file when present and degrades to ABSENT-with-a-note, never to
+  a silent zero (the R127 lesson, filed the same session).
+- **Corrected 2026-08-17 (DEV), landing R126: "one session takes both" is
+  withdrawn.** The claim rested on the two sharing a report surface and they do
+  not. R126 landed in the PIPELINE and the BRIEF, because that is the only
+  place the entered set and the `Ceiling` column are both in hand; this is a
+  qa_portfolio panel that additionally needs R135's prior file, which is still
+  untracked and unwired. What R126 did leave behind is the surface to hang this
+  on: `frontier_from_brief` reads the artifact's block and leads the section
+  with it, so these columns extend a block that now exists rather than one that
+  had to be invented alongside them. Two of the four columns (chalk-sum,
+  sub-10% carry) are ABSENT on every build until R135 lands, so R135 is worth
+  taking first or in the same session even though it sits in Tier 2.
+- **Also gained from R126's landing:** `tools/qa_portfolio.py` had ZERO tests
+  before 2026-08-17 and now has five, all on the block-reading half. Anything
+  this item adds to that file is adding to a surface whose sections 1 and 2 are
+  still unpinned; R11 owns the rest of that coverage and this entry should not
+  quietly become it.
 - **Audit fields.** Moves: leverage visibility. Evidence: V2 (3.17/3.18
   re-read this session). Acceptance: panel renders on a fixture portfolio
   with and without a prior file. Falsifier: none — reporting. FOSS: existing.
@@ -2103,12 +2173,39 @@ R12 are the context and process ideas; they slot in opportunistically.
   hitters without a hand per side rather than an all-or-nothing team list, and
   keep the existing key's meaning by deriving it from `count == 9`.
 
+### R150. Does an arm in a game belong in a washout count? (P2, XS + one decision) | new 2026-08-17, measured while landing R126
+
+- **What:** two surfaces now count a lineup's exposure to one game and they
+  disagree by construction. `execution_pipeline.compute_portfolio_frontier`
+  counts BATS only, because R126's definition zeroes a game's hitters and keeps
+  the arms deliberately. `qa_portfolio.section_frontier`'s `game` axis
+  increments once per roster spot before its pitcher check, so it counts arms
+  too. Measured on the archived 06-03 grid the day R126 landed: the run reports
+  16/18 entries materially exposed to SD@PHI, the axis reports 18/18. Both are
+  right about what they count and the printed section now says so, which is the
+  interim rather than the answer.
+- **Why it is a real question and not a bug:** the two readings encode different
+  beliefs about correlation. "Keep the arms" says an arm can BENEFIT from the
+  script that kills the bats in its game (a pitcher's duel is exactly one game
+  going cold for hitters), so counting him as washout exposure double-counts a
+  hedge as a risk. "Count every spot" says a rainout, a postponement or a lineup
+  scratch takes the whole game including the arm, and those are the events a
+  washout count is really about. The honest reading may be that they are two
+  different axes with two different names, not one axis with a bug.
+- **Fix, once decided:** either qa_portfolio's `game` axis drops its arms and
+  the two numbers agree, or the axis is RENAMED to what it measures (roster
+  footprint) and the run's stays the bat exposure. One of the two; leaving both
+  named "washout" is what this entry exists to stop.
+- **Ben's, not DEV's,** because it is a correlation belief and not an
+  implementation detail. Cheap either way; the cost is the decision.
+- **Rides:** R136 (same report block) or R11 (same tool). Never its own session.
+
 ### R131. Four smalls off one slate, three DEV and one Ben's (P2, XS each) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment
 
 - **(a) `Solo Shot` is missing from `dk_contest_archetypes.csv`.** Two contests on the slate ("MLB $2.5K Solo Shot (Night)", "MLB $500 Solo Shot (Night)") matched no row in the 24-row file and blocked the build until postures were passed by hand. They are single-entry GPPs and the family recurs. **This is not DEV's and it is not simply ARCHIVE's:** the 2026-08-09 curated-archetypes fragment already settled the principle for this exact row — a curated row reaches `resolve_contest_shape` immediately and reranks lineups on contests entered that night, which makes it a strategy change and Ben's dated decision, not an archival write. Listed in Tier 4 beside R1c-tail so both are decided and executed in one pass.
 - **(b) `fetch_slate_bundle.py --venues` takes a FILE PATH, not a venue list.** Verified 2026-08-16: the flag defaults to `data/reference/team_to_venue.csv` and the failure path warns `weather skipped: venue file not found at <value>`, so passing `Sutter Health Park,Angel Stadium` produced an empty weather block under a message that reads like a missing file rather than a misused flag. Fix either end — one line in SKILL.md, or accept both forms and say which was parsed. Accepting both is slightly better because the error message is the thing that misled, and a flag that names what it parsed cannot mislead the same way twice.
 - **(c) SKILL.md should carry the iteration discipline.** Each rebuild grows the bank and changes results; past two rebuilds expect collapse and non-reproducibility; the delivery must be the newest certified run, so decide before rebuilding rather than after. All three cost time on this slate. This is the operator-facing half of R130, which owns the reporting half.
-- **(d) SKILL.md should carry the dual objective** so R126's apex/washout definition survives outside a chat prompt. Sequence it after R126 lands, not before, or the skill documents a metric the pipeline does not emit.
+- **(d) SKILL.md should carry the dual objective** so R126's apex/washout definition survives outside a chat prompt. Sequence it after R126 lands, not before, or the skill documents a metric the pipeline does not emit. **Unblocked 2026-08-17: R126 has landed**, so the definitions to document are `portfolio_frontier`'s own keys, in the brief's exposure block, plus the `frontier:` review line. Two things the landing means this half must say rather than paraphrase: the retained percent is NOT comparable across slates and the intact count is, and the histogram is what separates two builds the gates and the retained percent cannot.
 
 ### R138. Bank scenario coverage: one stack family per game, stated as standing practice (P2, XS) | new 2026-08-16, from the leverage ideation fragment
 

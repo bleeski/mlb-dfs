@@ -25,6 +25,127 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R126: the stated objective becomes a measurement, and the histogram is the part that separates two builds
+
+DEV, claim `engine_2026-08-17`. Tier 1's head, taken in tier order. It is the
+only item on the board that measures what Ben said he is optimizing for.
+
+**The gap.** Ben named the objective on 2026-08-15 — "dually optimize apex
+lineups with preventing a total washout across the portfolio" — and neither term
+existed in the engine, the brief or the skill. `washout` had zero matches across
+`mlb_engine/`, `tools/` and `skills/`; `apex` existed only as
+`posture_allocator`'s Tier A, a contest-classification band and not a portfolio
+measurement. BUILD hand-rolled both in a scratch script to choose among five
+2138_2g variants, so the numbers that decided a delivery were neither
+reproducible run to run nor comparable across slates.
+
+**What landed.** `execution_pipeline.compute_portfolio_frontier` (module v1.16 ->
+v1.17) measures both ends over the ENTERED set off the run's own `Ceiling`
+column. Apex is portfolio ceiling total, mean per entry, and best single entry,
+each named with its entry id. Washout is a per-game counterfactual: zero that
+game's HITTERS, keep the arms, report the percent of portfolio ceiling retained,
+the entries left fully intact, the entries materially exposed at
+`FRONTIER_MATERIAL_BATS` (3, qa_portfolio's own threshold, kept identical so the
+two reports describe the same object), and a histogram over entries of bats
+drawn from that game. The block reaches `diagnostics.json` and BOTH success
+return paths as `portfolio_frontier`, and `build_slate.py` carries it into the
+brief INSIDE R116's exposure block — not a new section, because "is this
+portfolio concentrated in a way the gates do not catch" is the question that
+block already half-answered — plus one `format_frontier_line` review line at
+build time. A counterfactual over data already in hand: no solve, no network,
+wrapped on the `_bank_coverage` rule so a review proxy can never kill a run.
+
+**Measured over ENTRIES, not distinct lineups.** Two entries holding one lineup
+die together, and CLAUDE.md's dual-objective note already says the washout
+objective binds at the portfolio level rather than within a lineup. Counting
+distinct lineups would report a six-entry portfolio built from one lineup as a
+single exposure.
+
+Four things the work established that the entry as filed did not carry.
+
+*The retained percent cannot separate the two builds the item was filed to
+separate.* The entry offers "percent of portfolio ceiling retained" as the
+washout metric and the histogram as the part that earned its place. Building it
+showed the second claim is stronger than it reads: on the fixture reproducing
+2138_2g's shape, the concentrated and spread portfolios post the SAME apex
+(792.0) and the SAME retained percent (65.2%), and differ only in
+`entries_fully_intact` — 0 against 3. Retained percent is a slate-size artifact:
+it is bounded below by the arms plus the other games' bats, so it falls as the
+slate shrinks and a 2-game number is not comparable to a 10-game one, which is
+one of the two problems this item exists to fix. `entries_fully_intact` is
+comparable. The block's note says so rather than leaving it to be discovered,
+and a test pins that sentence.
+
+*qa_portfolio was about to shadow it.* R134's tool already prints a
+"DUAL-OBJECTIVE FRONTIER" section computed from share-of-portfolio counts,
+because it reads a delivered CSV and a salary file and neither carries a
+`Ceiling`. Leaving that alone would have put two numbers under one word on one
+screen with nothing saying which one the build used — the R128 lesson on a new
+surface. `frontier_from_brief` now reads the artifact's block and leads with it;
+the structural axes stay, relabelled the INDEPENDENT STRUCTURAL CHECK. An absent
+block is NAMED (a build predating R126, or one that did not enter at
+`run_slate`) rather than falling through to the axes, and a short apex is
+flagged before anyone compares it to another build's.
+
+*And the two game counts genuinely differ, so the difference is stated in
+words.* Measured on the archived 06-03 grid the same session: the run reports
+16/18 entries materially exposed to SD@PHI, qa_portfolio's axis reports 18/18.
+Both are right. The axis increments per roster spot in a game before its pitcher
+check, so it counts arms; the run counts bats only, because keeping the arms is
+the definition — an arm can benefit from the script that kills the bats. Whether
+an arm belongs in a washout count at all is a real question and it is filed, not
+answered here on an R126 claim. The printed section reconciles the two rather
+than letting a reader conclude one is broken.
+
+*A missing input is one fact; a missing player is one fact per player.* R127's
+boundary, applied deliberately in both directions. No `Ceiling` column reports a
+reason and NO list, because a zero-valued apex block reads as a portfolio with
+no ceiling. A rostered player absent from projections IS named, in
+`unpriced_roster_players` with a note that every total is SHORT, because a
+silent zero there reads as a low-ceiling portfolio instead of a missing join.
+No game column keeps apex and names the washout gap instead of dropping both.
+
+**Evidence.** Twenty-seven tests, `test_core` 716 -> 743, gate 1074 -> 1101.
+Twelve mutations run by hand against the finished guards and all twelve caught,
+including the three that a first cut would have let through: `by_game`'s sort
+removed (the ordering fixture now makes the worst game the alphabetically LAST
+one, because with the two aligned `touched` is already sorted and dropping the
+sort still names the right game), the material threshold's `>=` slipped to `>`
+(counted at exactly three bats, invisible on any fixture that only draws two or
+four), and `entries_fully_intact` hardwired to 0. One guard was wrong on its
+first cut and is worth recording because it is R65's shape again from the other
+direction: the label sweep asserted no banned word appears anywhere in the
+block, and failed on the block's own disclaimer ("neither is a probability, a
+win rate, a cash rate"). It now sweeps keys and every non-note string, and
+asserts the notes disclaim. Run end to end on the archived 06-03 slate: the
+block lands in the result and in `diagnostics.json`, apex 2597.6 across 18
+entries, washout binding on SD@PHI at 71.6% retained with 0 entries untouched,
+bats-per-entry `[[2,2],[3,5],[4,5],[5,5],[8,1]]`. The certified export hash is
+unchanged and the golden replay's nine tests pass, which is the requirement: an
+additive diagnostic must not move a byte of the delivered file.
+
+**Not in scope, and named rather than left implicit.** The SKILL.md half is
+R131(d) and stays there. R136's leverage panel does NOT ride this session as the
+board predicted: R126 landed in the pipeline and the brief, R136 is a
+qa_portfolio panel needing R135's prior file, so they are no longer one surface
+and the sequencing note on R136 is corrected. `tools/qa_portfolio.py` had zero
+tests before this entry; the five added here are its first, and covering the
+rest of it belongs to R11.
+
+**Pins and versions.** `execution_pipeline` v1.16 -> v1.17, mirrored in
+`tools/audit.py`. `EXPECTED_SUITE_COUNTS["tests.test_core"]` 716 -> 743, total
+1074 -> 1101. The PASS line moved in CLAUDE.md and in
+`skills/generate-lineups/SKILL.md`, which was separately stale at 1056 — two
+moves behind, since R127 moved the count and did not carry it. The ledger Quick
+Card's pin line moved the same way and under the same DEV-held `ledger` claim
+the five 2026-08-17 corrections above it used; no ledger section was touched.
+
+Touched: `mlb_engine/pipeline/execution_pipeline.py`, `tools/qa_portfolio.py`,
+`skills/generate-lineups/scripts/build_slate.py`,
+`skills/generate-lineups/SKILL.md`, `tools/audit.py`, `tests/test_core.py`,
+`CLAUDE.md`, `docs/backlog.md`, `ledger/MLB_Classic_Calibration_Ledger.md`
+(pin line only).
+
 ## 2026-08-17 — R127: a factor that fell back to its neutral default is now NAMED, and one boolean stops answering for two sides
 
 DEV, claim `engine_2026-08-17`. Tier 1's head, taken in tier order. Both halves

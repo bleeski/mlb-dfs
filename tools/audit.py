@@ -143,7 +143,31 @@ EXPECTED_SUITE_COUNTS = {
     # a missing split reporting None rather than guessing False, the named list
     # reaching the brief, the Projection_Mode distribution and its absent case,
     # and two on the reference warnings naming the factor they feed.
-    "tests.test_core": 716,
+    # R126, 2026-08-17: 716 -> 743, the twenty-seven that pin the dual-objective
+    # frontier. Ten on apex and washout themselves: the ceiling totals summed
+    # off the run's own column, a mutation that moves one Ceiling and watches
+    # the total move (the numbers are readable enough to hardwire), the named
+    # best entry with a stable tie-break, the measurement being over ENTRIES
+    # rather than distinct lineups, the counterfactual keeping the arms, the
+    # histogram covering every entry, the 2138_2g reproduction where apex and
+    # retained percent are IDENTICAL and only intact entries separate the two
+    # builds, an untouched game not becoming a row, the ordering putting the
+    # binding game first on a fixture whose worst game is alphabetically last,
+    # and the material threshold counted at exactly three bats. Five on honest
+    # degrade: a missing Ceiling column reporting one fact and no list (R127's
+    # boundary), a missing game column keeping apex, an unpriced rostered
+    # player NAMED rather than zeroed, nothing-to-measure saying so, and the
+    # wrapper that cannot kill a run. Three on labels and the note, including
+    # the cross-slate comparability limit the retained percent does not have.
+    # Four on the wiring: three carriers of the block (both return paths plus
+    # diagnostics.json), the brief carrying it INSIDE the exposure block, and
+    # the review line stating both ends, degrading loudly, and flagging a
+    # short total. Five on qa_portfolio reading the artifact's block instead of
+    # shadowing it with a number computed off files that carry no Ceiling: the
+    # block surfaced, an absent one named rather than fallen through, its own
+    # axes labelled the independent check, a short apex flagged before it is
+    # compared, and the 06-03 reconciliation (16/18 vs 18/18) stated in words.
+    "tests.test_core": 743,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -207,7 +231,7 @@ EXPECTED_VERSION_TEXT = {
     "mlb_engine/entries/dk_entries_manager.py": 'VERSION = "v1.6"',
     "mlb_engine/swap/late_swap_manager.py": 'VERSION = "v1.4"',
     "mlb_engine/pipeline/build_state_manager.py": 'VERSION = "v1.4"',
-    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.16"',
+    "mlb_engine/pipeline/execution_pipeline.py": 'VERSION = "v1.17"',
     "mlb_engine/projections/projection_builder.py": 'VERSION = "v1.6"',
     "mlb_engine/projections/xwoba_base_correction.py": 'VERSION = "v1.2"',
     "mlb_engine/intake/live_data_adapters.py": 'VERSION = "v1.6"',
