@@ -25,6 +25,161 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R135: the predict-then-grade ownership loop starts, and the join it needs is the part that had to be built
+
+DEV, claim `engine_2026-08-17`. Tier 1's head after R126 closed, taken with
+R136's own sequencing note as the reason: two of R136's four columns are ABSENT
+on every build until this lands, so the panel would have shipped mostly empty.
+R151 rides the same commit and has its own entry below.
+
+**The gap.** `mlb_engine/field/ownership_prior.py` has existed since the July
+scaffolding pass, unwired (and, per the correction below, tracked all along
+despite three documents saying otherwise), carrying `predict_ownership` and
+`grade_against_actuals` and a header that says its whole purpose is to "start the
+predict-then-grade loop on slate one instead of waiting." Nothing called either
+half. Meanwhile R10's bar is a fitted prior that beats flat-12 in the satellite
+cell, graded into the ledger, and every slate that passed without a prediction
+file was a slate that could never grade anything. Three docs, the ledger and two
+red-team reviews all named the module; none of them made it run.
+
+**What landed.** `tools/ownership_pred.py` (v1.0), both halves in one file
+because both halves read one schema and a schema split across two tools drifts.
+`emit` writes `outputs/<date>/ownership_pred_<tag>.json` before lock from the
+salary file plus whatever feed and odds packet the build is using, all six
+archetypes in one pass. `grade` scores one archetype against one archived
+standings export and prints a ledger block. Review-only throughout: it reads
+files, writes one JSON, imports no pipeline, touches no run directory, and makes
+no network call at all. The module's VERSION is now pinned in the audit's
+`EXPECTED_VERSION_TEXT` beside the boundary modules and its wiring is carried
+here — R107(a)'s discipline, which R135's entry named as the condition of first
+wiring. The two skill steps the item asked for: SKILL.md gains the pre-lock emit
+under "Better data when there is time", and the archival runbook gains Job 1 step
+9, ARCHIVE's grade.
+
+**One premise of the entry was simply false, and three places carried it.** R135,
+this module's own header, and this changelog's R143 entry all describe
+`ownership_prior.py` as "untracked and unwired". It was unwired. It was never
+untracked: `git log --follow` puts it in `6a7f4a9`, the v3.0.0-pre restructure
+commit and the repo's first, so there was no `git add` to make and the R107(a)
+checklist had one fewer item than it read. The same header claimed the module
+sits "outside the 26-file cap", which is also wrong — `audit.engine_module_count`
+counts `mlb_engine/**/*.py` off the filesystem, so it has always been one of the
+26. Both claims are corrected in the header rather than deleted, because a
+reader who has seen them copied into three documents needs the correction, not a
+silent tidy. Recording it because the cost was not zero: the tracked half sent
+this session looking for state that did not exist, and a checklist item that
+turns out to be already done is indistinguishable from one that was skipped.
+
+**No network, deliberately, and an absent input is named rather than filled.**
+`build_slate.py` fetches totals when `--odds` is omitted; this does not, because
+a nightly review report that spends API credit is a report that gets turned off.
+An absent odds file makes the implied-total tilt INERT and says the word, with
+the reason, at the top of the emit output. The same holds for the batting order,
+the probable arms and the optional value tilt: four inputs, each `applied` or
+`INERT` with a sentence. R127's boundary applies in both directions on purpose —
+a missing FILE is one fact about the build and reports no list, a partially
+priced slate names the teams that fell back to the league mean.
+
+Three things the work established that the entry as filed did not carry.
+
+*The grade cannot join without a crosswalk the prediction has to record, and this
+is the load-bearing finding.* `grade_against_actuals` keys on DK Player_ID. A DK
+standings export has no Player_ID column at all — the miner keys ownership on
+`player_norm`, a normalized NAME. Wire the two together as the entry describes
+and the join is empty, `grade_against_actuals` returns "no overlapping
+Player_IDs", and R135's acceptance criterion fails while every number still
+prints. So the prediction file records the salary file's own `name_norm ->
+Player_ID` map at emit time, when the slate's own authoritative file is in hand,
+and the grade joins through it. Two consequences. The map is keyed with
+`field_miner.normalize_name` and NOT the intake's, because the repo has two
+normalizers and they disagree on an apostrophe ("Ryan O'Hearn" folds to
+`ryan ohearn` one way and `ryan o hearn` the other); the actuals side is the
+miner's, so the crosswalk is the miner's, and a test pins that they still
+disagree. And two players whose names normalize identically on one slate are
+AMBIGUOUS (R75's class): both leave the join and both are named, because
+resolving to one id attributes one man's ownership to the other.
+
+*Two baselines, not one, because R10's named bar is nearly free.* The entry's
+acceptance says "beside the flat-12 baseline". flat-12 is the optimizer's Mid
+tier default, a constant 12% for every player, which on a 180-player slate spends
+2160% of a 1000% roster budget — beating it on MAE is close to automatic, and a
+report showing only that number would present a free win as the gate cleared,
+which is the false-signal class this board has closed six times. `flat_budget`
+ships beside it: 800% across the hitters and 200% across the arms, spread evenly,
+the null actually worth arguing with. Both verdicts are reported and the note
+says which is which.
+
+*One aggregation, shared, not re-derived.* DK's right-hand table is grained per
+(player, roster position) and the rows SUM to a player's field share.
+`mine_contest` has aggregated it that way since v0.3 with the rule inline; the
+grader needs the identical number, and two functions summing one table is exactly
+how two surfaces end up disagreeing about one contest's chalk (R128's lesson,
+R150's open question). The rule moved out to `field_miner.own_by_player_norm` and
+both callers read it. A row with no `%Drafted` cell creates no key there: absent
+is not zero, and a 0% actual would score the prior against a number DK never
+published.
+
+**What this is not.** Every output is an UNCALIBRATED STRUCTURAL PRIOR or a
+deterministic error measurement over one contest. Nothing reaches the optimizer,
+projections or `Ownership_Tier`; ownership stays conditioned on archetype and
+field size and is never pooled; one contest never moves a prior. The grade
+refuses an archetype the prediction does not carry, which is what stops a
+satellite being graded against a cash prediction.
+
+**Evidence.** Eighteen tests, plus R151's one, `test_core` 743 -> 762, gate
+1101 -> 1120. Thirteen mutations run by hand against the finished guards, all
+thirteen caught — but two SURVIVED their first run and both were fixture
+weakness rather than guard weakness, which is the part worth recording. The
+slate-restriction guard survived because the odds fixture only priced games that
+were on the slate, so there was nothing for the restriction to remove; the
+fixture now prices LAD@SF as well. The shared-aggregation guard survived a
+mutation that took a maximum instead of a sum, because every player in the
+standings fixture appeared on exactly one roster-position row; the fixture now
+gives O'Hearn 1B and OF rows, which is the case the aggregation exists for. Run
+end to end on the archived 06-03 slate and on the live 2026-08-16 1335_8g files:
+the 06-03 grade reports prior MAE 14.35 points against flat-12's 14.53 and
+flat-budget's 15.64, mean signed error -10.44, Spearman 0.266, 47 of 47 named
+players joined, and the arms bucket at MAE 46.95 — that file predates DK's
+`Starting` column, so `probable_sp` was INERT and every arm took the
+non-probable discount. The first graded slate therefore says the prior barely
+clears its own named bar and misses the arms badly, which is the record this item
+exists to start rather than a result to defend.
+
+## 2026-08-17 — R151: an accented lineup name now matches DK's plain-ASCII spelling, and two F4 terms stop dying quietly
+
+DEV, same claim and same commit as R135, filed and fixed in session rather than
+left on the board: the emitter R135 ships surfaces this merge's disagreement list
+to the operator, so shipping it while knowing the list was entirely false
+positives would have added a surface that steers the operator wrong.
+
+**What was wrong.** R143's `merge_dk_starting_into_feed` compared the feed's
+names to DK's with `.strip().lower()`, which folds case and nothing else. The MLB
+Stats API ships diacritics and the DK salary file does not, so "José Ramírez"
+never matched "Jose Ramirez". `slate_intake_manager.normalize_name` exists for
+precisely this — its own comment says it NFKD-folds so an accented feed name
+matches DK's plain-ASCII spelling — and it was already imported in that module,
+one line above.
+
+**Two costs, and the second is the expensive one.** The disagreement list, which
+R143 added so a DK-versus-paste conflict is NAMED rather than silently resolved,
+reported 7 of 15 posted sides on the 2026-08-16 1335_8g slate and all 7 were
+accents. A list whose entries are 100% false is a list the operator learns to
+skim. Underneath it, the merge's carry-forward lookup keys on the same string, so
+`prior` came back empty for those hitters and the merged row silently dropped the
+feed's MLBAM `id` and `bat_side` — the Savant join key and the platoon input,
+both F4 terms, which is R117's defect on the merge surface instead of the paste
+surface. Measured on that slate: ten hitters lost both, among them Ramírez,
+Acuña, Giménez and Suárez. `f4_handedness_unavailable` could not see it, because
+it only fires when a side loses ALL nine hands.
+
+**The fix, and one deliberate change to the report.** Both the comparison and the
+lookup key on `normalize_name`. The disagreement entries now report each source's
+own SPELLING rather than the comparison key, because an operator reading that
+list is checking a roster move and the useful string is the one the source
+printed; the existing test moved from `zz_scratched` to `ZZ_Scratched` for that
+reason and the comment says so. After the fix, the same slate reports 0
+disagreements and 0 hitters losing either field.
+
 ## 2026-08-17 — R126: the stated objective becomes a measurement, and the histogram is the part that separates two builds
 
 DEV, claim `engine_2026-08-17`. Tier 1's head, taken in tier order. It is the

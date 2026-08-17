@@ -167,7 +167,27 @@ EXPECTED_SUITE_COUNTS = {
     # block surfaced, an absent one named rather than fallen through, its own
     # axes labelled the independent check, a short apex flagged before it is
     # compared, and the 06-03 reconciliation (16/18 vs 18/18) stated in words.
-    "tests.test_core": 743,
+    # R135 + R151, 2026-08-17: 743 -> 762, the nineteen that pin the
+    # predict-then-grade loop and the name fold under it. One is R151's, on the
+    # DK/feed merge: an accented feed name now matches DK's plain-ASCII spelling,
+    # so the disagreement list stops reporting seven false positives on a real
+    # slate and the merged row stops dropping the feed's MLBAM id and bat_side
+    # (both F4 terms, R117's defect on the merge surface). Eighteen are R135's.
+    # Six on the emitter: the name crosswalk the grade joins through, an absent
+    # odds file named INERT with no per-player list against a partially priced
+    # slate named per team (R127's boundary in both directions), side counts
+    # intersected with the salary file's teams, DK-posted sides attributed to DK
+    # per R143, and the roster budget accounting reported per archetype. Two on
+    # determinism and the slate date coming off Game Info rather than the clock.
+    # Six on the grade: per-feature buckets rather than one number, both
+    # baselines with flat-12 labelled the easy one, an unmatched actual name
+    # listed rather than counted, an archetype the prediction does not carry
+    # refused, actuals taken from the ONE aggregation mine_contest uses on a
+    # multi-slot fixture, and a blank %Drafted cell creating no key. Two on the
+    # crosswalk keying on field_miner's normalizer and not the intake's, which
+    # disagree on an apostrophe. One on labels, one on R107(a)'s tracked-and-
+    # pinned discipline. Thirteen hand-run mutations, all thirteen caught.
+    "tests.test_core": 762,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -243,6 +263,12 @@ EXPECTED_VERSION_TEXT = {
     # R59: the team-code boundary is an ingest contract, so it is pinned
     # like the other boundary modules rather than left to R76(e).
     "mlb_engine/team_codes.py": 'VERSION = "v1.0"',
+    # R135, 2026-08-17: the structural ownership prior stops being local state.
+    # It sat untracked and unwired since the July scaffolding pass while three
+    # docs and the ledger named it, which is R107(a)'s shape; wiring it into the
+    # predict-then-grade loop carries that discipline, so it is pinned here.
+    # Still review-only and never applied to projections or Ownership_Tier.
+    "mlb_engine/field/ownership_prior.py": 'VERSION = "v0.1-prior"',
 }
 
 CSV_REQUIRED = {

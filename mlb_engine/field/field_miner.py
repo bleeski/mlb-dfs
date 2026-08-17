@@ -289,6 +289,30 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
             "contest_type": contest_type}
 
 
+def own_by_player_norm(player_table: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    """{normalized name: actual %Drafted} at PLAYER grain, one definition.
+
+    DK's right-hand table is grained per (player, roster position): O'Hearn
+    drafted at 1B in two entries and OF in three appears twice and the two rows
+    SUM to his field share. ``mine_contest`` has aggregated it that way since
+    v0.3; R135's grader needs the identical number to join a prediction against,
+    and two functions summing one table is how the two surfaces end up
+    disagreeing about one contest's chalk (the R128/R150 class). So the rule
+    lives here and both callers read it.
+
+    Rows with no ``%Drafted`` cell contribute nothing and do not create a key: a
+    player the export lists without a share is absent from this map, which is a
+    different fact from a player the field drafted 0% of the time.
+    """
+    rows: Dict[str, List[float]] = defaultdict(list)
+    for record in player_table or []:
+        pct = record.get("pct_drafted")
+        if pct is None:
+            continue
+        rows[str(record.get("player_norm") or "")].append(float(pct))
+    return {name: round(sum(values), 2) for name, values in sorted(rows.items())}
+
+
 # ---------------------------------------------------------------------------
 # Salary join (authoritative for salary and team; ledger invariant 3.1)
 # ---------------------------------------------------------------------------
@@ -677,16 +701,13 @@ def mine_contest(
     # multi-position player appears once per drafted slot and the rows SUM to
     # his total field share. Aggregate to player grain here; the raw split is
     # preserved in player_table.
-    own_rows: Dict[str, List[float]] = defaultdict(list)
     fpts: Dict[str, float] = {}
     disp: Dict[str, str] = {}
     for p in ptable:
         disp.setdefault(p["player_norm"], p["player"])
-        if p["pct_drafted"] is not None:
-            own_rows[p["player_norm"]].append(p["pct_drafted"])
         if p["fpts"] is not None and p["player_norm"] not in fpts:
             fpts[p["player_norm"]] = p["fpts"]
-    own = {nm: round(sum(v), 2) for nm, v in own_rows.items()}
+    own = own_by_player_norm(ptable)
 
     has_salary = salary_map is not None
     smap = salary_map or {}

@@ -1,9 +1,21 @@
-"""ownership_prior.py — structural ownership prior for MLB Classic (untracked).
+"""ownership_prior.py — structural ownership prior for MLB Classic.
 
-STATUS: review-only scaffolding, deliberately OUTSIDE the audited engine and
-outside the 26-file cap. Both open project slots stay reserved for the fitted
-ownership model this replaces once 8-15 archetype-conditioned slates of
-archived DK standings exist. Nothing here is a calibrated value: every output
+STATUS: review-only, and WIRED as of R135 (2026-08-17): `tools/ownership_pred.py`
+calls both halves, and this module's VERSION is pinned in the audit's
+`EXPECTED_VERSION_TEXT` beside the boundary modules. Two claims that used to
+head this file were false and are corrected rather than deleted, because three
+other documents copied them. It was never UNTRACKED: `git log --follow` puts it
+in the v3.0.0-pre restructure commit, the repo's first, so "untracked and
+unwired" was half right and the tracked half sent R135 looking for a `git add`
+that was not needed. And it is not outside the audit's module count, which is
+taken off the filesystem: it has always been one of the 26.
+
+What remains true: nothing here is applied to projections, `Ownership_Tier`, or
+the optimizer, and both open project slots stay reserved for the fitted model
+this replaces. The fitted replacement lands once 8-15
+archetype-conditioned slates of archived DK standings exist.
+
+Nothing here is a calibrated value: every output
 is an UNCALIBRATED STRUCTURAL PRIOR, labeled as such, never a win-rate, ROI,
 or probability claim, and never auto-applied to projections, Ownership_Tier,
 or the optimizer.

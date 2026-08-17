@@ -39,6 +39,53 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-17 (fourth session), DEV, claim `engine_2026-08-17`: **R135 is CLOSED
+and migrated** to CHANGELOG.md, and **R151 was filed and closed in the same
+session**, which is the one thing here worth reading before the R-number. R135
+was taken out of Tier 2 rather than in tier order, on R136's own instruction: two
+of R136's four columns are ABSENT on every build until R135 lands, so taking the
+tier head first would have shipped a panel that was mostly empty. **R136 is
+still this tier's head and its blocker is now gone**, and its entry gained the
+schema, the archetype rule and the one trap: a chalk-sum computed off a
+prediction whose implied-total tilt was INERT is a salary-and-order number
+wearing a market label, so the emitter's `applied`/`INERT` state belongs beside
+the column. Four things carried forward. **First, the load-bearing finding, and
+the entry as filed could not have worked without it.** `grade_against_actuals`
+joins on DK Player_ID; a DK standings export has no Player_ID column at all,
+because the miner keys ownership on a normalized NAME. Wired as filed, the join
+returns zero and the grade prints "no overlapping Player_IDs" while every other
+number looks fine, which is the acceptance criterion failing silently. The
+prediction file therefore records the salary file's own `name_norm -> Player_ID`
+map at emit time, keyed with `field_miner`'s normalizer and NOT the intake's,
+because the two disagree on an apostrophe ("Ryan O'Hearn" -> `ryan ohearn` one
+way, `ryan o hearn` the other) and the actuals side is the miner's. **Second, R10's
+named bar is nearly free and the report says so.** flat-12 is a constant 12% for
+every player, which spends 2160% of a 1000% roster budget on a full slate, so
+`flat_budget` (800/200 spread evenly) ships beside it as the null worth arguing
+with. Reporting only flat-12 would have presented a free win as the gate cleared.
+**Third, the first graded slate is not flattering and that is the point:** on the
+archived 06-03 grid the prior posts MAE 14.35 points against flat-12's 14.53 and
+flat-budget's 15.64, mean signed -10.44, Spearman 0.266, and an arms bucket at
+46.95 because that salary file predates DK's `Starting` column so `probable_sp`
+was inert. The record starting is the deliverable; the number is not a result to
+defend. **Fourth, R151.** The emitter surfaces `merge_dk_starting_into_feed`'s
+disagreement list to the operator, and on the 2026-08-16 1335_8g slate that list
+read 7 of 15 posted sides with all 7 false: the merge compared `.strip().lower()`
+while the MLB Stats API ships diacritics and DK does not. Underneath the noise,
+the same key drove the carry-forward lookup, so ten hitters silently lost the
+feed's MLBAM id and bat side — both F4 terms, R117's defect on the merge surface,
+invisible to `f4_handedness_unavailable` because it only fires when a side loses
+all nine. Fixed with the module's own `normalize_name`, and the disagreement list
+now prints each source's SPELLING rather than the comparison key. Gate 1101 ->
+1120 (`test_core` 743 -> 762, `grew`); CLAUDE.md, SKILL.md and the ledger Quick
+Card pin line all moved with it, the last under the DEV-held `ledger` claim its
+seven same-date predecessors used. Thirteen mutations run by hand, all thirteen
+caught — two only after the FIXTURES were fixed, which is worth repeating: a
+guard that survives its mutation is sometimes a weak fixture rather than a weak
+assertion, and both here were (an odds fixture with no off-slate game cannot
+test a slate restriction; a standings fixture with one row per player cannot
+tell a sum from a maximum).*
+
 *2026-08-17 (third session), DEV, claim `engine_2026-08-17`: **R126 is CLOSED
 and migrated** to CHANGELOG.md, taken in tier order as the head of Tier 1 and of
 the QA-hardening batch. **R136 is the new head of this tier**, with its
@@ -789,7 +836,10 @@ underneath it.*
    **R136** (P2, S, WS2) is the new head of this batch, and its
    "one session takes both" sequencing is WITHDRAWN on the entry: R126 landed in
    the pipeline and the brief, R136 is a qa_portfolio panel needing R135's
-   still-unwired prior file, so they are not one surface. **R130** (P2, S, WS4) is reporting only; its proposed
+   still-unwired prior file, so they are not one surface. **R135 CLOSED
+   2026-08-17**, migrated to CHANGELOG.md, taken later the same day on that
+   sequencing note rather than in tier order: the prior file exists now and
+   R136 enters with its input specified rather than assumed. **R130** (P2, S, WS4) is reporting only; its proposed
    remedy is declined on the entry. **R131** (P2, XS, WS6) is the smalls, one
    of which is Ben's rather than DEV's. The batch shared two surfaces with work
    already here — R129 with R98(3)'s restore remainder, which closed with it on
@@ -882,14 +932,21 @@ underneath it.*
     for — same frozen inputs, alternate construction policy, scored against
     the REAL archived field, deterministically. Self-validating: replaying
     every archived own entry must reproduce its recorded points and rank.
-17. **R135** (P2, S, WS2; 2026-08-16, from the leverage fragment) — wire the
-    v0.1 structural ownership prior into a predict-then-grade shadow loop:
-    BUILD emits a pre-lock prediction file, ARCHIVE grades it at mine time
-    into the ledger. No engine change, review-only, and it starts R10's
-    graded record now — every slate that passes without a prediction file is
-    a slate that can never grade anything, the same destroys-evidence logic
-    that put R118 at the head. Beside R118 rather than behind it: S against
-    M, different surfaces, no shared session.
+17. **R135 — CLOSED 2026-08-17**, migrated to CHANGELOG.md. Taken out of
+    Tier 2 and ahead of its slot on R136's own sequencing note (two of R136's
+    four columns are ABSENT until it lands), which is the one case where
+    jumping the tier is the tier's own instruction. `tools/ownership_pred.py`
+    emits the pre-lock prediction and grades it against an archived standings
+    export; the module is tracked and pinned under R107(a)'s discipline, and
+    the two skill steps are in SKILL.md and the archival runbook. **The
+    finding that mattered is the join:** `grade_against_actuals` keys on DK
+    Player_ID and a standings export has no such column, so the prediction
+    now records the salary file's own name crosswalk at emit time or the
+    grade silently joins nobody. Two baselines ship rather than one, because
+    flat-12 is a constant 12% against a 1000% budget and beating it is nearly
+    free. First graded slate (archived 06-03): prior MAE 14.35 against
+    flat-12's 14.53 and flat-budget's 15.64, arms bucket 46.95. **R48 + R83
+    is the next item in this tier after R118.**
 18. **R48 + R83** (S each, WS2) — the per-contest leverage table and the
    per-run factor-audit persist plus hash-bound enrichment inputs: the
    grading substrate R10's bar reads against. R48's backfill re-mine is the
@@ -1459,33 +1516,6 @@ a restated priority.
 - **[Corrected 2026-08-16 (DEV): Ben DECIDED this on 2026-08-09 and this line never caught up.** The decision is recorded in `docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`, which is retained on disk as its sole carrier — it holds the nine-family table, the observed `ticket_count` values, and four cautions that exist nowhere else (three families are multi-valued and must not be written single-valued; the `SUPERSat` matcher gap worth 17 entries; check `competing_patterns` before adding nine patterns at once; two rows are GOLF-only and are not this engine's domain). Two other entries on this board already say Ben decided — R10's step 1 and Tier 4's R1c-tail — so only this paragraph was stale. What remains is ARCHIVE executing it, not Ben deciding it. The text below is left as written history.]
 - **Awaiting Ben, carried from the same fragment and NOT written:** nine recurring satellite/qualifier families Ben demonstrably enters, by name substring, with the `Places_Paid` values actually observed (for a satellite, `Places_Paid` IS the ticket count awarded). The table is in ledger 3.14. ARCHIVE did not add them to `dk_contest_archetypes.csv` because a curated `ticket_count` reaches `resolve_contest_shape` immediately, where 1 routes to `wta_ticket_satellite` and anything else takes the ticket-line blend: that reranks lineups on contests entered tonight, which makes it a strategy change and Ben's dated decision rather than an archival write. Same reasoning for BUILD's suggested `Solo Shot` row. What DID land is the pure observed-history half, in `data/reference/contest_library.json` (`mlb $1.25k solo shot (early)|1.00`, field 1486, paid 350, breadth 0.2355), which is trust-order-2 and outranks name inference the next time that exact contest and fee recurs without changing any shape mapping. Given that the satellite volume is now an open question rather than something to cut, this input is more likely to matter than it looked: if the satellites are staying, routing them to the right objective is exactly the work that pays.
 
-### R135. Start the predict-then-grade ownership shadow loop with the v0.1 structural prior (P2, S; no engine change) | new 2026-08-16, from the leverage ideation fragment; module verified in tree
-
-- **What:** `mlb_engine/field/ownership_prior.py` (v0.1, untracked, unwired)
-  exists for exactly this — its own header says "start the predict-then-grade
-  loop on slate one instead of waiting" — and carries `grade_against_actuals`
-  (`:219`). Nothing calls either half. Meanwhile R10's bar is "beat flat-12,
-  graded into the ledger," and every slate that passes without a prediction
-  file is a slate that can never grade anything.
-- **Fix:** BUILD emits `outputs/<date>/ownership_pred_<slate>.json` pre-lock
-  from the salary file, odds packet and posted orders (review-only, no engine
-  import, one skill step); ARCHIVE grades it via `grade_against_actuals` at
-  mine time into the ledger (one skill step on its side). Labels ride the
-  module's own: UNCALIBRATED STRUCTURAL PRIOR, never a probability claim.
-  Done when: a built slate's prediction file exists before lock and its
-  graded per-feature errors appear in the ledger beside the flat-12 baseline.
-- **Why Tier 2 beside R118:** cheapest evidence-per-session item on the
-  board, and it starts the clock on R10's graded record now, so by the time
-  the satellite prior is fit there is a record of which structural signals
-  miss and how badly. Feeds R136's chalk-sum column and R141's post-lock
-  recompute; jumps nothing (the spine order R118 → R48+R83 → R10 stands).
-- **Audit fields.** Moves: evidence. Acceptance: prediction file per built
-  slate; graded per-feature MAE/Spearman in the ledger at mine time.
-  Falsifier: none — recording only. FOSS: existing. Owner: none. Rollback:
-  two skill steps removed. Untracked-module note: first wiring carries the
-  R107(a) discipline — VERSION, audit pin, tracking, changelog — in the same
-  commit.
-
 ### R136. qa_portfolio leverage panel: the field-facing third axis beside apex and washout (P2, S) | new 2026-08-16, from the leverage ideation fragment
 
 - **What:** qa_portfolio (R134) reports the dual-objective frontier — apex
@@ -1503,6 +1533,21 @@ a restated priority.
 - **Sequencing:** head of Tier 1's QA batch now that R126 has closed. Uses
   R135's prior file when present and degrades to ABSENT-with-a-note, never to
   a silent zero (the R127 lesson, filed the same session).
+- **R135 LANDED 2026-08-17, so this item's blocker is gone and its inputs are
+  now specified rather than assumed.** The prior file is
+  `outputs/<date>/ownership_pred_<tag>.json`, schema `ownership_pred/v1`, and it
+  carries all six archetypes plus a per-player `features` block (batting order,
+  implied total, probable-SP flag, Base) and a `name_norm -> Player_ID`
+  crosswalk. Read the archetype matching the contest whose portfolio is being
+  reviewed, never the file's first key: ownership is conditioned on archetype
+  and pooling is a house-rule violation, not a rounding choice. The chalk-sum
+  and sub-10%-carry columns come off `own_pct_by_player_id` for that archetype;
+  the ABSENT-with-a-note path is still needed, because the file only exists for
+  slates where BUILD ran the step. One thing to reuse rather than rebuild: the
+  emitter's four-input `applied`/`INERT` block already says which features were
+  live, and a chalk-sum computed off a prediction whose implied-total tilt was
+  inert is a salary-and-order number wearing a market label. Surface that state
+  beside the column.
 - **Corrected 2026-08-17 (DEV), landing R126: "one session takes both" is
   withdrawn.** The claim rested on the two sharing a report surface and they do
   not. R126 landed in the PIPELINE and the BRIEF, because that is the only
@@ -1513,7 +1558,9 @@ a restated priority.
   with it, so these columns extend a block that now exists rather than one that
   had to be invented alongside them. Two of the four columns (chalk-sum,
   sub-10% carry) are ABSENT on every build until R135 lands, so R135 is worth
-  taking first or in the same session even though it sits in Tier 2.
+  taking first or in the same session even though it sits in Tier 2. (**R135
+  landed later the same day, out of Tier 2 on exactly this instruction; see the
+  LANDED bullet above for what the prior file actually contains.**)
 - **Also gained from R126's landing:** `tools/qa_portfolio.py` had ZERO tests
   before 2026-08-17 and now has five, all on the block-reading half. Anything
   this item adds to that file is adding to a surface whose sections 1 and 2 are
@@ -1848,11 +1895,25 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
 
 - **What:** (a) `run_late_swap(contest_shapes=None)` scores every entry's candidates on the pure-ceiling `large_wta` profile (`late_swap_manager.py:311`) — tools/late_swap.py documents and works around it; the engine API neither warns nor records the substitution. (b) operator-supplied posture strings are never validated (`execution_pipeline.py:874`): an unknown token silently builds as `large_gpp` while `posture_source="operator_supplied"` suppresses the unresolved-contest blockers (reproduced with `{"123": "wta"}` — a token `normalize_posture` itself accepts). (c) `run_late_swap` accepts a naive `as_of` and reinterprets it as UTC (`late_swap_manager.py:73`): an ET wall-clock reads 4-5h early and every lock-derived gate shares the same wrong map (PLAUSIBLE as a live event — the shipped tool passes aware UTC; the API is the exposed leg).
 - **Fix:** default swap shapes from the parent run's recorded postures or refuse when unmapped; validate posture strings against `STRATEGY_DEFAULTS` (mirror `validate_shape`'s discipline); raise or warn on naive datetimes at the swap boundary.
+- **This item is a STANDING RED in the skill evals, recorded 2026-08-17 so the
+  next session does not re-derive it.** `skills/generate-lineups/evals/run_evals.py`
+  eval 5 (`adversarial-multi-ticket-satellite`) fails with `forbidden claim
+  present: /large_wta/`, and it fails identically on a pristine checkout — a DEV
+  session that changes anything else and then runs the evals will see one FAIL
+  and has to prove it is not theirs. It was verified pristine on 2026-08-17 while
+  landing R135. Closing (a) closes the eval; until then, eval 5 red is the
+  expected state and 7 of 8 passing is a clean run.
 
 ### R68. late_swap operator rails: downgrade guard inert on "Name (ID)" cells; hostile flag and feed parsing at T-minutes (P2, S) | audit 2026-08-04, verified in tree
 
 - **What:** (a) `_load_entry_rosters` (`tools/late_swap.py:229`) never normalizes roster cells, unlike every other reader on the path: a DK-redownloaded or hand-edited parent file ("Jose Ramirez (12345678)") makes `_score_roster` return None for every entry, every changed entry prints "not comparable", and the net-downgrade refusal silently never triggers — a strictly worse swap ships without `--accept-downgrade`. (b) `--entry-ids 4711612345,` (trailing comma) raises a raw ValueError traceback (`:508`). (c) the `--lineups` feed is `json.loads`-ed unguarded (`:451`; same at `build_slate.py:2209` and `solver_probe.py:85`) — a truncated file prints a JSONDecodeError instead of the mapped-blocker style the odds files get.
 - **Fix:** normalize cells with `normalize_player_id`; filter empty tokens; wrap the three parses in the "unreadable feed: <exc>" pattern.
+- **The name-fold half of (a) is no longer hypothetical (R151, 2026-08-17).** The
+  same family — a reader on the intake path comparing raw strings while the rest
+  of the intake normalizes — cost ten hitters their MLBAM id and bat side on a
+  real slate through `merge_dk_starting_into_feed`, and produced seven false
+  disagreement reports on top. This entry's "Jose Ramirez (12345678)" example is
+  that defect one function over. Take the two together if either is taken.
 
 ### R141. Late-swap leverage pass: post-lock, report-only (P2, S) | new 2026-08-16, from the leverage ideation fragment
 
@@ -1866,7 +1927,9 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
   `run_late_swap` rails unchanged; locked games stay closed (build contract
   item 5).
 - **Sequencing:** behind R135 — it recomputes R135's prior, and without one
-  it has nothing to recompute. Tier 5, opportunistic.
+  it has nothing to recompute. **R135 CLOSED 2026-08-17**, so this is unblocked:
+  the file is `outputs/<date>/ownership_pred_<tag>.json` and the recompute is
+  `predict_ownership` again on the post-lock state. Tier 5, opportunistic.
 - **Audit fields.** Moves: leverage (swap window). Acceptance: fixture
   post-lock state → tier list plus alternatives, zero engine mutation.
   Falsifier: none — reporting. FOSS: existing. Owner: none. Rollback: flag

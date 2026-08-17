@@ -488,20 +488,37 @@ def merge_dk_starting_into_feed(
                 continue
             covered.add(team)
             side = dict(game.get(key) or {})
-            existing = {str(h.get("name") or "").strip().lower(): h
+            # R151. Both the disagreement read and the carry-forward lookup key
+            # on the SAME normalized name the rest of the intake uses. They used
+            # to key on `.strip().lower()`, which folds case and nothing else, so
+            # a feed's "Jose Ramirez" (MLB Stats API ships diacritics) never
+            # matched DK's plain-ASCII "Jose Ramirez" spelling. Two costs, and
+            # the second is the expensive one: every accented name on a posted
+            # side reported as a DISAGREEMENT (7 of 15 sides on the 2026-08-16
+            # 1335_8g slate, all 7 false), and `prior` came back empty, so the
+            # merged row silently dropped the feed's MLBAM `id` and `bat_side` --
+            # R117's defect exactly, both F4 terms dead for that hitter. Ten
+            # hitters lost both on that one slate, and `f4_handedness_unavailable`
+            # stayed empty because it only fires when a side loses ALL nine.
+            existing = {normalize_name(h.get("name")): h
                         for h in (side.get("lineup") or [])}
             if existing:
                 report["upgraded"].append(team)
-                dk_names = {h["name"].strip().lower() for h in order}
-                only_feed = sorted(set(existing) - dk_names)
-                only_dk = sorted(dk_names - set(existing))
+                dk_by_norm = {normalize_name(h["name"]): h["name"] for h in order}
+                # Compared on the normalized key, REPORTED as each source spelled
+                # it: an operator reading this list is checking a roster move, so
+                # the useful string is the one the source printed.
+                only_feed = sorted(str(existing[n].get("name") or n)
+                                   for n in set(existing) - set(dk_by_norm))
+                only_dk = sorted(dk_by_norm[n]
+                                 for n in set(dk_by_norm) - set(existing))
                 if only_feed or only_dk:
                     report["disagreements"].append({
                         "team": team, "resolved_to": "dk_salary_starting",
                         "in_feed_not_dk": only_feed, "in_dk_not_feed": only_dk})
             merged = []
             for hitter in order:
-                prior = existing.get(hitter["name"].strip().lower(), {})
+                prior = existing.get(normalize_name(hitter["name"]), {})
                 row = {"order": hitter["order"], "name": hitter["name"],
                        "dk_id": hitter["dk_id"]}
                 # Everything DK does not ship, kept from whatever did.

@@ -178,6 +178,33 @@ Per contest:
    ledger in place or under the slate's `A-NNN` entry, then delete the
    consumed fragment file. Fragments are create-only for every other
    role; ARCHIVE is the only merger.
+9. **Grade the ownership prediction, if BUILD emitted one (R135).** The other
+   half of the predict-then-grade loop. Skip it only when
+   `outputs/<slate_date>/ownership_pred_*.json` does not exist, and say so, so
+   the gap is a recorded absence rather than an unexamined one.
+
+   ```bash
+   python tools/ownership_pred.py grade \
+       --pred outputs/<slate_date>/ownership_pred_<tag>.json \
+       --standings data/archive/<slate_date>/standings_<contest_id>.csv \
+       --archetype <the archetype THIS contest was> \
+       --contest-id <contest_id> --field-size <n>
+   ```
+
+   `--archetype` is the contest's own archetype, from the contest JSON at step
+   2, never the prediction's default. Ownership is conditioned on archetype and
+   field size and never pooled across them (CLAUDE.md), so one contest grades
+   against one archetype and a mismatch is a pooling error wearing a number.
+   The prediction file carries all six, so grading four contests off one slate
+   means four runs of this command.
+
+   It prints a ledger block. File it the same way step 6 files the miner's: into
+   the slate's `A-NNN` entry, beside the mined block, newest first. Two numbers
+   in it are the point of the exercise — the per-feature buckets (which
+   structural signal missed, and by how much) and the two baselines, flat-12
+   (R10's named bar, and a nearly-free one) and flat-budget (the null worth
+   arguing with). One contest never moves a prior; the record is what
+   accumulates.
 
 After all contests on the slate: return the updated ledger, the updated
 registry, and the mined JSON files to the claude.ai project session.

@@ -13656,10 +13656,45 @@ class DkBattingOrderPrecedenceTests(unittest.TestCase):
         self.assertEqual(1, len(report["disagreements"]))
         d = report["disagreements"][0]
         self.assertEqual("dk_salary_starting", d["resolved_to"])
-        self.assertEqual(["zz_scratched"], d["in_feed_not_dk"])
-        self.assertEqual(["h1"], d["in_dk_not_feed"])
+        # R151: compared on the normalized key, reported as each source spelled
+        # it. This used to read "zz_scratched" -- the raw name lowercased, which
+        # was also the comparison key, which is why an accent broke the match.
+        self.assertEqual(["ZZ_Scratched"], d["in_feed_not_dk"])
+        self.assertEqual([self.NINE[0]], d["in_dk_not_feed"])
         names = [h["name"] for h in feed["games"][0]["away"]["lineup"]]
         self.assertEqual(self.NINE, names, "DK's order is what survives")
+
+    def test_an_accented_feed_name_matches_dks_plain_ascii_spelling(self):
+        """R151, measured on the 2026-08-16 1335_8g slate. The MLB Stats API
+        ships diacritics and DK's salary file does not, and this merge compared
+        `.strip().lower()`, which folds case and nothing else. Two costs: 7 of 15
+        posted sides reported a DISAGREEMENT and all 7 were false, and the
+        carry-forward lookup missed, so ten hitters silently lost the feed's
+        MLBAM `id` and `bat_side` -- both F4 terms dead, R117's defect on a new
+        surface. `f4_handedness_unavailable` could not see it because it only
+        fires when a side loses all nine."""
+        lda = self._adapters()
+        accented = ["José Ramírez", "Ronald Acuña Jr.", "Andrés Giménez",
+                    "Luis García Jr.", "Eugenio Suárez"] + self.NINE[5:]
+        plain = ["Jose Ramirez", "Ronald Acuna Jr.", "Andres Gimenez",
+                 "Luis Garcia Jr.", "Eugenio Suarez"] + self.NINE[5:]
+        players = self._players({"CLE": plain})
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "CLE", "lineup_status": "confirmed",
+                     "lineup": [{"order": i, "name": n, "bat_side": "S",
+                                 "id": 600000 + i}
+                                for i, n in enumerate(accented, start=1)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, players)
+        self.assertEqual([], report["disagreements"],
+                         "same nine men, five of them spelled with accents")
+        lineup = feed["games"][0]["away"]["lineup"]
+        self.assertEqual(9, len(lineup))
+        self.assertTrue(all(h.get("bat_side") == "S" for h in lineup),
+                        "the feed's handedness survives the accent fold")
+        self.assertTrue(all(h.get("id") for h in lineup),
+                        "so does the MLBAM id the Savant join needs")
 
     def test_the_merge_keeps_handedness_the_feed_had(self):
         """DK ships no bat_side and F4 platoon needs it. Where a feed covers
@@ -13915,6 +13950,440 @@ class SkillCacheDriftTests(unittest.TestCase):
         self.assertIn("warnings.append(", tail)
         self.assertNotIn("errors.append(", tail)
         self.assertIn('checks["skill_cache"] = drift', tail)
+
+
+class OwnershipPriorShadowLoopTests(unittest.TestCase):
+    """R135. The predict-then-grade loop, wired: emit before lock, grade at mine
+    time, and never a probability claim at either end.
+
+    The item's own Why is that every slate passing without a prediction file is a
+    slate that can never grade anything, so the acceptance is mechanical: the
+    file exists before lock and its graded per-feature errors reach the ledger
+    beside the flat-12 baseline. What the wiring had to establish, and what these
+    pin, is that the join actually lands -- `grade_against_actuals` keys on DK
+    Player_ID and a DK standings export has no such column, so without the salary
+    file's own name crosswalk recorded at emit time the grade returns zero
+    joined players and the acceptance fails while reporting a clean run.
+    """
+
+    HITTERS = [f"H{i}" for i in range(1, 10)]
+
+    @staticmethod
+    def _tool():
+        from tools import ownership_pred
+        return ownership_pred
+
+    def _salary_csv(self, directory, teams=("NYY", "BOS"), starting=True,
+                    extra_rows=()):
+        """A minimal two-team DK Classic salary file, optionally with orders."""
+        path = Path(directory) / "DKSalaries.csv"
+        header = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+                  "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                  "Status", "Starting"]
+        rows, pid = [], 5000
+        info = f"{teams[0]}@{teams[1]} 08/16/2026 07:05PM ET"
+        for team in teams:
+            for slot, name in enumerate(self.HITTERS, start=1):
+                full = f"{name} {team}"
+                rows.append(["OF", f"{full} ({pid})", full, str(pid), "OF",
+                             str(3000 + 100 * slot), info, team, "8.5", "",
+                             str(slot) if starting else ""])
+                pid += 1
+            arm = f"SP {team}"
+            rows.append(["SP", f"{arm} ({pid})", arm, str(pid), "P", "9000",
+                         info, team, "18.2", "", "SP" if starting else ""])
+            pid += 1
+        rows.extend(extra_rows)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            writer.writerows(rows)
+        return path
+
+    def _odds(self, directory, total=9.0):
+        """One slate game priced, and one game that is NOT on this slate.
+
+        The off-slate event is the whole point: an odds pull covers the day, so
+        a fixture with only slate games cannot tell a restricted map from an
+        unrestricted one.
+        """
+        path = Path(directory) / "odds.json"
+
+        def event(away, home, when):
+            return {"home_team": home, "away_team": away, "commence_time": when,
+                    "bookmakers": [{"key": "draftkings", "markets": [
+                        {"key": "totals", "outcomes": [
+                            {"name": "Over", "point": total},
+                            {"name": "Under", "point": total}]}]}]}
+
+        path.write_text(json.dumps([
+            event("New York Yankees", "Boston Red Sox", "2026-08-16T23:05:00Z"),
+            event("Los Angeles Dodgers", "San Francisco Giants",
+                  "2026-08-17T02:10:00Z"),
+        ]), encoding="utf-8")
+        return path
+
+    def _standings_csv(self, directory, shares):
+        """A DK standings export whose right-hand block carries %Drafted.
+
+        ``shares`` maps a name to a LIST of (roster position, pct) rows, because
+        DK's grain is per (player, roster position): the multi-slot case is the
+        one the aggregation exists for and a one-row-per-player fixture cannot
+        tell summing from taking a maximum.
+        """
+        path = Path(directory) / "contest-standings-1.csv"
+        header = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points",
+                  "Lineup", "", "Player", "Roster Position", "%Drafted", "FPTS"]
+        rows, first = [], True
+        for name in sorted(shares):
+            for slot, pct in shares[name]:
+                left = (["1", "9001", "someone (1/1)", "0", "100.0",
+                         "OF A OF B OF C P D P E"] if first
+                        else ["", "", "", "", "", ""])
+                first = False
+                rows.append(left + ["", name, slot, f"{pct}%", "12.5"])
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            writer.writerows(rows)
+        return path
+
+    # -- emit ---------------------------------------------------------------
+
+    def test_the_prediction_carries_the_crosswalk_the_grade_joins_through(self):
+        """The design's load-bearing claim, and the reason the file records names
+        at all. Delete the crosswalk and the grade joins nobody, which is the
+        acceptance criterion failing while every number still prints."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary_csv(tmp)
+            pred = tool.build_prediction(salary, archetypes=["cash"])
+            actual = {"h1 nyy": 40.0, "h2 nyy": 25.0, "sp nyy": 55.0}
+            graded = tool.grade_prediction(pred, actual, "cash")
+            self.assertEqual(3, graded["join"]["joined_players"])
+            stripped = dict(pred)
+            stripped["crosswalk"] = {"name_norm_to_player_id": {}}
+            blind = tool.grade_prediction(stripped, actual, "cash")
+            self.assertEqual(0, blind["join"]["joined_players"])
+            self.assertEqual(3, len(blind["join"]["unmatched_actual_names"]))
+
+    def test_an_absent_odds_file_is_named_inert_and_never_a_silent_zero(self):
+        """R127's boundary, the file direction: one fact about the build, a
+        reason, and no per-player list. The prior falls back to a league mean, so
+        a reader who is not told will read a flat tilt as a flat market."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["cash"])
+            block = pred["inputs"]["implied_totals"]
+            self.assertFalse(block["applied"])
+            self.assertIn("INERT", block["reason"])
+            self.assertIn("never fetches", block["reason"])
+            self.assertNotIn("slate_teams_without_a_total", block)
+
+    def test_a_slate_team_with_no_posted_total_is_named_per_team(self):
+        """The other direction of the same boundary: a missing PLAYER, or here a
+        missing team, is one fact per name and is listed."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary_csv(tmp, teams=("NYY", "BOS"))
+            # A third team on the slate that the odds payload never prices.
+            extra = [["OF", f"X{i} (7{i:03d})", f"X{i}", f"7{i:03d}", "OF",
+                      "3200", "CLE@DET 08/16/2026 07:05PM ET", "CLE", "7.1",
+                      "", str(i)] for i in range(1, 10)]
+            salary = self._salary_csv(tmp, teams=("NYY", "BOS"),
+                                      extra_rows=extra)
+            pred = tool.build_prediction(salary, odds_path=self._odds(tmp),
+                                         archetypes=["cash"])
+            block = pred["inputs"]["implied_totals"]
+            self.assertTrue(block["applied"])
+            self.assertEqual("2 of 3", block["slate_teams_priced"])
+            self.assertEqual(["CLE"], block["slate_teams_without_a_total"])
+            self.assertIn("LEAGUE_MEAN_IMPLIED", block["partial_note"])
+            self.assertEqual(2, block["teams"],
+                             "the fixture prices LAD@SF too, which is not on "
+                             "this slate; an unrestricted map would carry four")
+
+    def test_side_counts_are_intersected_with_the_salary_files_teams(self):
+        """A lineups feed is a whole-day pull and a slate is a draftgroup. An
+        unintersected count reports coverage the build does not have, which is
+        the same class as the odds count above."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary_csv(tmp, starting=False)
+            feed = Path(tmp) / "lineups_feed.json"
+            feed.write_text(json.dumps({"games": [{
+                "game_date_utc": "2026-08-16T23:05:00+00:00",
+                "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                         "lineup": [{"order": i, "name": f"H{i}_NYY"}
+                                    for i in range(1, 10)]},
+                "home": {"team_abbrev": "BOS", "lineup_status": "unknown",
+                         "lineup": []}}, {
+                "game_date_utc": "2026-08-16T23:05:00+00:00",
+                "away": {"team_abbrev": "COL", "lineup_status": "confirmed",
+                         "lineup": [{"order": i, "name": f"C{i}"}
+                                    for i in range(1, 10)]},
+                "home": {"team_abbrev": "SF", "lineup_status": "unknown",
+                         "lineup": []}}]}), encoding="utf-8")
+            pred = tool.build_prediction(salary, feed_path=feed,
+                                         archetypes=["cash"])
+            block = pred["inputs"]["batting_order"]
+            self.assertEqual(["NYY"], block["sides_from_feed"])
+            self.assertEqual(2, block["slate_teams"])
+            self.assertEqual(["BOS"], block["sides_with_no_posted_order"])
+
+    def test_dk_posted_sides_are_attributed_to_dk_not_the_feed(self):
+        """R143's ranking is per side and the report has to say which source
+        supplied which, or the operator cannot tell a fetch was unnecessary."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["cash"])
+            block = pred["inputs"]["batting_order"]
+            self.assertEqual(["BOS", "NYY"], block["sides_from_dk"])
+            self.assertEqual([], block["sides_from_feed"])
+            self.assertEqual(18, block["slots"])
+            self.assertIn("R143", block["source_ranking"])
+
+    def test_an_ambiguous_normalized_name_is_named_and_leaves_the_join(self):
+        """R75's class. A standings export cannot tell two same-named players
+        apart, so resolving to one id would attribute one man's ownership to the
+        other. Both leave the join and both are reported."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            twin = [["OF", "H1 NYY (9999)", "H1 NYY", "9999", "OF", "3100",
+                     "NYY@BOS 08/16/2026 07:05PM ET", "NYY", "6.0", "", ""]]
+            salary = self._salary_csv(tmp, extra_rows=twin)
+            pred = tool.build_prediction(salary, archetypes=["cash"])
+            ambiguous = pred["crosswalk"]["ambiguous_names"]
+            self.assertEqual(["h1 nyy"], [a["name_norm"] for a in ambiguous])
+            self.assertNotIn("h1 nyy", pred["crosswalk"]["name_norm_to_player_id"])
+            graded = tool.grade_prediction(pred, {"h1 nyy": 40.0, "h2 nyy": 10.0},
+                                          "cash")
+            self.assertEqual(["h1 nyy"], graded["join"]["ambiguous_actual_names"])
+            self.assertEqual(1, graded["join"]["joined_players"])
+
+    def test_the_roster_budget_accounting_is_reported_per_archetype(self):
+        """8 hitter slots and 2 P slots, so the field's shares sum to 800 and
+        200. A sum off its budget means a player left the pool between the
+        softmax and the file, and the check is what makes that visible."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp))
+            self.assertEqual(6, len(pred["archetypes"]))
+            for archetype, block in pred["archetypes"].items():
+                check = block["budget_check"]
+                self.assertAlmostEqual(800.0, check["hitter_pct_sum"], delta=1.0,
+                                       msg=archetype)
+                self.assertAlmostEqual(200.0, check["pitcher_pct_sum"], delta=1.0,
+                                       msg=archetype)
+
+    def test_the_emitted_payload_is_deterministic_apart_from_the_stamp(self):
+        """Determinism is a house rule and a prediction that shifts between two
+        runs of one salary file cannot be graded against anything."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary_csv(tmp)
+            first = tool.build_prediction(salary)
+            second = tool.build_prediction(salary)
+            for payload in (first, second):
+                payload.pop("generated_utc")
+            self.assertEqual(json.dumps(first, sort_keys=True),
+                             json.dumps(second, sort_keys=True))
+
+    # -- grade --------------------------------------------------------------
+
+    def test_the_grade_reports_per_feature_buckets_not_one_number(self):
+        """R135's Why: the point is knowing WHICH structural signal misses. One
+        MAE over the slate cannot say, and a player sits in several buckets at
+        once on purpose."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["large_field_gpp"])
+            actual = {"h1 nyy": 45.0, "h9 nyy": 4.0, "sp nyy": 60.0,
+                      "sp bos": 3.0}
+            graded = tool.grade_prediction(pred, actual, "large_field_gpp")
+            buckets = graded["per_feature"]
+            self.assertIn("pool=hitter", buckets)
+            self.assertIn("pool=pitcher", buckets)
+            self.assertIn("order=1-3", buckets)
+            self.assertIn("order=7-9", buckets)
+            self.assertTrue(any(k.startswith("salary_q") for k in buckets))
+            self.assertGreater(buckets["pool=pitcher"]["mae_pct_points"],
+                               buckets["pool=hitter"]["mae_pct_points"],
+                               "the arms are where this prior misses; the "
+                               "buckets exist to say so")
+
+    def test_both_baselines_are_reported_and_flat_12_is_labeled_the_easy_one(self):
+        """R10's bar names flat-12, a constant 12% that spends 2160% of a 1000%
+        budget on a full slate. Reporting only that number would present a
+        nearly-free win as the gate cleared, which is the false-signal class."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["cash"])
+            graded = tool.grade_prediction(pred, {"h1 nyy": 40.0, "h5 nyy": 12.0,
+                                                  "sp nyy": 30.0}, "cash")
+            self.assertIn("flat_12", graded["baselines"])
+            self.assertIn("flat_budget", graded["baselines"])
+            self.assertIsNotNone(graded["verdict"]["beats_flat_12"])
+            self.assertIsNotNone(graded["verdict"]["beats_flat_budget"])
+            self.assertIn("nearly free", graded["verdict"]["note"])
+            self.assertIn("ONE contest never moves a prior",
+                          graded["verdict"]["note"])
+
+    def test_an_unmatched_actual_name_is_listed_rather_than_counted(self):
+        """A standings export from the wrong slate produces a near-total
+        unmatched list, which is a different fact from a prior that missed. A
+        count alone reads the same either way."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["cash"])
+            graded = tool.grade_prediction(
+                pred, {"nobody at all": 30.0, "someone else": 20.0}, "cash")
+            self.assertEqual(0, graded["join"]["joined_players"])
+            self.assertEqual(["nobody at all", "someone else"],
+                             graded["join"]["unmatched_actual_names"])
+
+    def test_the_grade_refuses_an_archetype_the_prediction_does_not_carry(self):
+        """Grading a satellite against a cash prediction would pool across
+        archetypes, which CLAUDE.md forbids outright."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["cash"])
+            with self.assertRaises(ValueError) as caught:
+                tool.grade_prediction(pred, {"h1 nyy": 10.0}, "wta_satellite")
+            self.assertIn("wta_satellite", str(caught.exception))
+
+    def test_actuals_come_from_the_one_aggregation_mine_contest_uses(self):
+        """DK's right-hand table is grained per (player, roster position) and the
+        rows SUM. Two functions summing one table is how two surfaces end up
+        disagreeing about one contest's chalk, so the rule lives in field_miner
+        and both callers read it."""
+        from mlb_engine.field import field_miner
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            standings = self._standings_csv(
+                tmp, {"Ryan O'Hearn": [("1B", 18.0), ("OF", 12.0)],
+                      "Adley Rutschman": [("C", 12.5)]})
+            actual, meta = tool.actuals_from_standings(standings)
+            parsed = field_miner.parse_standings_export(str(standings))
+            self.assertEqual(field_miner.own_by_player_norm(parsed["player_table"]),
+                             actual)
+            self.assertEqual(30.0, actual["ryan ohearn"],
+                             "1B in some entries and OF in others; the rows SUM "
+                             "to his field share and neither row is it")
+            self.assertEqual(2, meta["players_with_a_share"])
+            source = (REPO / "tools" / "ownership_pred.py").read_text(
+                encoding="utf-8")
+            self.assertIn("own_by_player_norm", source)
+
+    def test_the_default_path_dates_the_slate_off_game_info_not_the_clock(self):
+        """A tool run at 00:30 UTC on a 19:10 ET slate is on the next calendar
+        day, so a default that reads the clock writes the prediction into
+        tomorrow's outputs directory where the grader will not look for it."""
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary_csv(tmp)
+            self.assertEqual("2026-08-16", tool.slate_date_from_salary(salary))
+            pred = tool.build_prediction(salary, archetypes=["cash"])
+            self.assertEqual("2026-08-16", pred["slate_date"])
+
+    def test_the_crosswalk_uses_the_miners_normalizer_not_the_intakes(self):
+        """The repo has two normalizers and they disagree on an apostrophe:
+        field_miner folds "Ryan O'Hearn" to `ryan ohearn`, slate_intake_manager
+        to `ryan o hearn`. The actuals side is field_miner's `player_norm`, so
+        the crosswalk has to be keyed the miner's way or every apostrophe name on
+        the slate silently leaves the join."""
+        from mlb_engine.field.field_miner import normalize_name as miner_norm
+        from mlb_engine.intake.slate_intake_manager import (
+            normalize_name as intake_norm,
+        )
+        self.assertNotEqual(miner_norm("Ryan O'Hearn"), intake_norm("Ryan O'Hearn"),
+                            "if these ever agree this guard is obsolete, not the "
+                            "reasoning behind it")
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            row = [["1B", "Ryan O'Hearn (8888)", "Ryan O'Hearn", "8888", "1B",
+                    "4200", "NYY@BOS 08/16/2026 07:05PM ET", "NYY", "9.9", "", ""]]
+            pred = tool.build_prediction(self._salary_csv(tmp, extra_rows=row),
+                                         archetypes=["cash"])
+            crosswalk = pred["crosswalk"]["name_norm_to_player_id"]
+            self.assertIn(miner_norm("Ryan O'Hearn"), crosswalk)
+            self.assertNotIn(intake_norm("Ryan O'Hearn"), crosswalk)
+            graded = tool.grade_prediction(pred, {miner_norm("Ryan O'Hearn"): 22.0},
+                                          "cash")
+            self.assertEqual(1, graded["join"]["joined_players"])
+
+    def test_a_row_with_no_drafted_cell_creates_no_key(self):
+        """Absent is not zero. A player the export lists without a share must not
+        arrive at the grade as a 0% actual, which would score the prior against
+        a number DK never published."""
+        from mlb_engine.field.field_miner import own_by_player_norm
+        table = [{"player_norm": "a", "pct_drafted": 10.0},
+                 {"player_norm": "a", "pct_drafted": 5.5},
+                 {"player_norm": "b", "pct_drafted": None}]
+        self.assertEqual({"a": 15.5}, own_by_player_norm(table))
+
+    # -- labels -------------------------------------------------------------
+
+    def test_no_banned_label_reaches_the_payload_or_the_ledger_block(self):
+        """CLAUDE.md's non-negotiable. The sweep runs over the emitted JSON and
+        the block ARCHIVE files, not over the source, because the source has to
+        be able to say the words in order to forbid them."""
+        tool = self._tool()
+        banned = ("roi", "win rate", "cash rate", "profitab", "upload-ready",
+                  "expected value", "+ev")
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = tool.build_prediction(self._salary_csv(tmp),
+                                         archetypes=["cash"])
+            graded = tool.grade_prediction(pred, {"h1 nyy": 40.0, "h2 nyy": 20.0,
+                                                  "sp nyy": 30.0}, "cash")
+            block = tool.ledger_block(graded)
+        payload = json.dumps(pred).lower()
+        for word in banned:
+            # The disclaimers name what these numbers are NOT, so the sweep
+            # excludes any line that is doing that naming -- the R126 lesson,
+            # where a naive sweep failed on the block's own disclaimer.
+            for text, where in ((payload, "prediction"),
+                                (json.dumps(graded).lower(), "grade"),
+                                (block.lower(), "ledger block")):
+                hits = [line for line in text.split("\\n") if word in line]
+                claims = [h for h in hits
+                          if "never" not in h and "not a" not in h
+                          and "neither" not in h]
+                self.assertEqual([], claims, f"{word!r} claimed in the {where}")
+        self.assertIn("UNCALIBRATED STRUCTURAL PRIOR", pred["label"].upper())
+        self.assertIn("never pool", block.lower())
+
+    def test_the_prior_module_is_tracked_and_pinned_like_a_boundary(self):
+        """R107(a)'s discipline, which R135's entry names as the condition of
+        first wiring: a module the operating docs rely on cannot exist only as
+        local state. VERSION, an audit pin, tracked in git, changelog.
+
+        The tracking half was already true and three documents said otherwise
+        (see the R135 changelog entry): this module has been tracked since the
+        repo's first commit. The assertion stays anyway, because what the pin
+        makes dangerous is the COMBINATION -- an audited version string on a file
+        a fresh clone does not get is a gate that passes on one machine and
+        fails on another.
+        """
+        from tools import audit
+        from mlb_engine.field import ownership_prior
+        rel = "mlb_engine/field/ownership_prior.py"
+        self.assertIn(rel, audit.EXPECTED_VERSION_TEXT)
+        self.assertIn(ownership_prior.VERSION, audit.EXPECTED_VERSION_TEXT[rel])
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", rel], cwd=REPO,
+            capture_output=True, text=True)
+        if tracked.returncode != 0 and not (REPO / ".git").exists():
+            self.skipTest("no git checkout here; tracking is not decidable")
+        self.assertEqual(0, tracked.returncode,
+                         f"{rel} is pinned by the audit but untracked, which is "
+                         f"the R107(a) shape exactly")
 
 
 if __name__ == "__main__":

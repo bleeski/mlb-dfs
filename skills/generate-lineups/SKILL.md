@@ -208,6 +208,40 @@ before lock, run them first and pass the results in:
   and moneylines itself if `THE_ODDS_API_KEY` is set, and leaves F1 at 1.0 for
   everyone if it is not.
 
+### One extra step before lock: emit the ownership prediction (R135)
+
+Two seconds, no network, no quota, and it cannot touch the build. It writes the
+field-ownership prior for this slate so the archived standings can grade it after
+the fact. Run it once you have the salary file and whatever feed and odds you are
+going to use, BEFORE lock:
+
+```bash
+python tools/ownership_pred.py emit --salary <DKSalaries.csv> \
+    --feed <lineups_feed.json> --odds <odds.json> --slate <tag>
+# -> outputs/<date>/ownership_pred_<tag>.json
+```
+
+Why it is not optional even though nothing reads it today: a slate that passes
+without a prediction file can never be graded, so skipping it does not defer the
+cost, it destroys the evidence. R10's bar is a fitted ownership prior that beats
+flat-12 in the satellite cell, graded into the ledger, and this is what starts
+that record accumulating now instead of on the day the fit begins.
+
+It reads the same inputs the build does and reports each one as applied or INERT.
+Read that block: `implied_totals INERT` means every hitter fell back to a league
+mean, and a prediction with three of four features inert is worth grading but not
+worth reasoning from. It never fetches to fill a gap, deliberately, so the
+prediction costs no API credit and no clock.
+
+The fourth feature, the value tilt, needs a Base projection and the build is what
+produces one. If you have already built and there is still time before lock, add
+`--base runs/<run_id>/final/projections.csv` and re-emit; that file has the
+`Player_ID` and `Base` columns this reads. Without it the tilt is inert and the
+prediction is salary, order, implied total and probable-SP only.
+
+Nothing here reaches the optimizer, projections, or `Ownership_Tier`. It is an
+UNCALIBRATED STRUCTURAL PRIOR and the file says so on every read.
+
 ### Projection enrichment (this is what makes the build more than APPG)
 
 The build applies six deterministic priors: the xwOBA Base correction, xISO
@@ -769,7 +803,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1101 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1120 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of
