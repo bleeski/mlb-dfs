@@ -25,6 +25,41 @@ performance claim.
 
 ---
 
+## 2026-08-16 — SKILL.md's audit pin corrected (928 → 1015) and its pin instruction pointed at the per-suite dict (docs only)
+
+DEV, claim `engine_2026-08-17`, docs only, no code. Ben: review the
+generate-lineups skill and confirm the installed copy is current.
+
+**Two stale facts in `skills/generate-lineups/SKILL.md`, Session hygiene.** The
+expected audit line read `PASS, 26 modules, 928 tests`. `EXPECTED_SUITE_COUNTS`
+in `tools/audit.py` sums to 1015 (657 / 56 / 218 / 9 / 75), so the skill was
+five moves stale: R114+R67 (928 → 942), the false-signal batch (→ 962), R116
+(→ 975), R129+R36 F6m(1) (→ 1000), R128 (→ 1015). CLAUDE.md and the ledger
+Quick Card both already carried 1015, so the skill was the one doc of the three
+its own paragraph names that had not been updated. Corrected to
+`PASS v2.26.0, 26 modules, 1015 tests`.
+
+The same paragraph told a session to bump `EXPECTED_TEST_COUNT`, which R62
+demoted to a derived sum on 2026-08-10; bumping it does nothing, since the
+audit reads the per-suite dict. Rewritten to name `EXPECTED_SUITE_COUNTS` as
+the source of truth and to carry the state-word rule already in CLAUDE.md and
+the Quick Card: only `grew` is a stale pin, and `shortfall`,
+`skipped_in_place` and `absent` are lost coverage. A session reading this file
+alone under deadline could have lowered a pin to clear a shortfall, which is
+how the golden replay's nine tests leave the gate for good.
+
+**Not fixed here, and it is not a repo defect.** The Cowork-installed copy of
+this skill is a snapshot taken 2026-07-24 and is 85 commits behind the repo:
+351 lines shorter, missing the multi-session check, the scipy preflight, the
+autobuild fast path, the qa_portfolio pass, projection enrichment, R32 paste
+intake, the preflight-before-presenting section with its four exit codes, and
+the Showdown thesis ladder, and its frontmatter still calls Showdown
+certified. Its bundled `scripts/build_slate.py` is 522 lines against the
+repo's 2822. Nothing in the repo invokes that copy (SKILL.md calls
+`<repo>/skills/generate-lineups/scripts/build_slate.py` by absolute path), so
+the stale script is inert as long as a session follows the current text. The
+snapshot was refreshed from this file the same session, outside the repo.
+
 ## 2026-08-16 — Fragment-merge and queue re-order: R135–R141 filed from the leverage ideation bundle, R11's double listing resolved, R132 split on the autonomy boundary
 
 DEV, claim `engine_2026-08-16`, docs only, no code. Ben: review the fragment

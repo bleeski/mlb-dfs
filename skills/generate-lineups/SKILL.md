@@ -727,7 +727,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS, 26 modules, 928 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1015 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of
@@ -740,9 +740,15 @@ python skills/generate-lineups/evals/run_evals.py    # --only <id> for one
 
 The audit checks dependencies first and names the install command if something is
 missing, because a missing solver is not a slow build, it is no build. It also
-pins the test count, so adding tests requires bumping `EXPECTED_TEST_COUNT` and
-the three docs that quote the expected line (CLAUDE.md, the ledger Quick Card,
-and this file). A count mismatch is the pin working, not a broken suite.
+pins the test count, PER SUITE since R62: `EXPECTED_SUITE_COUNTS` in
+`tools/audit.py` is the source of truth and `EXPECTED_TEST_COUNT` is only its
+sum, so adding tests means bumping the suite's own entry, not a single total,
+and then the three docs that quote the expected line (CLAUDE.md, the ledger
+Quick Card, and this file). A count mismatch is the pin working, not a broken
+suite, but read the state word the audit prints before touching a pin. Only
+`grew` is a stale pin. `shortfall`, `skipped_in_place` and `absent` are lost
+coverage, they name the precondition to stage, and lowering a pin to meet them
+retires the tests for good.
 
 Skip the test suite under deadline pressure. Inside T-20, go straight to the
 build. The preflight is the one part that is never skipped: it costs about 9
