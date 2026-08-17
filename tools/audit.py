@@ -18,6 +18,7 @@ import re
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -96,7 +97,15 @@ EXPECTED_SUITE_COUNTS = {
     # feed that has it and named absent when none does, probables staying
     # SP/P against PO and PLR, one shared definition of coverage, and the
     # whole point: a fully posted slate building with no feed at all.
-    "tests.test_core": 676,
+    # R145, 2026-08-17: 676 -> 682, the six that pin git freshness -- a clean
+    # clone, unpushed commits named as the push Ben owes, commits the clone
+    # never pulled (the case that makes session start's `git log` a lie), the
+    # default-branch trap including the two ways it is NOT a finding, a
+    # branch with no upstream staying silent rather than reporting 0/0, and
+    # the wiring landing in warnings and never errors. The seventh is the
+    # non-numeric degrade, which VendoredPylibsTests found by patching
+    # subprocess.run out from under it.
+    "tests.test_core": 683,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -327,6 +336,15 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
         errors.append("scipy.optimize.milp unavailable")
     checks["scipy_milp"] = {"passed": scipy_ok}
 
+    # Before the suite, deliberately. Both shell out, and VendoredPylibsTests
+    # asserts on the LAST subprocess.run the audit made -- it is checking that
+    # the suite subprocess inherited the vendored PYTHONPATH. Running git after
+    # the suite made these calls the last ones and broke that test, which is
+    # the test doing its job. Order is the fix; rewriting the older test to
+    # accommodate a newer check would have retired a real assertion.
+    fresh = git_freshness(root)
+    checks["git_freshness"] = fresh
+
     test_result = None
     if run_tests:
         # F19: the suite includes a determinism gate, and a gate that runs under
@@ -355,6 +373,31 @@ def run_audit(root: Path, run_tests: bool = False) -> Dict[str, Any]:
             f"({', '.join(CHANGELOG_TRACKED_PATHS)}; inbox fragments exempt) since "
             f"CHANGELOG.md was last written; a change is not shipped until its "
             f"entry exists. Newest: {debt['commits'][0]}")
+
+    if fresh["available"]:
+        age = fresh["fetch_age_hours"]
+        # Behind is the one that makes session start's `git log` read a lie, so
+        # it leads. Ahead is Ben's push. A long-stale contact is said either
+        # way, because it is what both numbers are worth.
+        if fresh["behind"]:
+            warnings.append(
+                f"{fresh['behind']} commit(s) on {fresh['upstream']} are not in "
+                f"this clone; `git log` at session start is missing them. Pull "
+                f"before trusting it")
+        if fresh["ahead"]:
+            warnings.append(
+                f"{fresh['ahead']} commit(s) on {fresh['branch']} are not on "
+                f"{fresh['upstream']}; sessions commit and Ben pushes, so this "
+                f"is a push Ben owes, and until then no clone can see them")
+        if age is not None and age > 24 and not fresh["behind"]:
+            warnings.append(
+                f"last contact with the remote was {age}h ago, so 'behind: 0' "
+                f"is only as current as that; this clone cannot fetch")
+        if fresh["default_branch_mismatch"]:
+            warnings.append(
+                f"origin/HEAD is {fresh['default_branch_mismatch']} but the "
+                f"work is on {fresh['branch']}; a fresh clone lands on that "
+                f"default and gets its tree")
 
     drift = skill_cache_drift(root)
     checks["skill_cache"] = drift
@@ -728,6 +771,84 @@ def skill_cache_drift(root: Path) -> Dict[str, Any]:
                 reasons.append("body")
         if reasons:
             out["drifted"].append({"skill": name, "reasons": reasons})
+    return out
+
+
+# R145. CLAUDE.md's session start reads `git log` to learn what moved. That
+# read is only as current as the clone, and a stale `git log` looks EXACTLY like
+# a current one: there is no "you are twelve days behind" line in its output.
+# Nothing here can fetch -- this sandbox has no credential for a private repo
+# and `git fetch` dies on "could not read Username" -- so the honest move is not
+# to guarantee freshness but to make the uncertainty visible. Three facts, all
+# readable offline, all warnings.
+def git_freshness(root: Path) -> Dict[str, Any]:
+    """How far the clone is from the last remote state it actually saw.
+
+    ``ahead`` needs a push (Ben's action, per docs/cowork_sync_protocol.md);
+    ``behind`` needs a pull (the session's). ``fetch_age_hours`` is what both
+    numbers are worth: measured against the remote-tracking ref, which moves
+    only on fetch or push, so a long-stale fetch means ``behind: 0`` proves
+    nothing. ``default_branch_mismatch`` catches the trap that a fresh clone
+    lands on ``origin/HEAD`` -- still ``master`` here, stale since 2026-08-04.
+
+    Silent without git, without a remote, or on a branch with no upstream.
+    """
+    out: Dict[str, Any] = {"available": False, "ahead": 0, "behind": 0,
+                           "fetch_age_hours": None, "branch": None,
+                           "default_branch_mismatch": None}
+
+    def _git(*args: str) -> Optional[str]:
+        try:
+            done = subprocess.run(("git", "-C", str(root)) + args,
+                                  capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return done.stdout.strip() if done.returncode == 0 else None
+
+    branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+    if not branch or branch == "HEAD":
+        return out
+    out["branch"] = branch
+    upstream = _git("rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
+    if not upstream:
+        return out
+    ahead = _git("rev-list", "--count", f"{upstream}..{branch}")
+    behind = _git("rev-list", "--count", f"{branch}..{upstream}")
+    # Anything that is not a bare count means this was not git answering --
+    # a patched subprocess.run in a test, a wrapper on PATH, a git that
+    # printed advice. Degrade to silent; an audit that raises on its own
+    # bookkeeping is worse than one that says nothing, and `available: False`
+    # already means "not measured" rather than "clean".
+    if not (ahead or "").strip().isdigit() or not (behind or "").strip().isdigit():
+        return out
+    out.update(available=True, upstream=upstream,
+               ahead=int(ahead.strip()), behind=int(behind.strip()))
+
+    # The remote-tracking ref moves on fetch OR push, and .git/FETCH_HEAD is
+    # touched by fetch alone. Either one is evidence of contact; take the newer.
+    newest = 0.0
+    for rel in ("FETCH_HEAD", f"refs/remotes/{upstream}"):
+        path = root / ".git" / rel
+        try:
+            newest = max(newest, path.stat().st_mtime)
+        except OSError:
+            continue
+    if newest:
+        out["fetch_age_hours"] = round(
+            (datetime.now(timezone.utc).timestamp() - newest) / 3600.0, 1)
+
+    head_ref = _git("rev-parse", "--abbrev-ref", "origin/HEAD")
+    # An origin/HEAD that is not a proper symbolic ref abbreviates to the
+    # literal "origin/HEAD", whose tail is "HEAD" and matches no branch name.
+    # Reporting that as a mismatch would warn on every clone that simply never
+    # had one set, which is noise, not a finding.
+    if head_ref in (None, "", "origin/HEAD", "HEAD"):
+        head_ref = None
+    if head_ref and head_ref.split("/")[-1] != branch:
+        # Not an error: it is legitimate to work off the default branch. It IS
+        # worth saying, because a fresh clone lands on origin/HEAD and gets that
+        # branch's tree, which here is weeks behind the branch the work is on.
+        out["default_branch_mismatch"] = head_ref
     return out
 
 

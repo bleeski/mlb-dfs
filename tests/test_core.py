@@ -12418,6 +12418,162 @@ class PortfolioConcentrationInTheBriefTests(unittest.TestCase):
         self.assertIn('exposure["candidate_reuse_counts"]', brief_source)
 
 
+class GitFreshnessTests(unittest.TestCase):
+    """R145: session start reads `git log`, and a stale log looks current.
+
+    Ben, 2026-08-17: "how can we make sure the git log is up-to-date always?"
+    It cannot be guaranteed from here. This sandbox has no credential for a
+    private repo, `git fetch` dies on "could not read Username", and the
+    remote-tracking ref moves only on fetch or push. So the answer is to make
+    the uncertainty visible instead of silent, which is what these pin.
+
+    Every test builds a throwaway repo pair. Nothing touches the real one.
+    """
+
+    def _audit(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "audit.py"
+        spec = importlib.util.spec_from_file_location("audit_freshness", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _pair(self, tmp):
+        """A bare 'remote' and a clone tracking it, both with one commit."""
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+        remote, work = Path(tmp) / "remote.git", Path(tmp) / "work"
+
+        def git(where, *args):
+            subprocess.run(("git", "-C", str(where)) + args, check=True,
+                           capture_output=True, env=env)
+
+        subprocess.run(("git", "init", "-q", "--bare", "-b", "main",
+                        str(remote)), check=True, capture_output=True)
+        subprocess.run(("git", "init", "-q", "-b", "main", str(work)),
+                       check=True, capture_output=True)
+        (work / "a.txt").write_text("one\n", encoding="utf-8")
+        git(work, "add", "a.txt")
+        git(work, "commit", "-q", "-m", "one")
+        git(work, "remote", "add", "origin", str(remote))
+        git(work, "push", "-q", "-u", "origin", "main")
+        return work, git
+
+    def _commit(self, git, work, text):
+        (work / "a.txt").write_text(text + "\n", encoding="utf-8")
+        git(work, "add", "a.txt")
+        git(work, "commit", "-q", "-m", text)
+
+    def test_a_clean_clone_reports_zero_both_ways(self):
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = self._pair(tmp)
+            out = module.git_freshness(work)
+        self.assertTrue(out["available"])
+        self.assertEqual((0, 0), (out["ahead"], out["behind"]))
+
+    def test_unpushed_commits_are_named_as_a_push_ben_owes(self):
+        """Sessions commit and Ben pushes (docs/cowork_sync_protocol.md). Until
+        he does, no other clone can see the work at all -- which is exactly how
+        14 commits sat invisible from 2026-08-14 to 08-17."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            self._commit(git, work, "two")
+            self._commit(git, work, "three")
+            out = module.git_freshness(work)
+        self.assertEqual(2, out["ahead"])
+        self.assertEqual(0, out["behind"])
+
+    def test_commits_the_clone_has_not_pulled_are_named(self):
+        """This is the one that makes session start's `git log` a lie, so it is
+        the one that has to be detectable."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            other = Path(tmp) / "other"
+            subprocess.run(("git", "clone", "-q", str(Path(tmp) / "remote.git"),
+                            str(other)), check=True, capture_output=True)
+            env = {**os.environ, "GIT_AUTHOR_NAME": "o",
+                   "GIT_AUTHOR_EMAIL": "o@o", "GIT_COMMITTER_NAME": "o",
+                   "GIT_COMMITTER_EMAIL": "o@o"}
+            (other / "a.txt").write_text("from elsewhere\n", encoding="utf-8")
+            for args in (("add", "a.txt"), ("commit", "-q", "-m", "elsewhere"),
+                         ("push", "-q", "origin", "main")):
+                subprocess.run(("git", "-C", str(other)) + args, check=True,
+                               capture_output=True, env=env)
+            git(work, "fetch", "-q", "origin")
+            out = module.git_freshness(work)
+        self.assertEqual(1, out["behind"])
+        self.assertEqual(0, out["ahead"])
+
+    def test_the_default_branch_trap_is_named(self):
+        """A fresh clone lands on origin/HEAD. On the real repo that is still
+        `master`, stale since 2026-08-04, while the work is on `main` -- so a
+        new clone silently gets a tree weeks old."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            self.assertIsNone(module.git_freshness(work)["default_branch_mismatch"],
+                              "a clone with no origin/HEAD set is not a finding")
+            git(work, "symbolic-ref", "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/main")
+            self.assertIsNone(module.git_freshness(work)["default_branch_mismatch"],
+                              "matching default is not a finding")
+            git(work, "branch", "-q", "legacy")
+            git(work, "push", "-q", "origin", "legacy")
+            git(work, "symbolic-ref", "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/legacy")
+            out = module.git_freshness(work)
+        self.assertEqual("origin/legacy", out["default_branch_mismatch"])
+
+    def test_a_branch_with_no_upstream_is_silent_not_clean(self):
+        """No upstream means nothing to measure against. Reporting 0/0 there
+        would be the false clean this whole check exists to avoid."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            git(work, "checkout", "-q", "-b", "detached-work")
+            out = module.git_freshness(work)
+        self.assertFalse(out["available"])
+        self.assertEqual(0, out["behind"])
+
+    def test_a_non_numeric_answer_degrades_to_silent(self):
+        """Found by VendoredPylibsTests, which patches subprocess.run to fake
+        the suite subprocess and so fed this check unittest output. An `int()`
+        on whatever came back raised inside run_audit and took the whole audit
+        down. Anything that is not a bare count means git was not the one
+        answering, and the honest result is `available: False`, not a crash and
+        not a clean 0/0."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = self._pair(tmp)
+            real = subprocess.run
+
+            def fake(cmd, *a, **kw):
+                if isinstance(cmd, (list, tuple)) and "rev-list" in cmd:
+                    return types.SimpleNamespace(
+                        returncode=0, stdout="Ran 0 tests in 0.0s\n\nOK", stderr="")
+                return real(cmd, *a, **kw)
+
+            with unittest.mock.patch.object(module.subprocess, "run", fake):
+                out = module.git_freshness(work)
+        self.assertFalse(out["available"])
+        self.assertEqual((0, 0), (out["ahead"], out["behind"]))
+
+    def test_freshness_is_wired_as_a_warning_and_never_an_error(self):
+        """An out-of-date clone is a real problem and still not a reason to
+        refuse to build a slate."""
+        source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
+                  ).read_text(encoding="utf-8")
+        wiring = source.split("fresh = git_freshness(root)", 1)
+        self.assertEqual(2, len(wiring), "run_audit must call git_freshness")
+        tail = wiring[1].split("drift = skill_cache_drift(root)", 1)[0]
+        self.assertIn("warnings.append(", tail)
+        self.assertNotIn("errors.append(", tail)
+        self.assertIn('checks["git_freshness"] = fresh', tail)
+
+
 class DkBattingOrderPrecedenceTests(unittest.TestCase):
     """R143, Ben 2026-08-17: DKSalaries first, a paste second, an API third.
 

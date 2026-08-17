@@ -25,6 +25,48 @@ performance claim.
 
 ---
 
+## 2026-08-17 — R145: the audit says how stale this clone is, because `git log` never will
+
+DEV, claim `engine_2026-08-17`. Ben, on R144's new session-start step: "how can
+we make sure the git log is up-to-date always?"
+
+**It cannot be guaranteed, and the failure is silent.** A `git log` twelve days
+behind renders identically to a current one; there is no line in its output
+that says so. This sandbox cannot resolve the question either — `bleeski/mlb-dfs`
+is private and `git fetch` here dies on `could not read Username for
+'https://github.com'`, so the remote-tracking ref moves only when Ben pushes
+from Windows. Guaranteeing freshness was never available. Making the
+uncertainty VISIBLE is, and that is what landed.
+
+`git_freshness` in `tools/audit.py` reports four things at session start, in
+the slot `changelog_debt` and `skill_cache_drift` already occupy, so it costs
+no new step and no new call:
+
+- **behind** — commits on the upstream this clone never pulled. Leads, because
+  it is the case that makes session start's `git log` read a lie.
+- **ahead** — commits no clone can see yet. Sessions commit and Ben pushes
+  (`docs/cowork_sync_protocol.md`), so this names a push Ben owes. It stood at
+  14 earlier today, nothing pushed since 08-14; Ben cleared it mid-session and
+  `origin/main` now matches disk at `14bb55b`.
+- **fetch_age_hours** — off `.git/FETCH_HEAD` or the remote ref, whichever is
+  newer. Stated past 24h because it is what the other two numbers are WORTH: a
+  `behind: 0` from a week-old contact proves nothing.
+- **default_branch_mismatch** — `origin/HEAD` is still `origin/master`, stale
+  since 2026-08-04, while the work is on `main`. A fresh clone lands on that
+  default and gets an early-August tree. **Open, and Ben's to fix in GitHub
+  Settings → Branches; the audit will keep saying so until he does.**
+
+All warnings, never errors: an out-of-date clone is real and is still not a
+reason to refuse to build a slate. Silent without git, without a remote, or on
+a branch with no upstream, because reporting 0/0 where nothing was measured is
+the false clean this check exists to avoid. One shape found while testing and
+guarded: an `origin/HEAD` that is not a proper symbolic ref abbreviates to the
+literal `origin/HEAD`, which matches no branch name and would have warned on
+every clone that simply never set one.
+
+Tests: seven in `tests.test_core.GitFreshnessTests`, each building a throwaway
+bare remote and clone; `test_core` 676 -> 683, total 1034 -> 1041. A seventh test came from the build itself: `VendoredPylibsTests` patches `subprocess.run` to check the suite subprocess inherits the vendored PYTHONPATH, fed this check unittest output, and its `int()` raised inside `run_audit`. Two fixes, both keeping the older assertion intact — a non-numeric answer degrades to `available: False` rather than crashing, and the freshness read now runs BEFORE the suite so it is not the last subprocess call. Rewriting that test to accommodate a newer check would have retired a real assertion.
+
 ## 2026-08-17 — R143 + R144: the salary file is the first source for batting order, and session start reads what changed
 
 DEV, claim `engine_2026-08-17`, plus a `ledger` claim for the pin line only.

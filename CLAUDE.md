@@ -205,7 +205,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    DEFAULT branch is `master`, which is stale by weeks. A fresh clone lands on
    `master` and gets an old tree. Work on `main`.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1034 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1041 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
