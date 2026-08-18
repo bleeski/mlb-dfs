@@ -25,6 +25,52 @@ performance claim.
 
 ---
 
+## 2026-08-18 — R77 residue: the two 08-13 monkey-patch files are swept, and the DEV dirt gate stops naming a dead owner
+
+DEV, claim `engine_2026-08-18`. Ben asked what to do about them, which is how a
+five-day-old condition finally got a decision.
+
+**What was wrong.** `tools/_operator_patch_20260813_crossgame.py` and
+`tools/_run_patched_build.py` had sat untracked inside the DEV write set since
+the 2026-08-13 1507_3g build. `claim.py dirt --role DEV` classifies untracked
+files under `tools/` as foreign dirt and BLOCKS, naming the owner — and there
+was no owner left to name, so every DEV session since 08-13 opened blocked on a
+dead session's leftovers. A gate that exists to serialize live work was
+serializing against nobody, which is how a real block gets read as noise.
+
+**Why they went rather than being tracked.** The runner hardcodes
+`/sessions/dreamy-eloquent-einstein/mnt/mlb-dfs`, a container path verified
+absent, so it could not run under any circumstances. The patch is worse than
+dead: it re-execs `bank_cache` and `optimizer_v3` at import with string
+substitutions, aborting unless each anchor matches exactly once — and BOTH
+ANCHORS STILL MATCH THIS TREE EXACTLY ONCE, verified the same day. Anything
+importing it silently drops the same-game SP-pair filter for that whole
+process, on a slate it was scoped away from five days ago. Committing an
+unreviewed engine override into the engine's own repo is not the fix either, so
+both moved to `_to_delete/tools_residue_20260818/` (gitignored; this mount
+grants create and truncate but not unlink) with a WHY.md recording what each
+one was.
+
+**What was kept.** R115 cited the patch by path as the only existing
+implementation of a per-SP-pair FLOOR, so sweeping the file would have taken
+the mechanism with it. Its entry now carries the mechanism instead: every pair
+control in `contest_allocator` is a CEILING (`pair_cap` adds one row per
+distinct pair bounded `-inf..headroom`), so "each pair at least twice" is not
+reachable by relaxing anything that exists; the floor is the mirrored row on
+the same index set, one per pair, after the `pair_cap` block. Two design
+consequences went in beside it — a floor of `m` over `d` pairs is infeasible on
+its face when `d * m > entries`, and a floor cannot relax the way a ceiling
+does, so without its own rung on the ladder it converts a delivery into a
+refusal, which is R132's failure arriving through the control meant to prevent
+R115's. The slate's own record was already in two ledger inbox fragments and
+stays there.
+
+**Result:** `claim.py dirt --role DEV` reports clean for the first time since
+08-13. R77's remaining scope is the in-tree dead code proper. No code, no
+tests, no gate change; the count stays 1139.
+
+---
+
 ## 2026-08-18 — R136: the third axis, where the portfolio sits against the FIELD
 
 DEV, claim `engine_2026-08-18`. Head of Tier 1's QA batch and of the tier,

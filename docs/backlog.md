@@ -76,13 +76,17 @@ defect the entry was written to prevent — SURVIVED until the fixture stopped
 giving every archetype identical shares. A test asserting the LABEL passes while
 the DATA comes from the wrong block. Gate 1120 -> 1139 (`test_core` 762 -> 781,
 `grew`); CLAUDE.md, SKILL.md and the ledger Quick Card pin line moved with it,
-the last under a DEV-held `ledger` claim, that line and nothing else. One
-condition to report and not fix: `tools/_operator_patch_20260813_crossgame.py`
-and `tools/_run_patched_build.py` are still untracked inside the DEV write set
-from the 08-13 1507_3g session, so `claim.py dirt --role DEV` opens every DEV
-session BLOCKED on two files nobody owns any more. That is R107's residue item
-and it now has a cost: the gate that exists to name a live owner names a dead
-one instead.*
+the last under a DEV-held `ledger` claim, that line and nothing else. **Swept the same
+session, after Ben asked:** `tools/_operator_patch_20260813_crossgame.py` and
+`tools/_run_patched_build.py` had been untracked inside the DEV write set since
+08-13, so `claim.py dirt --role DEV` opened every DEV session BLOCKED on two
+files with no owner left to name. The runner hardcoded a container path that no
+longer exists and could not have run; the patch's two string anchors STILL match
+the tree exactly once, so it was a live hazard rather than dead weight — any
+import of it drops the same-game SP-pair filter for that whole process. Both
+moved to `_to_delete/tools_residue_20260818/` with a WHY.md, and R115 keeps the
+per-pair FLOOR mechanism the patch was the only copy of. `dirt --role DEV` is
+clean for the first time since 08-13.*
 
 *2026-08-17 (fifth session), DEV, claim `engine_greenfield_spec_2026-08-17`:
 **the fifth greenfield edition arrived and was adjudicated the same day; the
@@ -1201,9 +1205,10 @@ trail); **R108** (the `dk_tokens` module; moves the module-count pin);
 **R111(a)** (sync_check resolves the real branch); **R76** (doc-truth batch —
 MANIFEST.md's stale seed keeps being cited by every external review, cheap to
 retire); **R77** (dead code carrying the forbidden pool reduction one call
-site away; the audit adds two named residents: `tools/_operator_patch_20260813_crossgame.py`
-+ `tools/_run_patched_build.py`, run-scoped to a closed slate and carrying a
-stale hardcoded mount path); **R75** (Savant same-name collapse); **R109**'s
+site away; the two named residents `tools/_operator_patch_20260813_crossgame.py`
++ `tools/_run_patched_build.py` were SWEPT 2026-08-18 to
+`_to_delete/tools_residue_20260818/`, so what remains under R77 is the in-tree
+dead code proper); **R75** (Savant same-name collapse); **R109**'s
 sync_check half (the residue sweep waits on Ben's delete grant); **R78**
 (remainder only — the floor cap landed 2026-08-17 under R147; what is left is
 the fixture dtypes, the cp310-only lock hashes, and installed-vs-lock in the
@@ -1907,9 +1912,29 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
   the primary job axis (`bank_cache.py:752-756`); truncation is the cause.
   Downstream the joint MILP reports slice properties as slate properties
   (R112's family), and on 1507_3g the operator monkey-patched the engine
-  mid-slate (`tools/_operator_patch_20260813_crossgame.py`: `cross_game_only`
-  forced off in `enumerate_sp_pairs` and `bank_cache`, plus a synthesized
-  per-pair LOWER bound no engine control expresses).
+  mid-slate (`cross_game_only` forced off in `enumerate_sp_pairs` and
+  `bank_cache`, plus a synthesized per-pair LOWER bound no engine control
+  expresses).
+- **The patch's floor, kept here 2026-08-18 because the file it lived in was
+  swept and this entry was its only other reader.** The mechanism is three
+  lines and the diagnosis in it is the part worth having: EVERY pair control in
+  `contest_allocator` is a CEILING, `pair_cap` adding one row per distinct pair
+  as `add({x_idx(e, k): 1.0 ...}, -np.inf, headroom(...))`, so "each pair at
+  least twice" is not expressible by relaxing anything that exists. The floor
+  is the mirrored row on the same index set — `add({x_idx(e, k): 1.0 for e in
+  range(E) for k in range(K) if sp_pairs[k] == pair}, float(minimum), np.inf)`,
+  one per pair, immediately after the `pair_cap` block. Two consequences to
+  design around rather than discover: a floor of `m` over `d` distinct pairs is
+  infeasible on its face when `d * m > entries`, which is the closed-form check
+  the sibling fragment already asks the refusal to name; and a floor cannot
+  relax the way a ceiling does, so it needs its own place on the relaxation
+  ladder or it converts a delivery into a refusal — which is R132's failure
+  arriving through the control meant to prevent R115's. The bank-side half is
+  separate and cheaper: `bank_cache` filters `if ga != gb` on `usable_pairs`
+  and `enumerate_sp_pairs` defaults `cross_game_only=True`, which on a 2-game
+  slate leaves 4 of 6 combinations before the allocator sees anything.
+  Body archived at `_to_delete/tools_residue_20260818/` (gitignored) with a
+  WHY.md; the two ledger fragments carry the slate's own record.
 - **Why P1:** one whole slate window lost (the fragment's own cost line), and
   a run-scoped engine patch is the operator routing around a missing control
   — both silent-quality shapes, on the surface R98 and R112 already name.
