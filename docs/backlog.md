@@ -2441,6 +2441,17 @@ R12 are the context and process ideas; they slot in opportunistically.
   since 08-04, and no existing clone can read that without a credentialed
   `ls-remote --symref` — the one call that cannot run on the device VM at all
   (R147). CLAUDE.md now states the limit honestly, which is the interim.
+  **Premise CORRECTED 2026-08-18: the trap is gone.** GitHub's default is
+  `main` and `master` is deleted (Ben), so a fresh clone lands on the right
+  tree and R111(b) is closed. What SURVIVES is the mechanism, and it is the
+  half worth fixing: `default_branch_mismatch` reads a local cache, so it
+  returns `null` whether or not GitHub agrees, and it would be equally silent
+  if the default were changed AGAIN tomorrow. The item is therefore no longer
+  "the audit cannot see a known trap" but "the audit reports a check it does
+  not perform", which is the false-signal family and argues for either doing it
+  properly off `ls-remote --symref` when a fetch succeeds, or deleting the
+  field and saying so. Ben's decision half is RETIRED: there is no setting
+  left for him to change.
   **Fix:** take the default off `ls-remote --symref HEAD` when a fetch
   succeeded, fall back to the local ref and SAY which was read, and keep the
   check silent rather than clean when neither is available. **Or decide it is
@@ -2696,7 +2707,24 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   SKILL.md rule present. Falsifier: none — instrumentation. FOSS: stdlib.
   Owner: none. Rollback: remove tool and line.
 
-### R111. `sync_check.py` hardcodes `main`, and GitHub's default branch is `master` (P2, S) | new 2026-08-11, from DEV fragment `2026-08-11_DEV_sync-check-branch-and-default-branch.md`, merged 2026-08-12
+### R111(a). `sync_check.py` hardcodes `main` (P2, S) | new 2026-08-11, from DEV fragment `2026-08-11_DEV_sync-check-branch-and-default-branch.md`, merged 2026-08-12; **(b) CLOSED 2026-08-18**
+
+- **(b) IS DONE AND WAS DONE BEFORE THIS ENTRY NOTICED (Ben, 2026-08-18).**
+  GitHub's default is `main` and `master` is deleted. Ben did exactly what the
+  Fix line below asked for, and no document was updated, so CLAUDE.md, this
+  entry, `docs/cowork_sync_protocol.md`, `tools/audit.py`'s `git_freshness`
+  docstring and R148(a) all kept asserting `master` — until a session on
+  2026-08-18 repeated it back to him as a to-do and he asked why. **The
+  generalizable defect is not the stale value, it is that the value carried a
+  VERIFICATION DATE, which made it read as more trustworthy rather than less.**
+  A dated reading is evidence about the moment it was taken; treating it as a
+  standing fact is the same error R145-R147 fixed for refs, arriving on a
+  SETTING that no local command can re-read. Corrective rule now in CLAUDE.md
+  and the sync protocol: trust the method (`ls-remote --symref origin HEAD`
+  from a machine holding the credential), never the recorded number. Note the
+  local `origin/master` ref persists after the branch is deleted, because a
+  push never prunes, so it is not evidence either way — `git fetch --prune`
+  clears it. **(a) remains open and is what this entry is now about.**
 
 - **What, two halves, one of them not code.** (a) `tools/sync_check.py` reads
   `refs/heads/main` at three sites (`:142`, `:159`, `:184`) regardless of what

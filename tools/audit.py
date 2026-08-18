@@ -999,8 +999,12 @@ def git_freshness(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
     ``behind`` needs a pull (the session's). ``fetch_age_hours`` is what both
     numbers are worth: measured against the remote-tracking ref, which moves
     only on fetch or push, so a long-stale fetch means ``behind: 0`` proves
-    nothing. ``default_branch_mismatch`` catches the trap that a fresh clone
-    lands on ``origin/HEAD`` -- still ``master`` here, stale since 2026-08-04.
+    nothing. ``default_branch_mismatch`` compares the checked-out branch to this
+    clone's cached ``origin/HEAD``; it CANNOT see GitHub's own default, which
+    only ``ls-remote --symref`` reads. GitHub's default is ``main`` and
+    ``master`` is deleted (Ben, 2026-08-18, closing R111(b)) -- so the trap this
+    was built for is gone, and what remains is the limit: do not read a null
+    here as agreement with GitHub.
 
     Silent without git, without a remote, or on a branch with no upstream.
     """

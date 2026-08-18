@@ -232,12 +232,20 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    What no fetch can fix: sessions COMMIT and Ben PUSHES
    (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub and
    the audit names that too. And `default_branch_mismatch` reads this clone's
-   LOCAL `origin/HEAD`, which is a cached copy of GitHub's default from
-   whenever `set-head` last ran, not the setting itself: on this disk it
-   points at `main`, so the check is silent and will stay silent. GitHub's own
-   default is still `master`, stale since 08-04, so a FRESH clone lands on it
-   and gets an old tree. Nothing here will remind you. Work on `main`, and fix
-   the default in GitHub Settings → Branches.
+   LOCAL `origin/HEAD`, a cached copy of GitHub's default from whenever
+   `set-head` last ran, so it can agree with the cache and never with GitHub.
+   **The default is `main` and `master` is deleted (Ben, 2026-08-18), which
+   closes R111(b).** This file asserted "still `master`" until that date, and
+   the failure is worth keeping: the reading was TRUE when R111 verified it by
+   `ls-remote --symref` on 08-11, Ben then acted on it, and no document was
+   updated, so an 08-18 session repeated a seven-day-old reading as current and
+   sent him to change a setting he had already changed. That is R145-R147's
+   lesson applied to a SETTING rather than a ref — a value nothing on this disk
+   can re-read goes stale silently and confidently. Trust the method, not the
+   number: `git ls-remote --symref origin HEAD` from a machine holding the
+   credential is the only reading of GitHub's default, it cannot run on the
+   device VM at all, and this clone can carry a stale `origin/master`
+   indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
    `PASS  v2.26.0  26 modules  1182 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it

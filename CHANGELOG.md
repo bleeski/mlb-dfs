@@ -25,6 +25,53 @@ performance claim.
 
 ---
 
+## 2026-08-18 — R111(b) closes retroactively: the default branch was fixed a week ago and five documents never noticed
+
+DEV, claim `engine_2026-08-18`. Docs and one docstring, no behaviour.
+
+**What happened.** Ben asked why a session told him GitHub's default branch was
+`master` when he had set it to `main` and deleted `master` some time ago. The
+answer is that the repo said so, in five places, on evidence that was correct
+when taken: R111(b) verified `ref: refs/heads/master  HEAD` by
+`git ls-remote --symref` on 2026-08-11 and asked Ben for one setting change. He
+made it. Nothing was updated. CLAUDE.md's session-start step 0, R111's own
+entry, R148(a), `docs/cowork_sync_protocol.md` and `audit.py`'s `git_freshness`
+docstring all kept asserting the old value, and a session on 08-18 repeated it
+to him as a to-do.
+
+**The defect worth keeping is not staleness, it is that the stale value carried
+a verification date.** "Verified against the live remote on 2026-08-11 with
+`ls-remote --symref`" reads as MORE trustworthy than an unsourced claim, and it
+is not: a dated reading is evidence about the moment it was taken and says
+nothing about now. This is R145-R147's lesson — a number nothing can re-read
+goes stale silently — arriving on a SETTING instead of a ref, and settings are
+worse, because a ref at least has a mechanism that could move it.
+
+**Why nothing here could have caught it.** `origin/HEAD` is a local cache from
+the last `set-head`. `origin/master` survives the branch's deletion
+indefinitely, because a push never prunes and this clone's fetch fails on the
+device VM (R147) — so its presence today is not evidence the branch exists, and
+mistaking it for evidence is the trap one layer down. The only reading is
+`ls-remote --symref origin HEAD` from a machine holding the credential, which
+the device VM cannot do; the container can reach GitHub but the repo is private
+and moving `GH_PAT` into a session transcript is barred outright.
+
+**Corrections.** Every live surface now states the method rather than the
+number, and says which readings are incapable of answering. R111 is retitled to
+its open half, R111(a), with (b) closed on the record. R148(a) keeps its
+mechanism half and loses its premise: the trap it was built to name is gone, so
+the item is no longer "the audit cannot see a known trap" but "the audit reports
+a check it does not perform" — the false-signal family, and it argues for
+computing the default off `ls-remote --symref` when a fetch succeeds or deleting
+the field. Ben's decision half of both items is retired; there is no setting
+left to change. Dated session notes under Board history are left as written.
+
+**Not corrected, deliberately:** this clone still holds a stale
+`origin/master`. `git fetch --prune` from a machine with network clears it, and
+that same command is the independent confirmation of everything above.
+
+---
+
 ## 2026-08-18 — R133: a seeded ninth stops reading like an observed one, one bar replaces three, and two documented overrides finally do something
 
 DEV, claim `engine_2026-08-18`. Tier 1's head, taken in tier order after R117
