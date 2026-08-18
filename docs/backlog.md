@@ -86,7 +86,17 @@ the tree exactly once, so it was a live hazard rather than dead weight — any
 import of it drops the same-game SP-pair filter for that whole process. Both
 moved to `_to_delete/tools_residue_20260818/` with a WHY.md, and R115 keeps the
 per-pair FLOOR mechanism the patch was the only copy of. `dirt --role DEV` is
-clean for the first time since 08-13.*
+clean for the first time since 08-13. **The .gitignore question that went with
+it is CLOSED, and the answer was that no .gitignore change was needed:**
+`_scratch_*/` (line 17) already matches at ANY depth, verified by
+`git check-ignore -v` on a probe at `tools/_scratch_probe_.../patch.py`, which
+`git status` and `dirt` both ignore. The gap was never the ignore file, it was
+that nothing told a session under a clock where to put a run-scoped patch, so
+the 08-13 session wrote a bare `tools/_operator_patch_*.py` that no rule covers.
+One paragraph in CLAUDE.md's multi-session git section now names
+`tools/_scratch_<tag>/` as the home and the sweep as the close-out. A broader
+rule (`tools/_*.py`) was rejected: it would hide a genuinely new tool someone
+names with an underscore, and it silences the warning rather than the residue.*
 
 *2026-08-17 (fifth session), DEV, claim `engine_greenfield_spec_2026-08-17`:
 **the fifth greenfield edition arrived and was adjudicated the same day; the

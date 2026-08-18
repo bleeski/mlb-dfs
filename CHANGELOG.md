@@ -25,6 +25,36 @@ performance claim.
 
 ---
 
+## 2026-08-18 — Run-scoped patches get a home, and the .gitignore rule they needed already existed
+
+DEV, claim `engine_2026-08-18`. Contract change to CLAUDE.md's multi-session git
+section, no code. Follows the R77 residue sweep earlier the same day, and
+answers the question that sweep left open.
+
+**The proposal was a new `.gitignore` rule and the measurement killed it.**
+`.gitignore:17` carries `_scratch_*/` with no leading slash, which git matches
+at ANY depth: `git check-ignore -v` on a probe at
+`tools/_scratch_probe_1507_3g/patch.py` resolves to that line, and both
+`git status --short` and `claim.py dirt --role DEV` report zero. So a
+run-scoped patch could have been invisible to the dirt gate since long before
+08-13 at no cost. The gap was never the ignore file. It was that nothing told a
+session under a T-20 clock where to put one, so the 1507_3g session wrote a bare
+`tools/_operator_patch_20260813_crossgame.py`, which no rule covers and which
+then blocked every DEV session for five days.
+
+**What shipped instead:** one paragraph naming `tools/_scratch_<tag>/` as the
+home for a run-scoped patch or throwaway runner, and the sweep into
+`_to_delete/` as the close-out, with the reason the sweep is not optional — a
+patch that outlives its slate is a HAZARD rather than clutter, because both of
+the 08-13 patch's string anchors still matched the tree on 08-18 and importing
+it would have changed engine behaviour on a slate it was never scoped to.
+
+**Rejected:** a broader `tools/_*.py`. It would hide a genuinely new tool
+someone names with an underscore, and it silences the warning rather than the
+residue, which is the direction R77 exists to push against.
+
+---
+
 ## 2026-08-18 — R77 residue: the two 08-13 monkey-patch files are swept, and the DEV dirt gate stops naming a dead owner
 
 DEV, claim `engine_2026-08-18`. Ben asked what to do about them, which is how a

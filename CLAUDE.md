@@ -354,6 +354,18 @@ is reported and left alone. `git add` by explicit path only, never `-A`.
 While any claim you do not own is live: no checkout, reset, stash,
 restore, or clean.
 
+A run-scoped patch or throwaway runner goes in `tools/_scratch_<tag>/`,
+never a bare `tools/_something.py` (Ben, 2026-08-18). `_scratch_*/` is
+already gitignored AT ANY DEPTH, so the directory keeps `dirt` clean while
+the file stays where the build imports it; a bare file in `tools/` is
+foreign dirt that blocks every later DEV session and names an owner who
+went home. Two such files did exactly that for five days after the 08-13
+1507_3g slate. Sweep the directory when the slate closes, which on this
+mount means `mv` into `_to_delete/`, because a patch that outlives its
+slate is a HAZARD and not clutter: both 08-13 anchors still matched the
+tree on 08-18, so importing that file would have silently changed engine
+behaviour on a slate it was never scoped to.
+
 One writer per contended file. Only ARCHIVE edits the ledger; only DEV
 edits the backlog and this file, and contract changes happen only with no
 other session live. Everyone else records by dropping a fragment in
