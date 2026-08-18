@@ -348,7 +348,7 @@ The output is an ordinary feed, so `build_slate.py --lineups` and
 `late_swap.py --lineups` take it unchanged. Every side carries
 `source: operator_paste`.
 
-Five things to know before you run it.
+Six things to know before you run it.
 
 **It exits 2 and writes nothing when a name will not resolve.** mlb.com
 abbreviates first names (`J Peña`), so matching is on first initial plus surname
@@ -386,6 +386,21 @@ guess. Paste the page as it comes.
 still showed TBD, so the CSV was ahead of both feeds. The paste wins where both
 name someone and the disagreement is reported. A DK-derived probable carries no
 handedness, so the opposing platoon view falls back to its default.
+
+**Check that the probables actually attached (R117).** The parser reads both
+renders of mlb.com's hand line -- `RHP` alone, and `RHP 8-7, 3.87 ERA, 144 SO` on
+one line -- but only the first was read until 2026-08-18, and the failure was
+silent in every direction: zero probables attached, no warning, the held name
+became the game's VENUE, and DK's `Starting` fallback then supplied a name with a
+null id and an empty hand, which kills F4's Savant join AND its platoon prior.
+Three slates certified that way with `f4_non_neutral: 0`. So: if the tool prints
+`DK STARTING` for every side of a paste that clearly named pitchers, the hand line
+is a THIRD render and the parse warning names the line it could not read. Two
+surfaces answer this after the build without re-reading the log --
+`pool_report.opposing_probables_incomplete` names the sides whose opposing
+probable carries no id or no hand, and the brief's `factors_inert`, printed as the
+`factors:` line beside the frontier line, names any factor that scored rows and
+moved none of them.
 
 **Fall back only for what the paste does not cover.** If some games are still TBD,
 fetch a feed for those and pass it as `--merge-feed <api_feed.json>`. A pasted
@@ -803,7 +818,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1139 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1157 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

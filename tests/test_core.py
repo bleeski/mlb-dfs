@@ -11605,8 +11605,15 @@ class AuditSkipHonestyTests(unittest.TestCase):
         would drop the coverage along with the precondition.
         """
         audit = self._audit()
+        # R117, 2026-08-18: this read `{"ran": 75}` against the pin's value at
+        # the time, so moving the paste pin to 82 turned the state from
+        # `skipped_in_place` into `shortfall` and failed a test about neither.
+        # The vehicle is the SHAPE -- ran exactly at the pin with skips inside
+        # it -- so it takes the pin from the dict that owns it.
+        pinned = audit.EXPECTED_SUITE_COUNTS["tests.test_paste_lineups"]
         verdict = audit.classify_suite(
-            "tests.test_paste_lineups", {"ran": 75, "skipped": 29, "present": True})
+            "tests.test_paste_lineups",
+            {"ran": pinned, "skipped": 29, "present": True})
         self.assertEqual(verdict["state"], "skipped_in_place")
         self.assertNotIn("update EXPECTED", verdict["advice"].lower())
         self.assertIn("29 were SKIPPED", verdict["advice"])
@@ -14736,6 +14743,179 @@ class OwnershipPriorShadowLoopTests(unittest.TestCase):
         self.assertEqual(0, tracked.returncode,
                          f"{rel} is pinned by the audit but untracked, which is "
                          f"the R107(a) shape exactly")
+
+
+class NamedProbableWithNoF4InputTests(unittest.TestCase):
+    """R117(b): a probable that arrives NAMED but cannot feed F4 is one warning.
+
+    This is the case `teams_without_opposing_probable` structurally cannot see.
+    DK's `Starting` column names an arm and carries neither an MLBAM id nor a
+    hand, so the pool holds a probable that looks live and feeds nothing: the
+    empty id fails the Savant join (F4's quality term) and the empty hand misses
+    every key in F4_PLATOON_PRIOR (F4's platoon term). On 1910_10g all twenty
+    arrived that way and the build certified with f4_non_neutral 0 of 180.
+
+    One warning naming the sides, not one line per side. Twenty per-side info
+    lines is what read as routine.
+    """
+
+    @staticmethod
+    def _feed(*, drop_id=(), drop_hand=()):
+        feed = pool_lineups_feed()
+        for game in feed["games"]:
+            for key in ("away", "home"):
+                side = game[key]
+                probable = side.get("probable_pitcher")
+                if not probable:
+                    continue
+                if side["team_abbrev"] in drop_id:
+                    probable["id"] = None
+                if side["team_abbrev"] in drop_hand:
+                    probable["hand"] = ""
+        return feed
+
+    def _pool(self, tmp, feed):
+        salary = Path(tmp) / "salary.csv"
+        pool_salary_csv(salary)
+        return lda.build_slate_pool(salary, feed, platoon_json=pool_platoon_json())
+
+    def test_a_complete_probable_raises_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, pool_lineups_feed())["pool_report"]
+            self.assertEqual(
+                report["opposing_probables_incomplete"],
+                {"no_mlbam_id": [], "no_hand": []})
+            self.assertEqual(
+                [w for w in report["warnings"] if "named but incomplete" in w], [])
+
+    def test_a_missing_hand_is_named_once_and_says_which_term_dies(self):
+        # T1's own probable is the OPPOSING probable for T2, so dropping the
+        # hand on T1's arm is reported against T2's bats. Asserting the
+        # opposing direction is the point: a report keyed the other way would
+        # send the operator to the wrong side of the matchup.
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(tmp, self._feed(drop_hand=("T1",)))["pool_report"]
+            self.assertEqual(report["opposing_probables_incomplete"]["no_hand"],
+                             ["T2"])
+            self.assertEqual(report["opposing_probables_incomplete"]["no_mlbam_id"],
+                             [])
+            named = [w for w in report["warnings"] if "named but incomplete" in w]
+            self.assertEqual(len(named), 1, named)
+            self.assertIn("no handedness", named[0])
+            self.assertIn("T2", named[0])
+            self.assertIn("platoon term stays", named[0])
+            self.assertNotIn("no MLBAM id", named[0])
+            # Loud, never blocking: F4 is a prior and a build without it ships.
+            self.assertEqual(
+                [b for b in report["blockers"] if "named but incomplete" in b], [])
+
+    def test_both_fields_missing_on_every_side_is_still_one_warning(self):
+        """The 1910_10g shape: every arm arrives via the DK fallback."""
+        teams = ("T1", "T2", "T3", "T4")
+        with tempfile.TemporaryDirectory() as tmp:
+            report = self._pool(
+                tmp, self._feed(drop_id=teams, drop_hand=teams))["pool_report"]
+            incomplete = report["opposing_probables_incomplete"]
+            self.assertEqual(incomplete["no_mlbam_id"], ["T1", "T2", "T3", "T4"])
+            self.assertEqual(incomplete["no_hand"], ["T1", "T2", "T3", "T4"])
+            named = [w for w in report["warnings"] if "named but incomplete" in w]
+            self.assertEqual(len(named), 1, named)
+            self.assertIn("no MLBAM id", named[0])
+            self.assertIn("no handedness", named[0])
+
+    def test_the_probables_are_still_carried_into_the_pool(self):
+        """Reporting is not filtering. Removing them would thin the pool."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, self._feed(drop_id=("T1",), drop_hand=("T1",)))
+            self.assertIn("T2", pool["opposing_probables"])
+            self.assertEqual(pool["opposing_probables"]["T2"]["name"], "T1 Ace")
+
+
+class InertFactorReportingTests(unittest.TestCase):
+    """R117(b): a factor computed for rows that moved none of them is INERT.
+
+    The count already existed (`f4_non_neutral`) and lived in an enrichment
+    warning at the top of the log, which is the one surface a session at T-10
+    does not re-read. These pin the two things the fix adds: the classification,
+    and the wording that says what the number means.
+    """
+
+    @staticmethod
+    def _module():
+        return BuildSlateScriptTests._module()
+
+    def test_a_factor_that_moved_a_row_is_not_inert(self):
+        mod = self._module()
+        self.assertEqual(
+            mod.inert_factors([("F4", {"h1": 1.04, "h2": 1.0},
+                                {"non_neutral_f4": 1})]),
+            [])
+
+    def test_a_factor_computed_for_rows_that_moved_none_is_inert(self):
+        mod = self._module()
+        self.assertEqual(
+            mod.inert_factors([("F4", {"h1": 1.0, "h2": 1.0},
+                                {"non_neutral_f4": 0})]),
+            [{"factor": "F4", "rows_scored": 2, "non_neutral": 0}])
+
+    def test_a_factor_that_scored_nothing_is_absent_rather_than_inert(self):
+        """Different fact, different warnings. Folding them together is the bug."""
+        mod = self._module()
+        self.assertEqual(
+            mod.inert_factors([("F1", {}, {"skipped": "no odds packet available",
+                                           "non_neutral_f1": 0})]),
+            [])
+
+    def test_the_row_count_comes_off_the_map_not_the_report(self):
+        """The three factors disagree on what they call their row count, and a
+        count taken off the emitted map cannot drift from what the solver got."""
+        mod = self._module()
+        inert = mod.inert_factors([
+            ("F5", {f"p{i}": 1.0 for i in range(7)},
+             {"non_neutral_f5": 0, "games_scored": 2}),
+        ])
+        self.assertEqual(inert[0]["rows_scored"], 7)
+
+    def test_all_three_factors_are_classified_and_sorted(self):
+        mod = self._module()
+        inert = mod.inert_factors([
+            ("F5", {"p1": 1.0}, {"non_neutral_f5": 0}),
+            ("F1", {"p1": 1.0}, {"non_neutral_f1": 0}),
+            ("F4", {"p1": 1.09}, {"non_neutral_f4": 1}),
+        ])
+        self.assertEqual([row["factor"] for row in inert], ["F1", "F5"])
+
+    def test_the_review_line_says_what_the_zero_means(self):
+        mod = self._module()
+        clean = mod.format_inert_factors_line([])
+        self.assertIn("none inert", clean)
+        line = mod.format_inert_factors_line(
+            [{"factor": "F4", "rows_scored": 180, "non_neutral": 0}])
+        self.assertIn("F4", line)
+        self.assertIn("180", line)
+        self.assertIn("ranked nothing", line)
+        # The distinction the brief could not make before.
+        self.assertIn("not the same as applying evenly", line)
+
+    def test_the_brief_carries_the_block_beside_the_gates_not_inside_them(self):
+        """Placement is the fix, and the certification vocabulary stays closed.
+
+        Read off the source: `factors_inert` is a sibling of `gates`, and the
+        gates dict still holds exactly the three certification keys. An inert
+        factor certifies nothing and blocks nothing, so putting it inside would
+        make a review proxy read as a gate -- the label rule this repo treats as
+        non-negotiable.
+        """
+        import re
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"factors_inert": factors_inert,', src)
+        self.assertIn('payload["factors_inert"] = factors_inert', src)
+        for block in re.findall(r'"gates": \{(.*?)\}', src, re.S):
+            self.assertNotIn("factors_inert", block)
+            self.assertEqual(
+                sorted(re.findall(r'"(\w+)":', block)),
+                ["allocation_certified", "selection_certified", "workflow_valid"])
 
 
 if __name__ == "__main__":

@@ -1161,3 +1161,147 @@ class ShowdownSalaryFileResolutionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+def _joined_render(text: str) -> str:
+    """The same paste with each hand line and its statline on ONE line.
+
+    R117. mlb.com rendered the hand alone on 2026-07-29 and with the record
+    trailing it on 2026-08-13, and the two are the same page. Deriving the second
+    render from the FIRST fixture rather than hand-writing a new one is
+    deliberate: a synthetic fixture proves the regex matches the string the test
+    author had in mind, while this proves the identical slate resolves to the
+    identical pitchers either way. R136's fixture lesson, one suite over.
+    """
+    out = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if out and stripped and stripped[0].isdigit() and "ERA" in stripped \
+                and out[-1].strip() in ("RHP", "LHP"):
+            out[-1] = f"{out[-1].strip()} {stripped}"
+            continue
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
+class HandLineRenderTests(unittest.TestCase):
+    """R117: both renders of the hand line, measured against the same paste.
+
+    The defect this pins was silent in every direction. `_HAND` anchored on `$`,
+    so `RHP 8-7, 3.87 ERA, 144 SO` fell through to the statline branch and was
+    consumed as decoration; the pitcher count landed at 0, which `_assign` reads
+    as "no pitcher lines were pasted" and does not warn about; and the held name
+    went on to become the game's VENUE. Downstream, a DK `Starting` fallback
+    supplied a name with a null id and an empty hand, which kills the Savant join
+    AND the platoon prior, so F4 was 1.0 for every hitter and the build
+    certified.
+    """
+
+    def setUp(self):
+        self.joined = _joined_render(_text())
+
+    def test_the_joined_render_is_actually_different(self):
+        """Guard the guard: a no-op transform would make every test below pass."""
+        self.assertNotEqual(self.joined, _text())
+        self.assertIn("RHP 0-0, 4.76 ERA, 4 SO", self.joined)
+        self.assertNotIn("\nRHP\n", self.joined)
+
+    def test_both_renders_yield_the_same_six_probables_with_hands(self):
+        bare_games, bare_warnings = parse_paste(_text())
+        joined_games, joined_warnings = parse_paste(self.joined)
+        self.assertEqual(bare_warnings, [])
+        self.assertEqual(joined_warnings, [])
+
+        def _arms(games):
+            return [(g.game_id, side, arm.display_name, arm.mlbam_id, arm.hand)
+                    for g in games
+                    for side, arm in (("away", g.away_pitcher), ("home", g.home_pitcher))
+                    if arm is not None]
+
+        bare, joined = _arms(bare_games), _arms(joined_games)
+        self.assertEqual(len(bare), 6, "the fixture should carry six probables")
+        self.assertEqual(bare, joined)
+        # The hand is the whole point: an empty one collapses F4's platoon term.
+        self.assertTrue(all(row[4] in ("R", "L") for row in joined), joined)
+
+    def test_the_joined_render_does_not_pollute_the_venue(self):
+        """A held name that never promoted used to be read as the venue."""
+        for game in parse_paste(self.joined)[0]:
+            for arm in (game.away_pitcher, game.home_pitcher):
+                self.assertNotEqual(game.venue, arm.display_name if arm else None)
+        venues = {g.game_id: g.venue for g in parse_paste(self.joined)[0]}
+        self.assertEqual(venues, {g.game_id: g.venue
+                                  for g in parse_paste(_text())[0]})
+
+    def test_an_unknown_hand_render_warns_instead_of_taking_the_venue(self):
+        """The next render change degrades to a NAMED failure, not to silence.
+
+        This is the branch that catches the shape neither pattern knows. It must
+        warn, drop the held name, and leave the venue alone -- the three things
+        that were each wrong before.
+        """
+        text = _text().replace("RHP\n0-0, 4.76 ERA, 4 SO", "0-0, 4.76 ERA, 4 SO")
+        self.assertNotEqual(text, _text())
+        games, warnings = parse_paste(text)
+        joined = " ".join(warnings)
+        self.assertIn("statline", joined)
+        self.assertIn("Hayden Wesneski", joined)
+        game = next(g for g in games if g.game_id == "HOU@LAA")
+        self.assertNotEqual(game.venue, "Hayden Wesneski")
+        self.assertEqual(game.venue, "Angel Stadium")
+        # One arm promoted and one did not, so the count is 1 and `_assign`'s
+        # "0 or exactly 2" rule attaches NEITHER. The refusal is the right
+        # outcome; being able to see why is what this fix adds.
+        self.assertIsNone(game.away_pitcher)
+        self.assertIsNone(game.home_pitcher)
+        self.assertIn("found 1 probable pitcher line(s)", joined)
+
+    def test_a_venueless_paste_does_not_take_a_pitcher_name_as_the_venue(self):
+        """The pollution case, and it needs a paste with NO venue line.
+
+        Found by mutation: dropping the held name in the unknown-render branch
+        SURVIVED against the fixture above, because that fixture carries
+        'Angel Stadium' before the pitcher block and `_flush_pending` only
+        writes a venue when there is not one already. The fixture could not
+        distinguish the two behaviours, so the guard was unpinned. Measured on
+        the pre-fix tree, this shape returned venue='Hayden Wesneski'.
+        """
+        text = _text().replace("9:38 PM\nAngel Stadium\n", "9:38 PM\n")
+        self.assertNotIn("Angel Stadium", text)
+        # Unknown hand render on the away arm, so its name is held and dropped.
+        text = text.replace("RHP\n0-0, 4.76 ERA, 4 SO", "0-0, 4.76 ERA, 4 SO")
+        game = next(g for g in parse_paste(text)[0] if g.game_id == "HOU@LAA")
+        self.assertEqual(game.venue, "")
+        self.assertNotEqual(game.venue, "Hayden Wesneski")
+
+    def test_a_stray_hand_prefixed_line_is_not_read_as_handedness(self):
+        """`[RL]HP` opening a line is not by itself a handedness claim.
+
+        The loose fix for this defect is `^[RL]HP\\b.*`, which would promote any
+        line beginning those three letters. The statline pattern requires a W-L
+        record or an ERA/SO line, so a name does not become a hand.
+        """
+        from mlb_engine.intake.paste_lineups import _match_hand
+        self.assertEqual(_match_hand("RHP"), "R")
+        self.assertEqual(_match_hand("LHP 5-4, 5.79 ERA, 61 SO"), "L")
+        self.assertEqual(_match_hand("RHP 8-7"), "R")
+        self.assertIsNone(_match_hand("RHP Salvador Perez"))
+        self.assertIsNone(_match_hand("LHPitcher of record"))
+        self.assertIsNone(_match_hand("Angel Stadium"))
+
+    def test_the_joined_render_resolves_to_the_same_feed(self):
+        """End to end: the feed a build consumes is identical either way."""
+        rows = list(csv.DictReader(SALARY.read_text(encoding="utf-8-sig").splitlines()))
+        self.assertTrue(rows)
+        stamp = "2026-08-13T22:10:00Z"   # else `fetched_at` defaults to now()
+        bare = resolve_paste_to_feed(_text(), str(SALARY),
+                                     resolve_overrides=RESOLVE, fetched_at=stamp)
+        joined = resolve_paste_to_feed(self.joined, str(SALARY),
+                                       resolve_overrides=RESOLVE, fetched_at=stamp)
+        self.assertEqual(bare["report"]["blockers"], [])
+        self.assertEqual(joined["report"]["blockers"], [])
+        # The DK `Starting` fallback is what supplied a name with a null id and
+        # an empty hand on 1910_10g. Neither render should need it here.
+        self.assertEqual(joined["report"].get("dk_declared_probables") or [], [])
+        self.assertEqual(json.dumps(bare["feed"], sort_keys=True, default=str),
+                         json.dumps(joined["feed"], sort_keys=True, default=str))

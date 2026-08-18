@@ -202,7 +202,18 @@ EXPECTED_SUITE_COUNTS = {
     # and the cross-contest comparison), three on Showdown (captain rank but
     # no Classic chalk-sum, salary left reading CPT/UTIL, an unpriced entry
     # excluded rather than guessed), and two on resolving the prediction file.
-    "tests.test_core": 781,
+    # R117(b), 2026-08-18: 781 -> 792, the eleven that pin an inert factor
+    # being nameable -- four on a NAMED opposing probable that cannot feed F4
+    # (the complete case stays silent, a missing hand is one warning against the
+    # OPPOSING side naming the term it kills, the twenty-arm 1910_10g shape is
+    # still one warning, and reporting never filters the pool), and seven on the
+    # classification (a factor that moved a row is not inert, one that moved
+    # none is, one that scored NOTHING is absent rather than inert, the row
+    # count comes off the emitted map because the three factors disagree on what
+    # they call it, all three sort, the review line says a neutral factor ranked
+    # nothing, and `factors_inert` sits BESIDE the gates while the gates dict
+    # keeps exactly its three certification keys).
+    "tests.test_core": 792,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -236,7 +247,15 @@ EXPECTED_SUITE_COUNTS = {
     # and the rationale for why this is a split and not a filter.
     "tests.test_upload_integrity": 218,
     "tests.test_golden_replay": 9,
-    "tests.test_paste_lineups": 75,
+    # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
+    # mlb.com hand line against the same paste -- the joined render derived from
+    # the bare fixture (plus the guard that the transform is not a no-op), the
+    # six probables and their hands identical either way, the venue untouched,
+    # the end-to-end feed byte-identical, a render neither pattern knows warning
+    # and dropping the held name instead of taking the venue, the venueless
+    # paste that is the only fixture able to see that drop (found by mutation),
+    # and `[RL]HP` opening a line not being a handedness claim by itself.
+    "tests.test_paste_lineups": 82,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this

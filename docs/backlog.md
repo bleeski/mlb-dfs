@@ -39,6 +39,50 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-18 (second session), DEV, claim `engine_2026-08-18`: **R117 is CLOSED
+and migrated** to CHANGELOG.md, taken in tier order as Tier 1's head. **R133 is
+the new head of Tier 1** — the tier already recorded why R117 outranked it (R117
+changed SELECTION, R133 changes labels and overrides), and that reason is spent.
+Four things worth reading before the R-number, and three of them changed the
+entry as filed. **First, the entry named the wrong line.** There is no dropped
+continuation line: `_HAND` was anchored on `$`, and mlb.com renders the
+probable's hand two ways — alone on its own line (Ben's 07-29 paste, which always
+parsed correctly) and with the record trailing it on ONE line as
+`RHP 8-7, 3.87 ERA, 144 SO` (the 08-13 paste), which fell into the `_STATLINE`
+branch and was consumed as decoration. The module docstring carried the first
+render as though it were the only one, and that is how the assumption survived
+three slates; corrected in place. **Second, the silence had three faces and the
+entry named one.** Measured on the real fixture re-rendered the joined way:
+both pitchers `None`, `parse_paste` warnings `[]`, both hitter sides resolving
+perfectly. `_assign`'s "0 or exactly 2" rule then reads a pitcher count of ZERO
+as "no pitcher lines were pasted" and by design does not warn, and
+`_flush_pending` writes the held name into `game.venue` — a venueless paste came
+back `venue='Hayden Wesneski'`. The DK `Starting` fallback's null id plus empty
+hand is the fourth face and the one the entry had. **Third, the loudness half
+generalized past F4 without being asked to.** F1 and F5 carry the identical
+"every value is neutral" condition, so the classification is factor-general, and
+the load-bearing distinction is INERT (scored rows, moved none) against ABSENT
+(scored nothing) — different facts, different remedies, and folding them together
+is how "F4 is off for this build" came to read as routine enrichment noise.
+`factors_inert` sits BESIDE `gates` and not inside it: those three keys are the
+certification vocabulary, an inert factor certifies nothing and blocks nothing,
+and a review proxy among them reads as a gate. **Fourth, the fixture lesson
+landed for the third consecutive item.** Fourteen mutations were run by hand and
+fourteen caught, but dropping the held name SURVIVED until a seventh test was
+added, because the fixture carries `Angel Stadium` before the pitcher block and
+`_flush_pending` only writes a venue when there is not one — that fixture cannot
+distinguish the two behaviours, so the guard read green while pinning nothing.
+R136 and R128 are the same shape. Gate 1139 -> 1157 (`test_paste_lineups`
+75 -> 82, `test_core` 781 -> 792, both `grew`); CLAUDE.md and SKILL.md pin lines
+moved with it, and SKILL.md's paste section grew a sixth item naming the
+symptom (`DK STARTING` on every side of a paste that clearly named pitchers).
+The falsifier on the entry was checked and did NOT fire: the frozen salary
+header carries no handedness column, so the parse half stands rather than
+shrinking to the loudness half. The entry's rider — derive the slate tag before
+lighting the beacon so claims and artifacts agree — did not land here and moves
+to R131's smalls; it is a claims-naming fact and shares no surface with the
+paste or the brief.*
+
 *2026-08-18, DEV, claim `engine_2026-08-18`: **R136 is CLOSED and migrated** to
 CHANGELOG.md, taken in tier order as the head of Tier 1 and of its QA batch,
 which R135 had unblocked the day before. **R117 is the new head of Tier 1**: the
@@ -954,16 +998,36 @@ underneath it.*
    already here — R129 with R98(3)'s restore remainder, which closed with it on
    2026-08-16, and R127 with the Tier 4 FanGraphs decision — and both are
    cross-referenced rather than duplicated.
-8. **R117, elevated 2026-08-14 evening; moved ahead of R133 2026-08-16** (P1,
-   S, WS3) — the paste drops the probable's `RHP|LHP` continuation line; a
-   null id plus an empty hand kill BOTH F4 terms (the Savant join and the
-   platoon prior), and the build certifies with the hitter side's entire
-   opposing-pitcher signal absent. Third slate in two days; repairing
-   1910_10g's twenty probables took F4 from 0 to 180 non-neutral and moved
-   primary stacks off Oracle Park. `f4_non_neutral == 0` also becomes loud in
-   the brief where gates are read. Ordered ahead of R133 because it changes
-   SELECTION where R133 changes labels and overrides, and its parse half is
-   R122's Showdown handedness input — one fix, two workstreams.
+8. **R117 — CLOSED 2026-08-18**, migrated to CHANGELOG.md, taken in tier order
+   as the tier's head. Both halves landed and three things about the entry as
+   filed are corrected on the record. The CONTINUATION LINE was never the
+   problem: `_HAND` anchored on `$`, and mlb.com renders the hand two ways — alone
+   on its line (Ben's 07-29 paste, which always parsed) and with the record
+   trailing it on ONE line (the 08-13 paste), which fell into the `_STATLINE`
+   branch and was consumed as decoration. The module docstring carried the first
+   render as the only one, which is how the assumption survived three slates. The
+   silence had THREE faces where the entry named one: zero probables attached
+   with no warning, `_assign` reading a pitcher count of 0 as "nothing was
+   pasted" by design, and `_flush_pending` writing the held name into
+   `game.venue` (a venueless paste came back `venue='Hayden Wesneski'`). And the
+   loudness half generalized past F4 to F1 and F5, because all three carry the
+   identical "every value is neutral" condition — with the distinction that
+   carries it being INERT (scored rows, moved none) against ABSENT (scored
+   nothing), which are different facts with different remedies. The falsifier was
+   checked and did not fire: the salary header carries no handedness column, so
+   the parse half stands. Gate 1139 -> 1157 (`test_paste_lineups` 75 -> 82,
+   `test_core` 781 -> 792, both `grew`); fourteen mutations run by hand, all
+   fourteen caught, one only after the FIXTURE was fixed — dropping the held name
+   survived because the fixture carries a venue BEFORE the pitcher block, so it
+   could not distinguish the two behaviours, and the venueless paste is the only
+   shape that can. The entry's rider (derive the slate tag before lighting the
+   beacon) did NOT land with it and moves to R131's smalls. **R133 is the new
+   head of Tier 1**, on the ordering this tier already recorded: R117 was ahead
+   of it because R117 changed SELECTION where R133 changes labels and overrides,
+   and that reason is now spent. What R117 leaves for R133: the pool report's
+   `opposing_probables_incomplete` is the two-list pattern to follow, and
+   `factors_inert` is the precedent for a review key that sits BESIDE the gates
+   rather than inside them.
 9. **R133** (P1, S + one decision, WS3; 2026-08-16, from BUILD's 2026-08-12
    fragment that this board twice recorded as consumed and was not) — the
    partial-side remainder R60 did not close. R60 stopped a bench bat
@@ -1352,8 +1416,14 @@ the batch's named rider and did not get pulled.
   states what was actually applied — an all-flat platoon says so. (2)
   resolve handedness before falling back flat: the MLB Stats API `people`
   endpoint returns `pitchHand` for an id in one allowlisted call (statsapi
-  is already in R88's allowlist), and R117's continuation-line parse fixes
-  the paste side of the same hole. (3) an all-flat platoon factor is LOUD at
+  is already in R88's allowlist), and **R117 LANDED 2026-08-18** and fixed the
+  paste side of the same hole — read its changelog entry before wiring (2): what
+  was broken was not a continuation line but `_HAND`'s `$` anchor against
+  mlb.com's second render, and `_match_hand` is the function to consume rather
+  than re-derive. R117's loudness half also shipped the surface (3) should
+  match rather than duplicate: `factors_inert` beside the gates, and one named
+  pool warning per slate rather than one per side. (3) an all-flat platoon
+  factor is LOUD at
   the `stale_platoon_policy` precedent's severity: `'block'` engine default,
   `'warn'` from build_slate.
 - **Audit fields.** Moves: robustness (label truth). Evidence: V2 (fragment
@@ -1732,46 +1802,6 @@ Route every inbound abbrev through `to_dk_abbrev` at parse time (merge_feeds, Ro
 - **Why (c) is blocked rather than just unbuilt:** that parser is regex over live third-party HTML with no frozen real-page fixture (R65 shipped the parse FLOOR but declined the fixture; it sits on R90 with the hand step named). Changing its extraction surface without a fixture of the page it parses is how a silent-empty regression ships, and silent-empty is the exact failure R65's floor exists to catch. Do (c) after R90's RotoWire fixture, or accept the risk deliberately.
 - **What remains, (d):** `fetch_slate_bundle.py:278` — the second same-venue game reuses the first leg's weather window, unmarked. Independent surface, no interaction with (a) or (b). Carries a small decision: give the second leg its own window, or widen the first leg's window to the latest same-venue start (the filed fix says the latter). Either way, mark it rather than leaving the reuse silent.
 - **Scope of the remainder:** both affect a doubleheader slate only, and neither is in the wrong-lineup-reaches-the-pool class (a) and (b) were, which is why the priority drops from P1 to P2. (c) degrades a TBD team's projected order on a DH; (d) degrades one game's weather input.
-
-### R117. Paste drops the probable-pitcher continuation line, and a matchup factor that applied to nothing is silent (P1, S; elevated from P2 2026-08-14 evening) | new 2026-08-14, merged from BUILD fragment 2026-08-13, ask 6; root cause confirmed same day on 1910_10g
-
-- **What:** the mlb.com paste renders a probable as `Jacob deGrom` newline
-  `RHP 8-7, 3.87 ERA, 144 SO`; `lineups_from_paste.py` reports all four
-  sides "the paste left this side's probable unnamed", falls back to DK's
-  `Starting` column (which carries no handedness), and F4's platoon half
-  computes 1.0 for 36 of 36 hitters — the build certified. Hand-patching the
-  four hands produced a 0.94-1.04 F4 spread and the IDENTICAL distinct-lineup
-  set, so this is a correctness-and-reporting defect, not a portfolio-quality
-  one; sized small on that measurement.
-- **Fix, two parts:** (a) parse the `RHP|LHP <record>, <ERA>, <SO>`
-  continuation line so pasted probables attach with hand; (b) "F4 neutral
-  for 100% of scored hitters" becomes loud (the R69 family): a factor that
-  applied to nothing must not read like one that applied evenly. Fragment
-  ask 7 (derive the slate tag before lighting the beacon so claims and
-  artifacts agree) is recorded here as its rider.
-- **Audit fields.** Moves: robustness. Evidence: V2 (fragment + delivered
-  run's F4 distribution: 36 non-neutral after the hand patch). Acceptance: a
-  fixture paste with continuation lines yields hands and a non-degenerate F4;
-  the degenerate case warns. Falsifier: if DK `Starting` reliably carries
-  hand elsewhere, (a) shrinks to the loudness half. FOSS: stdlib. Owner:
-  none. Rollback: parser change is additive; loudness is one warning.
-- **Elevated P2 → P1, 2026-08-14 evening: third slate in two days, and the
-  mechanism is now fully named** (from the `floored-bank-hint` fragment's
-  item 2, verified by its repair). The dropped continuation line leaves
-  every probable `"id": null, "hand": ""`; the null id fails the join to
-  `expected_stats_pitching.csv` and the empty hand collapses the platoon
-  prior, so BOTH F4 terms go to 1.0 — `f4_non_neutral: 0` of 180 hitters on
-  1910_10g, certified clean. Patching the twenty probables took F4 to 180
-  non-neutral / 161 platoon-applied and moved the primary stacks off Oracle
-  Park (Statcast 2024-26 HR factor 78, second-worst in MLB), which had held
-  4 of 15 primary stacks in the F4-dead build — the degradation is
-  material, not cosmetic. Two asks fold in from that recurrence: a probable
-  reaching the pool with a null id or empty hand is ONE named pool warning,
-  not twenty per-side info lines that read as routine; and `f4_non_neutral
-  == 0` prints beside the gates in the brief, not in an enrichment warning
-  at the top of a log. R122's handedness resolution (statsapi `pitchHand`)
-  is the same hole on the Showdown path; land the parse once, both consume
-  it.
 
 ### R75. The DK↔Savant crosswalk joins on normalized name only; same-name players collapse to one row (P2, S) | audit 2026-08-04, verified in tree
 
@@ -2378,12 +2408,13 @@ R12 are the context and process ideas; they slot in opportunistically.
   (roster footprint, bat exposure, and now field share), so the case for naming
   the two washout numbers apart got stronger, not weaker. Never its own session.
 
-### R131. Four smalls off one slate, three DEV and one Ben's (P2, XS each) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment
+### R131. Five smalls, four DEV and one Ben's (P2, XS each) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment; (e) added 2026-08-18 off R117
 
 - **(a) `Solo Shot` is missing from `dk_contest_archetypes.csv`.** Two contests on the slate ("MLB $2.5K Solo Shot (Night)", "MLB $500 Solo Shot (Night)") matched no row in the 24-row file and blocked the build until postures were passed by hand. They are single-entry GPPs and the family recurs. **This is not DEV's and it is not simply ARCHIVE's:** the 2026-08-09 curated-archetypes fragment already settled the principle for this exact row — a curated row reaches `resolve_contest_shape` immediately and reranks lineups on contests entered that night, which makes it a strategy change and Ben's dated decision, not an archival write. Listed in Tier 4 beside R1c-tail so both are decided and executed in one pass.
 - **(b) `fetch_slate_bundle.py --venues` takes a FILE PATH, not a venue list.** Verified 2026-08-16: the flag defaults to `data/reference/team_to_venue.csv` and the failure path warns `weather skipped: venue file not found at <value>`, so passing `Sutter Health Park,Angel Stadium` produced an empty weather block under a message that reads like a missing file rather than a misused flag. Fix either end — one line in SKILL.md, or accept both forms and say which was parsed. Accepting both is slightly better because the error message is the thing that misled, and a flag that names what it parsed cannot mislead the same way twice.
 - **(c) SKILL.md should carry the iteration discipline.** Each rebuild grows the bank and changes results; past two rebuilds expect collapse and non-reproducibility; the delivery must be the newest certified run, so decide before rebuilding rather than after. All three cost time on this slate. This is the operator-facing half of R130, which owns the reporting half.
 - **(d) SKILL.md should carry the dual objective** so R126's apex/washout definition survives outside a chat prompt. Sequence it after R126 lands, not before, or the skill documents a metric the pipeline does not emit. **Unblocked 2026-08-17: R126 has landed**, so the definitions to document are `portfolio_frontier`'s own keys, in the brief's exposure block, plus the `frontier:` review line. Two things the landing means this half must say rather than paraphrase: the retained percent is NOT comparable across slates and the intact count is, and the histogram is what separates two builds the gates and the retained percent cannot.
+- **(e) Derive the slate tag BEFORE lighting the beacon, so claims and artifacts agree.** Arrived 2026-08-18 as R117's rider and filed here rather than landing with it: R117 was a paste parser and a brief key, and this is a claims-naming fact that shares no surface with either. The ask (BUILD fragment 2026-08-13, ask 7) is that the tag in `claims/slate_<date>_<tag>` and the tag in `outputs/<date>/` come from one derivation, because a session that lights the beacon first and names the artifacts afterwards produces two names for one slate and nothing reconciles them. Note the mutex is nominal (CLAUDE.md), so a mismatched beacon name blocks nobody and the cost is archaeology later, which is why this is XS and P2 rather than a contract change.
 
 ### R138. Bank scenario coverage: one stack family per game, stated as standing practice (P2, XS) | new 2026-08-16, from the leverage ideation fragment
 

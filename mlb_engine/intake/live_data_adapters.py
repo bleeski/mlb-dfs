@@ -1589,6 +1589,43 @@ def build_slate_pool(
     team_by_player_id = {
         r["Player_ID"]: r["Team"] for r in rows if r["Player_ID"] not in pitcher_roles
     }
+
+    # R117(b). A probable that reaches the pool NAMED but with no MLBAM id or no
+    # hand is a dead F4 wearing a live probable's clothes: the empty id fails the
+    # join to the Savant pitching table so the quality term is 1.0, and the empty
+    # hand misses every key in F4_PLATOON_PRIOR so the platoon term is 1.0 too.
+    # `teams_without_opposing_probable` cannot see it, because DK's `Starting`
+    # column supplied a NAME and that list only holds sides with no probable at
+    # all. On 1910_10g every one of twenty probables arrived this way and the
+    # build certified with `f4_non_neutral: 0` of 180 hitters.
+    # ONE warning naming the sides, not one info line per side: twenty per-side
+    # lines is what read as routine, and the fact is about the slate.
+    opposing_probables = extract_opposing_probables(
+        lineups_feed, _salary_game_times(salary_map))
+    probables_no_id = sorted(
+        team for team, rec in opposing_probables.items()
+        if not str((rec or {}).get("id") or "").strip())
+    probables_no_hand = sorted(
+        team for team, rec in opposing_probables.items()
+        if str((rec or {}).get("hand") or "").strip().upper() not in ("R", "L"))
+    if probables_no_id or probables_no_hand:
+        detail = []
+        if probables_no_id:
+            detail.append(
+                f"no MLBAM id for the opposing probable of "
+                f"{', '.join(probables_no_id)} (the Savant join key, so F4's "
+                f"SP-quality term stays 1.0 for those bats)")
+        if probables_no_hand:
+            detail.append(
+                f"no handedness for the opposing probable of "
+                f"{', '.join(probables_no_hand)} (so F4's platoon term stays "
+                f"1.0 for those bats)")
+        warnings.append(
+            "opposing probables reached the pool named but incomplete: "
+            + "; ".join(detail)
+            + ". A DK `Starting` fallback carries a name and neither field; "
+            "supply a lineups feed or a paste with the RHP/LHP line to restore "
+            "F4")
     kept_confirmed_hitters = sorted(
         pid for pid in confirmed_hitter_ids if str(pid) in keep
     )
@@ -1611,8 +1648,7 @@ def build_slate_pool(
         # already applies. Without it these two are last-write-wins on a
         # doubleheader and a matinee build takes the night starter's F4 quality
         # and the night side's bat hands.
-        "opposing_probables": extract_opposing_probables(
-            lineups_feed, _salary_game_times(salary_map)),
+        "opposing_probables": opposing_probables,
         "batter_hands": extract_batter_hands(
             lineups_feed, salary_map, _salary_game_times(salary_map)),
         "clock": clock,
@@ -1654,6 +1690,14 @@ def build_slate_pool(
             "platoon_dependent_teams": platoon_dependent_teams,
             # R69(a). Whether DK's Status/Starting read was armed for this file.
             "salary_status_coverage": status_coverage,
+            # R117(b). The machine-readable half of the warning above: which
+            # sides hold a NAMED opposing probable that cannot feed F4. Two
+            # lists rather than one, because a missing id and a missing hand
+            # kill different terms and are fixed by different inputs.
+            "opposing_probables_incomplete": {
+                "no_mlbam_id": probables_no_id,
+                "no_hand": probables_no_hand,
+            },
             "slate_date": slate_date.isoformat(),
             "warnings": warnings,
             "blockers": blockers,

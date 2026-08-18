@@ -1584,6 +1584,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
         )
 
+    # R117(b). Computed here, where all three maps have settled (the degraded
+    # path above empties them), and REPORTED beside the gates rather than here.
+    # The placement is the fix: this fact lived in an enrichment warning at the
+    # top of the log, which is the one place a session at T-10 does not re-read.
+    factors_inert = inert_factors([
+        ("F1", f1_by_player_id, f1_report),
+        ("F4", f4_by_player_id, f4_report),
+        ("F5", f5_by_player_id, f5_report),
+    ])
+
     # R127. A factor that fell back to its neutral default on a DECLARED STARTER
     # changes selection, so it reaches stderr at build time and not only the
     # brief the operator reads afterwards. The engine hands back its own list
@@ -1851,6 +1861,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             "selection_certified": result.get("selection_certified"),
             "allocation_certified": result.get("allocation_certified"),
         }
+        # R117(b). A refusal is read harder than a delivery, and an inert factor
+        # is one candidate reason the bank had nothing to separate.
+        payload["factors_inert"] = factors_inert
+        print(f"factors: {format_inert_factors_line(factors_inert)}",
+              file=sys.stderr)
         payload["pool_blockers_soft"] = soft
         payload["pool_blockers_overridden"] = (
             hard if (hard and args.ignore_pool_blockers) else [])
@@ -1878,6 +1893,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # it once out loud where the operator reads before approving.
     exposure["frontier"] = result.get("portfolio_frontier")
     print(f"frontier: {format_frontier_line(exposure['frontier'])}", file=sys.stderr)
+    print(f"factors: {format_inert_factors_line(factors_inert)}", file=sys.stderr)
     brief = {
         "status": "certified" if checks["passed"] else "verify_failed",
         "contest_type": "classic",
@@ -1915,6 +1931,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             "selection_certified": result.get("selection_certified"),
             "allocation_certified": result.get("allocation_certified"),
         },
+        # R117(b). Beside the gates, deliberately NOT inside them: these three
+        # keys are the certification vocabulary and an inert factor certifies
+        # nothing and blocks nothing. It sits here because this is where a
+        # reader asks "what was this build standing on", and the answer used to
+        # be twelve warnings up the log.
+        "factors_inert": factors_inert,
         "solve": {
             "strategy": strategy,
             "single_lineup_s": round(single_s, 2),
@@ -2381,6 +2403,56 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        == "even_split_no_market_input" else "")),
     }
     return (0 if template.get("passed") else 3), brief
+
+
+def inert_factors(factors) -> list:
+    """Which factors were computed for rows and moved NONE of them (R117(b)).
+
+    ``factors`` is a sequence of ``(name, by_player_id_map, report)``. A factor
+    is INERT when it scored at least one row and every value it produced is the
+    neutral 1.0 -- which is arithmetically identical to not computing it at all,
+    and is what the brief could not distinguish from a factor that applied
+    evenly. A factor that scored NOTHING is absent rather than inert: that is a
+    different fact with its own warnings, and folding the two together is how
+    "F4 is off for this build" came to read like routine enrichment noise.
+
+    Read the counts off the emitted MAP, not off a report key: the three factors
+    do not agree on what they call their row count (``hitters_scored``,
+    ``games_priced``, ``games_scored``), and a count derived from the thing the
+    solver actually received cannot drift from it.
+    """
+    NON_NEUTRAL_KEY = {"F1": "non_neutral_f1", "F4": "non_neutral_f4",
+                       "F5": "non_neutral_f5"}
+    out = []
+    for name, by_player, report in factors:
+        rows = len(by_player or {})
+        if not rows:
+            continue
+        key = NON_NEUTRAL_KEY.get(str(name).upper())
+        non_neutral = int((report or {}).get(key) or 0) if key else 0
+        if non_neutral:
+            continue
+        out.append({"factor": str(name).upper(), "rows_scored": rows,
+                    "non_neutral": non_neutral})
+    return sorted(out, key=lambda row: row["factor"])
+
+
+def format_inert_factors_line(inert) -> str:
+    """One review line for the inert-factor block, in the gates' own voice.
+
+    R117(b). `f4_non_neutral: 0` of 180 hitters certified clean on 1910_10g
+    while the only surface saying so was an enrichment warning at the top of the
+    log. This prints where the operator reads gates, and it says what the number
+    MEANS -- a factor at 1.0 everywhere ranked nothing -- because the count
+    alone reads as a tally rather than as a dead input.
+    """
+    if not inert:
+        return "none inert: every computed factor moved at least one row"
+    parts = [f"{row['factor']} scored {row['rows_scored']} row(s) and moved none"
+             for row in inert]
+    return ("INERT " + "; ".join(parts)
+            + " -- a factor at neutral 1.0 everywhere ranked nothing, which is "
+              "not the same as applying evenly")
 
 
 def format_frontier_line(frontier: dict | None) -> str:

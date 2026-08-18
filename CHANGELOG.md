@@ -25,6 +25,134 @@ performance claim.
 
 ---
 
+## 2026-08-18 — R117: mlb.com's hand line has two renders, and a factor that applied to nothing stops reading like one that applied evenly
+
+DEV, claim `engine_2026-08-18`. Tier 1's head, taken in tier order after R136
+closed the QA-hardening batch's last substantive entry. The only P1 left above
+the tier's remainder, and the one that changes SELECTION where the remainder
+changes labels.
+
+**What was wrong, and the entry named the wrong line.** The filing said the paste
+"drops the probable-pitcher continuation line." The continuation line was never
+the problem. `_HAND` was `^(?P<hand>[RL])HP\s*$`, anchored on `$`, and mlb.com
+renders the hand TWO ways: alone on its own line with `0-0, 4.76 ERA, 4 SO`
+below it (Ben's 2026-07-29 paste, which parses correctly and always did), and
+with the record trailing it on ONE line as `RHP 8-7, 3.87 ERA, 144 SO` (the
+2026-08-13 paste). The second shape fell past `_HAND` into the `_STATLINE`
+branch, which consumed it as decoration. The module docstring carried the
+first render as though it were the only one, which is how the assumption
+survived three slates. Corrected in place rather than tidied away, because a
+reader who has seen `RHP` on its own line in that docstring needs to know it is
+one of two.
+
+**The silence had three faces and the entry named one.** Measured on the real
+fixture re-rendered the joined way, pre-fix: `away_pitcher: None`,
+`home_pitcher: None`, `parse_paste` warnings `[]`, and both hitter sides
+resolving perfectly. Then `_assign`'s "0 or exactly 2" rule reads a pitcher count
+of ZERO as "no pitcher lines were pasted" and by design does not warn. Then
+`_flush_pending` treats the held name as the venue: a paste with no venue line
+came back `venue='Hayden Wesneski'`. Downstream, `_apply_dk_starting` supplied
+`{"id": None, "name": ..., "hand": ""}` from DK's `Starting` column, and that
+kills BOTH F4 terms — the empty id fails the join to
+`expected_stats_pitching.csv`, the empty hand misses every key in
+`F4_PLATOON_PRIOR` — so `f4_non_neutral: 0` of 180 hitters on 1910_10g,
+certified clean. `teams_without_opposing_probable` structurally cannot see it,
+because DK supplied a NAME and that list only holds sides with no probable at
+all.
+
+**(a) The parse.** `_match_hand` reads both renders through two named patterns
+rather than one loose one. Deliberately NOT `^[RL]HP\b.*`: the statline form has
+to carry a W-L record or an ERA/SO line, so a stray line opening with those
+three letters cannot become a handedness claim. The unknown-render branch is new
+and is the part that matters for the NEXT render change: a statline arriving
+while a name is still held now WARNS, names the line it could not read, and
+DROPS the held name instead of letting it become the venue. R122's Showdown
+handedness consumes the same parse.
+
+**(b) The loudness, on three surfaces.** `pool_report.opposing_probables_incomplete`
+splits the sides into `no_mlbam_id` and `no_hand` — two lists, because the two
+gaps kill different terms and are fixed by different inputs — and the pool emits
+ONE warning naming them, not one info line per side. Twenty per-side lines is
+what read as routine on 1910_10g, and the fact is about the slate. Reporting
+never filters: the incomplete probables stay in `opposing_probables`, because
+removing them would be the pool reduction the contract forbids arriving as a
+report change. In the brief, `factors_inert` sits BESIDE `gates` and not inside
+it, on both the certified brief and the exit-3 refusal payload, with one
+`factors:` review line beside R126's `frontier:` line. Inside `gates` was
+rejected: those three keys are the certification vocabulary, an inert factor
+certifies nothing and blocks nothing, and a review proxy sitting among them
+reads as a gate.
+
+**Generalized past F4, and the classification is the load-bearing part.** F1 and
+F5 carry the identical "every value is neutral" condition, so `inert_factors`
+takes all three. A factor that scored NOTHING is absent rather than inert — a
+different fact with its own warnings — and folding the two together is how "F4 is
+off for this build" came to read like routine enrichment noise. The row count
+comes off the emitted MAP rather than a report key, because the three factors
+disagree on what they call it (`hitters_scored`, `games_priced`, `games_scored`)
+and a count taken off the thing the solver received cannot drift from it.
+
+**The falsifier was checked and did not fire.** The entry said (a) shrinks to the
+loudness half if DK's `Starting` column reliably carries hand elsewhere. The
+frozen salary files' header is
+`Position,Name + ID,Name,ID,Roster Position,Salary,Game Info,TeamAbbrev,AvgPointsPerGame,Status,Starting`
+— no handedness column anywhere, so the parse half stands.
+
+**What this does NOT do.** F4 stays a labeled deterministic prior, `factors_inert`
+gates nothing, and no severity changed: an inert factor is a warning, never a
+blocker, because a build without F4 still ships and blocking on a prior would
+cost a delivery. The entry's rider (derive the slate tag before lighting the
+beacon so claims and artifacts agree) is NOT in this change and returns to the
+board under R131's smalls.
+
+**Evidence.** Eighteen tests: `test_paste_lineups` 75 -> 82, `test_core`
+781 -> 792, gate 1139 -> 1157. Both renders are asserted against the SAME
+fixture, with the joined one derived from the bare one by a transform that has
+its own no-op guard — R136's fixture lesson one suite over: a hand-written second
+fixture proves the regex matches the string the test author had in mind, while a
+derived one proves the identical slate resolves to identical pitchers and a
+byte-identical feed either way.
+
+Fourteen mutations run by hand, fourteen caught, and ONE only after the fixture
+was fixed:
+
+| # | Mutation | Result |
+|---|---|---|
+| M1 | statline pattern removed from `_match_hand` | caught (3 tests) |
+| M2 | loose `^[RL]HP\b.*` instead of the statline shape | caught |
+| M3 | unknown-render warning deleted | caught |
+| M4 | held name still falls through to the venue | **SURVIVED**, then caught |
+| M5 | pool report keyed on the probable's OWN team | caught |
+| M6 | one warning per side instead of one per slate | caught |
+| M7 | the pool warning promoted to a blocker | caught |
+| M8 | incomplete probables filtered out of the pool | caught |
+| M9 | `if not rows` guard removed (scored-nothing reads as inert) | caught |
+| M10 | row count read off a report key | caught (3 tests) |
+| M11 | `if non_neutral` guard removed | caught (2 tests) |
+| M12 | the "not the same as applying evenly" clause dropped | caught |
+| M13 | `factors_inert` moved INSIDE the `gates` dict | caught |
+| M14 | the certified brief's `factors_inert` key deleted | caught |
+
+**One test broke that is not about this change, and it is fixed rather than
+routed around.** `AuditSkipHonestyTests.test_skips_that_keep_the_count_are_still_reported`
+read `{"ran": 75}` against the paste pin's value at the time, so moving that pin
+to 82 turned the classification from `skipped_in_place` into `shortfall` and
+failed a test about neither. It now takes the pin from
+`EXPECTED_SUITE_COUNTS`, because the vehicle is the SHAPE — ran exactly at the
+pin with skips inside it — and a test that hardcodes a pin breaks on every pin
+move for a reason unrelated to what it asserts. The three neighbouring `75`s in
+that class are `parse_unittest_report` string fixtures and are correctly
+arbitrary; they were checked and left alone.
+
+M4 is the entry worth reading. Dropping the held name survived because the
+fixture carries `Angel Stadium` BEFORE the pitcher block and `_flush_pending`
+only writes a venue when there is not one already — so that fixture cannot
+distinguish the two behaviours, and the guard was unpinned while its test read
+green. The seventh test is a VENUELESS paste, which is the only shape that can
+see it. Same lesson as R136's surviving mutation and R128 before it: a green test
+over a fixture that cannot separate two outcomes is worse than a missing test,
+because it tells the next session not to look.
+
 ## 2026-08-18 — Run-scoped patches get a home, and the .gitignore rule they needed already existed
 
 DEV, claim `engine_2026-08-18`. Contract change to CLAUDE.md's multi-session git

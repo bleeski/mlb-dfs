@@ -104,6 +104,16 @@ _HITTER = re.compile(
     r"^(?P<order>\d{1,2})\.\s*(?P<name>.+?)\s*\((?P<bats>[RLS])\)\s*(?P<pos>[A-Z0-9/]{1,4})\s*$")
 _TEAM_HEADER = re.compile(r"^(?P<team>[A-Z]{2,4})\s+Lineup\s*$")
 _HAND = re.compile(r"^(?P<hand>[RL])HP\s*$")
+# R117. The SAME fact with the statline appended on one line:
+# "RHP 8-7, 3.87 ERA, 144 SO". mlb.com renders the hand alone on 2026-07-29's
+# paste and with the record trailing it on 2026-08-13's, and only the first
+# shape was ever matched, so every probable on three slates fell through to the
+# `_STATLINE` branch and was consumed as decoration. Deliberately NOT
+# `[RL]HP\b.*`: the rest has to look like a pitcher's line (a W-L record, or an
+# ERA/SO statline) or this stops being structural and starts guessing that any
+# line opening with those three letters names a hand.
+_HAND_STATLINE = re.compile(
+    r"^(?P<hand>[RL])HP[\s,]+(?P<stats>\d{1,3}-\d{1,3}\b.*|.*\b(?:ERA|SO)\b.*)$")
 _RECORD = re.compile(r"^\(\d{1,3}-\d{1,3}\)$")
 _CLOCK = re.compile(r"^(?P<h>\d{1,2}):(?P<m>\d{2})\s*(?P<ap>[AP]M)?\s*(?:ET)?$", re.I)
 _STATLINE = re.compile(r"\bERA\b|\bSO\b")
@@ -191,6 +201,21 @@ def _club_names(line: str) -> Optional[Tuple[str, str]]:
     return away, home
 
 
+def _match_hand(text: str) -> Optional[str]:
+    """'RHP' or 'RHP 8-7, 3.87 ERA, 144 SO' -> 'R'; anything else -> None.
+
+    R117. Two renders of one fact. Keeping them as two named patterns rather
+    than one loose one is the point: the bare form is exact, and the statline
+    form has to carry a W-L record or an ERA/SO line, so a stray line beginning
+    'LHP' cannot silently become a handedness claim.
+    """
+    for pattern in (_HAND, _HAND_STATLINE):
+        found = pattern.match(text)
+        if found:
+            return found.group("hand").upper()
+    return None
+
+
 def _looks_like_name(text: str) -> bool:
     """A bare line that could be a venue or a person's name, not decoration."""
     if not text or len(text) > 60:
@@ -226,6 +251,18 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
     ``LHP`` line that follows it; the venue is whatever bare line was displaced
     without ever being promoted. Requiring the link meant a plain-text paste
     resolved every hitter and zero pitchers, because the id lives only in the URL.
+
+    R117. The hand line has TWO renders and only the bare one was matched. The
+    2026-07-29 paste put ``RHP`` alone on its line with ``0-0, 4.76 ERA, 4 SO``
+    below it; the 2026-08-13 paste put both on one line as
+    ``RHP 8-7, 3.87 ERA, 144 SO``. ``_HAND`` anchored on ``$``, so the second
+    shape fell past it into the ``_STATLINE`` branch and was consumed as
+    decoration -- every probable dropped, on three slates in two days, with no
+    warning anywhere. ``_match_hand`` now reads both. The two ways that silence
+    was expensive are recorded on the failure branch below and in
+    ``_assign``: a held name became the VENUE, and a pitcher count of zero is
+    the same shape as "no pitcher lines were pasted", which ``_assign`` does not
+    warn about by design.
     """
     games: List[PastedGame] = []
     warnings: List[str] = []
@@ -308,17 +345,33 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
                 blocks.append([])
             continue
 
-        hand = _HAND.match(stripped)
+        hand = _match_hand(stripped)
         if hand and pending_name is not None:
             pitchers.append(PastedPitcher(display_name=pending_name[0],
                                           mlbam_id=pending_name[1],
-                                          hand=hand.group("hand").upper()))
+                                          hand=hand))
             pending_name = None
             continue
 
         if _RECORD.match(stripped):
             continue
         if _STATLINE.search(stripped):
+            # R117. A statline arriving while a NAME is still held means the line
+            # that should have promoted that name to a pitcher was a shape this
+            # parser does not know. Say so and DROP the name: letting it fall
+            # through to `_flush_pending` wrote a pitcher's name into
+            # `game.venue` (measured: a paste with no venue line came back
+            # venue='Hayden Wesneski') and left the pitcher count at 0, which
+            # `_assign` reads as "nothing was pasted" and does not warn about.
+            # A named parse failure is the floor here; a wrong venue plus a
+            # dead F4 is what the silence cost three times.
+            if pending_name is not None and current is not None:
+                current.warnings.append(
+                    f"held {pending_name[0]!r} as a probable's name and the next "
+                    f"line was a statline ({stripped!r}) rather than a "
+                    f"'RHP'/'LHP' hand line, so no hand could be read and the "
+                    f"name is dropped rather than mistaken for the venue")
+                pending_name = None
             continue
         clock = _CLOCK.match(stripped)
         if clock:
