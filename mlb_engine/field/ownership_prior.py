@@ -71,6 +71,82 @@ ARCHETYPE_PARAMS: Dict[str, Dict[str, float]] = {
 }
 DEFAULT_ARCHETYPE = "large_field_gpp"
 
+# R136. The engine speaks twelve CONTEST SHAPES and this prior speaks six
+# ARCHETYPES, so anything reading a prediction for a real contest has to
+# project one vocabulary onto the other. That projection lives here, once,
+# rather than in whichever report tool needed it first: a private copy in
+# qa_portfolio would have been a second answer to "which archetype is this
+# contest", and ownership is CONDITIONED on archetype, so a second answer is a
+# pooling bug waiting to happen.
+#
+# Every value carries how much the projection LOSES, because two of these are
+# not the same kind of statement. EXACT means the shape and the archetype name
+# the same thing. COLLAPSED means several shapes share one archetype, so the
+# projection has thrown away a distinction the engine makes -- five WTA and
+# satellite shapes land on one `wta_satellite`, and `mid_field_gpp` has no
+# counterpart at all and is read as the flatter neighbour. A caller printing a
+# number off a COLLAPSED projection is printing it for a coarser contest than
+# the one in hand, and the label is how a reader knows that.
+ARCHETYPE_BY_CONTEST_SHAPE: Dict[str, Tuple[str, str]] = {
+    "cash":                 ("cash", "EXACT"),
+    "single_entry_gpp":     ("single_entry_gpp", "EXACT"),
+    "small_field_gpp":      ("small_gpp", "EXACT"),
+    "large_field_gpp":      ("large_field_gpp", "EXACT"),
+    "mme_gpp":              ("mme", "EXACT"),
+    "mid_field_gpp":        ("large_field_gpp", "COLLAPSED"),
+    "portfolio_gpp":        ("mme", "COLLAPSED"),
+    "small_wta":            ("wta_satellite", "COLLAPSED"),
+    "mid_wta":              ("wta_satellite", "COLLAPSED"),
+    "large_wta":            ("wta_satellite", "COLLAPSED"),
+    "wta_ticket_satellite": ("wta_satellite", "COLLAPSED"),
+    "satellite":            ("wta_satellite", "COLLAPSED"),
+}
+
+
+def archetype_for_contest_shape(shape: object) -> Optional[Tuple[str, str]]:
+    """(archetype, EXACT|COLLAPSED) for a contest shape, or None if unknown.
+
+    None rather than DEFAULT_ARCHETYPE on purpose. A shape this map does not
+    carry is a shape somebody added to ``contest_shapes`` without deciding what
+    the field does in it, and answering that with the default would price the
+    contest against a large-field GPP crowd while saying nothing. The import
+    check below is what makes that case unreachable in a released tree; the
+    None is for a caller holding a shape string from a file rather than from
+    the vocabulary.
+    """
+    return ARCHETYPE_BY_CONTEST_SHAPE.get(str(shape or "").strip().lower())
+
+
+def _check_shape_projection() -> None:
+    """The map covers the closed shape set exactly, checked at import.
+
+    ``contest_shapes`` is the vocabulary and every producer of a shape
+    validates against it at import (CLAUDE.md). This is the consumer side of
+    the same rule: adding a thirteenth shape and forgetting the field it
+    implies fails here, loudly, at import, instead of silently defaulting a
+    live contest to the wrong crowd.
+    """
+    from mlb_engine.contest_shapes import CONTEST_SHAPES
+
+    missing = sorted(set(CONTEST_SHAPES) - set(ARCHETYPE_BY_CONTEST_SHAPE))
+    extra = sorted(set(ARCHETYPE_BY_CONTEST_SHAPE) - set(CONTEST_SHAPES))
+    if missing or extra:
+        raise ImportError(
+            "ARCHETYPE_BY_CONTEST_SHAPE must cover contest_shapes.CONTEST_SHAPES "
+            f"exactly; missing {missing}, not a shape {extra}")
+    unknown = sorted({a for a, _ in ARCHETYPE_BY_CONTEST_SHAPE.values()}
+                     - set(ARCHETYPE_PARAMS))
+    if unknown:
+        raise ImportError(
+            f"ARCHETYPE_BY_CONTEST_SHAPE maps to unknown archetype(s) {unknown}")
+    bad = sorted({e for _, e in ARCHETYPE_BY_CONTEST_SHAPE.values()}
+                 - {"EXACT", "COLLAPSED"})
+    if bad:
+        raise ImportError(f"unknown projection exactness {bad}")
+
+
+_check_shape_projection()
+
 HITTER_BUDGET_PCT = 800.0   # 8 hitter slots per roster
 PITCHER_BUDGET_PCT = 200.0  # 2 P slots per roster
 

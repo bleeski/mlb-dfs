@@ -12,6 +12,7 @@ import tempfile
 import types
 import unittest
 import unittest.mock
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13143,6 +13144,357 @@ class PortfolioFrontierTests(unittest.TestCase):
         self.assertIn("APEX IS SHORT", text)
         self.assertIn("Do not compare this apex to another build's", text)
 
+
+class LeveragePanelTests(unittest.TestCase):
+    """R136: the field-facing third axis in qa_portfolio, and its labels.
+
+    Sections 2 and 3 measure a portfolio against the SLATE. This one measures
+    it against the crowd, off an uncalibrated v0.1 prior, which is why most of
+    what follows pins a LABEL or an ABSENCE rather than a number: the numbers
+    are only as good as the prior and the whole risk of the section is a
+    reader taking one for a measurement.
+    """
+
+    SHAPES = ["satellite", "cash"]
+    # Multipliers applied to the fixture's shares, one per archetype, so the
+    # two archetypes in a prediction file are distinguishable in the OUTPUT and
+    # not only in the label.
+    ARCHETYPE_SCALES = (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+
+    @staticmethod
+    def _qa():
+        from tools import qa_portfolio
+        return qa_portfolio
+
+    def _salary(self, showdown=False):
+        """id -> row. Ten Classic slots need 2 P and 8 bats; Showdown needs
+        one CPT row and its UTIL twin, which is the duplication the panel
+        refuses to price."""
+        rows = {}
+        if showdown:
+            for i in range(6):
+                rows[f"c{i}"] = {"ID": f"c{i}", "Name": f"Cap{i}",
+                                 "Roster Position": "CPT", "Salary": "9000",
+                                 "TeamAbbrev": "AAA",
+                                 "Game Info": "AAA@BBB 07:00PM ET"}
+                rows[f"u{i}"] = {"ID": f"u{i}", "Name": f"Cap{i}",
+                                 "Roster Position": "UTIL", "Salary": "6000",
+                                 "TeamAbbrev": "AAA",
+                                 "Game Info": "AAA@BBB 07:00PM ET"}
+            return rows
+        for i in range(2):
+            rows[f"p{i}"] = {"ID": f"p{i}", "Name": f"Arm{i}",
+                             "Roster Position": "P", "Salary": "9000",
+                             "TeamAbbrev": "AAA",
+                             "Game Info": "AAA@BBB 07:00PM ET"}
+        for i in range(12):
+            rows[f"h{i}"] = {"ID": f"h{i}", "Name": f"Bat{i}",
+                             "Roster Position": "OF", "Salary": "4000",
+                             "TeamAbbrev": "AAA",
+                             "Game Info": "AAA@BBB 07:00PM ET"}
+        return rows
+
+    HDR = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+           "P", "P", "C", "1B", "2B", "3B", "SS", "OF"]
+    SD_HDR = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+              "CPT", "UTIL", "UTIL", "UTIL", "UTIL", "UTIL"]
+
+    def _entry(self, entry_id, contest_id, bats, name="Contest"):
+        return [entry_id, name, contest_id, "$1", "p0", "p1"] + bats
+
+    def _body(self, contest_id="111", n=2, first=0):
+        return [self._entry(str(9000 + i), contest_id,
+                            [f"h{(first + i + j) % 12}" for j in range(6)])
+                for i in range(n)]
+
+    def _prior(self, shares=None, tiers=None, archetypes=("cash",
+                                                          "wta_satellite"),
+               inputs_applied=True, sha="deadbeef"):
+        shares = shares or {**{f"p{i}": 20.0 for i in range(2)},
+                            **{f"h{i}": 5.0 for i in range(12)}}
+        tiers = tiers or {k: "Mid" for k in shares}
+        return {
+            "schema": "ownership_pred/v1",
+            "prior_version": "v0.1-prior",
+            "slate_date": "2026-08-18", "slate_tag": "t",
+            "salary_file": {"sha256": sha},
+            "inputs": {k: {"applied": inputs_applied} for k in
+                       ("batting_order", "implied_totals", "probable_sp",
+                        "base_projection")},
+            # Each archetype carries DIFFERENT shares on purpose. A fixture
+            # whose archetypes hold the same numbers cannot tell whether the
+            # panel read the right one -- it passed a mutation that replaced
+            # the resolved archetype with the file's first key, which is the
+            # exact defect R136's entry names. R151's lesson: a guard that
+            # survives its mutation is sometimes a weak fixture.
+            "archetypes": {a: {"own_pct_by_player_id":
+                               {k: round(v * f, 3) for k, v in shares.items()},
+                               "tier_by_player_id": dict(tiers)}
+                           for f, a in zip(self.ARCHETYPE_SCALES, archetypes)},
+        }
+
+    def _run(self, brief=None, prior="default", hdr=None, body=None,
+             showdown=False, prior_path="/tmp/pred.json",
+             note="test", salary_path=None, archetype=None, sal=None):
+        qa = self._qa()
+        if prior == "default":
+            prior = self._prior()
+        return qa.section_leverage(
+            brief if brief is not None else {"contests": [
+                {"contest_id": "111", "contest_shape": "satellite",
+                 "contest_name": "Sat"}]},
+            sal if sal is not None else self._salary(showdown),
+            hdr or (self.SD_HDR if showdown else self.HDR),
+            body if body is not None else self._body(),
+            prior, Path(prior_path) if prior_path else None, note,
+            Path(salary_path or __file__), archetype)
+
+    # ---- the projection itself
+
+    def test_the_shape_projection_covers_the_closed_vocabulary_exactly(self):
+        """A thirteenth contest shape with no field behaviour decided for it is
+        an ImportError, not a silent default. This is the consumer side of the
+        rule that every producer of a shape validates against contest_shapes."""
+        from mlb_engine.contest_shapes import CONTEST_SHAPES
+        from mlb_engine.field.ownership_prior import (
+            ARCHETYPE_BY_CONTEST_SHAPE, ARCHETYPE_PARAMS)
+        self.assertEqual(set(ARCHETYPE_BY_CONTEST_SHAPE), set(CONTEST_SHAPES))
+        for shape, (archetype, exactness) in ARCHETYPE_BY_CONTEST_SHAPE.items():
+            self.assertIn(archetype, ARCHETYPE_PARAMS, shape)
+            self.assertIn(exactness, ("EXACT", "COLLAPSED"), shape)
+
+    def test_a_collapsed_projection_is_labelled_as_one(self):
+        """Five WTA and satellite shapes land on one archetype, so a number
+        printed for a satellite is priced for a coarser contest than the one
+        entered. The reader is told; a bare archetype name would not."""
+        from mlb_engine.field.ownership_prior import (
+            archetype_for_contest_shape as f)
+        self.assertEqual(f("satellite"), ("wta_satellite", "COLLAPSED"))
+        self.assertEqual(f("large_wta"), ("wta_satellite", "COLLAPSED"))
+        self.assertEqual(f("cash"), ("cash", "EXACT"))
+        self.assertEqual(f("mme_gpp"), ("mme", "EXACT"))
+
+    def test_an_unknown_shape_is_none_and_never_the_default_archetype(self):
+        """DEFAULT_ARCHETYPE would price the contest against a large-field GPP
+        crowd while saying nothing about having guessed."""
+        from mlb_engine.field.ownership_prior import (
+            archetype_for_contest_shape as f, DEFAULT_ARCHETYPE)
+        self.assertIsNone(f("no_such_shape"))
+        self.assertIsNone(f(""))
+        self.assertIsNone(f(None))
+        self.assertEqual(DEFAULT_ARCHETYPE, "large_field_gpp")
+
+    # ---- the field mean is an identity, not a formula copied into a docstring
+
+    def test_the_field_mean_equals_the_mean_cumulative_ownership_of_a_field(self):
+        """Built the long way and checked against the closed form. Take an
+        explicit field of lineups, count each player's share, and the mean of
+        those lineups' cumulative ownership must equal sum(own_p^2) exactly --
+        that is the claim the panel prints, so it is tested against a field
+        rather than restated."""
+        field = [("a", "b", "c"), ("a", "b", "d"), ("a", "c", "d"),
+                 ("b", "c", "e"), ("a", "b", "c")]
+        counts = defaultdict(int)
+        for lineup in field:
+            for p in lineup:
+                counts[p] += 1
+        own = {p: 100.0 * c / len(field) for p, c in counts.items()}
+        long_way = sum(sum(own[p] for p in lineup) for lineup in field) / len(field)
+        self.assertAlmostEqual(self._qa().field_mean_cum_own(own), long_way, 9)
+
+    # ---- conditioning on archetype
+
+    def test_each_contest_reads_its_own_archetype_never_the_files_first_key(self):
+        """Ownership is conditioned on archetype -- the same player on the same
+        slate has been observed 20-31 points apart across them -- so a file
+        holding two contests gets two readings. 'cash' sorts first in the
+        prediction file and is the wrong answer for a satellite."""
+        brief = {"contests": [
+            {"contest_id": "111", "contest_shape": "satellite"},
+            {"contest_id": "222", "contest_shape": "cash"}]}
+        body = self._body("111", 2) + self._body("222", 2)
+        lines = self._run(brief=brief, body=body)
+        text = "\n".join(lines)
+        self.assertIn("satellite -> wta_satellite [COLLAPSED]", text)
+        self.assertIn("cash -> cash [EXACT]", text)
+        # The label alone is not the test. The label is printed off the
+        # resolved archetype and the NUMBERS are read out of the block, so a
+        # panel that labels correctly and prices off the file's first key
+        # passes any assertion on the label. `cash` sorts first, and its
+        # fixture shares are half wta_satellite's.
+        prior = self._prior()
+        cash = sum(prior["archetypes"]["cash"]["own_pct_by_player_id"][pid]
+                   for pid in ("p0", "p1", "h0", "h1", "h2", "h3", "h4", "h5"))
+        sat = sum(
+            prior["archetypes"]["wta_satellite"]["own_pct_by_player_id"][pid]
+            for pid in ("p0", "p1", "h0", "h1", "h2", "h3", "h4", "h5"))
+        self.assertNotAlmostEqual(cash, sat)
+        under_sat = lines[lines.index(
+            [l for l in lines if "satellite -> wta_satellite" in l][0]) + 2]
+        self.assertIn(f"chalk-sum {sat:.1f}", under_sat)
+
+    def test_an_unresolved_shape_reports_rather_than_defaulting(self):
+        text = "\n".join(self._run(brief={"contests": []}))
+        self.assertIn("archetype UNRESOLVED", text)
+        self.assertIn("carries no contest_shape for this id", text)
+        self.assertNotIn("chalk-sum ", text)
+
+    def test_an_archetype_absent_from_the_file_says_which_ones_are_present(self):
+        prior = self._prior(archetypes=("cash",))
+        text = "\n".join(self._run(prior=prior))
+        self.assertIn("'wta_satellite' ABSENT from the prediction file", text)
+        self.assertIn("which carries cash", text)
+
+    # ---- R127's boundary, applied in both directions
+
+    def test_a_missing_prior_file_is_one_fact_with_no_player_list(self):
+        """The file is missing: that is one fact about this review. Listing ten
+        players under it would say the same thing ten times, and the paste
+        intake's ratio rule is the same reasoning."""
+        text = "\n".join(self._run(prior=None, prior_path=None,
+                                   note="no prediction file in outputs/x/"))
+        self.assertIn("ABSENT", text)
+        self.assertIn("ABSENT, not zero", text)
+        self.assertNotIn("Bat0", text)
+        self.assertIn("SALARY LEFT", text)  # the column needing no prior
+
+    def test_a_player_missing_from_a_present_file_is_named_per_player(self):
+        shares = {f"p{i}": 20.0 for i in range(2)}
+        shares.update({f"h{i}": 5.0 for i in range(3)})
+        text = "\n".join(self._run(prior=self._prior(shares=shares)))
+        self.assertIn("CHALK-SUM IS SHORT", text)
+        self.assertIn("Bat3", text)
+        self.assertIn("the totals above understate", text)
+
+    # ---- the traps the entry named
+
+    def test_an_inert_implied_total_is_named_beside_the_chalk_sum(self):
+        """R136's own words: a chalk-sum computed off a prediction whose
+        implied-total tilt was inert is a salary-and-order number wearing a
+        market label."""
+        text = "\n".join(self._run(prior=self._prior(inputs_applied=False)))
+        self.assertIn("IMPLIED-TOTAL TILT WAS INERT", text)
+        self.assertIn("wearing a market label", text)
+        applied = "\n".join(self._run())
+        self.assertNotIn("INERT", applied)
+
+    def test_a_prior_that_priced_a_different_salary_file_says_so(self):
+        """DK re-publishes salaries during the day and the prediction records
+        the sha256 of the file it read."""
+        text = "\n".join(self._run(salary_path=__file__))
+        self.assertIn("PRIOR PRICED A DIFFERENT SALARY FILE", text)
+        self.assertIn("Re-emit before reading them", text)
+
+    def test_the_carry_column_counts_tiers_because_the_absolute_bar_is_inert(self):
+        """Measured on the 2026-08-17 slate: the prior spreads 800% over 284
+        hitter rows, the top hitter reaches 8.9%, and every hitter is therefore
+        'sub-10%'. Counting that literally returns 8-of-8 on every entry, which
+        separates nothing. The tier is a rank and it does separate."""
+        shares = {**{f"p{i}": 20.0 for i in range(2)},
+                  **{f"h{i}": 5.0 for i in range(12)}}
+        tiers = {k: ("Low" if k in ("h0", "h1") else "Mid") for k in shares}
+        body = [self._entry("1", "111", ["h0", "h1", "h2", "h3", "h4", "h5"]),
+                self._entry("2", "111", ["h6", "h7", "h8", "h9", "h10", "h11"])]
+        text = "\n".join(self._run(
+            prior=self._prior(shares=shares, tiers=tiers,
+                              archetypes=("wta_satellite",)), body=body))
+        self.assertIn("low-owned carry 1/2 entries", text)
+        self.assertIn("{0: 1, 2: 1}", text)
+        self.assertIn("bottom-TIER hitters", text)
+        # The legend recomputes the arithmetic from the pool in hand rather
+        # than quoting a slate, because the whole point of it is that the
+        # number depends on how many rows the budget is spread over.
+        self.assertIn("spreads 800% over 12 priced hitter rows", text)
+        self.assertIn("the top hitter reaches 5.0% with 12 of 12 rows under "
+                      "10%", text)
+        self.assertIn("is a constant and not a column", text)
+
+    def test_the_read_once_prose_is_not_repeated_under_every_contest(self):
+        """The first cut printed every caveat under every contest and a
+        six-contest file ran to forty lines of repeated paragraphs. An unread
+        caveat protects nobody."""
+        brief = {"contests": [{"contest_id": str(c), "contest_shape": "cash"}
+                              for c in (111, 222, 333)]}
+        body = (self._body("111") + self._body("222") + self._body("333"))
+        text = "\n".join(self._run(brief=brief, body=body))
+        self.assertEqual(text.count("accounting identity"), 1)
+        self.assertEqual(text.count("mean signed error of -10.44"), 1)
+        self.assertEqual(text.count("chalk-sum "), 3)
+
+    def test_the_cross_contest_line_is_the_comparison_the_prior_supports(self):
+        brief = {"contests": [{"contest_id": "111", "contest_shape": "cash"},
+                              {"contest_id": "222", "contest_shape": "cash"}]}
+        shares = {**{f"p{i}": 20.0 for i in range(2)},
+                  **{f"h{i}": (30.0 if i < 6 else 1.0) for i in range(12)}}
+        body = [self._entry("1", "111", [f"h{i}" for i in range(6)]),
+                self._entry("2", "222", [f"h{i}" for i in range(6, 12)])]
+        text = "\n".join(self._run(prior=self._prior(shares=shares), body=body,
+                                   brief=brief))
+        self.assertIn("ACROSS THIS FILE: chalkiest contest 111", text)
+        self.assertIn("least chalky contest 222", text)
+        self.assertIn("both sides of it are the same prior on the same slate",
+                      text)
+
+    # ---- Showdown
+
+    def test_showdown_gets_the_captain_rank_and_no_classic_chalk_sum(self):
+        """The prior budgets 800/200 over a ten-seat Classic roster and a
+        Showdown salary file lists every player twice, so a percentage off it
+        is not that contest's crowd. The RANK survives; the percentage does
+        not, and the panel says which is which."""
+        tiers = {**{f"c{i}": ("High" if i == 0 else "Low") for i in range(6)},
+                 **{f"u{i}": "Mid" for i in range(6)}}
+        prior = self._prior(shares={k: 5.0 for k in tiers}, tiers=tiers)
+        body = [["1", "C", "111", "$1", "c0", "u1", "u2", "u3", "u4", "u5"],
+                ["2", "C", "111", "$1", "c3", "u1", "u2", "u3", "u4", "u5"]]
+        text = "\n".join(self._run(prior=prior, body=body, showdown=True,
+                                   archetype="wta_satellite"))
+        self.assertIn("ABSENT for Showdown", text)
+        self.assertIn("lists every player TWICE", text)
+        self.assertIn("captain own-tier: High 1, Low 1", text)
+        self.assertNotIn("chalk-sum ", text)
+
+    def test_salary_left_reads_showdown_slots_and_its_own_medians(self):
+        """CPT and UTIL are not in SLOTS, which drives sections 2 and 3, so a
+        Showdown file reported nothing at all before this section existed."""
+        body = [["1", "C", "111", "$1", "c0", "u1", "u2", "u3", "u4", "u5"]]
+        text = "\n".join(self._run(body=body, showdown=True, prior=None,
+                                   prior_path=None, note="none"))
+        self.assertIn("SALARY LEFT across 1 entries: $11,000", text)
+        self.assertIn("winners $200, field $300", text)
+
+    def test_salary_left_excludes_an_unpriced_entry_rather_than_guessing(self):
+        body = [self._entry("1", "111", ["h0", "h1", "h2", "h3", "h4", "h5"]),
+                self._entry("2", "111", ["h0", "h1", "h2", "h3", "h4", "zz"])]
+        text = "\n".join(self._run(body=body))
+        self.assertIn("SALARY LEFT across 1 entries", text)
+        self.assertIn("SALARY LEFT IS SHORT: 1 entr(ies)", text)
+
+    # ---- resolution of the prior file
+
+    def test_two_prediction_files_are_named_rather_than_picked_from(self):
+        """R70's rule on a new surface: more than one file matching an intake
+        role is a question for the operator, not a race won by sort order."""
+        qa = self._qa()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "outputs" / "2026-08-18"
+            out.mkdir(parents=True)
+            for tag in ("a", "b"):
+                (out / f"ownership_pred_{tag}.json").write_text("{}")
+            path, note = qa.find_prior_file({"date": "2026-08-18"}, None,
+                                            Path(td))
+            self.assertIsNone(path)
+            self.assertIn("AMBIGUOUS", note)
+            self.assertIn("ownership_pred_a.json", note)
+            path, note = qa.find_prior_file(
+                {"date": "2026-08-18", "slate": {"tag": "b"}}, None, Path(td))
+            self.assertEqual(path.name, "ownership_pred_b.json")
+            self.assertIn("brief date + slate tag", note)
+
+    def test_a_wrong_schema_refuses_to_guess_at_the_layout(self):
+        text = "\n".join(self._run(prior={"schema": "something/v9"}))
+        self.assertIn("is schema 'something/v9', not ownership_pred/v1", text)
+        self.assertIn("will not guess at a layout", text)
 
 class GitFreshnessTests(unittest.TestCase):
     """R145: session start reads `git log`, and a stale log looks current.

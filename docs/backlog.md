@@ -39,6 +39,51 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-18, DEV, claim `engine_2026-08-18`: **R136 is CLOSED and migrated** to
+CHANGELOG.md, taken in tier order as the head of Tier 1 and of its QA batch,
+which R135 had unblocked the day before. **R117 is the new head of Tier 1**: the
+batch's three substantive entries (R127, R126, R136) are all closed and its
+remainder is R130 + R131, both P2 and XS-S with one half of R131 being Ben's, so
+they sweep opportunistically rather than holding a tier slot. R117 is the only
+P1 above them and it changes SELECTION where they change labels. Four things
+worth reading before the R-number, and the first two changed the entry as filed.
+**First, the sub-10% carry column as specified is a constant.** Ledger 3.17's
+threshold is an absolute 10% on ACTUAL %Drafted; the v0.1 prior spreads its 800%
+hitter budget over every priced hitter row, which on 1905_7g is 284 rows with a
+mean of 2.8% and a top hitter of 8.9%, so all 284 are "sub-10%" and the literal
+column returned 8-of-8 on every entry of every contest. That is R126's
+retained-percent finding in a new place: a metric that cannot separate the two
+things it was filed to separate. It ships as the prior's own within-pool TIER, a
+rank, which does separate them, and the absolute count comes back with R10's
+fitted model (rider filed there). **Second, the chalk-sum's reference needs no
+model.** The field's own mean cumulative ownership is exactly sum(own_p^2) — an
+accounting identity, the same count taken along the other axis, assuming nothing
+about how the field builds — so the panel prints a comparison rather than a
+naked number, and the identity is pinned against an explicit field built the
+long way rather than restated from the docstring. What is NOT readable is the
+magnitude: the prior under-concentrates by a measured 10.44 points (R135), so
+the section closes on the cross-contest ORDER within one file, which is the
+comparison the same prior on the same slate does support. **Third, Showdown got
+smaller, not bigger.** The captain column ships as a RANK and the chalk-sum is
+ABSENT there, because the prior budgets 800/200 over a ten-seat Classic roster
+while a Showdown salary file lists every player twice (186 rows for 93 players
+on the 2026-08-14 NYY@TOR file). That is a defect in the PRIOR, and R139's step
+1 is now a Showdown-native prior rather than a report change; its entry carries
+the correction. **Fourth, the fixture lesson landed again.** Fifteen mutations
+were run by hand and fifteen were caught, but one — replacing the resolved
+archetype with the prediction file's first key, which is the exact pooling
+defect the entry was written to prevent — SURVIVED until the fixture stopped
+giving every archetype identical shares. A test asserting the LABEL passes while
+the DATA comes from the wrong block. Gate 1120 -> 1139 (`test_core` 762 -> 781,
+`grew`); CLAUDE.md, SKILL.md and the ledger Quick Card pin line moved with it,
+the last under a DEV-held `ledger` claim, that line and nothing else. One
+condition to report and not fix: `tools/_operator_patch_20260813_crossgame.py`
+and `tools/_run_patched_build.py` are still untracked inside the DEV write set
+from the 08-13 1507_3g session, so `claim.py dirt --role DEV` opens every DEV
+session BLOCKED on two files nobody owns any more. That is R107's residue item
+and it now has a cost: the gate that exists to name a live owner names a dead
+one instead.*
+
 *2026-08-17 (fifth session), DEV, claim `engine_greenfield_spec_2026-08-17`:
 **the fifth greenfield edition arrived and was adjudicated the same day; the
 queue does not move.** Its controlling fact is its own header: it audited
@@ -853,13 +898,43 @@ underneath it.*
    PLAYER is named per player. Gate 1074 -> 1101 (`test_core` 716 -> 743);
    twelve mutations run by hand, all twelve caught, and one guard rewritten
    because a naive label sweep failed on the block's own disclaimer.
-   **R136** (P2, S, WS2) is the new head of this batch, and its
-   "one session takes both" sequencing is WITHDRAWN on the entry: R126 landed in
-   the pipeline and the brief, R136 is a qa_portfolio panel needing R135's
-   still-unwired prior file, so they are not one surface. **R135 CLOSED
+   **R136 — CLOSED 2026-08-18**, migrated to CHANGELOG.md, taken in tier order
+   as the head of the batch and of the tier, with R135's prior file in hand.
+   Four things the work established, two of which changed the entry. The
+   sub-10% carry column as FILED is a constant: 3.17's threshold is an absolute
+   10% on actual %Drafted and the v0.1 prior spreads 800% over every priced
+   hitter row, so on 1905_7g the top hitter reaches 8.9% and the literal count
+   returned 8-of-8 on every entry — it ships as the prior's own within-pool
+   TIER, a rank, which does separate entries, and the absolute count returns
+   with R10's fitted model. The chalk-sum's field-mean reference needs no model:
+   the field's own mean cumulative ownership is exactly sum(own_p^2), an
+   accounting identity, pinned against an explicit field built the long way. The
+   magnitude of a delta is NOT readable (the prior under-concentrates by a
+   measured 10.44 points) so the section closes on the cross-contest order
+   within one file, which is the comparison the prior does support. And Showdown
+   gets the captain RANK and no chalk-sum, because the prior budgets 800/200
+   over a ten-seat Classic roster while a Showdown salary file lists every
+   player twice — 186 rows for 93 players on the 2026-08-14 NYY@TOR file — which
+   is a defect in the prior and now rides R139. Gate 1120 -> 1139 (`test_core`
+   762 -> 781, `grew`); fifteen mutations run by hand, all fifteen caught, one
+   only after the FIXTURE was fixed (identical shares across archetypes let a
+   test assert the LABEL while the DATA came from the wrong block, which is
+   exactly the defect the entry named). **The batch's three substantive entries
+   are now all closed and its remainder is R130 + R131, both P2 and XS-S with
+   one half of R131 being Ben's rather than DEV's; sweep them opportunistically
+   rather than as a tier slot. R117 is the new head of Tier 1**, on the tier's
+   own ordering: it is the only P1 left above it and it changes SELECTION where
+   the remainder changes labels. What R136 left behind for
+   the two smalls: `_leverage_legend` and `section_leverage` are the read-once
+   pattern to extend, and `tools/qa_portfolio.py` now has 24 tests rather than
+   five, all on sections 3 and 4 — sections 1 and 2 are still unpinned and R11
+   owns them. The entry as filed said
+   "one session takes both" of R126 and itself; that was WITHDRAWN when R126
+   landed, and correctly — R126 landed in the pipeline and the brief while R136
+   is a qa_portfolio panel, so they were never one surface. **R135 CLOSED
    2026-08-17**, migrated to CHANGELOG.md, taken later the same day on that
-   sequencing note rather than in tier order: the prior file exists now and
-   R136 enters with its input specified rather than assumed. **R130** (P2, S, WS4) is reporting only; its proposed
+   sequencing note rather than in tier order, and it paid: R136 entered with its
+   input specified rather than assumed. **R130** (P2, S, WS4) is reporting only; its proposed
    remedy is declined on the entry. **R131** (P2, XS, WS6) is the smalls, one
    of which is Ben's rather than DEV's. The batch shared two surfaces with work
    already here — R129 with R98(3)'s restore remainder, which closed with it on
@@ -931,7 +1006,9 @@ underneath it.*
 15b. **R150, new 2026-08-17** (P2, XS + one decision, WS6) — not a tier slot
    of its own. Two surfaces now count one lineup's exposure to one game and
    disagree by construction, and the decision is Ben's because it is a
-   correlation belief. Rides R136 or R11.
+   correlation belief. Rides R11, now that R136 has shipped without
+   resolving it: R136's panel restates the gap in words beside the two counts
+   rather than closing it.
 15a. **R149, new 2026-08-17** (P1, S, WS6) — the installed skill is six moves
    behind and the drift check that exists to catch that is structurally blind
    in a cloud session. Enters the tier rather than Tier 5 on the same
@@ -1324,8 +1401,21 @@ the batch's named rider and did not get pulled.
   the top-owned captain won 26%), so 9.1-vs-15.4 is one 8-contest tranche,
   not a law — which is why the report comes first.
 - **Fix, two steps:** (1) report — captain own-tier histogram and
-  predicted-dup per entry in the Showdown brief; R136's panel carries it, so
-  this step lands with R136. (2) control, D3 in Tier 4 — tier targets per
+  predicted-dup per entry in the Showdown brief. **PARTLY LANDED 2026-08-18
+  with R136, and the remainder is bigger than this line assumed.** R136's panel
+  does report a captain own-TIER histogram per contest, and it is a RANK
+  because the percentage is not available: the v0.1 prior budgets 800% across
+  hitters and 200% across pitchers for a 2-P-plus-8-hitter Classic roster,
+  while a Showdown salary file lists every player TWICE (a CPT row and a UTIL
+  row, different ids and different salaries), so one budget is spread over
+  roughly double the rows and split across two rows per person, against a
+  roster that seats six — 186 rows for 93 players on the 2026-08-14 NYY@TOR
+  file. The tier is computed over those same doubled rows, so even the rank is
+  distorted: one player's CPT row and UTIL row land in different tiers.
+  **A Showdown-native ownership prior is therefore this item's real step 1**,
+  and it is a prior change (one budget of 600% over six seats, captain and
+  flex priced as one player) rather than a report change. Predicted-dup per
+  entry did not land and is unaffected. (2) control, D3 in Tier 4 — tier targets per
   portfolio (at most N entries on the top-2 structural-own captains, a floor
   on captains outside the top-5), enforced beside `max_cpt_exposure_pct` with
   the same relax-then-count discipline, and only after the report has run for
@@ -1487,6 +1577,17 @@ a restated priority.
 
 ### R10. Ownership and duplication, wired and graded (P1, M, gated) | was G3, absorbing RC 1.8/2.5/2.10
 
+- **Rider added 2026-08-18, landing R136:** the fitted model owes a column
+  back. R136's low-owned-carry column wanted ledger 3.17's absolute sub-10%
+  bar and could not use it, because the v0.1 prior spreads its 800% budget
+  over every priced hitter row and puts EVERY hitter under 10% (measured on
+  1905_7g: 284 rows, top hitter 8.9%, mean 2.8%). It ships as a within-pool
+  tier instead. When a fitted prior lands on the actual %Drafted scale, the
+  absolute count becomes meaningful and the column should switch back —
+  `_leverage_legend` in `tools/qa_portfolio.py` recomputes and prints that
+  arithmetic on every run, so the moment it stops reading "every row" is
+  visible without anyone remembering this bullet.
+
 - **What:** `ownership_prior.py` and `field_miner.score_duplication_risk` exist and remain unwired; nothing populates `Projected_Ownership_Pct`, so the optimizer's field-pressure term runs on flat tier defaults; meta-lineup failure degrades silently.
 - **Why:** field behavior is the one commercial capability that materially changes satellite results (clearing the cut line unduplicated is the whole game), and it is the highest-value modeling work available once the archive is trustworthy, which F9/F10 made true. Gate unchanged: roughly eight archetype-conditioned slates; G4 means every new slate now also grades the operator, not just the field.
 - **Fix:** per the 07-25 final plus RC's refinements: fit per archetype from the archive; model stack ownership separately from player ownership (stack popularity is not a product of independents); write versioned `data/reference/ownership_prior_<archetype>.json` artifacts and load them in `_assemble_projection_frame`; persist each slate's prediction file before lock so grading is never retroactive; grade with `grade_against_actuals` into the ledger against the flat-12 baseline with a stated go/no-go; wire the duplication screen into the checkpoint for satellite postures; surface `meta_lineup_status` instead of the silent empty list; label everything a prior, mark duplication `unmodeled` when ownership is absent rather than substituting silently. Live builds consume precomputed artifacts only; nothing trains at T-10. Done when: per-slate graded MAE/Spearman appear in the ledger; the prior beats flat-12 across the gate count before any production column flips; checkpoints show expected duplicates on satellite portfolios.
@@ -1546,61 +1647,6 @@ a restated priority.
 - **This item has less decidable surface than it looks, and Ben has parked the missing half (2026-07-29, from an ARCHIVE fragment; ledger 3.14).** The entry-history export carries only `Entry_Fee`, `Winnings_Non_Ticket` and `Winnings_Ticket`. A third channel exists that the export cannot see: DK promotional benefits tied to ticket acquisition and to contest-entry volume, which plausibly runs OPPOSITE to the cash result, because a $0.01 satellite is the cheapest available unit of "contest entered" and any promotion keying on entry or ticket counts is served far better by 4,201 penny satellites than by 678 dollar contests. **Ben's call on 2026-07-29: leave it unmeasured; no promotional record gets pulled for now.** Consequences to respect: the satellite leg's -$244.45 is a CASH-ONLY figure and must never be quoted as the result of the strategy; any earlier reading that "the satellites are the loss" is withdrawn; and since the satellite block is 86% of MLB entries and is now explicitly ungraded, what remains is 678 non-satellite entries at $301.01 fees against $247.15 cash, a small sample of observed outcomes that is not evidence of an edge in either direction. R13 stays open and the next thing that moves it is graded non-satellite slates accumulating, not another pass over this export. Separately, the $175 of unresolved ticket face is **held inventory, not a loss**: several of those Best Ball contests have not commenced (NFL from September 2026, NBA from October), so a re-export after they settle resolves it in the record and nobody needs to chase it before then.
 - **[Corrected 2026-08-16 (DEV): Ben DECIDED this on 2026-08-09 and this line never caught up.** The decision is recorded in `docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`, which is retained on disk as its sole carrier — it holds the nine-family table, the observed `ticket_count` values, and four cautions that exist nowhere else (three families are multi-valued and must not be written single-valued; the `SUPERSat` matcher gap worth 17 entries; check `competing_patterns` before adding nine patterns at once; two rows are GOLF-only and are not this engine's domain). Two other entries on this board already say Ben decided — R10's step 1 and Tier 4's R1c-tail — so only this paragraph was stale. What remains is ARCHIVE executing it, not Ben deciding it. The text below is left as written history.]
 - **Awaiting Ben, carried from the same fragment and NOT written:** nine recurring satellite/qualifier families Ben demonstrably enters, by name substring, with the `Places_Paid` values actually observed (for a satellite, `Places_Paid` IS the ticket count awarded). The table is in ledger 3.14. ARCHIVE did not add them to `dk_contest_archetypes.csv` because a curated `ticket_count` reaches `resolve_contest_shape` immediately, where 1 routes to `wta_ticket_satellite` and anything else takes the ticket-line blend: that reranks lineups on contests entered tonight, which makes it a strategy change and Ben's dated decision rather than an archival write. Same reasoning for BUILD's suggested `Solo Shot` row. What DID land is the pure observed-history half, in `data/reference/contest_library.json` (`mlb $1.25k solo shot (early)|1.00`, field 1486, paid 350, breadth 0.2355), which is trust-order-2 and outranks name inference the next time that exact contest and fee recurs without changing any shape mapping. Given that the satellite volume is now an open question rather than something to cut, this input is more likely to matter than it looked: if the satellites are staying, routing them to the right objective is exactly the work that pays.
-
-### R136. qa_portfolio leverage panel: the field-facing third axis beside apex and washout (P2, S) | new 2026-08-16, from the leverage ideation fragment
-
-- **What:** qa_portfolio (R134) reports the dual-objective frontier — apex
-  concentration and washout exposure — and nothing reports how the portfolio
-  sits against the FIELD. R126's histogram answers "do we all die with one
-  game"; nothing answers "do we all die with the field."
-- **Fix:** report-only columns per portfolio in the same block: structural
-  chalk-sum per lineup (v0.1 prior until R10's is fit), count of
-  sub-10%-structural hitters per lineup (the 3.17 carry pattern: 104/116
-  contests had a top-5 FPTS player under 10% drafted; winners carried one at
-  51% vs the 13% base), captain own-tier histogram for Showdown (R139 step
-  1), and salary-leave distribution against the archived winner medians
-  (3.17: winners $250, field $200, us $100). Never a gate; deterministic;
-  labels per the house rule.
-- **Sequencing:** head of Tier 1's QA batch now that R126 has closed. Uses
-  R135's prior file when present and degrades to ABSENT-with-a-note, never to
-  a silent zero (the R127 lesson, filed the same session).
-- **R135 LANDED 2026-08-17, so this item's blocker is gone and its inputs are
-  now specified rather than assumed.** The prior file is
-  `outputs/<date>/ownership_pred_<tag>.json`, schema `ownership_pred/v1`, and it
-  carries all six archetypes plus a per-player `features` block (batting order,
-  implied total, probable-SP flag, Base) and a `name_norm -> Player_ID`
-  crosswalk. Read the archetype matching the contest whose portfolio is being
-  reviewed, never the file's first key: ownership is conditioned on archetype
-  and pooling is a house-rule violation, not a rounding choice. The chalk-sum
-  and sub-10%-carry columns come off `own_pct_by_player_id` for that archetype;
-  the ABSENT-with-a-note path is still needed, because the file only exists for
-  slates where BUILD ran the step. One thing to reuse rather than rebuild: the
-  emitter's four-input `applied`/`INERT` block already says which features were
-  live, and a chalk-sum computed off a prediction whose implied-total tilt was
-  inert is a salary-and-order number wearing a market label. Surface that state
-  beside the column.
-- **Corrected 2026-08-17 (DEV), landing R126: "one session takes both" is
-  withdrawn.** The claim rested on the two sharing a report surface and they do
-  not. R126 landed in the PIPELINE and the BRIEF, because that is the only
-  place the entered set and the `Ceiling` column are both in hand; this is a
-  qa_portfolio panel that additionally needs R135's prior file, which is still
-  untracked and unwired. What R126 did leave behind is the surface to hang this
-  on: `frontier_from_brief` reads the artifact's block and leads the section
-  with it, so these columns extend a block that now exists rather than one that
-  had to be invented alongside them. Two of the four columns (chalk-sum,
-  sub-10% carry) are ABSENT on every build until R135 lands, so R135 is worth
-  taking first or in the same session even though it sits in Tier 2. (**R135
-  landed later the same day, out of Tier 2 on exactly this instruction; see the
-  LANDED bullet above for what the prior file actually contains.**)
-- **Also gained from R126's landing:** `tools/qa_portfolio.py` had ZERO tests
-  before 2026-08-17 and now has five, all on the block-reading half. Anything
-  this item adds to that file is adding to a surface whose sections 1 and 2 are
-  still unpinned; R11 owns the rest of that coverage and this entry should not
-  quietly become it.
-- **Audit fields.** Moves: leverage visibility. Evidence: V2 (3.17/3.18
-  re-read this session). Acceptance: panel renders on a fixture portfolio
-  with and without a prior file. Falsifier: none — reporting. FOSS: existing.
-  Owner: none. Rollback: columns out.
 
 ### R137. Market-vs-crowd divergence screen (P2, S; quota-priced) | new 2026-08-16, from the leverage ideation fragment
 
@@ -2292,7 +2338,10 @@ R12 are the context and process ideas; they slot in opportunistically.
   named "washout" is what this entry exists to stop.
 - **Ben's, not DEV's,** because it is a correlation belief and not an
   implementation detail. Cheap either way; the cost is the decision.
-- **Rides:** R136 (same report block) or R11 (same tool). Never its own session.
+- **Rides:** R11 (same tool). R136 was the other host and it shipped
+  2026-08-18 without touching this: it added a THIRD count to the same screen
+  (roster footprint, bat exposure, and now field share), so the case for naming
+  the two washout numbers apart got stronger, not weaker. Never its own session.
 
 ### R131. Four smalls off one slate, three DEV and one Ben's (P2, XS each) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment
 

@@ -4,7 +4,7 @@
 Ben, 2026-08-16: run this after every certified build and try to falsify the
 portfolio before uploading it, using data the build did not already price in.
 
-Three sections, in the order that catches the most for the least reading:
+Four sections, in the order that catches the most for the least reading:
 
   1. WHAT THE BUILD ACTUALLY APPLIED. Read from the brief's own enrichment
      self-report, not from documentation. This section exists because on
@@ -24,6 +24,17 @@ Three sections, in the order that catches the most for the least reading:
      also exactly what loses every entry at once. This section measures both
      ends as deterministic review proxies and shows where the portfolio sits.
 
+  4. FIELD-FACING LEVERAGE (R136). Sections 2 and 3 both measure the portfolio
+     against the SLATE. Neither says whether the entered set looks like
+     everybody else's, which is the axis a satellite is actually won on. This
+     section reports cumulative structural chalk against the field's own mean,
+     the count of low-owned hitters carried, Showdown captain own-tier, and
+     salary left against the archived medians -- per contest, conditioned on
+     that contest's archetype and never pooled across them. Its ownership
+     inputs are an UNCALIBRATED v0.1 prior, so the sign of a delta is readable
+     and its magnitude is not; where the prior is missing the column says
+     ABSENT and why, never zero.
+
 Truthful labels are not optional here. Every number this tool prints is a
 deterministic review proxy or a labeled prior. Nothing is a probability, a win
 rate, a cash rate, or an ROI, and no finding is phrased as one.
@@ -35,14 +46,24 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 SLOTS = ("P", "C", "1B", "2B", "3B", "SS", "OF")
+
+# R136 needs one engine import: the shape-to-archetype projection, which this
+# tool reads rather than copies. Run as `python tools/qa_portfolio.py`, sys.path
+# starts at tools/ and `mlb_engine` is invisible, which is exactly how the first
+# live run of the panel reported the projection ABSENT on a tree where it was
+# fine. Same two lines ownership_pred.py already carries.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def norm(s: str) -> str:
@@ -82,6 +103,23 @@ def read_savant(path: Optional[Path]) -> Dict[str, dict]:
                 last, first = [p.strip() for p in name.split(",", 1)]
                 out[norm(first + last)] = r
     return out
+
+
+def sha256_of(path: Path) -> str:
+    """Digest of one file, or "" when it cannot be read.
+
+    Used to ask whether a prediction priced the salary file under review. DK
+    re-publishes salaries during the day, and a prior emitted from the earlier
+    download prices a pool that is no longer this one.
+    """
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 16), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return ""
 
 
 def fnum(r: dict, key: str) -> Optional[float]:
@@ -378,6 +416,474 @@ def section_frontier(
     return out
 
 
+# ---------------------------------------------------------------- section 4
+
+SHOWDOWN_SLOTS = ("CPT", "UTIL")
+DK_SALARY_CAP = 50000.0
+SUB10_THRESHOLD_PCT = 10.0
+
+# Ledger 3.17/3.18, OBSERVED OUTCOMES from the mined archive, never predictions
+# and never a target to build toward. Medians of salary left unspent.
+SALARY_LEFT_MEDIANS = {
+    "Classic": "winners $250, field $200, our own past entries $100",
+    "Showdown": "winners $200, field $300, our own past entries $300",
+}
+# Ledger 3.17, paired cumulative-ownership delta (winner minus that contest's
+# field mean), median percentage points, by the ledger's own contest families.
+# Printed whole rather than matched to the resolved archetype: the ledger's
+# families are a THIRD vocabulary, and projecting shapes onto it as well would
+# put two lossy joins under one number.
+LEDGER_CUM_OWN_DELTAS = ("Classic satellites +4.9, solo shots +9.5, "
+                         "single-entry GPPs +8.6, mini-MAX +1.1, "
+                         "supersatellites -13.2")
+
+
+def is_showdown_header(hdr: List[str]) -> bool:
+    return "CPT" in hdr
+
+
+def entry_slot_ids(hdr: List[str], row: List[str]) -> Tuple[List[str], Optional[str]]:
+    """(all rostered ids, captain id or None) for one entry row.
+
+    Classic reuses ``lineup_players``. Showdown is read here rather than by
+    widening SLOTS, because SLOTS drives sections 2 and 3 and those measure
+    stacks and arms against a Classic roster; widening it would make them
+    answer for a format they were never written for.
+    """
+    if not is_showdown_header(hdr):
+        return lineup_players(hdr, row), None
+    ids: List[str] = []
+    captain = None
+    for i, col in enumerate(hdr):
+        if col not in SHOWDOWN_SLOTS or i >= len(row) or not row[i].strip():
+            continue
+        pid = row[i].strip().split("(")[-1].rstrip(")")
+        ids.append(pid)
+        if col == "CPT" and captain is None:
+            captain = pid
+    return ids, captain
+
+
+def read_prior(path: Optional[Path]) -> Optional[dict]:
+    if not path or not path.exists():
+        return None
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def find_prior_file(brief: dict, explicit: Optional[str],
+                    root: Path) -> Tuple[Optional[Path], str]:
+    """(path, how it was resolved). Ambiguity is named, never picked from.
+
+    R70's rule on a new surface: more than one file matching an intake role is
+    a question for the operator, not a race won by sort order. The tag path is
+    tried first because that is what ``ownership_pred emit`` writes, and the
+    glob is the fallback for a hand-named file.
+    """
+    if explicit:
+        return Path(explicit), "operator (--ownership-pred)"
+    date = str(brief.get("date") or "")
+    if not date:
+        return None, "no slate date in the brief, so no default path to try"
+    outdir = root / "outputs" / date
+    tag = str((brief.get("slate") or {}).get("tag") or "")
+    if tag:
+        by_tag = outdir / f"ownership_pred_{tag}.json"
+        if by_tag.exists():
+            return by_tag, f"brief date + slate tag ({date}/{tag})"
+    found = sorted(outdir.glob("ownership_pred_*.json"))
+    if len(found) == 1:
+        return found[0], f"the one prediction file in outputs/{date}/"
+    if len(found) > 1:
+        return None, ("AMBIGUOUS: " + str(len(found)) + " prediction files in "
+                      f"outputs/{date}/ (" + ", ".join(f.name for f in found)
+                      + "); pass --ownership-pred to name one")
+    return None, f"no prediction file in outputs/{date}/"
+
+
+def _quantiles(values: Sequence[float]) -> Tuple[float, float, float]:
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    median = (ordered[mid] if len(ordered) % 2
+              else (ordered[mid - 1] + ordered[mid]) / 2.0)
+    return ordered[0], median, ordered[-1]
+
+
+def field_mean_cum_own(own: Mapping[str, float]) -> float:
+    """The field's own mean cumulative ownership, as an accounting identity.
+
+    If ``own_p`` is the share of field lineups containing player p, then summing
+    cumulative ownership over the field and dividing by the number of lineups
+    gives sum_p own_p * (own_p * N) / N = sum_p own_p^2. Exactly, with no
+    assumption about how the field builds and no independence anywhere: it is
+    the same count taken along the other axis. In percent units that is
+    sum(own_pct^2)/100, which is what this returns.
+    """
+    return sum(v * v for v in own.values()) / 100.0
+
+
+def section_leverage(
+    brief: dict,
+    sal: Dict[str, dict],
+    hdr: List[str],
+    body: List[List[str]],
+    prior: Optional[dict],
+    prior_path: Optional[Path],
+    prior_note: str,
+    salary_path: Path,
+    archetype_override: Optional[str] = None,
+) -> List[str]:
+    """R136. Where this portfolio sits against the FIELD, per contest.
+
+    Sections 2 and 3 measure the portfolio against the slate: the market, the
+    Savant expectations, and its own internal correlation. None of that says
+    whether the entered set looks like everybody else's, which is the axis a
+    satellite is actually won on. This section is that third axis, and every
+    number in it is a deterministic function of a LABELED PRIOR (v0.1,
+    uncalibrated) or of the delivered bytes. Nothing here is an ownership
+    measurement, because ownership is not observable before lock.
+
+    Conditioned on contest archetype throughout, never pooled: the same player
+    on the same slate has been observed 20-31 percentage points apart across
+    archetypes, so a portfolio spanning two contests gets two readings.
+
+    The prose is emitted ONCE and the per-contest lines are numbers. The first
+    cut printed every caveat under every contest and a six-contest file ran to
+    forty lines of repeated paragraphs, which is how a section stops being read
+    at all -- and an unread caveat protects nobody.
+    """
+    n = len(body)
+    if not n:
+        return []
+    showdown = is_showdown_header(hdr)
+    fmt = "Showdown" if showdown else "Classic"
+    out: List[str] = [
+        f"FIELD-FACING LEVERAGE ({fmt} entries). Sections 2 and 3 measure this "
+        f"portfolio against the slate; this measures it against the crowd. "
+        f"Every column is a deterministic review proxy over a LABELED PRIOR or "
+        f"over the delivered bytes -- never a measured ownership, never a "
+        f"probability."]
+
+    # ---- salary discipline. Needs no prior, so it reports even when the rest
+    # of the section cannot: an ABSENT panel with nothing in it teaches a
+    # reader to skip the whole section.
+    left: List[float] = []
+    unpriced_rows = 0
+    for row in body:
+        ids, _ = entry_slot_ids(hdr, row)
+        if not ids:
+            continue
+        spend = 0.0
+        short = False
+        for pid in ids:
+            v = fnum(sal[pid], "Salary") if pid in sal else None
+            if v is None:
+                short = True
+                break
+            spend += v
+        if short:
+            unpriced_rows += 1
+            continue
+        left.append(DK_SALARY_CAP - spend)
+    if left:
+        lo, med, hi = _quantiles(left)
+        out.append(
+            f"SALARY LEFT across {len(left)} entries: ${lo:,.0f} / ${med:,.0f} / "
+            f"${hi:,.0f} (min/median/max), {sum(1 for v in left if v <= 0):d} "
+            f"spending the full cap.")
+        out.append(
+            f"  archived {fmt} medians, OBSERVED OUTCOMES from the mined "
+            f"archive and not a target: {SALARY_LEFT_MEDIANS[fmt]}. The ledger "
+            f"records this as not independent of shape and not acted on.")
+    if unpriced_rows:
+        out.append(
+            f"  SALARY LEFT IS SHORT: {unpriced_rows} entr(ies) hold a player "
+            f"the salary file does not price, so they are excluded rather than "
+            f"counted at a guessed salary.")
+
+    # ---- everything below needs the prior file.
+    if prior is None:
+        out.append(f"CHALK-SUM, LOW-OWNED CARRY and CAPTAIN TIER: ABSENT. "
+                   f"{prior_note}.")
+        out.append("  ABSENT, not zero: emit one with `python "
+                   "tools/ownership_pred.py emit --salary <DKSalaries.csv> "
+                   "--feed <lineups_feed.json> --odds <slate_bundle.json>` and "
+                   "re-run. One fact about this review, so no per-player list "
+                   "follows it.")
+        return out
+    if str(prior.get("schema")) != "ownership_pred/v1":
+        out.append(f"CHALK-SUM, LOW-OWNED CARRY and CAPTAIN TIER: ABSENT. "
+                   f"{prior_path} is schema {prior.get('schema')!r}, not "
+                   f"ownership_pred/v1; this panel will not guess at a layout.")
+        return out
+    try:
+        from mlb_engine.field.ownership_prior import (
+            archetype_for_contest_shape as projector)
+    except ImportError as exc:  # noqa: BLE001
+        out.append(
+            f"CHALK-SUM, LOW-OWNED CARRY and CAPTAIN TIER: ABSENT. The "
+            f"shape-to-archetype projection lives in "
+            f"mlb_engine.field.ownership_prior and will not import here "
+            f"({exc}). This panel deliberately carries no second copy of that "
+            f"map: two answers to 'which archetype is this contest' is how a "
+            f"portfolio gets priced against the wrong crowd.")
+        return out
+
+    out.append(f"prior file: {prior_path} ({prior.get('schema')}, prior "
+               f"{prior.get('prior_version')}, {prior.get('slate_date')} "
+               f"{prior.get('slate_tag')}), resolved by {prior_note}.")
+    recorded = str((prior.get("salary_file") or {}).get("sha256") or "")
+    actual = sha256_of(salary_path)
+    if recorded and actual and recorded != actual:
+        out.append(
+            f"  PRIOR PRICED A DIFFERENT SALARY FILE: it records sha256 "
+            f"{recorded[:12]} and the file under review is {actual[:12]}. DK "
+            f"re-publishes salaries during the day, so every column below is "
+            f"computed against a pool that may not be this one. Re-emit before "
+            f"reading them.")
+    inputs = prior.get("inputs") or {}
+    states = {k: bool((inputs.get(k) or {}).get("applied"))
+              for k in ("batting_order", "implied_totals", "probable_sp",
+                        "base_projection")}
+    out.append("  prior inputs: " + ", ".join(
+        f"{k} {'applied' if v else 'INERT'}" for k, v in states.items()))
+    if not states["implied_totals"]:
+        out.append(
+            "  IMPLIED-TOTAL TILT WAS INERT, so every chalk-sum below is a "
+            "salary-and-order number wearing a market label. Read it as "
+            "structural crowding only.")
+
+    have = prior.get("archetypes") or {}
+    shapes = {str(c.get("contest_id")): (str(c.get("contest_shape") or ""),
+                                         str(c.get("contest_name") or ""))
+              for c in (brief.get("contests") or [])}
+    groups: Dict[str, List[List[str]]] = defaultdict(list)
+    for row in body:
+        groups[(row[2].strip() if len(row) > 2 else "")].append(row)
+
+    # Resolve every contest first, so the read-once prose can be sized to what
+    # this file actually contains rather than to what the tool can do.
+    resolved: List[Tuple[str, List[List[str]], str, str, str, str]] = []
+    deferred: List[str] = []
+    for cid in sorted(groups):
+        rows = groups[cid]
+        shape, cname = shapes.get(cid, ("", ""))
+        if not cname and rows and len(rows[0]) > 1:
+            cname = rows[0][1].strip()
+        label = f"contest {cid or '(no id)'} '{cname[:52]}' | {len(rows)} entries"
+        if archetype_override:
+            archetype, exactness = archetype_override, "OPERATOR"
+        else:
+            projected = projector(shape)
+            if projected is None:
+                deferred.append(
+                    f"{label}: archetype UNRESOLVED"
+                    + ("; the brief carries no contest_shape for this id"
+                       if not shape else
+                       f"; shape {shape!r} is not in the projection map")
+                    + ". Not defaulted, because ownership is conditioned on "
+                      "archetype and the wrong one is worse than none. Pass "
+                      "--archetype to name it.")
+                continue
+            archetype, exactness = projected
+        if archetype not in have:
+            deferred.append(
+                f"{label}: archetype {archetype!r} ABSENT from the prediction "
+                f"file, which carries {', '.join(sorted(have)) or 'none'}. "
+                f"Re-emit with --archetype {archetype}.")
+            continue
+        resolved.append((cid, rows, shape, archetype, exactness, label))
+
+    if resolved and not showdown:
+        out.extend(_leverage_legend(sal, have,
+                                    sorted({a for _, _, _, a, _, _ in resolved})))
+    if showdown:
+        out.append(
+            "CHALK-SUM and LOW-OWNED CARRY: ABSENT for Showdown, and that is a "
+            "property of the prior rather than of this portfolio. The prior "
+            "budgets 800% across hitters and 200% across pitchers for a "
+            "2-P-plus-8-hitter Classic roster; a Showdown salary file lists "
+            "every player TWICE (a CPT row and a UTIL row, different ids and "
+            "different salaries), so one budget is spread over roughly double "
+            "the rows and split across two rows per person, against a roster "
+            "that seats six. Measured on the 2026-08-14 NYY@TOR file: 186 rows "
+            "for 93 players. A percentage off that is not this contest's crowd.")
+        out.append(
+            "  CAPTAIN OWN-TIER is what survives, as a RANK. ledger 3.18, "
+            "OBSERVED: winner captain %Drafted median 14.8 against a field "
+            "median of 13.0, and the top-owned captain won 22 of 85 sampled "
+            "contests. Captain chalk is not a leak; captain chalk with nothing "
+            "differentiated under it is R139's open question.")
+
+    for cid, rows, shape, archetype, exactness, label in resolved:
+        block = have[archetype]
+        own = {k: float(v) for k, v in
+               (block.get("own_pct_by_player_id") or {}).items()}
+        tiers = block.get("tier_by_player_id") or {}
+        out.append(f"{label} | {shape or '(no shape)'} -> {archetype} "
+                   f"[{exactness}]")
+        if exactness == "COLLAPSED":
+            out.append("  COLLAPSED: several engine shapes share this "
+                       "archetype, so the crowd below is priced for a coarser "
+                       "contest than the one entered.")
+
+        if showdown:
+            hist: Dict[str, int] = defaultdict(int)
+            unknown = 0
+            for row in rows:
+                _, cap = entry_slot_ids(hdr, row)
+                if cap is None:
+                    continue
+                tier = tiers.get(cap)
+                if tier is None:
+                    unknown += 1
+                else:
+                    hist[str(tier)] += 1
+            if not hist and not unknown:
+                continue
+            out.append(
+                "  captain own-tier: "
+                + ", ".join(f"{t} {hist[t]}" for t in ("High", "Mid", "Low")
+                            if hist.get(t))
+                + (f", not in the prior {unknown}" if unknown else ""))
+            continue
+
+        chalks: List[float] = []
+        carries: List[int] = []
+        missing: Dict[str, str] = {}
+        for row in rows:
+            ids, _ = entry_slot_ids(hdr, row)
+            if not ids:
+                continue
+            total = 0.0
+            carry = 0
+            for pid in ids:
+                if pid not in own:
+                    missing[pid] = (sal.get(pid) or {}).get("Name") or pid
+                    continue
+                total += own[pid]
+                if ((sal.get(pid) or {}).get("Roster Position") != "P"
+                        and str(tiers.get(pid)) == "Low"):
+                    carry += 1
+            chalks.append(total)
+            carries.append(carry)
+        if not chalks:
+            continue
+        lo, med, hi = _quantiles(chalks)
+        field_mean = field_mean_cum_own(own)
+        delta = med - field_mean
+        out.append(
+            f"  chalk-sum {lo:.1f} / {med:.1f} / {hi:.1f} (min/median/max) "
+            f"against a field mean of {field_mean:.1f} | DELTA {delta:+.1f} pp, "
+            f"chalk-{'positive' if delta >= 0 else 'negative'}")
+        if missing:
+            names = sorted(missing.values())
+            out.append(
+                f"  CHALK-SUM IS SHORT: {len(missing)} rostered player(s) carry "
+                f"no prediction, so the totals above understate: "
+                + ", ".join(names[:8])
+                + (f", and {len(names) - 8} more" if len(names) > 8 else "")
+                + ". Named per player, because a player missing from a present "
+                  "file is one fact per player; a missing FILE is one fact and "
+                  "gets no list.")
+        hist_carry: Dict[int, int] = defaultdict(int)
+        for c in carries:
+            hist_carry[c] += 1
+        out.append(
+            f"  low-owned carry {sum(1 for c in carries if c)}/{len(carries)} "
+            f"entries | per-entry counts "
+            + "{" + ", ".join(f"{k}: {hist_carry[k]}"
+                              for k in sorted(hist_carry)) + "}")
+
+    out.extend(deferred)
+    if len(resolved) > 1 and not showdown:
+        ranked = []
+        for _cid, rows, _, archetype, _, label in resolved:
+            own = {k: float(v) for k, v in
+                   (have[archetype].get("own_pct_by_player_id") or {}).items()}
+            per = []
+            for row in rows:
+                ids, _cap = entry_slot_ids(hdr, row)
+                if ids:
+                    per.append(sum(own.get(p, 0.0) for p in ids))
+            if per:
+                ranked.append((_quantiles(per)[1] - field_mean_cum_own(own),
+                               f"contest {_cid}"))
+        if len(ranked) > 1:
+            ranked.sort()
+            out.append(
+                f"ACROSS THIS FILE: chalkiest {ranked[-1][1]} at "
+                f"{ranked[-1][0]:+.1f} pp, least chalky {ranked[0][1]} at "
+                f"{ranked[0][0]:+.1f} pp. This comparison is the one the "
+                f"uncalibrated scale supports, because both sides of it are "
+                f"the same prior on the same slate.")
+    return out
+
+
+def _leverage_legend(sal: Dict[str, dict], have: Mapping[str, Any],
+                     used: Sequence[str]) -> List[str]:
+    """The read-once explanation of the two prior-fed columns.
+
+    Sized to the file in hand: the sub-10% arithmetic below is recomputed from
+    this slate's own pool rather than quoted, because the whole point of it is
+    that the number depends on how many hitter rows the budget is spread over.
+    """
+    rows = [pid for pid, r in sal.items()
+            if (r.get("Roster Position") or "") != "P"]
+    priced = [pid for pid in rows
+              if any(pid in (have[a].get("own_pct_by_player_id") or {})
+                     for a in used)]
+    out = [
+        "HOW TO READ THE TWO PRIOR COLUMNS (once, not per contest):",
+        "  CHALK-SUM is an entry's cumulative predicted %Drafted, against the "
+        "field's own mean. That mean is an accounting identity and not a "
+        "simulation: over a field whose player shares are own_p, mean "
+        "cumulative ownership is exactly sum(own_p^2), the same count taken "
+        "along the other axis, assuming nothing about how the field builds.",
+        "  Read the SIGN and the ORDER, not the magnitude. This prior is "
+        "uncalibrated and its first grade (R135, archived 06-03 grid) posted a "
+        "mean signed error of -10.44 points, so it under-concentrates, while "
+        "ledger 3.17's winner-minus-field medians are on the actual %Drafted "
+        "scale (OBSERVED: " + LEDGER_CUM_OWN_DELTAS + "). The two scales do "
+        "not meet until the prior is fit; comparing this file's contests to "
+        "each other is what the prior does support.",
+    ]
+    if priced:
+        # Per ROW, taking each row's largest share across the archetypes in
+        # play. Summing across archetypes instead reported "852 of 852" for a
+        # 284-row pool priced three ways, which is a row count multiplied by an
+        # archetype count and reads as a pool four times the real one.
+        best = {pid: max(float(have[a]["own_pct_by_player_id"][pid])
+                         for a in used
+                         if pid in have[a].get("own_pct_by_player_id", {}))
+                for pid in priced}
+        top = max(best.values()) if best else 0.0
+        under = sum(1 for v in best.values() if v < SUB10_THRESHOLD_PCT)
+        out.append(
+            f"  LOW-OWNED CARRY counts bottom-TIER hitters (the prior's own "
+            f"'Low', bottom 40% of the hitter pool by predicted share), not "
+            f"3.17's absolute sub-10%, because the two are not on one scale: "
+            f"this prior spreads 800% over {len(priced)} priced hitter rows, "
+            f"and at its most concentrated archetype in this file the top "
+            f"hitter reaches {top:.1f}% with {under} of {len(best)} rows under "
+            f"10%. Where "
+            f"that is every row, the literal count returns 8-of-8 on every "
+            f"entry, which is a constant and not a column. The tier is a "
+            f"within-pool percentile and survives an uncalibrated scale; the "
+            f"absolute count returns with the fitted model.")
+    out.append(
+        "  What the carry counts is the OPPORTUNITY for ledger 3.17's pattern, "
+        "never the pattern: 3.17 measured a player who finished top-5 in "
+        "contest FPTS while under 10% drafted (winners carried one in 51% of "
+        "contests against a 13% field base rate), and which player scores is "
+        "not knowable before lock. A zero in every entry has foreclosed the "
+        "pattern; a high count is a punt count, not a win.")
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -385,6 +891,13 @@ def main() -> int:
     ap.add_argument("--salary", required=True, help="DKSalaries CSV for the slate")
     ap.add_argument("--brief", required=True, help="build_brief JSON for the run")
     ap.add_argument("--reference-dir", default="data/reference")
+    ap.add_argument("--ownership-pred", default=None,
+                    help="ownership_pred/v1 JSON for this slate; default is "
+                         "outputs/<brief date>/ownership_pred_<slate tag>.json")
+    ap.add_argument("--archetype", default=None,
+                    help="force the prior archetype for every contest in the "
+                         "file, instead of projecting it from each contest's "
+                         "shape in the brief")
     ap.add_argument("--json", dest="as_json", action="store_true")
     a = ap.parse_args()
 
@@ -407,11 +920,23 @@ def main() -> int:
     # off data that carries no Ceiling would put two answers on one screen with
     # nothing saying which one the build actually used.
     frontier = frontier_from_brief(brief) + section_frontier(sal, hdr, body)
+    # R136. The third axis: sections 2 and 3 measure this portfolio against the
+    # slate, this one measures it against the crowd. Its inputs are a labeled
+    # prior and the delivered bytes, and every column it cannot compute says
+    # ABSENT with the reason rather than reporting a zero.
+    prior_path, prior_note = find_prior_file(
+        brief, a.ownership_pred, REPO_ROOT)
+    prior = read_prior(prior_path)
+    if prior_path is not None and prior is None:
+        prior_note = f"{prior_path} is not readable JSON"
+    leverage = section_leverage(brief, sal, hdr, body, prior, prior_path,
+                                prior_note, Path(a.salary), a.archetype)
 
     if a.as_json:
         print(json.dumps({
             "entries": len(body), "applied": applied,
             "findings": findings, "frontier": frontier,
+            "leverage": leverage,
             "labels": "deterministic review proxies and labeled priors only; "
                       "never ROI, win rate, cash rate, or probability",
         }, indent=1))
@@ -428,6 +953,9 @@ def main() -> int:
         print(f"  * {line}")
     print("\n-- 3. DUAL-OBJECTIVE FRONTIER --")
     for line in frontier:
+        print(f"  {line}")
+    print("\n-- 4. FIELD-FACING LEVERAGE --")
+    for line in leverage:
         print(f"  {line}")
     print("\nlabels: deterministic review proxies and labeled priors only; "
           "never ROI, win rate, cash rate, or probability")

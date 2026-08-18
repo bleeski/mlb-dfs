@@ -187,7 +187,22 @@ EXPECTED_SUITE_COUNTS = {
     # crosswalk keying on field_miner's normalizer and not the intake's, which
     # disagree on an apostrophe. One on labels, one on R107(a)'s tracked-and-
     # pinned discipline. Thirteen hand-run mutations, all thirteen caught.
-    "tests.test_core": 762,
+    # R136, 2026-08-18: 762 -> 781, the nineteen that pin the field-facing
+    # leverage panel -- three on the shape-to-archetype projection (it covers
+    # the closed vocabulary exactly, a COLLAPSED projection is labelled one,
+    # and an unknown shape is None rather than the default), one that checks
+    # the field-mean identity against an explicit field built the long way,
+    # five on conditioning (each contest reads its own archetype and the
+    # fixture's archetypes carry different shares so the LABEL cannot pass for
+    # the DATA, an unresolved shape reports instead of defaulting, an absent
+    # archetype names what the file does carry, and R127's boundary in both
+    # directions), five on the named traps (an INERT implied total, a prior
+    # that priced a different salary file, the carry column counting a rank
+    # because the absolute bar is inert on this prior, the read-once prose,
+    # and the cross-contest comparison), three on Showdown (captain rank but
+    # no Classic chalk-sum, salary left reading CPT/UTIL, an unpriced entry
+    # excluded rather than guessed), and two on resolving the prediction file.
+    "tests.test_core": 781,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,

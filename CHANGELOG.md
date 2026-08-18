@@ -25,6 +25,133 @@ performance claim.
 
 ---
 
+## 2026-08-18 — R136: the third axis, where the portfolio sits against the FIELD
+
+DEV, claim `engine_2026-08-18`. Head of Tier 1's QA batch and of the tier,
+taken in tier order now that R135 has landed and its two ABSENT columns have an
+input. `tools/qa_portfolio.py` gains a fourth section, `section_leverage`, and
+`mlb_engine/field/ownership_prior.py` gains the contest-shape projection the
+section reads.
+
+**What:** sections 1-3 all measure a delivered portfolio against the SLATE —
+what the build applied, the market and Savant cross-checks, and R126's apex and
+washout. None of them says whether the entered set looks like everybody else's,
+which is the axis a satellite is actually won on. Section 4 reports four
+columns, per contest and conditioned on that contest's archetype: cumulative
+structural chalk against the field's own mean, bottom-tier hitters carried,
+Showdown captain own-tier, and salary left against the archived medians. Report
+only, no gate, exit codes unchanged.
+
+**Conditioned per contest, never pooled.** The panel groups the delivered rows
+by Contest ID, resolves each contest's `contest_shape` from the brief, projects
+that onto one of the prior's six archetypes, and reads that archetype's block.
+Reading the prediction file's first key instead is a pooling bug: the same
+player on the same slate has been observed 20-31 points apart across archetypes.
+The projection lives in `ownership_prior.ARCHETYPE_BY_CONTEST_SHAPE`, once, with
+an import-time check that it covers `contest_shapes.CONTEST_SHAPES` exactly —
+the consumer half of the rule that every producer of a shape validates against
+that vocabulary. A thirteenth shape added without deciding what the field does
+in it fails at import instead of quietly pricing a live contest against a
+large-field GPP crowd, and an unrecognized shape string returns None, never
+`DEFAULT_ARCHETYPE`. Twelve shapes map onto six archetypes, so every value
+carries whether the projection is `EXACT` or `COLLAPSED`, and a COLLAPSED
+reading says on the line that the crowd below is priced for a coarser contest
+than the one entered.
+
+**Four things the work established, and two of them changed the item as filed.**
+
+**First, the sub-10% carry column as specified is a constant, and the fix is a
+rank.** Ledger 3.17's carry pattern is measured on ACTUAL %Drafted with an
+absolute 10% bar. The v0.1 prior is not on that scale: it spreads its 800%
+hitter budget across every priced hitter row, so on the 2026-08-17 1905_7g slate
+that is 284 rows, the mean row sits at 2.8%, the top hitter reaches 8.9%, and
+all 284 are "sub-10%". Counted literally the column returned 8-of-8 on every
+entry of every contest — a constant, which separates nothing, and the same
+defect class R126 found in the retained percent. It ships as the prior's own
+within-pool TIER instead (`Low`, the bottom 40%), which is a rank and survives
+an uncalibrated scale; on the same slate that column reads 0, 1 or 2 per entry
+and does separate them. The legend recomputes the arithmetic from the pool in
+hand rather than quoting the slate, because the whole point is that the number
+depends on how many rows the budget is spread over. The absolute count returns
+with R10's fitted model.
+
+**Second, the field mean is an accounting identity, not a simulation.** A
+chalk-sum with nothing to compare it to is a number nobody can act on, and the
+comparison does not need a model: if `own_p` is the share of field lineups
+containing p, then the field's own mean cumulative ownership is exactly
+`sum(own_p^2)`, the same count taken along the other axis. It assumes nothing
+about how the field builds and it is pinned against an explicit five-lineup
+field built the long way, not restated from the docstring.
+
+**Third, the magnitude of the delta is not readable and the panel says so
+rather than letting it be read.** On 1905_7g the six contests post +11.5 to
++28.0 pp against the prior's own field mean while ledger 3.17's winner-minus-
+field medians run +1.1 to +9.5 on the actual scale. Those are different scales:
+R135's first grade measured this prior at a mean signed error of -10.44 points,
+so it under-concentrates. What the prior does support is the SIGN and the
+cross-contest ORDER within one file, and the section closes on exactly that
+comparison — chalkiest and least chalky contest — because both sides of it are
+the same prior on the same slate.
+
+**Fourth, Showdown gets the captain rank and no chalk-sum, and that is a defect
+in the prior rather than in this panel.** The prior budgets 800/200 for a
+2-P-plus-8-hitter Classic roster. A Showdown salary file lists every player
+TWICE, a CPT row and a UTIL row with different ids and different salaries, so
+one budget is spread over roughly double the rows and split across two rows per
+person, against a roster that seats six: measured on the 2026-08-14 NYY@TOR
+file, 186 rows for 93 players. A percentage off that is not that contest's
+crowd, so the chalk-sum and carry columns are ABSENT for Showdown with the
+reason stated, and the captain column ships as the within-pool TIER, which is
+the part that survives. Filed as a rider on R139, which owns Showdown captain
+leverage. Salary left needs no prior and reports for both formats against the
+right medians; it reads CPT and UTIL through a Showdown-aware slot reader
+rather than by widening `SLOTS`, because `SLOTS` drives sections 2 and 3 and
+those measure stacks and arms against a Classic roster.
+
+**R127's boundary, in both directions.** A missing prediction FILE is one fact
+about the review and gets no per-player list; a rostered player missing from a
+PRESENT file is one fact per player and is named, with the totals marked SHORT
+the way R126 marks a short apex. Two further absences report rather than guess:
+a prediction file whose schema is not `ownership_pred/v1`, and a contest whose
+shape the brief does not carry — `--archetype` is the operator's way in, and
+defaulting is refused because the wrong archetype is worse than none. R70's
+rule arrives on a new surface too: more than one `ownership_pred_*.json` in
+`outputs/<date>/` is named as AMBIGUOUS rather than resolved by sort order.
+
+**Two evidence checks that are not columns.** The panel prints the emitter's
+own four-input `applied`/`INERT` block, and when the implied-total tilt was
+INERT it says on the line that the chalk-sum below is a salary-and-order number
+wearing a market label — R136's own named trap. And it compares the prediction's
+recorded `salary_file.sha256` against the file under review, because DK
+re-publishes salaries during the day and a prior emitted from the earlier
+download prices a pool that is no longer this one.
+
+**The prose is emitted once.** The first cut printed every caveat under every
+contest and the six-contest 1905_7g file ran to forty lines of repeated
+paragraphs. An unread caveat protects nobody, so the explanation is hoisted into
+one read-once legend sized to the file in hand and the per-contest lines are
+numbers.
+
+**First reading, 2026-08-17 1905_7g, nine entries across six contests.**
+Chalk-positive in all six (+11.5 mini-MAX to +28.0 on the NFL Kickoff
+satellite), a bottom-tier hitter in 2 of 9 entries, and $0 of salary left in 8
+of 9 against archived medians of $250 for winners and $200 for the field. Stated
+as what the panel prints, not as a verdict: the prior is uncalibrated, and one
+portfolio never moves a prior.
+
+**Gate 1120 -> 1139** (`test_core` 762 -> 781, `grew`). Fifteen mutations run by
+hand, all fifteen caught, and ONE ONLY AFTER THE FIXTURE WAS FIXED — which is
+R151's lesson arriving on schedule. Replacing the resolved archetype with the
+file's first key SURVIVED, because the fixture gave every archetype identical
+shares, so the test could assert the LABEL (printed off the resolved archetype)
+while the DATA came from the wrong block. The fixture now scales each
+archetype's shares differently and the test reads the number under the line, not
+the line. CLAUDE.md, `skills/generate-lineups/SKILL.md` and the ledger Quick
+Card pin line moved with the gate, the last under a DEV-held `ledger` claim,
+that line and nothing else.
+
+---
+
 ## 2026-08-17 — Greenfield spec, fifth edition: it audited the retired workbench; one rider on R123 and one sim-gate clause (docs only)
 
 DEV, claim `engine_greenfield_spec_2026-08-17`. Ben uploaded a 1,912-line
