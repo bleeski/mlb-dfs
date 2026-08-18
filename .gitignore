@@ -77,3 +77,8 @@ data/reference/paste_cache/
 # Environment, never history; the mount cannot delete it, so it is ignored instead
 # of swept, and it stops reading as unexplained dirt at session start (R107(b)).
 _stage_repo*.tar.gz
+
+# R152 split-gate state: per-class results for a gate run across several calls.
+# Live session state, never history -- the verdict is the audit's output, and a
+# unit record is only evidence about the tree fingerprint stamped on it.
+.audit_gate/

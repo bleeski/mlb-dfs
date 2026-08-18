@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 import unittest.mock
@@ -13593,24 +13594,136 @@ class GitFreshnessTests(unittest.TestCase):
         self.assertEqual(0, out["ahead"])
 
     def test_the_default_branch_trap_is_named(self):
-        """A fresh clone lands on origin/HEAD. On the real repo that is still
-        `master`, stale since 2026-08-04, while the work is on `main` -- so a
-        new clone silently gets a tree weeks old."""
+        """A fresh clone lands on GitHub's default. When that is not the branch
+        the work is on, the clone silently gets another tree.
+
+        R148(a) changed where the answer comes from, and the docstring with it:
+        this used to read the clone's cached `origin/HEAD` and call that the
+        default. It is a copy of the default from whenever `set-head` last ran,
+        no fetch refreshes it, and it agreed with the local ref through the
+        entire week five documents asserted a value GitHub no longer had.
+        """
         module = self._audit()
         with tempfile.TemporaryDirectory() as tmp:
             work, git = self._pair(tmp)
+            remote = Path(tmp) / "remote.git"
             self.assertIsNone(module.git_freshness(work)["default_branch_mismatch"],
-                              "a clone with no origin/HEAD set is not a finding")
-            git(work, "symbolic-ref", "refs/remotes/origin/HEAD",
-                "refs/remotes/origin/main")
-            self.assertIsNone(module.git_freshness(work)["default_branch_mismatch"],
-                              "matching default is not a finding")
+                              "a remote whose default IS the branch is not a "
+                              "finding")
             git(work, "branch", "-q", "legacy")
             git(work, "push", "-q", "origin", "legacy")
-            git(work, "symbolic-ref", "refs/remotes/origin/HEAD",
-                "refs/remotes/origin/legacy")
+            subprocess.run(("git", "-C", str(remote), "symbolic-ref", "HEAD",
+                            "refs/heads/legacy"), check=True, capture_output=True)
             out = module.git_freshness(work)
-        self.assertEqual("origin/legacy", out["default_branch_mismatch"])
+        self.assertEqual("legacy", out["default_branch_mismatch"])
+        self.assertEqual("legacy", out["default_branch"])
+        self.assertEqual("remote", out["default_branch_source"])
+        self.assertIsNone(out["default_branch_reason"])
+
+    def test_the_default_comes_from_the_remote_and_not_the_cached_ref(self):
+        """R148(a)'s falsifier, and the exact shape that made the old check a
+        check that could not fail: the cache AGREES with the checked-out branch
+        while the remote's default is somewhere else. Reading the cache returns
+        null here and reads as agreement; asking the remote does not."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            remote = Path(tmp) / "remote.git"
+            git(work, "branch", "-q", "legacy")
+            git(work, "push", "-q", "origin", "legacy")
+            # the cache says main, which is also the branch: agreement, twice
+            git(work, "symbolic-ref", "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/main")
+            subprocess.run(("git", "-C", str(remote), "symbolic-ref", "HEAD",
+                            "refs/heads/legacy"), check=True, capture_output=True)
+            out = module.git_freshness(work)
+        self.assertEqual("main", out["origin_head_cached"])
+        self.assertEqual("legacy", out["default_branch_mismatch"],
+                         "the remote is the authority, not the cached ref")
+        self.assertEqual("main", out["origin_head_cache_stale"],
+                         "a cache the remote disagrees with is its own finding")
+
+    def test_an_unreadable_default_is_unavailable_with_a_reason_never_null(self):
+        """The whole point of the item. A null that means "checked, agrees" and
+        a null that means "never asked" cannot be the same value."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            git(work, "remote", "set-url", "origin",
+                str(Path(tmp) / "no-such-remote.git"))
+            out = module.git_freshness(work)
+        self.assertIsNone(out["default_branch"])
+        self.assertIsNone(out["default_branch_source"])
+        self.assertIsNone(out["default_branch_mismatch"])
+        self.assertTrue(out["default_branch_reason"],
+                        "unavailable must carry the reason it was unavailable")
+
+    def test_a_reason_is_one_of_r147s_three_and_never_gits_stream(self):
+        """R147's classification, reused rather than re-invented. git's stderr
+        can echo a URL, so the reason is a fixed string chosen from three."""
+        module = self._audit()
+        sync = self._sync()
+        allowed = {sync.GIT_FAIL_NETWORK, sync.GIT_FAIL_CREDENTIAL,
+                   sync.GIT_FAIL_UNKNOWN}
+        with tempfile.TemporaryDirectory() as tmp:
+            work, git = self._pair(tmp)
+            git(work, "remote", "set-url", "origin",
+                str(Path(tmp) / "no-such-remote.git"))
+            read = module._read_remote_default_branch(work)
+        self.assertIsNone(read["branch"])
+        self.assertTrue(
+            any(reason in read["reason"] for reason in allowed),
+            f"classify it or say it did not run: {read['reason']}")
+        self.assertNotIn("no-such-remote", read["reason"],
+                         "the reason never carries the stream it read")
+
+    def test_a_network_failure_does_not_pay_for_a_second_remote_call(self):
+        """The device VM of a cloud Cowork session, measured 2026-08-17: DNS
+        resolves, TCP to GitHub does not, and the proxy 403s CONNECT. Once the
+        fetch has established that, asking ls-remote costs another timeout to
+        learn the same thing -- so the reason is inherited. A REJECTED
+        CREDENTIAL is not the same fact and does not skip it: a path remote and
+        a public repo both answer without one."""
+        module = self._audit()
+        sync = self._sync()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = self._pair(tmp)
+            calls = []
+
+            def no_network(root, timeout=20):
+                return {"fetched": False,
+                        "reason": "fetch failed: " + sync.GIT_FAIL_NETWORK}
+
+            def counted(root, timeout=15):
+                calls.append(root)
+                return {"branch": "main", "reason": None}
+
+            with unittest.mock.patch.object(module, "_try_git_fetch", no_network), \
+                    unittest.mock.patch.object(
+                        module, "_read_remote_default_branch", counted):
+                out = module.git_freshness(work)
+                self.assertEqual([], calls, "no second call after no network")
+                self.assertIn(sync.GIT_FAIL_NETWORK, out["default_branch_reason"])
+
+                def rejected(root, timeout=20):
+                    return {"fetched": False,
+                            "reason": "fetch failed: " + sync.GIT_FAIL_CREDENTIAL}
+
+                with unittest.mock.patch.object(module, "_try_git_fetch", rejected):
+                    out = module.git_freshness(work)
+        self.assertEqual(1, len(calls),
+                         "a rejected credential still gets the read attempted")
+        self.assertEqual("main", out["default_branch"])
+
+    def test_no_fetch_says_the_default_was_not_read(self):
+        """`--no-fetch` opts out of the network, and that includes this. Silent
+        would be indistinguishable from checked."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            work, _ = self._pair(tmp)
+            out = module.git_freshness(work, allow_fetch=False)
+        self.assertIsNone(out["default_branch_source"])
+        self.assertIn("--no-fetch", out["default_branch_reason"])
 
     def test_a_branch_with_no_upstream_is_silent_not_clean(self):
         """No upstream means nothing to measure against. Reporting 0/0 there
@@ -13720,10 +13833,32 @@ class GitFreshnessTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
                   ).read_text(encoding="utf-8")
         fetch = source.split("def _try_git_fetch", 1)[1].split("\ndef ", 1)[0]
-        self.assertIn("GIT_ASKPASS", fetch)
-        self.assertIn("GIT_TERMINAL_PROMPT", fetch)
+        # R148(a) moved the askpass plumbing into _credentialed_git_env so the
+        # fetch and the default-branch read share ONE credential path. The
+        # guard follows it rather than narrowing to what is left: every
+        # function that touches the token is scanned, and the new one is
+        # scanned for reading the remote by NAME too.
+        cred = source.split("def _credentialed_git_env", 1)[1].split("\ndef ", 1)[0]
+        symref = source.split("def _read_remote_default_branch", 1)[1].split(
+            "\ndef ", 1)[0]
+        self.assertIn("GIT_ASKPASS", cred)
+        self.assertIn("GIT_TERMINAL_PROMPT", cred)
         self.assertIn('["git", "fetch", "--quiet", "origin"]', fetch,
                       "the remote is named, never a URL carrying a credential")
+        self.assertIn('["git", "ls-remote", "--symref", "origin", "HEAD"]',
+                      symref,
+                      "the remote is named, never a URL carrying a credential")
+        for name, body in (("_credentialed_git_env", cred),
+                           ("_read_remote_default_branch", symref)):
+            scanned = body.split('"""', 2)[-1]
+            for leak in ("{token", "token}", "https://", "remote.origin.url",
+                         "print("):
+                self.assertNotIn(leak, scanned,
+                                 f"possible credential leak in {name}: {leak}")
+        self.assertEqual(1, symref.split('"""', 2)[-1].count("done.stderr"),
+                         "the stream is read once, for classification")
+        self.assertIn("classify_git_failure(done.stderr)", symref,
+                      "the only permitted reader is the classifier")
         # Scan the CODE. The docstring says ".git/config" and "remote URL"
         # describing what is avoided, and a scanner that cannot tell prose from
         # an instruction fails on its own documentation.
@@ -13857,12 +13992,26 @@ class GitFreshnessTests(unittest.TestCase):
 
     def test_both_tools_classify_through_the_one_function(self):
         """Two readers of the same failure that disagree about its cause would
-        be worse than either alone (the R128 rule). audit imports it from
-        sync_check the same way it already imports find_token."""
+        be worse than either alone (the R128 rule). audit takes it from
+        sync_check the same way it already takes find_token.
+
+        R148(a) rewrote the assertion, not its meaning: the three copies of
+        `from sync_check import ...` became one `_sync_check()` helper when a
+        third caller arrived, so what is pinned now is that audit OWNS no
+        classification of its own and reads sync_check's -- which is the rule
+        the literal import was standing in for.
+        """
         root = Path(__file__).resolve().parents[1] / "tools"
         audit_src = (root / "audit.py").read_text(encoding="utf-8")
         sync_src = (root / "sync_check.py").read_text(encoding="utf-8")
-        self.assertIn("from sync_check import classify_git_failure", audit_src)
+        self.assertIn("import sync_check", audit_src)
+        self.assertIn("sync.classify_git_failure", audit_src)
+        self.assertEqual(0, audit_src.count("def classify_git_failure"),
+                         "audit must not grow its own classifier")
+        for marker in ("_GIT_NETWORK_MARKERS", "_GIT_CREDENTIAL_MARKERS",
+                       "GIT_FAIL_CREDENTIAL ="):
+            self.assertNotIn(marker, audit_src,
+                             "the marker lists live in sync_check alone")
         self.assertIn("classify_git_failure(proc.stderr)", sync_src)
         self.assertNotIn('"fetch failed: check the token scope', audit_src)
         self.assertNotIn('"ls-remote failed: check the token scope"', sync_src)
@@ -14916,6 +15065,372 @@ class InertFactorReportingTests(unittest.TestCase):
             self.assertEqual(
                 sorted(re.findall(r'"(\w+)":', block)),
                 ["allocation_certified", "selection_certified", "workflow_valid"])
+
+
+class SplitGateTests(unittest.TestCase):
+    """R152: the session-start gate assembled across several calls.
+
+    `python tools/audit.py --run-tests --terse` is CLAUDE.md's step 2 and it
+    does not fit a Cowork `device_bash` call, which dies at 45 seconds:
+    measured 2026-08-18 on the device mount, tests.test_core alone needs ~89s
+    and one of its 792 tests needs 35.8s by itself. Backgrounding it is the
+    trap, not the workaround -- nohup and setsid both die with the call, the
+    log comes back EMPTY, which reads exactly like a silent pass, and a killed
+    audit.py leaves a zero-byte .git/index.lock that strands the session's
+    commit an hour later (R109).
+
+    So the split is supported, and these pin the three rules that keep it from
+    becoming the false signal it exists to replace: only a complete assembly
+    may print the clean line, complete means class coverage rather than a
+    matching count, and units measured against different trees are not
+    evidence about either.
+    """
+
+    def _audit(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "audit.py"
+        spec = importlib.util.spec_from_file_location("audit_split_gate", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _write(self, root, records):
+        path = Path(root) / "the_audit_gate_dir"
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "units.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+
+    def _fake_suites(self, module):
+        """Two suites of two classes, so a fixture is readable at a glance."""
+        return unittest.mock.patch.multiple(
+            module,
+            GATE_DIR="the_audit_gate_dir",
+            AUDITED_SUITES=("tests.alpha", "tests.beta"),
+            EXPECTED_SUITE_COUNTS={"tests.alpha": 10, "tests.beta": 4},
+            EXPECTED_TEST_COUNT=14)
+
+    def _now(self):
+        return datetime.now(timezone.utc).isoformat()
+
+    def _records(self, fingerprint, **overrides):
+        """A complete, clean two-suite gate. Tests bend one thing at a time."""
+        now = self._now()
+        records = [
+            {"kind": "enum", "suite": "tests.alpha", "fingerprint": fingerprint,
+             "ts": now, "present": True, "tests": 10,
+             "classes": {"AlphaOne": ["t1", "t2"], "AlphaTwo": ["t3"]}},
+            {"kind": "unit", "suite": "tests.alpha", "cls": "AlphaOne",
+             "fingerprint": fingerprint, "ts": now, "ran": 6, "skipped": 0,
+             "failures": 0, "errors_count": 0, "ok": True, "seconds": 1.0},
+            {"kind": "unit", "suite": "tests.alpha", "cls": "AlphaTwo",
+             "fingerprint": fingerprint, "ts": now, "ran": 4, "skipped": 0,
+             "failures": 0, "errors_count": 0, "ok": True, "seconds": 1.0},
+            {"kind": "enum", "suite": "tests.beta", "fingerprint": fingerprint,
+             "ts": now, "present": True, "tests": 4,
+             "classes": {"BetaOne": ["t1"]}},
+            {"kind": "unit", "suite": "tests.beta", "cls": "BetaOne",
+             "fingerprint": fingerprint, "ts": now, "ran": 4, "skipped": 0,
+             "failures": 0, "errors_count": 0, "ok": True, "seconds": 1.0},
+        ]
+        return records + list(overrides.get("extra", []))
+
+    def test_a_partial_gate_never_prints_the_clean_pass_line(self):
+        """The constraint. That exact string is what CLAUDE.md quotes and what
+        test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes fixes byte for
+        byte, so a partial run printing it would be the false-signal family
+        arriving inside the gate itself."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            self._write(root, self._records(fingerprint)[:3])  # beta missing
+            report = module.gate_report(root, allow_fetch=False)
+            line = module.gate_report_line(report, root)
+        self.assertFalse(report.get("gate_complete"))
+        self.assertTrue(line.startswith("GATE INCOMPLETE"), line)
+        self.assertNotIn("PASS", line)
+        self.assertIn("beta not started", line)
+
+    def test_a_complete_clean_gate_prints_the_line_claude_md_quotes(self):
+        """The other half: a gate that really did run every unit prints the
+        same string the single call prints, because it is the same formatter
+        over the same assembled verdict. Two spellings of a pass would be two
+        things for a reader to learn."""
+        module = self._audit()
+        root = Path(__file__).resolve().parents[1]
+        modules = module.engine_module_count(root)
+        result = {"passed": True, "warnings": [], "errors": [],
+                  "gate_complete": True,
+                  "project_version": module.PROJECT_VERSION,
+                  "checks": {"tests": {
+                      "runtime_test_count": module.EXPECTED_TEST_COUNT,
+                      "skipped_total": 0,
+                      "suite_results": {n: {"suite": n, "state": "clean"}
+                                        for n in module.AUDITED_SUITES}}}}
+        line = module.gate_report_line(result, root)
+        self.assertEqual(
+            line,
+            f"PASS  {module.PROJECT_VERSION}  {modules} modules  "
+            f"{module.EXPECTED_TEST_COUNT} tests")
+        self.assertIn(line, (root / "CLAUDE.md").read_text(encoding="utf-8"))
+
+    def test_completeness_is_class_coverage_and_not_the_count(self):
+        """The count can be reached while coverage is lost: one class grows by
+        exactly what a missing class held and the total still lands on the pin.
+        A class list cannot be reached that way, so the class list is what
+        completeness reads."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            records = self._records(fingerprint)
+            records = [r for r in records if r.get("cls") != "AlphaTwo"]
+            records[1]["ran"] = 10  # the pin is met, AlphaTwo never ran
+            self._write(root, records)
+            state = module.assemble_gate(root, fingerprint)
+            report = module.gate_report(root, allow_fetch=False)
+        self.assertFalse(state["complete"])
+        self.assertEqual(["AlphaTwo"], state["owed"]["tests.alpha"])
+        self.assertEqual(10, state["suite_results"]["tests.alpha"]["ran"],
+                         "the count matched its pin and proved nothing")
+        self.assertTrue(any("owes 1 class" in r for r in report["refusals"]))
+
+    def test_a_class_covered_by_its_methods_counts_and_a_gap_does_not(self):
+        """A class too big for one call is re-run as its own test methods. It
+        is covered when every method is, and not before."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            records = [r for r in self._records(fingerprint)
+                       if r.get("cls") != "AlphaOne"]
+            part = {"kind": "unit", "suite": "tests.alpha",
+                    "cls": "AlphaOne.t1", "fingerprint": fingerprint,
+                    "ts": self._now(), "ran": 1, "skipped": 0, "failures": 0,
+                    "errors_count": 0, "ok": True, "seconds": 30.0}
+            self._write(root, records + [part])
+            partial = module.assemble_gate(root, fingerprint)
+            rest = dict(part, cls="AlphaOne.t2", ran=5)
+            self._write(root, records + [part, rest])
+            whole = module.assemble_gate(root, fingerprint)
+        self.assertEqual(["AlphaOne"], partial["owed"]["tests.alpha"])
+        self.assertTrue(whole["complete"])
+        self.assertEqual(10, whole["suite_results"]["tests.alpha"]["ran"])
+
+    def test_units_from_another_tree_are_refused_and_never_merged(self):
+        """Chunks measured against different code are not evidence about
+        either tree, and there are two ways to get that wrong: report the
+        verdict anyway, or quietly COUNT the foreign record while refusing.
+
+        The first cut of this test only pinned the refusal, and the mutation
+        that merges foreign records into the totals survived it -- the refusal
+        fires off a separate list and never notices. So the stale record here
+        carries an absurd count and claims a class nobody ran: the assembled
+        numbers must not contain it, and the class it claimed must still be
+        owed."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            records = [r for r in self._records(fingerprint)
+                       if r.get("cls") != "AlphaTwo"]
+            foreign = {"kind": "unit", "suite": "tests.alpha", "cls": "AlphaTwo",
+                       "fingerprint": "0000deadbeef0000", "ts": self._now(),
+                       "ran": 999, "skipped": 0, "failures": 0,
+                       "errors_count": 0, "ok": True, "seconds": 1.0}
+            self._write(root, records + [foreign])
+            state = module.assemble_gate(root, fingerprint)
+            report = module.gate_report(root, allow_fetch=False)
+            line = module.gate_report_line(report, root)
+        self.assertEqual(["0000deadbeef0000"], state["stale_fingerprints"])
+        self.assertEqual(6, state["suite_results"]["tests.alpha"]["ran"],
+                         "a foreign record must not reach the count")
+        self.assertEqual(["AlphaTwo"], state["owed"]["tests.alpha"],
+                         "a foreign record covers nothing")
+        self.assertFalse(report["gate_complete"])
+        self.assertTrue(any("different tree" in r for r in report["refusals"]))
+        self.assertTrue(line.startswith("GATE INCOMPLETE"))
+
+    def test_units_older_than_the_limit_are_refused(self):
+        """The fingerprint covers code and nothing covers the reference data or
+        the interpreter, so old units stop being evidence about now."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            stale = (datetime.now(timezone.utc)
+                     - timedelta(hours=module.GATE_MAX_AGE_H + 1)).isoformat()
+            records = [dict(r, ts=stale) for r in self._records(fingerprint)]
+            self._write(root, records)
+            report = module.gate_report(root, allow_fetch=False)
+        self.assertFalse(report["gate_complete"])
+        self.assertTrue(any("old" in r for r in report["refusals"]))
+
+    def test_a_unit_that_never_finishes_is_named_then_refused(self):
+        """A killed call leaves a breadcrumb and no result. Naming it is what
+        turns "the call died" into a diagnosis; refusing on the second failure
+        is what stops the gate spending every call on the same test."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            records = [r for r in self._records(fingerprint)
+                       if r.get("cls") != "AlphaTwo"]
+            started = {"kind": "started", "suite": "tests.alpha",
+                       "cls": "AlphaTwo", "fingerprint": fingerprint,
+                       "ts": self._now()}
+            self._write(root, records + [started])
+            state = module.assemble_gate(root, fingerprint)
+            oversized = {"kind": "oversized", "suite": "tests.alpha",
+                         "cls": "AlphaTwo.t3", "attempts": 2,
+                         "fingerprint": fingerprint, "ts": self._now()}
+            self._write(root, records + [started, oversized])
+            report = module.gate_report(root, allow_fetch=False)
+        self.assertEqual(["alpha.AlphaTwo"], state["unfinished_units"])
+        self.assertTrue(any("does not finish in one call" in r
+                            for r in report["refusals"]))
+        self.assertTrue(any("AlphaTwo.t3" in r for r in report["refusals"]))
+
+    def test_a_breadcrumb_is_answered_by_covering_the_class(self):
+        """The cut-off class is finished by its methods, and the unmatched
+        class-level breadcrumb it left behind stays unmatched forever. Once the
+        class is covered the question is answered, and a gate that keeps
+        reporting work it has already done is a gate carrying noise -- which is
+        how a reader learns to skip the brackets."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            records = [r for r in self._records(fingerprint)
+                       if r.get("cls") != "AlphaOne"]
+            cut_off = {"kind": "started", "suite": "tests.alpha",
+                       "cls": "AlphaOne", "fingerprint": fingerprint,
+                       "ts": self._now()}
+            method = {"kind": "unit", "suite": "tests.alpha", "ran": 3,
+                      "cls": "AlphaOne.t1", "fingerprint": fingerprint,
+                      "ts": self._now(), "skipped": 0, "failures": 0,
+                      "errors_count": 0, "ok": True, "seconds": 30.0}
+            self._write(root, records + [cut_off, method])
+            half = module.assemble_gate(root, fingerprint)
+            rest = dict(method, cls="AlphaOne.t2", ran=3)
+            self._write(root, records + [cut_off, method, rest])
+            whole = module.assemble_gate(root, fingerprint)
+        self.assertEqual(["alpha.AlphaOne"], half["unfinished_units"],
+                         "still owed, so the breadcrumb still stands")
+        self.assertEqual([], whole["unfinished_units"])
+        self.assertTrue(whole["complete"])
+
+    def test_the_fingerprint_reads_content_and_ignores_scratch_and_pycache(self):
+        """Content, never mtime: this mount hands git different mtimes for
+        identical bytes, so an mtime fingerprint would refuse valid runs at
+        random. Scratch and bytecode are excluded because neither is the tree
+        under test and both change constantly."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "mlb_engine").mkdir()
+            target = root / "mlb_engine" / "thing.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            first = module.tree_fingerprint(root)
+            os.utime(target, (0, 0))
+            self.assertEqual(first, module.tree_fingerprint(root),
+                             "an mtime change is not a content change")
+            (root / "tools").mkdir()
+            (root / "tools" / "_scratch_x").mkdir()
+            (root / "tools" / "_scratch_x" / "patch.py").write_text(
+                "y = 2\n", encoding="utf-8")
+            (root / "mlb_engine" / "__pycache__").mkdir()
+            (root / "mlb_engine" / "__pycache__" / "thing.py").write_text(
+                "z = 3\n", encoding="utf-8")
+            self.assertEqual(first, module.tree_fingerprint(root),
+                             "scratch and bytecode are not the tree")
+            target.write_text("x = 2\n", encoding="utf-8")
+            self.assertNotEqual(first, module.tree_fingerprint(root))
+
+    def test_both_paths_assemble_their_verdict_with_one_summariser(self):
+        """R133's fixture lesson one layer out: a second copy of these rules is
+        what the tests would then pin. The split path calls the function the
+        single call returns."""
+        module = self._audit()
+        source = (Path(__file__).resolve().parents[1] / "tools" / "audit.py"
+                  ).read_text(encoding="utf-8")
+        single = source.split("def run_audited_suites", 1)[1].split(
+            "\ndef ", 1)[0]
+        self.assertIn("return summarize_suite_results(", single)
+        report = source.split("def gate_report", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("summarize_suite_results(state[\"suite_results\"])",
+                      report)
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            self._write(root, self._records(fingerprint))
+            state = module.assemble_gate(root, fingerprint)
+            summary = module.summarize_suite_results(state["suite_results"])
+        self.assertTrue(summary["passed"])
+        self.assertEqual(14, summary["runtime_test_count"])
+        self.assertEqual([], summary["_errors"])
+
+    def test_the_state_words_survive_the_split_path(self):
+        """`shortfall`, `skipped_in_place` and `absent` are LOST COVERAGE and
+        only `grew` is a stale pin (R62(b)). The split path must not soften
+        that into "the chunks did not add up"."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp, self._fake_suites(module):
+            root = Path(tmp)
+            fingerprint = module.tree_fingerprint(root)
+            records = self._records(fingerprint)
+            records[1] = dict(records[1], ran=2)  # every class ran, tests lost
+            self._write(root, records)
+            state = module.assemble_gate(root, fingerprint)
+            report = module.gate_report(root, allow_fetch=False)
+        self.assertTrue(state["complete"], "coverage is whole; the count is not")
+        verdict = state["suite_results"]["tests.alpha"]
+        self.assertEqual("shortfall", verdict["state"])
+        self.assertIn("LOST COVERAGE", verdict["advice"])
+        self.assertIn("do not lower", verdict["advice"])
+        self.assertFalse(report["checks"]["tests"]["count_matches"])
+
+    def test_the_child_records_each_unit_as_it_lands_and_resumes(self):
+        """The record has to survive the call being killed, so the child writes
+        it per unit rather than handing results back through its exit. Two
+        calls with a deadline already past run one unit each and lose
+        nothing."""
+        module = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package = root / "gatecheck_pkg"
+            package.mkdir()
+            (package / "__init__.py").write_text("", encoding="utf-8")
+            (package / "test_units.py").write_text(
+                "import unittest\n\n"
+                "class OneTests(unittest.TestCase):\n"
+                "    def test_a(self):\n        self.assertTrue(True)\n"
+                "    def test_b(self):\n        self.assertTrue(True)\n\n"
+                "class TwoTests(unittest.TestCase):\n"
+                "    def test_c(self):\n        self.assertTrue(True)\n",
+                encoding="utf-8")
+            self.addCleanup(sys.path.remove, str(root))
+            self.addCleanup(
+                lambda: [sys.modules.pop(name, None) for name in
+                         ("gatecheck_pkg", "gatecheck_pkg.test_units")])
+            with unittest.mock.patch.object(module, "GATE_DIR", "gate_state"):
+                fingerprint = module.tree_fingerprint(root)
+                module._gate_child(root, "gatecheck_pkg.test_units",
+                                   time.time() - 1, fingerprint)
+                after_one = module.read_gate_units(root)
+                module._gate_child(root, "gatecheck_pkg.test_units",
+                                   time.time() - 1, fingerprint)
+                after_two = module.read_gate_units(root)
+        enum = [r for r in after_one if r["kind"] == "enum"][0]
+        self.assertEqual({"OneTests": ["test_a", "test_b"],
+                          "TwoTests": ["test_c"]}, enum["classes"])
+        self.assertEqual(["OneTests"],
+                         [r["cls"] for r in after_one if r["kind"] == "unit"])
+        self.assertEqual(["OneTests", "TwoTests"],
+                         [r["cls"] for r in after_two if r["kind"] == "unit"])
+        self.assertEqual(1, len([r for r in after_two if r["kind"] == "enum"]),
+                         "the second call re-uses the enumeration it found")
+
 
 
 if __name__ == "__main__":

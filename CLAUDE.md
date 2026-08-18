@@ -231,13 +231,22 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    GitHub normally.
    What no fetch can fix: sessions COMMIT and Ben PUSHES
    (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub and
-   the audit names that too. And `default_branch_mismatch` reads this clone's
+   the audit names that too. `default_branch_mismatch` USED to read this clone's
    LOCAL `origin/HEAD`, a cached copy of GitHub's default from whenever
-   `set-head` last ran, so it can agree with the cache and never with GitHub.
-   **The default is `main` and `master` is deleted (Ben, 2026-08-18), which
-   closes R111(b).** This file asserted "still `master`" until that date, and
-   the failure is worth keeping: the reading was TRUE when R111 verified it by
-   `ls-remote --symref` on 08-11, Ben then acted on it, and no document was
+   `set-head` last ran, so it agreed with the cache and never with GitHub;
+   since R148(a) it reads the remote itself and reports which source answered,
+   so a null there means "asked and agrees" only when `default_branch_source`
+   says `remote`, and it carries R147's classified reason when it could not ask.
+   **The default is `main` and `master` is deleted. Verified 2026-08-18 from
+   Ben's Windows machine, and the COMMAND is the citation, not the person:**
+
+       git ls-remote --symref origin HEAD  ->  ref: refs/heads/main   HEAD
+       git fetch --prune                   ->  - [deleted]  (none) -> origin/master
+
+   This file asserted "still `master`" until that date, and
+   the failure is worth keeping: the reading was TRUE when R111 verified it the
+   same way on 2026-08-11 (`ref: refs/heads/master`, `master` = `d0212c2`), Ben
+   then acted on it, and no document was
    updated, so an 08-18 session repeated a seven-day-old reading as current and
    sent him to change a setting he had already changed. That is R145-R147's
    lesson applied to a SETTING rather than a ref — a value nothing on this disk
@@ -247,7 +256,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1182 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1199 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -260,6 +269,22 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    leave the gate for good. All four are WARNINGS: proceed, fix after the
    slate. A failing suite blocks. The audit gates test_core, test_showdown,
    test_upload_integrity, test_golden_replay, and test_paste_lineups.
+   **That one command does not fit a Cowork `device_bash` call, which dies at
+   45 seconds, so the gate has a supported split (R152).** Measured 2026-08-18
+   on the device mount: `tests.test_core` alone needs ~89s and one of its tests
+   needs 35.8s by itself. Backgrounding it is the trap and not the workaround —
+   `nohup` and `setsid` both die with the call, the log comes back EMPTY, which
+   reads exactly like a silent pass, and a killed `audit.py` strands the
+   session's next commit on a zero-byte `.git/index.lock` (R109). Instead:
+   `python tools/audit.py --gate-run` until it prints `GATE COMPLETE` (exit 3
+   means more remains), then `python tools/audit.py --gate-report --terse`,
+   which prints the SAME pinned line above when every unit ran and
+   `GATE INCOMPLETE ...` when it did not. Only a complete assembly may print
+   that line. Completeness is class coverage and not a matching count, every
+   record is stamped with a content fingerprint of the tree so an edit mid-run
+   resets the state rather than mixing two trees, and a unit that cannot finish
+   in one call is NAMED rather than skipped. State lives in `.audit_gate/`
+   (gitignored); `--gate-reset` starts over.
 3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
    before any build. Exit 3 means the bank does not fit: pass `time_budget_s`
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.

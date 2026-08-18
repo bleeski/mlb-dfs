@@ -9,15 +9,18 @@ provenance now; the retired originals live in docs/legacy/.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import hashlib
 import importlib.util
+import io
 import json
 import py_compile
 import re
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -213,7 +216,29 @@ EXPECTED_SUITE_COUNTS = {
     # they call it, all three sort, the review line says a neutral factor ranked
     # nothing, and `factors_inert` sits BESIDE the gates while the gates dict
     # keeps exactly its three certification keys).
-    "tests.test_core": 792,
+    # R148(a) + R152, 2026-08-18: 792 -> 809. Five are R148(a)'s, on a check
+    # that could not fail: the default branch read from the REMOTE and not the
+    # clone's cached origin/HEAD (the falsifier is the shape that hid it -- the
+    # cache agreeing with the checked-out branch while the remote's default is
+    # elsewhere), an unreadable default carrying R147's classified reason
+    # instead of a null that reads as agreement, the reason never carrying
+    # git's own stream, a no-network fetch not paying for a second remote call
+    # while a rejected credential still does, and --no-fetch saying so.
+    # Twelve are R152's, on the gate assembled across several calls: a partial
+    # assembly never printing the clean line and a complete one printing it
+    # byte-identically, completeness read as CLASS COVERAGE rather than a
+    # matching count (both directions, including a class covered by its own
+    # methods), units from another tree refused AND kept out of the numbers,
+    # an age limit, a unit that never finishes named and then refused, the
+    # content fingerprint ignoring bytecode and scratch, one summariser behind
+    # both paths, the state words surviving the split, and the child recording
+    # each unit as it lands so a killed call loses only the one in flight, and
+    # a breadcrumb answered by covering its class rather than reported forever.
+    # Eighteen hand-run mutations, all eighteen caught -- one of them only
+    # after the FIXTURE was strengthened: pinning the stale-tree refusal alone
+    # let a mutation that merged foreign records into the totals survive, since
+    # the refusal fires off a separate list and never reads the counts.
+    "tests.test_core": 809,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     "tests.test_showdown": 56,
@@ -548,11 +573,33 @@ def run_audit(root: Path, run_tests: bool = False,
                 f"last contact with the remote was {age}h ago and this run "
                 f"could not fetch ({fresh['fetch_reason']}), so 'behind: 0' is "
                 f"only as current as that")
+        # R148(a), three cases and one deliberate silence. A warning that
+        # fires on every run in an environment that can never satisfy it
+        # trains the reader to skip warnings, so "could not read" alone is
+        # recorded in the JSON and says nothing here; it speaks up only when
+        # the cache it cannot confirm points somewhere else.
         if fresh["default_branch_mismatch"]:
             warnings.append(
-                f"origin/HEAD is {fresh['default_branch_mismatch']} but the "
-                f"work is on {fresh['branch']}; a fresh clone lands on that "
-                f"default and gets its tree")
+                f"GitHub's default branch is "
+                f"{fresh['default_branch_mismatch']} but the work is on "
+                f"{fresh['branch']}; a fresh clone lands on that default and "
+                f"gets its tree")
+        elif fresh["default_branch_reason"] and fresh["origin_head_cached"] \
+                and fresh["origin_head_cached"] != fresh["branch"]:
+            warnings.append(
+                f"GitHub's default branch could not be read "
+                f"({fresh['default_branch_reason']}) and this clone's cached "
+                f"origin/HEAD is {fresh['origin_head_cached']} against work on "
+                f"{fresh['branch']}; the cache is not evidence about GitHub, "
+                f"so confirm with `git ls-remote --symref origin HEAD` from a "
+                f"machine that has the credential")
+        if fresh["origin_head_cache_stale"]:
+            warnings.append(
+                f"this clone's origin/HEAD still reads "
+                f"{fresh['origin_head_cache_stale']} while GitHub's default is "
+                f"{fresh['default_branch']}; a fetch never refreshes it, so "
+                f"clear it with `git remote set-head origin -a` before any "
+                f"reading quotes it")
 
     drift = skill_cache_drift(root)
     checks["skill_cache"] = drift
@@ -681,12 +728,9 @@ def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
     state (import graphs, module caches), which R59 showed can pass under a
     combined run purely because an earlier suite dirtied the interpreter.
     """
-    errors: List[str] = []
-    warnings: List[str] = []
     results: Dict[str, Any] = {}
     stdout_tail = ""
     stderr_tail = ""
-    any_failed = False
 
     for name in AUDITED_SUITES:
         path = root / "tests" / f"{name.split('.')[-1]}.py"
@@ -704,19 +748,34 @@ def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
         rec["passed"] = proc.returncode == 0
         results[name] = classify_suite(name, rec)
         if proc.returncode != 0:
-            any_failed = True
             stdout_tail = proc.stdout[-2000:]
             stderr_tail = proc.stderr[-4000:]
 
+    return summarize_suite_results(results, stdout_tail=stdout_tail,
+                                   stderr_tail=stderr_tail)
+
+
+def summarize_suite_results(results: Dict[str, Any], stdout_tail: str = "",
+                            stderr_tail: str = "") -> Dict[str, Any]:
+    """One verdict out of the per-suite verdicts, for either path.
+
+    R152 extracted this from run_audited_suites so the split-run gate assembles
+    its answer with the SAME function rather than a second copy of the rules.
+    A copy is what the tests would then pin -- R133 landed that lesson on a
+    fixture that had copied a fifteen-line gate merge, and this is the same
+    shape one layer out. What lives here is the split CLAUDE.md acts on: a
+    count mismatch is bookkeeping to fix after the slate, a failing suite is
+    not.
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
     runtime_count = sum(r["ran"] for r in results.values()
                         if isinstance(r.get("ran"), int))
     total_skipped = sum(r.get("skipped", 0) for r in results.values())
     count_ok = runtime_count == EXPECTED_TEST_COUNT
-    suite_ok = not any_failed
+    suite_ok = not any(r.get("present", True) and not r.get("passed")
+                       for r in results.values())
 
-    # Split, because CLAUDE.md tells the operator to proceed on one of these
-    # and not the other: a count mismatch during a live slate is bookkeeping
-    # that has not caught up, and a failing suite is not.
     if not suite_ok:
         failed = sorted(n for n, r in results.items()
                         if r.get("present", True) and not r.get("passed"))
@@ -742,6 +801,538 @@ def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
         "_errors": errors,
         "_warnings": warnings,
     }
+
+
+# ---------------------------------------------------------------------------
+# R152: the gate across several calls.
+#
+# CLAUDE.md's session-start step 2 is one command, and in a cloud Cowork
+# session it cannot finish: `device_bash` is hard-capped at 45 seconds and
+# tests.test_core alone measured 89s (84.9s of tests plus a 4.2s import) on
+# 2026-08-18. Backgrounding it is worse than useless -- nohup and setsid both
+# die when the call returns, the log comes back EMPTY, which looks exactly like
+# a silent pass, and a killed audit.py leaves a zero-byte .git/index.lock that
+# strands the session's commit half an hour later (R109).
+#
+# So the split is a supported path rather than a session improvising one:
+# `--gate-run` until it says complete, then `--gate-report`. Three rules hold
+# it honest.
+#   1. Only a COMPLETE assembly may print the clean full-gate line. A partial
+#      one prints GATE INCOMPLETE and exits 3. The pinned string is what
+#      CLAUDE.md quotes and what test_the_clean_pass_line_is_the_one_CLAUDE_md_
+#      quotes fixes byte for byte; a partial run printing it would be the
+#      false-signal family arriving inside the gate itself.
+#   2. Complete means every enumerated CLASS of every audited suite has a
+#      record -- not that the counts happen to sum. A count can be reached by
+#      a suite that grew while another lost coverage; a class list cannot.
+#   3. Every record carries a fingerprint of the tree it ran against, and the
+#      report refuses a mixed set. Chunks measured against different code are
+#      not evidence about either tree.
+# The verdicts themselves go through classify_suite and summarize_suite_results,
+# the same two functions the single-call path uses, so the split path cannot
+# drift into a second opinion about what `shortfall` means.
+GATE_DIR = ".audit_gate"
+GATE_UNITS_FILE = "units.jsonl"
+GATE_TIMINGS_FILE = "timings.json"
+# A device_bash call dies at 45s. The child stops taking new classes at the
+# deadline and the parent allows it a margin to finish the one in flight.
+GATE_DEFAULT_BUDGET_S = 28.0
+# The whole call, parent included. A device_bash call dies at 45s and takes the
+# parent's own report with it, so the parent stops the child while it can still
+# print what landed.
+GATE_CALL_CEILING_S = 39.0
+# The room an UNRECORDED class must have before it may start. A count-based
+# guess is useless here -- DeterminismTests is 4 tests and 24.5s while
+# PortfolioFrontierTests is 27 tests and 0.11s -- so the first pass buys its
+# knowledge by running things, and the reserve bounds what that costs. It is
+# deliberately not the slowest class measured: a reserve that large spends
+# two thirds of every call waiting, and the downside of guessing low is only
+# that the parent cuts the child off and the class is retried FIRST on the
+# next call, with the whole budget to itself.
+GATE_UNKNOWN_RESERVE_S = 10.0
+# Records older than this are not evidence about the tree now: the fingerprint
+# covers the code, nothing covers the reference data or the interpreter.
+GATE_MAX_AGE_H = 6.0
+
+
+def tree_fingerprint(root: Path) -> str:
+    """Content hash of every .py the gate could be measuring.
+
+    Content, never mtime: this mount hands git different mtimes for identical
+    bytes (docs/cowork_sync_protocol.md), so an mtime fingerprint would refuse
+    a valid split run at random. The file LIST is hashed too, so an added or
+    deleted module moves it even when no surviving file changed.
+    """
+    parts: List[str] = []
+    for folder in ("mlb_engine", "tools", "tests"):
+        base = root / folder
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*.py")):
+            if "__pycache__" in path.parts or any(
+                    seg.startswith("_scratch_") for seg in path.parts):
+                continue
+            try:
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                digest = "unreadable"
+            parts.append(f"{path.relative_to(root).as_posix()}:{digest}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def gate_units_path(root: Path) -> Path:
+    return root / GATE_DIR / GATE_UNITS_FILE
+
+
+def _gate_append(root: Path, record: Dict[str, Any]) -> None:
+    """One JSON object per line, flushed as it lands.
+
+    The child writes here directly rather than handing results back through
+    its exit, because the call around it can be killed at any moment: a killed
+    call must lose the class in flight and nothing else.
+    """
+    path = gate_units_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        handle.flush()
+
+
+def read_gate_units(root: Path) -> List[Dict[str, Any]]:
+    """Every record on disk. A malformed line is skipped, never fatal: a call
+    killed mid-write leaves a partial line and that is not a reason to lose the
+    other forty."""
+    path = gate_units_path(root)
+    if not path.exists():
+        return []
+    out: List[Dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict):
+            out.append(record)
+    return out
+
+
+def gate_reset(root: Path) -> None:
+    """Truncate in place. The mount grants create and truncate but not unlink
+    (R109), so `open("w")` is the delete that works here."""
+    path = gate_units_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("", encoding="utf-8")
+
+
+def _gate_timings(root: Path) -> Dict[str, float]:
+    path = root / GATE_DIR / GATE_TIMINGS_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {k: float(v) for k, v in data.items()
+            if isinstance(v, (int, float))} if isinstance(data, dict) else {}
+
+
+def _gate_record_timings(root: Path, learned: Dict[str, float]) -> None:
+    """Kept OUTSIDE the fingerprint, deliberately: how long a unit takes is not
+    a claim about the tree's correctness, and losing it on every edit would
+    make the first pass after every commit the slow one."""
+    timings = _gate_timings(root)
+    for key, seconds in learned.items():
+        timings[key] = round(seconds, 2)
+    path = root / GATE_DIR / GATE_TIMINGS_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(timings, indent=1, sort_keys=True),
+                    encoding="utf-8")
+
+
+def assemble_gate(root: Path, fingerprint: Optional[str] = None) -> Dict[str, Any]:
+    """Per-suite verdicts out of the recorded units, plus what is still owed.
+
+    The verdicts come from classify_suite, so `shortfall`, `skipped_in_place`,
+    `absent` and `grew` mean here exactly what they mean in the single-call
+    path -- three of them LOST COVERAGE and only `grew` a stale pin.
+
+    Completeness is CLASS COVERAGE and never the count. A suite whose recorded
+    units happen to sum to its pin can still be missing a class, if another
+    class grew by as much as the missing one held; a class list cannot be
+    reached that way. The count is then checked on top, by classify_suite,
+    which is where a real shortfall or a stale pin gets named.
+    """
+    fingerprint = fingerprint or tree_fingerprint(root)
+    units = read_gate_units(root)
+    stale = sorted({r.get("fingerprint") for r in units
+                    if r.get("fingerprint") != fingerprint})
+    mine = [r for r in units if r.get("fingerprint") == fingerprint]
+    enums = {r["suite"]: r for r in mine if r.get("kind") == "enum"}
+
+    results: Dict[str, Any] = {}
+    owed: Dict[str, Any] = {}
+    coverage: Dict[str, Any] = {}
+    oversized: List[str] = []
+    unfinished: List[str] = []
+    for name in AUDITED_SUITES:
+        enum = enums.get(name)
+        recs = [r for r in mine if r.get("kind") == "unit"
+                and r.get("suite") == name]
+        recorded = {r.get("cls") for r in recs}
+        oversized += [f"{name.split('.')[-1]}.{r.get('cls')}" for r in mine
+                      if r.get("kind") == "oversized" and r.get("suite") == name]
+        attempts = sorted(_gate_unit_attempts(units, name, fingerprint))
+        if enum is None:
+            owed[name] = None  # never enumerated: the suite has not started
+            coverage[name] = {"ran": 0, "classes": None}
+            continue
+        classes = enum.get("classes") or {}
+        missing = [cls for cls, methods in classes.items()
+                   if cls not in recorded
+                   and not all(f"{cls}.{m}" in recorded for m in methods)]
+        covered = len(classes) - len(missing)
+        coverage[name] = {"ran": covered, "classes": len(classes)}
+        # A breadcrumb is a question, and covering the class ANSWERS it: the
+        # class-level attempt that was cut off stays unmatched forever once the
+        # fallback finishes the same class by method, and reporting it after
+        # that is a gate carrying noise about work it has already done.
+        unfinished += [f"{name.split('.')[-1]}.{unit}" for unit in attempts
+                       if unit.split(".")[0] in set(missing)]
+        if missing:
+            owed[name] = missing
+        if not enum.get("present", True):
+            results[name] = classify_suite(name, {"present": False, "ran": None})
+            continue
+        rec = {
+            "present": True,
+            "ran": sum(int(r.get("ran") or 0) for r in recs),
+            "skipped": sum(int(r.get("skipped") or 0) for r in recs),
+            "failures": sum(int(r.get("failures") or 0) for r in recs),
+            "errors_count": sum(int(r.get("errors_count") or 0) for r in recs),
+        }
+        rec["passed"] = all(r.get("ok") for r in recs) and not missing
+        rec["returncode"] = 0 if rec["passed"] else 1
+        results[name] = classify_suite(name, rec)
+
+    ages = [r.get("ts") for r in mine if r.get("ts")]
+    age_h = None
+    if ages:
+        try:
+            oldest = min(datetime.fromisoformat(t) for t in ages)
+            age_h = round((datetime.now(timezone.utc) - oldest).total_seconds()
+                          / 3600.0, 1)
+        except ValueError:
+            age_h = None
+
+    return {
+        "fingerprint": fingerprint,
+        "stale_fingerprints": stale,
+        "suite_results": results,
+        "owed": owed,
+        "coverage": coverage,
+        "complete": not owed and len(results) == len(AUDITED_SUITES),
+        "age_hours": age_h,
+        "unfinished_units": sorted(set(unfinished)),
+        "oversized_units": sorted(set(oversized)),
+    }
+
+
+def _gate_unit_attempts(units: List[Dict[str, Any]], suite: str,
+                        fingerprint: str) -> Dict[str, int]:
+    """Units that were STARTED and never finished, counted per unit id.
+
+    The breadcrumb is what turns "the call died" into a diagnosis. One
+    unfinished attempt on a CLASS means the class is too big for a call here
+    and the next run splits it into its own test methods; two on a METHOD
+    means the gate cannot be run in this environment at this budget, which is
+    a refusal to report and not a thing to keep retrying.
+    """
+    started: Dict[str, int] = {}
+    finished: Dict[str, int] = {}
+    for record in units:
+        if record.get("suite") != suite or record.get("fingerprint") != fingerprint:
+            continue
+        key = record.get("cls")
+        if record.get("kind") == "started":
+            started[key] = started.get(key, 0) + 1
+        elif record.get("kind") == "unit":
+            finished[key] = finished.get(key, 0) + 1
+    return {k: v - finished.get(k, 0) for k, v in started.items()
+            if v - finished.get(k, 0) > 0}
+
+
+def _gate_child(root: Path, suite: str, deadline: float,
+                fingerprint: str) -> int:
+    """Run one suite's units, one at a time, until the deadline is near.
+
+    ONE suite per child, never two. The single-call path gives each suite its
+    own subprocess because a suite that asserts on process state can pass
+    purely because an earlier suite dirtied the interpreter (R59), and a child
+    that mixed suites would hand that back.
+
+    A unit is a test CLASS, so setUpClass runs once per class exactly as it
+    does in `python -m unittest <suite>`. A class that has already been cut off
+    once is re-run as its individual METHODS instead: that changes setUpClass
+    to once per test, which is why it is the fallback and not the default.
+    Measured 2026-08-18 on the device VM, and the reason the fallback exists:
+    DeterminismTests did not finish in 42s, and one of its four tests
+    (test_solver_inputs_are_identical_across_hash_seeds, which spawns a process
+    per hash seed) took 35.8s of that by itself.
+    """
+    import unittest as _unittest
+    sys.path.insert(0, str(root))
+    units = read_gate_units(root)
+    mine = [r for r in units if r.get("suite") == suite
+            and r.get("fingerprint") == fingerprint]
+    done = {r.get("cls") for r in mine if r.get("kind") == "unit"}
+    unfinished = _gate_unit_attempts(units, suite, fingerprint)
+    have_enum = any(r.get("kind") == "enum" for r in mine)
+
+    loader = _unittest.TestLoader()
+    loaded = loader.loadTestsFromName(suite)
+    buckets: Dict[str, Dict[str, Any]] = {}
+
+    def walk(node: Any) -> None:
+        for item in node:
+            if isinstance(item, _unittest.TestSuite):
+                walk(item)
+            else:
+                buckets.setdefault(type(item).__name__, {})[
+                    item.id().rsplit(".", 1)[-1]] = item
+
+    walk(loaded)
+    classes = {name: sorted(methods) for name, methods in sorted(buckets.items())}
+    if not have_enum:
+        _gate_append(root, {
+            "kind": "enum", "suite": suite, "classes": classes,
+            "tests": sum(len(m) for m in classes.values()), "present": True,
+            "fingerprint": fingerprint,
+            "ts": datetime.now(timezone.utc).isoformat()})
+
+    # What to run, in order, as (unit id, tests). A class already carrying an
+    # unfinished attempt -- or already half-recorded by method -- is expanded.
+    plan: List[Any] = []
+    for name, methods in classes.items():
+        split = unfinished.get(name, 0) > 0 or any(
+            f"{name}.{m}" in done for m in methods)
+        if not split:
+            if name not in done:
+                plan.append((name, [buckets[name][m] for m in methods]))
+            continue
+        for method in methods:
+            unit_id = f"{name}.{method}"
+            if unit_id not in done:
+                plan.append((unit_id, [buckets[name][method]]))
+
+    timings = _gate_timings(root)
+    learned: Dict[str, float] = {}
+    ran_here = 0
+    for unit_id, tests in plan:
+        attempts = unfinished.get(unit_id, 0)
+        if "." in unit_id and attempts >= 2:
+            # A single test that will not finish here. Say so once, in the
+            # record, and stop spending calls on it.
+            if not any(r.get("kind") == "oversized" and r.get("cls") == unit_id
+                       for r in mine):
+                _gate_append(root, {
+                    "kind": "oversized", "suite": suite, "cls": unit_id,
+                    "attempts": attempts, "fingerprint": fingerprint,
+                    "ts": datetime.now(timezone.utc).isoformat()})
+            continue
+        left = deadline - time.time()
+        known = timings.get(f"{suite}.{unit_id}")
+        if ran_here:
+            # Never start something that will not fit. An unrecorded unit is
+            # not guessed at: it gets a reserve, or it waits for the next call.
+            # The first unit of a batch always runs, so the gate cannot stall.
+            if known is not None:
+                if known * 1.25 + 1.0 > left:
+                    break
+            elif left < GATE_UNKNOWN_RESERVE_S:
+                break
+        _gate_append(root, {
+            "kind": "started", "suite": suite, "cls": unit_id,
+            "fingerprint": fingerprint,
+            "ts": datetime.now(timezone.utc).isoformat()})
+        stream = io.StringIO()
+        started_at = time.time()
+        with contextlib.redirect_stdout(stream):
+            result = _unittest.TextTestRunner(stream=stream, verbosity=0).run(
+                _unittest.TestSuite(tests))
+        seconds = time.time() - started_at
+        _gate_append(root, {
+            "kind": "unit", "suite": suite, "cls": unit_id,
+            "ran": result.testsRun, "skipped": len(result.skipped),
+            "failures": len(result.failures), "errors_count": len(result.errors),
+            "ok": result.wasSuccessful(), "seconds": round(seconds, 2),
+            "fingerprint": fingerprint,
+            "ts": datetime.now(timezone.utc).isoformat()})
+        learned[f"{suite}.{unit_id}"] = seconds
+        ran_here += 1
+    if learned:
+        # Once per batch, not once per unit: the record that must survive a
+        # killed call is the unit line above, and rewriting this file 800 times
+        # over a full gate costs more than the knowledge is worth.
+        _gate_record_timings(root, learned)
+    return 0
+
+
+def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S) -> Dict[str, Any]:
+    """One call's worth of the gate. Run it again until it says complete."""
+    started_at = time.time()
+    fingerprint = tree_fingerprint(root)
+    units = read_gate_units(root)
+    reset = bool(units) and any(r.get("fingerprint") != fingerprint
+                                for r in units)
+    if reset:
+        # The tree moved under a run in progress. Records from before it are
+        # about other code; keeping them would let a report assemble a verdict
+        # no single tree ever produced.
+        gate_reset(root)
+
+    state = assemble_gate(root, fingerprint)
+    if state["complete"]:
+        return {"complete": True, "reset": reset, "ran_suite": None,
+                "state": state, "note": "gate complete: run --gate-report"}
+
+    suite = next((n for n in AUDITED_SUITES if n in state["owed"]), None)
+    path = root / "tests" / f"{suite.split('.')[-1]}.py"
+    if not path.exists():
+        # An audited suite that is not on disk is a finding, not a chunk to
+        # run: classify_suite calls it `absent` and names it lost coverage.
+        _gate_append(root, {
+            "kind": "enum", "suite": suite, "classes": [], "tests": 0,
+            "present": False, "fingerprint": fingerprint,
+            "ts": datetime.now(timezone.utc).isoformat()})
+        state = assemble_gate(root, fingerprint)
+        return {"complete": state["complete"], "reset": reset,
+                "ran_suite": suite, "state": state,
+                "note": f"{suite} is not on disk"}
+
+    env = dict(os.environ)
+    env["PYTHONHASHSEED"] = "0"
+    deps = check_dependencies(root)
+    if deps.get("vendored_pylibs"):
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = deps["vendored_pylibs"] + (
+            os.pathsep + existing if existing else "")
+    deadline = time.time() + budget
+    # Two clocks, and they are different promises. `budget` is when the child
+    # stops STARTING units; the ceiling is when the parent gives up on the one
+    # in flight. Sizing the kill off the budget instead would cut off exactly
+    # the units that need a whole call to themselves.
+    ceiling = max(5.0, GATE_CALL_CEILING_S - (time.time() - started_at))
+    timed_out = False
+    child = None
+    try:
+        child = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--gate-child",
+             suite, "--gate-deadline", repr(deadline),
+             "--gate-fingerprint", fingerprint],
+            cwd=str(root), env=env, capture_output=True, text=True,
+            timeout=ceiling)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+    state = assemble_gate(root, fingerprint)
+    # A child that died for its OWN reason (an import error, a crash) leaves no
+    # unit record and no breadcrumb, and would otherwise read as "no progress".
+    child_error = None
+    if child is not None and child.returncode != 0:
+        child_error = (child.stderr or child.stdout or "").strip()[-400:]
+    return {"complete": state["complete"], "reset": reset, "ran_suite": suite,
+            "state": state, "timed_out": timed_out, "child_error": child_error,
+            "note": "gate complete: run --gate-report" if state["complete"]
+            else "more units remain: run --gate-run again"}
+
+
+def gate_run_line(outcome: Dict[str, Any]) -> str:
+    """Progress, never a verdict. Nothing this prints may begin with PASS."""
+    state = outcome["state"]
+    parts = []
+    for name in AUDITED_SUITES:
+        cover = state["coverage"].get(name) or {}
+        total = cover.get("classes")
+        parts.append(f"{name.split('.')[-1]} "
+                     f"{cover.get('ran', 0)}/{'?' if total is None else total}")
+    head = "GATE COMPLETE" if outcome["complete"] else "GATE PROGRESS"
+    line = f"{head}  " + "; ".join(parts)
+    if outcome.get("reset"):
+        line += "  [tree changed since the last unit: state reset]"
+    if outcome.get("timed_out"):
+        line += (f"  [the call was cut off before its class finished; "
+                 f"raise --gate-budget or run it alone]")
+    if state["unfinished_units"]:
+        line += ("  [started and never finished, split into methods on the "
+                 "next call: " + ", ".join(state["unfinished_units"]) + "]")
+    if state["oversized_units"]:
+        line += ("  [does not finish in one call here: "
+                 + ", ".join(state["oversized_units"]) + "]")
+    if outcome.get("child_error"):
+        line += "  [child exited non-zero: " + outcome["child_error"] + "]"
+    return line + "  -> " + outcome["note"]
+
+
+def gate_report(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
+    """The assembled verdict, or a refusal that names what is missing.
+
+    Returns a run_audit-shaped result when the gate is complete, so
+    terse_output formats it -- one formatter for both paths, which is what
+    keeps the clean line byte-identical and the abnormal decorations the same.
+    """
+    fingerprint = tree_fingerprint(root)
+    state = assemble_gate(root, fingerprint)
+    refusals: List[str] = []
+    if state["stale_fingerprints"]:
+        refusals.append(
+            f"{len(state['stale_fingerprints'])} recorded unit(s) ran against "
+            f"a different tree than the one on disk now; chunks measured "
+            f"against different code are not evidence about either. Re-run "
+            f"with --gate-reset")
+    if state["age_hours"] is not None and state["age_hours"] > GATE_MAX_AGE_H:
+        refusals.append(
+            f"the oldest recorded unit is {state['age_hours']}h old (limit "
+            f"{GATE_MAX_AGE_H}h); the fingerprint covers code and nothing "
+            f"covers the reference data or the interpreter. Re-run with "
+            f"--gate-reset")
+    if not state["complete"]:
+        owed = []
+        for name, missing in state["owed"].items():
+            short = name.split(".")[-1]
+            owed.append(f"{short} not started" if missing is None
+                        else f"{short} owes {len(missing)} class(es)")
+        refusals.append("gate not complete: " + "; ".join(owed))
+    if state["oversized_units"]:
+        # The honest floor. Some environments cannot run some tests inside one
+        # call, and the answer is to say which and where to run them, never to
+        # report a gate that skipped them.
+        refusals.append(
+            "does not finish in one call at this budget: "
+            + ", ".join(state["oversized_units"])
+            + ". Raise --gate-budget, or run the gate in the container where "
+              "the whole suite fits one process")
+    if refusals:
+        return {"gate_complete": False, "refusals": refusals, "state": state}
+
+    summary = summarize_suite_results(state["suite_results"])
+    result = run_audit(root, run_tests=False, allow_fetch=allow_fetch)
+    result["errors"].extend(summary.pop("_errors"))
+    result["warnings"].extend(summary.pop("_warnings"))
+    result["checks"]["tests"] = summary
+    result["passed"] = not result["errors"]
+    result["summary"] = "Audit passed" if result["passed"] else "Audit failed"
+    result["gate_complete"] = True
+    result["gate_state"] = {k: state[k] for k in
+                            ("fingerprint", "age_hours", "coverage")}
+    return result
+
+
+def gate_report_line(result: Dict[str, Any], root: Path) -> str:
+    """A refusal never wears the clean line's clothes: it starts with GATE
+    INCOMPLETE, which no reader and no test can mistake for PASS."""
+    if not result.get("gate_complete"):
+        return "GATE INCOMPLETE  " + ";  ".join(result["refusals"])
+    return terse_output(result, root)
 
 
 # The full DEV write set. Ben's 2026-08-01 rule: EVERY change — code or
@@ -936,6 +1527,66 @@ def skill_cache_drift(root: Path) -> Dict[str, Any]:
 # and `git fetch` dies on "could not read Username" -- so the honest move is not
 # to guarantee freshness but to make the uncertainty visible. Three facts, all
 # readable offline, all warnings.
+def _sync_check():
+    """`sync_check` as a module, imported from BESIDE this file.
+
+    Not from the audited root, which is what the three copies of this import
+    used to do. The classifier and the token resolver are properties of this
+    tool, not of the tree being audited, so pointing them at `root` made every
+    audit of anything other than this repo report "sync_check unavailable" --
+    including every temp-repo fixture, where it hid the difference between a
+    classified failure and no classifier at all.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import sync_check  # type: ignore
+        return sync_check
+    except Exception:
+        return None
+
+
+def _credentialed_git_env(root: Path) -> Dict[str, Any]:
+    """An environment that hands git a token through GIT_ASKPASS and nothing else.
+
+    R148(a) extracted this out of ``_try_git_fetch`` so the fetch and the
+    default-branch read share ONE credential path rather than two copies of it.
+    A copy is what the tests would then pin (R133's lesson, one layer out), and
+    the rule this carries is the one rule that cannot be relaxed: the token
+    reaches git through GIT_ASKPASS and an env var and NEVER through argv, a
+    remote URL, ``.git/config``, or any stream this process prints.
+
+    Returns ``env: None`` with a named ``reason`` when no credential is
+    reachable; a caller that does not need one (a path remote, a public repo)
+    may still run git with its own environment.
+    """
+    out: Dict[str, Any] = {"env": None, "credential": None, "reason": None}
+    sync = _sync_check()
+    if sync is None:
+        out["reason"] = "sync_check unavailable"
+        return out
+    try:
+        name, token = sync.find_token()
+    except Exception:
+        name, token = None, None
+    if not token:
+        out["reason"] = "no credential in env or .env"
+        return out
+    askpass = root / ".git" / "audit_askpass"
+    try:
+        askpass.write_text(
+            '#!/bin/sh\ncase "$1" in *[Uu]sername*) echo x-access-token;; '
+            '*) echo "$AUDIT_GIT_TOKEN";; esac\n', encoding="utf-8")
+        askpass.chmod(0o700)
+    except OSError:
+        out["reason"] = "askpass could not be written"
+        return out
+    env = dict(os.environ)
+    env.update({"AUDIT_GIT_TOKEN": token, "GIT_ASKPASS": str(askpass),
+                "GIT_TERMINAL_PROMPT": "0"})
+    out.update(env=env, credential=name)
+    return out
+
+
 def _try_git_fetch(root: Path, timeout: int = 20) -> Dict[str, Any]:
     """Update the remote-tracking refs, if a credential is reachable.
 
@@ -951,34 +1602,22 @@ def _try_git_fetch(root: Path, timeout: int = 20) -> Dict[str, Any]:
     the stale-ref reading is used, honestly labelled.
     """
     out: Dict[str, Any] = {"fetched": False, "reason": None}
-    try:
-        sys.path.insert(0, str(root / "tools"))
-        from sync_check import classify_git_failure, find_token  # type: ignore
-    except Exception:
+    sync = _sync_check()
+    if sync is None:
         out["reason"] = "sync_check unavailable"
         return out
-    try:
-        name, token = find_token()
-    except Exception:
-        name, token = None, None
-    if not token:
-        out["reason"] = "no credential in env or .env"
+    classify_git_failure = sync.classify_git_failure
+    cred = _credentialed_git_env(root)
+    if cred["env"] is None:
+        out["reason"] = cred["reason"]
         return out
 
-    askpass = root / ".git" / "audit_askpass"
     try:
-        askpass.write_text(
-            '#!/bin/sh\ncase "$1" in *[Uu]sername*) echo x-access-token;; '
-            '*) echo "$AUDIT_GIT_TOKEN";; esac\n', encoding="utf-8")
-        askpass.chmod(0o700)
-        env = dict(os.environ)
-        env.update({"AUDIT_GIT_TOKEN": token, "GIT_ASKPASS": str(askpass),
-                    "GIT_TERMINAL_PROMPT": "0"})
         done = subprocess.run(["git", "fetch", "--quiet", "origin"],
                               cwd=str(root), capture_output=True, text=True,
-                              timeout=timeout, env=env)
+                              timeout=timeout, env=cred["env"])
         if done.returncode == 0:
-            out.update(fetched=True, credential=name)
+            out.update(fetched=True, credential=cred["credential"])
         else:
             # stderr can echo a URL; never surface it, and never the token.
             # R147: it is CLASSIFIED instead. This line read "check the token
@@ -992,6 +1631,68 @@ def _try_git_fetch(root: Path, timeout: int = 20) -> Dict[str, Any]:
     return out
 
 
+def _fetch_reason_is_network(root: Path, reason: Optional[str]) -> bool:
+    """Did the fetch fail because nothing outbound works from here?
+
+    R147 classifies a failure into three; only the network one makes a SECOND
+    remote call pointless. A rejected credential is not the same fact: a path
+    remote and a public repo both answer ls-remote without one.
+    """
+    sync = _sync_check()
+    if sync is None:
+        return False
+    return bool(reason) and sync.GIT_FAIL_NETWORK in reason
+
+
+def _read_remote_default_branch(root: Path, timeout: int = 15) -> Dict[str, Any]:
+    """GitHub's OWN default branch, which only ``ls-remote --symref`` can read.
+
+    R148(a). ``origin/HEAD`` in a clone is a cache written by the last
+    ``clone`` or ``set-head`` and a fetch never refreshes it, so a check
+    against it returns the same answer whatever GitHub does -- it agreed with
+    the local ref through the entire week the documents were wrong, and it
+    would be equally silent if the default moved again tomorrow. This is the
+    one call that asks the remote.
+
+    Read-only by choice: ``git remote set-head -a`` would answer the same
+    question by WRITING the cache, which hides the reading inside a side
+    effect and leaves the audit having modified the repo it is auditing.
+
+    Same credential discipline as the fetch, through the shared helper. The
+    reason on failure is R147's three-way classification and never git's own
+    stream, which can echo a URL.
+    """
+    out: Dict[str, Any] = {"branch": None, "reason": None}
+    sync = _sync_check()
+    classify_git_failure = (sync.classify_git_failure if sync is not None
+                            else lambda stream: "sync_check unavailable")
+    cred = _credentialed_git_env(root)
+    env = cred["env"] or dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    try:
+        done = subprocess.run(
+            ["git", "ls-remote", "--symref", "origin", "HEAD"],
+            cwd=str(root), capture_output=True, text=True, timeout=timeout,
+            env=env)
+    except subprocess.TimeoutExpired:
+        out["reason"] = f"ls-remote exceeded {timeout}s"
+        return out
+    except (OSError, subprocess.SubprocessError):
+        out["reason"] = "ls-remote could not run"
+        return out
+    if done.returncode != 0:
+        out["reason"] = "ls-remote failed: " + classify_git_failure(done.stderr)
+        return out
+    found = re.search(r"^ref:\s+refs/heads/(\S+)\s+HEAD$", done.stdout, re.M)
+    if not found:
+        # A remote that answers without a symref line has no default to read
+        # (an empty repo, or a HEAD pointing outside refs/heads). Silent, not
+        # clean: the caller must not read a missing branch as agreement.
+        out["reason"] = "the remote answered with no symbolic HEAD"
+        return out
+    out["branch"] = found.group(1)
+    return out
+
+
 def git_freshness(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
     """How far the clone is from the last remote state it actually saw.
 
@@ -999,18 +1700,48 @@ def git_freshness(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
     ``behind`` needs a pull (the session's). ``fetch_age_hours`` is what both
     numbers are worth: measured against the remote-tracking ref, which moves
     only on fetch or push, so a long-stale fetch means ``behind: 0`` proves
-    nothing. ``default_branch_mismatch`` compares the checked-out branch to this
-    clone's cached ``origin/HEAD``; it CANNOT see GitHub's own default, which
-    only ``ls-remote --symref`` reads. GitHub's default is ``main`` and
-    ``master`` is deleted (Ben, 2026-08-18, closing R111(b)) -- so the trap this
-    was built for is gone, and what remains is the limit: do not read a null
-    here as agreement with GitHub.
+    nothing.
+
+    ``default_branch_mismatch`` is GitHub's own default when it differs from
+    the checked-out branch, and R148(a) is the reason it is worth this much
+    prose. It used to compare the branch against this clone's cached
+    ``origin/HEAD`` -- a copy of the default from whenever ``set-head`` last
+    ran, which no fetch refreshes -- so it returned ``null`` whether or not
+    GitHub agreed, and a null read as agreement. That is a check that cannot
+    fail. It now reads the remote through ``ls-remote --symref`` and reports
+    which source answered:
+
+      - ``default_branch_source: "remote"`` -- asked GitHub. A null mismatch
+        here means checked and agrees.
+      - ``default_branch_source: None`` with ``default_branch_reason`` set --
+        NOT read, in R147's three-way form (no network / rejected credential /
+        unknown). A null mismatch here means nothing at all. The device VM of a
+        cloud Cowork session lives here permanently.
+
+    The reading that closed R111(b) is also the shape a citation should take
+    here. From Ben's Windows machine on 2026-08-18:
+    ``git ls-remote --symref origin HEAD`` -> ``ref: refs/heads/main  HEAD``,
+    and ``git fetch --prune`` -> ``- [deleted] (none) -> origin/master``. The
+    same command returned ``master`` on 2026-08-11 and both readings were true
+    when taken, which is why the command and its output are the citation and
+    the person who ran it is not.
+
+    ``origin_head_cached`` is the local cache kept beside it, and
+    ``origin_head_cache_stale`` names it when the remote disagrees: a fresh
+    clone follows GitHub, but ``git clone`` from a stale cache is not the
+    failure -- reading that cache AS GitHub is, and that is what this
+    separates.
 
     Silent without git, without a remote, or on a branch with no upstream.
     """
     out: Dict[str, Any] = {"available": False, "ahead": 0, "behind": 0,
                            "fetch_age_hours": None, "branch": None,
+                           "default_branch": None,
+                           "default_branch_source": None,
+                           "default_branch_reason": None,
                            "default_branch_mismatch": None,
+                           "origin_head_cached": None,
+                           "origin_head_cache_stale": None,
                            "fetched": False, "fetch_reason": None}
     if allow_fetch:
         attempt = _try_git_fetch(root)
@@ -1076,11 +1807,34 @@ def git_freshness(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
     # had one set, which is noise, not a finding.
     if head_ref in (None, "", "origin/HEAD", "HEAD"):
         head_ref = None
-    if head_ref and head_ref.split("/")[-1] != branch:
-        # Not an error: it is legitimate to work off the default branch. It IS
-        # worth saying, because a fresh clone lands on origin/HEAD and gets that
-        # branch's tree, which here is weeks behind the branch the work is on.
-        out["default_branch_mismatch"] = head_ref
+    out["origin_head_cached"] = head_ref.split("/")[-1] if head_ref else None
+
+    # R148(a): ask the remote, and when that cannot happen say so by name. The
+    # second call is skipped only when the fetch already proved there is no
+    # network -- a rejected credential is not proof, since a path remote and a
+    # public repo both answer without one.
+    if not allow_fetch:
+        out["default_branch_reason"] = (
+            "--no-fetch: GitHub's default branch was not read")
+    elif not out["fetched"] and _fetch_reason_is_network(
+            root, out["fetch_reason"]):
+        out["default_branch_reason"] = out["fetch_reason"]
+    else:
+        read = _read_remote_default_branch(root)
+        out["default_branch"] = read["branch"]
+        out["default_branch_reason"] = read["reason"]
+
+    if out["default_branch"]:
+        out["default_branch_source"] = "remote"
+        out["default_branch_reason"] = None
+        if out["default_branch"] != branch:
+            # Not an error: it is legitimate to work off the default branch. It
+            # IS worth saying, because a fresh clone lands on GitHub's default
+            # and gets that branch's tree.
+            out["default_branch_mismatch"] = out["default_branch"]
+        if out["origin_head_cached"] \
+                and out["origin_head_cached"] != out["default_branch"]:
+            out["origin_head_cache_stale"] = out["origin_head_cached"]
     return out
 
 
@@ -1136,7 +1890,51 @@ def main() -> None:
                         help="skip the git fetch that makes 'behind' a "
                              "measurement; the stale-ref reading is used and "
                              "labelled as such")
+    # R152: the same gate across several calls, for a caller whose per-call
+    # ceiling cannot hold --run-tests (a Cowork device_bash call dies at 45s
+    # and tests.test_core alone needs ~89s).
+    parser.add_argument("--gate-run", action="store_true",
+                        help="run as much of the gate as fits one call, "
+                             "recording per-class results; repeat until it "
+                             "says complete. Exit 0 complete, 3 more remains")
+    parser.add_argument("--gate-report", action="store_true",
+                        help="assemble the recorded units into one verdict. "
+                             "Exit 0 pass, 1 fail, 3 incomplete or refused")
+    parser.add_argument("--gate-reset", action="store_true",
+                        help="drop the recorded units and start the gate over")
+    parser.add_argument("--gate-budget", type=float,
+                        default=GATE_DEFAULT_BUDGET_S,
+                        help="seconds of testing one --gate-run may start "
+                             f"(default {GATE_DEFAULT_BUDGET_S:.0f}; a Cowork "
+                             "device_bash call dies at 45)")
+    parser.add_argument("--gate-child", nargs=1, help=argparse.SUPPRESS)
+    parser.add_argument("--gate-deadline", help=argparse.SUPPRESS)
+    parser.add_argument("--gate-fingerprint", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    root = Path(args.root)
+
+    if args.gate_child:
+        raise SystemExit(_gate_child(root, args.gate_child[0],
+                                     float(args.gate_deadline),
+                                     args.gate_fingerprint))
+    if args.gate_reset:
+        gate_reset(root)
+        print("gate state reset")
+        if not (args.gate_run or args.gate_report):
+            raise SystemExit(0)
+    if args.gate_run:
+        outcome = gate_run(root, budget=args.gate_budget)
+        print(gate_run_line(outcome))
+        raise SystemExit(0 if outcome["complete"] else 3)
+    if args.gate_report:
+        assembled = gate_report(root, allow_fetch=not args.no_fetch)
+        if args.terse or not args.output:
+            print(gate_report_line(assembled, root))
+        else:
+            print(json.dumps(assembled, indent=2, sort_keys=True))
+        if not assembled.get("gate_complete"):
+            raise SystemExit(3)
+        raise SystemExit(0 if assembled["passed"] else 1)
 
     result = run_audit(Path(args.root), run_tests=args.run_tests,
                        allow_fetch=not args.no_fetch)

@@ -39,6 +39,38 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-18 (fourth session), DEV, claim `engine_2026-08-18`: **R148(a) is
+CLOSED and migrated**, **R152 is FILED AND CLOSED in the same commit** (number
+reserved in the stubs below, entry in CHANGELOG.md), and the R111(b) doc-truth
+tail is done — the five corrected surfaces now cite the COMMAND, its date and
+its output instead of "Ben, 2026-08-18", because a correction that fixes a
+stale reading by attaching a name repeats the defect it is correcting. **R121
+remains the head of Tier 1**, untouched: this session was Ben's three  named
+infrastructure items and it did not spend a tier slot. **R148(b) survives in
+Tier 5** and is what is left of that number. Four things worth reading before
+the R-numbers. **First, R148(a)'s premise was already dead and the mechanism was
+the item.** The trap (a fresh clone landing on a stale default) was retired when
+Ben changed the setting; what remained was a check that returned `null` whether
+or not GitHub agreed and would be equally silent if the default moved again. It
+now reads the remote and says which source answered, and the fix as filed was
+corrected in one place: the fallback does NOT compare against the local cache,
+because a comparison against a cache presented as "the default branch" is the
+original defect wearing a label. **Second, a test CLASS is not a small enough
+unit for the split gate.** `DeterminismTests` did not finish in a 42-second
+call, so a cut-off class is re-run as its individual METHODS and a method that
+still cannot finish is REFUSED by name rather than skipped. **Third, the device
+VM is not a constant and no fixed chunk plan survives it**: the same class
+measured 24.5s at 19:50 and did not finish in 42s at 20:15, same code, same
+machine. That is why the ledger Quick Card's hand-measured boundaries are
+replaced by a runner that learns its own times rather than re-measured into the
+next staleness. **Fourth, the fixture lesson landed for the fifth consecutive
+item.** Eighteen mutations by hand, all eighteen caught, but the stale-tree
+guard survived its first mutation because the test pinned the REFUSAL and never
+the counts — the loud half of the behaviour without the quiet half. Gate
+1182 -> 1199 (`test_core` 792 -> 809, `grew`); CLAUDE.md, SKILL.md and the
+ledger Quick Card pin line moved with it, the last under a DEV-held `ledger`
+claim, that line and nothing else.*
+
 *2026-08-18 (third session), DEV, claim `engine_2026-08-18`: **R133 is CLOSED
 and migrated** to CHANGELOG.md, taken in tier order as Tier 1's head. Parts (1),
 (3) and (4); (2), the equal-weight seeded ninth, is filed to MLB_Classic.md as a
@@ -1369,9 +1401,9 @@ dead code proper); **R75** (Savant same-name collapse); **R109**'s
 sync_check half (the residue sweep waits on Ben's delete grant); **R78**
 (remainder only — the floor cap landed 2026-08-17 under R147; what is left is
 the fixture dtypes, the cp310-only lock hashes, and installed-vs-lock in the
-dependency gate); **R148** (the default-branch check reads a local cache, and
-handedness is reported per side while the data is per hitter — (a) wants Ben's
-decision first, since changing the GitHub default retires it without code);
+dependency gate); **R148(b)** (handedness is reported per side while the data is per hitter;
+(a) closed 2026-08-18 and migrated, and Ben's decision half died with the
+premise);
 **R44** and **R38** (archival
 operator time); **R89** (consolidated blockers line, chmod final/ — gained
 the single-pass rider 2026-08-14 and now rides R124); **R137** (the
@@ -2429,9 +2461,18 @@ R12 are the context and process ideas; they slot in opportunistically.
   If that holds, the audit check is a backstop and the pointer is the
   mechanism, which is the reverse of how R142 wrote it up.
 
-### R148. Two gaps R147 measured and did not close (P2, XS each) | new 2026-08-17, from the R142-R146 review
+### R148(b). Handedness is reported per side while the data is per hitter (P2, XS) | new 2026-08-17, from the R142-R146 review; **(a) CLOSED 2026-08-18, migrated to CHANGELOG.md**
 
-- **(a) `default_branch_mismatch` reads a LOCAL cache, so the trap it was built
+- **(a) IS DONE.** The default branch is read from the remote through
+  `ls-remote --symref` when the fetch reaches it, `default_branch_source` says
+  which source answered, and an unreadable default carries R147's classified
+  reason instead of a null that read as agreement. Ben's decision half was
+  already retired when the premise was corrected: the setting is changed and
+  there is nothing left for him to decide. Entry and landing record in
+  CHANGELOG.md. What follows is the filed text, kept because the SHAPE it
+  names — a check that returns the same answer whatever the world does — is
+  the thing to recognize elsewhere.
+- **(a, as filed) `default_branch_mismatch` reads a LOCAL cache, so the trap it was built
   for is invisible from any existing clone.** R145 reports it off this clone's
   `origin/HEAD`, which is a copy of GitHub's default from whenever `set-head`
   last ran. On this disk that ref points at `main`, so the check returns `null`
@@ -2458,6 +2499,12 @@ R12 are the context and process ideas; they slot in opportunistically.
   not worth code:** Ben changing the default in GitHub Settings → Branches
   retires the trap outright, which makes this a Tier 4 decision as much as a
   Tier 5 fix. Sequence the decision first.
+  **Landed as the first half of that, with one correction to the fix as
+  filed:** the fallback does NOT report a mismatch off the local ref. The cache
+  is reported beside the reading under its own name, because a comparison
+  against a cache presented as "the default branch" is the original defect
+  wearing a label, and a cache the remote disagrees with is its own finding
+  (`origin_head_cache_stale`).
 - **(b) `f4_handedness_unavailable` is per-SIDE while the data is per-HITTER.**
   R143 names a side only when NO hitter on it carries `bat_side`, so a MIXED
   side is silent. It is reachable through R143's own disagreement path: DK's
@@ -2709,7 +2756,15 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
 
 ### R111(a). `sync_check.py` hardcodes `main` (P2, S) | new 2026-08-11, from DEV fragment `2026-08-11_DEV_sync-check-branch-and-default-branch.md`, merged 2026-08-12; **(b) CLOSED 2026-08-18**
 
-- **(b) IS DONE AND WAS DONE BEFORE THIS ENTRY NOTICED (Ben, 2026-08-18).**
+- **(b) IS DONE AND WAS DONE BEFORE THIS ENTRY NOTICED.** Verified 2026-08-18
+  from Ben's Windows machine, the command being the citation rather than the
+  person who ran it:
+
+  ```
+  git ls-remote --symref origin HEAD  ->  ref: refs/heads/main   HEAD
+  git fetch --prune                   ->  - [deleted]  (none) -> origin/master
+  ```
+
   GitHub's default is `main` and `master` is deleted. Ben did exactly what the
   Fix line below asked for, and no document was updated, so CLAUDE.md, this
   entry, `docs/cowork_sync_protocol.md`, `tools/audit.py`'s `git_freshness`
@@ -2721,7 +2776,13 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   standing fact is the same error R145-R147 fixed for refs, arriving on a
   SETTING that no local command can re-read. Corrective rule now in CLAUDE.md
   and the sync protocol: trust the method (`ls-remote --symref origin HEAD`
-  from a machine holding the credential), never the recorded number. Note the
+  from a machine holding the credential), never the recorded number. **The
+  five corrected surfaces were re-cited 2026-08-18** to name that command, its
+  date and its output instead of "Ben, 2026-08-18": a document that fixes a
+  stale reading by attaching a NAME repeats the defect it is correcting, since
+  the reader still cannot tell what was read or when. R148(a) closed the same
+  day made the audit run the command itself, so the reading in
+  `checks.git_freshness` is now taken rather than quoted. Note the
   local `origin/master` ref persists after the branch is deleted, because a
   push never prunes, so it is not evidence either way — `git fetch --prune`
   clears it. **(a) remains open and is what this entry is now about.**
@@ -2924,6 +2985,19 @@ existed from F15). The `+0 targeted candidates` case is the same-game pair
 filter in `usable_pairs`, not the targeted builder. The documentation half
 shipped. Remainders refiled as **R101** (queue position 3) and **R102**
 (opportunistic; renumbered **R103** on 2026-08-10). Full reasoning in CHANGELOG.md.
+
+### R152. FILED AND CLOSED 2026-08-18 -- the split-run session gate, entry migrated
+
+Filed and landed in one session at Ben's instruction, so it never sat on the
+open board. The number is reserved. `python tools/audit.py --run-tests --terse`
+cannot finish inside a Cowork `device_bash` call (hard-capped at 45s;
+`tests.test_core` alone needs ~89s and one of its tests 35.8s), and the obvious
+workaround is worse than the problem: a backgrounded run dies with the call,
+its log comes back empty — which reads like a silent pass — and the killed
+process strands the next commit on a zero-byte `.git/index.lock` (R109). The
+gate now runs across calls (`--gate-run` until complete, then `--gate-report`),
+and only a complete assembly may print the pinned clean line. Full entry and
+the two findings that outlived the item in CHANGELOG.md.
 
 ### R104, R45, R105, R54. LANDED 2026-08-10 -- the Workstream 1 Showdown batch, all four entries migrated to CHANGELOG.md
 

@@ -62,7 +62,13 @@ outage, which sends you debugging the wrong thing.
 2. **Work.** Engine work belongs in the container when the suite matters: it
    runs in about 30 seconds there against several minutes chunked on the mount,
    where a `device_bash` call is capped at 45 seconds and cannot hold a full
-   run. Small edits are fine written directly on the mount.
+   run. Small edits are fine written directly on the mount. When the gate has
+   to run ON the mount, it has a supported split since R152: repeat
+   `python tools/audit.py --gate-run` until it says complete, then
+   `python tools/audit.py --gate-report --terse`. It records per test class
+   under `.audit_gate/` against a content fingerprint of the tree, so editing
+   between calls resets the run rather than mixing two trees, and only a
+   complete assembly may print the clean pinned line.
 3. **Session end.** Commit on the mount, one git operation per call, staging by
    explicit path. Then tell Ben to push. A session that ends without committing
    leaves its work exposed: on 2026-08-10 an orphaned session left a complete,
@@ -124,22 +130,35 @@ opening the destination:
   is a Showdown guard already satisfied by a tracked fixture. The remaining
   gap is other suites' fixtures. Until it closes, container runs start from a
   tarball of the working tree, not from GitHub.
-- **GitHub's default branch is `main`, and `master` is deleted (Ben,
-  2026-08-18).** This bullet said the opposite from 2026-08-12 to 2026-08-18
+- **GitHub's default branch is `main`, and `master` is deleted.** Verified
+  2026-08-18 from Ben's Windows machine, and the command is the citation:
+
+  ```
+  git ls-remote --symref origin HEAD  ->  ref: refs/heads/main   HEAD
+  git fetch --prune                   ->  - [deleted]  (none) -> origin/master
+  ```
+
+  This bullet said the opposite from 2026-08-12 to 2026-08-18
   and the correction is worth more than the fact. The old reading was TRUE when
-  taken: `ls-remote --symref` returned `ref: refs/heads/master  HEAD` at
+  taken: the same command returned `ref: refs/heads/master  HEAD` at
   `d0212c2` (2026-08-04) on 2026-08-11, R111(b) asked Ben for the setting
   change, he made it, and no document was updated — so five documents kept
   asserting a stale value with a verification date attached, which reads as
   MORE trustworthy than an unsourced claim, not less. A dated reading is
-  evidence of what was true then and says nothing about now.
-  **Nothing on this disk can re-read it.** `origin/HEAD` is a local cache from
+  evidence of what was true then and says nothing about now, which is why the
+  citations here name the command and its output rather than the person who
+  ran it.
+  **Nothing on this disk can re-read it offline.** `origin/HEAD` is a local
+  cache from
   the last `set-head`; `origin/master` survives a deletion indefinitely because
   a push never prunes; and `ls-remote --symref` needs the credential and
   outbound network, which the device VM does not have (R147). The only reading
   is `git ls-remote --symref origin HEAD` from Ben's own machine or a container
-  holding `GH_PAT`. Re-read it before repeating it, and clear a dead
-  remote-tracking ref with `git fetch --prune`.
+  holding `GH_PAT` — which, since R148(a), is what `tools/audit.py` runs itself
+  whenever the fetch reaches the remote, reporting `default_branch_source:
+  remote` when it asked and R147's classified reason when it could not. Re-read
+  it before repeating it, and clear a dead remote-tracking ref with
+  `git fetch --prune`.
 - **`sync_check.py` hardcodes `main` (R111(a), still open).** Three reads of
   `refs/heads/main` (`:238`, `:255`, `:280`) regardless of what is checked out,
   so on any other branch it prints `disk main ?` and then gives remedies for a

@@ -25,6 +25,169 @@ performance claim.
 
 ---
 
+## 2026-08-18 — R152: the session-start gate can be run across several calls, and only a complete run prints the clean line
+
+DEV, claim `engine_2026-08-18`. New in `tools/audit.py`: a gate mode
+(`--gate-run`, `--gate-report`, `--gate-reset`, `--gate-budget`), state under
+`.audit_gate/`, and eleven tests. Filed and landed in the same session.
+
+**What.** `python tools/audit.py --run-tests --terse` is CLAUDE.md's
+session-start step 2 and it does not fit a Cowork `device_bash` call, which is
+hard-capped at 45 seconds. Measured on the device mount this date:
+`tests.test_core` alone needs about 89 seconds (84.9s of tests across its 109
+classes plus a 4.2s import), and one of its tests —
+`DeterminismTests.test_solver_inputs_are_identical_across_hash_seeds`, which
+spawns a process per hash seed — took 35.8s by itself. So a cloud session
+either skipped its own gate or assembled it by hand and read the numbers off
+the screen.
+
+**Why the obvious workaround is worse than the problem.** Backgrounding does
+not survive the call. `nohup` and `setsid` both die when it returns, the log
+comes back EMPTY — which reads exactly like a silent pass — and a killed
+`audit.py` leaves a zero-byte `.git/index.lock` that strands the session's next
+commit half an hour later with nothing linking the two (R109). That happened
+this date and cost two failed commits before the cause was found.
+
+**Fix.** `--gate-run` runs as much of the gate as fits one call and records it,
+repeated until it prints `GATE COMPLETE`; `--gate-report` assembles the records
+into one verdict. Three rules keep the split from becoming the false signal it
+exists to replace.
+
+- **Only a COMPLETE assembly may print the clean line.** That string is what
+  CLAUDE.md quotes and what `test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes`
+  fixes byte for byte; a partial run printing it would be the false-signal
+  family arriving inside the gate itself. A partial one prints
+  `GATE INCOMPLETE ...` and exits 3.
+- **Complete means class coverage, not a matching count.** A count can be
+  reached while coverage is lost — one class grows by exactly what a missing
+  class held — and a class list cannot. The count is then checked on top, by
+  `classify_suite`, which is where a real shortfall or a stale pin still gets
+  named with the same state words as the single-call path.
+- **Every record carries a content fingerprint of the tree it ran against**,
+  and the report refuses a mixed set. Chunks measured against different code
+  are not evidence about either tree. An edit between calls resets the state
+  rather than merging.
+
+**What it is not.** Not faster: it is the same work in more calls, and it costs
+one interpreter start per call. Not a second opinion either — the verdict goes
+through `classify_suite` and a newly extracted `summarize_suite_results`, the
+same two functions the single-call path uses, so the split cannot drift into
+its own idea of what `shortfall` means. Extracting the summariser is R133's
+fixture lesson one layer out: a copy is what the tests would then pin.
+
+**Two things the work established that the filed item did not carry.**
+
+1. **A test class is not a small enough unit.** `DeterminismTests` did not
+   finish in 42 seconds, so the runner falls back to running a cut-off class's
+   individual test METHODS on the next call — which changes `setUpClass` from
+   once per class to once per test, and is why it is the fallback and not the
+   default. A single METHOD that still cannot finish is recorded `oversized`
+   and REFUSED by name: some environments cannot run some tests inside one
+   call, and the honest answer names which and says where to run them, never a
+   verdict that skipped them.
+2. **The environment is not a constant, so no fixed chunk plan is right for
+   long.** The same class measured 24.5s at 19:50 and did not finish in 42s at
+   20:15, same VM, same code. The runner therefore learns each unit's time as
+   it goes (kept outside the fingerprint, since how long a unit takes is not a
+   claim about the tree) and resumes from what it has recorded, instead of
+   following boundaries someone measured once. The ledger Quick Card's
+   hand-measured chunk boundaries, stale since the 594-test era, are replaced
+   by this rather than re-measured into the next staleness.
+
+**Tests.** Twelve, `tests.test_core` 792 -> 809 with R148(a)'s five. Eighteen
+mutations run by hand, all eighteen caught — one only after the FIXTURE was
+strengthened: pinning the stale-tree REFUSAL alone let a mutation that merged
+foreign records into the totals survive, because the refusal fires off a
+separate list and never reads the counts. That is the fixture lesson landing
+for the fifth consecutive item, and this time it was a test that checked the
+loud half of a behaviour and not the quiet half.
+
+## 2026-08-18 — R148(a): the audit stops reporting a default-branch check it does not perform
+
+DEV, claim `engine_2026-08-18`. `tools/audit.py`, five tests. Closes R148(a);
+(b) stays open in Workstream 6.
+
+**What.** `git_freshness.default_branch_mismatch` compared the checked-out
+branch against this clone's cached `origin/HEAD` — a copy of GitHub's default
+from whenever `set-head` last ran, which no fetch refreshes. It returned `null`
+whether or not GitHub agreed, it agreed with the local ref through the entire
+week five documents asserted a value GitHub no longer had, and it would be
+equally silent if the default moved again tomorrow. A null read as agreement.
+The item's premise was corrected the same day (the trap it was built for is
+gone), and what survived is the mechanism: a check that cannot fail.
+
+**Fix.** The default is read from the remote with
+`git ls-remote --symref origin HEAD` when the fetch reaches it, and the result
+says which source answered. `default_branch_source: remote` means asked, so a
+null mismatch there means checked and agrees; `default_branch_source: null`
+with `default_branch_reason` set means NOT read, in R147's three-way form (no
+network, rejected credential, unknown), which on a cloud session's device VM is
+permanent. The second call is skipped only when the fetch already proved there
+is no network — a rejected credential is not that proof, since a path remote
+and a public repo both answer without one.
+
+**One correction to the fix as filed.** The fallback does NOT report a mismatch
+off the local ref. The cache is reported beside the reading under its own name
+(`origin_head_cached`), and when the remote disagrees with it that is its own
+finding (`origin_head_cache_stale`, remedied by `git remote set-head origin -a`).
+Comparing against a cache while calling it "the default branch" is the original
+defect wearing a label.
+
+**One deliberate silence.** "Could not read" alone does not warn. It is the
+permanent condition of the device VM, and a warning that fires on every run in
+an environment that can never satisfy it trains the reader to skip warnings —
+the same reasoning R146 used to drop the staleness hedge after a successful
+fetch. It warns when the reading exists and mismatches, when the cache is stale
+against a real reading, and when the reading is unavailable AND the cache
+points somewhere other than the branch in hand. The JSON always carries the
+source and the reason, so nothing reads as a check that passed.
+
+**Structural.** The askpass plumbing moved out of `_try_git_fetch` into
+`_credentialed_git_env`, so the fetch and the read share one credential path
+rather than two copies of the token rule; the token still reaches git through
+GIT_ASKPASS alone and never argv, a URL, `.git/config` or any stream. The
+source-scanning guard follows it and now covers both functions plus the new
+one, which is a wider scan than before, not a narrower one. `sync_check` is
+also imported from beside `audit.py` rather than from the audited root: the
+classifier is a property of this tool, and resolving it against `root` made
+every temp-repo fixture report "sync_check unavailable" — hiding the difference
+between a classified failure and no classifier at all.
+
+**Tests.** Five new in `GitFreshnessTests`, one rewritten
+(`test_the_default_branch_trap_is_named` asserted the cache WAS the source,
+which is the defect), and `test_both_tools_classify_through_the_one_function`
+re-expressed: it pinned the literal `from sync_check import classify_git_failure`
+and now pins the rule that literal stood for — audit owns no classifier and no
+marker list of its own. The falsifier is the shape that hid the bug: the cache
+agreeing with the checked-out branch while the remote's default is somewhere
+else.
+
+## 2026-08-18 — R111(b) tail: the five corrected surfaces now cite the command, not the person
+
+DEV, claim `engine_2026-08-18`. `CLAUDE.md`, `docs/cowork_sync_protocol.md`,
+`docs/backlog.md` (R111(a) and R148), `tools/audit.py` docstring. Docs only.
+
+**What.** The morning's correction fixed the VALUE in five places and cited it
+as "Ben, 2026-08-18". That reproduces the defect it was correcting one turn
+later: a reader still cannot tell what was read, or by what, and "a person said
+so on a date" is exactly the shape that made a seven-day-old reading look
+current. The whole lesson of the item is trust the method, not the number, and
+the documents failed their own rule.
+
+**Fix.** Each of the five now carries the command, the date and the output:
+
+```
+git ls-remote --symref origin HEAD  ->  ref: refs/heads/main   HEAD
+git fetch --prune                   ->  - [deleted]  (none) -> origin/master
+```
+
+taken from Ben's Windows machine on 2026-08-18, beside the 2026-08-11 reading
+of the same command (`ref: refs/heads/master`, `d0212c2`) which was equally
+true when it was taken. Not re-run from here, deliberately: the device VM has
+no route to GitHub (R147), the repo is private, and moving `GH_PAT` into a
+session transcript is barred by the key guardrail — a failed fetch is not
+evidence about a setting, and saying so is part of the citation.
+
 ## 2026-08-18 — R111(b) closes retroactively: the default branch was fixed a week ago and five documents never noticed
 
 DEV, claim `engine_2026-08-18`. Docs and one docstring, no behaviour.
