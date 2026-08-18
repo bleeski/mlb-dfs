@@ -71,8 +71,18 @@ Failure is loud, never quiet, and the failure kinds are kept apart:
     and a nickname or a same-initial teammate is exactly how it would.
   - Resolved but ABSENT FROM THE DK POOL, in ones -> reported, not fatal. DK's
     file is authoritative for eligibility (CLAUDE.md), so a starter DK did not
-    list is unrosterable no matter what this module says. The team stays
-    confirmed and the slot is named in ``unrostered_starters``.
+    list is unrosterable no matter what this module says, and the slot is named
+    in ``unrostered_starters``.
+    **R133 correction, 2026-08-18: this paragraph used to end "the team stays
+    confirmed", and the code has never done that.** ``lineup_status`` is
+    ``confirmed`` only at nine RESOLVED-AND-ROSTERED rows, so a side mlb.com
+    posted complete with one starter DK did not list goes PARTIAL and routes
+    through the TBD path. That is deliberate at the label layer -- see Ben's
+    call below -- but the docstring said the opposite for three slates, and it
+    is what told the 2026-08-12 reader not to look. Whether such a side SHOULD
+    be confirmed is a selection question (it changes F2 stamping and whether a
+    ninth is seeded at all); it sits with R133(2) and is Ben's or
+    MLB_Classic.md's, not this module's.
   - Resolved but ABSENT FROM THE DK POOL, in bulk -> a blocker. R32 round 2.
     Eighteen of these arrived on one 2026-07-30 build and the feed was still
     written, because each was judged on its own. They are not eighteen facts.
@@ -121,6 +131,13 @@ _STATLINE = re.compile(r"\bERA\b|\bSO\b")
 # would go, are POSITIVE information that the side is unposted. Both hold a slot.
 _TBD_SLOT = re.compile(r"^(?P<order>\d{1,2})\.\s*TBD\.?\s*$", re.I)
 _BARE_TBD = re.compile(r"^TBD\.?$", re.I)
+
+# R133(1). A posted MLB side is nine batting slots. The module used the literal
+# in one place and now needs it in three, and `tools/preflight_upload.py` holds
+# its own copy under the same name -- a mirror, not a merge, for the reason
+# `_HAND` is here rather than shared: this module carries a pinned zero-network
+# contract and must not import a tool to reach a number. Kept in sync by test.
+POSTED_LINEUP_SLOTS = 9
 
 HITTER_POSITIONS = {"C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "OF", "DH"}
 
@@ -825,7 +842,8 @@ def resolve_paste_to_feed(
             # Ben's call: a short block is PARTIAL, which the status builder reads
             # as projected and reports in partial_lineup_teams. Calling nine-minus-
             # one 'confirmed' would be the labels rule broken at the front door.
-            status = "confirmed" if len(rows) == 9 else ("partial" if rows else "tbd")
+            status = ("confirmed" if len(rows) == POSTED_LINEUP_SLOTS
+                      else ("partial" if rows else "tbd"))
             if status == "confirmed":
                 confirmed.append(team)
             elif status == "partial":
@@ -833,10 +851,34 @@ def resolve_paste_to_feed(
                 # fact from a side mlb.com posted short, and the report must not
                 # blur them: the first is this tool failing and is a blocker, the
                 # second is the world and is a labelled projection.
+                #
+                # R133(1): there is a THIRD fact and it read as the second one.
+                # mlb.com can post all nine while DK rosters eight of them, and
+                # "mlb.com posted a partial lineup" is then simply false --
+                # mlb.com posted a complete one and DK did not list a player.
+                # The two have different remedies (wait and re-paste vs nothing
+                # to do, he is unrosterable either way), so they are two lists
+                # under ``posted_sides_incomplete`` and a ``cause`` on the row,
+                # the ``opposing_probables_incomplete`` treatment. The counts
+                # travel with it because the prose cannot be joined on.
+                if side_blocked:
+                    cause = "unresolved_name"
+                    reason = "unresolved name(s); see blockers"
+                elif len(lineup) >= POSTED_LINEUP_SLOTS and side_absent:
+                    cause = "dk_unrostered"
+                    reason = (f"mlb.com posted all {len(lineup)}; "
+                              f"{side_absent} have no DK salary row, so DK did "
+                              f"not list them and they are unrosterable")
+                else:
+                    # Unchanged wording on purpose: this is the one case the
+                    # original sentence was TRUE about, and a reader who has
+                    # seen it on three slates should still recognise it.
+                    cause = "mlb_short"
+                    reason = "mlb.com posted a partial lineup"
                 partial.append({
                     "team": team, "game_id": game_id, "hitters_posted": len(rows),
-                    "reason": ("unresolved name(s); see blockers" if side_blocked
-                               else "mlb.com posted a partial lineup"),
+                    "mlb_posted": len(lineup), "absent_from_dk": side_absent,
+                    "cause": cause, "reason": reason,
                 })
             sides[side] = {
                 "team_abbrev": team,
@@ -883,6 +925,17 @@ def resolve_paste_to_feed(
         "resolved": resolved_count,
         "confirmed_teams": sorted(confirmed),
         "partial_teams": partial,
+        # R133(1). The machine-readable half of the reason strings above. Two
+        # lists rather than one because the remedies differ: a short post is
+        # fixed by waiting and re-pasting, and a DK-unrostered starter is not
+        # fixable at all -- DK owns eligibility, so there is nothing to wait
+        # for. ``unresolved_name`` is deliberately absent: that side is already
+        # a blocker and a reader must not find it in a projection bucket.
+        "posted_sides_incomplete": {
+            "mlb_short": [r["team"] for r in partial if r["cause"] == "mlb_short"],
+            "dk_unrostered": [r["team"] for r in partial
+                              if r["cause"] == "dk_unrostered"],
+        },
         "unrostered_starters": unrostered,
         "dk_declared_probables": dk_probables,
         "unrostered_policy": {

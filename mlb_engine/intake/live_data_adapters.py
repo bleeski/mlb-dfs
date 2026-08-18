@@ -955,15 +955,25 @@ def build_slate_pool(
     # compute-limited pool reduction: it removes players who cannot take the
     # field, which is a fact in the authoritative file, not a search-effort
     # trade. Day-to-day players stay eligible and warn.
-    status_out_rows: List[Dict[str, str]] = []
+    # R133(3): hoisted above the status loop, which is now its first caller --
+    # a dropped player leaves `players` here and `by_id` can no longer answer
+    # "was that a pitcher" later. One definition, five callers, unchanged rule.
+    def is_pitcher(sp: Any) -> bool:
+        return "P" in tuple(sp.positions)
+
+    status_out_rows: List[Dict[str, Any]] = []
     status_watch_ids: set[str] = set()
     players = []
     for p in all_players:
         tier = salary_status_tier(p.status)
         if tier == "out":
+            # R133(3): `is_pitcher` travels with the row because the shelved
+            # player is dropped from `players` here and `by_id` cannot answer
+            # the question later. The thin-team blocker needs it -- it used to
+            # list IL PITCHERS as reasons a team was short of HITTERS.
             status_out_rows.append(
                 {"player_id": p.player_id, "name": p.name, "team": p.team,
-                 "status": p.status}
+                 "status": p.status, "is_pitcher": bool(is_pitcher(p))}
             )
             continue
         if tier == "watch":
@@ -987,9 +997,6 @@ def build_slate_pool(
     confirmed_order = dict(status["confirmed_order_by_player_id"])
     probable_ids = list(status["probable_pitcher_ids"])
     excluded_game_ids = set(status["excluded_game_ids"])
-
-    def is_pitcher(sp: Any) -> bool:
-        return "P" in tuple(sp.positions)
 
     def appg_of(sp: Any) -> float:
         try:
@@ -1446,18 +1453,65 @@ def build_slate_pool(
                 f"authoritative order went unused"
             )
 
-    # A team that cannot field nine hitters after exclusions cannot be stacked
-    # and should not be silently half-present in the pool.
+    # R133(3). This loop used to fire a BLOCKER at any count under nine, with
+    # the message "the team cannot fill a stack". Three things were wrong with
+    # it and they compound.
+    #
+    # The bar. A DK Classic lineup admits at most MAX_HITTERS_PER_TEAM hitters
+    # from one team, so a team with that many CAN fill a maximum stack and the
+    # sentence was false everywhere from 5 to 8. The bar now comes off the
+    # solver constant rather than a number typed here, so if DK's rule moves the
+    # check moves with it. It lands on the same 5 the contract already names for
+    # a crosswalk failure (CLAUDE.md, SKILL.md), which is a coincidence of
+    # arithmetic and not a copy: five is what fills a stack, and five is also
+    # where a posted lineup that matched almost nothing stops being thin data.
+    #
+    # The contradiction. The confirmed path above ALREADY decides this exact
+    # question and decides it differently -- `n < 5` blocks as a crosswalk
+    # failure, 5 through 8 warns -- so a confirmed team at 8 got a warning there
+    # and a blocker here, from one fact. This loop no longer re-decides a
+    # confirmed team; it covers the statuses that path does not reach.
+    #
+    # The attribution. `status_out_rows` is built from every salary row, so the
+    # list named PITCHERS as reasons a team was short of HITTERS. Worse, it is
+    # not the cause at all when the shortfall is a posted starter DK never
+    # listed: on 2026-08-12 DET read "8/9 hitters after dropping [15 IL
+    # arms/bats]" when the actual ninth was Corey Julks, who has no salary row
+    # and appears in no dropped list. The list is now hitters only, and it is
+    # only offered as an explanation when it can be one.
+    from mlb_engine.optimize.optimizer_v3 import MAX_HITTERS_PER_TEAM
+
+    unstackable: List[str] = []
+    short_of_nine: List[str] = []
     for team, rec in sorted(teams_report.items()):
         if rec.get("status") in ("excluded_postponed", "excluded_no_order_data"):
             continue
-        if int(rec.get("hitters") or 0) < 9:
-            dropped_here = [r for r in status_out_rows if r["team"] == team]
-            if dropped_here:
+        n = int(rec.get("hitters") or 0)
+        if n >= 9:
+            continue
+        hitters_dropped = [r for r in status_out_rows
+                           if r["team"] == team and not r.get("is_pitcher")]
+        detail = f"{team}: {n}/9 hitters in the pool"
+        if hitters_dropped:
+            detail += (" after dropping "
+                       + ", ".join(f"{r['name']} ({r['status']})"
+                                   for r in hitters_dropped))
+        if n < MAX_HITTERS_PER_TEAM:
+            unstackable.append(team)
+            # The confirmed path owns this decision for a confirmed team and
+            # says it better (it names the crosswalk). Two blockers on one fact
+            # is what this loop was already doing wrong.
+            if rec.get("status") != "confirmed":
                 blockers.append(
-                    f"{team}: {rec.get('hitters')}/9 hitters after dropping "
-                    + ", ".join(f"{r['name']} ({r['status']})" for r in dropped_here)
-                    + "; the team cannot fill a stack"
+                    detail + f"; under {MAX_HITTERS_PER_TEAM}, so the team "
+                    f"cannot fill a stack of any legal size"
+                )
+        else:
+            short_of_nine.append(team)
+            if rec.get("status") != "confirmed":
+                warnings.append(
+                    detail + f"; enough for a full {MAX_HITTERS_PER_TEAM}-hitter "
+                    f"stack, short of a full lineup"
                 )
 
     # Pitchers: probables plus explicit declarations. Nothing else exists.
@@ -1697,6 +1751,19 @@ def build_slate_pool(
             "opposing_probables_incomplete": {
                 "no_mlbam_id": probables_no_id,
                 "no_hand": probables_no_hand,
+            },
+            # R133(3). Which teams are short of nine hitters, split at the bar
+            # that decides what being short MEANS. Two lists rather than one
+            # because the remedies differ and only one of them is fatal: under
+            # MAX_HITTERS_PER_TEAM the team cannot fill a stack of any legal
+            # size and the build is of a different slate, at or above it the
+            # team stacks normally and the shortfall costs options. This is the
+            # one definition of thin; `_derive_workflow_gates` reads it rather
+            # than recomputing a third bar of its own.
+            "thin_teams": {
+                "cannot_fill_a_stack": unstackable,
+                "short_of_nine": short_of_nine,
+                "stack_bar": MAX_HITTERS_PER_TEAM,
             },
             "slate_date": slate_date.isoformat(),
             "warnings": warnings,

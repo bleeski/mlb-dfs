@@ -1305,3 +1305,99 @@ class HandLineRenderTests(unittest.TestCase):
         self.assertEqual(joined["report"].get("dk_declared_probables") or [], [])
         self.assertEqual(json.dumps(bare["feed"], sort_keys=True, default=str),
                          json.dumps(joined["feed"], sort_keys=True, default=str))
+
+
+class PartialSideCauseTests(unittest.TestCase):
+    """R133(1). A side mlb.com posted COMPLETE, one of whose starters DK never
+    listed, reported ``reason: "mlb.com posted a partial lineup"``. mlb.com
+    posted a complete one; DK did not roster a player, which the report already
+    knew one field away in ``unrostered_starters`` and then collapsed.
+
+    The two facts have different remedies -- wait and re-paste versus nothing to
+    do, DK owns eligibility -- so they are two lists and a machine-readable
+    cause, the ``opposing_probables_incomplete`` treatment.
+    """
+
+    def _rows(self, text):
+        out = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
+        return out, {r["team"]: r for r in out["report"]["partial_teams"]}
+
+    def _dk_unrostered_paste(self):
+        """LAA posts all nine; its Trout slot names a player with no salary row."""
+        return _text().replace(
+            "[M Trout](https://www.mlb.com/player/mike-trout-545361)",
+            "[Q Nobody](https://www.mlb.com/player/quinn-nobody-999999)")
+
+    def _mlb_short_paste(self):
+        """LAA's ninth slot is not posted at all."""
+        return _text().replace(
+            "9. [T Heineman](https://www.mlb.com/player/tyler-heineman-623168) (S) C\n",
+            "")
+
+    def test_nine_posted_with_one_unrostered_does_not_say_mlb_posted_a_partial(self):
+        out, rows = self._rows(self._dk_unrostered_paste())
+        self.assertEqual(out["report"]["blockers"], [])
+        laa = rows["LAA"]
+        self.assertEqual(laa["cause"], "dk_unrostered")
+        self.assertEqual(laa["mlb_posted"], 9)
+        self.assertEqual(laa["absent_from_dk"], 1)
+        self.assertEqual(laa["hitters_posted"], 8)
+        self.assertNotIn("mlb.com posted a partial", laa["reason"])
+        self.assertIn("posted all 9", laa["reason"])
+        self.assertIn("no DK salary row", laa["reason"])
+
+    def test_a_genuinely_short_side_keeps_the_sentence_that_was_true(self):
+        """The companion the fixture needs. Without a side that IS mlb-short, a
+        mutation stamping every partial side `dk_unrostered` passes the test
+        above -- which is the R117/R136/R128 fixture lesson, one layer down."""
+        out, rows = self._rows(self._mlb_short_paste())
+        laa = rows["LAA"]
+        self.assertEqual(laa["cause"], "mlb_short")
+        self.assertEqual(laa["mlb_posted"], 8)
+        self.assertEqual(laa["absent_from_dk"], 0)
+        self.assertEqual(laa["reason"], "mlb.com posted a partial lineup")
+
+    def test_the_two_causes_land_in_their_own_lists_and_a_blocked_side_in_neither(self):
+        split = self._rows(self._dk_unrostered_paste())[0][
+            "report"]["posted_sides_incomplete"]
+        self.assertEqual(split["dk_unrostered"], ["LAA"])
+        self.assertEqual(split["mlb_short"], [])
+        split = self._rows(self._mlb_short_paste())[0][
+            "report"]["posted_sides_incomplete"]
+        self.assertEqual(split["mlb_short"], ["LAA"])
+        self.assertEqual(split["dk_unrostered"], [])
+        # An unresolved name is a blocker, and a reader must never find it in a
+        # projection bucket. No `resolve_overrides`, so SEA's 'W Wilson' blocks.
+        out = resolve_paste_to_feed(_text(), str(SALARY))
+        split = out["report"]["posted_sides_incomplete"]
+        self.assertNotIn("SEA", split["mlb_short"])
+        self.assertNotIn("SEA", split["dk_unrostered"])
+        self.assertEqual(
+            [r["cause"] for r in out["report"]["partial_teams"]
+             if r["team"] == "SEA"], ["unresolved_name"])
+
+    def test_a_dk_unrostered_side_is_still_partial_not_confirmed(self):
+        """The docstring claimed for three slates that "the team stays confirmed"
+        and the code has never done that. Whether it SHOULD is R133(2), Ben's;
+        what this pins is that the two now agree about what happens today."""
+        out, _ = self._rows(self._dk_unrostered_paste())
+        laa = out["feed"]["games"][0]["home"]
+        self.assertEqual(laa["team_abbrev"], "LAA")
+        self.assertEqual(laa["lineup_status"], "partial")
+        self.assertNotIn("LAA", out["report"]["confirmed_teams"])
+        # No assertion on the docstring text. The correction QUOTES the sentence
+        # it corrects, so a substring check cannot tell a live claim from a
+        # retracted one -- the same fixture-cannot-distinguish trap R117 hit,
+        # met here while writing the guard rather than after shipping it.
+
+    def test_the_slots_constant_mirrors_preflights_copy(self):
+        """R104's interim, applied to a number rather than a token set: two
+        modules, one value, pinned equal because this one cannot import that one
+        without breaking its zero-network contract."""
+        from mlb_engine.intake.paste_lineups import POSTED_LINEUP_SLOTS
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_pf_r133", str(REPO / "tools" / "preflight_upload.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        self.assertEqual(POSTED_LINEUP_SLOTS, mod.POSTED_LINEUP_SLOTS)

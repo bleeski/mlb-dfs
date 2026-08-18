@@ -1016,6 +1016,69 @@ PRE_EXPORT_GATE_NAMES = (
     "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
 )
 
+# R133(4). Gates an explicit assumption may promote against a DERIVED FALSE, as
+# opposed to against a None. Deliberately one entry, and deliberately not a
+# knob: CLAUDE.md's autonomy section authorizes exactly one such assertion --
+# "override a pool blocker whose shape you have classified benign, and assert
+# `lineup_gate_passed` on that same evidence. Both together or neither" -- and
+# every other gate on the list reads a fact the operator cannot have better
+# evidence about than the file does. A salary schema failure is not a judgement
+# call, so assuming past it would be a way to certify a broken CSV.
+OVERRIDABLE_GATES = ("lineup_gate_passed",)
+
+
+def resolve_gate_assertions(
+    gate_defaults: Mapping[str, Any],
+    supplied: Mapping[str, Any],
+    assume_gates: Optional[Sequence[str]],
+    derived_gates: Mapping[str, Any],
+    gate_evidence: Mapping[str, str],
+) -> Tuple[Dict[str, Any], List[str], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Apply ``assume_gates`` and say which of three things each request was.
+
+    Extracted from ``run_slate`` for R133(4) so a test can exercise the real
+    merge. The first cut of that test reimplemented these fifteen lines and
+    passed against two mutations of the lines it claimed to pin -- a test over a
+    copy of the logic pins the copy.
+
+    Returns ``(gates, assumed, overridden, refused)``.
+
+    - ASSUMED: the evidence said nothing (None), so the caller supplies it. The
+      T-5 fast path, unchanged since F4.
+    - OVERRIDDEN: the evidence said False and the caller has read it and
+      disagrees. Only ``OVERRIDABLE_GATES`` may be, and the record carries the
+      evidence string being contradicted rather than just the gate name.
+    - REFUSED: neither. Reported rather than silently discarded, which is what
+      cost the 2026-08-12 build two runs at T-10.
+    """
+    requested = {str(x) for x in (assume_gates or [])} & set(derived_gates)
+    assumed = sorted(n for n in requested if gate_defaults.get(n) is None)
+    overridden = sorted(n for n in requested
+                        if n in OVERRIDABLE_GATES
+                        and gate_defaults.get(n) is False)
+    refused = sorted(requested - set(assumed) - set(overridden))
+    gates = {**gate_defaults, **dict(supplied or {})}
+    for name in assumed + overridden:
+        if gates.get(name) is None or name in overridden:
+            gates[name] = True
+    gates = {k: v for k, v in gates.items() if v is not None}
+    overridden_records = [
+        {"gate": name, "derived": False,
+         "evidence_contradicted": gate_evidence.get(name, "")}
+        for name in overridden
+    ]
+    refused_records = [
+        {"gate": name, "derived": gate_defaults.get(name),
+         "reason": ("already decided True by the evidence; nothing to assume"
+                    if gate_defaults.get(name) is True else
+                    f"derived False and not in OVERRIDABLE_GATES "
+                    f"({', '.join(sorted(OVERRIDABLE_GATES))}); the fix is the "
+                    f"input, not the flag"),
+         "evidence": gate_evidence.get(name, "")}
+        for name in refused
+    ]
+    return gates, assumed, overridden_records, refused_records
+
 
 def _applied(block: Any) -> Optional[bool]:
     """True when an enrichment map reached rows, False when it reached none.
@@ -1067,9 +1130,21 @@ def _derive_workflow_gates(
 
     A gate is True only when something checkable says so, False when something
     checkable says otherwise, and None when nothing does. None is not a pass:
-    ``validate_upload_ready_gates`` reports it as a missing gate and blocks. The
-    caller can assume any of them explicitly via ``assume_gates``, which is
-    recorded, and that is the only way one of these reaches True unchecked.
+    ``validate_upload_ready_gates`` reports it as a missing gate and blocks.
+
+    **R133(4) correction, 2026-08-18.** This paragraph used to end "the caller
+    can assume any of them explicitly via ``assume_gates``", and the code has
+    never done that: ``run_slate`` promoted a gate only where the derived value
+    was None, so an assumption against a derived FALSE was discarded -- while
+    still being written into ``assumed_gates`` in the artifact, which is a
+    record of an assumption that had no effect. An operator following
+    CLAUDE.md's own instruction ("override a pool blocker whose shape you have
+    classified benign, and assert ``lineup_gate_passed`` on that same evidence.
+    Both together or neither") got a blocked build from doing exactly what the
+    contract says. ``lineup_gate_passed`` is now overridable against a derived
+    False and lands in ``overridden_gates`` beside the evidence it contradicts;
+    every other gate keeps None-only semantics, because that gate is the only
+    one the contract authorizes asserting on operator evidence.
     """
     gates: Dict[str, Optional[bool]] = {}
     why: Dict[str, str] = {}
@@ -1092,16 +1167,39 @@ def _derive_workflow_gates(
 
     report = dict(pool_report or {})
     if report:
-        thin = sorted(
-            team for team, rec in (report.get("teams") or {}).items()
-            if str(rec.get("status")) not in ("excluded_postponed", "excluded_no_order_data")
-            and int(rec.get("hitters") or 0) < 9
-        )
+        # R133(3): this was the THIRD reader of "how short is too short" and it
+        # held the strictest bar of the three -- any team under nine failed the
+        # gate, while the pool report's own confirmed path called 5 through 8 a
+        # warning. One fact, two verdicts, and the gate's verdict won silently.
+        # The bar is now MAX_HITTERS_PER_TEAM, the count that fills a maximum DK
+        # stack, and the pool report computes it once under `thin_teams`. The
+        # fallback recomputes it at the same bar for a report that predates the
+        # key or was assembled by hand; it is not a second definition, and the
+        # two are pinned equal by test.
+        from mlb_engine.optimize.optimizer_v3 import MAX_HITTERS_PER_TEAM
+
+        live = {
+            team: rec for team, rec in (report.get("teams") or {}).items()
+            if str(rec.get("status")) not in ("excluded_postponed",
+                                              "excluded_no_order_data")
+        }
+        split = report.get("thin_teams") or {}
+        if "cannot_fill_a_stack" in split:
+            thin = sorted(str(t) for t in split.get("cannot_fill_a_stack") or [])
+            short = sorted(str(t) for t in split.get("short_of_nine") or [])
+        else:
+            thin = sorted(t for t, rec in live.items()
+                          if int(rec.get("hitters") or 0) < MAX_HITTERS_PER_TEAM)
+            short = sorted(t for t, rec in live.items()
+                           if MAX_HITTERS_PER_TEAM <= int(rec.get("hitters") or 0) < 9)
         gates["lineup_gate_passed"] = not report.get("blockers") and not thin
         why["lineup_gate_passed"] = (
             f"pool report: {len(report.get('blockers') or [])} blockers, "
-            f"{len(thin)} team(s) under nine hitters"
+            f"{len(thin)} team(s) under {MAX_HITTERS_PER_TEAM} hitters and so "
+            f"unable to fill a stack"
             + (f" ({', '.join(thin)})" if thin else "")
+            + f"; {len(short)} short of nine but stackable"
+            + (f" ({', '.join(short)})" if short else "")
         )
     elif order_by_team:
         # R53: this branch read `elif projected_order:` -- and `projected_order` is
@@ -3745,12 +3843,24 @@ def run_slate(
     # The T-5 fast path. An assumed gate certifies, and the assumption is written
     # verbatim into the artifact, so the file states which checks were skipped
     # rather than implying they ran.
-    assumed = sorted({str(x) for x in (assume_gates or [])} & set(derived_gates))
-    gates = {**gate_defaults, **supplied}
-    for name in assumed:
-        if gates.get(name) is None:
-            gates[name] = True
-    gates = {k: v for k, v in gates.items() if v is not None}
+    #
+    # R133(4). Two facts wear one name here and they are not the same claim.
+    # ASSUMING a gate nothing checked is a statement about missing evidence.
+    # OVERRIDING a gate the evidence decided False is a statement that the
+    # operator has read that evidence and disagrees. The loop below used to
+    # promote only the first and DROP the second on the floor -- while still
+    # listing it in `assumed_gates`, so the artifact recorded an assumption that
+    # changed nothing. An operator doing what CLAUDE.md's autonomy section
+    # instructs, overriding a pool blocker and asserting `lineup_gate_passed` on
+    # the same evidence, got a blocked build for it.
+    #
+    # `lineup_gate_passed` is the only gate an override reaches, because it is
+    # the only one the contract authorizes asserting on operator evidence, and
+    # the override is recorded SEPARATELY with the evidence it contradicts. A
+    # reader of the artifact can then tell "nobody checked" from "the check said
+    # no and was overruled", which is the whole point of the labels rule.
+    gates, assumed, overridden_gates, gates_assumption_refused = resolve_gate_assertions(
+        gate_defaults, supplied, assume_gates, derived_gates, gate_evidence)
     # Only the gates a caller actually supplied are caller-asserted. The label
     # used to name six gates nobody had asserted.
     caller_asserted = sorted(set(supplied) & set(PRE_EXPORT_GATE_NAMES))
@@ -3770,6 +3880,10 @@ def run_slate(
         "caller_asserted_gates": caller_asserted,
         "workflow_gate_evidence": gate_evidence,
         "assumed_gates": assumed,
+        # R133(4). Kept apart from `assumed_gates` on purpose: one says nothing
+        # checked, the other says the check said no.
+        "overridden_gates": overridden_gates,
+        "gates_assumption_refused": gates_assumption_refused,
         "contest_identity_blockers": contest_identity_blockers,
         "strategy_defaults_are_priors": True,
         "projected_order": projected_order,
@@ -3943,6 +4057,7 @@ def run_slate(
                   "front_door_version": VERSION,
                   "workflow_gate_evidence": gate_evidence,
                   "assumed_gates": assumed,
+                  "overridden_gates": overridden_gates,
                   "caller_asserted_gates": caller_asserted,
                   },
         # When candidates were handed in, run_slate did not build the bank and
@@ -3978,6 +4093,8 @@ def run_slate(
         "caller_asserted_gates": caller_asserted,
         "workflow_gate_evidence": gate_evidence,
         "assumed_gates": assumed,
+        "overridden_gates": overridden_gates,
+        "gates_assumption_refused": gates_assumption_refused,
         "contest_identity_blockers": contest_identity_blockers,
         "strategy_defaults_are_priors": True,
         "light_satellite": bool(light_satellite),

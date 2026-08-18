@@ -1475,10 +1475,48 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                     "override recorded in the brief.",
         }, indent=1))
         return 3, {}
+    # R133(4). CLAUDE.md's hard list names this one "stop and ask", above all
+    # others: a name-crosswalk failure means the real lineup is sitting unused
+    # while a projection substitutes for it, and building anyway is a certified
+    # file for a lineup nobody posted. `--ignore-pool-blockers` used to let it
+    # through, spend the whole build, and then lose it at the pre-export gate.
+    # It refuses HERE, by name, which is what the 2026-08-12 fragment asked for.
+    unoverridable = [b for b in hard if UNOVERRIDABLE_POOL_BLOCKER_RE.search(b)]
+    if unoverridable and args.ignore_pool_blockers:
+        for b in unoverridable:
+            print(f"POOL BLOCKER NOT OVERRIDABLE: {b}", file=sys.stderr)
+        print(json.dumps({
+            "status": "pool_blocked",
+            "blockers": unoverridable,
+            "other_hard_blockers": [b for b in hard if b not in unoverridable],
+            "soft_blockers": soft,
+            "note": "--ignore-pool-blockers does not cover a name-crosswalk "
+                    "failure. CLAUDE.md's hard list calls this one stop-and-ask "
+                    "above all others, because the real posted lineup is in hand "
+                    "and a projection is being substituted for it. Refused here "
+                    "rather than after the build, which is where the pre-export "
+                    "gate used to refuse it. Fix the crosswalk (check the team "
+                    "code and the name spellings against the salary file) or "
+                    "exclude the team.",
+        }, indent=1))
+        return 3, {}
     if hard:
         for b in hard:
             print(f"POOL BLOCKER OVERRIDDEN by --ignore-pool-blockers: {b}",
                   file=sys.stderr)
+        # R133(4). This flag alone never certified and never said so. The
+        # pre-export gate re-derives `lineup_gate_passed` from this same pool
+        # report, so an overridden blocker still fails it; CLAUDE.md's autonomy
+        # section already says the two moves go together ("both together or
+        # neither") and this is the tool finally saying which second move.
+        if "lineup_gate_passed" not in (
+                parse_assume_gates_arg(getattr(args, "assume_gates", None)) or []):
+            print("NOTE: the pre-export gate re-reads this pool report "
+                  "independently, so overriding the blocker here does not by "
+                  "itself certify. Add --assume-gates lineup_gate_passed to "
+                  "assert the gate on the same evidence (CLAUDE.md: both "
+                  "together or neither); the override is recorded in "
+                  "diagnostics under overridden_gates.", file=sys.stderr)
 
     # A salary/feed clock disagreement means two sources describe different
     # slates, so say which one this build adopted rather than picking silently.
@@ -2633,6 +2671,12 @@ ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
                    "weather_gate_passed", "odds_gate_passed")
 
+# R133(4). Pool blockers `--ignore-pool-blockers` refuses to override, matched
+# on the phrase both producers in `live_data_adapters` share. Kept here rather
+# than in the engine because it is the FLAG's policy, not the pool's: the pool
+# reports the fact and this script decides what an operator may wave through.
+UNOVERRIDABLE_POOL_BLOCKER_RE = _re.compile(r"crosswalk failure", _re.I)
+
 # The two shapes validate_upload_ready_gates emits, and nothing else.
 _GATE_ERROR_RE = _re.compile(r"^(?:Missing|Failed) pre-export gate: (\w+)")
 
@@ -2772,13 +2816,23 @@ def main() -> int:
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "
-                         "when you have read the blocker and know it is wrong.")
+                         "when you have read the blocker and know it is wrong. "
+                         "This is HALF the move: the pre-export gate re-reads "
+                         "the pool report, so pair it with --assume-gates "
+                         "lineup_gate_passed. A crosswalk failure is refused "
+                         "outright rather than overridden.")
     ap.add_argument("--assume-gates", dest="assume_gates", default=None,
                     help="comma-separated pre-export gates to certify without "
                          "checking, for the T-5 fast path. Each one is recorded "
                          "verbatim in diagnostics.json, so the artifact states "
                          "which checks were skipped instead of implying they ran. "
-                         "Valid: " + ", ".join(ASSUMABLE_GATES))
+                         "A gate nothing checked lands in assumed_gates; "
+                         "lineup_gate_passed may also override a gate the "
+                         "evidence decided FALSE and lands in overridden_gates "
+                         "with the evidence it contradicts. Any other gate "
+                         "against a False derivation is refused and reported in "
+                         "gates_assumption_refused rather than silently doing "
+                         "nothing. Valid: " + ", ".join(ASSUMABLE_GATES))
     ap.add_argument("--postures", default=None,
                     help="comma-separated <contest_id_or_name>=<posture> pairs, e.g. "
                          "'192707612=wta_satellite,192707473=cash'. Postures: cash, "

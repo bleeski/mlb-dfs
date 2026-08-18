@@ -39,6 +39,55 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-18 (third session), DEV, claim `engine_2026-08-18`: **R133 is CLOSED
+and migrated** to CHANGELOG.md, taken in tier order as Tier 1's head. Parts (1),
+(3) and (4); (2), the equal-weight seeded ninth, is filed to MLB_Classic.md as a
+selection question and is Ben's. **R121 is the new head of Tier 1** — it is the
+next P1 in the queue, it is S, and it is the only remaining item that changes
+what a session BELIEVES at decision time rather than what a report says
+afterward. Four things worth reading before the R-number, and three of them
+changed the entry as filed. **First, the contract's 5-of-9 bar was already in
+the code and the blocker CONTRADICTED it.** The entry read as though no such bar
+existed; `live_data_adapters`' confirmed path has always blocked at `n < 5` as a
+crosswalk failure and warned from 5 to 8, twenty lines above the loop that then
+blocked at `< 9` on the same team and the same fact. The filed fix, "move the
+blocker to the contract's 5-of-9 bar", would have produced two blockers on one
+team; the fix it needed was for the later loop to stop re-deciding a decided
+question. CLAUDE.md and SKILL.md both scope their 5-of-9 sentence to a
+name-crosswalk failure and always did — one bar was read as governing the other
+check. **Second, there was a THIRD reader and it decided certification.**
+`_derive_workflow_gates` recomputed `thin` at `< 9` from the same teams dict and
+independently of the blockers list, so the sharpest case is one the entry did not
+have: a confirmed team at 8 with no status-dropped rows produced NO blocker at
+all, and the build still could not certify. `--ignore-pool-blockers` had nothing
+to override. **Third, the paste module's docstring claimed the opposite of the
+code on the exact point**, ending "the team stays confirmed" where `lineup_status`
+has never been `confirmed` below nine rostered rows; the source fragment quoted
+the paragraph above that sentence and missed it. Corrected in place. **Fourth,
+the fixture lesson landed for the FOURTH consecutive item, and this time the
+fixture was a copy of the code.** Seventeen mutations by hand and all seventeen
+caught, but two survived the first pass because the test helper had copied
+run_slate's fifteen-line gate merge instead of calling it — a test over a copy of
+the logic pins the copy. The remedy was extracting `resolve_gate_assertions` so
+both call one thing, which is the first time in this run of four that the answer
+was to make the code testable rather than to fix the data. R117, R136 and R128 are
+the same shape one layer out. One mutation also read SURVIVED off a stale
+`__pycache__` and was a harness artifact rather than a weak guard; the harness now
+clears it between runs, and a mutation harness that can lie in the reassuring
+direction is worse than none. What the work established that the entry did not
+carry: the crosswalk bar and `MAX_HITTERS_PER_TEAM` are the same number for
+different reasons (five fills a maximum DK stack), so the new bar reads the solver
+constant instead of copying a doc; and `assumed_gates` was recording a request
+that had no effect, which is a truthful-labels problem and not only a broken flag,
+which is why the override is a separate key carrying the evidence it contradicts.
+(4) was verified by RUNNING both overrides rather than reading them and both
+reproduced. Gate 1157 -> 1182 (`test_upload_integrity` 218 -> 238,
+`test_paste_lineups` 82 -> 87, both `grew`); CLAUDE.md, SKILL.md and the ledger
+Quick Card pin line moved with it, the last under a DEV-held `ledger` claim, that
+line and nothing else. CLAUDE.md's autonomy and hard-guardrail bullets and
+SKILL.md's pool-warning section also moved, because both described behaviour this
+item changed.*
+
 *2026-08-18 (second session), DEV, claim `engine_2026-08-18`: **R117 is CLOSED
 and migrated** to CHANGELOG.md, taken in tier order as Tier 1's head. **R133 is
 the new head of Tier 1** — the tier already recorded why R117 outranked it (R117
@@ -1028,14 +1077,48 @@ underneath it.*
    `opposing_probables_incomplete` is the two-list pattern to follow, and
    `factors_inert` is the precedent for a review key that sits BESIDE the gates
    rather than inside them.
-9. **R133** (P1, S + one decision, WS3; 2026-08-16, from BUILD's 2026-08-12
-   fragment that this board twice recorded as consumed and was not) — the
-   partial-side remainder R60 did not close. R60 stopped a bench bat
-   DISPLACING a posted starter; this is the case where nothing was displaced
-   and the ninth seat was filled anyway, with `lineup_status` and the pool
-   blocker both describing it wrong. Sits beside R117 because both are the same
-   class: an intake surface that certifies while saying something untrue about
-   what it did.
+9. **R133 — CLOSED 2026-08-18**, migrated to CHANGELOG.md, taken in tier order
+   as the tier's head. Parts (1), (3) and (4) landed; (2), the equal-weight
+   seeded ninth, is filed to MLB_Classic.md as a selection question and is
+   Ben's. Four things about the entry as filed are corrected on the record, and
+   three of them changed the work. **The contract's 5-of-9 bar was already
+   implemented and the blocker CONTRADICTED it**: the confirmed path in
+   `live_data_adapters` has always blocked at `n < 5` as a crosswalk failure and
+   warned from 5 to 8, twenty lines above the loop that then blocked at `< 9` on
+   the same team and the same fact. So the filed fix, "move the blocker to the
+   contract's 5-of-9 bar", would have produced two blockers on one team; what it
+   needed was for the later loop to stop re-deciding a decided question. CLAUDE.md
+   and SKILL.md both scope their 5-of-9 sentence to a name-crosswalk failure and
+   always did. **There was a THIRD reader and it was the one that decided
+   certification**: `_derive_workflow_gates` recomputed `thin` at `< 9`
+   independently of the blockers list, so a confirmed team at 8 with no
+   status-dropped rows produced NO blocker at all and still could not certify —
+   `--ignore-pool-blockers` had nothing to override and the gate failed anyway.
+   **The paste module's docstring claimed the opposite of the code on the exact
+   point**, ending "the team stays confirmed" where `lineup_status` has never
+   been `confirmed` below nine rostered rows; the source fragment quoted the
+   paragraph above that sentence and missed it. Corrected in place. And what the
+   work established that the entry did not carry: the crosswalk bar and
+   `MAX_HITTERS_PER_TEAM` are the same number for different reasons — five fills
+   a maximum DK stack — so the new bar reads the solver constant rather than
+   copying a doc, and `assumed_gates` was recording a request that had no effect,
+   which is a truthful-labels problem and not only a broken flag. (4) was checked
+   by RUNNING both overrides rather than reading them, as instructed, and both
+   reproduced. Gate 1157 -> 1182 (`test_upload_integrity` 218 -> 238,
+   `test_paste_lineups` 82 -> 87, both `grew`); seventeen mutations by hand, all
+   seventeen caught — but TWO survived the first pass because the test had COPIED
+   run_slate's gate merge instead of calling it, which is the fourth consecutive
+   item with a green test over a fixture that pinned nothing and the first where
+   the remedy was to make the code testable (`resolve_gate_assertions` extracted)
+   rather than to fix the data. One more read SURVIVED off a stale `__pycache__`
+   and was a harness artifact; the harness now clears it between runs.
+   **R121 is the new head of Tier 1**, on the ordering already recorded here: it
+   is the next P1 in the queue, it is S, and it is the only remaining item that
+   changes what a session BELIEVES at decision time rather than what a report
+   says afterward — a decremented mental countdown read 24.7 real minutes as "~5"
+   and cost a five-control relaxation against a floored 34-candidate bank. What
+   R133 leaves for it: nothing shared: R121 is `tools/slate_clock.py` plus a
+   SKILL.md rule, no intake or gate surface in common.
 10. **R121** (P1, S, WS6) — the clock is a measurement, not an estimate: two
    sessions in one day carried a decremented mental countdown, erred in the
    expensive direction (24.7 real minutes read as "~5"), and the second
@@ -1756,10 +1839,14 @@ a restated priority.
 ## Workstream 3 — Intake and pool truth
 
 The pool is the strategy surface the contract defends hardest. R60 CLOSED
-2026-08-12 and this stream has one open P1 again as of 2026-08-16 — **R133**,
-the partial-side remainder R60 did not close, filed from a fragment this board
-twice recorded as consumed by R60 and which is in fact a report of a defect in
-what R60 shipped. What R60 leaves behind is the
+2026-08-12; **R133 CLOSED 2026-08-18** and its entry moved to CHANGELOG.md, so
+this stream has no open P1 again. R133 was the partial-side remainder R60 did not
+close, filed from a fragment this board twice recorded as consumed by R60 and
+which was in fact a report of a defect in what R60 shipped. Its remainder is (2),
+the equal-weight seeded ninth, which is a SELECTION question filed to
+MLB_Classic.md rather than carried here — and note precisely, because this board
+has been imprecise about it: R60's deferral covered F2-from-a-posted-slot only,
+so the equal-weight question has never actually been asked of anyone. What R60 leaves behind is the
 partial-side rule now written into the build contract, which is the thing to
 check a new intake path against. R81 is the armed design pass that retires a
 whole wrong-slate family; R82's unknown-code report and R90's fixtures are its
@@ -1767,12 +1854,6 @@ supporting pieces. R17 and R106 are contest-truth edges of the same boundary. R1
 the same shape as R82 one vocabulary over — a second reader of DK's `Starting`
 tokens, held in sync by a test pin rather than a single definition — and the
 two are the natural pair for one session.
-
-### R133. The partial-side remainder: a seeded ninth is not an observed ninth, and three surfaces say otherwise (P1, S + one decision) | new 2026-08-16, from BUILD's 2026-08-12 fragment — filed late, see below
-
-- **What:** four findings from a partial-side slate, none of them closed by R60. R60 stopped a bench bat from DISPLACING a posted starter. This is the different case where nothing was displaced: the side posted eight, the ninth seat was filled from the platoon projection, and three surfaces then described the result as if nine had been observed. (1) `lineup_status` has no value for "posted but incomplete," so a side with `hitters_posted + len(unrostered_starters) == 9` reads the same as a fully confirmed side, and the `reason` field says nothing truthful about the difference. (2) The seeded ninth is selectable at the same weight as an observed posted starter, which is the strategy half and the one that needs a decision rather than a patch. (3) The pool blocker fires on `< 9` while CLAUDE.md's stated bar is 5 of 9, and its message lists IL PITCHERS as reasons a team is short of HITTERS. (4) `--ignore-pool-blockers` and `--assume-gates lineup_gate_passed` are both re-blocked by the pre-export gate on the identical fact, so neither override actually overrides.
-- **Why:** (1), (3) and (4) are the same class as R117 and R70 — an intake surface that certifies while saying something untrue about what it did — and (4) is worse than a wrong label, because two documented escape hatches do not work and an operator at T-10 discovers that by trying both. (3) is a live-slate blocker firing on a bar the contract does not set, with a message that sends the reader to look at the wrong roster. **The filing history is itself worth recording:** this board recorded this fragment as consumed by R60 twice, on 2026-08-14 and again inside the 2026-08-15 sweep note. It cannot have been. R60 closed on 2026-08-12 and this fragment reports on R60's shipped behaviour; `CHANGELOG.md`'s R46-round-2 entry of the same day names all four findings and states in plain text that they are not fixed and "those four are the disease." A closed item's number is not a lid, and "checked, still consumed" is not a check.
-- **Fix:** (1) a third `lineup_status` value, or at minimum a truthful `reason` on the existing one, whenever posted plus unrostered equals nine. (3) move the blocker to the contract's 5-of-9 bar and make its message list HITTERS. (4) make one of the two overrides actually reach the pre-export gate, and delete or rename the other rather than leaving two flags that both look like they should work. (2) is Ben's or MLB_Classic.md's, not DEV's, and it is the same shape as the F2-from-a-posted-slot question R60 deliberately deferred to MLB_Classic.md — take it there rather than reopening it here, and note that R60's deferral covered F2 only, so the equal-weight-ninth question has never actually been asked. Land (1)(3)(4) without waiting on (2).
 
 ### R81. Slate fingerprint contract at every intake boundary (prevention, M; design pass first) | audit 2026-08-04
 

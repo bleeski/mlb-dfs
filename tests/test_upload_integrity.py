@@ -3809,3 +3809,370 @@ class DuplicateLineupContextTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class ThinTeamBarTests(unittest.TestCase):
+    """R133(3). One bar, read in one place, keyed to the solver constant.
+
+    Before this, three readers answered "how short is too short" and two of them
+    disagreed. ``build_slate_pool``'s confirmed path calls 5 through 8 a warning
+    and under 5 a crosswalk blocker; a later loop in the same function blocked
+    at anything under NINE with the sentence "the team cannot fill a stack";
+    ``_derive_workflow_gates`` recomputed the nine-bar a third time and its
+    verdict is the one that decided certification.
+
+    ``MAX_HITTERS_PER_TEAM`` is 5, so a team with five CAN fill a maximum DK
+    stack and the sentence was false everywhere from 5 to 8. On 2026-08-12 DET
+    read "8/9 hitters after dropping [15 IL arms/bats]; the team cannot fill a
+    stack" -- eight hitters, a false claim, and a dropped list naming PITCHERS
+    that had nothing to do with the shortfall.
+    """
+
+    def _pool(self, il_ids=()):
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        feed = {"date": "2026-07-25", "games": [
+            {"game_pk": 1, "game_date_utc": "2026-07-25T23:05:00Z",
+             "status": "Scheduled",
+             "away": {"team_abbrev": "AAA", "lineup_status": "tbd", "lineup": [],
+                      "probable_pitcher": {"name": "AAA Aster", "id": "1",
+                                           "hand": "R"}},
+             "home": {"team_abbrev": "BBB", "lineup_status": "tbd", "lineup": [],
+                      "probable_pitcher": {"name": "BBB Aster", "id": "2",
+                                           "hand": "R"}}},
+            {"game_pk": 2, "game_date_utc": "2026-07-25T23:10:00Z",
+             "status": "Scheduled",
+             "away": {"team_abbrev": "CCC", "lineup_status": "tbd", "lineup": [],
+                      "probable_pitcher": {"name": "CCC Aster", "id": "3",
+                                           "hand": "R"}},
+             "home": {"team_abbrev": "DDD", "lineup_status": "tbd", "lineup": [],
+                      "probable_pitcher": {"name": "DDD Aster", "id": "4",
+                                           "hand": "R"}}}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            write_classic_salary(salary, il_ids=il_ids)
+            return build_slate_pool(str(salary), feed)["pool_report"]
+
+    # AAA's ten rows are 1001 (SP) then 1002..1010 (nine hitters).
+    AAA_SP = "1001"
+    AAA_HITTERS = tuple(str(1002 + i) for i in range(9))
+
+    @staticmethod
+    def _shortfall(report, team="AAA"):
+        """Blockers about the HITTER count, which is what this bar decides. A
+        side with no rosterable arm is a different fact with its own blocker,
+        and the SP-on-IL fixture below legitimately produces one."""
+        return [b for b in report["blockers"]
+                if b.startswith(f"{team}:")
+                and ("hitters" in b or "crosswalk" in b)]
+
+    def test_eight_hitters_is_not_a_blocker(self):
+        report = self._pool(il_ids=(self.AAA_HITTERS[0],))
+        self.assertEqual(report["teams"]["AAA"]["hitters"], 8)
+        self.assertEqual(self._shortfall(report), [])
+        self.assertEqual(report["thin_teams"]["short_of_nine"], ["AAA"])
+        self.assertEqual(report["thin_teams"]["cannot_fill_a_stack"], [])
+
+    def test_four_hitters_blocks_and_names_the_stack_bar(self):
+        report = self._pool(il_ids=self.AAA_HITTERS[:5])
+        self.assertEqual(report["teams"]["AAA"]["hitters"], 4)
+        hits = self._shortfall(report)
+        self.assertEqual(len(hits), 1, hits)
+        self.assertIn("cannot fill a stack of any legal size", hits[0])
+        self.assertIn("under 5", hits[0])
+        self.assertEqual(report["thin_teams"]["cannot_fill_a_stack"], ["AAA"])
+
+    def test_five_hitters_fills_a_maximum_stack_and_does_not_block(self):
+        """The bar itself. Five is what MAX_HITTERS_PER_TEAM admits, so five is
+        exactly where "cannot fill a stack" stops being true."""
+        report = self._pool(il_ids=self.AAA_HITTERS[:4])
+        self.assertEqual(report["teams"]["AAA"]["hitters"], 5)
+        self.assertEqual(self._shortfall(report), [])
+        self.assertEqual(report["thin_teams"]["short_of_nine"], ["AAA"])
+
+    def test_the_bar_is_the_solver_constant_not_a_literal(self):
+        from mlb_engine.optimize.optimizer_v3 import MAX_HITTERS_PER_TEAM
+        self.assertEqual(self._pool()["thin_teams"]["stack_bar"],
+                         MAX_HITTERS_PER_TEAM)
+
+    def test_an_il_pitcher_is_not_named_as_a_reason_a_team_lacks_hitters(self):
+        """The 2026-08-12 message's worst line. The dropped list came off every
+        salary row, so five IL ARMS were offered as the reason DET was short of
+        HITTERS -- and the actual ninth was a starter with no salary row, who
+        appears in no dropped list at all."""
+        report = self._pool(il_ids=(self.AAA_SP,) + self.AAA_HITTERS[:5])
+        self.assertEqual(report["teams"]["AAA"]["hitters"], 4)
+        hits = self._shortfall(report)
+        self.assertEqual(len(hits), 1, hits)
+        self.assertNotIn("Aster", hits[0])   # the SP fixture surname
+        self.assertIn("Boone", hits[0])      # the first IL hitter
+        dropped = {r["name"]: r["is_pitcher"] for r in report["status_dropped"]}
+        self.assertTrue(dropped["AAA Aster"])
+        self.assertFalse(dropped["AAA Boone"])
+
+    def test_a_confirmed_team_is_not_double_decided(self):
+        """The confirmed path owns this call and says it better (it names the
+        crosswalk). Two blockers from one fact is what the old loop did."""
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            # Six AAA hitters shelved, so DK's own Starting 1-9 is INCOMPLETE
+            # for AAA and R143 does not source the side from the salary file --
+            # the feed's three-name confirmed lineup is what reaches the pool.
+            write_classic_salary(salary, il_ids=self.AAA_HITTERS[3:])
+            lineup = [{"order": i + 1, "id": str(9000 + i),
+                       "name": f"AAA {SURNAMES[i + 1]}", "position": "OF"}
+                      for i in range(3)]
+            feed = {"date": "2026-07-25", "games": [
+                {"game_pk": 1, "game_date_utc": "2026-07-25T23:05:00Z",
+                 "status": "Scheduled",
+                 "away": {"team_abbrev": "AAA", "lineup_status": "confirmed",
+                          "lineup": lineup, "probable_pitcher": None},
+                 "home": {"team_abbrev": "BBB", "lineup_status": "tbd",
+                          "lineup": [], "probable_pitcher": None}}]}
+            report = build_slate_pool(str(salary), feed)["pool_report"]
+        self.assertEqual(report["teams"]["AAA"]["status"], "confirmed")
+        self.assertEqual(report["teams"]["AAA"]["hitters"], 3)
+        hits = self._shortfall(report)
+        self.assertEqual(len(hits), 1, hits)
+        self.assertIn("crosswalk failure", hits[0])
+        self.assertEqual(report["thin_teams"]["cannot_fill_a_stack"], ["AAA"])
+
+
+class LineupGateBarAgreesWithThePoolTests(unittest.TestCase):
+    """R133(3), the third reader. The gate recomputed the nine-bar itself, so a
+    team the pool report called a WARNING failed certification anyway, and no
+    override could reach it because the gate's `thin` half never consulted the
+    blockers list."""
+
+    def _gate(self, pool_report):
+        from mlb_engine.pipeline import execution_pipeline as epi
+        return epi._derive_workflow_gates(
+            schema={"passed": True, "summary": "ok"},
+            entry_requirements=[{"entry_id": "1", "contest_id": "5"}],
+            posture_by_contest={"5": {"posture": "large_gpp"}},
+            projected_order={"requested": 0}, pitcher_roles=None,
+            projection_enrichment={}, pool_report=pool_report, order_by_team=None)
+
+    def test_a_stackable_team_short_of_nine_no_longer_fails_the_gate(self):
+        gates, why = self._gate({
+            "blockers": [], "teams": {"AAA": {"status": "confirmed", "hitters": 8}},
+            "thin_teams": {"cannot_fill_a_stack": [], "short_of_nine": ["AAA"],
+                           "stack_bar": 5}})
+        self.assertTrue(gates["lineup_gate_passed"])
+        self.assertIn("short of nine but stackable (AAA)", why["lineup_gate_passed"])
+
+    def test_an_unstackable_team_still_fails_the_gate(self):
+        gates, why = self._gate({
+            "blockers": [], "teams": {"AAA": {"status": "confirmed", "hitters": 4}},
+            "thin_teams": {"cannot_fill_a_stack": ["AAA"], "short_of_nine": [],
+                           "stack_bar": 5}})
+        self.assertFalse(gates["lineup_gate_passed"])
+        self.assertIn("under 5 hitters", why["lineup_gate_passed"])
+
+    def test_the_fallback_bar_equals_the_pool_reports_bar(self):
+        """A hand-assembled report carries no `thin_teams`. The fallback must
+        classify identically or there are two definitions again -- which is the
+        defect this closed, reintroduced as a compatibility branch."""
+        for hitters in range(0, 10):
+            teams = {"AAA": {"status": "confirmed", "hitters": hitters}}
+            split = {"cannot_fill_a_stack": ["AAA"] if hitters < 5 else [],
+                     "short_of_nine": ["AAA"] if 5 <= hitters < 9 else [],
+                     "stack_bar": 5}
+            with_key = self._gate({"blockers": [], "teams": teams,
+                                   "thin_teams": split})
+            without = self._gate({"blockers": [], "teams": teams})
+            self.assertEqual(with_key[0]["lineup_gate_passed"],
+                             without[0]["lineup_gate_passed"], hitters)
+            self.assertEqual(with_key[1]["lineup_gate_passed"],
+                             without[1]["lineup_gate_passed"], hitters)
+
+    def test_an_excluded_team_at_zero_is_not_thin(self):
+        gates, _ = self._gate({
+            "blockers": [],
+            "teams": {"AAA": {"status": "excluded_postponed", "hitters": 0},
+                      "BBB": {"status": "confirmed", "hitters": 9}}})
+        self.assertTrue(gates["lineup_gate_passed"])
+
+
+class GateAssumptionVersusOverrideTests(unittest.TestCase):
+    """R133(4). Two documented escape hatches, neither of which worked.
+
+    Measured on 2026-08-12 and reproduced here: ``--ignore-pool-blockers`` let
+    the build run and the pre-export gate re-read the same pool report and
+    failed; ``--assume-gates lineup_gate_passed`` did not suppress it either.
+    The mechanism was one line -- ``run_slate`` promoted a gate only where the
+    derived value was ``None``, so an assumption against a derived ``False`` was
+    dropped WHILE STILL being written into ``assumed_gates``: a recorded
+    assumption that changed nothing.
+
+    An operator following CLAUDE.md's own autonomy section ("override a pool
+    blocker whose shape you have classified benign, and assert
+    ``lineup_gate_passed`` on that same evidence. Both together or neither") got
+    a blocked build for doing exactly what the contract says.
+    """
+
+    BLOCKED_POOL = {
+        "blockers": ["AAA: 4/9 hitters in the pool; under 5, so the team cannot "
+                     "fill a stack of any legal size"],
+        "teams": {"AAA": {"status": "platoon", "hitters": 4}},
+        "thin_teams": {"cannot_fill_a_stack": ["AAA"], "short_of_nine": [],
+                       "stack_bar": 5},
+    }
+
+    def _merge(self, assume, pool_report=None):
+        """run_slate's own gate merge, called rather than reimplemented.
+
+        The first cut of this helper copied the fifteen lines out of run_slate,
+        and it passed against two mutations of the lines it named -- promoting
+        None only, and recording an override as an assumption. A test over a copy
+        of the logic pins the copy. `resolve_gate_assertions` was extracted for
+        exactly this reason (R133(4)).
+        """
+        from mlb_engine.pipeline import execution_pipeline as epi
+        derived, evidence = epi._derive_workflow_gates(
+            schema={"passed": True, "summary": "ok"},
+            entry_requirements=[{"entry_id": "1", "contest_id": "5"}],
+            posture_by_contest={"5": {"posture": "large_gpp"}},
+            projected_order={"requested": 0}, pitcher_roles=None,
+            projection_enrichment={},
+            pool_report=self.BLOCKED_POOL if pool_report is None else pool_report,
+            order_by_team=None)
+        defaults = {**derived, "projection_schema_gate_passed": True,
+                    "optimizer_gate_passed": True}
+        gates, assumed, over, refused = epi.resolve_gate_assertions(
+            defaults, {}, assume, derived, evidence)
+        return (gates, assumed, [r["gate"] for r in over],
+                [r["gate"] for r in refused], evidence)
+
+    def test_without_the_flag_the_gate_still_fails(self):
+        gates, assumed, over, refused, _ = self._merge([])
+        self.assertFalse(gates["lineup_gate_passed"])
+        self.assertEqual((assumed, over, refused), ([], [], []))
+
+    def test_asserting_the_lineup_gate_now_reaches_the_pre_export_gate(self):
+        gates, assumed, over, refused, evidence = self._merge(
+            ["lineup_gate_passed"])
+        self.assertTrue(gates["lineup_gate_passed"])
+        self.assertEqual(over, ["lineup_gate_passed"])
+        # And it is an OVERRIDE, not an assumption. The distinction is the whole
+        # point: one says nothing checked, the other says the check said no.
+        self.assertEqual(assumed, [])
+        self.assertEqual(refused, [])
+        from mlb_engine.entries.dk_entries_manager import (
+            validate_upload_ready_gates)
+        pre = validate_upload_ready_gates(gates, allocation_required=False)
+        self.assertNotIn("lineup_gate_passed", pre["failed_gates"])
+        self.assertIn("under 5 hitters", evidence["lineup_gate_passed"])
+
+    def test_a_gate_that_was_never_checked_is_an_assumption_not_an_override(self):
+        """The pre-R133 semantics, still intact for the T-5 fast path. A pool
+        report absent and no batting orders leaves the gate None."""
+        gates, assumed, over, refused, _ = self._merge(
+            ["lineup_gate_passed"], pool_report={})
+        self.assertTrue(gates["lineup_gate_passed"])
+        self.assertEqual(assumed, ["lineup_gate_passed"])
+        self.assertEqual(over, [])
+
+    def test_another_gate_against_a_false_derivation_is_refused_not_silent(self):
+        """The silent discard is what cost the 2026-08-12 build. Widening the
+        override to every gate would let an operator certify a broken salary CSV,
+        so the other five are refused BY NAME instead."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+        self.assertEqual(epi.OVERRIDABLE_GATES, ("lineup_gate_passed",))
+        gates, assumed, over, refused, _ = self._merge(["salary_gate_passed"])
+        self.assertEqual(refused, ["salary_gate_passed"])
+        self.assertEqual((assumed, over), ([], []))
+        self.assertTrue(gates["salary_gate_passed"])  # derived True on its own
+
+    def test_the_override_record_carries_the_evidence_it_contradicts(self):
+        """A gate name alone would not tell a later reader WHAT was overruled.
+        The whole reason this is not `assumed_gates` is that it has a because."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+        derived, evidence = epi._derive_workflow_gates(
+            schema={"passed": True, "summary": "ok"},
+            entry_requirements=[{"entry_id": "1", "contest_id": "5"}],
+            posture_by_contest={"5": {"posture": "large_gpp"}},
+            projected_order={"requested": 0}, pitcher_roles=None,
+            projection_enrichment={}, pool_report=self.BLOCKED_POOL,
+            order_by_team=None)
+        _, _, over, _ = epi.resolve_gate_assertions(
+            derived, {}, ["lineup_gate_passed"], derived, evidence)
+        self.assertEqual(len(over), 1)
+        self.assertEqual(over[0]["gate"], "lineup_gate_passed")
+        self.assertFalse(over[0]["derived"])
+        self.assertEqual(over[0]["evidence_contradicted"],
+                         evidence["lineup_gate_passed"])
+        self.assertIn("under 5 hitters", over[0]["evidence_contradicted"])
+
+    def test_a_refused_request_says_which_of_the_two_reasons_it_was(self):
+        from mlb_engine.pipeline import execution_pipeline as epi
+        defaults = {"lineup_gate_passed": False, "salary_gate_passed": True,
+                    "odds_gate_passed": False}
+        _, _, _, refused = epi.resolve_gate_assertions(
+            defaults, {}, ["salary_gate_passed", "odds_gate_passed"], defaults,
+            {"odds_gate_passed": "no odds matched"})
+        by_gate = {r["gate"]: r for r in refused}
+        self.assertIn("nothing to assume", by_gate["salary_gate_passed"]["reason"])
+        self.assertIn("not in OVERRIDABLE_GATES",
+                      by_gate["odds_gate_passed"]["reason"])
+        self.assertEqual(by_gate["odds_gate_passed"]["evidence"],
+                         "no odds matched")
+
+    def test_the_run_slate_payload_keeps_the_two_records_apart(self):
+        """The keys where a caller actually reads them."""
+        import inspect
+        from mlb_engine.pipeline import execution_pipeline as epi
+        src = inspect.getsource(epi.run_slate)
+        self.assertIn('"overridden_gates": overridden_gates', src)
+        self.assertIn('"gates_assumption_refused": gates_assumption_refused', src)
+        self.assertIn("resolve_gate_assertions(", src)
+
+
+class IgnorePoolBlockersIsHonestTests(unittest.TestCase):
+    """R133(4), the other half. The flag is documented as "build anyway and have
+    the override recorded", and alone it never certified. It now says so at the
+    moment it is used, and it refuses outright the one blocker CLAUDE.md's hard
+    list calls stop-and-ask above all others."""
+
+    def _build_slate(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_bs_r133",
+            str(REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_a_crosswalk_failure_is_not_overridable(self):
+        bs = self._build_slate()
+        for blocker in (
+            "AAA: confirmed lineup matched 3/9 salary hitters; crosswalk "
+            "failure, real lineup went unused",
+            "AAA: DK marks 9 confirmed batting slots in the salary file but the "
+            "pool holds 2; crosswalk failure, the authoritative order went unused",
+        ):
+            self.assertTrue(bs.UNOVERRIDABLE_POOL_BLOCKER_RE.search(blocker),
+                            blocker)
+
+    def test_an_ordinary_thin_team_blocker_stays_overridable(self):
+        """The fixture that stops the regex from being "refuse everything". A
+        blocker that matched every string would make the flag useless and the
+        test above would still pass."""
+        bs = self._build_slate()
+        for blocker in (
+            "AAA: 4/9 hitters in the pool; under 5, so the team cannot fill a "
+            "stack of any legal size",
+            "AAA: TBD lineup and platoon data filled only 3/9; team excluded",
+            "feed does not match this draftgroup",
+        ):
+            self.assertFalse(bs.UNOVERRIDABLE_POOL_BLOCKER_RE.search(blocker),
+                             blocker)
+
+    def test_the_flag_help_and_the_override_note_name_the_second_move(self):
+        import inspect
+        bs = self._build_slate()
+        src = inspect.getsource(bs)
+        self.assertIn("POOL BLOCKER NOT OVERRIDABLE", src)
+        self.assertIn("--assume-gates lineup_gate_passed to", src)
+        self.assertIn("both together or neither", src.replace(
+            '"\n                  "', ""))

@@ -67,7 +67,13 @@ What you may do unattended, because the engine has already classified it:
   (`STRUCTURAL_FEASIBILITY_CHECKS`), to the named value and no further.
 - Override a pool blocker whose shape you have classified benign, and assert
   `lineup_gate_passed` on that same evidence, since the gate derives from the
-  pool report. Both together or neither.
+  pool report. Both together or neither. **This pair did not actually work until
+  R133 (2026-08-18):** `--assume-gates` promoted a gate only where the derived
+  value was None, so asserting the gate against a derived False was discarded
+  while still being recorded, and both moves together still lost the build at the
+  pre-export gate. The assertion now reaches it, lands in `overridden_gates` with
+  the evidence it contradicts, and is a different record from `assumed_gates` --
+  one says nothing checked, the other says the check said no.
 - Choose postures, stack plans, and where to sit on the frontier below.
 
 What stays hard, and is not reopened by this section:
@@ -79,7 +85,16 @@ What stays hard, and is not reopened by this section:
 - An exposure cap. It has no engine-named floor, so raising one concentrates
   the entered set: that is a strategy change and it is Ben's.
 - A pool blocker you cannot classify, a name-crosswalk failure (under 5 of 9
-  hitters matched) above all. Stop and ask.
+  hitters matched) above all. Stop and ask. R133 made that enforcement rather
+  than instruction: `--ignore-pool-blockers` REFUSES a crosswalk failure by name
+  at the blocker, instead of spending the build and losing it at the gate.
+  Two related things the same item settled, because this bar had three readers
+  and two of them disagreed. The 5-of-9 above is the CROSSWALK bar and always
+  was; a team merely short of nine hitters is a different fact, and its bar is
+  `MAX_HITTERS_PER_TEAM` (5), the count that fills a maximum DK stack. A team at
+  5 through 8 warns and certifies, which is what the pool report's confirmed
+  path always said and what the thin-team blocker and the lineup gate both used
+  to override at `< 9`. `pool_report.thin_teams` is now the one definition.
 
 `tools/autobuild.py` is that policy as code and records every decision in
 `outputs/<date>/autobuild_decisions.json`. Reach for it first; it is not a
@@ -224,7 +239,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    and gets an old tree. Nothing here will remind you. Work on `main`, and fix
    the default in GitHub Settings → Branches.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1157 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1182 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

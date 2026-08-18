@@ -587,6 +587,16 @@ on this slate. A team matching fewer than 5 of 9 salary hitters is a blocker, no
 a warning, because that is a name-crosswalk failure and building anyway
 substitutes a projected order while the real lineup sits unused.
 
+R133, 2026-08-18: a team merely SHORT OF NINE is a different fact and no longer
+blocks. Its bar is `MAX_HITTERS_PER_TEAM` (5), the count that fills a maximum DK
+stack, so 5 through 8 warns and certifies while under 5 blocks. Read
+`pool_report.thin_teams`, which splits the two and carries the bar. Also worth
+knowing at T-10: `--ignore-pool-blockers` alone never certified, because the
+pre-export gate re-reads the pool report; pair it with `--assume-gates
+lineup_gate_passed` (the tool now prints this at the override) and the assertion
+lands in `overridden_gates` with the evidence it contradicts. A crosswalk failure
+is refused outright rather than overridden.
+
 Keep it to a handful of lines. Ben can open the JSON if he wants the rest. Do not
 narrate the steps you took; he watched them happen.
 
@@ -818,7 +828,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1157 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1182 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

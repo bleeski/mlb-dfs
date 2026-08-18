@@ -245,7 +245,26 @@ EXPECTED_SUITE_COUNTS = {
     # reading, the printed T-5 block, verify_export inheriting the split
     # through the shared advisory(), the brief agreeing on one delivered file,
     # and the rationale for why this is a split and not a filter.
-    "tests.test_upload_integrity": 218,
+    # R133(3)+(4), 2026-08-18: 218 -> 238, the twenty that pin one thin-team bar
+    # and an override that reaches the gate. Six on the pool report (eight
+    # hitters no longer blocking, four blocking and naming the stack bar, five
+    # being exactly where "cannot fill a stack" stops being true, the bar coming
+    # off MAX_HITTERS_PER_TEAM rather than a literal, an IL PITCHER no longer
+    # offered as the reason a team lacks HITTERS, and a confirmed team decided
+    # once instead of twice). Four on the gate agreeing with the pool it reads
+    # (a stackable short team passing, an unstackable one failing, the
+    # no-thin_teams fallback classifying identically across all ten counts, and
+    # an excluded team at zero not counting as thin). Seven on assumption versus
+    # override (no flag still failing, the lineup gate now reaching the
+    # pre-export gate, a None gate still being an assumption and not an
+    # override, the other five gates refused BY NAME rather than silently
+    # discarded, the override record carrying the evidence it contradicts, a
+    # refusal saying which of the two reasons it was, and the payload keeping the
+    # two records apart). Three on the flag half (a crosswalk failure not being
+    # overridable, an ordinary thin-team blocker still being overridable -- the
+    # fixture that stops the regex from meaning "refuse everything" -- and the
+    # override note naming the second move).
+    "tests.test_upload_integrity": 238,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from
@@ -255,7 +274,15 @@ EXPECTED_SUITE_COUNTS = {
     # and dropping the held name instead of taking the venue, the venueless
     # paste that is the only fixture able to see that drop (found by mutation),
     # and `[RL]HP` opening a line not being a handedness claim by itself.
-    "tests.test_paste_lineups": 82,
+    # R133(1), 2026-08-18: 82 -> 87, the five that pin a truthful reason on a
+    # side mlb.com posted COMPLETE with one starter DK never listed -- the new
+    # `dk_unrostered` cause and its reason, the genuinely-short side keeping the
+    # sentence that was true (the companion fixture, without which a mutation
+    # stamping every side `dk_unrostered` passes), each cause landing in its own
+    # list with a blocked side in neither, and such a side still being `partial`
+    # rather than `confirmed`, which is what the module docstring claimed for
+    # three slates and the code has never done.
+    "tests.test_paste_lineups": 87,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this

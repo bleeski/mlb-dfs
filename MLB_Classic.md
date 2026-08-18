@@ -216,6 +216,27 @@ Combined clip 0.85-1.15. Inputs come from `live_data_adapters.extract_opposing_p
 `platoon_order_adapter.py` consumes the FanGraphs RosterResource "Platoon Lineups" JSON, a per-slate data input on the same footing as the Savant CSVs. It serves two opt-in purposes, both upstream of the solve and both deterministic review inputs, never ROI or win-rate claims.
 
 - TBD-lineup fallback. When a team's DK lineup is not yet posted, `build_projected_order` selects the `vs_RHP` or `vs_LHP` order by the opposing starter's hand (from the mlb-lineups feed, usually populated even when the batting order is TBD) and emits a `{Player_ID: slot}` map crosswalked to DK ids via the salary file. Passed to `run_slate` as `platoon_order_by_player_id`, it sets `Batting_Order` and `F2 = batting_order_factor(slot)` on rows that lack an order, before `build_projections`. It never sets `confirmed_teams`: a projected order is not a confirmation and must not trigger the per-team starter restriction (Section 4). A posted lineup supersedes it through `refresh_confirmed_lineups`.
+- **OPEN, awaiting Ben (filed here 2026-08-18 by R133(2)): a seeded ninth is
+  selectable at the same weight as an observed posted starter.** When a side is
+  PARTIAL — mlb.com posted fewer than nine, or posted nine and DK rosters fewer —
+  the team routes through the TBD path and the empty seats are filled from this
+  file, then from top AvgPointsPerGame. R60 stopped a fill from DISPLACING a
+  posted starter. It did not change the WEIGHT of a fill that displaced nothing.
+  Live case, 2026-08-12 slate 1840_3g: DET posted all nine, DK had no row for the
+  ninth, the fill picked the highest-APPG DET bat available (a bench catcher at
+  $4500 / 9.07 APPG against the posted catcher's $5600 / 8.63), and the optimizer
+  took him in 6 of 18 certified entries. He was not playing.
+  The question is whether a labelled prior standing in for an unknown should be
+  selectable at parity with an observation, and the two candidate answers are a
+  weight penalty on a seeded fill, or seeding no ninth at all for a partial side.
+  A third answer is in the 2026-08-12 fragment and belongs to the same decision:
+  mark such a side `confirmed` with its rosterable posted starters, which would
+  end the seeding and stamp F2 from the real slots in one move.
+  **Note precisely what R60 deferred, because the backlog has been imprecise
+  about it: R60's deferral to this document covered F2-FROM-A-POSTED-SLOT only.
+  The equal-weight question has never actually been asked of anyone.** R133 landed
+  the three label-and-override halves (see CHANGELOG.md, 2026-08-18) and left this
+  untouched on purpose: it changes what gets SELECTED, so it is Ben's.
 - Batting-order mispricing screen. `mispricing_screen` compares tonight's slot against the player's RHP/LHP-frequency-weighted typical slot from the same file and reports the F2-implied lift. It formalizes the `role_elevation` signal noted just above: a promotion versus the player's own typical order, surfaced for review. It does not activate salary suppression or change any projection on its own; the operator reviews it and decides.
 
 ## 7. Candidate construction

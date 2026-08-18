@@ -25,6 +25,189 @@ performance claim.
 
 ---
 
+## 2026-08-18 — R133: a seeded ninth stops reading like an observed one, one bar replaces three, and two documented overrides finally do something
+
+DEV, claim `engine_2026-08-18`. Tier 1's head, taken in tier order after R117
+closed. Parts (1), (3) and (4) of the entry; (2), the equal-weight seeded ninth,
+is a selection question and stays Ben's — see the filing note at the end.
+
+**What was wrong.** A partial-side slate on 2026-08-12 (1840_3g, 18-entry apex)
+certified all three gates carrying Eduardo Valencia, a DET bench catcher who was
+not in that night's posted lineup. R60 had already closed the case where a bench
+bat DISPLACES a posted starter. This was the case where nothing was displaced:
+mlb.com posted all nine DET slots, DK had no salary row for the ninth (Corey
+Julks), the side therefore counted eight, the TBD path seeded a ninth from the
+platoon reference, and it picked the highest-APPG bat available. Three surfaces
+then described the result as if nine had been observed.
+
+**Why.** Same class as R117 and R70, an intake surface that certifies while
+saying something untrue about what it did — and (4) is worse than a wrong label,
+because two documented escape hatches did not work and an operator at T-10
+discovers that by trying both.
+
+**Fix, (1): the paste report tells the two facts apart.**
+`paste_lineups.py` reported `reason: "mlb.com posted a partial lineup"` for both
+a side mlb.com posted short and a side mlb.com posted COMPLETE whose ninth DK
+never listed. The second sentence is simply false, and the report already knew
+the difference one field away in `unrostered_starters`. A `cause` now travels on
+each `partial_teams` row (`mlb_short`, `dk_unrostered`, `unresolved_name`) with
+`mlb_posted` and `absent_from_dk` beside it, and `posted_sides_incomplete` splits
+the two projectable causes into their own lists — the
+`opposing_probables_incomplete` treatment, two lists because the remedies differ:
+wait and re-paste, versus nothing to do at all, since DK owns eligibility.
+`unresolved_name` is deliberately in neither list; that side is a blocker and a
+reader must not find it in a projection bucket. The `mlb_short` sentence is
+unchanged on purpose: it was the one case the original wording was true about.
+
+**Fix, (3): one thin-team bar, keyed to the solver, read in one place.** The
+blocker fired at any count under nine with the message "the team cannot fill a
+stack". `MAX_HITTERS_PER_TEAM` is 5, so that sentence was false everywhere from
+5 to 8 — DET had eight. The bar is now that constant rather than a number typed
+into the check, so DK's rule and the check move together. Three further
+corrections rode with it. The dropped-players list came off every salary row, so
+it named IL PITCHERS as reasons a team lacked HITTERS; `is_pitcher` now travels
+on each `status_dropped` row (it has to, because a shelved player leaves
+`players` at that point and cannot be classified later) and the list is hitters
+only. The list was also not the CAUSE in the live case at all — DET read "8/9
+hitters after dropping [15 IL arms/bats]" when the actual ninth appears in no
+dropped list — so it is only offered when it can be an explanation. And the
+loop no longer re-decides a CONFIRMED team, because the confirmed path twenty
+lines above already decides it and says it better. `pool_report.thin_teams`
+carries `cannot_fill_a_stack`, `short_of_nine` and the bar itself.
+
+**Fix, (4): the pair CLAUDE.md instructs now works, and the flags stop looking
+like they work alone.** `run_slate` promoted an assumed gate only where the
+derived value was `None`, so `--assume-gates lineup_gate_passed` against a
+derived `False` was discarded — while still being written into `assumed_gates`,
+which is a record of an assumption that changed nothing. `--ignore-pool-blockers`
+never touched the pool report it overrode, so the gate re-read the identical
+blockers list. `OVERRIDABLE_GATES` is now `("lineup_gate_passed",)` and an
+assertion against a derived False promotes and lands in `overridden_gates` beside
+the evidence it contradicts; `gates_assumption_refused` names a request that was
+neither, rather than dropping it. One gate and not six, because that is the only
+one CLAUDE.md's autonomy section authorizes asserting on operator evidence — a
+salary schema failure is not a judgement call, and assuming past it would be a
+way to certify a broken CSV. `build_slate.py` prints the second move at the
+override, and REFUSES a crosswalk failure by name at the blocker instead of
+spending the build, which is what the 2026-08-12 fragment asked for in its last
+line.
+
+**Premise corrections, and there were four.** Every factual claim on the entry
+was checked against the tree first, per the R117 lesson. Three failed, and two
+other documents carried them.
+
+*The contract's 5-of-9 bar was already implemented, and the blocker CONTRADICTED
+it.* The entry said the blocker "fires on `< 9` while CLAUDE.md's stated bar is 5
+of 9", which reads as though the code had no such bar. `live_data_adapters.py`'s
+confirmed path has always had exactly it — `n < 5` blocks as a crosswalk failure,
+5 through 8 warns — twenty lines above the loop that then blocked at `< 9` on the
+same team and the same fact. So this was not a missing bar; it was two readers of
+one question disagreeing, with the stricter one winning silently. The filed fix,
+"move the blocker to the contract's 5-of-9 bar", would have produced two blockers
+on the same team at `< 5`. What the fix actually needed was for the later loop to
+stop re-deciding what the confirmed path had decided. `CLAUDE.md`'s hard list and
+`skills/generate-lineups/SKILL.md` both scope their 5-of-9 sentence to a
+name-crosswalk failure and always did; the fragment and this entry read one bar
+as governing the other check.
+
+*There was a THIRD reader, and it was the one that decided certification.*
+`_derive_workflow_gates` recomputed `thin` at `< 9` from the same
+`pool_report["teams"]`, independently of the blockers list. So the sharpest case
+is one the entry did not have: a confirmed team at 8 with no status-dropped rows
+produces NO blocker at all — the old loop needed a non-empty dropped list to fire
+— and the build still could not certify. `--ignore-pool-blockers` had nothing to
+override and the gate failed anyway. Measured before the fix, on the DET shape:
+`(False, 'pool report: 0 blockers, 1 team(s) under nine hitters (DET)')`.
+
+*The paste module's docstring claimed the opposite of the code, on the exact
+point.* Its policy text ended "The team stays confirmed and the slot is named in
+`unrostered_starters`." `lineup_status` is `confirmed` only at nine
+resolved-and-rostered rows, so such a side has always gone PARTIAL and routed
+through the TBD path. The 2026-08-12 fragment quoted the paragraph ABOVE that
+sentence and missed it. This is the R117 shape exactly: a docstring carrying a
+claim the code does not implement is worse than a missing test, because it tells
+the next reader not to look. Corrected in place rather than tidied away.
+
+*What the work established that the entry did not carry.* The contract's 5-of-9
+crosswalk bar and `MAX_HITTERS_PER_TEAM` are the same number for different
+reasons — five is what fills a maximum DK stack, and five is also where a posted
+lineup that crosswalked to almost nothing stops being thin data. That makes the
+new bar principled rather than a doc-copy, and it is why the check reads the
+solver constant. Also: `assumed_gates` recorded a request that had no effect,
+which is a truthful-labels problem and not only a broken flag, and it is why the
+override is a separate key with a `because` rather than a second entry in the
+same list.
+
+**Mutation table.** Seventeen mutations by hand, each against the guard that
+claims to pin it. All seventeen caught.
+
+| # | Mutation | Result |
+|---|---|---|
+| M1 | cause always `mlb_short` (drop the `dk_unrostered` branch) | caught |
+| M2 | cause always `dk_unrostered` | caught |
+| M3 | `dk_unrostered` reason reverts to the false sentence | caught |
+| M4 | `unresolved_name` leaks into the `mlb_short` list | caught |
+| M5 | `POSTED_LINEUP_SLOTS` drifts from preflight's copy | caught |
+| M6 | pool blocker bar back to `< 9` | caught |
+| M7 | `MAX_HITTERS_PER_TEAM` moves to 6; the bar must move with it | caught |
+| M8 | dropped list stops filtering pitchers | caught |
+| M9 | the confirmed team is decided twice again | caught |
+| M10 | every thin team lands in `cannot_fill_a_stack` | caught |
+| M11 | `assume_gates` promotes `None` only, as before | caught |
+| M12 | every gate becomes overridable | caught |
+| M13 | an override is recorded as an assumption | caught |
+| M14 | gate `thin` bar back to `< 9` | caught |
+| M15 | the fallback uses a second definition | caught |
+| M16 | the unoverridable regex matches everything | caught |
+| M17 | the unoverridable regex matches nothing | caught |
+
+Two things about that table are worth more than the score. **M11 and M13 SURVIVED
+on the first pass, and the fixture was the defect.** The test helper had copied
+run_slate's fifteen-line gate merge instead of calling it, so mutating the engine
+could not move it: a test over a copy of the logic pins the copy. The remedy was
+to extract `resolve_gate_assertions` and have both `run_slate` and the test call
+it — the fourth consecutive item (R117, R136, R128, this one) where a green test
+sat over a fixture that pinned nothing, and the first where the fix was to make
+the code testable rather than to fix the data. **And M9 read SURVIVED once and
+was a harness artifact, not a weak guard.** Two mutations of the same file in
+quick succession left a stale `__pycache__`; the harness now clears it before and
+after every run, and M9 reproduces as caught both in isolation and in sequence.
+A mutation harness that can lie in the reassuring direction is worse than none.
+
+**Companion fixtures added for the same reason.** Two of the seventeen guards
+would pass over a fixture that cannot distinguish the behaviours, so each got a
+partner: a genuinely mlb-short side beside the `dk_unrostered` one (without it,
+stamping every partial side `dk_unrostered` passes), and an ordinary thin-team
+blocker beside the crosswalk one (without it, a regex matching every string reads
+as correct). One assertion was also DELETED while being written: a check that the
+docstring no longer contains the false sentence, which cannot tell a live claim
+from a retracted one, because the correction quotes what it corrects.
+
+**Gate 1157 -> 1182.** `test_upload_integrity` 218 -> 238, `test_paste_lineups`
+82 -> 87, both `grew`; `test_core` 792, `test_showdown` 56,
+`test_golden_replay` 9 unchanged. `EXPECTED_SUITE_COUNTS`, the CLAUDE.md
+session-start line, the SKILL.md expect line and the ledger Quick Card pin line
+moved with it, the last under a DEV-held `ledger` claim, that line and nothing
+else. CLAUDE.md's autonomy and hard-guardrail bullets and SKILL.md's pool-warning
+section carry the behaviour changes, since both described what the code did.
+
+**On (2), and on what R60 actually deferred.** The seeded ninth is still
+selectable at the same weight as an observed posted starter, and that is
+unchanged here deliberately: it is a selection question, not a label. Filed to
+`MLB_Classic.md` rather than reopened. Worth stating precisely, because the
+board has been imprecise about it: **R60's deferral covered F2-from-a-posted-slot
+only.** The equal-weight question has never actually been asked of anyone. The
+2026-08-12 fragment's own suggestion — mark such a side `confirmed`, which would
+solve the seeding and the F2 stamping together — belongs there too, and is why
+the paste module still stamps `partial` rather than being "fixed" in this commit.
+
+**On the filing history.** This board recorded the source fragment as consumed by
+R60 twice, on 2026-08-14 and again in the 2026-08-15 sweep note. It cannot have
+been: R60 closed on 2026-08-12 and the fragment reports on R60's shipped
+behaviour, and this file's own R46-round-2 entry of that date names all four
+findings and says in plain text that they are not fixed. A closed item's number
+is not a lid, and "checked, still consumed" is not a check.
+
 ## 2026-08-18 — R117: mlb.com's hand line has two renders, and a factor that applied to nothing stops reading like one that applied evenly
 
 DEV, claim `engine_2026-08-18`. Tier 1's head, taken in tier order after R136
