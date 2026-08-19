@@ -10,9 +10,22 @@ unwired" was half right and the tracked half sent R135 looking for a `git add`
 that was not needed. And it is not outside the audit's module count, which is
 taken off the filesystem: it has always been one of the 26.
 
-What remains true: nothing here is applied to projections, `Ownership_Tier`, or
-the optimizer, and both open project slots stay reserved for the fitted model
-this replaces. The fitted replacement lands once 8-15
+R154 (2026-08-19) narrowed that further, and the sentence that used to sit here
+("nothing here is applied to projections, `Ownership_Tier`, or the optimizer")
+is now true of only two of those three. `attach_projected_ownership` writes ONE
+column, `Projected_Ownership_Pct`, which `optimizer_v3._ownership_pct_for_row`
+already read and defaulted to a flat 12.0. `Ownership_Tier` is still never
+written, because `_ownership_priority` reads it in one-off selection and an
+uncalibrated prior must not reach lineups through a side door.
+
+What made that safe to do on an uncalibrated prior is the first grade, from
+contest 194022265 (7,833 entries) on 2026-08-19: Spearman +0.581 against
+realized %Drafted on `large_field_gpp`, +0.66 on `cash`, with the LEVEL
+under-predicted by about a third and not fixable by rescaling. Ordering is
+usable; magnitude is not. So R154 spends the ordering (constraints that rank
+lineups by cumulative predicted ownership) and spends none of the magnitude
+(no objective coefficient, no per-player value claim). Both open project slots
+stay reserved for the fitted model this replaces, which lands once 8-15
 archetype-conditioned slates of archived DK standings exist.
 
 Nothing here is a calibrated value: every output
@@ -302,6 +315,119 @@ def predict_ownership(
             "ledger; the fitted replacement takes a tracked project slot."
         ),
     }
+
+
+PROJECTED_OWNERSHIP_COLUMN = "Projected_Ownership_Pct"
+
+
+def attach_projected_ownership(
+    projections_df: Any,
+    contest_shape: object = None,
+    archetype: Optional[str] = None,
+    implied_total_by_team: Optional[Mapping[str, float]] = None,
+    overwrite: bool = False,
+) -> Tuple[Any, Dict[str, Any]]:
+    """Write ``Projected_Ownership_Pct`` onto a COPY of a projections frame.
+
+    R154, and the one place this module's old "never applied to projections"
+    sentence stops being true. Two things bound how far it goes.
+
+    It writes ONE column, and that column has exactly one reader in the engine
+    (``optimizer_v3._ownership_pct_for_row``), which until R154 fell back to a
+    flat 12.0 for every player. So attaching this changes no lineup by itself:
+    the two R154 controls are off unless a caller passes a number, and until
+    one does, the only visible effect is that the ownership diagnostics stop
+    being a constant.
+
+    It does NOT touch ``Ownership_Tier``. That field is behaviour-bearing --
+    ``_ownership_priority`` reads it in one-off selection -- and this prior is
+    uncalibrated, so writing it would change lineups through a side door with
+    no gate and no record. ``tier_by_player_id`` is returned in the report for
+    a caller that opts in explicitly, and nothing here applies it.
+
+    Everything written is an UNCALIBRATED STRUCTURAL PRIOR. It is a predicted
+    share, never a measured one, and never a win-rate or probability claim.
+
+    Feature inputs are read off the frame itself (``Salary``, ``Position``,
+    ``Team``, ``Batting_Order``, ``Base_Projection``) so the prediction cannot
+    drift from the projections it is attached to. ``implied_total_by_team`` is
+    the caller's, because it comes from the odds leg and is not on the frame.
+
+    Returns ``(frame_copy, report)``. ``report['applied']`` is False with a
+    ``reason`` whenever the column was not written, which includes an unknown
+    contest shape: ``archetype_for_contest_shape`` answers None for a shape
+    nobody has decided the field's behaviour for, and defaulting that to a
+    large-field crowd would price the contest against the wrong field while
+    saying nothing.
+    """
+    frame = projections_df.copy()
+    report: Dict[str, Any] = {
+        "applied": False, "reason": None, "archetype": None,
+        "shape_match": None, "prior_version": VERSION,
+        "players_scored": 0, "column": PROJECTED_OWNERSHIP_COLUMN,
+        "label": "UNCALIBRATED STRUCTURAL PRIOR; predicted share, never measured",
+    }
+    if PROJECTED_OWNERSHIP_COLUMN in getattr(frame, "columns", []) and not overwrite:
+        report["reason"] = "column_present_and_overwrite_false"
+        return frame, report
+
+    resolved, match = (archetype, "EXPLICIT") if archetype else (
+        archetype_for_contest_shape(contest_shape) or (None, None))
+    if not resolved:
+        report["reason"] = f"unknown_contest_shape:{contest_shape!r}"
+        return frame, report
+    if resolved not in ARCHETYPE_PARAMS:
+        report["reason"] = f"unknown_archetype:{resolved}"
+        return frame, report
+    report["archetype"], report["shape_match"] = resolved, match
+
+    records = frame.to_dict("records")
+    if not records:
+        report["reason"] = "empty_frame"
+        return frame, report
+
+    def _num(value):
+        try:
+            out = float(value)
+        except (TypeError, ValueError):
+            return None
+        return None if out != out else out  # NaN
+
+    orders, bases, sps = {}, {}, []
+    for row in records:
+        pid = str(row.get("Player_ID") or "").strip()
+        if not pid:
+            continue
+        order = _num(row.get("Batting_Order"))
+        if order and 1 <= order <= 9:
+            orders[pid] = int(order)
+        base = _num(row.get("Base_Projection"))
+        if base is None:
+            base = _num(row.get("Base"))
+        if base is not None:
+            bases[pid] = base
+        if _is_pitcher(str(row.get("Position") or "").replace("/", ",").split(",")):
+            sps.append(pid)
+
+    prediction = predict_ownership(
+        records, archetype=resolved,
+        implied_total_by_team=implied_total_by_team,
+        batting_order_by_player_id=orders,
+        probable_sp_ids=sps,
+        base_projection_by_player_id=bases or None,
+    )
+    own = prediction["own_pct_by_player_id"]
+    frame[PROJECTED_OWNERSHIP_COLUMN] = [
+        own.get(str(row.get("Player_ID") or "").strip()) for row in records
+    ]
+    report.update(
+        applied=True,
+        players_scored=sum(1 for row in records
+                           if str(row.get("Player_ID") or "").strip() in own),
+        tier_by_player_id=prediction["tier_by_player_id"],
+        note=prediction["note"],
+    )
+    return frame, report
 
 
 def grade_against_actuals(

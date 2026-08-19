@@ -15432,6 +15432,180 @@ class SplitGateTests(unittest.TestCase):
                          "the second call re-uses the enumeration it found")
 
 
+class LeverageControlsTests(unittest.TestCase):
+    """R154. Leverage arrives as two LINEAR CONSTRAINTS, not an objective term.
+
+    Ben's statement of the objective (2026-08-19): apex means p(first), so a
+    2%-owned player at the same projection is worth more than a 30%-owned one.
+    The first graded prediction (contest 194022265, 7,833 entries) put the
+    prior's ORDERING at Spearman +0.581 against realized %Drafted and its LEVEL
+    a third low and not fixable by rescaling. These pin the consequence: the
+    ordering is spent on constraints, and the magnitude is spent on nothing.
+
+    Both controls are OFF unless a caller passes a number, which is what makes
+    this landable on an uncalibrated prior.
+    """
+
+    POSITIONS = ["C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+
+    @classmethod
+    def _pool(cls, chalk_own=30.0, low_own=2.0):
+        """Four teams, two games. Every hitter position carries one chalk bat
+        (better ceiling, high ownership) and one low-owned bat, so a floor is
+        satisfiable at every slot and a refusal means the CONSTRAINT bound and
+        not that the fixture ran out of eligible positions."""
+        rows, pid = [], 0
+        for team, opp, gid in [("A", "B", "A@B"), ("B", "A", "A@B"),
+                               ("C", "D", "C@D"), ("D", "C", "C@D")]:
+            for k in range(2):
+                pid += 1
+                rows.append(dict(
+                    Player_ID=str(pid), Name=f"SP{pid}", Team=team, Opponent=opp,
+                    Position="P", Salary=5000, Game_ID=gid, Floor=8.0,
+                    Ceiling=24.0 if k == 0 else 17.0, Excluded="", Locked="",
+                    Projected_Ownership_Pct=40.0 if k == 0 else 3.0))
+            for pos in cls.POSITIONS:
+                for chalky in (True, False):
+                    pid += 1
+                    rows.append(dict(
+                        Player_ID=str(pid), Name=f"H{pid}", Team=team, Opponent=opp,
+                        Position=pos, Salary=4000, Game_ID=gid, Floor=3.0,
+                        Ceiling=16.0 if chalky else 10.0, Excluded="", Locked="",
+                        Projected_Ownership_Pct=chalk_own if chalky else low_own))
+        return pd.DataFrame(rows)
+
+    def _solve(self, df, **kwargs):
+        status = {}
+        lineup, _ = opt.build_single_lineup(
+            df, target="ceiling", status_out=status, **kwargs)
+        if lineup is None:
+            return None, status
+        bats = [r for _, r in lineup.iterrows()
+                if r.get("Assigned_Position") in opt.HITTER_POSITIONS]
+        return {
+            "ceiling": round(float(lineup["Ceiling"].sum()), 2),
+            "cum_own": round(opt._lineup_projected_ownership_sum(lineup), 1),
+            "hitters": len(bats),
+            "low_bats": sum(1 for r in bats
+                            if float(r["Projected_Ownership_Pct"]) < 10.0),
+        }, status
+
+    def test_controls_default_off_change_nothing(self):
+        df = self._pool()
+        base, _ = self._solve(df)
+        passed_none, _ = self._solve(
+            df, max_cumulative_ownership_pct=None, min_low_owned_hitters=None)
+        self.assertEqual(base, passed_none,
+                         "a build that says nothing about ownership solves the "
+                         "same MILP it solved before R154")
+        self.assertEqual(0, base["low_bats"],
+                         "unconstrained, the ceiling-max answer is all chalk; "
+                         "that is the behaviour the controls exist to bound")
+
+    def test_cumulative_ownership_cap_binds(self):
+        df = self._pool()
+        base, _ = self._solve(df)
+        capped, _ = self._solve(df, max_cumulative_ownership_pct=200.0)
+        self.assertLessEqual(capped["cum_own"], 200.0)
+        self.assertLess(capped["cum_own"], base["cum_own"])
+        self.assertLess(capped["ceiling"], base["ceiling"],
+                        "leverage is bought with ceiling; a cap that costs "
+                        "nothing did not bind")
+
+    def test_tighter_cap_buys_more_leverage_for_more_ceiling(self):
+        df = self._pool()
+        loose, _ = self._solve(df, max_cumulative_ownership_pct=200.0)
+        tight, _ = self._solve(df, max_cumulative_ownership_pct=120.0)
+        self.assertLessEqual(tight["cum_own"], 120.0)
+        self.assertLess(tight["cum_own"], loose["cum_own"])
+        self.assertLess(tight["ceiling"], loose["ceiling"])
+
+    def test_low_owned_floor_delivers_exactly_what_it_asks(self):
+        df = self._pool()
+        for wanted in (2, 4, 6, 8):
+            got, _ = self._solve(df, min_low_owned_hitters=wanted)
+            self.assertIsNotNone(got, f"floor of {wanted} is satisfiable here")
+            self.assertGreaterEqual(got["low_bats"], wanted)
+
+    def test_floor_counts_bats_and_never_a_cheap_arm(self):
+        """The bug this test exists for. DK slots are P1/P2, never 'P', so the
+        obvious `slot != 'P'` filter is TRUE for both pitcher slots and a cheap
+        SP satisfies a 'low-owned hitter' floor. Written that way, a build
+        asked for 4 leverage bats, shipped 2, and every counter read clean."""
+        df = self._pool()
+        got, _ = self._solve(df, min_low_owned_hitters=4)
+        bats_under = got["low_bats"]
+        self.assertGreaterEqual(bats_under, 4)
+        self.assertEqual(8, got["hitters"])
+        # The two cheap arms in the pool sit at 3.0%, under the 10% bar. If they
+        # were counting, this floor would be satisfiable with 2 bats.
+        strict, _ = self._solve(df, min_low_owned_hitters=8)
+        self.assertEqual(8, strict["low_bats"],
+                         "all eight HITTER slots, with the arms not helping")
+
+    def test_floor_above_the_hitter_slot_count_refuses(self):
+        got, status = self._solve(self._pool(), min_low_owned_hitters=9)
+        self.assertIsNone(got, "there are only eight hitter slots")
+        self.assertTrue(status.get("proven_infeasible"))
+
+    def test_unreachable_threshold_is_named_not_generic(self):
+        """No hitter under the bar is a different fact from an infeasible MILP,
+        and the caller can act on only one of them."""
+        got, status = self._solve(
+            self._pool(), min_low_owned_hitters=1, low_owned_threshold_pct=0.5)
+        self.assertIsNone(got)
+        self.assertEqual("low_owned_floor_unreachable", status.get("status"))
+        self.assertIn("0.5", status.get("message", ""))
+
+    def test_controls_are_deterministic(self):
+        df = self._pool()
+        first, _ = self._solve(df, max_cumulative_ownership_pct=200.0,
+                               min_low_owned_hitters=4)
+        second, _ = self._solve(df, max_cumulative_ownership_pct=200.0,
+                                min_low_owned_hitters=4)
+        self.assertEqual(first, second)
+
+    def test_attach_writes_one_column_and_never_the_tier(self):
+        from mlb_engine.field import ownership_prior as prior
+        df = self._pool().drop(columns=["Projected_Ownership_Pct"])
+        df["Batting_Order"] = [(i % 9) + 1 for i in range(len(df))]
+        out, report = prior.attach_projected_ownership(
+            df, contest_shape="large_field_gpp",
+            implied_total_by_team={"A": 5.1, "B": 4.4, "C": 3.9, "D": 4.2})
+        self.assertTrue(report["applied"])
+        self.assertEqual("large_field_gpp", report["archetype"])
+        self.assertIn("Projected_Ownership_Pct", out.columns)
+        self.assertNotIn("Ownership_Tier", out.columns,
+                         "Ownership_Tier is behaviour-bearing in one-off "
+                         "selection; an uncalibrated prior never writes it")
+        self.assertAlmostEqual(
+            prior.HITTER_BUDGET_PCT + prior.PITCHER_BUDGET_PCT,
+            float(out["Projected_Ownership_Pct"].sum()), delta=0.5)
+
+    def test_attach_refuses_an_undecided_shape_rather_than_defaulting(self):
+        from mlb_engine.field import ownership_prior as prior
+        out, report = prior.attach_projected_ownership(
+            self._pool().drop(columns=["Projected_Ownership_Pct"]),
+            contest_shape="a_shape_nobody_priced")
+        self.assertFalse(report["applied"])
+        self.assertIn("unknown_contest_shape", report["reason"])
+
+    def test_attach_leaves_an_existing_column_alone_unless_told(self):
+        from mlb_engine.field import ownership_prior as prior
+        df = self._pool()
+        out, report = prior.attach_projected_ownership(
+            df, contest_shape="large_field_gpp")
+        self.assertFalse(report["applied"])
+        self.assertEqual("column_present_and_overwrite_false", report["reason"])
+        self.assertEqual(list(df["Projected_Ownership_Pct"]),
+                         list(out["Projected_Ownership_Pct"]))
+
+    def test_projected_ownership_is_a_declared_optional_field(self):
+        self.assertIn("Projected_Ownership_Pct", opt.OPTIONAL_PROJECTION_FIELDS)
+        report = opt.validate_projection_schema(self._pool())
+        self.assertIn("Projected_Ownership_Pct",
+                      report["available_optional_fields"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

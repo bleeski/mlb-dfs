@@ -376,7 +376,7 @@ CORE_PROJECTION_FIELDS = (
 OPTIONAL_PROJECTION_FIELDS = (
     'Base_Projection', 'Ownership_Tier', 'Confidence_Tier', 'Stack_Group',
     'Batting_Order', 'Notes', 'Salary_Suppression', 'Base_Projection_MetaLineup',
-    'Right_Tail_Volatility_Tier',
+    'Right_Tail_Volatility_Tier', 'Projected_Ownership_Pct',
 )
 
 def validate_projection_schema(projections_df):
@@ -775,6 +775,9 @@ def _build_single_lineup_scipy(
     max_overlap=None,
     stack_core_blocklist=None,
     forbidden_player_combos=None,
+    max_cumulative_ownership_pct=None,
+    min_low_owned_hitters=None,
+    low_owned_threshold_pct=None,
     time_limit_s=None,
     status_out=None,
 ):
@@ -872,6 +875,55 @@ def _build_single_lineup_scipy(
             cap_coefs[idx] = cap_coefs.get(idx, 0.0) - float(bonus)
         add_constraint(cap_coefs, -np.inf, 0.0)
     add_constraint({idx: float(row_by_pid[pid]['Salary']) for (pid, _slot), idx in assign_index.items()}, -np.inf, SALARY_CAP)
+
+    # R154. Leverage as a CONSTRAINT, not an objective coefficient. Cumulative
+    # predicted ownership is a linear function of the assignment variables, so
+    # both bounds below are one row each and neither re-ranks a single player.
+    # That ordering is deliberate: a constraint is auditable against a measured
+    # band and refuses visibly, where a mis-weighted objective term changes what
+    # every player on the slate is worth and fails silently.
+    #
+    # Both are OFF unless the caller passes a number, so a build that says
+    # nothing about ownership solves exactly the MILP it solved before.
+    # `Projected_Ownership_Pct` is a LABELED PRIOR, never a measured share.
+    if max_cumulative_ownership_pct is not None:
+        own_coefs = {
+            idx: _ownership_pct_for_row(row_by_pid[pid])
+            for (pid, _slot), idx in assign_index.items()
+        }
+        add_constraint(own_coefs, -np.inf, float(max_cumulative_ownership_pct))
+    if min_low_owned_hitters is not None:
+        threshold = float(
+            low_owned_threshold_pct
+            if low_owned_threshold_pct is not None
+            else DEFAULT_LOW_OWNED_THRESHOLD_PCT
+        )
+        # Hitters only, keyed on the slot's REQUIRED POSITION and not on the
+        # slot name. The DK slot vocabulary is P1/P2, never 'P', so the
+        # obvious `slot != 'P'` test is true for both pitcher slots: written
+        # that way the floor counted a cheap arm as a leverage bat and a
+        # "4 low-owned hitters" build shipped with 2, its counters reading
+        # clean. Caught in R154's own bring-up, before it shipped.
+        low_coefs = {
+            idx: 1.0
+            for (pid, slot), idx in assign_index.items()
+            if required_by_slot.get(slot) in HITTER_POSITIONS
+            and _ownership_pct_for_row(row_by_pid[pid]) < threshold
+        }
+        if low_coefs:
+            add_constraint(low_coefs, float(min_low_owned_hitters), np.inf)
+        elif float(min_low_owned_hitters) > 0:
+            # No hitter in the pool clears the bar, so the floor is
+            # unsatisfiable. Say which of the two it is rather than emitting an
+            # empty row and letting the solver report a generic infeasibility.
+            _record_solver_status(
+                status_out, status='low_owned_floor_unreachable',
+                message=(f'low_owned_floor_unreachable:no hitter under '
+                         f'{threshold:.1f}% predicted ownership'),
+                proven_infeasible=True,
+                time_limit_s=resolve_solver_time_limit(time_limit_s),
+            )
+            return None, None
 
     for team in df['Team'].unique():
         team_hitter_pids = df[(df['Team'] == team) & (df['_pos_set'].apply(lambda pos: bool(pos & HITTER_POSITIONS) and 'P' not in pos))]['Player_ID'].tolist()
@@ -1065,6 +1117,9 @@ def build_single_lineup(
     skip_feasibility_check=False,
     apply_suppression=True,
     solver_backend='auto',
+    max_cumulative_ownership_pct=None,
+    min_low_owned_hitters=None,
+    low_owned_threshold_pct=None,
     time_limit_s=None,
     status_out=None,
 ):
@@ -1090,6 +1145,9 @@ def build_single_lineup(
         stack_constraints=stack_constraints, bringback_constraint=bringback_constraint,
         overlap_reference=overlap_reference, max_overlap=max_overlap,
         stack_core_blocklist=stack_core_blocklist, forbidden_player_combos=forbidden_player_combos,
+        max_cumulative_ownership_pct=max_cumulative_ownership_pct,
+        min_low_owned_hitters=min_low_owned_hitters,
+        low_owned_threshold_pct=low_owned_threshold_pct,
         time_limit_s=time_limit_s, status_out=status_out,
     )
 
@@ -2761,6 +2819,10 @@ def build_multi_lineup(
 
 DEFAULT_CANDIDATE_BANK_CAP = 150
 DEFAULT_OWNERSHIP_PCT_BY_TIER = {'Low': 5.0, 'Mid': 12.0, 'High': 25.0}
+# R154. What counts as a "low-owned" bat for the min_low_owned_hitters floor.
+# 10.0 is the bar ledger 3.17 already uses for its winner-vs-field comparison,
+# so the floor and the archived observation are measured on ONE definition.
+DEFAULT_LOW_OWNED_THRESHOLD_PCT = 10.0
 COMMON_SALARY_BAND_THRESHOLD = 49800
 RIGHT_TAIL_TIERS = ('Stable', 'Volatile', 'Eruption', 'Unknown')
 DEFAULT_EXPOSURE_DELTA_TOP_N = 20

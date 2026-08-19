@@ -238,7 +238,20 @@ EXPECTED_SUITE_COUNTS = {
     # after the FIXTURE was strengthened: pinning the stale-tree refusal alone
     # let a mutation that merged foreign records into the totals survive, since
     # the refusal fires off a separate list and never reads the counts.
-    "tests.test_core": 809,
+    # R154, 2026-08-19: 809 -> 821, the twelve that pin leverage as two LINEAR
+    # CONSTRAINTS rather than an objective term -- both controls default OFF and
+    # reproduce the pre-R154 solve, the cumulative-ownership cap binding and
+    # costing ceiling (a cap that costs nothing did not bind), a tighter cap
+    # buying more leverage for more ceiling, the low-owned floor delivering what
+    # it asks at 2/4/6/8, the floor counting BATS and never a cheap arm (DK slots
+    # are P1/P2 and the obvious `slot != 'P'` filter is true for both, which
+    # shipped 2 bats against a floor of 4 with every counter clean -- caught in
+    # bring-up), a floor above the eight hitter slots refusing, an unreachable
+    # THRESHOLD named apart from a generic infeasibility, determinism, and three
+    # on the attach half: one column written and never Ownership_Tier, an
+    # undecided contest shape refused rather than defaulted, and an existing
+    # column left alone.
+    "tests.test_core": 821,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

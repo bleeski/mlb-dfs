@@ -25,6 +25,87 @@ performance claim.
 
 ---
 
+## 2026-08-19 — R154: the ownership prior reaches the optimizer, as two linear constraints and no objective coefficient
+
+DEV, claim `engine_2026-08-19`. Ben's statement of the objective, after reading
+the standings for contest 194022265: "when I say apex I wasn't thinking just in
+terms of raw projected points, but also factoring in leverage so p(first)." Two
+players at the same projection are not worth the same when one is 30% owned and
+the other is 2%.
+
+**What the archive said.** The 2026-08-19 Relay Throw (7,833 entries, $25K to
+1st) is the first slate holding BOTH a pre-lock `ownership_pred_<tag>.json` and
+an archived standings export, which is the pairing R135 built the emit step for.
+Realized cumulative ownership by finish band, over 7,822 parsed lineups:
+
+| band | n | cum-own | sub-10% bats |
+|---|---:|---:|---:|
+| 1st | 1 | 167.0% | 4.00 |
+| top 10 | 10 | 160.1% | 4.50 |
+| top 235 | 238 | 166.9% | 4.10 |
+| cashed | 1,724 | 177.9% | 3.62 |
+| missed | 6,098 | 190.3% | 3.25 |
+| field | 7,822 | 187.5% | 3.33 |
+| the delivered entry | 1 | **254.7%** | **2** |
+
+Monotone across every band, and the delivered entry sat at the 95.6th percentile
+of chalkiness and finished 5287th.
+
+**The prior was good enough to act on, in one direction only.** Graded against
+realized %Drafted: Spearman **+0.581** on `large_field_gpp`, +0.66 on `cash`,
+with the LEVEL under-predicted by about a third and NOT fixable by rescaling
+(MAE 5.71 raw, 5.92 normalized to the known slot budget). Ordering is usable,
+magnitude is not. R154 spends the ordering and spends none of the magnitude.
+
+**What shipped.**
+
+`ownership_prior.attach_projected_ownership` writes ONE column,
+`Projected_Ownership_Pct`, onto a copy of a projections frame, keyed to the
+contest's resolved shape. `optimizer_v3._ownership_pct_for_row` has read that
+column since before this change and fell back to a flat 12.0 for every player,
+so the engine had both ends of this pipe and no pipe. It does NOT write
+`Ownership_Tier`: that field is behaviour-bearing in `_ownership_priority`'s
+one-off selection, and an uncalibrated prior does not reach lineups through a
+side door. An undecided contest shape is refused rather than defaulted, for the
+reason `archetype_for_contest_shape` already returns None.
+
+`build_single_lineup` takes `max_cumulative_ownership_pct`,
+`min_low_owned_hitters` and `low_owned_threshold_pct` (default 10.0, the bar
+ledger 3.17 already uses, so the floor and the archived observation share one
+definition). Cumulative predicted ownership is a linear function of the
+assignment variables, so each is ONE constraint row and neither re-ranks a
+single player.
+
+**Constraints and not an objective term, deliberately.** A constraint is
+auditable against a measured band and refuses visibly. A mis-weighted objective
+coefficient changes what every player on the slate is worth and fails silently,
+and one contest cannot size that coefficient. Both controls are OFF unless a
+caller passes a number, which is what makes this landable on an uncalibrated
+prior: a build that says nothing about ownership solves the identical MILP it
+solved before.
+
+**A bug caught in bring-up, kept because it is the instructive kind.** The
+hitters-only filter on the floor was first written `slot != 'P'`. DK's slot
+vocabulary is `P1`/`P2` and never `'P'`, so that test is TRUE for both pitcher
+slots and a cheap arm counted as a leverage bat: a build asked for 4 low-owned
+hitters, got 2, and every counter read clean. It keys on the slot's required
+POSITION now. Same shape as R153's two leaked caps, one week apart, and the same
+lesson: a control enforced against the wrong index is not a control, and it
+reports itself clean.
+
+Not shipped here, and named so it is not assumed: nothing calls
+`attach_projected_ownership` on the production path yet, so no build changes
+until a caller sets a value. Wiring it into `run_slate` with per-contest-shape
+values is the next item, and the objective term (C in the proposal) waits on
+3-5 more graded slates.
+
+`tests/test_core.py::LeverageControlsTests`, 12 tests, pin 809 -> 821, total
+1205 -> 1217. The ledger Quick Card's pin line still reads 1205 and is ARCHIVE's
+to correct; that file had uncommitted foreign edits at the time of this change
+and was left alone.
+
+---
+
 ## 2026-08-19 — R153: a Showdown player-exposure cap at 50%, the captain cap down to 25%, and both made to bind where the roster spots are spent
 
 DEV, claim `engine_2026-08-19`. Ben's instruction, given mid-slate on the
