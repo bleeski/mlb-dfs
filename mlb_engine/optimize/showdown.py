@@ -37,11 +37,38 @@ VERSION = "0.3-review"
 # slate (Chris Sale, Base 22.35 against a next-best of ~15) before this cap
 # existed. Default caps any single captain to a third of the bank.
 #
-# 0.33 rather than 0.35 because the cap count is a floor() of pct * n, so 0.35
-# rounds UP to a breach at some entry counts: at n=20 it permits 7 captains,
-# which is 35% realized. 0.33 permits 6, which is 30%. Set 2026-07-25 when the
-# standing instruction became "never more than a third".
-DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.33
+# The cap count is a floor() of pct * n, so the realized exposure can only ever
+# land at or below the requested pct, never above it. Set to 0.25 on 2026-08-19
+# (Ben, R153) when the standing instruction moved from "never more than a third"
+# to "never more than a quarter". The prior value was 0.33, chosen over 0.35
+# because 0.35 rounds UP to a breach at some entry counts (at n=20 it permits 7
+# captains, a realized 35%); 0.25 has no such edge, since floor() of a quarter is
+# a quarter or less at every n.
+#
+# Feasibility note, because this is the number most likely to make a slot
+# infeasible: n entries at 0.25 needs at least ceil(n / floor(0.25*n)) distinct
+# captains, which is 4 at any n >= 8 and 5 at small n where the floor bites
+# (n=19 -> cap 4 -> 5 captains). A Showdown pool is 20 players on a fully posted
+# slate, so the bar is low; it is not low on an unposted slate where the pool
+# falls back to all_healthy and the thesis ladder does not run.
+DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25
+
+# Ben, 2026-08-19 (R153). No single PLAYER, in any role, fills more than half the
+# entered set. This is the portfolio-level washout control CLAUDE.md's dual
+# objective names and the module did not have: the overlap bound stops two
+# lineups from being the same lineup, and the captain cap stops one captain from
+# owning the portfolio, but neither stops one cheap bat appearing in nearly every
+# entry. Measured on the 2026-08-19 ARI@BOS build that prompted this: 19 unique
+# rosters, overlap bound clean at 0 relaxations, captain cap clean -- and Nick
+# Sogard in 12 of 19 entries (63.2%), because he was the cheapest posted leadoff
+# bat and every BOS-leaning thesis reached for the same salary relief. One 0-for-4
+# takes down twelve entries at once, which is precisely the correlated failure the
+# other two controls were never measuring.
+#
+# floor(), for the same reason the captain cap uses it: this is an upper bound, so
+# rounding must never let the allowed count push realized exposure above the
+# requested cap. At n=19 the count is 9, a realized 47.4%.
+DEFAULT_MAX_PLAYER_EXPOSURE_PCT = 0.50
 
 # Two lineups that share five of six players are one lineup with a swapped punt
 # bat. Exact-set forbidding calls that unique; this does not. Roster size minus
@@ -371,9 +398,42 @@ def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract,
     }
 
 
+def exposure_cap_count(pct: Optional[float], n: int) -> Optional[int]:
+    """The integer slot count an exposure percentage allows over ``n`` entries.
+
+    ``floor()``, never ceil or round: an exposure cap is an UPPER bound, so the
+    allowed count may never let realized exposure exceed the requested pct. The
+    ``max(1, ...)`` keeps a cap from forbidding every player at tiny ``n`` (at
+    n=1, floor(0.50 * 1) is 0, which is not a portfolio control, it is an empty
+    bank). ``None`` in means the control is disabled and ``None`` comes back.
+    """
+    if not pct:
+        return None
+    return max(1, math.floor(float(pct) * max(1, int(n))))
+
+
+def player_cap_structural_floor(pool_size: int, n_entries: int,
+                                contract: RosterContract = SHOWDOWN) -> Optional[float]:
+    """The lowest player-exposure pct that can fill ``n_entries`` from a pool of
+    ``pool_size``, or None when the pool is empty.
+
+    ``n_entries`` rosters need ``n_entries * roster_size`` filled slots and each
+    player may fill at most ``cap_count`` of them, so any cap below
+    ``roster_size / pool_size`` is infeasible by counting alone, before a single
+    MILP runs. Reported rather than auto-applied: CLAUDE.md's Autonomy section
+    makes RAISING an exposure cap a strategy change and Ben's call, so the engine
+    says the cap cannot hold and lets the relaxation counters record what
+    actually happened, instead of quietly widening a bound he set.
+    """
+    if pool_size <= 0:
+        return None
+    return contract.roster_size / float(pool_size)
+
+
 def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHOWDOWN,
                         max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
                         max_shared_players: Optional[int] = DEFAULT_MAX_SHARED_PLAYERS,
+                        max_player_exposure_pct: Optional[float] = DEFAULT_MAX_PLAYER_EXPOSURE_PCT,
                         diagnostics: Optional[Dict[str, Any]] = None,
                         **kwargs) -> List[Dict[str, Any]]:
     """Up to ``n`` distinct legal lineups sharing at most ``max_shared_players``
@@ -402,26 +462,66 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
     bank: List[Dict[str, Any]] = []
     forbidden: List[List[str]] = []
     cpt_counts: Dict[str, int] = {}
+    player_counts: Dict[str, int] = {}
     n_target = max(1, int(n))
     # floor, not ceil/round: this is an upper bound, so rounding must never let
-    # the allowed count push the realized exposure pct above the requested cap.
-    cap = max(1, math.floor(max_cpt_exposure_pct * n_target)) if max_cpt_exposure_pct else None
+    # the realized exposure pct push above the requested cap. Both caps share one
+    # helper so the two can never drift apart on the rounding rule.
+    cap = exposure_cap_count(max_cpt_exposure_pct, n_target)
+    player_cap = exposure_cap_count(max_player_exposure_pct, n_target)
     relaxed_slots = 0
     overlap_relaxed_slots = 0
     both_relaxed_slots = 0
+    player_relaxed_slots = 0
     ignored_locks: List[str] = []
+    caller_excludes = [str(x) for x in (kwargs.pop("excludes", None) or [])]
+
+    def _over_cap() -> List[str]:
+        """Players who have already filled their allowed share of the bank."""
+        if player_cap is None:
+            return []
+        return sorted(k for k, c in player_counts.items() if c >= player_cap)
+
     for _ in range(n_target):
         cpt_excludes = [k for k, c in cpt_counts.items() if cap is not None and c >= cap] or None
+        over = _over_cap()
+        # The caller's own excludes always apply; the cap's excludes are the part
+        # that relaxes, so the two are kept separate rather than merged once.
+        with_cap = (caller_excludes + [k for k in over if k not in caller_excludes]) or None
+        without_cap = caller_excludes or None
         lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                   cpt_excludes=cpt_excludes,
+                                   cpt_excludes=cpt_excludes, excludes=with_cap,
                                    max_shared_players=max_shared_players, **kwargs)
         # Relax the overlap bound before the captain cap. Captain concentration
         # is the failure this module was built to prevent, so it is the last
         # control to give way.
         if lu is None and max_shared_players is not None:
             lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       cpt_excludes=cpt_excludes, **kwargs)
+                                       cpt_excludes=cpt_excludes, excludes=with_cap,
+                                       **kwargs)
             if lu is not None:
+                overlap_relaxed_slots += 1
+        # R153. The player-exposure cap sits between the overlap bound and the
+        # captain cap, and the order is the point rather than an accident. Overlap
+        # first because two lineups differing by one bat are one lineup and that is
+        # the cheapest thing to give up. Player exposure second because it is a
+        # PORTFOLIO property: relaxing it puts one more entry on a player who is
+        # already at half the set, which is a washout cost spread thin, whereas
+        # relaxing the captain cap concentrates the single highest-leverage slot.
+        # Captain last, unchanged, because captain concentration is the failure
+        # this module was built to prevent.
+        if lu is None and over:
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       cpt_excludes=cpt_excludes, excludes=without_cap,
+                                       max_shared_players=max_shared_players, **kwargs)
+            if lu is not None:
+                player_relaxed_slots += 1
+        if lu is None and over and max_shared_players is not None:
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       cpt_excludes=cpt_excludes, excludes=without_cap,
+                                       **kwargs)
+            if lu is not None:
+                player_relaxed_slots += 1
                 overlap_relaxed_slots += 1
         # R54(a). This rung used to drop ``max_shared_players`` along with the
         # captain cap while incrementing only the captain counter, so a bank
@@ -432,6 +532,7 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # rung relaxes exactly the one control it names.
         if lu is None and cpt_excludes:
             lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       excludes=with_cap,
                                        max_shared_players=max_shared_players, **kwargs)
             if lu is not None:
                 relaxed_slots += 1
@@ -442,11 +543,27 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # portfolio is all three at zero.
         if lu is None and cpt_excludes and max_shared_players is not None:
             lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       **kwargs)
+                                       excludes=with_cap, **kwargs)
             if lu is not None:
                 both_relaxed_slots += 1
                 overlap_relaxed_slots += 1
                 relaxed_slots += 1
+        # R153. The floor rung: every control off, the caller's own excludes still
+        # honoured. A slot that needs this is a slot where no control held, and it
+        # is counted in all four places rather than under one new name, because the
+        # counters answer "how many lineups were built WITHOUT this control".
+        if lu is None and (over or cpt_excludes or max_shared_players is not None):
+            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
+                                       excludes=without_cap, **kwargs)
+            if lu is not None:
+                if over:
+                    player_relaxed_slots += 1
+                if cpt_excludes:
+                    relaxed_slots += 1
+                if max_shared_players is not None:
+                    overlap_relaxed_slots += 1
+                if cpt_excludes and max_shared_players is not None:
+                    both_relaxed_slots += 1
         if lu is None:
             break
         # R54(c). A lock the melt never carried used to no-op in silence.
@@ -457,6 +574,8 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         forbidden.append(lu["player_keys"])
         cpt_key = lu["captain"]["player_key"]
         cpt_counts[cpt_key] = cpt_counts.get(cpt_key, 0) + 1
+        for key in lu["player_keys"]:
+            player_counts[key] = player_counts.get(key, 0) + 1
     if diagnostics is not None:
         diagnostics["max_cpt_exposure_pct"] = max_cpt_exposure_pct
         diagnostics["cap_count"] = cap
@@ -467,6 +586,14 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # R54(a)/(c). Both new facts ride the same dict the brief already reads.
         diagnostics["both_relaxed_slots"] = both_relaxed_slots
         diagnostics["ignored_locks"] = list(ignored_locks)
+        # R153. The player-exposure cap, reported on the same footing as the other
+        # two so a caller reading "clean" is reading all three controls.
+        diagnostics["max_player_exposure_pct"] = max_player_exposure_pct
+        diagnostics["player_cap_count"] = player_cap
+        diagnostics["player_exposure"] = dict(player_counts)
+        diagnostics["player_relaxed_slots"] = player_relaxed_slots
+        diagnostics["player_cap_structural_floor"] = player_cap_structural_floor(
+            len(df), n_target, contract)
     return bank
 
 

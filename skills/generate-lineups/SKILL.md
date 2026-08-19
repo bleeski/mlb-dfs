@@ -735,22 +735,64 @@ available. `construction.win_share_basis` says which input was used. On
 `even_split_no_market_input` the two sides got equal weight because no moneyline
 matched, which is a real weakness on a lopsided game and belongs in your report.
 
-**Two portfolio controls, both enforced in the solver, both reported:**
+**Three portfolio controls, all enforced in the solver, all reported:**
 
 - `max_shared_players` (default 4 of 6). No two lineups may share more than four
   players. Overlap counts the PLAYER, not the role, because promoting a UTIL to
   CPT is not a differentiated lineup. Exact-set forbidding, the old default,
   called a one-player swap unique.
-- `max_cpt_exposure_pct` (default 0.33). The count is a `floor()`, which is why
-  the default is 0.33 and not 0.35: at 20 entries 0.35 permits seven captains,
-  a realized 35%.
+- `max_cpt_exposure_pct` (default **0.25**, Ben 2026-08-19). No captain above a
+  quarter of the entered set.
+- `max_player_exposure_pct` (default **0.50**, Ben 2026-08-19, new in R153). No
+  PLAYER, in any role, above half of it. This is the portfolio-level washout
+  control the module lacked: on the 2026-08-19 ARI@BOS build the overlap bound
+  was clean at 0 relaxations, the captain cap was clean, and Nick Sogard was in
+  12 of 19 entries because he was the cheapest posted leadoff bat and every
+  BOS-leaning thesis reached for the same salary relief. One 0-for-4 took down
+  twelve entries, which is exactly the correlated failure the other two controls
+  were never measuring.
 
-Both relax rather than truncate, and in a fixed order: the overlap bound gives
-way first, then the captain lock, then the thesis. A short bank leaves a blank
-reserved row and a blank row blocks certification, so silently shrinking is the
-one outcome not on offer. Every relaxation is counted in `diversity` and
-`captain_exposure` and repeated in `caution`. Read those before reporting the
-portfolio as clean. Override either through `--controls-override`.
+Every cap count is a `floor()` of pct * entries, so realized exposure lands at or
+below the requested pct. That rounding rule is why the captain cap used to be
+0.33 rather than 0.35 (at 20 entries 0.35 permits seven captains, a realized
+35%); 0.25 has no such edge. The one escape is `pct * n < 1`, where the count
+clamps to 1 rather than forbidding everyone.
+
+They relax rather than truncate, in a fixed order: overlap gives way first, then
+player exposure, then the captain lock, then the thesis. A short bank leaves a
+blank reserved row and a blank row blocks certification, so silently shrinking is
+the one outcome not on offer. Player exposure sits second because relaxing it
+puts one more entry on a player already at half the set, a washout cost spread
+thin, where relaxing the captain lock concentrates the single highest-leverage
+slot.
+
+**Read `counted_relaxations.clean` and understand what is NOT in it.** Both caps
+bind against the REALIZED set. When a thesis names a player who is already at a
+cap, the player comes off that thesis's `cpt` and `locks` before the solve, the
+thesis still builds, and the removal lands in `player_exposure.cap_reassignments`
+and `.locks_dropped`. Those are not relaxations and are not counted as such:
+nothing gave way, the cap held, and what moved was the thesis label. So a thesis
+row reading "BOS win close (variant 2, Wilyer Abreu captain)" can legitimately
+have a different captain, and the reassignment list is where that is stated.
+
+R153 second pass, worth knowing because both leaks shipped once: a cap enforced
+anywhere other than where the roster spots are actually spent is not a cap.
+`solve_ladder` enforced no captain cap at all, trusting `build_thesis_ladder`'s
+apportionment, so a lock substitution landed on top of a full captain (26.3%
+under a 25% cap). And the player cap's original carve-out for a thesis's own
+names let one player reach 57.9% under a 50% cap while `player_relaxed` read 0 —
+the cap reporting itself clean while not binding.
+
+Every relaxation is counted in `diversity`, `captain_exposure` and
+`player_exposure`, and repeated in `caution`. Read those before reporting the
+portfolio as clean. Override any of the three through `--controls-override`,
+which reads all of them from one dict.
+
+`player_exposure.structural_floor_pct` is `roster_size / pool_size`, the lowest
+cap that can fill the entries from the pool by counting alone. A cap below it
+cannot hold no matter what the solver does. The engine reports that and does not
+widen the cap, because raising an exposure cap is a strategy change and CLAUDE.md
+makes it Ben's.
 
 Both defaults live in `mlb_engine/optimize/showdown.py`. The Showdown suite is
 `tests/test_showdown.py`, and `tools/audit.py` DOES gate it, along with
@@ -828,7 +870,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1199 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 26 modules, 1205 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

@@ -27,12 +27,15 @@ import pandas as pd
 
 from mlb_engine.optimize.showdown import (
     DEFAULT_MAX_CPT_EXPOSURE_PCT,
+    DEFAULT_MAX_PLAYER_EXPOSURE_PCT,
     DEFAULT_MAX_SHARED_PLAYERS,
     build_showdown_lineup,
     certify_showdown,
+    exposure_cap_count,
+    player_cap_structural_floor,
 )
 
-VERSION = "0.1"
+VERSION = "0.2"
 
 # PA-share prior by batting-order slot. Deterministic, not fitted to any slate.
 ORDER_FACTOR = {1: 1.08, 2: 1.06, 3: 1.05, 4: 1.03, 5: 1.00,
@@ -401,8 +404,7 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
 
     counts = _largest_remainder(weights, int(n_entries))
 
-    cap = (max(1, math.floor(max_cpt_exposure_pct * max(1, int(n_entries))))
-           if max_cpt_exposure_pct else None)
+    cap = exposure_cap_count(max_cpt_exposure_pct, int(n_entries))
     cpt_counts: Dict[str, int] = {}
     cap_relaxed = 0
     theses: List[Dict[str, Any]] = []
@@ -483,21 +485,61 @@ def _round_robin(counts: Mapping[int, int]) -> List[int]:
 # --------------------------------------------------------------------------- #
 def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                  max_shared_players: Optional[int] = DEFAULT_MAX_SHARED_PLAYERS,
+                 max_player_exposure_pct: Optional[float] = DEFAULT_MAX_PLAYER_EXPOSURE_PCT,
+                 max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
                  time_limit: int = 8,
                  diagnostics: Optional[Dict[str, Any]] = None,
                  ) -> List[Optional[Dict[str, Any]]]:
     """Solve each thesis under its own constraints, enforcing the overlap bound
-    against every lineup already built.
+    and the player-exposure cap against every lineup already built.
 
     Relaxation order when a thesis will not solve: drop the overlap bound, then
-    drop the captain lock, then report the thesis infeasible. The captain lock
-    goes before the thesis itself because a thesis with a different captain is
-    still that game state; a missing lineup is a blank reserved row, and a blank
-    row blocks certification.
+    drop the player-exposure cap, then drop the captain lock, then report the
+    thesis infeasible. The captain lock goes before the thesis itself because a
+    thesis with a different captain is still that game state; a missing lineup is
+    a blank reserved row, and a blank row blocks certification.
+
+    R153, on where the player cap sits. Overlap gives way first because two
+    lineups differing by one bat are one lineup and that is the cheapest thing to
+    lose. The player cap gives way second: relaxing it puts one more entry on a
+    player already at half the set, a washout cost spread thin, where relaxing the
+    captain lock concentrates the single highest-leverage slot. Captain stays
+    last, unchanged.
+
+    R153, second pass. **Both caps are HARD and bind against the REALIZED set, not
+    against the apportionment.** The first pass got this wrong in two ways that the
+    2026-08-19 ARI@BOS build made visible, and both are worth keeping written down
+    because they are the same mistake in two places: a cap that is enforced
+    somewhere other than where the roster spots are actually spent is not a cap.
+
+    1. The player cap protected a thesis's own ``cpt`` and ``locks`` on the
+       reasoning that a lock is the more specific instruction. That reasoning is
+       fine and the consequence was not: the ladder assigns captains by name, a
+       captain IS a roster spot, and so the carve-out let Wilyer Abreu reach 11 of
+       19 (57.9%) under a 50% cap with ``player_relaxed: 0`` -- the cap reporting
+       itself clean while not holding. A capped player is now removed from the
+       thesis's cpt and locks BEFORE the solve, and the removal is named in
+       ``player_cap_cpt_reassigned`` / ``player_cap_locks_dropped``. The thesis
+       still gets built; it gets built with a different captain, which the ladder
+       already treats as the same game state.
+    2. ``solve_ladder`` enforced no captain cap whatsoever. It relied on
+       ``build_thesis_ladder``'s apportionment, which caps the captains it ASSIGNS
+       -- but the lock-relaxation rung then picks a substitute captain with no cap
+       awareness, so a substitution lands on top of an already-full captain. Payton
+       Tolle reached 5 of 19 (26.3%) against a cap count of 4. The cap is now
+       enforced here too, against the running realized count, on every rung.
     """
     prior: List[List[str]] = []
     out: List[Optional[Dict[str, Any]]] = []
     overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
+    player_relaxed = 0
+    player_counts: Dict[str, int] = {}
+    cpt_counts: Dict[str, int] = {}
+    player_cap = exposure_cap_count(max_player_exposure_pct, len(theses))
+    cpt_cap = exposure_cap_count(max_cpt_exposure_pct, len(theses))
+    player_cap_cpt_reassigned: List[Dict[str, str]] = []
+    player_cap_locks_dropped: List[Dict[str, str]] = []
+    cpt_cap_reassigned: List[Dict[str, str]] = []
     ignored_locks: List[str] = []
     # R113. `captain_lock_relaxed` (this counter) and `captain_cap_relaxed`
     # (from the thesis-apportionment step, a different mechanism entirely) used
@@ -509,14 +551,25 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     name_by_key = dict(zip(df["Player_Key"], df["Name"]))
     lock_relaxation_detail: List[Dict[str, str]] = []
 
-    def _record_lock_relaxation(thesis: Mapping[str, Any], solved: Mapping[str, Any]) -> None:
+    def _record_lock_relaxation(thesis: Mapping[str, Any], solved: Mapping[str, Any]) -> int:
+        """Record a captain substitution and return 1, or 0 if none happened.
+
+        R153. A rung that drops the lock and then happens to pick the SAME captain
+        substituted nothing, and counting it puts a row in the caution naming a
+        player who replaced himself. The floor rung made this reachable, because it
+        solves with no ``cpt_excludes`` at all. The counter and the detail list are
+        incremented together so ``len(detail) == captain_lock_relaxed`` always.
+        """
         requested = thesis.get("cpt")
         actual = (solved.get("captain") or {}).get("player_key")
+        if requested and actual and requested == actual:
+            return 0
         lock_relaxation_detail.append({
             "thesis": str(thesis.get("name") or thesis.get("template") or "?"),
             "requested": name_by_key.get(requested, requested) if requested else "none",
             "actual": name_by_key.get(actual, actual) if actual else "?",
         })
+        return 1
 
     for thesis in theses:
         work = df.copy()
@@ -524,40 +577,119 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         if mult:
             work["Base"] = [float(b) * float(mult.get(k, 1.0))
                             for b, k in zip(work["Base"], work["Player_Key"])]
-        kw = dict(locks=thesis.get("locks") or None,
-                  excludes=thesis.get("excludes") or None,
-                  time_limit=time_limit)
-        lu = build_showdown_lineup(work, cpt_lock=thesis.get("cpt"),
-                                   forbidden_sets=prior or None,
+        tname = str(thesis.get("name") or thesis.get("template") or "?")
+        thesis_excludes = [str(k) for k in (thesis.get("excludes") or [])]
+        # R153. Both caps bind against the REALIZED counts, and a capped player is
+        # removed from this thesis's own cpt and locks first. A lock plus an
+        # exclude on one key is an instant infeasibility that misreports as "the
+        # thesis could not solve", so the contradiction is resolved here, in favour
+        # of the cap, and every removal is named.
+        over = sorted(k for k, c in player_counts.items()
+                      if player_cap is not None and c >= player_cap)
+        over_set = set(over)
+        cpt_full = {k for k, c in cpt_counts.items()
+                    if cpt_cap is not None and c >= cpt_cap}
+        # A player at the PLAYER cap cannot take a captain slot either, since the
+        # captain is a roster spot. Union, not just the captain counts.
+        cpt_excludes = sorted(cpt_full | over_set) or None
+
+        want_cpt = str(thesis["cpt"]) if thesis.get("cpt") else None
+        cpt_lock = want_cpt
+        if want_cpt and want_cpt in over_set:
+            cpt_lock = None
+            player_cap_cpt_reassigned.append({
+                "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
+                "count_at_cap": str(player_counts.get(want_cpt, 0))})
+        elif want_cpt and want_cpt in cpt_full:
+            cpt_lock = None
+            cpt_cap_reassigned.append({
+                "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
+                "count_at_cap": str(cpt_counts.get(want_cpt, 0))})
+
+        want_locks = [str(k) for k in (thesis.get("locks") or []) if k]
+        locks = [k for k in want_locks if k not in over_set]
+        for k in [k for k in want_locks if k in over_set]:
+            player_cap_locks_dropped.append({
+                "thesis": tname, "player": name_by_key.get(k, k),
+                "count_at_cap": str(player_counts.get(k, 0))})
+
+        with_cap = (thesis_excludes + [k for k in over if k not in thesis_excludes]) or None
+        without_cap = thesis_excludes or None
+        kw = dict(locks=locks or None, time_limit=time_limit)
+        lu = build_showdown_lineup(work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
+                                   forbidden_sets=prior or None, excludes=with_cap,
                                    max_shared_players=max_shared_players, **kw)
         if lu is None and max_shared_players is not None:
-            lu = build_showdown_lineup(work, cpt_lock=thesis.get("cpt"),
-                                       forbidden_sets=prior or None, **kw)
+            lu = build_showdown_lineup(work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
+                                       forbidden_sets=prior or None,
+                                       excludes=with_cap, **kw)
             if lu is not None:
                 overlap_relaxed += 1
-        if lu is None:
-            lu = build_showdown_lineup(work, forbidden_sets=prior or None,
+        # R153. Player cap second, before the captain lock.
+        if lu is None and over:
+            lu = build_showdown_lineup(work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
+                                       forbidden_sets=prior or None,
+                                       excludes=without_cap,
                                        max_shared_players=max_shared_players, **kw)
             if lu is not None:
-                cpt_relaxed += 1
-                _record_lock_relaxation(thesis, lu)
+                player_relaxed += 1
+        if lu is None and over and max_shared_players is not None:
+            lu = build_showdown_lineup(work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
+                                       forbidden_sets=prior or None,
+                                       excludes=without_cap, **kw)
+            if lu is not None:
+                player_relaxed += 1
+                overlap_relaxed += 1
+        if lu is None:
+            lu = build_showdown_lineup(work, cpt_excludes=cpt_excludes,
+                                       forbidden_sets=prior or None,
+                                       excludes=with_cap,
+                                       max_shared_players=max_shared_players, **kw)
+            if lu is not None:
+                cpt_relaxed += _record_lock_relaxation(thesis, lu)
         # R54(b). The fourth rung, which the BANK ladder had and this one did
         # not: a thesis solvable only under both relaxations returned None and
         # left a blank reserved row -- write-blocked at T-5 -- on a pool the bank
         # path fills. Counted in every place it is true, matching
         # build_showdown_bank: these answer "how many lineups were built without
         # this control", so a clean ladder is all three at zero.
-        if lu is None and thesis.get("cpt") and max_shared_players is not None:
-            lu = build_showdown_lineup(work, forbidden_sets=prior or None, **kw)
+        if lu is None and cpt_lock and max_shared_players is not None:
+            lu = build_showdown_lineup(work, cpt_excludes=cpt_excludes,
+                                       forbidden_sets=prior or None,
+                                       excludes=with_cap, **kw)
             if lu is not None:
-                both_relaxed += 1
+                substituted = _record_lock_relaxation(thesis, lu)
+                both_relaxed += substituted
                 overlap_relaxed += 1
-                cpt_relaxed += 1
-                _record_lock_relaxation(thesis, lu)
+                cpt_relaxed += substituted
+        # R153. The floor rung: every portfolio control off, the thesis's own
+        # excludes still honoured. Counted in every place it is true, matching
+        # build_showdown_bank, because these counters answer "how many lineups were
+        # built WITHOUT this control" and the brief's clean verdict rests on that.
+        # The captain cap comes off here too: at this rung nothing else has worked
+        # and the alternative is a blank reserved row, which blocks certification.
+        if lu is None and (over or cpt_lock or cpt_excludes
+                           or max_shared_players is not None):
+            lu = build_showdown_lineup(work, forbidden_sets=prior or None,
+                                       excludes=without_cap, **kw)
+            if lu is not None:
+                if over:
+                    player_relaxed += 1
+                if max_shared_players is not None:
+                    overlap_relaxed += 1
+                substituted = _record_lock_relaxation(thesis, lu) if cpt_lock else 0
+                cpt_relaxed += substituted
+                if max_shared_players is not None:
+                    both_relaxed += substituted
         if lu is None:
             infeasible += 1
         else:
             prior.append(list(lu["player_keys"]))
+            for key in lu["player_keys"]:
+                player_counts[key] = player_counts.get(key, 0) + 1
+            got_cpt = (lu.get("captain") or {}).get("player_key")
+            if got_cpt:
+                cpt_counts[got_cpt] = cpt_counts.get(got_cpt, 0) + 1
             # R54(c). A thesis lock the melt never carried used to no-op in
             # silence, and cpt_counts then accounted against captains that were
             # never enforced.
@@ -579,6 +711,23 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "both_relaxed": both_relaxed,
             "ignored_locks": list(ignored_locks),
             "infeasible": infeasible,
+            # R153. The player-exposure cap, reported on the same footing as the
+            # other two controls so "clean" means all three held. The three
+            # reassignment lists are NOT relaxations: nothing gave way, a capped
+            # player was taken off a thesis's own cpt or locks so the cap could
+            # hold. They are named because a thesis that built with a different
+            # captain than its label implies is a fact the reader wants.
+            "max_player_exposure_pct": max_player_exposure_pct,
+            "player_cap_count": player_cap,
+            "player_relaxed": player_relaxed,
+            "player_cap_cpt_reassigned": list(player_cap_cpt_reassigned),
+            "player_cap_locks_dropped": list(player_cap_locks_dropped),
+            "player_cap_structural_floor": player_cap_structural_floor(
+                len(df), len(theses)),
+            "max_cpt_exposure_pct": max_cpt_exposure_pct,
+            "cpt_cap_count": cpt_cap,
+            "cpt_cap_reassigned": list(cpt_cap_reassigned),
+            "captain_exposure_realized": dict(cpt_counts),
         })
     return out
 
@@ -624,6 +773,10 @@ def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         "captain_exposure": dict(sorted(captains.items(), key=lambda kv: -kv[1])),
         "max_captain_exposure_pct": round(max(captains.values()) / n * 100, 1) if n else 0.0,
         "player_exposure": dict(sorted(exposure.items(), key=lambda kv: -kv[1])),
+        # R153. The realized ceiling of the player-exposure cap, next to the
+        # captain one it mirrors. Realized off the SOLVED lineups, so it is what
+        # the delivered file actually carries, not what was requested.
+        "max_player_exposure_pct": round(max(exposure.values()) / n * 100, 1) if n and exposure else 0.0,
         "prior_note": ("Base = 0.60*salary-regressed + 0.40*AvgPointsPerGame, "
                        "x batting-order PA factor x platoon factor. A labeled "
                        "deterministic prior, not a projection."),

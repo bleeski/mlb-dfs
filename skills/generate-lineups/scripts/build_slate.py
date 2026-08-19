@@ -2106,6 +2106,13 @@ def showdown_relaxation_caution(
     share_cap,
     overlap_relaxed: int,
     both_relaxed: int,
+    player_cap_count=None,
+    player_relaxed: int = 0,
+    cap_reassignments=None,
+    player_locks_dropped=None,
+    player_structurally_feasible: bool = True,
+    player_structural_floor=None,
+    player_cap_pct=None,
 ) -> str:
     """The Showdown ladder's relaxation NOTEs, one clause per counter that
     actually fired, each naming its own mechanism.
@@ -2145,6 +2152,36 @@ def showdown_relaxation_caution(
         notes += (f" NOTE: {both_relaxed} slot(s) needed BOTH the overlap bound "
                   "and the captain lock dropped at once; those are the least "
                   "controlled lineups in the bank (R54).")
+    # R153. The player-exposure cap's own clauses. Kept separate from the captain
+    # ones for R113's reason: they are different mechanisms with different
+    # remedies, and captain_exposure.by_player cannot show a player-cap event.
+    if player_relaxed:
+        notes += (f" NOTE: the {player_cap_count}-entry player exposure cap "
+                  f"relaxed on {player_relaxed} slot(s), so at least one player "
+                  f"sits above {player_cap_pct:.0%} of the entered set -- read "
+                  "player_exposure.by_player before uploading.")
+    if cap_reassignments:
+        detail = "; ".join(
+            f"{d.get('player', '?')} off {d.get('thesis', '?')}"
+            for d in cap_reassignments)
+        notes += (f" NOTE: {len(cap_reassignments)} thesis captain(s) were "
+                  f"REASSIGNED because the named player was already at a cap, so "
+                  f"the solver chose a different captain for that game state: "
+                  f"{detail}. Nothing relaxed -- the cap held and the thesis label "
+                  "is what moved.")
+    if player_locks_dropped:
+        detail = "; ".join(
+            f"{d.get('player', '?')} off {d.get('thesis', '?')}"
+            for d in player_locks_dropped)
+        notes += (f" NOTE: {len(player_locks_dropped)} thesis lock(s) were dropped "
+                  f"because the player was at the exposure cap: {detail}. Those "
+                  "lineups are still the thesis's shape, minus that one name.")
+    if not player_structurally_feasible:
+        notes += (f" NOTE: the player exposure cap of {player_cap_pct:.0%} is "
+                  f"below this pool's structural floor of "
+                  f"{player_structural_floor:.1%} (roster size over pool size), "
+                  "so it could not hold from the first slot regardless of the "
+                  "solver. Widen it deliberately or accept the relaxations.")
     return notes
 
 
@@ -2168,6 +2205,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     overrides = args.controls_override or {}
     cpt_cap = overrides.get("max_cpt_exposure_pct", sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
     share_cap = overrides.get("max_shared_players", sd.DEFAULT_MAX_SHARED_PLAYERS)
+    # R153. The third portfolio control. Reads from the same --controls-override
+    # dict as the other two, so the escape hatch is one flag rather than three.
+    player_cap_pct = overrides.get("max_player_exposure_pct",
+                                   sd.DEFAULT_MAX_PLAYER_EXPOSURE_PCT)
 
     # Handedness and the moneyline are what make the ladder more than a relabeled
     # points-max bank, so gather them before deciding the path. Both are
@@ -2195,6 +2236,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                              max_cpt_exposure_pct=cpt_cap)
         theses = ladder_meta["theses"]
         solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
+                                 max_player_exposure_pct=player_cap_pct,
+                                 max_cpt_exposure_pct=cpt_cap,
                                  diagnostics=solve_diag)
         if any(lu is None for lu in solved):
             print(json.dumps({"status": "ladder_infeasible",
@@ -2207,6 +2250,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     else:
         bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
                                       max_shared_players=share_cap,
+                                      max_player_exposure_pct=player_cap_pct,
                                       diagnostics=cpt_diagnostics)
         if len(bank) < n_entries:
             print(json.dumps({"status": "bank_short",
@@ -2307,6 +2351,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         both_relaxed = solve_diag.get("both_relaxed") or 0
         ignored_locks = list(solve_diag.get("ignored_locks") or [])
         max_overlap = report.get("max_pairwise_overlap")
+        # R153.
+        player_counts = report.get("player_exposure") or {}
+        player_cap_count = solve_diag.get("player_cap_count")
+        player_relaxed = solve_diag.get("player_relaxed") or 0
+        player_structural_floor = solve_diag.get("player_cap_structural_floor")
+        # Not relaxations: a capped player taken off a thesis's own cpt or locks so
+        # the cap could hold. Named because the thesis then built with a captain its
+        # label does not imply.
+        cap_reassignments = (list(solve_diag.get("player_cap_cpt_reassigned") or [])
+                             + list(solve_diag.get("cpt_cap_reassigned") or []))
+        player_locks_dropped = list(solve_diag.get("player_cap_locks_dropped") or [])
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
@@ -2321,11 +2376,27 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         both_relaxed = cpt_diagnostics.get("both_relaxed_slots") or 0
         ignored_locks = list(cpt_diagnostics.get("ignored_locks") or [])
         max_overlap = None
+        # R153. build_showdown_bank keys its counts by Player_Key, not name, so
+        # the names are resolved here to match the ladder path's shape.
+        _name_by_key = dict(zip(df["Player_Key"], df["Name"])) if len(df) else {}
+        player_counts = {_name_by_key.get(k, k): c
+                         for k, c in (cpt_diagnostics.get("player_exposure") or {}).items()}
+        player_cap_count = cpt_diagnostics.get("player_cap_count")
+        player_relaxed = cpt_diagnostics.get("player_relaxed_slots") or 0
+        # No thesis on this path, so nothing can be reassigned off one.
+        cap_reassignments = []
+        player_locks_dropped = []
+        player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
     captain_exposure = {
         key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
         for key, count in sorted(captain_counts.items(), key=lambda kv: -kv[1])
     }
     realized_cpt_pct = max((v["pct"] for v in captain_exposure.values()), default=0.0)
+    player_exposure = {
+        key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
+        for key, count in sorted(player_counts.items(), key=lambda kv: -kv[1])
+    }
+    realized_player_pct = max((v["pct"] for v in player_exposure.values()), default=0.0)
 
     brief = {
         # Showdown ships as v0.2-review (cpt exposure cap added 2026-07-23) and
@@ -2373,6 +2444,33 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "lock_relaxed_slots": lock_relaxed,
             "lock_relaxation_detail": lock_relaxation_detail,
         },
+        # R153 (Ben, 2026-08-19). The third portfolio control, reported on the same
+        # footing as the captain cap it mirrors. This is the PORTFOLIO-level
+        # washout axis CLAUDE.md's dual objective names: the overlap bound stops
+        # two lineups being one lineup and the captain cap stops one captain owning
+        # the set, and neither of them stops one bat appearing in most entries.
+        "player_exposure": {
+            "cap_pct": player_cap_pct,
+            "cap_count": player_cap_count,
+            "realized_max_pct": realized_player_pct,
+            "by_player": player_exposure,
+            "relaxed_slots": player_relaxed,
+            # NOT relaxations. A capped player was taken off a thesis's own captain
+            # slot or locks so the cap could hold, so the thesis built with a
+            # different captain than its label implies. Recorded because that is a
+            # fact the reader wants, not because anything gave way.
+            "cap_reassignments": cap_reassignments,
+            "locks_dropped": player_locks_dropped,
+            # The lowest cap that can fill this many entries from this pool by
+            # counting alone. A cap_pct below it cannot hold no matter what the
+            # solver does, and the engine reports that rather than widening a
+            # bound Ben set (CLAUDE.md, Autonomy).
+            "structural_floor_pct": (round(player_structural_floor, 4)
+                                     if player_structural_floor else None),
+            "structurally_feasible": (player_structural_floor is None
+                                      or not player_cap_pct
+                                      or player_cap_pct >= player_structural_floor),
+        },
         "diversity": {
             "max_shared_players": share_cap,
             "max_pairwise_overlap": max_overlap,
@@ -2387,12 +2485,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "captain_relaxed_slots": relaxed_slots,
             "overlap_relaxed_slots": overlap_relaxed,
             "both_relaxed_slots": both_relaxed,
+            # R153. The third control has to be in the clean verdict, or "clean"
+            # keeps meaning "two of three held" and reads as all of them.
+            "player_relaxed_slots": player_relaxed,
             # R54(c). Locks the solver was handed and could not enforce, because
             # the key is absent from the melted pool. Non-empty means the bank
             # was built without a player the operator asked for.
             "ignored_locks": ignored_locks,
             "clean": not (relaxed_slots or overlap_relaxed or both_relaxed
-                          or ignored_locks),
+                          or player_relaxed or ignored_locks),
         },
         "construction": ({
             "mode": "thesis_ladder",
@@ -2416,15 +2517,24 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         }),
         "caution": (f"showdown.py is v{sd.VERSION} and Phase 3 is not complete. "
                     "Per-lineup checks, template preservation, the captain "
-                    "exposure cap, and the roster-overlap bound passed, but this "
-                    "is not the Classic three-gate certification. Review before "
-                    "uploading."
+                    "exposure cap, the player exposure cap, and the roster-overlap "
+                    "bound passed, but this is not the Classic three-gate "
+                    "certification. Review before uploading."
                     # R113: cap and lock relaxations are named separately, each
                     # off its own counter, rather than summed into one sentence
                     # that always blamed the cap.
                     + showdown_relaxation_caution(
                         cap_count, cap_relaxed, lock_relaxed, lock_relaxation_detail,
                         share_cap, overlap_relaxed, both_relaxed,
+                        player_cap_count=player_cap_count,
+                        player_relaxed=player_relaxed,
+                        cap_reassignments=cap_reassignments,
+                        player_locks_dropped=player_locks_dropped,
+                        player_structurally_feasible=(
+                            player_structural_floor is None or not player_cap_pct
+                            or player_cap_pct >= player_structural_floor),
+                        player_structural_floor=player_structural_floor,
+                        player_cap_pct=player_cap_pct,
                     )
                     # R54(c). Loudest of the four, because it is not a relaxation
                     # the solver chose: it is an instruction that did not arrive.
@@ -2848,9 +2958,14 @@ def main() -> int:
                          "'{\"max_shared_players\": 8}'. Use when a build fails "
                          "with a feasibility hint naming a control floor; this "
                          "raises diversity caps, it never changes the player pool. "
-                         "Showdown reads \"max_cpt_exposure_pct\" from the same "
-                         "dict (default 0.35) to cap how much of the bank a "
-                         "single captain can fill; pass null to disable it.")
+                         "Showdown reads all three of its controls from this same "
+                         "dict: \"max_shared_players\" (default 4 of 6), "
+                         "\"max_cpt_exposure_pct\" (default 0.25) for how much of "
+                         "the set one captain may fill, and "
+                         "\"max_player_exposure_pct\" (default 0.50) for how much "
+                         "one player may fill in ANY role. Each cap count is a "
+                         "floor() of pct x entries, so realized exposure never "
+                         "exceeds the pct. Pass null to disable a cap.")
     ap.add_argument("--bundle",
                     help="slate_bundle.json from tools/fetch_slate_bundle.py. "
                          "Supplies the per-venue forecast for F5. Park factors "

@@ -241,7 +241,15 @@ EXPECTED_SUITE_COUNTS = {
     "tests.test_core": 809,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
-    "tests.test_showdown": 56,
+    # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
+    # (captain 0.33 -> 0.25, new player cap at 0.50). Two of the six are the
+    # leaks the first cut shipped and the live ARI@BOS build exposed: solve_ladder
+    # enforced no captain cap at all, so a lock substitution landed on top of a
+    # full captain (26.3% realized under a 25% cap), and the player cap carved out
+    # a thesis's own cpt and locks, so a named player reached 57.9% under a 50%
+    # cap while every relaxation counter read clean. A cap enforced somewhere
+    # other than where the roster spots are spent is not a cap.
+    "tests.test_showdown": 62,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

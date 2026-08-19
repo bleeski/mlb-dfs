@@ -299,12 +299,82 @@ def _assert_counts_match_the_bank(case, bank, diag, share_cap):
 
 
 class ShowdownDiversityTests(unittest.TestCase):
-    def test_defaults_are_a_third_and_four_shared(self):
-        # 0.33 not 0.35: cap_count is a floor(), and 0.35 * 20 = 7, which is a
-        # realized 35%. The standing instruction is "never more than a third".
-        self.assertEqual(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT, 0.33)
+    def test_defaults_are_a_quarter_half_and_four_shared(self):
+        # R153, Ben 2026-08-19: the standing instruction moved from "never more
+        # than a third" to "never more than a quarter", and a PLAYER cap was added
+        # at half the entered set. cap_count is a floor() in both cases, so
+        # realized exposure can only land at or below the requested pct.
+        self.assertEqual(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT, 0.25)
+        self.assertEqual(sd.DEFAULT_MAX_PLAYER_EXPOSURE_PCT, 0.50)
         self.assertEqual(sd.DEFAULT_MAX_SHARED_PLAYERS, 4)
-        self.assertEqual(math.floor(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT * 20), 6)
+        self.assertEqual(math.floor(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT * 20), 5)
+
+    def test_exposure_cap_count_never_rounds_a_cap_upward(self):
+        """R153. The one property both caps rest on: floor(), never round or ceil.
+
+        A cap count that rounds up lets realized exposure exceed the requested
+        pct, which is how 0.35 permitted 7 captains of 20 (a realized 35%) and is
+        why the old default was 0.33. Checked across a range of entry counts
+        rather than one, because the failure is arithmetic and shows up at some n
+        and not others.
+        """
+        for n in (2, 3, 4, 7, 8, 15, 19, 20, 33, 100):
+            for pct in (0.25, 0.33, 0.5, 0.6):
+                count = sd.exposure_cap_count(pct, n)
+                if math.floor(pct * n) >= 1:
+                    self.assertLessEqual(
+                        count / n, pct + 1e-9,
+                        f"cap of {pct} over {n} entries allows {count}, a realized "
+                        f"{count / n:.3f}")
+                else:
+                    # The documented escape: floor() is 0 here, which would forbid
+                    # every player, and a cap that cannot build one lineup is not a
+                    # control, it is an empty bank. It clamps to 1 and the realized
+                    # pct is ABOVE the request -- true at any n where pct * n < 1,
+                    # not only at n = 1.
+                    self.assertEqual(count, 1)
+        self.assertEqual(sd.exposure_cap_count(0.5, 1), 1)
+        self.assertEqual(sd.exposure_cap_count(0.25, 2), 1)
+        self.assertIsNone(sd.exposure_cap_count(None, 20))
+
+    def test_player_cap_structural_floor_is_roster_over_pool(self):
+        """R153. A cap below roster_size/pool_size cannot hold by counting alone,
+        before any MILP runs. Reported rather than auto-raised, because widening
+        an exposure cap is a strategy change and CLAUDE.md makes it Ben's."""
+        self.assertAlmostEqual(sd.player_cap_structural_floor(20, 19), 0.30)
+        self.assertAlmostEqual(sd.player_cap_structural_floor(12, 19), 0.50)
+        self.assertIsNone(sd.player_cap_structural_floor(0, 19))
+
+    def test_bank_holds_the_player_exposure_cap(self):
+        """R153. The control that did not exist. On the 2026-08-19 ARI@BOS build
+        the overlap bound was clean, the captain cap was clean, and one bat was in
+        12 of 19 entries -- correlated failure that neither other control was
+        measuring."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        diag = {}
+        bank = sd.build_showdown_bank(df, 12, max_player_exposure_pct=0.5,
+                                      diagnostics=diag, time_limit=6)
+        self.assertEqual(len(bank), 12)
+        counts = collections.Counter(k for l in bank for k in l["player_keys"])
+        cap_count = diag["player_cap_count"]
+        self.assertEqual(cap_count, 6)                       # floor(0.5 * 12)
+        if not diag["player_relaxed_slots"]:
+            self.assertLessEqual(max(counts.values()), cap_count)
+        # Biconditional, so it fails in both directions: a counter that misses a
+        # real relaxation AND one that claims a relaxation that did not happen.
+        self.assertEqual(diag["player_relaxed_slots"] == 0,
+                         max(counts.values()) <= cap_count,
+                         f"player counter {diag['player_relaxed_slots']} disagrees "
+                         f"with a realized max of {max(counts.values())} against "
+                         f"a cap count of {cap_count}")
+
+    def test_player_cap_of_none_disables_it(self):
+        df = sd.melt_showdown_salary_csv(SAL)
+        diag = {}
+        sd.build_showdown_bank(df, 6, max_player_exposure_pct=None,
+                               diagnostics=diag, time_limit=6)
+        self.assertIsNone(diag["player_cap_count"])
+        self.assertEqual(diag["player_relaxed_slots"], 0)
 
     def test_bank_respects_the_overlap_bound(self):
         df = sd.melt_showdown_salary_csv(SAL)
@@ -372,7 +442,14 @@ class ShowdownDiversityTests(unittest.TestCase):
         """
         df = _one_captain_pool()
         diag = {}
+        # R153. max_player_exposure_pct=None on purpose. This pool is 12 players
+        # and 4 entries, so the 50% player cap lands EXACTLY on its structural
+        # floor (roster 6 / pool 12) and every player would have to appear exactly
+        # twice -- which forces the floor rung and drops the overlap bound this
+        # test exists to watch hold. Disabling it keeps the fixture isolating the
+        # two controls it was built to tell apart.
         bank = sd.build_showdown_bank(df, 4, diagnostics=diag, time_limit=5,
+                                      max_player_exposure_pct=None,
                                       max_shared_players=4)
         self.assertEqual(len(bank), 4)
         # The captain cap genuinely binds here: only one player is affordable at
@@ -475,7 +552,7 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         self.assertGreaterEqual(len(ladder["allocation"]), 8)
         self.assertEqual(ladder["win_share_basis"], "moneyline_no_vig")
         counts = collections.Counter(t["cpt"] for t in ladder["theses"])
-        self.assertLessEqual(max(counts.values()) / 18, 1.0 / 3.0)
+        self.assertLessEqual(max(counts.values()) / 18, 0.25)
 
     def test_ladder_solves_unique_rosters_under_both_bounds(self):
         ladder = st.build_thesis_ladder(self.df, 18, moneyline={"MIN": -150, "CHC": 130})
@@ -484,8 +561,78 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         report = st.portfolio_report(self.df, ladder["theses"], lineups)
         self.assertTrue(report["all_unique_rosters"])
         self.assertLessEqual(report["max_pairwise_overlap"], 4)
-        self.assertLessEqual(report["max_captain_exposure_pct"], 100.0 / 3.0)
+        self.assertLessEqual(report["max_captain_exposure_pct"], 25.0)
         self.assertTrue(all(r["lineup_certified"] for r in report["lineups"]))
+
+    def test_solve_ladder_enforces_the_captain_cap_against_the_realized_set(self):
+        """R153. ``solve_ladder`` enforced NO captain cap: it trusted
+        ``build_thesis_ladder``'s apportionment, and the lock-relaxation rung then
+        picked a substitute captain with no cap awareness, so a substitution landed
+        on top of an already-full captain.
+
+        Live evidence, 2026-08-19 ARI@BOS at 19 entries and a cap count of 4:
+        Payton Tolle finished with 5 captain slots, a realized 26.3% under a 25%
+        cap, and every relaxation counter read clean because a lock substitution is
+        not a cap event. The cap is enforced here now, against the running realized
+        count, on every rung.
+
+        Teeth: dropping ``cpt_excludes`` from the solve calls puts the substituted
+        captain back over the cap and fails the first assertion.
+        """
+        ladder = st.build_thesis_ladder(self.df, 16, moneyline={"MIN": -150, "CHC": 130},
+                                        max_cpt_exposure_pct=0.25)
+        diag = {}
+        lineups = st.solve_ladder(self.df, ladder["theses"], max_cpt_exposure_pct=0.25,
+                                  time_limit=5, diagnostics=diag)
+        solved = [l for l in lineups if l is not None]
+        realized = collections.Counter(l["captain"]["player_key"] for l in solved)
+        cap_count = diag["cpt_cap_count"]
+        self.assertEqual(cap_count, 4)                        # floor(0.25 * 16)
+        # The floor rung can legitimately exceed the cap, and says so. Absent one,
+        # the realized count is bound.
+        if not diag["captain_lock_relaxed"]:
+            self.assertLessEqual(max(realized.values()), cap_count)
+        self.assertLessEqual(max(realized.values()), cap_count + diag["captain_lock_relaxed"])
+
+    def test_player_cap_beats_a_thesis_that_names_a_capped_player(self):
+        """R153, second pass. The first cut protected a thesis's own ``cpt`` and
+        ``locks`` from the cap on the reasoning that a lock is the more specific
+        instruction. The reasoning was fine; the consequence was that the cap did
+        not hold. The ladder assigns captains BY NAME and a captain is a roster
+        spot, so on the 2026-08-19 ARI@BOS build Wilyer Abreu reached 11 of 19
+        (57.9%) under a 50% cap while ``player_relaxed`` read 0 -- the cap
+        reporting itself clean while not binding.
+
+        A capped player now comes off the thesis's cpt and locks before the solve,
+        and the removal is NAMED rather than counted as a relaxation, because
+        nothing gave way: the cap held and the thesis label is what moved.
+
+        Teeth: restoring the carve-out puts the named player back over the cap and
+        fails the exposure assertion while ``player_relaxed`` stays 0.
+        """
+        star = str(self.df.sort_values("Base", ascending=False).iloc[0]["Player_Key"])
+        theses = [{"cpt": star, "locks": [star], "name": f"all-in on the star {i}"}
+                  for i in range(10)]
+        diag = {}
+        lineups = st.solve_ladder(self.df, theses, max_player_exposure_pct=0.5,
+                                  time_limit=4, diagnostics=diag)
+        solved = [l for l in lineups if l is not None]
+        self.assertTrue(solved, "the ladder must still produce lineups")
+        counts = collections.Counter(k for l in solved for k in l["player_keys"])
+        cap_count = diag["player_cap_count"]
+        self.assertEqual(cap_count, 5)                        # floor(0.5 * 10)
+        self.assertLessEqual(
+            counts[star], cap_count,
+            f"{star} reached {counts[star]} of {len(solved)} against a cap count "
+            f"of {cap_count}; the thesis carve-out is back")
+        self.assertEqual(diag["player_relaxed"], 0,
+                         "a reassignment is not a relaxation: nothing gave way")
+        # Every deviation from the thesis is named, so the reader is never left
+        # inferring why a thesis built with a captain its label does not imply.
+        self.assertTrue(diag["player_cap_cpt_reassigned"],
+                        "a capped captain was silently swapped without being named")
+        self.assertTrue(diag["player_cap_locks_dropped"],
+                        "a capped lock was silently dropped without being named")
 
     def test_the_thesis_ladder_has_the_bank_ladder_s_fourth_rung(self):
         """R54(b). ``solve_ladder`` never tried overlap+captain relaxed together
@@ -503,8 +650,12 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         df = _synth()                       # 7 players, almost no legal variety
         theses = [{"cpt": "AA_Star|AA", "name": f"t{i}"} for i in range(8)]
         diag = {}
+        # R153. Both caps off. Every thesis here names the same captain, so the
+        # captain cap would reassign it away by the third slot and the fourth rung
+        # would never be reached -- the rung would look retired when it is not.
         out = st.solve_ladder(df, theses, max_shared_players=4, time_limit=4,
-                              diagnostics=diag)
+                              max_cpt_exposure_pct=None,
+                              max_player_exposure_pct=None, diagnostics=diag)
         self.assertGreaterEqual(diag["both_relaxed"], 1,
                                 "the fourth rung never fired on a pool built to "
                                 "need it; the scenario, not the fix, is stale")
@@ -523,7 +674,12 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         df = _synth()
         theses = [{"cpt": "AA_Star|AA", "name": f"t{i}"} for i in range(8)]
         diag = {}
-        st.solve_ladder(df, theses, max_shared_players=4, time_limit=4, diagnostics=diag)
+        # R153. Caps off for the same reason as the fourth-rung test: this pins a
+        # LOCK substitution, and a cap reassignment is a different event that would
+        # pre-empt it.
+        st.solve_ladder(df, theses, max_shared_players=4, time_limit=4,
+                        max_cpt_exposure_pct=None, max_player_exposure_pct=None,
+                        diagnostics=diag)
         self.assertGreaterEqual(diag["captain_lock_relaxed"], 1)
         detail = diag["lock_relaxation_detail"]
         self.assertEqual(len(detail), diag["captain_lock_relaxed"])

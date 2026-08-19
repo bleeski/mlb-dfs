@@ -256,7 +256,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  26 modules  1199 tests`. The module count comes off the
+   `PASS  v2.26.0  26 modules  1205 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -445,15 +445,44 @@ build", never "upload-ready", and run the preflight on every deliverable.
 promoted run to refine. Bringing Showdown under the three gates is open
 backlog, not a decision left implicit.
 
-Two portfolio controls are enforced in the solver, not in review, and relaxed
-only in the stated order and counted: no two lineups share more than
-max_shared_players (4 of 6, counting the player and not the role), and no
-captain exceeds max_cpt_exposure_pct
-(0.33, a floor() of pct * n, which is why it is not 0.35). Both relax before
-they truncate, in the order overlap then captain lock then thesis, because a
-short bank leaves a blank reserved row and a blank row blocks certification.
+THREE portfolio controls are enforced in the solver, not in review, and relaxed
+only in the stated order and counted (R153, Ben 2026-08-19):
+- `max_shared_players`, 4 of 6, counting the PLAYER and not the role.
+- `max_cpt_exposure_pct`, **0.25**, no captain above a quarter of the entered set.
+- `max_player_exposure_pct`, **0.50**, no PLAYER in any role above half of it.
+  This is the portfolio-level washout axis the dual objective names and the
+  module did not have. On the 2026-08-19 ARI@BOS build the overlap bound was
+  clean, the captain cap was clean, and one cheap leadoff bat was in 12 of 19
+  entries: correlated failure neither other control was measuring.
+
+Every cap count is a `floor()` of pct * entries, so realized exposure lands at
+or below the requested pct at every entry count. (That rounding rule is why the
+captain cap used to be 0.33 rather than 0.35; 0.25 has no such edge.) The one
+escape is `pct * n < 1`, where the count clamps to 1 rather than forbidding
+everyone.
+
+They relax before they truncate, in the order overlap, then player exposure,
+then captain lock, then thesis, because a short bank leaves a blank reserved row
+and a blank row blocks certification. Player exposure sits second because
+relaxing it puts one more entry on a player already at half the set, a washout
+cost spread thin, where relaxing the captain lock concentrates the single
+highest-leverage slot.
+
+**Both caps bind against the REALIZED set, not against an apportionment**, and
+that distinction is the whole of R153's second pass. A cap enforced anywhere
+other than where the roster spots are actually spent is not a cap: `solve_ladder`
+trusted `build_thesis_ladder`'s captain apportionment and its own lock-relaxation
+rung then substituted a captain with no cap awareness (26.3% realized under a 25%
+cap), and the player cap carved out a thesis's own `cpt` and `locks` on the
+reasoning that a lock is more specific (57.9% realized under a 50% cap, with
+every relaxation counter reading clean). A capped player now comes off the
+thesis's captain slot and locks BEFORE the solve. That is not a relaxation and is
+not counted as one — nothing gave way, the cap held and the thesis label moved —
+so it is named in `player_exposure.cap_reassignments` and `.locks_dropped`.
+
 Every relaxation is counted in the brief. A portfolio is not clean because the
-gates passed; it is clean when the relaxation counts are zero.
+gates passed; it is clean when the relaxation counts are zero. Override any of
+the three through `--controls-override`, which reads all of them from one dict.
 
 ## Scheduled task sessions
 Each scheduled run is its own session. Read this file and the ledger Quick

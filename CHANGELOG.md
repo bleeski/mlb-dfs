@@ -25,6 +25,91 @@ performance claim.
 
 ---
 
+## 2026-08-19 — R153: a Showdown player-exposure cap at 50%, the captain cap down to 25%, and both made to bind where the roster spots are spent
+
+DEV, claim `engine_2026-08-19`. Ben's instruction, given mid-slate on the
+2026-08-19 ARI@BOS Showdown build: cap captain exposure at 25% and player
+exposure overall at 50%. The captain number was a one-line change. The player
+number was a control that did not exist.
+
+**Why the gap mattered.** Showdown had two portfolio controls, and both were
+clean on that build: the overlap bound held at 4 of 6 with zero relaxations, all
+19 rosters were unique, and no captain exceeded the cap. Nick Sogard was in 12 of
+19 entries (63.2%). He was the cheapest posted leadoff bat, so every BOS-leaning
+thesis reached for him as salary relief, and one 0-for-4 would have taken down
+twelve entries at once. That is the correlated failure CLAUDE.md's dual objective
+names as the washout end of the frontier, and nothing in the module was measuring
+it: the overlap bound stops two lineups being one lineup, the captain cap stops
+one captain owning the set, and neither looks at a single player's share of the
+whole. Any archived Showdown portfolio from before this date was "clean" in the
+sense that two controls held.
+
+**What shipped.** `DEFAULT_MAX_PLAYER_EXPOSURE_PCT = 0.50` and
+`DEFAULT_MAX_CPT_EXPOSURE_PCT` 0.33 -> 0.25 in `mlb_engine/optimize/showdown.py`,
+enforced in both build paths (`build_showdown_bank` and
+`showdown_theses.solve_ladder`), reported in the brief's new `player_exposure`
+block, folded into `counted_relaxations.clean`, and readable from the same
+`--controls-override` dict as the other two. `exposure_cap_count` is now one
+shared helper so the two caps cannot drift apart on the rounding rule, which is
+`floor()` in both cases: an exposure cap is an upper bound, so rounding must never
+let the allowed count push realized exposure above the requested pct. (That rule
+is why the captain cap was 0.33 rather than 0.35 — at n=20, 0.35 permits seven
+captains, a realized 35%. 0.25 has no such edge.) The one escape is `pct * n < 1`,
+where the count clamps to 1, because a cap that cannot build a single lineup is
+not a control.
+
+Relaxation order is now overlap, then player exposure, then captain lock, then
+thesis. Player exposure sits second deliberately: relaxing it puts one more entry
+on a player already at half the set, a washout cost spread thin, where relaxing
+the captain lock concentrates the single highest-leverage slot. A fifth floor rung
+was added to both ladders — every control off, the caller's own excludes still
+honoured — because a short bank leaves a blank reserved row and a blank row blocks
+certification.
+
+**The second pass, which is the part worth keeping.** The first cut shipped both
+caps leaking, and both leaks reported themselves clean. A cap enforced anywhere
+other than where the roster spots are actually SPENT is not a cap.
+
+1. `solve_ladder` enforced no captain cap whatsoever. It trusted
+   `build_thesis_ladder`'s apportionment, which caps the captains it ASSIGNS —
+   but the lock-relaxation rung then picks a substitute captain with no cap
+   awareness, so a substitution lands on top of an already-full captain. Payton
+   Tolle finished at 5 of 19 (26.3%) against a cap count of 4, and every
+   relaxation counter read clean, because a lock substitution is not an exposure
+   event. The cap is enforced there now, against the running realized count, on
+   every rung.
+2. The player cap protected a thesis's own `cpt` and `locks`, on the reasoning
+   that a lock is the more specific instruction and a lock-plus-exclude on one key
+   is an instant infeasibility that misreports as "the thesis could not solve."
+   The reasoning was fine and the consequence was not: the ladder assigns captains
+   BY NAME and a captain is a roster spot, so Wilyer Abreu reached 11 of 19
+   (57.9%) under a 50% cap with `player_relaxed: 0`. A capped player now comes off
+   the thesis's cpt and locks BEFORE the solve. That is not a relaxation and is not
+   counted as one — nothing gave way, the cap held, and what moved was the thesis
+   label — so it is named in `player_exposure.cap_reassignments` and
+   `.locks_dropped`. A thesis row can therefore legitimately carry a different
+   captain than its name implies, and the reassignment list is where that is said.
+
+Also here: `_record_lock_relaxation` returns 0 when the substitute captain is the
+one that was requested, so the floor rung can no longer record a player replacing
+himself, and the counter and the detail list stay equal in length.
+`player_cap_structural_floor` reports `roster_size / pool_size`, the lowest cap
+that can fill the entries by counting alone — reported, never auto-applied,
+because widening an exposure cap is a strategy change and CLAUDE.md makes it Ben's.
+
+**Delivered under the corrected caps:** captain max 21.1%, player max 47.4%, zero
+relaxations on all three controls, 19 unique rosters, preflight exit 0.
+
+Pins and docs in the same commit: `tests/test_showdown.py` 56 -> 62 (the six
+include one test per leak, each with its teeth stated), `EXPECTED_SUITE_COUNTS`
+and the three documents that quote the total (CLAUDE.md, this skill's SKILL.md,
+the ledger Quick Card) 1199 -> 1205. Three existing fixtures needed their caps
+disabled rather than their assertions weakened: `_one_captain_pool` is 12 players
+and 4 entries, so a 50% player cap lands exactly on its structural floor and
+forces the floor rung the test exists to watch NOT fire; and the two `_synth`
+ladder fixtures name one captain for every thesis, so the captain cap would
+reassign it away before the rung under test is reachable.
+
 ## 2026-08-18 — R152: the session-start gate can be run across several calls, and only a complete run prints the clean line
 
 DEV, claim `engine_2026-08-18`. New in `tools/audit.py`: a gate mode
