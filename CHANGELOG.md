@@ -25,6 +25,79 @@ performance claim.
 
 ---
 
+## 2026-08-19 — R155: a fresh clone can pass the session-start gate, and the container can start from GitHub instead of a tarball
+
+DEV, claim `engine_2026-08-19_skillreview`. Filed and closed in one session; the
+number is reserved in docs/backlog.md and the entry lives here.
+
+**What moved.** `tests.test_upload_integrity.PreflightFeedDefaultTests.test_the_feed_is_auto_resolved_from_the_slate_date`
+builds its feed under a repo root it controls and runs a COPY of
+`tools/preflight_upload.py` from that root, instead of reading
+`data/slates/2026-07-25/lineups_feed.json` off the disk that built that slate.
+The tool imports no engine and no third-party module, which is what makes a copy
+runnable, and that is a property the preflight contract already guarantees ("no
+engine import, no network").
+
+**Why.** `data/slates/*/` is gitignored runtime data, so the file the test's own
+docstring called "the repo carries" is in no checkout. Measured 2026-08-19 on a
+clone of `main` at 57775a5 in a cloud container: instead of the pinned clean
+line the gate printed `FAIL  test suite FAILED in tests.test_upload_integrity
+(ran 1217); do not build`, and that one test was the ONLY hard failure in the
+1217. The cost is not the red line, it is what the red line SAYS: the
+session-start gate told the session not to build, and the failure named a feed
+resolver rather than a missing fixture, so the obvious next move was to hunt a
+regression in code that was fine.
+
+Three facts worth keeping beside it.
+
+**The existing guard could not see this.**
+`test_core.TestDataDependenciesAreVendoredOrGuardedTests` runs git to check that
+a test reading a data path either vendors it or guards it. This dependency is
+named in the TOOL (`resolve_feed_for_slate` globs
+`REPO_ROOT/data/slates/<date>/`), not in the test, so no amount of reading the
+test file finds it. A data dependency reached through production code is a
+different shape and that guard does not cover it.
+
+**The suite's other untracked-fixture dependencies fail SOFTLY, and that is the
+difference this entry is really about.** Two `test_core` tests skip with
+`2026-08-16 salary file not staged`, the audit prints `skipped_in_place`, and
+CLAUDE.md already names that lost coverage rather than a pass. Same class of
+dependency, read correctly in one second. The asymmetry was the defect; the
+missing file was only its occasion.
+
+**The container can now clone.** `docs/cowork_sync_protocol.md` said a
+credentialled container could clone in principle, and that container runs
+therefore start from a tarball of the working tree. Measured today: staging
+`.env` as a file and sourcing it, the transport that section already mandates,
+clones `bleeski/mlb-dfs` in one call, and with this fix the clone runs
+`PASS  v2.26.0  26 modules  1217 tests  4 skipped` in about 40s against a
+pinned venv (numpy 2.2.6, pandas 2.3.3, scipy 1.15.3). The 4 remaining skips
+are 2 fixture (the 2026-08-16 salary above) and 2 environment (`no .env on this
+machine`, `no vendored .pylibs/scipy in this checkout`), and the last two are
+correct in a clone by definition. The tarball bridge is still the path for
+UNCOMMITTED work; it is no longer the path for a green suite.
+
+**Not done, and named rather than left implicit.** Those two fixture skips are
+the whole remainder of "a fresh clone cannot run the suite green", and closing
+them means vendoring a DK salary export under `tests/fixtures/slates/` the way
+R62 did for the paste suite. Left open deliberately: that is a second decision
+about what belongs in the repo, not a consequence of this one.
+
+**Also, separately measured, and filed rather than fixed (R149's tail).**
+`mlb-standings-pull-checklist` is still ABSENT from the cloud container's skill
+cache `/root/.claude/skills/synced/`, read 2026-08-19 23:38Z, an hour after the
+device session that installed it, so R149's "Also" bullet is closed for the
+desktop and open for a cloud session. And the account skill a cloud session
+actually loads is named `mlb-generate-lineups` while the repo directory is
+`generate-lineups`: `audit.skill_cache_drift` looks up `cache/<repo dir name>`,
+finds nothing, `continue`s, and returns `available: true, checked: 0,
+drifted: []`. A cache it could read, and it checked none of it. Filed as
+R149(d), not fixed here, because what the check should assert about a ROUTER
+whose description and body differ from the repo BY DESIGN is a design question
+and not a lookup bug. The `1073`-character figure in the
+`SKILL_DESCRIPTION_LIMIT` comment is corrected to 993 in this commit, with the
+correction dated: the shortening rode R142's commit 189de4f unremarked.
+
 ## 2026-08-19 — R154: the ownership prior reaches the optimizer, as two linear constraints and no objective coefficient
 
 DEV, claim `engine_2026-08-19`. Ben's statement of the objective, after reading

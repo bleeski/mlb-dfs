@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -986,11 +987,46 @@ class PreflightFeedDefaultTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("no lineups feed resolved", result.stdout)
 
+    def _repo_skeleton_with_feed(self, slate_date: str = "2026-07-25") -> Path:
+        """A throwaway repo root holding only what the resolver reads.
+
+        `resolve_feed_for_slate` globs `REPO_ROOT/data/slates/<date>/` and
+        REPO_ROOT is derived from the TOOL's own `__file__`, so the only way to
+        exercise the CLI auto-resolve against a feed we control is to run a COPY
+        of the tool from a root we built. The tool imports no engine and no
+        third-party module, so a copy runs standalone.
+
+        This replaced reading the real `data/slates/2026-07-25/lineups_feed.json`
+        off Ben's disk. `data/slates/*/` is gitignored runtime data, so that file
+        is in no checkout: the test passed on the machine that built the slate
+        and FAILED RED in every fresh clone, where the session-start gate then
+        printed `test suite FAILED in tests.test_upload_integrity` and told the
+        session not to build. Measured 2026-08-19 on a clone from GitHub -- it
+        was the ONLY hard failure in the 1217. The nearby guard
+        (`test_core.TestDataDependenciesAreVendoredOrGuardedTests`) could not
+        see it because the untracked path is named in the tool, not in the test.
+        """
+        root = self.dir / "repo"
+        (root / "tools").mkdir(parents=True, exist_ok=True)
+        (root / "data" / "reference").mkdir(parents=True, exist_ok=True)
+        slates = root / "data" / "slates" / slate_date
+        slates.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO / "tools" / "preflight_upload.py", root / "tools")
+        shutil.copy2(REPO / "data" / "reference" / "dk_contest_archetypes.csv",
+                     root / "data" / "reference")
+        shutil.copy2(self._feed(), slates / "lineups_feed.json")
+        return root
+
     def test_the_feed_is_auto_resolved_from_the_slate_date(self):
         """No --feed passed. The fixture's Game Info dates the slate 2026-07-25,
-        and the repo carries data/slates/2026-07-25/lineups_feed.json, so the
-        resolver finds it without being told and says which file it used."""
-        payload = json.loads(self._run("--json").stdout)
+        and a feed sits under data/slates/2026-07-25/ of the root the tool runs
+        from, so the resolver finds it unprompted and says which file it used."""
+        root = self._repo_skeleton_with_feed()
+        proc = subprocess.run(
+            [sys.executable, str(root / "tools" / "preflight_upload.py"),
+             "--entries", str(self.entries), "--salary", str(self.salary),
+             "--json"], capture_output=True, text=True)
+        payload = json.loads(proc.stdout)
         self.assertIn("resolved", payload["info"]["feed_autoresolve"])
         self.assertIn("2026-07-25", payload["info"]["feed_autoresolve"])
         self.assertTrue(payload["info"]["feed_file"].endswith(".json"))

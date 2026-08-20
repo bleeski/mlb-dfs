@@ -33,7 +33,13 @@ git different mtimes for identical bytes, so porcelain reports ` M` while
   GitHub moved ahead of me".
 - **The container reaches github.com.** `bleeski/mlb-dfs` is private, so a
   credential is required. Without one, the container cannot clone, and the
-  disk-to-container path is the tarball bridge below.
+  disk-to-container path is the tarball bridge below. **With one it clones, and
+  that is now measured rather than assumed (2026-08-19):** stage `.env` as a
+  file, source it, and
+  `git clone https://x-access-token:$GH_PAT@github.com/bleeski/mlb-dfs`
+  succeeds in one call. Scrub the remote afterwards
+  (`git remote set-url origin https://github.com/bleeski/mlb-dfs`) so the token
+  stops living in `.git/config`, and never let it reach a command that echoes.
 - **Neither can reach DraftKings.** Unchanged, and not negotiable. See the
   guardrails in CLAUDE.md.
 
@@ -123,13 +129,23 @@ opening the destination:
   with unlink, which fails on this mount, so a marker-authoritative rule would
   report a live claim as free. `check` and `sweep` now name any claim in that
   state and print the command that completes it.
-- **A fresh clone cannot run the suite green.** It needs untracked fixtures.
-  R62 vendored the paste suite's two salary files under
-  `tests/fixtures/slates/` on 2026-08-10, which removed eight of that suite's
-  nine `skipUnless` guards and its entry in `SUITE_PRECONDITIONS`; the ninth
-  is a Showdown guard already satisfied by a tracked fixture. The remaining
-  gap is other suites' fixtures. Until it closes, container runs start from a
-  tarball of the working tree, not from GitHub.
+- **A fresh clone runs the suite green as of 2026-08-19, with two named
+  skips.** It used to need untracked fixtures. R62 vendored the paste suite's
+  two salary files under `tests/fixtures/slates/` on 2026-08-10, which removed
+  eight of that suite's nine `skipUnless` guards and its entry in
+  `SUITE_PRECONDITIONS`; the ninth is a Showdown guard already satisfied by a
+  tracked fixture. R155 closed the last HARD failure: one upload-integrity test
+  read `data/slates/2026-07-25/lineups_feed.json`, gitignored runtime data that
+  is in no checkout, so a clone printed `FAIL  test suite FAILED in
+  tests.test_upload_integrity (ran 1217); do not build` while Ben's disk printed
+  PASS. Measured after the fix on a clone of `main` at 57775a5:
+  `PASS  v2.26.0  26 modules  1217 tests  4 skipped`, about 40s, pinned venv
+  (numpy 2.2.6, pandas 2.3.3, scipy 1.15.3). What is left is 2 fixture skips
+  (`2026-08-16 salary file not staged`, both in `test_core`) and 2 environment
+  skips (`no .env on this machine`, `no vendored .pylibs/scipy in this
+  checkout`) that are correct in a clone by definition. So container runs may
+  start from GitHub for anything COMMITTED; the tarball bridge below is for
+  UNCOMMITTED work, which no clone can see.
 - **GitHub's default branch is `main`, and `master` is deleted.** Verified
   2026-08-18 from Ben's Windows machine, and the command is the citation:
 

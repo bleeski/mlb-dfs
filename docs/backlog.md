@@ -39,6 +39,23 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-19 (skill review), DEV, claim `engine_2026-08-19_skillreview`: Ben
+asked whether the repo, the memories or the installed lineup skill needed
+updating. **R155 is FILED AND CLOSED in the same commit** (stub below, entry in
+CHANGELOG.md) and **R149 gains (d) while its "Also" half closes**. **R121
+remains the head of Tier 1**, untouched: this session spent no tier slot. Three
+things to read before the numbers. **First, the session-start gate was RED in a
+fresh clone and green on Ben's disk**, on one test that read a gitignored slate
+file, which is exactly why nobody saw it -- every session that ran the gate ran
+it where the file existed. **Second, the container-to-GitHub link works.**
+`GH_PAT` from `.env`, staged as a file and sourced, clones the private repo, and
+with R155 the clone runs the pinned 1217 in about 40s, which retires "container
+runs start from a tarball" for anything committed. **Third, the drift check is
+name-blind and not only path-blind**: the repo directory is `generate-lineups`,
+the skill a cloud session loads is `mlb-generate-lineups`, so a cache it CAN
+read still reports `checked: 0`. That is R149(d), and it is a design question
+about what a check should assert about a ROUTER, not a lookup bug.*
+
 *2026-08-18 (fourth session), DEV, claim `engine_2026-08-18`: **R148(a) is
 CLOSED and migrated**, **R152 is FILED AND CLOSED in the same commit** (number
 reserved in the stubs below, entry in CHANGELOG.md), and the R111(b) doc-truth
@@ -2451,6 +2468,15 @@ R12 are the context and process ideas; they slot in opportunistically.
   `drifted: [{skill: generate-lineups, reasons: ["body"]}]`.
 - **Also:** `mlb-standings-pull-checklist` is absent from that cache entirely,
   so its half of R142 cannot be verified from here at all.
+  **HALF CLOSED 2026-08-19.** A device session installed it as a POINTER and
+  verified the round trip in-session (sentinel survived, description identical,
+  the drift check moved from `checked: 1` to `checked: 2`, `drifted: []`), and
+  its repo description measures 993 characters, not the 1073 this entry read on
+  2026-08-17 -- the shortening rode R142's own commit, 189de4f, unremarked. It
+  is still ABSENT from the CLOUD container's cache
+  `/root/.claude/skills/synced/` (read 2026-08-19 23:38Z, an hour after that
+  install), so the bullet is closed for the desktop and open for a cloud
+  session.
 - **Fix:** (a) `skill_cache_dir` tries a short ordered list of known cache
   roots instead of one derived path, and REPORTS which it read, keeping the
   silent-not-clean rule where none match; (b) re-save the installed body as
@@ -2460,6 +2486,35 @@ R12 are the context and process ideas; they slot in opportunistically.
   can miss one and the pointer is the only shape that is safe by construction.
   If that holds, the audit check is a backstop and the pointer is the
   mechanism, which is the reverse of how R142 wrote it up.
+- **(b) IS DONE, 2026-08-19,** and the round trip is confirmed for the first
+  time. The device plugin cache
+  (`AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/<plugin>/<session>/skills`,
+  a THIRD root, not derivable from the repo because two session GUIDs sit in the
+  middle of it) holds the 59-line pointer, sentinel present, description
+  byte-identical. Two things came with it. That cache's mtime is NOT the save
+  time -- it read two days BEFORE the save that produced the file -- so it is
+  not a freshness signal: read the sentinel and the description, ignore the
+  timestamp. And (a) is untouched: `skill_cache_dir` still derives one path and
+  still reports `available: false` from a device session.
+- **(d) NEW 2026-08-19, and it is the sharper half of (a).** Even pointed at a
+  cache it CAN read, the check matches nothing. It looks up `cache/<repo dir
+  name>`; the repo directory is `generate-lineups`; the account skill a cloud
+  session actually loads is `mlb-generate-lineups`. Against
+  `/root/.claude/skills/synced/` it returns `available: true, checked: 0,
+  drifted: []`, which is indistinguishable from a clean check. Two decisions sit
+  under it and neither is a lookup fix. FIRST, the installed name has to come
+  from somewhere the repo controls; an `installed_as:` key in the repo skill's
+  own frontmatter is the cheap version. SECOND, and the real question: the
+  account skill is a ROUTER, so its description and body differ from the repo BY
+  DESIGN and comparing them reports permanent drift. Decide what the check
+  should ASSERT about a router -- sentinel present? the three carried hard rules
+  present? the path resolution still resolves? -- before making it able to see
+  one. Until then `checked` and `cache_dir` belong in the terse output, which is
+  (a)'s ask and the one piece of this that is purely reporting. Measured beside
+  it: the installed router is now 155 lines / 8.4KB, not the ~3.5KB R142
+  installed, and it has grown operational content of its own (a lock-clock
+  preflight, GitHub and PAT facts, a hand-built fallback procedure) that no repo
+  file governs and no check watches.
 
 ### R148(b). Handedness is reported per side while the data is per hitter (P2, XS) | new 2026-08-17, from the R142-R146 review; **(a) CLOSED 2026-08-18, migrated to CHANGELOG.md**
 
@@ -2985,6 +3040,21 @@ existed from F15). The `+0 targeted candidates` case is the same-game pair
 filter in `usable_pairs`, not the targeted builder. The documentation half
 shipped. Remainders refiled as **R101** (queue position 3) and **R102**
 (opportunistic; renumbered **R103** on 2026-08-10). Full reasoning in CHANGELOG.md.
+
+### R155. FILED AND CLOSED 2026-08-19 -- a fresh clone passes the gate, entry migrated
+
+Filed and landed in one session, so it never sat on the open board. The number
+is reserved. One test read a gitignored runtime file
+(`data/slates/2026-07-25/lineups_feed.json`) off the disk that built that slate,
+so it passed there and FAILED RED in every fresh clone: the only hard failure in
+the 1217, printing `do not build` at the session-start gate and naming a feed
+resolver rather than a missing fixture. It now builds its own repo skeleton and
+runs a copy of the tool from it. Consequence worth the number: a container can
+clone from GitHub with `GH_PAT` and run the pinned suite green in about 40s,
+where the sync protocol previously sent it to a tarball of the working tree.
+Remainder left open on purpose: two `test_core` tests still skip on an unstaged
+2026-08-16 salary file, and vendoring a DK export to close them is a separate
+decision. Full entry in CHANGELOG.md.
 
 ### R152. FILED AND CLOSED 2026-08-18 -- the split-run session gate, entry migrated
 

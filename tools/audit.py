@@ -1427,7 +1427,10 @@ SKILL_CACHE_ENV = "MLB_SKILL_CACHE_DIR"
 # CANNOT be installed as written and someone shortens it by hand at install
 # time. That is drift the moment it is created and it never converges: found
 # 2026-08-17 on mlb-standings-pull-checklist at 1073 characters, which is why
-# this is checked at the source instead of only reported downstream.
+# this is checked at the source instead of only reported downstream. That skill
+# has since been shortened to 993 (it rode R142's commit, 189de4f, unremarked),
+# so 1073 is the history and not a current reading -- re-measure before citing
+# it, which is this check's whole point.
 SKILL_DESCRIPTION_LIMIT = 1024
 
 
