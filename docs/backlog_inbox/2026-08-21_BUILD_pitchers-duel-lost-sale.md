@@ -26,3 +26,27 @@ that isn't the one delivered. Related to the general "relaxation visibility"
 gap already filed same day in
 `2026-08-21_BUILD_showdown-tool-gaps.md`, but this is a construction-behavior
 question rather than a reporting-tool gap.
+
+**Ben's follow-up (2026-08-21, same session): the real fix is upstream of the
+relaxation, in `showdown_theses.py`'s allocation table.** `pitchers_duel` got
+`allocation: 1` while six other templates (`favorite_win_big`,
+`favorite_win_big_no_sp`, `favorite_win_close`, and their `underdog_*`
+counterparts) each got `2`, specifically so a second variant can hedge which
+player captains. A "both starters rostered" game state is exactly the case
+that wants that hedge: one lineup with Sale captaining and Misiorowski at
+UTIL, one with Misiorowski captaining and Sale at UTIL, four hitters varied
+enough between them to clear `max_shared_players=4`. Allocation at 1 is why
+there was no sibling slot for the relaxation to fall back to, and it produced
+a single lineup missing a starter instead of two lineups each carrying both.
+
+This fits inside the existing 25% captain cap (`cap_count=4`), it does not
+need a relaxation: in the delivered file Sale captained 3 of 19, so he has one
+free captain slot; Misiorowski captained 4 of 19 (already at cap), so his half
+of the hedge would need to come from reassigning one of his other three
+captaincies to this thesis rather than adding a fifth. Both pitchers'
+UTIL-side player exposure (Sale 5/19, Misiorowski 7/19) has headroom under the
+50% cap either way. Recommend `pitchers_duel` move to `allocation: 2` (one
+slot funded by trimming a less load-bearing template, e.g. `ace_loses` or
+`both_explode`), each variant captained by a different starter with the
+existing variant-2 hitter-diversification logic already used elsewhere in the
+ladder.
