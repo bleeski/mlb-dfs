@@ -1,3 +1,12 @@
+**CONSUMED by DEV, 2026-08-21, claim `engine_2026-08-21`: fixed as R156, full
+entry in CHANGELOG.md.** This mount cannot unlink a tracked file (same
+constraint as the `.git/index.lock` gotcha, R109), so the fragment stays on
+disk rather than being removed; treat this note as the merge and ignore the
+body below as open work. Ben or a session with unlink access may delete this
+file outright.
+
+---
+
 # "Pitchers duel" thesis delivered without one of its two named starters
 
 Slate `slate_2026-08-21_atlmil_sd` (1610_1g_sd), entry 5225725107 / contest

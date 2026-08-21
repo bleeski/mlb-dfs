@@ -25,6 +25,86 @@ performance claim.
 
 ---
 
+## 2026-08-21 — R156: "pitchers duel" now always rosters both starters, and gets a real hedge
+
+DEV, claim `engine_2026-08-21`. Ben, same day, after a live ATL@MIL Showdown
+delivery: "the game is over so no rebuild needed, but let's change whatever we
+need to for the future since pitchers duel categorically means both pitchers
+play well and thus should be rostered."
+
+**What happened.** The 2026-08-21 ATL@MIL Showdown build's `pitchers_duel`
+thesis ("Pitchers duel - both starters rostered") delivered CPT Jacob
+Misiorowski plus four bats, no Chris Sale, verified by ID against
+`assignment_log` (Sale's CPT id 43897908 and UTIL id 43897818 both absent).
+The lineup no longer matched its own name.
+
+**Root cause, two parts.** `build_thesis_ladder` builds a thesis's `locks`
+list by filtering out whichever player is `cpt` (`!= cpt`), on the reasoning
+that a captain does not also need to be a lock. `duel()` names TWO required
+players and assigns only one to captain, so that filter stripped the OTHER
+starter's only protection the moment he was not captain. Sale's build carried
+exactly one `pitchers_duel` slot (`construction.allocation.pitchers_duel: 1`),
+Sale was that slot's chosen captain, the overlap bound made no feasible
+lineup exist with him captaining, `solve_ladder`'s relaxation ladder
+substituted Misiorowski for the captain slot, and with Sale never in `locks`
+to begin with, nothing brought him back as UTIL either.
+
+**What shipped.** `duel()` now returns a `hard_locks` key carrying both
+starters, never filtered by who captains; `build_thesis_ladder` merges
+`hard_locks` into `locks` unconditionally, after the `!= cpt` filter runs on
+everything else. `cpt_ladder` is restricted to the two starters (it previously
+fell through to each side's bottom-band bats), so a relaxed captain slot can
+only ever reassign between the two arms, never wander to a hitter under a
+thesis named for the arms. The original design also locked the top band's
+best hitter per side on top of both arms; measured infeasible on its own
+against this slate's real prices (Sale CPT $17,100 + Misiorowski UTIL $12,600
++ one top-band bat per side runs $47,500-48,100 of the $50,000 cap before the
+remaining two roster spots), so those hitter locks are gone. The four non-arm
+spots are now a free salary/points choice, bounded only by the existing
+roster contract's `min_players_per_team=1` (trivially satisfied, since the
+two arms are already on different teams).
+
+**Weight, separately.** `pitchers_duel`'s share of the neutral bucket moved
+0.30 -> 0.45. Ben's read: a 25% captain cap leaves room for a second slot that
+hedges which arm captains, the same hedge six directional templates already
+get through their own variant-2 logic, and one slot is why there was no
+sibling lineup for the relaxation to fall back to.
+
+**Verification.** `tests/test_showdown.py` gains four tests in
+`ShowdownThesisLadderTests`: both starters are unconditional locks on every
+`pitchers_duel` thesis a ladder produces, and stay in the solved roster end to
+end; the captain is always one of the two arms, never a bat, once enough
+entries force a second slot; a representative fixture case (n=19, moneyline
+MIN -150/CHC +130) reaches allocation >= 2; and a sweep across
+n=3,8,13,19,27,35 on that fixture never returns an infeasible thesis. Broader,
+hand-run sweep (not committed as a test, too slow to gate on): n=3-40 across
+six moneyline scenarios on the tracked fixture and four on the real
+2026-08-21 ATL@MIL data, 380 apportion+solve checks total, 0 infeasible.
+`tests.test_showdown` moves 62 -> 66 (`tools/audit.py`'s
+`EXPECTED_SUITE_COUNTS`, pin corrected same commit), full suite green at
+1221. `CLAUDE.md`, `skills/generate-lineups/SKILL.md`, and the ledger's Quick
+Card pin are corrected to match (ledger under its own claim, pin line only,
+per standing practice).
+
+**Not a universal guarantee, stated plainly.** Reaching allocation=2 for
+`pitchers_duel` depends on how its share lands against the other ten
+templates' shares under largest-remainder apportionment, which depends on the
+moneyline split. On the n=19 fixture case above it hit 2 in 3 of 6 tested
+moneylines; on the real ATL@MIL data, 2 of 4. What is unconditional now is
+narrower and load-bearing: whichever `pitchers_duel` slots DO get built always
+carry both starters, regardless of which one ends up captaining.
+
+**Left alone, deliberately.** The same `locks`/`cpt_ladder` overlap pattern
+that caused this exists in `shootout()`, `bottom_order()`, `ace_loses()`, and
+`both_explode()` -- any thesis whose `locks` names a player who can also be
+assigned `cpt` has the same latent failure mode once a relaxation fires.
+Ben's instruction was scoped to `pitchers_duel`; the other four are a finding
+for a later session, not fixed here.
+
+Filed and closed in this session. Not queued through `docs/backlog.md`: no
+open Tier entry existed for it, matching R153/R154's precedent for a
+live-build fix Ben authorized and DEV shipped the same day.
+
 ## 2026-08-19 — R155: a fresh clone can pass the session-start gate, and the container can start from GitHub instead of a tarball
 
 DEV, claim `engine_2026-08-19_skillreview`. Filed and closed in one session; the

@@ -262,7 +262,21 @@ EXPECTED_SUITE_COUNTS = {
     # a thesis's own cpt and locks, so a named player reached 57.9% under a 50%
     # cap while every relaxation counter read clean. A cap enforced somewhere
     # other than where the roster spots are spent is not a cap.
-    "tests.test_showdown": 62,
+    # R156, 2026-08-21: 62 -> 66, the four that pin pitchers_duel always
+    # carrying both starters. The live ATL@MIL delivery shipped this thesis
+    # with only Misiorowski, no Sale: the overlap bound made Sale infeasible as
+    # captain, the captain-lock relaxation substituted Misiorowski, and nothing
+    # else required Sale, because build_thesis_ladder's `!= cpt` filter had
+    # stripped him out of `locks` precisely because he WAS the assigned
+    # captain. Two tests pin the fix (both starters are unconditional
+    # `hard_locks`, merged into `locks` regardless of who captains; the
+    # captain is always one of the two arms, never a bat, since `cpt_ladder`
+    # is now restricted to them) and two pin what the fix could have broken
+    # (a solved lineup always contains both arms end to end, and the removed
+    # top-band hitter locks -- infeasible on their own, measured at
+    # $47,500-48,100 of the $50,000 cap before the last two roster spots --
+    # never returns as an infeasible thesis across a range of entry counts).
+    "tests.test_showdown": 66,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

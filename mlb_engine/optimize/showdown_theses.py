@@ -16,6 +16,13 @@ to allocate entries across templates.
 
 VERSION history
   0.1  2026-07-25  initial ladder, 12 templates, captain cap + overlap enforced
+  0.2  undated     gap in this history -- the module version moved without a
+                    line here; predates R156 and is not reconstructed
+  0.3  2026-08-21  R156: duel()'s locks are now unconditional on both starters
+                   via a new hard_locks field (build_thesis_ladder merges it
+                   past the `!= cpt` filter), cpt_ladder restricted to the two
+                   starters, the top-band hitter locks removed after being
+                   measured infeasible against real prices, weight 0.30 -> 0.45
 """
 from __future__ import annotations
 
@@ -35,7 +42,7 @@ from mlb_engine.optimize.showdown import (
     player_cap_structural_floor,
 )
 
-VERSION = "0.2"
+VERSION = "0.3"
 
 # PA-share prior by batting-order slot. Deterministic, not fitted to any slate.
 ORDER_FACTOR = {1: 1.08, 2: 1.06, 3: 1.05, 4: 1.03, 5: 1.00,
@@ -277,15 +284,43 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
             "name": "Pitchers duel - both starters rostered",
             "why": ("Neither offense gets going. Both arms on the card carry the "
                     "score, and the four bats are cheap because runs are scarce."),
-            "cpt_ladder": (both_sp
-                           + shape["bands"][fav]["bottom"]
-                           + shape["bands"][dog]["bottom"]),
-            # Both arms, plus one bat locked from each side. Without the bat
-            # locks a uniform suppression leaves the solver free to fill all
-            # four remaining slots from whichever team is cheaper, and a 1-5
-            # split is not what "neither offense gets going" describes.
-            "locks": both_sp + shape["bands"][fav]["top"][:1]
-                             + shape["bands"][dog]["top"][:1],
+            # Captain comes from the two starters ONLY, never a bottom-order bat.
+            # "Pitchers duel" is about the two arms; a hitter captaining it is a
+            # different story wearing this thesis's name. When both starters are
+            # already at the captain cap the walk below forces one past it
+            # (counted honestly in cap_relaxed) rather than reaching for a bat.
+            "cpt_ladder": list(both_sp),
+            # R156. No hitter lock here on purpose, and that is a change from the
+            # original version, which locked one top-band bat from each side "so
+            # a uniform suppression doesn't leave the solver free to fill all four
+            # remaining slots from whichever team is cheaper." That reasoning
+            # predates making both arms hard-required (below): an ace at CPT plus
+            # the other arm at UTIL already runs 28,500-31,500 of the 50,000 cap,
+            # and adding a top-band bat from EACH side on top of that was measured
+            # infeasible on the 2026-08-21 ATL@MIL slate -- Sale CPT + Misiorowski
+            # UTIL + one top-band hitter each ran to 47,500-48,100, leaving under
+            # $2,500 for two more roster spots against a $3,000 pool floor,
+            # regardless of which arm captained. The two-teams rule
+            # (`min_players_per_team=1`) is already satisfied by the two arms
+            # alone, since they come from different teams, so nothing here needs
+            # to force it a second time; which four hitters actually join them is
+            # a salary/points question for the solver, not a locked assumption,
+            # and the suppression multiplier below still prices every hitter down
+            # uniformly so none of the four is a full-price bat.
+            "locks": [],
+            # R156, Ben 2026-08-21: "pitchers duel categorically means both
+            # pitchers play well and thus should be rostered." Both arms are
+            # HARD-required regardless of who ends up captaining -- unlike an
+            # ordinary "locks" entry, this is never filtered by `cpt` in
+            # build_thesis_ladder, so it survives every rung of solve_ladder's
+            # relaxation ladder. Without it, the starter who is NOT the
+            # initially-assigned captain had no protection at all (the generic
+            # ladder code filters him out of "locks" only because he WAS picked
+            # as cpt), so once the overlap bound forced a captain substitution he
+            # was free to be dropped from the roster entirely rather than merely
+            # losing the armband -- caught from a live ATL@MIL delivery where
+            # this thesis shipped with only one of the two starters.
+            "hard_locks": list(both_sp),
             "mult": {k: SUPPRESS_DUEL
                      for t in shape["teams"] for k in _hitters(shape, t)},
         }
@@ -344,7 +379,14 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
             "mult": {},
         }
 
-    add("pitchers_duel", None, 0.30, duel)
+    # R156, 2026-08-21: 0.30 -> 0.45. A single slot cannot hedge which arm ends
+    # up captaining, and six directional templates already get a second
+    # variant (favorite/underdog x win_big/win_big_no_sp/win_close) for exactly
+    # that hedge. This is a bias in the largest-remainder apportionment, not a
+    # guarantee: whether this template clears a second slot at a given n still
+    # depends on how its share lands against the other ten under that n's
+    # moneyline split.
+    add("pitchers_duel", None, 0.45, duel)
     add("both_explode", None, 0.30, both_explode)
     add("ace_loses", None, 0.22, ace_loses)
     # Weighted well above the other neutral templates because it is only ever
@@ -437,12 +479,21 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             cpt_name = str(df.loc[df["Player_Key"] == cpt, "Name"].iloc[0]) \
                 if cpt is not None and (df["Player_Key"] == cpt).any() else "no captain"
             name = f"{name} (variant {allocation[spec['id']]}, {cpt_name} captain)"
+        # R156. `locks` strips the captain because a captain does not need
+        # separate protection -- true as long as HE stays captain. `hard_locks`
+        # is the escape hatch for a player who must be rostered no matter what
+        # happens to the captain assignment later (solve_ladder's relaxation
+        # ladder can drop or substitute cpt on its own). It is never filtered by
+        # `cpt`, so it survives every rung. Only `duel()` sets it today.
+        raw_locks = [k for k in (built.get("locks") or []) if k and k != cpt]
+        hard_locks = [k for k in (built.get("hard_locks") or []) if k]
+        locks = raw_locks + [k for k in hard_locks if k not in raw_locks]
         thesis = {
             "template": spec["id"],
             "name": name,
             "why": built["why"],
             "cpt": cpt,
-            "locks": [k for k in (built.get("locks") or []) if k and k != cpt],
+            "locks": locks,
             "excludes": [k for k in (built.get("excludes") or []) if k and k != cpt],
             "mult": {k: v for k, v in (built.get("mult") or {}).items()},
         }

@@ -740,6 +740,94 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         self.assertEqual(st.describe_slate(no_sp)["bullpen_teams"], ["CHC"])
         self.assertIn("bullpen_game", st.build_thesis_ladder(no_sp, 18)["allocation"])
 
+    # ---- R156 ------------------------------------------------------------ #
+    def test_pitchers_duel_always_carries_both_starters_however_it_solves(self):
+        """R156, Ben 2026-08-21: "pitchers duel categorically means both
+        pitchers play well and thus should be rostered." A live ATL@MIL
+        delivery shipped this thesis with only Misiorowski, no Sale at all: the
+        overlap bound made Sale infeasible as captain, solve_ladder's
+        relaxation ladder dropped the captain lock, and nothing else required
+        Sale's presence, because build_thesis_ladder's generic ``locks``
+        filter had stripped him out precisely because he WAS the assigned
+        captain.
+
+        Teeth: reverting ``hard_locks`` (either dropping it from ``duel()`` or
+        the merge in ``build_thesis_ladder``) fails the first loop immediately,
+        since the pre-fix ``locks`` list carries only whichever starter is NOT
+        ``cpt``.
+        """
+        ladder = st.build_thesis_ladder(self.df, 19, moneyline={"MIN": -150, "CHC": 130})
+        both_sp = {v for v in ladder["shape"]["starters"].values() if v}
+        self.assertEqual(len(both_sp), 2)
+        duel_theses = [t for t in ladder["theses"] if t["template"] == "pitchers_duel"]
+        self.assertGreaterEqual(len(duel_theses), 1)
+        for t in duel_theses:
+            self.assertTrue(both_sp.issubset(set(t["locks"])),
+                            f"{t['name']}: both starters must be unconditional "
+                            f"locks, not just whichever one is not currently cpt")
+
+        lineups = st.solve_ladder(self.df, ladder["theses"], time_limit=5)
+        by_name = dict(zip((t["name"] for t in ladder["theses"]), lineups))
+        for t in duel_theses:
+            lu = by_name[t["name"]]
+            self.assertIsNotNone(lu, f"{t['name']} must solve: both arms fit "
+                                     f"comfortably under the cap once the thesis "
+                                     f"no longer also locks a top-band bat per side")
+            self.assertTrue(both_sp.issubset(set(lu["player_keys"])),
+                            f"{t['name']} shipped without both starters: "
+                            f"{lu['player_keys']}")
+
+    def test_pitchers_duel_captain_is_always_one_of_the_two_starters(self):
+        """R156. Captaining a bottom-order bat under "pitchers duel" is a
+        different story wearing this thesis's name. ``cpt_ladder`` is
+        restricted to the two starters, so the apportionment walk either picks
+        one of them or, once both are at the captain cap, forces one past it
+        (counted in ``captain_cap_relaxed``) rather than reaching for a bat.
+        """
+        ladder = st.build_thesis_ladder(self.df, 25, moneyline={"MIN": -150, "CHC": 130})
+        both_sp = {v for v in ladder["shape"]["starters"].values() if v}
+        duel_theses = [t for t in ladder["theses"] if t["template"] == "pitchers_duel"]
+        self.assertGreaterEqual(len(duel_theses), 2,
+                                "n=25 should need more than one pitchers_duel slot "
+                                "to exercise the cap-relaxed path")
+        for t in duel_theses:
+            self.assertIn(t["cpt"], both_sp, f"{t['name']} captained a non-starter")
+
+    def test_pitchers_duel_gets_a_second_slot_when_entries_allow(self):
+        """R156, Ben 2026-08-21: "even with the captains capped at 25% one of
+        the game thesis should be pitchers duel, which would mean 2 lineups
+        with both pitchers, one where each is captain." A single slot cannot
+        hedge which arm ends up producing. Weight bumped 0.30 -> 0.45 so a
+        slate with room schedules a second look at this game state rather than
+        spending it all on one variant.
+
+        Not a promise that every entry count and win share lands on exactly 2
+        -- the neutral bucket shares one largest-remainder apportionment with
+        the ten directional templates, so the exact count is data-dependent --
+        but this fixture at this entry count is the reproduction, and it must
+        not regress to 1.
+        """
+        ladder = st.build_thesis_ladder(self.df, 19, moneyline={"MIN": -150, "CHC": 130})
+        self.assertGreaterEqual(ladder["allocation"].get("pitchers_duel", 0), 2)
+
+    def test_pitchers_duel_never_goes_infeasible_across_entry_counts(self):
+        """R156. The original design locked both arms AND a top-band bat from
+        each side. An ace at CPT plus the other arm at UTIL already runs
+        28,500-31,500 of the 50,000 cap; adding a top-band bat per side on top
+        of that was measured infeasible on the 2026-08-21 ATL@MIL slate
+        regardless of which arm captained, leaving under $2,500 for two more
+        roster spots against a $3,000 pool floor. The hitter locks are gone
+        now; both arms stay hard-required and the other four spots are a free
+        salary/points choice, which must always fit.
+        """
+        for n in (3, 8, 13, 19, 27, 35):
+            ladder = st.build_thesis_ladder(self.df, n, moneyline={"MIN": -150, "CHC": 130})
+            diag = {}
+            st.solve_ladder(self.df, ladder["theses"], time_limit=5, diagnostics=diag)
+            self.assertEqual(diag["infeasible"], 0,
+                             f"n={n}: {diag['infeasible']} pitchers_duel-era thesis "
+                             f"(or another) could not solve at all")
+
 
 # --------------------------------------------------------------------------
 # R29(5): the odds fetch reported "no moneyline matched" on a priced game
