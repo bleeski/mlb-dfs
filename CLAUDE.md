@@ -75,6 +75,28 @@ What you may do unattended, because the engine has already classified it:
   the evidence it contradicts, and is a different record from `assumed_gates` --
   one says nothing checked, the other says the check said no.
 - Choose postures, stack plans, and where to sit on the frontier below.
+- **Loosen `max_pitcher_exposure_pct` / `max_player_exposure_pct` /
+  `max_primary_stack_exposure_pct` to rescue a proven-infeasible joint MILP
+  (R157, Ben 2026-08-22).** Conditions, both required: both
+  `STRUCTURAL_FEASIBILITY_CHECKS` remedies are already applied at their named
+  values, and the engine's own infeasibility error names no single control as
+  binding (`"no single control is arithmetically binding... the interaction of
+  the active controls is"`) -- i.e. the remaining bind is the exposure caps'
+  interaction, not something the engine can name a floor for on its own.
+  Confirm with all three fully open (1.0) first as a sanity check that the
+  bank can certify at all, then set a delivered-file target looser than the
+  posture defaults but short of 1.0 -- re-derive it from that slate's
+  structural floors (`player_exposure_floor` etc. in the feasibility report),
+  never hardcode a number forward. 0.55 was that target on 1335_3g (9 entries,
+  6 pitchers, 3 games; floors were all 3-of-9); a bigger or thinner slate
+  floors differently. Never leave the delivered file at 1.0. Record the
+  before/after values and the triggering diagnostic in the brief, same
+  discipline as any other override. Origin: asked to arbitrate this exact
+  infeasibility on 1335_3g via AskUserQuestion, Ben answered, then delegated
+  the class of decision rather than answer it per slate -- `tools/autobuild.py`
+  does not implement this yet (its docstring still lists exposure caps under
+  "WHAT IT WILL NOT DO, EVER"); until it does, this is manual
+  `--controls-override` reasoning, not the supervisor's own loop.
 
 What stays hard, and is not reopened by this section:
 - The money-and-entry wall and the manual-DK rule.
@@ -82,8 +104,11 @@ What stays hard, and is not reopened by this section:
   probability claim, and the proxies below are proxies.
 - The preflight before upload, and blank reserved rows.
 - Any reduction of the legal player pool, for any reason.
-- An exposure cap. It has no engine-named floor, so raising one concentrates
-  the entered set: that is a strategy change and it is Ben's.
+- An exposure cap changed as a STRATEGY preference -- more or less
+  concentration for its own sake, independent of whether the build certifies.
+  That still has no engine-named floor and is still Ben's. (Loosening one to
+  rescue a proven-infeasible joint MILP is the delegated case above, R157,
+  and is a feasibility rescue, not a strategy change.)
 - A pool blocker you cannot classify, a name-crosswalk failure (under 5 of 9
   hitters matched) above all. Stop and ask. R133 made that enforcement rather
   than instruction: `--ignore-pool-blockers` REFUSES a crosswalk failure by name

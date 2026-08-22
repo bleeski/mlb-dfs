@@ -25,6 +25,43 @@ performance claim.
 
 ---
 
+## 2026-08-22 — R157: exposure-cap loosening for feasibility rescue is delegated
+
+DEV, claim `engine_claude-autonomy_2026-08-22`. Ben, same day, after a live
+1335_3g Classic build: "I dont want to have to intervene and want you to make
+these determinations and relax the constraints yourself."
+
+**What happened.** The 1335_3g build (9 entries across 5 `wta_satellite` + 1
+`single_entry` + 1 `mme` contest, 3 games, 6 pitchers) proved infeasible on
+the joint MILP after both `STRUCTURAL_FEASIBILITY_CHECKS` remedies were
+applied at their named values (`max_sp_pair_repetition` 1->2,
+`max_shared_players` 6->7). The remaining error named no single control as
+binding, only the interaction of `max_pitcher_exposure_pct` /
+`max_player_exposure_pct` / `max_primary_stack_exposure_pct` (0.43/0.35/0.35,
+the minimum of the three postures present in one joint entry set). CLAUDE.md's
+Autonomy section named exposure caps as Ben's call and did not reopen it, so
+the build session asked via `AskUserQuestion` rather than decide. Ben answered
+(loosen toward ~0.55 after confirming feasibility fully open at 1.0), then
+asked what would let a future session make that call itself without asking.
+
+**What shipped.** CLAUDE.md's Autonomy section now delegates exposure-cap
+loosening specifically for this rescue case -- both structural remedies
+already at their named values, and the engine names the interaction rather
+than a single control -- while leaving strategy-motivated cap changes
+(concentration for its own sake, independent of certification) as Ben's.
+
+**What did not ship.** `tools/autobuild.py` does not implement this: its
+docstring still lists exposure caps under "WHAT IT WILL NOT DO, EVER", so the
+supervisor's own retry loop still stops there. Filed as
+`docs/backlog_inbox/2026-08-22_DEV_autobuild-exposure-cap-rescue.md` rather
+than coded here, because teaching the supervisor to (a) detect the
+"interaction, not a single control" error shape and (b) re-derive a delivered
+target from that slate's own structural floors rather than hardcoding 0.55
+forward is a real code change that wants its own tests, not a rushed edit
+made mid-answer to a different question.
+
+---
+
 ## 2026-08-21 — R156: "pitchers duel" now always rosters both starters, and gets a real hedge
 
 DEV, claim `engine_2026-08-21`. Ben, same day, after a live ATL@MIL Showdown
