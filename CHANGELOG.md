@@ -25,6 +25,156 @@ performance claim.
 
 ---
 
+## 2026-08-22 — Greenfield spec, SIXTH edition: reviewed at ac8ac05 on Ben's instruction, landed here after re-adjudication against a tree that moved 22 commits; R158–R189 filed, five riders, two note corrections, the queue resequenced (docs only)
+
+DEV, claim `engine` (bare mutex, taken at landing). Ben commissioned the sixth
+edition on 2026-08-17 ("assume nothing is correct... write the spec"), then
+redirected the deliverable mid-session: confirm completion, fold the findings
+into the backlog, and resequence the queue on impact against technical
+challenge. The review ran that day against HEAD `ac8ac05`; the device bridge
+dropped at delivery; and by the time the scheduled retry fired on 2026-08-22
+the tree had moved 22 commits (R152–R157 filed and closed, R117/R133/R136
+closed, pins 1120 -> 1221). So the landing is itself an adjudication: every
+finding re-verified against `ec832cf` before filing, the review's numbers
+remapped around the collision, and one finding dropped as overtaken.
+
+**Method.** Ed5's lesson applied first: the review pinned the right tree (the
+mount at ac8ac05, tarred to the cloud container per the replication recipe)
+and replicated the suite green BEFORE reading code (`PASS v2.26.0 26 modules
+1120 tests, 4 skipped` — the four environment gates). Seven parallel
+reviewers: optimizer/MILP math, pipeline/gates/allocator wiring,
+intake/projections, operator tools, tests/audit infrastructure, docs/context
+economics, industry research. Reproduce-before-filing enforced (scratch
+scripts in /tmp only; no repo file touched during review); the coordinator
+re-verified the twelve highest-severity cites before the first filing pass. A
+mid-session spend limit killed all seven reviewers at ~80%; all seven were
+resumed from their transcripts and delivered complete reports. At landing,
+every finding was re-checked against ec832cf: files untouched by the week's
+22 commits carry their review verification forward; files that moved were
+re-read at the new lines, and the three sharpest findings were RE-REPRO'D at
+this head — the scratch-inside-a-posted-nine silently discarding DK's order
+(R159a), the TBD-game-time front-door crash (R160), and the value-guard
+`enriched` manifest tier (R172).
+
+**The headline the board should keep:** every module KEEPS. Thirty-two
+verified defects, five riders, two note corrections — zero rebuild arguments.
+The rejected-program family did not return; Do-not-build and the four-clause
+sim gate are untouched. The benchmark brief's one adopted fact: the archive
+is the moat — ownership MAE by bucket, duplication-vs-ownership fits, and
+realized rake/payout tables are computable from `data/archive/` and published
+by no vendor, which independently validates Tier 2's ordering.
+
+**Filed, by workstream.** WS1: R158 (Showdown time-limit read as
+infeasibility — the F13 inversion Classic v3.20 removed). WS3: R159 (the R143
+no-fetch hardening batch: coverage reads raw rows while the merge reads the
+status-filtered map, so a scratch inside a posted nine silently falls to APPG
+with the fetch skipped and the probable dropped — repro'd at this head;
+dk_id-only probables invisible to F4; `Starting=SP` unused on un-posted
+sides; partial handedness loss unreported), R160 (synthesized game with an
+unparseable salary time crashes the front door — repro'd at this head), R161
+(slate_date UTC fallback + game_time_et hardcode, the R65 class), R162
+(rate-only FanGraphs file silently neutral; PLAUSIBLE, labeled). WS4: R163
+(unearned DU relaxation high-water; final validation at relaxed thresholds;
+51 solves where 11 suffice), R164 (bank job-grid waste: identical re-solves
+under pins, provably infeasible opponent-team jobs), R165 (excludes vs
+unnormalized Player_ID in the cap-denominator and viable-SP helpers — R55's
+class on two more sites), R166 (post-R61 controls without fixed-row
+denominators: R116's reuse default inert on scoped swaps, whole-file reuse
+breachable, five-stack floor on the wrong denominator, no export-side reuse
+grade), R167 (the third `_cap_count` copy clamps a >1 pct: checkpoint
+feasible, approve crashes after the bank spend, run left `building`), R168
+(build_slate's two exit-1 crash doors, re-scoped at landing: the tuple return
+now at main():3136 and the fresh-fetch leg at :3157 — the platoon-side fetch
+gained a guard during the week), R169 (supervisor hardening: TimeoutExpired
+kills the decision log; UTC-dated pre-brief refusals; two rails; zero tests),
+R170 (preserve-fallback tag; silent --odds fall-through), R171 (qa_portfolio
+can read clean when it is not). WS5: R172 (value guard counted as enrichment:
+every default build records `projection_tier: "enriched"` — repro'd at this
+head), R173 (lineup gate certifies on a truthy keyless pool_report — the R53
+class on the branch R53 did not touch), R174 (locked-team introduction ban
+never re-derived post-export), R175 (verify_export weaker than preflight on
+contest identity and delivered-manifest state — the R52 divergence class),
+R176 (gate-evidence honesty batch: vacuous salary gate with a false evidence
+string, unrecorded assertable gates, a constant-True certification key, two
+silent excepts on the delivery-evidence path), R177 (empty-vs-None confirmed
+set fails open), R178 (csv.Error exits 1; Showdown declared-arm ack). WS6:
+R179 (build_asserted bypasses the F19 hash-seed pin on exactly the builds
+autobuild routes through it), R180 (audit-hardening batch: changelog_debt
+blind to MLB_Classic.md/MANIFEST/requirements, the amnesty window, no
+suite-discovery reconciliation, four smalls — the pin-sum comment now reads
+`# 1000` against 1221), R181 (eval 5's standing red misattributed — the
+forbidden `/large_wta/` regex matches the checkpoint's canonical vocabulary;
+harness re-run 7 PASS / 1 FAIL to prove it), R182 (eval surface-guard crash
+window), R183 (CLAUDE.md regrowth measured 12.6KB -> 25.9KB -> 33.9KB in ten
+days; byte-budget warning proposed), R184 (queue narratives — partially
+APPLIED in this commit: notes older than the two newest sessions relocated
+verbatim to Board history), R185 (SKILL.md reorder; now 52.2KB), R186 (claims
+hygiene: `sweep --archive` via mv, since unlink never comes), R188 (the
+1.24MB tracked `skills/generate-lineups-workspace/` eval residue — Tier 4,
+the disk delete is Ben's grant), R189 (R117's verified remainder: the F4
+quality term dies silently on id-less probables — every plain-text paste
+slate, zero warnings — plus the two paste hand shapes R117's `_HAND_WITH_STATS`
+fix did not cover). WS7: R187 (ownership_pred buries an unreadable feed).
+
+**Dropped at landing, recorded rather than filed:** the review's DH leg-blind
+DK-merge finding (mechanism-read at ac8ac05, contents PLAUSIBLE) is OVERTAKEN
+— the merge now derives per-game times from the salary file
+(`_salary_game_times`) and leg-selects with a `doubleheader_legs_dropped`
+counter. Re-open only with a DH repro against the current head.
+
+**Riders and corrections in place.** R98(3) gains the direct-path
+characterization (the direct path never opens the BankCache: resume
+structurally unreachable, refusals carry no bank evidence, the budget floor
+fires by construction — observed live). R76 gains the re-price ((c) is
+action-causing — its workaround is the forbidden pool reduction) plus
+instances re-confirmed at ec832cf, including MLB_Classic §13's
+retired-checksum claim and the dead migration-handoff doc. R83 gains the
+golden-schema blind spot (the gate runs the pre-`Starting` schema and never
+exercises the front door). R122 gains the `all_healthy` degeneration (thesis
+prior entirely inert while prior_note claims the full chain;
+`showdown_theses` still reads no `Pool_Basis` after R156). R149's rider is
+REALIGNED with its own (d): the deployed router carries no sentinel — hidden
+today by the name-blindness, a standing false positive the day (d) is fixed.
+Two false board notes corrected: R66's "Closing (a) closes the eval"
+(disproven by harness run; the fix is R181) and R79's "(a)-(e) are untouched"
+((a) has two behavioral exit-3 pins; (c) closed via R54, magnitudes still
+unpinned). Riders NOT placed in-line, recorded in the archived edition for
+their owners: R87 (measured: 97% of multi-lineup wall time inside HiGHS at
+n=10 on a real 6-game fixture; the matrix-rebuild lever is ~3%; `mip_rel_gap`
+on bank solves is where the mass is — a measurement that deprioritizes it
+further), R80(a) (the scrub loses to percent-encoding, so the leak needs a
+URL-quotable key), R108 (a fourth token site landed with R143; the two
+probable-pickers disagree on multi-SP), R58(c) (duplicate-abbrev
+last-write-wins mechanism confirmed; cheap interim warn), R9b (re-priced by
+measurement: the audit pin churned EIGHT times in one day across three
+hand-kept docs; clause (b)'s generated ENGINE_STATE.md retires the churn),
+and the Tier 4 Quick Card split (item 1 measured at 12,664 bytes on ONE
+line, 2.3x the size the decision was priced at).
+
+**The queue.** Resequenced per Ben's instruction: the ed6-landing note in
+`docs/backlog.md` carries the ordered list — the verified P1
+truth-and-delivery batches (intake truth, lost-window, false-evidence, solver
+truth, money-boundary parity, determinism minutes, audit hardening, bank
+waste, the Showdown WS1 batch) run ahead of the pre-existing Tier 1 remainder
+(R121 onward); Tier 2 deliberately untouched (R118 head — and the week's own
+R154 strengthened that spine); Tier 3 gains R166; Tier 4 gains R188; Tier 5
+absorbs the P2 tail. R184's discipline applied at filing: queue amendment
+notes older than the two newest sessions (40KB+) moved VERBATIM to Board
+history under a dated heading, per the 2026-08-10 relocation precedent. The
+unmerged 08-19..08-22 BUILD/DEV fragments in `docs/backlog_inbox/` are left
+for the next fragment-merge session, per the standing rule.
+
+**Evidence and files.** The full edition — all findings with repro scripts
+and outputs, per-module verdicts, the context-economics bill, the sourced
+industry benchmark, and the landing addendum with the re-verification census
+(review: 14 items with a VERIFIED-repro leg, 16 VERIFIED-read, 2 PLAUSIBLE;
+landing: 3 re-repro'd at ec832cf, the rest re-read, 1 dropped) — is archived
+at `docs/2026-08-22_critique_greenfield_spec_ed6.md`. Files in this commit:
+`docs/backlog.md` (queue note + resequence block, R158–R189, five riders, two
+note corrections, the R184 relocation),
+`docs/2026-08-22_critique_greenfield_spec_ed6.md` (new), this entry. No
+engine, tool, test, or skill surface moved; pins unchanged at 1221.
+
 ## 2026-08-22 — R157: exposure-cap loosening for feasibility rescue is delegated
 
 DEV, claim `engine_claude-autonomy_2026-08-22`. Ben, same day, after a live
