@@ -1184,6 +1184,41 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
     return f4, report
 
 
+def pool_brief_block(report: dict, pool: dict) -> dict:
+    """The brief's ``pool`` block, from the engine's own pool_report.
+
+    R190. This block carried four keys -- teams, platoon_source, warnings,
+    blockers -- and dropped two structured facts the pool_report has carried
+    since R117(b) and R143. Both are the same failure shape: the brief holds
+    the SYMPTOM and not the fact it joins to.
+
+    ``opposing_probables_incomplete`` is the one that cost something. On the
+    2026-08-18 1910_9g build the counts block read ``f4_platoon_applied: 0``
+    against ``f4_hitters_scored: 162``, with ``signal_applied: true``,
+    ``degraded: false`` and ``factors_inert: []`` -- every summary line green,
+    the whole platoon term dead, and the structured list naming which
+    probables arrived with no hand not present at any level of the brief. A
+    reader who noticed the 0 had nowhere to go.
+
+    ``dk_batting_order`` is R143's own record of whether the salary file
+    covered the slate end to end, which is what decides whether a fetch was
+    needed at all. Absent from the brief, so a session reading the brief saw
+    ``null`` and could not tell a covered slate from an uncovered one -- and
+    it is exactly on a fully covered slate, where DK ships no handedness, that
+    the platoon term is expected to be unavailable and the reader most needs
+    to see the coverage fact beside the zero.
+    """
+    return {
+        "teams": len(report.get("teams") or {}),
+        "platoon_source": pool.get("platoon_source"),
+        "warnings": report.get("warnings") or [],
+        "blockers": report.get("blockers") or [],
+        "opposing_probables_incomplete": (
+            report.get("opposing_probables_incomplete") or {}),
+        "dk_batting_order": report.get("dk_batting_order"),
+    }
+
+
 def summarize_enrichment(reference_status: dict, enrichment: dict,
                          f4_report: dict, degraded_reason,
                          f1_report: dict | None = None,
@@ -1991,12 +2026,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             "minutes_to_deadline": clock.get("minutes_to_deadline"),
             "salary_cross_check": (clock.get("salary_cross_check") or {}).get("agrees"),
         },
-        "pool": {
-            "teams": len(report.get("teams") or {}),
-            "platoon_source": pool.get("platoon_source"),
-            "warnings": report.get("warnings") or [],
-            "blockers": report.get("blockers") or [],
-        },
+        "pool": pool_brief_block(report, pool),
         "exposure": exposure,
         "verification": checks,
         "controls_override_applied": args.controls_override,
@@ -2019,7 +2049,22 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     back to a flat 1.00 and the affected teams are named in the brief, which is
     the honest outcome. Silently flattening it is not, because the prior_note
     still claims a platoon factor was applied.
+
+    R190. Both team keys are normalized through ``to_dk_abbrev``. They were not
+    until 2026-08-23, and the two sides of that lookup come from different
+    vocabularies: the MLB Stats API writes ``AZ``, DraftKings writes ``ARI``, so
+    on the 2026-08-19 1610_1g_sd (ARI @ BOS) build the feed carried BOTH
+    probable hands and the brief still reported ``platoon_unresolved_teams:
+    ["ARI"]`` with ``teams_with_hand: 1``. Every BOS hitter took a flat 1.00
+    against RHP Pfaadt instead of 0.94 same-handed or 1.04 opposite -- a ~10%
+    relative gap between the L and R bats on that side, collapsed silently. The
+    failure is one-sided by construction, which is why it reads half-clean: BOS
+    resolved, ARI did not, and only the unresolved list said so. ``AZ`` is one
+    of seven aliases in ``DK_ABBREV_REMAP``; the six FanGraphs spellings
+    (``WSN`` ``TBR`` ``CHW`` ``KCR`` ``SDP`` ``SFG``) reach this same boundary
+    from a pasted or FanGraphs-sourced feed.
     """
+    from mlb_engine.intake.live_data_adapters import to_dk_abbrev
     note: dict = {"source": None, "hitters_with_side": 0, "teams_with_hand": 0}
     feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
     feed = None
@@ -2046,8 +2091,8 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
             block = game.get(side) or {}
             # fetch_lineups writes team_abbrev; the other two are accepted so a
             # hand-rolled pre-fetch feed (the Cowork sandbox path) also works.
-            abbrev = (block.get("team_abbrev") or block.get("team")
-                      or block.get("abbrev"))
+            abbrev = to_dk_abbrev(block.get("team_abbrev") or block.get("team")
+                                  or block.get("abbrev"))
             for hitter in (block.get("lineup") or []):
                 if hitter.get("bat_side") and hitter.get("name"):
                     bat_side[str(hitter["name"])] = str(hitter["bat_side"])
@@ -2060,9 +2105,21 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     # LAD is graded against the NYM starter's hand.
     facing = {}
     for _, row in df.iterrows():
+        # DK's own column is not re-normalized, deliberately. `to_dk_abbrev`
+        # maps INTO DraftKings' vocabulary, so the salary file is already the
+        # target and the call would be a no-op on every real file. The
+        # symmetric version was written first and SURVIVED a mutation that
+        # removed it -- no fixture could tell the two apart, because none can
+        # honestly carry a non-DK code in a DK column. Shipping a line no test
+        # can justify is R77's class, so the fix stays one-sided, which is also
+        # the shape of the defect: only the FEED speaks another vocabulary.
         opp = str(row["Opponent"])
         if opp in hand:
             facing[opp] = hand[opp]
+    # Named, not silent: a DK team in this pool whose opposing hand never
+    # resolved is the one-sided collapse above, and it is cheaper to read here
+    # than to infer from `teams_with_hand: 1`.
+    note["teams_without_hand"] = sorted(t for t in teams if t not in hand)
     return bat_side, facing, note
 
 

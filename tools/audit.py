@@ -251,7 +251,18 @@ EXPECTED_SUITE_COUNTS = {
     # on the attach half: one column written and never Ownership_Tier, an
     # undecided contest shape refused rather than defaulted, and an existing
     # column left alone.
-    "tests.test_core": 821,
+    # R190(a), 2026-08-23: 821 -> 825, the four that pin the bundle's `/people`
+    # call filling BOTH halves of F4's platoon input. The schedule hydrate does
+    # not return `pitchHand`, so every probable left `fetch_lineups_feed` with
+    # `hand: None` -- 30 of 30 measured on 08-18 and again on 08-19 -- while
+    # `bat_side` sat populated on all 270 hitters, and the only place the dead
+    # term showed was `f4_platoon_applied: 0` beside `signal_applied: true`.
+    # Both probables resolving, the hitter half surviving in ONE request (a
+    # second call would mean a bolted-on fetch rather than a widened one), and
+    # a hand that still cannot resolve being NAMED in both directions -- no id
+    # to join on, and /people answering without pitchHand, which is the case a
+    # helpful fixture hides. Three hand-run mutations, all three caught.
+    "tests.test_core": 825,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -276,7 +287,32 @@ EXPECTED_SUITE_COUNTS = {
     # top-band hitter locks -- infeasible on their own, measured at
     # $47,500-48,100 of the $50,000 cap before the last two roster spots --
     # never returns as an infeasible thesis across a range of entry counts).
-    "tests.test_showdown": 66,
+    # R190(b)(c), 2026-08-23: 66 -> 72. Four are (b)'s, on the platoon lookup
+    # that had a DK code on one side and an MLB Stats API code on the other:
+    # `AZ` resolving against `ARI`, a FanGraphs alias resolving too, a team
+    # needing no remap unaffected (the regression guard), and a genuinely
+    # missing hand NAMED rather than folded into `teams_with_hand: 1`, which
+    # could not distinguish a code mismatch from a hand the feed never had.
+    # The symmetric version of the fix -- normalizing DK's own column as well
+    # -- SURVIVED its mutation and was dropped rather than shipped: no honest
+    # fixture can put a non-DK code in a DK column, and the defect is
+    # one-sided because only the feed speaks another vocabulary.
+    # R190(d), 2026-08-23: 72 -> 77, the five that pin the gate's call ceiling
+    # as the HOST's to state. `--gate-budget` was already tunable and did
+    # nothing on its own, because GATE_CALL_CEILING_S capped the child
+    # underneath it: --gate-budget 90 still killed the child at 39s, which
+    # reads exactly like a test that cannot finish, so a unit slower than the
+    # ceiling accumulated two "started" records, got marked `oversized`, and
+    # the gate became STRUCTURALLY unable to print its clean line. The device
+    # default is unchanged for a caller who says nothing; an explicit flag beats
+    # the environment; an unparseable env value falls back rather than raising,
+    # because a typo must not be how the gate stops working; and the returned
+    # ceiling is FLOORED above the budget, which is the defect as a property.
+    # Two are (c)'s, on the brief carrying the two structured pool_report facts
+    # it dropped (`opposing_probables_incomplete`, `dk_batting_order`) and
+    # still producing a block when a report carries neither, since a KeyError
+    # there would lose the brief on the refusal path that most needs one.
+    "tests.test_showdown": 77,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -347,7 +383,12 @@ EXPECTED_SUITE_COUNTS = {
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this
 # line's own rule warns about -- the dict is the source of truth either way.
-EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())  # 1000
+# R180(f), 2026-08-23: and it went stale AGAIN, reading 1000 against a dict
+# summing to 1221 -- the file's own staleness class, fourth instance, caught by
+# the ed6 review. The number is now gone rather than corrected: a comment that
+# restates a computed value has no failure mode except drifting, so there is
+# nothing left here to keep in step.
+EXPECTED_TEST_COUNT = sum(EXPECTED_SUITE_COUNTS.values())
 
 # What a suite needs on disk beyond a tracked-files-only checkout. Named so a
 # shortfall prints its remedy instead of a number: "stage this" is an action,
@@ -875,7 +916,47 @@ GATE_DEFAULT_BUDGET_S = 28.0
 # The whole call, parent included. A device_bash call dies at 45s and takes the
 # parent's own report with it, so the parent stops the child while it can still
 # print what landed.
+#
+# R190(d), 2026-08-23: 39.0 is the DEFAULT and no longer the only value.
+# `--gate-budget` was already tunable and it did nothing on its own, because
+# this ceiling capped the child underneath it -- raising the budget to 90 still
+# killed the child at 39s, which reads exactly like a test that cannot finish.
+# A unit needing more than ~39s therefore accumulated two "started" records,
+# got marked `oversized`, and the gate became STRUCTURALLY unable to print its
+# clean line: `DeterminismTests.test_solver_inputs_are_identical_across_hash_seeds`
+# measured 11.36s when R152 landed and 36.4s on 2026-08-23 in a container whose
+# own call cap is ~178s. That is R152's own lesson -- "the device VM is not a
+# constant and no fixed chunk plan survives it" -- arriving at the CALL CEILING
+# rather than the chunk plan, and a constant measured against one host is the
+# staleness class this file keeps rediscovering. So the ceiling is now the host's
+# to state: `--gate-ceiling`, or `MLB_GATE_CEILING_S`, floored at the budget plus
+# a margin so a raised budget can never again be silently capped underneath.
+# Nothing about the 45s device default changes; a caller that says nothing gets
+# exactly the old behaviour.
 GATE_CALL_CEILING_S = 39.0
+GATE_CEILING_ENV = "MLB_GATE_CEILING_S"
+
+
+def gate_call_ceiling(explicit: "float | None" = None,
+                      budget: float = GATE_DEFAULT_BUDGET_S) -> float:
+    """The wall-clock ceiling this host allows one --gate-run child.
+
+    Precedence: an explicit flag, then ``MLB_GATE_CEILING_S``, then the 39s
+    device default. The result is floored at ``budget + GATE_UNKNOWN_RESERVE_S``
+    so a raised ``--gate-budget`` cannot be capped by a lower ceiling without
+    the caller having asked for that, which is the defect R190(d) fixed.
+    """
+    value = explicit
+    if value is None:
+        raw = os.environ.get(GATE_CEILING_ENV, "").strip()
+        if raw:
+            try:
+                value = float(raw)
+            except ValueError:
+                value = None
+    if value is None:
+        value = GATE_CALL_CEILING_S
+    return max(float(value), float(budget) + GATE_UNKNOWN_RESERVE_S)
 # The room an UNRECORDED class must have before it may start. A count-based
 # guess is useless here -- DeterminismTests is 4 tests and 24.5s while
 # PortfolioFrontierTests is 27 tests and 0.11s -- so the first pass buys its
@@ -1213,7 +1294,8 @@ def _gate_child(root: Path, suite: str, deadline: float,
     return 0
 
 
-def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S) -> Dict[str, Any]:
+def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S,
+             ceiling: "float | None" = None) -> Dict[str, Any]:
     """One call's worth of the gate. Run it again until it says complete."""
     started_at = time.time()
     fingerprint = tree_fingerprint(root)
@@ -1257,7 +1339,11 @@ def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S) -> Dict[str, Any
     # stops STARTING units; the ceiling is when the parent gives up on the one
     # in flight. Sizing the kill off the budget instead would cut off exactly
     # the units that need a whole call to themselves.
-    ceiling = max(5.0, GATE_CALL_CEILING_S - (time.time() - started_at))
+    # R190(d): the ceiling is the HOST's to state, not a constant measured
+    # against one. `gate_call_ceiling` also floors it above the budget, so a
+    # raised --gate-budget can never again be silently capped underneath.
+    allowed = gate_call_ceiling(ceiling, budget=budget)
+    ceiling = max(5.0, allowed - (time.time() - started_at))
     timed_out = False
     child = None
     try:
@@ -1945,6 +2031,14 @@ def main() -> None:
                         help="seconds of testing one --gate-run may start "
                              f"(default {GATE_DEFAULT_BUDGET_S:.0f}; a Cowork "
                              "device_bash call dies at 45)")
+    parser.add_argument("--gate-ceiling", type=float, default=None,
+                        help="seconds of wall clock one --gate-run child may "
+                             f"use (default {GATE_CALL_CEILING_S:.0f}, the "
+                             "Cowork device_bash figure; also read from "
+                             f"{GATE_CEILING_ENV}). Raise it on a host with a "
+                             "longer call cap: a unit slower than the ceiling "
+                             "can never land, and the gate then cannot print "
+                             "its clean line at all")
     parser.add_argument("--gate-child", nargs=1, help=argparse.SUPPRESS)
     parser.add_argument("--gate-deadline", help=argparse.SUPPRESS)
     parser.add_argument("--gate-fingerprint", help=argparse.SUPPRESS)
@@ -1961,7 +2055,8 @@ def main() -> None:
         if not (args.gate_run or args.gate_report):
             raise SystemExit(0)
     if args.gate_run:
-        outcome = gate_run(root, budget=args.gate_budget)
+        outcome = gate_run(root, budget=args.gate_budget,
+                           ceiling=args.gate_ceiling)
         print(gate_run_line(outcome))
         raise SystemExit(0 if outcome["complete"] else 3)
     if args.gate_report:

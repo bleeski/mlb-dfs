@@ -25,6 +25,197 @@ performance claim.
 
 ---
 
+## 2026-08-23 — R190: F4's platoon hand was dead at three boundaries, and the fetch that killed it is the one the docs tell a session to copy. the inbox emptied (37 of 38 fragments consumed), R191–R211 filed, six riders
+
+DEV, claim `engine` (bare mutex). Ben's instruction: review and reprioritize the
+backlog, then implement the next thing. The ed6 landing had left twenty-two
+fragments in `docs/backlog_inbox/` explicitly unconsumed, naming the next
+fragment-merge session as their owner, so the review and the merge are the same
+pass. Session-start gate green before any edit: `PASS v2.26.0 26 modules 1221
+tests`, assembled over five `--gate-run` calls per R152. Gate 1221 -> 1236
+(`test_core` 821 -> 825, `test_showdown` 66 -> 77, both `grew`).
+
+**Why this was the next thing, and not what the queue said.** Slot 1 was "intake
+truth, one surface" — R159 + R160 + R189 + the R122 rider. Reading the fragments
+turned up the ROOT CAUSE sitting under two of those symptoms, filed three times
+by three BUILD sessions on three slates and never on the board. F4's platoon
+component compares a hitter's `bat_side` against the OPPOSING probable's hand,
+and `fetch_slate_bundle.fetch_lineups_feed` fetched only the first of the two:
+30 of 30 probables at `hand: None` on 2026-08-19, 30 of 30 again on 2026-08-18,
+against `bat_side` populated on 270 of 270 hitters. So the platoon half of F4 was
+inert for every hitter on every slate whose feed came from the bundle. It is XS,
+it is the cause of a symptom already at the head of the queue, and each of the
+three sessions had worked around it by hand — so it landed here rather than being
+filed. Slot 1 keeps its position minus the root cause; R189's remaining layers
+now run against a feed that carries hands.
+
+**(a) `tools/fetch_slate_bundle.py`: one `/people` call now fills both halves.**
+The schedule hydrate (`probablePitcher(note)`) does not return `pitchHand`, and
+`_backfill_bat_sides` only ever walked hitters, so a probable's `hand` was
+whatever the hydrate happened to carry, which is nothing. `_backfill_people`
+replaces it and takes both id sets: `/people` returns `batSide` and `pitchHand`
+in the same person object, so the union costs no extra request — pinned by a
+test, because a second call would mean the fix bolted on a fetch instead of
+widening one. **The expensive part of this defect was not the null field.** It
+was that SKILL.md names `fetch_lineups_feed` as the reference implementation a
+sandbox session must copy, and the reference was the one path that never did the
+backfill, so a session copying it CORRECTLY still shipped the dead term. A named
+probable still holding a null hand after the backfill is now a warning naming the
+side and the term it kills, in both directions: no id to join on, and `/people`
+answering without `pitchHand` — the second being the case a helpful fixture
+hides. Measured effect on the 08-19 slate the fragment reported: 0 → 53 of 54
+hitters, `factors_inert` empty.
+
+**(b) `build_slate.showdown_handedness`: the platoon lookup had two vocabularies
+and normalized neither.** It keyed the probable's hand by the lineups feed's raw
+`team_abbrev` and looked that up against DK's `Opponent`. The MLB Stats API
+writes `AZ`; DraftKings writes `ARI`; `DK_ABBREV_REMAP` exists for exactly this
+and was not called. On the 2026-08-19 1610_1g_sd (ARI @ BOS) build the feed
+carried BOTH probable hands and the brief still read `platoon_unresolved_teams:
+["ARI"]`, `teams_with_hand: 1` — every BOS hitter taking a flat 1.00 against RHP
+Pfaadt instead of 0.94 same-handed or 1.04 opposite, a ~10% relative gap between
+that side's L and R bats, collapsed silently. The failure is ONE-SIDED by
+construction, which is why it read half-clean: the side needing no remap resolved
+fine. `AZ` is one of seven aliases; the six FanGraphs spellings reach the same
+boundary from a pasted feed. `note["teams_without_hand"]` now names which DK team
+lost the term, because `teams_with_hand: 1` could not distinguish a code mismatch
+from a hand the feed never had.
+
+**One mutation survived, and it changed the fix rather than the test.** The first
+cut normalized DK's own column too, for symmetry. Removing that half passed every
+fixture — no honest fixture can put a non-DK code in a DK column, because
+`to_dk_abbrev` maps INTO DraftKings' vocabulary and the salary file is already
+the target. Rather than pad a test to justify the line, the line is gone: it is
+R77's class, and the one-sided fix is also the shape of the defect, since only
+the feed speaks another vocabulary. That reasoning is now a comment at the site
+so the next reader does not restore it. This is the sixth consecutive item where
+hand-run mutation found something the passing suite did not.
+
+**(c) The brief held the symptom and dropped the fact.** The Classic brief's
+`pool` block carried four keys — teams, platoon_source, warnings, blockers — and
+neither `opposing_probables_incomplete` (R117(b)) nor `dk_batting_order` (R143),
+both of which the engine's pool_report has carried for days. On the 08-18 1910_9g
+build the counts block read `f4_platoon_applied: 0` against `f4_hitters_scored:
+162`, with `signal_applied: true`, `degraded: false` and `factors_inert: []` —
+every summary line green, the whole term dead, and no structured fact in the
+brief to join the zero to. Extracted as `pool_brief_block(report, pool)` so the
+block is directly testable rather than pinned by a text assertion, including that
+a report carrying neither key still produces a block: a `KeyError` there would
+lose the brief on the refusal path that most needs one.
+
+**R180(f), free rider.** `EXPECTED_TEST_COUNT = sum(...)  # 1000` against a dict
+summing to 1221 — the file's own staleness class, fourth instance, caught by the
+ed6 review. The number is deleted rather than corrected: a comment restating a
+computed value has no failure mode except drifting, so there is nothing left to
+keep in step. The rest of R180 stays open.
+
+**Twenty-two fragments merged, and the board grew fourteen entries.** Filed:
+**R191** (the preflight's `--salary` auto-resolve grabbed a concurrent session's
+promoted run on two different Showdown slates the same day — exit 2, "0.0%
+embedded pool overlap", against delivered files that were clean; Showdown writes
+no `runs/` directory, so the newest-run search has nothing of its own to find),
+**R192** (the showdown `top exposure` line counts the ROLE not the PLAYER, drops
+the CPT column, hides the two most concentrated players, and contradicts R153 in
+the one place a pre-upload operator looks), **R193** (qa_portfolio accepts a
+brief by name and never matches it to `--entries`, so a stale brief from that
+day's failed attempts reported false gates on a certified delivery at T-13 — the
+opposite direction from R142's cost), **R194** (`ownership_pred.py` cannot read a
+Showdown salary file: the CPT/UTIL double rows make all 95 names "ambiguous" and
+defeat the 1-9 completeness check, so every Showdown prediction is unusable
+rather than weak evidence at grade time), **R195** (an explicit
+`--postures <id>=wta_satellite` reintroduces the pre-R1a `large_wta` mapping,
+because the literal string is not in `SATELLITE_TYPE_TOKENS` — the documented-safe
+move is the unsafe one for one family), **R196** (no Solo Shot archetype row, hit
+twice, and **not DEV's to fix**: `data/reference/` is ARCHIVE's write set),
+**R197** (`_low_owned_hitter_count` reads `Ownership_Tier == 'Low'` which no
+writer writes, so it is identically 0 while R154's constraint counts the real
+thing — the false-signal batch's class, arriving four days after that batch
+closed), **R198** (a mine costs 39s and 96% is avoidable; `_write_registry`
+rewrites 6.8MB per mine, making a tranche O(N × archive)), **R199**
+(`rebuild_registry.py` sources standings CSVs, so three archived contests can
+never enter the registry and re-running will never close it), **R200** (three
+archival mechanisms the docs mandate that have run zero, zero and once — one half
+has a Ben-side blocker and no code fix), **R201** (`MIN_AUTO_TEAM_COVERAGE` is a
+false negative on a 3-game slate, where the only reachable values are 0.667 and
+0.833, and it fires on the MANIFEST tier whose own docstring calls it
+authoritative — two contests including one with 142 entries lost their salary
+tables against a provably correct file), **R202** (`solver_probe.py` reads the
+staged slate, not the uploaded one), **R203** (teach `autobuild.py` R157's
+exposure-cap rescue; the 08-22 DEV fragment traced the design, the trigger's
+exact call site, and the 1910_9g near-miss the ordering must not repeat),
+**R204** ("grow the bank" is unbounded advice against a solve cost that is not:
+168 candidates refused in 33s, 413 in 37s, 573 did not finish inside a bounded
+call, and the refusal never changed because the binder was a control
+interaction).
+
+**Sixteen more fragments than `git status` could see, and five of them carried
+findings that were not on the board.** The inbox held 38; the ed6 note counted
+22, which is the number of UNTRACKED ones. The other 16 sat in the same directory
+already COMMITTED, because BUILD sessions have been committing their fragments
+since 08-19, so they never appeared as dirt and a session building its work list
+from `git status` could not see them at all — **the inbox is a DIRECTORY, list
+it, never infer it from a diff.** Eleven of the sixteen had been merged long ago
+and never deleted, which is the other half of the same confusion: a consumed
+fragment left in place is indistinguishable from an unconsumed one. 37 of 38 are
+consumed and deleted now; the one kept records a Ben decision rather than a
+finding. From the five that were live: **R205** (`parse_the_odds_api_totals` averages
+moneylines in AMERICAN-ODDS space, where -104 and +100 average to -2.0, a 98%
+favorite; everything below the parser then faithfully propagates a price no book
+posted, and the blast radius is INVERTED — the closer to a coin flip, the larger
+the fabricated split, against F1's own 0.85/1.15 clip. Its second half is the
+more interesting one: the filing session fixed it, rebuilt, and REJECTED the
+corrected build, because the correction promoted the only team with no posted
+lineup. The number got more honest and the portfolio got worse), **R206** (every
+portfolio control counts ENTRIES while one $15 entry carried 84.5% of the money —
+Matt Olson read 25% by count and 84.5% by dollars, and it took an external red
+team to see it after the build, qa_portfolio and the session's own adversarial
+pass all missed it), **R207** (the infeasibility hint names the active SET and
+made an operator binary-search it across four full builds to find one cap; a
+drop-one-control re-solve against the in-memory bank costs five solves and
+produces the number instead — the cheaper answer to what R203 and R204 both
+want), **R208** (Showdown has no equivalent of R143's batting-order merge, so a
+DK file with `Starting` blank on all 18 hitters routed a fully pasted slate to
+the fallback bank while `basis` still read `declared_starters`), and **R209**
+(the objective's `salary_uniqueness_weight` measured nothing — the delivered
+entry spent exactly $50,000 and was the 97.6th percentile chalkiest lineup in a
+7,833-entry field; parts A and B of that fragment had already shipped as R154 the
+same day, so only part C remains, gated behind 3-5 more graded slates), plus
+**R210** (three Showdown tool gaps, of which the sharpest is qa_portfolio section
+1 printing `controls relaxed: none` against a brief carrying a real captain-lock
+substitution — the adversarial tool reporting clean on the one axis R153 says
+defines clean) and **R211** (`pitchers_duel` landed 1 slot of 19 and the ladder
+has no per-thesis captain rotation, so Ben's stated two-lineup rule is
+unreachable at any entry count; the captain it did pick was whichever starter
+sorts first in `shape["teams"]`, a team-name-ordering artifact, and the
+`(variant 2, … captain)` label is proven false on the same delivery — entries 1
+and 14 both captained Dylan Cease). R196 also gained a THIRD occurrence, three
+price points in four days, all closed by one CSV row that DEV's write set does
+not contain.
+
+**Six riders, and two of them shrink their items.** **R118's fix (1) is already
+satisfied** — both stripped maps are pure functions of the RETAINED
+`player_table`, verified by rebuilding twelve hard-case contests two ways with
+12/12 identical results, so no backfill and no re-mine, and the item now owns two
+measured caveats instead (the first-wins collapse on 1,076 rows, and that
+`slate_date` is not a valid key — the draftgroup is, and the archive does not
+record it). **R44's mechanism is now named rather than inferred:**
+`extract_inbox_zips.py` contains no move call at all, and all 127 files in
+`processed_zips/` were moved there by hand, so the loop is not "the mine forgets
+the zip" but "nothing has ever moved one." **R10** gains which two of its five
+field-pressure terms are dead and the sharper fact that the constant one is
+RANK-NEUTRAL by construction — it cannot change a selection, ever, while looking
+like a live contribution — plus `has_duplication_signal` being permanently True
+and `optimizer_v3.py:3565`'s `else None` unreachable. **R149** gains a THIRD
+cache root that is not derivable from the repo, the first confirmed pointer round
+trip, and the fact that mtime in that cache is not the save time. **R161(b)** is
+re-confirmed at the line, and deliberately untouched: a clock fix inside a
+handedness fix is two changes in one commit. **R78** gains the one thing a swept
+fragment would otherwise have taken with it: the `TMPDIR=/tmp
+PYTHONPATH=.pylibs` recovery that every session in this file's history uses is
+documented nowhere — `.pylibs` exists on the mount and
+`grep -c pylibs skills/generate-lineups/SKILL.md CLAUDE.md` returns 0 and 0. It
+cost a T-18 window once and lives only in operator memory.
+
 ## 2026-08-22 — Greenfield spec, SIXTH edition: reviewed at ac8ac05 on Ben's instruction, landed here after re-adjudication against a tree that moved 22 commits; R158–R189 filed, five riders, two note corrections, the queue resequenced (docs only)
 
 DEV, claim `engine` (bare mutex, taken at landing). Ben commissioned the sixth

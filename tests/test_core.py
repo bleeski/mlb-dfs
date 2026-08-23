@@ -3821,6 +3821,125 @@ class EasternCalendarAuthorityTests(unittest.TestCase):
         self.assertEqual(_today_et(), self.env.today_et())
 
 
+class BundleProbableHandBackfillTests(unittest.TestCase):
+    """R190(a). The bundle's `/people` call filled `batSide` and not `pitchHand`.
+
+    F4's platoon component compares a hitter's bat side against the OPPOSING
+    probable's hand. The schedule hydrate (`probablePitcher(note)`) does not
+    return `pitchHand`, so every probable came out of `fetch_lineups_feed` with
+    `hand: None` -- measured 30 of 30 on 2026-08-19 and again on 2026-08-18 --
+    while `bat_side` sat populated on all 270 hitters. The platoon term was
+    therefore inert for the whole slate and the only place it showed was
+    `f4_platoon_applied: 0` in the brief's counts block, beside
+    `signal_applied: true` and `factors_inert: []`.
+
+    Three BUILD sessions filed it and each worked around it with a second
+    hand-rolled `/people` call. The reference implementation SKILL.md tells a
+    sandbox session to copy is the one path that never did it, which is the
+    expensive part: a session that copied the reference CORRECTLY still shipped
+    the dead term.
+    """
+
+    def setUp(self):
+        from tools import fetch_slate_bundle as fsb
+        self.fsb = fsb
+        self._real_get = fsb._get_json
+        self.calls = []
+
+    def tearDown(self):
+        self.fsb._get_json = self._real_get
+
+    # Probable ids are >= 900 in these fixtures so the fake endpoint can answer
+    # a pitcher with pitchHand and a hitter with batSide off the same call.
+    def _install(self, *, probable_ids=(901, 902), people_hands=True):
+        def fake(url, secret=None):
+            self.calls.append(url)
+            if "people" in url:
+                ids = [int(x) for x in
+                       url.split("personIds=")[1].split("&")[0].split(",")]
+                people = []
+                for pid in ids:
+                    if pid >= 900:
+                        people.append({
+                            "id": pid,
+                            "pitchHand": ({"code": "R"} if people_hands else {}),
+                            "primaryPosition": {"abbreviation": "P"}})
+                    else:
+                        people.append({
+                            "id": pid, "batSide": {"code": "L"},
+                            "primaryPosition": {"abbreviation": "OF"}})
+                return {"people": people}
+            away_p, home_p = probable_ids
+            return {"dates": [{"games": [{
+                "gamePk": 1, "gameDate": "2026-08-23T23:05:00Z", "gameNumber": 1,
+                "status": {"detailedState": "Scheduled"},
+                "venue": {"name": "Chase Field"},
+                "lineups": {
+                    "awayPlayers": [
+                        {"id": 100 + k, "fullName": f"A{k}",
+                         "primaryPosition": {"abbreviation": "OF"}} for k in range(9)],
+                    "homePlayers": [
+                        {"id": 200 + k, "fullName": f"H{k}",
+                         "primaryPosition": {"abbreviation": "OF"}} for k in range(9)]},
+                "teams": {
+                    "away": {"team": {"id": 1, "abbreviation": "AZ",
+                                      "name": "Arizona Diamondbacks"},
+                             "leagueRecord": {"wins": 1, "losses": 2},
+                             "probablePitcher": ({"id": away_p, "fullName": "Pfaadt"}
+                                                 if away_p is not None else
+                                                 {"fullName": "Pfaadt"})},
+                    "home": {"team": {"id": 2, "abbreviation": "BOS",
+                                      "name": "Boston Red Sox"},
+                             "leagueRecord": {"wins": 3, "losses": 4},
+                             "probablePitcher": {"id": home_p, "fullName": "Tolle"}}},
+            }]}]}
+        self.fsb._get_json = fake
+
+    def test_both_probables_get_a_hand_from_the_people_call(self):
+        self._install()
+        warnings = []
+        feed = self.fsb.fetch_lineups_feed("2026-08-23", warnings)
+        game = feed["games"][0]
+        self.assertEqual(game["away"]["probable_pitcher"]["hand"], "R")
+        self.assertEqual(game["home"]["probable_pitcher"]["hand"], "R")
+        self.assertEqual([], warnings)
+
+    def test_the_hitter_half_still_works_and_costs_no_extra_call(self):
+        # One request covers both id sets: /people returns batSide and pitchHand
+        # in the same person object, so the union is free. A second call here
+        # would mean the fix bolted on a second fetch instead of widening one.
+        self._install()
+        feed = self.fsb.fetch_lineups_feed("2026-08-23", [])
+        sides = [h["bat_side"] for h in feed["games"][0]["away"]["lineup"]]
+        self.assertEqual(sides, ["L"] * 9)
+        self.assertEqual(1, sum(1 for c in self.calls if "people" in c))
+
+    def test_a_named_probable_that_still_has_no_hand_is_named_not_null(self):
+        # The id is what the backfill joins on, so a probable named with no id
+        # cannot be resolved by any number of calls. That is the R117(b) shape
+        # at the source, and the whole opposing side loses the platoon term.
+        self._install(probable_ids=(None, 902))
+        warnings = []
+        feed = self.fsb.fetch_lineups_feed("2026-08-23", warnings)
+        self.assertIsNone(feed["games"][0]["away"]["probable_pitcher"]["hand"])
+        self.assertEqual(feed["games"][0]["home"]["probable_pitcher"]["hand"], "R")
+        self.assertEqual(1, len(warnings), warnings)
+        self.assertIn("AZ Pfaadt", warnings[0])
+        self.assertIn("platoon", warnings[0])
+
+    def test_people_answering_without_pitchhand_is_also_named(self):
+        # The other direction: the id joins, /people answers, and the payload
+        # carries no pitchHand. Silent null and a named loss are different
+        # facts and this is the one a fixture with a helpful endpoint hides.
+        self._install(people_hands=False)
+        warnings = []
+        feed = self.fsb.fetch_lineups_feed("2026-08-23", warnings)
+        self.assertIsNone(feed["games"][0]["away"]["probable_pitcher"]["hand"])
+        self.assertEqual(1, len(warnings), warnings)
+        self.assertIn("AZ Pfaadt", warnings[0])
+        self.assertIn("BOS Tolle", warnings[0])
+
+
 class RotoWireParseFloorTests(unittest.TestCase):
     """R65, second half. A regex parser over live third-party HTML fails EMPTY.
 

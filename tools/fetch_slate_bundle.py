@@ -156,6 +156,7 @@ def fetch_lineups_feed(date: str, warnings: List[str]) -> Optional[Dict[str, Any
             games_out.append(entry)
 
     lineups_by_game = _fetch_lineups_by_game(raw_games, warnings)
+    probable_ids: List[int] = []
     for game, entry in raw_games:
         teams = game.get("teams") or {}
         for side_key in ("away", "home"):
@@ -167,6 +168,8 @@ def fetch_lineups_feed(date: str, warnings: List[str]) -> Optional[Dict[str, Any
             if probable and probable.get("fullName"):
                 hand = (((probable.get("pitchHand") or {}).get("code")) or None)
                 probable_out = {"id": probable.get("id"), "name": probable.get("fullName"), "hand": hand}
+                if isinstance(probable.get("id"), int):
+                    probable_ids.append(probable["id"])
             lineup = lineups_by_game.get((entry["game_pk"], side_key), [])
             for hitter in lineup:
                 if isinstance(hitter.get("id"), int):
@@ -182,7 +185,8 @@ def fetch_lineups_feed(date: str, warnings: List[str]) -> Optional[Dict[str, Any
                 "lineup": lineup,
             }
 
-    _backfill_bat_sides(games_out, sorted(set(lineup_ids)), warnings)
+    _backfill_people(games_out, sorted(set(lineup_ids)),
+                     sorted(set(probable_ids)), warnings)
     return {"date": date, "fetched_at": datetime.now(timezone.utc).isoformat(), "games": games_out}
 
 
@@ -206,27 +210,73 @@ def _fetch_lineups_by_game(raw_games, warnings) -> Dict[Tuple[Any, str], List[Di
     return out
 
 
-def _backfill_bat_sides(games_out, ids: List[int], warnings: List[str]) -> None:
+def _backfill_people(games_out, hitter_ids: List[int], probable_ids: List[int],
+                     warnings: List[str]) -> None:
+    """Fill `bat_side` on every lineup hitter AND `hand` on every probable.
+
+    R190. Both halves of F4's platoon term come from `/people`, and until
+    2026-08-23 this call fetched only one of them. The schedule hydrate
+    (`probablePitcher(note)`) does not return `pitchHand`, so a probable's
+    `hand` was whatever the hydrate happened to carry, which is nothing:
+    measured 30 of 30 probables at `hand: None` on 2026-08-19, and 30 of 30
+    again on 2026-08-18. F4's platoon component compares a hitter's `bat_side`
+    against the OPPOSING probable's hand, so a null hand on every side makes
+    that component inert for every hitter on the slate while `bat_side` sits
+    populated on all 270 -- the brief reads `f4_platoon_applied: 0` beside
+    `f4_hitters_scored: 162` and nothing else says why. Three BUILD sessions
+    filed it (08-18, and twice on 08-19) and each worked around it with a
+    second hand-rolled `/people` call; the reference implementation SKILL.md
+    tells a sandbox session to copy is the one path that never did it, so a
+    session copying the reference correctly still shipped the dead term.
+
+    One request covers both id sets: `/people` returns `batSide` and
+    `pitchHand` in the same person object, so the union costs no extra call.
+
+    A named probable still holding a null hand AFTER the backfill is a fact
+    worth a warning, not a silent field. It means the id was missing or
+    `/people` declined it, and the platoon term is dead for the whole opposing
+    side. The engine names the same fact in
+    `pool_report.opposing_probables_incomplete.no_hand` (R117(b)); this warns
+    at the source, where the fetch could still be retried.
+    """
+    ids = sorted(set(hitter_ids) | set(probable_ids))
     sides: Dict[int, Optional[str]] = {}
     positions: Dict[int, str] = {}
+    hands: Dict[int, Optional[str]] = {}
     for start in range(0, len(ids), 100):
         chunk = ids[start:start + 100]
         try:
             payload = _get_json(f"{MLB_PEOPLE}?personIds={','.join(map(str, chunk))}")
         except RuntimeError as exc:
-            warnings.append(f"bat_side backfill failed for {len(chunk)} ids: {exc}")
+            warnings.append(f"people backfill failed for {len(chunk)} ids: {exc}")
             continue
         for person in payload.get("people") or []:
             sides[person.get("id")] = ((person.get("batSide") or {}).get("code")) or None
             positions[person.get("id")] = ((person.get("primaryPosition") or {}).get("abbreviation")) or ""
+            hands[person.get("id")] = ((person.get("pitchHand") or {}).get("code")) or None
+    unresolved: List[str] = []
     for game in games_out:
         for side_key in ("away", "home"):
-            for hitter in (game.get(side_key) or {}).get("lineup") or []:
+            block = (game.get(side_key) or {})
+            for hitter in block.get("lineup") or []:
                 pid = hitter.get("id")
                 if pid in sides:
                     hitter["bat_side"] = sides[pid]
                 if not hitter.get("position") and pid in positions:
                     hitter["position"] = positions[pid]
+            probable = block.get("probable_pitcher") or None
+            if not probable or not probable.get("name"):
+                continue
+            if not probable.get("hand") and hands.get(probable.get("id")):
+                probable["hand"] = hands[probable["id"]]
+            if not probable.get("hand"):
+                unresolved.append(
+                    f"{block.get('team_abbrev') or '?'} {probable.get('name')}")
+    if unresolved:
+        warnings.append(
+            "probable pitcher hand unresolved for "
+            + ", ".join(sorted(unresolved))
+            + "; F4's platoon component is inert for every hitter facing them")
 
 
 # --------------------------------------------------------------------------- #

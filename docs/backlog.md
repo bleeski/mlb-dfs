@@ -39,6 +39,108 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-23 (fragment merge + R190), DEV, claim `engine` (bare mutex): the ed6
+landing left twenty-two fragments in `docs/backlog_inbox/` explicitly unconsumed
+and named the next fragment-merge session as their owner. That is this session.
+**The inbox held 38 fragments; 37 are consumed and deleted, one is kept. R190 is
+FILED AND CLOSED in this commit, R191–R211 are filed, and six riders land on R44,
+R118, R10, R78, R149 and R161.** The one kept is
+`2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`, which records a
+Ben DECISION rather than a finding and is cited three times on the board. Gate
+1221 -> 1236 (`test_core` 821 -> 825, `test_showdown` 66 -> 77, both `grew`).
+
+**38, not 22, and the gap is worth naming.** `git status` showed **22 UNTRACKED**
+fragments, which is the number the ed6 note counted. **16 more were sitting in
+the same directory already COMMITTED** — BUILD sessions have been committing
+their fragments since 08-19 (`ec832cf`, `9a48ce7`, `bdc89a6` and others carry
+"backlog fragment" subjects), so they never appeared as dirt and a session
+building its work list from `git status` could not see them at all. **Five of the
+sixteen carried findings that were not on the board, and three of those five are
+the sharpest items in the whole pile** (R205, R206, R208, plus R210 and R211).
+**The inbox is a DIRECTORY, not a diff: list it, never infer it from
+`git status`.** The rest of the sixteen were merged long ago and never deleted
+(R60's, R121's, R127-R131's, R132's, R135-R141's and R156's sources), which is
+the other half of the same confusion — a consumed fragment left in place is
+indistinguishable from an unconsumed one, and the contract already says the
+owning role deletes. All of them are deleted now.
+
+**The queue moves once, and the reason is a recurrence count.** Slot 1 was
+"intake truth, one surface" (R159 + R160 + R189 + the R122 rider), and three
+independent BUILD sessions on three slates had filed the ROOT CAUSE under those
+symptoms without it being on the board: F4's platoon term needs a hitter's bat
+side AND the opposing probable's hand, and `fetch_slate_bundle.fetch_lineups_feed`
+fetched only the first. Measured 30 of 30 probables at `hand: None` on 08-18 and
+again on 08-19, against `bat_side` populated on 270 of 270 hitters. So the whole
+platoon half of F4 was inert on every slate whose feed came from the bundle, the
+brief read `f4_platoon_applied: 0` beside `signal_applied: true`, `degraded:
+false` and `factors_inert: []`, and each of the three sessions worked around it
+by hand with a second `/people` call. That is R190 and it landed here rather than
+being filed, because it is XS and it is the cause of a symptom already sitting at
+the head of the queue. **Slot 1 keeps its position, minus the root cause: R159 +
+R160 + R189 + R122-rider is still next**, and R189's remaining layers now run
+against a feed that actually carries hands.
+
+**One insertion, on evidence of the same kind.** **R191 + R192 enter at slot 2**,
+beside the lost-window batch, because they are lost-window defects: the
+preflight's `--salary` auto-resolve grabbed a concurrent session's promoted run
+on TWO different Showdown slates the same day, exit 2 with "0.0% embedded pool
+overlap" against a delivered file that was clean, and the recount that recovered
+it cost a round trip at the money boundary's last check (R191). R192 is the same
+file and the same operator: the showdown `top exposure` line counts the ROLE and
+not the PLAYER, so it drops the CPT column, hides the two most concentrated
+players outright, and contradicts R153 — written the same day, for the express
+reason that the washout axis is the PLAYER — in the one place a pre-upload
+operator looks. Both are informational-or-recoverable and neither shipped a wrong
+file; both are S, both recurred, and both make the final check disagree with the
+artifact it is checking.
+
+**One more insertion, from the committed nine.** **R205 enters at slot 3**:
+`parse_the_odds_api_totals` averages moneylines in AMERICAN-ODDS space, so -104
+and +100 average to -2.0, a 98% favorite, and everything below the parser
+faithfully propagates a price no book ever posted. It is S, the root cause is
+confirmed with a repro, and the blast radius is INVERTED — the closer a game is
+to a coin flip the more wrong F1 gets, so the games with no real edge receive the
+largest fabricated split, up against F1's own 0.85/1.15 clip. That belongs ahead
+of the false-evidence batch because it corrupts an INPUT rather than a record.
+Read its second half before touching it: the filing session fixed it, rebuilt,
+and then rejected the corrected build, because the correction promoted the one
+team with no posted lineup. The number got more honest and the portfolio got
+worse. That interaction is Ben's and it is filed as an observation, not a
+proposal.
+
+**Nothing else jumps.** R201 (`MIN_AUTO_TEAM_COVERAGE` is a false negative on a
+3-game slate and overrides the manifest tier the code's own docstring calls
+authoritative) is P1 and is the head of the Workstream 7 remainder, not of this
+tier: it damages archived evidence, which is Tier 2's input, so it sits with the
+measurement loop rather than ahead of it. **R207 rides R203** — it is the same
+call site and it is the cheaper, more actionable version of what R203 and R204
+both want, so whoever takes R203 should read R207 first. R203 itself is M and
+goes to Tier 3. R206 (every portfolio control counts entries while one $15 entry
+carried 84.5% of the money) is M with a real decision inside it and lands in
+Tier 2's neighbourhood, reporting both denominators before any cap binds on
+dollars. R209 (replace the objective's leverage proxy) stays GATED behind 3-5
+more graded slates, per its own fragment. R208 goes to the next Showdown session
+with R158/R122/R123. R195, R197, R202, R204 are Tier 5 smalls. R196 (the Solo
+Shot archetype row, now hit **three** times in four days) is **XS and not DEV's
+to fix** — `data/reference/` is ARCHIVE's write set, so it is filed with the role
+that owns it rather than sitting in a DEV queue where it cannot land, and the
+write-set boundary is precisely why it keeps recurring.
+
+**Three things for Ben, none of them code.** (1) 11 commits on `main` are not on
+`origin/main`; sessions commit and Ben pushes, so no clone can see this week's
+work until he does. (2) The DK contest entry-history export ends 2026-07-28, so
+`paid_places` is null on all 89 own-results records in the 08-22 tranche and
+`classify_tier` returns UNRESOLVED for every one of them, permanently — that is a
+manual DK download and nothing on the tool side fixes it (R200). (3) Is the
+`[2x]` in "MLB SUPERSatellite to NFL 9-13 … [2x]" the ticket count? R1c's gap
+still has no curated value and the guess is not DEV's to make. **And a fourth,
+larger than the other three: should the portfolio controls bind on ENTRIES or on
+DOLLARS (R206)?** An equal-weight cap is the right instrument for "don't lose
+every entry at once" and a dollar-weighted one for "don't lose the bankroll at
+once"; those are different objectives and the dual objective in CLAUDE.md does
+not say which the controls serve. R206's recommendation is to report both
+denominators first so the answer comes from evidence rather than from one slate.*
+
 *2026-08-22 (ed6 landing), DEV, claim `engine` (bare mutex): **the SIXTH
 greenfield edition — commissioned by Ben on 2026-08-17 against this repo at
 `ac8ac05`, reviewed that day by seven parallel container reviewers, and
@@ -906,6 +1008,125 @@ the batch's named rider and did not get pulled.
   control half dies, the report stands. FOSS: existing. Owner: D3. Rollback:
   report is additive; control defaults off.
 
+### R211. `pitchers_duel` gets one slot and the ladder never rotates a captain, so Ben's stated rule is unreachable at any entry count (P1, S-M) | new 2026-08-23, merged from BUILD fragment `2026-08-22_BUILD_pitchers-duel-needs-both-captain-variants.md`; Ben's rule stated 2026-08-22, both gaps traced to the line
+
+- **Ben's rule (2026-08-22), quoted:** "When we think of a 'pitchers duel' game
+  thesis for showdown we need to include both pitchers, and if we have enough
+  lineup slots in our portfolio we should have at least 2: one where each P is
+  captain and the other is UTIL. We can have more if it makes sense, but two
+  lineups (one with each as captain and the other as util) should be the
+  minimum."
+- **What already works:** R156's `duel()` hard-locks both starters into every
+  `pitchers_duel` lineup regardless of who captains, unfiltered by `cpt` and
+  surviving every rung of `solve_ladder`'s relaxation ladder. Both-pitchers-
+  rostered is solid. **What is missing is the second lineup with the captain
+  flipped**, and it is two independent gaps, both in `build_thesis_ladder`
+  (`showdown_theses.py` ~415). **(1) No allocation floor.** `pitchers_duel` is
+  one row among 13 templates, weighted 0.45 inside the 18% `NEUTRAL_SHARE`
+  slice and apportioned by `_largest_remainder` like everything else; on the
+  08-22 1335_1g_sd build it landed on exactly **1 slot out of 19 entries**.
+  R156's own comment already flags this. Nothing forces a second slot when both
+  starters are live, at any portfolio size. **(2) Repeated occurrences of one
+  thesis do not rotate captains.** The selection loop (~462) skips a candidate
+  only once he is at the GLOBAL exposure cap (4 of 19 that night), with no
+  memory of "already captained for THIS thesis id" — so a second
+  `pitchers_duel` occurrence would walk the same 2-element `cpt_ladder =
+  list(both_sp)`, find the first starter still under cap (true after one use),
+  and pick him AGAIN. Two occurrences of one template differ today only because
+  `solve_ladder`'s overlap bound forces different filler hitters, and the
+  `(variant 2, … captain)` label at ~481 names whatever the loop picked rather
+  than a guaranteed-different one. **Proven on the same delivery:** entries 1
+  and 14, "TOR win big - starter carries it" and "… (variant 2, Dylan Cease
+  captain)", both captained Dylan Cease — the variant was entirely in the four
+  supporting hitters.
+- **Why:** with one slot, the captain was whichever starter sorts first in
+  `shape["teams"]` (Weathers, NYY < TOR) — **a team-name-ordering artifact, not
+  a scored choice.** Getting the Cease-captain / Weathers-UTIL lineup into the
+  portfolio took a manual post-hoc `build_showdown_lineup` with
+  `cpt_lock=Cease, locks=[Weathers]`, hand-patched into an entry, because
+  nothing in the ladder produces it on its own even at higher `n_entries`.
+- **Fix, matching the two gaps.** **Allocation floor:** after `counts =
+  _largest_remainder(weights, n_entries)`, if the `pitchers_duel` spec is live
+  (`duel()` returned non-None, i.e. both starters declared) and the portfolio
+  can afford it without zeroing a template that would otherwise get a slot,
+  raise that index to at least 2, borrowing from wherever the remainder ranked
+  lowest. **"Can afford it" needs a real threshold and that threshold is DEV's
+  call** — Ben's own phrasing ("if we have enough lineup slots") makes it
+  conditional, and a 1-entry Solo Shot obviously keeps today's single slot.
+  **Per-thesis captain rotation:** give the selection loop a second piece of
+  state beside the global `cpt_counts` — which captains have already been used
+  for THIS thesis id — and on a second or later occurrence of the same template
+  skip a candidate already captained for it, in addition to the cap check,
+  before falling back to allowing a repeat. That second half fixes the
+  false-`variant` label on every directional template, not just this one.
+
+### R210. Three Showdown tool gaps: the probe errors out, QA section 1 reads Classic-shaped fields, and `--postures` may be a silent no-op (P2, S) | new 2026-08-23, merged from BUILD fragment `2026-08-21_BUILD_showdown-tool-gaps.md`
+
+- **What:** **(a)** `tools/solver_probe.py` errors on a Showdown salary CSV —
+  `_assemble_projection_frame` raises `ValueError: projection_rows is empty` on
+  a melted CPT/UTIL file, so the probe assumes Classic's pool shape. CLAUDE.md's
+  session-start step 3 calls for the probe "before any build" with no
+  Classic-only carve-out, so a Showdown session either skips a mandated check or
+  believes the tool is broken. **(b)** `qa_portfolio.py` section 1 printed
+  `controls relaxed: none` and `gates: {}` for a Showdown brief that actually
+  carried `counted_relaxations.captain_relaxed_slots: 1` and
+  `counted_relaxations.clean: false` — one captain-lock substitution (Sale →
+  Misiorowski) that the adversarial tool reported as clean. It reads a
+  Classic-shaped relaxation/gates field and does not know Showdown's
+  `counted_relaxations` / `captain_exposure` / `player_exposure` blocks.
+  **(c)** section 4 reported all 7 contest ids as "archetype UNRESOLVED … the
+  brief carries no contest_shape for this id" even though `--postures` was
+  passed for all 7, because Showdown's thesis-ladder construction does not
+  appear to branch by contest at all: one 19-lineup ladder was built across the
+  whole entries file regardless of which contest each blank row belonged to.
+- **Why:** (b) is the sharpest — R153's whole discipline is that a portfolio is
+  clean when the relaxation counts are ZERO, and the tool that exists to check
+  that printed `none` against a real relaxation. (c) is a question before it is
+  a defect: whether Showdown is MEANT to read postures. If it is not, the flag
+  should warn rather than silently accept, since the operator passed it
+  believing it did something.
+- **Fix:** (a) teach the probe the Showdown melt, or state Classic-only in
+  CLAUDE.md and the skill and have the probe say so on a Showdown file rather
+  than raising. (b) read Showdown's own brief blocks in section 1. (c) answer
+  the design question first, then either branch or warn. Rides R41 and R202.
+
+### R208. Showdown never merges a confirmed batting order from `--lineups`: R143 has no Showdown equivalent, and the fallback bank has its own ceiling (P1, S-M) | new 2026-08-23, merged from BUILD fragment `2026-08-22_BUILD_showdown-batting-order-not-merged-from-feed.md`; both halves observed on 1335_1g_sd
+
+- **What:** `Pool_Basis` and `Batting_Order` in `melt_showdown_salary_csv`
+  (`showdown.py` ~160-209) are derived ONLY from the DK salary file's own
+  `Starting` column — there is no Showdown equivalent of R143's
+  `merge_dk_starting_into_feed`. On 2026-08-22 `1335_1g_sd` (TOR @ NYY) DK had
+  flagged both probables (`Dylan Cease` → `P`, `Ryan Weathers` → `SP`) and left
+  `Starting` BLANK for all 18 hitters, while mlb.com carried a full confirmed
+  1-9 for both sides that Ben pasted and `lineups_from_paste.py` resolved
+  cleanly against this draftgroup's ids. Effect: `declared` held only the two
+  pitcher rows, so `basis` still read `declared_starters` **misleadingly** while
+  `Batting_Order.notna().sum()` was 0, and `run_showdown`'s `use_ladder =
+  (basis == "declared_starters" and posted >= 18)` evaluated False with a
+  perfectly good `--lineups` feed sitting right there. `showdown_handedness`
+  reads that feed for `bat_side` and pitcher hand only; it never touches
+  `Batting_Order` or `Pool_Basis`.
+- **Why:** it is DK-FILE-DEPENDENT and a build cannot assume either shape —
+  contrast 2026-08-19 ARI@BOS, where DK's own file DID carry 1-9 for both
+  sides. So the same slate type silently takes the good path or the fallback
+  depending on how DK filled one column, and `basis: declared_starters` reads
+  identically in both cases. Second half, filed as an observation because it
+  needs `build_showdown_bank` context: losing the ladder routed to
+  `sd.build_showdown_bank`, which returned `{"status": "bank_short", "built":
+  11, "needed": 19}` IDENTICALLY across two attempts at 14s and 18s
+  `--max-seconds` — the built count did not move, which smells structural
+  rather than search-bounded, and means "grow the bank" (the standing autonomy
+  default) did nothing. Worth checking whether it has its own version of the
+  ceiling R204 describes for the joint MILP.
+- **Fix:** give the Showdown melt the same source ranking the Classic front door
+  has — DK's `Starting` first, the `--lineups` feed second — so a resolved paste
+  or feed can supply `Batting_Order` and lift `Pool_Basis` when DK's column is
+  blank. The shipping workaround was a derived salary file with `Starting`
+  written onto both CPT and UTIL rows from the resolved feed, which is exactly
+  the merge, done by hand, outside the engine. And make `basis:
+  declared_starters` unable to coexist with `posted_hitters: 0`: that pair is
+  the misleading half and it is a one-line assertion.
+
 ### R158. A Showdown solver time-limit is read as infeasibility, and the ladder relaxes controls on a compute limit (P1, S) | new 2026-08-22, from the greenfield sixth edition (reviewed at ac8ac05, re-verified at ec832cf); VERIFIED-read
 
 - **What:** `showdown.py:360` treats every non-success `milp` result as `None`
@@ -1083,6 +1304,8 @@ a restated priority.
   arithmetic on every run, so the moment it stops reading "every row" is
   visible without anyone remembering this bullet.
 
+- **Rider added 2026-08-23, from ARCHIVE fragment `2026-08-22_ARCHIVE_r10-evidence-two-dead-terms.md` (verified in tree by direct call):** the premise still holds — every writer of `Ownership_Tier` writes `"Mid"`, `DEFAULT_OWNERSHIP_PCT_BY_TIER['Mid'] = 12.0`, so a 10-man Classic lineup's `ownership_sum_pct` is exactly 120.0, and R154's `attach_projected_ownership` deliberately never touches `Ownership_Tier`. Two specifics this item does not name, and the second is the sharper one. **WHICH terms are dead:** of the five in `field_pressure_score = 0.70*meta_overlap + 0.035*ownership_total + 0.75*salary_band_penalty + 0.40*high_owned_one_offs + 0.35*(primary_count >= 5)`, `ownership_total` is a constant 120.0 and `high_owned_one_offs` requires `Ownership_Tier == 'High'` and is identically 0. **And the constant one is RANK-NEUTRAL by construction, not merely uninformative:** in an additive score compared across candidates a constant 4.20 contribution cannot change any selection, ever, while looking like a live term in every output. The score's stated job, penalizing duplicate-prone constructions, is carried entirely by `meta_overlap`, `salary_band_penalty` and the `primary_count >= 5` bump. Downstream, `has_duplication_signal = bool(meta_lineup_ids) or field['ownership_sum_pct'] > 0` is permanently True because 120.0 > 0, so the field-pressure penalty is always subtracted, `duplication_risk_proxy` is never None, and the `else None` branch at `optimizer_v3.py:3565` is unreachable — a reviewer asking "is the duplication signal on?" gets Yes on every candidate on every slate, including slates where no meta-lineup ids were supplied and the honest answer is No. When R10's prior lands on the production path, `_ownership_pct_for_row` already prefers `Projected_Ownership_Pct` so `ownership_total` comes alive with no further wiring; `high_owned_one_offs` will NOT, because it reads the tier. See also R197, the same class on the low-owned diagnostic.
+
 - **What:** `ownership_prior.py` and `field_miner.score_duplication_risk` exist and remain unwired; nothing populates `Projected_Ownership_Pct`, so the optimizer's field-pressure term runs on flat tier defaults; meta-lineup failure degrades silently.
 - **Why:** field behavior is the one commercial capability that materially changes satellite results (clearing the cut line unduplicated is the whole game), and it is the highest-value modeling work available once the archive is trustworthy, which F9/F10 made true. Gate unchanged: roughly eight archetype-conditioned slates; G4 means every new slate now also grades the operator, not just the field.
 - **Fix:** per the 07-25 final plus RC's refinements: fit per archetype from the archive; model stack ownership separately from player ownership (stack popularity is not a product of independents); write versioned `data/reference/ownership_prior_<archetype>.json` artifacts and load them in `_assemble_projection_frame`; persist each slate's prediction file before lock so grading is never retroactive; grade with `grade_against_actuals` into the ledger against the flat-12 baseline with a stated go/no-go; wire the duplication screen into the checkpoint for satellite postures; surface `meta_lineup_status` instead of the silent empty list; label everything a prior, mark duplication `unmodeled` when ownership is absent rather than substituting silently. Live builds consume precomputed artifacts only; nothing trains at T-10. Done when: per-slate graded MAE/Spearman appear in the ledger; the prior beats flat-12 across the gate count before any production column flips; checkpoints show expected duplicates on satellite portfolios.
@@ -1129,6 +1352,150 @@ a restated priority.
 - **What:** the 3.17 leverage measurement — in 104 of 116 Classic contests (>= 40 entries) at least one player finished top-5 in contest FPTS under 10% drafted (mean 2.19 per contest); winners carried >= 1 in 51% against a 13% field base rate — was a bespoke pass over the mined JSONs. Nothing persists it per contest, so every regrade re-derives it and no build-time surface can ever cite it.
 - **Why:** it operationalizes the one differentiation channel the archive shows paying (low-owned pieces inside chalk-positive lineups) and is the natural grading target for R10's satellite prior. R39 was the Showdown half of the same blindness and landed 2026-08-08: `captain_norm` now rides every parsed entry and the miner emits a per-contest captain table, so the leverage table's Showdown counterpart has its input.
 - **Fix:** a `leverage` block per mined contest (players under 10% drafted with top-5 FPTS: name, %drafted, FPTS; carry rates for winner / top decile / field), same truthful labels as the rest of the block — deterministic descriptive statistics, never a probability claim. Backfill is one idempotent re-mine of the archive (~10 minutes in the cloud container per the 2026-08-04 registry-rebuild pattern). Pairs with the R30 miner batch.
+
+### R206. Every portfolio control counts ENTRIES, and the money is not distributed that way (P1, M + one Ben decision) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_portfolio-controls-count-entries-not-dollars.md`; surfaced by an external red team that three internal passes missed
+
+- **What:** `max_player_exposure_pct`, `max_primary_stack_exposure_pct`,
+  `max_pitcher_exposure_pct` and `max_shared_players` all measure share of
+  ENTRIES, and the washout/apex proxies in `execution_pipeline` do the same.
+  Every one uses an equal-weighted denominator. The 2026-08-19 `1235_4g`
+  entered set was not equal-weighted: 8 entries across 6 contests, $17.75
+  total, with a single $15 entry carrying **84.5% of the money** (the rest being
+  $1.00, $0.50 and five $0.25 satellites). On the count denominator the
+  heaviest exposures read 4 of 8, a comfortable 50%. On dollars: Drake Baldwin
+  and Jackson Merrill 94.4%, Paul Skenes 91.5%, Michael King 88.7%, **Matt
+  Olson 25% by count and 84.5% by dollars** — he appears in a quarter of the
+  entries and carries five sixths of the bankroll, because one of those two
+  entries is the $15 one.
+- **Why:** this is not "the caps are too loose." The caps are enforcing a
+  constraint nobody chose, and the cost runs both ways: diversifying entries 2
+  through 8 away from entry 1 spends real ceiling in those entries and buys
+  almost no dollar diversification, because entries 2 through 8 are $2.75
+  combined. A control reading 25% is describing a different portfolio than the
+  one that exists. Worth noting who caught it: an external red-team review of
+  the delivered file, not the build, not `qa_portfolio.py`, and not the
+  session's own adversarial pass — three passes over a portfolio whose headline
+  risk number was off by a factor of three.
+- **Fix, and the decision inside it:** the mechanism is a weighted denominator
+  — entry fee per Entry ID is in the DKEntries template, so the weights are
+  already on disk and need no new input. **What is Ben's is whether the caps
+  SHOULD be dollar-weighted, and that is not obvious**: an equal-weight cap is
+  the right instrument for "don't lose every entry at once" (the washout axis
+  R153 names, which is about correlated failure across entries and genuinely
+  counts entries), while a dollar-weighted cap is the right instrument for
+  "don't lose the bankroll at once." Those are two different objectives and the
+  dual objective in CLAUDE.md does not currently say which one the controls
+  serve. Recommended shape: REPORT both denominators first (cheap, S, no
+  behaviour change) so the divergence is visible on every mixed-stakes
+  portfolio, and only then decide whether any cap binds on dollars. Reporting
+  first is also what makes the decision answerable with evidence rather than
+  from one slate.
+
+### R209. The objective's leverage proxy measures nothing, and the first graded prediction says ordering is usable while level is not (P1, M, gated) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_apex-means-leverage-adjusted-not-points-max.md`; its parts A and B SHIPPED as R154 the same day, this is part C plus the calibration reading
+
+- **What:** `salary_uniqueness_weight` (0.62 on `large_field_gpp`) is the
+  engine's current stand-in for uniqueness, and on the 2026-08-19 `1235_4g`
+  apex contest it measured nothing: the delivered entry spent exactly $50,000
+  and was the **97.6th percentile chalkiest lineup** in a 7,833-entry field
+  (95.6th on realized ownership). Salary uniqueness is not ownership
+  uniqueness. Ben's own formulation is the replacement — a leverage-adjusted
+  value term weighted by contest shape, zero for cash and largest for a
+  top-heavy large field.
+- **The evidence, and it cuts two ways.** The pre-lock prediction file was
+  graded against the standings for 112 priced players. **Ordering is usable:**
+  Spearman +0.581 on `large_field_gpp` and +0.505 to +0.660 across archetypes,
+  and since flat-12 carries ZERO rank information by construction, +0.581
+  clears R10's bar on this cell. **Level is not:** every archetype
+  under-predicts (`large_field_gpp` predicted sum 610 against a real 909, a
+  third short), and rescaling to the known slot total makes it WORSE (MAE 5.71
+  → 5.92), so it is not a normalization error. A leverage objective needs only
+  the ordering — you do not need to know a player will be owned 30%, only that
+  he will be owned more than the alternative — which is exactly why R154 shipped
+  two linear CONSTRAINTS rather than an objective term. The realized
+  ownership/finish relation was monotone across every finish band (1st 167.0%
+  cumulative and 4.00 sub-10% bats; whole field 187.5% and 3.33; our entry
+  254.7% and 2).
+- **Why it is gated, and by what:** one contest cannot size a coefficient that
+  changes what every player is worth, and on this slate the CHALK BUSTED, which
+  is what makes the relation look so clean — on a slate where chalk hits, the
+  ordering inside the cashing bands inverts. The structural case for leverage
+  does not rest on chalk busting, it rests on duplication splitting a top-heavy
+  prize, but the MAGNITUDE above is one observation and is not a calibration.
+  The fragment is explicit that the delivered entry finished 5287th and scored
+  56.35 against a field mean of 64.74, so it lost on POINTS as well as on
+  leverage and the two cannot be separated from one result.
+- **Fix:** after 3-5 more graded slates, replace `salary_uniqueness_weight` with
+  the leverage-adjusted value term, weighted by contest shape. **Before that,
+  the smaller and unblocked prerequisite: nothing calls
+  `attach_projected_ownership` on the production path**, so R154's constraints
+  reach no build until a caller sets values — wiring it into `run_slate` with
+  per-contest-shape numbers is a separate, smaller item and it comes first. The
+  target band from this one contest, stated as a band derived from one contest
+  and never a calibration: roughly 160-170% cumulative ownership and at least 4
+  low-owned bats for a top-heavy large field. Grades belong in the ledger,
+  which is ARCHIVE's write.
+
+### R194. `ownership_pred.py` cannot read a Showdown salary file: every name is "ambiguous" and `batting_order` reports INERT on a fully posted slate (P2, S) | new 2026-08-23, merged from BUILD fragments `2026-08-19_BUILD_showdown-feed-abbrev-and-ownership-pred.md` item 2 and `2026-08-20_BUILD_ownership-pred-showdown-batting-order-false-inert.md`; TWO occurrences, two slates
+
+- **What:** on the 08-19 ARI@BOS Showdown slate, whose salary file posted 1-9
+  for BOTH sides in the `Starting` column, `emit` reported `crosswalk 95
+  ambiguous name(s), excluded from any grade join` and `batting_order INERT: no
+  side is posted 1-9 in the salary file and no feed supplied one`. Both
+  readings are artifacts of Showdown's file SHAPE, not of the slate: a Showdown
+  salary file lists every player twice, a `CPT` row and a `UTIL` row with
+  different ids and salaries, so every name is a duplicate and the 1-9
+  completeness check fails on the doubled rows. Recurred on 08-20 NYY@BAL,
+  where `build_slate.py` read the same file and reported `pool.basis:
+  declared_starters`, `posted_hitters: 18`, `construction.mode: thesis_ladder`,
+  cross-checked against the MLB Stats API probables endpoint and matched.
+- **Why:** two parsers for one fact that can disagree on the same file —
+  `build_slate_pool`'s (via `merge_dk_starting_into_feed` / `dk_order_coverage`,
+  R143) and `ownership_pred.py`'s own. Nothing downstream is affected because
+  the tool is review-only and reaches no optimizer, so no delivered lineup ever
+  moved. What it costs is EVIDENCE: this prediction is what gets graded against
+  archived standings (R135), and a file with two of four features inert and a
+  crosswalk that excludes all 95 players from any join is unusable evidence
+  rather than weak evidence — every Showdown prediction is silently degraded
+  for no real reason. `qa_portfolio.py` section 4 already declares CHALK-SUM and
+  LOW-OWNED CARRY absent for Showdown for the same double-row reason, so both
+  probably want one fix at one boundary.
+- **Fix:** dedupe on `UTIL` rows before scoring, and point the batting-order
+  read at `dk_order_coverage` — the one definition R143 already established —
+  rather than a second implementation. Fixing the crosswalk and the
+  batting-order read together is what makes the emitted file joinable at grade
+  time. Rides R187 (same tool, same "the CLI says applied while the JSON says
+  otherwise" family).
+
+### R197. `_low_owned_hitter_count` reads a key no writer writes, so it is identically 0 while R154's constraint counts the real thing (P2, XS) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_low-owned-diagnostic-false-signal.md`; VERIFIED-repro by the filing session
+
+- **What:** `optimizer_v3._low_owned_hitter_count` counts rows where
+  `Ownership_Tier == 'Low'`. Every writer of `Ownership_Tier` in the tree
+  writes the literal `"Mid"` and that is the complete set
+  (`slate_intake_manager.py:1353`, `execution_pipeline.py:3070`, `:3384`,
+  `:3661`), so `low_owned_hitter_count` in every candidate record is 0. R154
+  (landed 08-19) added the REAL low-owned test as a MILP constraint on
+  `Projected_Ownership_Pct` against `DEFAULT_LOW_OWNED_THRESHOLD_PCT = 10.0`,
+  and left the old diagnostic standing beside it. Repro'd directly: a frame of
+  five hitters at 4.0% ownership gives 5 by the constraint's measure and 0 by
+  the diagnostic's.
+- **Why:** the 2026-08-15 false-signal batch closed on the stated theme that
+  "the underlying computation was already correct, but the line reporting it
+  either couldn't fire, blamed the wrong control, or pointed at a key that
+  didn't exist." This is that, and it arrived four days AFTER the batch closed.
+  A build satisfying a `min_low_owned_hitters` floor of 4 reports 0 low-owned
+  hitters in its own record. Nothing calls `attach_projected_ownership` on the
+  production path yet, so the disagreement is latent rather than live — the
+  cheapest possible moment to fix it, and also the moment at which it is
+  easiest to ship a build whose counters lie.
+- **Fix:** read the diagnostic off the same quantity the constraint reads
+  (`_ownership_pct_for_row(row) < DEFAULT_LOW_OWNED_THRESHOLD_PCT`), hitters
+  only, keyed on the slot's required POSITION and not the slot name — R154's
+  own bring-up already found `slot != 'P'` is true for P1/P2. One definition of
+  low-owned in the module, the way R154 put one definition of the threshold in
+  it. Then decide whether `Ownership_Tier` should exist at all now that
+  `Projected_Ownership_Pct` is the live column; if it stays, a guard that fails
+  loudly when a behaviour-bearing read finds only the default would have caught
+  this and R10's original inertness both.
 
 ### R83. Per-run calibration provenance: persist the factor audit, hash-bind enrichment inputs, golden-replay one real manifest row (S) | audit 2026-08-04
 
@@ -1317,6 +1684,11 @@ Hypothesis-generated mlb.com renders (random posted-side subsets, `1. TBD` place
   Ben's machine.
 - **Fix:** (a) salary Game Info date first, feed date second, `repo_env`
   ET-today last. (b) `repo_env` ET conversion plus `%I`-lstrip.
+- **(b) re-confirmed 2026-08-23** while landing R190 in the same function:
+  `fetch_slate_bundle.py:152` still reads `(utc_dt - timedelta(hours=4))`. R190
+  deliberately did not touch it — a clock fix inside a handedness fix is two
+  changes in one commit — so (b) stays exactly as filed, one line, with the
+  file already open next time.
 
 ### R162. A FanGraphs pitching CSV with neither TBF nor IP silently neutralizes every arm (P2, XS) | new 2026-08-22, from the greenfield sixth edition; PLAUSIBLE (read only — verify by repro before fixing)
 
@@ -1328,6 +1700,52 @@ Hypothesis-generated mlb.com renders (random posted-side subsets, `1. TBD` place
   is manual by decision.
 - **Fix:** raise (mirroring the K-rate guard) or report `qualified=0` loudly.
 
+### R205. Cross-book American-odds averaging produces prices no book ever posted, worst on exactly the games with no edge (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_f1-implied-split-wrong-on-a-pickem-game.md`; root cause CONFIRMED with a repro, not inferred
+
+- **What:** `live_data_adapters.parse_the_odds_api_totals` averages moneylines
+  across books ARITHMETICALLY. American odds are discontinuous at ±100: -104
+  and +100 are adjacent prices, both about 50%, and their arithmetic mean is
+  **-2.0**, which as an American price reads as a 98% favorite. ATL@MIN on
+  2026-08-19 (`1235_4g`, run `20260819T153118Z_49f8ec18`): DK posted ATL -104 /
+  MIN -104, FD posted ATL -108 / MIN +100, and the parser emitted `{'ATL':
+  -106.0, 'MIN': -2.0}`. ATL averaged cleanly because both books were negative;
+  MIN straddled the boundary. Downstream: `american_to_implied_prob(-2.0)` =
+  0.0196, devig → p_away 0.963 / p_home 0.037, margin -2.22, split ATL 5.36 /
+  MIN 3.14 on an 8.5 total. Everything below the parser is CORRECT — it is
+  handed a price no book posted.
+- **Why P1, and why the blast radius is inverted:** the closer a game is to a
+  coin flip the more wrong F1 gets, so it is exactly the games with no real
+  edge that receive the largest fabricated split, and F1 clips at 0.85/1.15, so
+  a pick'em can deliver the maximum boost to one side and the maximum penalty
+  to the other. Reproduce with any game where two books straddle ±100, which on
+  a near-pick'em is the NORMAL shape (one book juices both sides to -104/-104,
+  another posts -108/+100). `total` is averaged the same way (DET@PIT: DK 8.5,
+  FD 8.0 → 8.25) — at least a real number, but a line neither book posts, and
+  the half-run grid exists for a reason.
+- **Fix:** stop averaging in American-odds space at any distance from ±100, the
+  scale is not linear there either. Defensible alternatives, pick one: a
+  single-book read, a median with a sign guard, or averaging in PROBABILITY
+  space and converting back. The last is the most faithful and is the same
+  arithmetic `vig_free_probabilities` already does.
+- **The half worth reading twice, and it is not a bug.** The filing session
+  fixed it at the input (filter `odds_raw_totals` to draftkings only — one book
+  cannot straddle itself, giving the correct ATL 4.25 / MIN 4.25), rebuilt, and
+  then **REJECTED the corrected build and delivered the original.** Correcting
+  MIN from 3.14 to 4.25 is a 35% swing and it moved the build hard into MIN
+  bats — but MIN had not posted a lineup, so those bats came off a 14.6-day-old
+  platoon reference. The corrected build carried 17 projected-order hitters
+  against the original's 8, put the weakest arm on the slate in 4 of 8 entries
+  against 2, and dropped the apex contest's ceiling from 149.9 to 133.4. **The
+  number got more honest and the portfolio got worse**, because the team the
+  correction promoted is the team with the least reliable roster data. That is
+  not an argument against fixing this. It is evidence that F1 accuracy and
+  lineup-source confidence interact and nothing in the build reconciles them: a
+  confirmed-lineup team and a platoon-projected team are treated as equally
+  knowable once F1 has spoken. **Whether a TBD team should carry a confidence
+  discount F1 cannot override is Ben's**, and it is filed here as an
+  observation rather than a proposal because it changes what every projection
+  means, not just this parser.
+
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
 The R51/R92 family lives here: reports that are honest line by line while
@@ -1335,6 +1753,115 @@ the composite steers wrong. R98's remainder is the P1. R36's Finding 10
 (prefilter starvation) belongs to this stream and lives inside the R36
 entry in Workstream 5; its re-measure is owed on the next live pinned-entry
 swap.
+
+### R207. The infeasibility hint names the active SET and makes the operator binary-search it, four builds at a time (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-20_BUILD_infeasibility-hint-does-not-name-the-minimum-cap.md`; measured on 1240_6g
+
+- **What:** on 2026-08-20 `1240_6g` (6 entries, 4 contests, 6-game Classic)
+  `build_slate.py` refused three times at the posture/auto-floored defaults
+  against a bank grown 25 → 68 candidates with 61 distinct SP pairs and 12
+  distinct stacks. Each refusal printed only "no single control is
+  arithmetically binding against this bank, so the interaction of the active
+  controls is." Bank growth first, per the autonomy policy: did not clear it.
+  Both STRUCTURAL remedies (`max_shared_players` 6→8, `max_sp_pair_repetition`
+  1→2): did not clear it either. What cleared it was **one cap, alone**:
+  `max_player_exposure_pct` 0.4 → 0.5, i.e. `floor(pct*n)` 2 → 3. Locating that
+  cost **four full builds at ~35s each**, because the hint names the active set
+  and not which member to move, so the only way to find the minimum change is
+  to re-run the whole build once per candidate control. The delivered portfolio
+  then posted 6 distinct primary stacks, 6 distinct SP pairs, 0 candidate-reuse
+  relaxations, and a realized max player exposure of exactly 3/6 — so the
+  binding cap was genuinely that one and every other control had slack.
+- **Why:** this is the concrete, cheap answer to the gap R203 and R204 both
+  describe, and it is cheaper than either. Raising an exposure cap is
+  explicitly Ben's call outside R157's feasibility-rescue case, and the current
+  hint gives him no way to see how far the raise has to go — so the cost is not
+  only the four builds, it is that the escalation to Ben carries no number.
+- **Fix:** when the joint MILP proves infeasible, re-solve once per active
+  control with that control ALONE dropped — five solves against the in-memory
+  bank, cheap next to four bank rebuilds — and name the controls whose removal
+  restores feasibility, each with the smallest pct step that changes
+  `floor(pct*n)`. That turns a four-build search into one line. Smaller
+  alternative worth checking first: an IIS from HiGHS would say it directly if
+  that backend exposes one. **Lands with R203 and R204's second half — same
+  message, same call site, and this is the version that produces an actionable
+  number rather than a named set.**
+
+### R203. Teach `autobuild.py` the R157 exposure-cap rescue (P1, M; Tier 3) | new 2026-08-23, merged from DEV fragment `2026-08-22_DEV_autobuild-exposure-cap-rescue.md`, which traced the design in full
+
+- **What:** CLAUDE.md's Autonomy section (R157, commit `fb4b03c`, 2026-08-22)
+  delegates loosening `max_pitcher_exposure_pct` / `max_player_exposure_pct` /
+  `max_primary_stack_exposure_pct` to rescue a proven-infeasible joint MILP,
+  under two conditions. `tools/autobuild.py` implements none of it: its
+  docstring still lists exposure caps under "WHAT IT WILL NOT DO, EVER", it has
+  no branch touching those three controls, and on exactly this refusal it falls
+  through to `dec.add(attempt, "stop", "refused with no remedy this supervisor
+  may take", ...)` at line 265. The policy is delegated in prose and the
+  supervisor still stops.
+- **Where the trigger comes from, traced:** `contest_allocator.py`, inside the
+  entry-level joint MILP solve (~2570-2633). `_diagnose_binding_constraints`
+  runs first; when its `binding` list is NON-empty each fact becomes its own
+  error line. When `binding` is EMPTY (the `else:` at ~2614) the code emits the
+  bare sentence this hinges on — "no single control is arithmetically binding
+  against this bank, so the interaction of the active controls is. Active:
+  …" — and `_infeasibility_remedies(bank_report, binding)` then returns `[]`,
+  because its own logic only emits text for controls it finds named in
+  `binding` and there is nothing to find. That is why the 1335_3g refusal was
+  one bare sentence with no `--controls-override` guidance, unlike the
+  `shared_players_floor` case, which gets it because the diagnostic names it.
+  The taxonomy already exists as code in the same file (~687-691):
+  `STRUCTURAL_FLOOR_CONTROLS` and `STRATEGY_CAP_CONTROLS`.
+- **The near-miss the design must not repeat:** `contest_allocator.py` 684-686
+  records that "raise the cap to the named floor" is what taught the 1910_9g
+  operator to move three exposure caps from 0.35/0.43 to 0.56 **against a bank
+  explored to 1.8%** — loosening caps when the real problem was an unexhausted
+  bank. `_infeasibility_remedies`' own docstring states the ordering that exists
+  to prevent it: bank growth FIRST, `--controls-override` second, never relax a
+  control against a bank that is still a slice. autobuild's loop already gets
+  this right by construction — it checks `job_list_exhausted is False` and grows
+  the bank (230-236) BEFORE the structural-checks block — so the new branch
+  belongs strictly after both, and the commit should say so explicitly, since
+  that ordering is the only thing making the 1910_9g mistake structurally
+  impossible rather than merely unlikely.
+- **Fix, in the file's own engine-diagnoses / supervisor-acts split.**
+  **Engine:** at the `binding`-empty call site (where `controls` is already in
+  scope — do NOT thread `controls` through `_infeasibility_remedies`, that is a
+  bigger and riskier change), when the bank is also exhausted, append one
+  explicit greppable line naming the diffuse interaction across
+  `STRATEGY_CAP_CONTROLS`, so the supervisor matches a signal instead of
+  parsing prose. It still names no FLOOR, because there isn't one, which keeps
+  the engine's state-only-what-I-can-prove discipline intact. **Supervisor:** a
+  new branch after the existing bank-growth and structural blocks that (i)
+  detects the signal, (ii) confirms neither `STRUCTURAL_FLOOR_CONTROLS` entry is
+  the current reason for refusal, (iii) re-runs once with the exposure caps
+  fully open at 1.0 purely as a can-this-bank-certify-at-all check — if that
+  still fails, STOP, because the pool or bank has a deeper problem and that is a
+  real human question — and (iv) on success searches DOWN for a delivered target
+  rather than hardcoding one. Recommended search: step down through a few
+  decreasing values inside the existing `--max-attempts` /
+  `--stop-after-minutes` budget and ship the first that still certifies. A
+  cheaper alternative is deriving the target from the realized exposure in the
+  certified-at-1.0 brief, but that has one data point behind it and no formula
+  worth standing on; a fixed 0.55 is a last-resort fallback only, never the
+  first thing tried. **Never leave the delivered file at 1.0.** Record
+  before/after for all three controls plus the triggering diagnostic in
+  `autobuild_decisions.json` — that is what lets a post-slate read confirm the
+  delegation was used correctly rather than as a blank check. Sync whatever
+  constant the branch needs against `STRATEGY_CAP_CONTROLS` at runtime the way
+  `assert_classification_in_sync()` (autobuild.py:69) already does for
+  `STRUCTURAL_FEASIBILITY_CHECKS`, never a fourth hand-copied literal.
+- **Coverage bar:** a `test_core` fixture reproducing the "binding empty, bank
+  exhausted, exposure caps the only remaining active controls" shape, the way
+  `test_slate_feasibility_derives_floors` and
+  `test_feasibility_relaxes_the_quota_downward_not_upward` reproduce the
+  structural cases. A live-slate confirmation is not evidence for this one.
+- **Grounding, stated as one data point:** 1335_3g (2026-08-22, 9 entries / 6
+  pitchers / 3 games, mixed wta_satellite+single_entry+mme) was infeasible at
+  the posture-merged defaults 0.43/0.35/0.35, still infeasible after both
+  structural remedies (`max_sp_pair_repetition` 1→2, `max_shared_players` 6→7),
+  certified at 1.0, and delivered at 0.55 with pitcher exposure topping out 4/9
+  and no in-contest duplicate lineups. Treat 0.55 as evidence that *a* number
+  exists for that shape of slate, never as the number. Lands with R204's second
+  half, which is the same message on the same surface.
 
 ### R98(3) + R98(4)-tail. The bank budget is still derived from leftover clock, and the CERTIFIED brief still cannot distinguish a deliberate cap from a starved one (P1, M) | new 2026-08-08; (1) and (2) landed the same evening, (4) half-landed
 
@@ -1782,6 +2309,104 @@ Three scipy-native levers, each of which moves golden bytes and therefore sequen
   absent; always print `signal_applied: true|false` plus the by-side split.
   Rides R11 (same tool).
 
+### R193. qa_portfolio reads whatever brief it is handed, so a stale one reported false gates on a certified delivery at T-13 (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_qa-portfolio-read-a-stale-brief.md`; field-reproduced on the 1835_9g slate
+
+- **What:** `qa_portfolio.py --entries outputs/2026-08-19/DKEntries_1835_9g_f64a2b1e.csv
+  --brief outputs/2026-08-19/build_brief_1835_9g.json` printed `gates:
+  workflow_valid false` and `F1 NEUTRAL: no implied totals reached the
+  projections`. Both were false for the delivered file:
+  `runs/20260819T221042Z_f64a2b1e/manifest.json` carries all three gates true,
+  `status: promoted`, `front_door: run_slate v1.17`, and the ownership
+  prediction file reads `implied_totals applied`. The brief on disk was from
+  that day's FAILED 15:28-15:33 attempts (`_b1.err`..`_b8.err`), tag-matching
+  and carrying `delivered_sha256: null`. Two defects, and they compound:
+  (a) QA accepts a brief by NAME and never checks it against `--entries`,
+  where the preflight already matches on `delivered_sha256`; (b) the 22:10
+  certified run wrote no brief into `outputs/<date>/` at all, so the only
+  `build_brief*_1835_9g.json` on disk was the wrong one and the nearest wrong
+  file won.
+- **Why:** this ran the OPPOSITE direction from R142's cost — the artifact said
+  certified and the adversarial diagnostic said failed, at T-13 on a live
+  slate. A promoted run with no brief also means SKILL.md's "diagnose from the
+  artifact" has no artifact, which is the more structural half.
+- **Fix:** (a) refuse a brief whose `delivered_sha256` does not equal the
+  sha256 of `--entries` — null included — and say which two files disagreed,
+  rather than reporting its fields as this portfolio's. (b) Write the brief
+  from `run_manager` at promotion so a promoted run always has one, or have QA
+  fall back to `manifest.json` when no matching brief exists. (a) is the
+  cheaper half and it is the one that makes a stale brief harmless.
+
+### R195. An explicit `--postures <id>=wta_satellite` reintroduces the pre-R1a `large_wta` mapping for a satellite contest (P1, XS) | new 2026-08-23, merged from BUILD fragment `2026-08-20_BUILD_postures-satellite-shape-bug.md`; mechanism traced to the line
+
+- **What:** `_resolve_contest_postures` in `execution_pipeline.py` builds
+  `inferred = {"inferred_type": "wta_satellite", ...}` from a plain-string CLI
+  override. `resolve_contest_shape` tests `itype in SATELLITE_TYPE_TOKENS`, and
+  `SATELLITE_TYPE_TOKENS = frozenset({"satellite"})` — the literal
+  `"wta_satellite"` is not a member, the check fails, and the call falls
+  through to `_posture_to_shape("wta_satellite")`, which is exactly the mapping
+  to `large_wta` that `contest_shapes.py`'s own docstring calls dead and wrong.
+  The AUTOMATIC path is fine: `infer_contest_archetype` reads
+  `inferred_type="satellite"` off the archetype row, which IS a member.
+- **Why:** the ledger Quick Card's standing instruction — pass explicit
+  postures by contest id, never trust name inference on family names — is the
+  thing that reintroduces the bug, because `wta_satellite` is the only
+  CLI-accepted posture string for that family (`VALID_POSTURES`). The 08-20
+  `1835_3g` build worked around it by deliberately NOT passing `--postures` for
+  two SUPERSatellite ids and letting inference run, confirmed correct via the
+  brief's `contest_shape: "satellite"`. So the documented-safe move is the
+  unsafe one, silently, for one family.
+- **Fix:** route the string-override path through the same satellite detection
+  the automatic path reaches — treat `wta_satellite` as a `SATELLITE_TYPE_TOKENS`
+  member, or have `_resolve_contest_postures` set
+  `payout_shape_default="ticket_line"` for that override. If neither, document
+  that an explicit `wta_satellite` override is WTA-ONLY and a satellite must be
+  left to inference, and make `VALID_POSTURES` say so. Related, and Ben's:
+  `dk_contest_archetypes.csv` carries no `ticket_count` for the
+  Satellite/Qualifier/Ticket rows (R1c), so `satellite_shape_for(None)` used a
+  default here — the `[2x]` in "MLB SUPERSatellite to NFL 9-13 … [2x]" may be
+  the count.
+
+### R202. `solver_probe.py` reads the staged slate, not the one being uploaded, and cannot be given a salary path (P2, XS) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_pitchhand-missing-and-bank-solve-ceiling.md` item 3
+
+- **What:** `--date 2026-08-19` resolved `data/slates/2026-08-19/DKSalaries.csv`,
+  which still held the `1235_4g` draftgroup from an earlier session that day,
+  and reported "pool 79 players, 7 SP" for a 9-game slate. `build_slate.py`
+  detects a draftgroup change and moves prior inputs aside; the probe has no
+  such check and no `--salary` flag.
+- **Why:** harmless here because the probe is advisory, and that is exactly why
+  it is worth fixing cheaply: its numbers were for a different slate and
+  nothing said so, and the probe is what a session runs to decide a time
+  budget. A wrong pool size gives a wrong budget with no warning.
+- **Fix:** accept `--salary`, and when resolving by date, cross-check the
+  resolved file's draftgroup against the entries file or print the draftgroup
+  it read. Naming the file and the draftgroup in the output is most of the fix.
+
+### R204. "Grow the bank" is unbounded advice against a solve cost that is not, and the diffuse-infeasibility message names no set (P2, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_pitchhand-missing-and-bank-solve-ceiling.md` item 2; measured on the 1835_9g slate
+
+- **What:** measured on a 14-entry 9-game slate, following the engine's own
+  first remedy while `job_list_exhausted` was False: 168 candidates refused
+  and the solve completed in ~33s; 413 refused, 37.2s; 573 did not finish
+  inside a 45s call; 601 the same. The refusal never changed between 168 and
+  413 because the binder was a control INTERACTION, not coverage — so growing
+  was the wrong remedy for 245 candidates' worth of clock, and past roughly
+  500 candidates a bounded environment can no longer read the answer at all.
+- **Why:** the hint repeats "grow the bank" with no price attached, and it is
+  the correct FIRST remedy (R98(2), and the 1910_9g near-miss is why it is
+  first), so this is not an argument to demote it. It is an argument that the
+  hint should carry the cost curve the caller needs to know when to stop
+  following it.
+- **Fix:** name the solve time the last slice took beside its coverage
+  percentage, so a caller can see the curve rather than infer it. And have the
+  bank-aware capacity check that prints "no single control is arithmetically
+  binding" name the SET it proved binding rather than only that no singleton
+  was — a caller can act on a named pair. That second half is the same surface
+  R203 needs and lands with it. Ben's open question from the same fragment,
+  not DEV's: should a ONE-entry contest set a portfolio-wide exposure cap for
+  12 entries it has no stake in? The mixed-portfolio merge floors
+  `max_sp_pair_repetition` and `max_shared_players` via `_slate_feasibility`
+  and does not floor the pct caps, which is how 0.35 and 1 arrived on a
+  `wta_satellite` slate whose own defaults are 0.45 and 2.
+
 ## Workstream 5 — Delivery, manifest, and preflight evidence
 
 What reaches outputs/ and what the record claims about it. R96 CLOSED and
@@ -2033,6 +2658,73 @@ per attempt. Nothing about these checks requires them to be serial.
 - **Fix:** add `csv.Error` to both except tuples; derive pitcher-ness from
   the salary `Position` column when Roster Position is CPT/UTIL.
 
+### R191. The preflight's `--salary` auto-resolve reaches for the newest promoted run, which on a Showdown slate is another session's Classic build (P1, S) | new 2026-08-23, merged from BUILD fragments `2026-08-20_BUILD_preflight-salary-autoresolve-wrong-run.md` and `..._-laahou.md`; TWO same-day field hits, mechanism VERIFIED-read
+
+- **What:** run `preflight_upload.py --entries <showdown.csv>` with no
+  `--salary`, per the skill's documented "three inputs resolve themselves"
+  path, and the resolution picks the newest `runs/<run_id>/inputs/DKSalaries.csv`
+  on disk, labeled `[promoted run snapshot]`. Twice on 2026-08-20 that was a
+  CONCURRENT session's Classic run: `1835_1g_sd` (NYY@BAL, 19 entries) resolved
+  to `20260820T214749Z_425a71ea`, and `2010_1g_sd` (LAA@HOU, 20 entries) to
+  `20260820T215055Z_4dcbd138`. Both exited 2 with `27 rostered player ID(s)
+  absent from the salary file` and `embedded player pool overlaps the salary
+  file at 0.0% (0/178)`. Both delivered files were clean: passing `--salary`
+  at the originally uploaded file gave 100.0% overlap and exit 0 immediately.
+- **Why:** the resolution assumes the newest run belongs to the file being
+  checked, which holds for Classic because `run_slate` promotes a run per
+  build. Showdown's `build_slate.py` path creates no `runs/<run_id>/` at all,
+  so on a Showdown preflight the search has nothing of its own to find and
+  falls through to whatever run was newest. Two hits on two slates in one day
+  is not a race, it is the expected behaviour any time a Classic build is
+  promoting while a Showdown preflight runs — and it would misfire the other
+  direction too, a Classic preflight resolving to a stale prior run, if the
+  timing lined up. The cost is a hard-blocking WRONG answer, not a warning,
+  at the one check that stands between a build and the money boundary; it
+  cost a round trip to a session that knew to pass the flag and would cost a
+  delivery to one that did not.
+- **Fix:** scope the promoted-run search to a run whose own game set or tag
+  matches the entries file, and REFUSE to auto-resolve rather than reaching
+  past it — a named "could not resolve, pass --salary" is a better answer than
+  a confident wrong file. Alternatively have Showdown builds write their own
+  minimal `runs/<run_id>/inputs/` snapshot so the resolution has something
+  real to find; that is the larger change and it is also what R41 needs
+  anyway. Regression fixture: two runs on one date, the newer one carrying a
+  different draftgroup, and an entries file matching the older.
+
+### R192. The preflight's showdown `top exposure` line counts the ROLE, not the PLAYER, so it drops the CPT column (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_preflight-exposure-drops-cpt.md`; reproduced exactly by the filing session
+
+- **What:** on the 2026-08-19 LAD@COL showdown delivery (`2040_1g_sd`, 19
+  entries) `preflight_upload.py` v1.1 printed `top exposure: Andy Pages 47.4%,
+  Zac Veen 47.4%, Mookie Betts 42.1%, Adael Amador 42.1%, Teoscar Hernandez
+  36.8%`. The brief's `player_exposure.by_player` and an independent positional
+  recount of the delivered CSV both give a different set, headed by Roki
+  Sasaki and containing Shohei Ohtani, neither of whom appears in the printed
+  five at all. Counting columns 5-9 (the five UTIL cells) and skipping column 4
+  (CPT) reproduces the printed numbers to the decimal.
+- **Why:** three costs, worst first. The two most concentrated players are
+  INVISIBLE — Sasaki captains 4 of 19 and is in 9 of 19; Ohtani captains 4 and
+  is in 8 — so an operator reading only the preflight sees a portfolio whose
+  most concentrated player is somebody else. It contradicts R153 in the one
+  place a pre-upload operator looks: R153 set `max_player_exposure_pct` at
+  0.50 "counting the PLAYER and not the role" on the same day and for the
+  express reason that correlated failure across entries is the washout axis,
+  the solver now enforces exactly that (realized max 9/19 = 47.4% at the
+  `floor(0.5*19)=9` cap), and the final check then prints a role-scoped number
+  beside it. And it fails in BOTH directions: every captained player is
+  under-reported and the ordering is wrong, so a genuine breach could read as
+  clean. Classic is unaffected — no multiplier role, so the two counts
+  coincide. Scope stated honestly: this is the informational display line, not
+  a hard check; every hard check passed and exit 0 was correct. The defect is
+  that a hand recount before handoff was necessary.
+- **Fix:** in the showdown branch of the exposure summary, resolve each roster
+  cell's draftable id to its player identity before counting, the way
+  `showdown.py` does for the cap, and count columns 4-9. Print the CPT-only
+  distribution on its own line as well, since the captain cap (0.25) and the
+  player cap (0.50) are separate controls and an operator checking either
+  against the brief currently has neither. Regression fixture already exists
+  in the field: the 08-19 LAD@COL portfolio, where Sasaki is 9 total / 5 UTIL,
+  so a player at the cap reads well under it on the UTIL-only count.
+
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
 The gate that proves the tree is sound, and the hygiene that keeps sessions
@@ -2049,9 +2741,13 @@ R12 are the context and process ideas; they slot in opportunistically.
 
 - **What:** (a) `requirements.txt` floors admit pandas 3.x, and on 3.0.2 the suite fails 4 tests in `ExcludedColumnCoercionTests` — the fixtures write `"False"` into a bool-dtype column (`test_core.py:4816,4846,4867`; pandas-3 strict setitem, already a FutureWarning on the pinned stack) — so the class guarding the forbidden-pool-reduction rule ERRORs before asserting anything, at the same moment the engine's own pandas behavior shifts underneath it. Reproduced in this audit's container on numpy 2.4.4 / pandas 3.0.2 / scipy 1.17.1, a floor-satisfying stack. The engine's own migration surface swept small and fixture-dominated (no iteritems/applymap/append/chained-assignment hits; `.copy()` discipline held; one latent Notes-append at `execution_pipeline.py:2474`). (b) `requirements.lock` hashes are cp310-only while the repo demonstrably runs under multiple interpreters (`__pycache__` holds cpython-310 AND cpython-313 artifacts; this audit's container ran 3.11): on any non-3.10 interpreter, `pip install --require-hashes` hard-fails with a hash error rather than a named interpreter mismatch — mid-T-minus if it happens live. (c) the audit's dependency gate is import-only (`audit.py:113`), never versions-vs-lock, so a wrong-pandas env reaches the test run before anything says so.
 - **Fix:** cap the floors (`numpy>=2.0,<3`, `pandas>=2.2,<3`, `scipy>=1.13,<2`); make the three fixture sites dtype-object first; add cp311/cp312 wheel hashes per pin or an env_probe interpreter assertion ("wrong interpreter: 3.13 vs lock 3.10"); have the audit report installed-vs-lock versions. Optional canary: a monthly scheduled ARCHIVE task resolves the floors into a throwaway venv, runs the audit, and drops a `docs/backlog_inbox/` fragment on failure.
+- **Rider added 2026-08-23, from BUILD fragment `2026-08-14_BUILD_cowork-sandbox-disk-full-blocks-scipy.md` (swept with the merge; its content survives here because nothing else records it).** The skill's preflight (`pip install -r requirements.txt --break-system-packages`) failed at T-18 on the 08-14 2138_4g slate with `OSError: [Errno 28] No space left on device: '/sessions/<session>/.local'` — `/sessions` at 100% (9.8G used, 0 available) with the session's own home holding only 288K of it, so nothing was reclaimable and clearing pip caches freed nothing. Cost about 3 minutes of a 20-minute window. **The workaround is now the standing practice and it is documented NOWHERE in the repo:** every session in this file's history runs `TMPDIR=/tmp PYTHONPATH=.pylibs`, `.pylibs` EXISTS on the mount, and `grep -c pylibs skills/generate-lineups/SKILL.md CLAUDE.md` returns **0 and 0** (measured 2026-08-23). So the recovery lives only in operator memory, which is exactly the shape that costs a T-18 window twice. Two lines in SKILL.md's sandbox section — the install target and the two environment variables — close it, and that half is XS and independent of the version pinning above.
 - **The floor cap LANDED 2026-08-17 under R147**, migrated to CHANGELOG.md; all three caps are in `requirements.txt`. Re-measured on the same stack that day: FIVE tests error, not four, since `RunSlateExclusionSeamTests` grew one after this entry was written. **(b), (c) and the fixture-dtype half stay OPEN and this item keeps its tier slot** — the cap makes a compliant install safe and does nothing about a non-3.10 interpreter hard-failing `--require-hashes`, or about the dependency gate that still checks imports rather than installed-vs-lock.
 
 ### R149. The installed skill is six moves behind and the drift check cannot see the cache a cloud session loads (P1, S) | new 2026-08-17, measured in session
+
+- **Rider added 2026-08-23, from DEV fragment `2026-08-19_DEV_r149-pointer-round-trip-verified-checklist-installed.md` (measured on a device Cowork session, read-only).** Four things, and the first is the input (a) was missing. **A THIRD cache root exists**, distinct from both this item names: a DEVICE session loads
+  `…/local-agent-mode-sessions/skills-plugin/<plugin-guid>/<session-guid>/skills`, mounted read-only in the sandbox, which is neither the repo's sibling `.claude/skills` that `skill_cache_dir` derives nor the container's `/root/.claude/skills/synced/`. It is **not derivable from the repo**, since two session GUIDs sit in the middle of it. Pointed at explicitly via `MLB_SKILL_CACHE_DIR`, the check returned `{"available": true, "checked": 2, "drifted": [], "oversized": []}`. **(b) is SATISFIED, and this is the first confirmation of the round trip:** `generate-lineups` in that cache is the 59-line pointer, sentinel present, trigger description byte-identical to the repo's at 815 of 1024 chars, so the R149 re-save DID reach it and R149's own 730-line no-sentinel measurement is superseded for this path. **mtime in that cache is not the save time** — the cached file read `2026-08-16 22:16`, two days BEFORE the re-save landed and one day before R142's commit — so read the sentinel and the description and ignore the timestamp. **A stale number in two places:** `mlb-standings-pull-checklist`'s repo description now measures **993** chars, under `SKILL_DESCRIPTION_LIMIT`, so the 1073-char figure in the `tools/audit.py` comment and in this entry is stale (the shortening appears to have ridden 189de4f, R142, with no separate commit); both need the one-line DEV pass. And the standing ask for (a): **record `cache_dir` in the terse output**, because a clean `skill_cache` line currently cannot be distinguished from one that checked a cache nobody loads. The "Also" half is closed — the checklist skill is installed in that cache as a POINTER per (c), round trip verified in-session, and the drift check moved `checked: 1` → `checked: 2` with `drifted: []`.
 
 - **ed6 rider (2026-08-22, VERIFIED-read from a live cloud container on
   2026-08-17, realigned with (d)):** the router IS deployed — that container's
@@ -2700,6 +3396,8 @@ was played can ever be learned from.
 
 ### R118. Retain the per-player FPTS map and replay portfolios against archived fields (P1, M) | new 2026-08-14, audit session; the audit's one strategic filing
 
+- **Rider added 2026-08-23, from ARCHIVE fragment `2026-08-22_ARCHIVE_r118-step-1-is-already-done.md`. Fix (1) is ALREADY SATISFIED and the re-mine backfill is unnecessary.** The strip is real (`field_miner.py:1982`), but both stripped maps are pure functions of `player_table`, which IS retained, and the miner itself builds them from exactly that list at `field_miner.py:703-710`; `own_by_player_norm` takes `player_table` as its only argument and `tools/ownership_pred.py:688` already calls it that way against an archived record. Measured across the archive: 379 mined records carry a `player_table`, 29,921 player-contest rows, **100% with a non-null `fpts`** (0 nulls), 5,926 distinct `(slate_date, player)` realized-scoring observations over 26 slate dates. **Verified rather than asserted:** twelve contests with internal position-row disagreements — the hardest reconstruction case — had their `{player → FPTS}` map rebuilt both ways, from the archived `player_table` and by re-parsing the raw standings CSV with `parse_standings_export`, and came back **12 of 12 identical, 0 mismatches.** So this item's M-lift shrinks to the replay tool: no backfill, no re-mine, no sidecar. Two caveats a replay tool MUST carry, both measured. **(i)** 1,076 of 29,921 rows (3.6%) are one player holding two DIFFERENT `fpts` values across roster-position rows inside a single contest; the engine's collapse is FIRST-WINS over the ordered list, so any reconstruction must be first-wins over the same order or it will silently disagree on those — the same DK multi-position row-splitting that produces `dk_table_deficit_pts`. **(ii)** 125 `(slate_date, player)` pairs disagree across contests on the same date, so **`slate_date` alone is not a valid key for a realized-FPTS table; the draftgroup is** — and the archive does not currently record the draftgroup on a mined record, which is a prerequisite this item now owns.
+
 - **What:** every mined contest computes `fpts_by_norm` — the exact
   {player → realized DK FPTS} map for that contest's whole field — and the
   archive step strips it (`field_miner.py:1961`; `fpts`/`FPTS` appears in no
@@ -2799,6 +3497,173 @@ was played can ever be learned from.
 - **What:** a successful mine moves the standings CSV out of `data/standings/inbox/` into `data/archive/<slate_date>/`, per the contract. The zip that CSV came from does not move, so it sits in the inbox forever, and the next run of `extract_inbox_zips.py` re-extracts the CSV the miner just archived, refilling the queue with contests that are already done. Measured at the filing session's start: 91 CSVs in the inbox, 83 already mined, 46 byte-identical to the archived copy. The 8 that actually needed work were invisible in the pile, and finding them meant diffing inbox IDs against `data/archive/*/mined_*.json` by hand — the same shape of problem R43 fixed for the awaiting-standings scan, one layer earlier in the pipeline.
 - **Why now, not before:** R43 (`tools/awaiting_standings.py`) reads `data/archive/*/mined_*.json` directly and is immune to this, since a stale re-extracted CSV in the inbox does not change what has actually been mined. So this is a real operator-time cost, not a correctness risk to the archive — hence P2, not P1.
 - **Fix:** `extract_inbox_zips.py` skips a zip whose contest ID already has a `data/archive/*/mined_<id>.json`, and a successful mine relocates the zip the same way it already relocates the CSV (`--no-archive-move` should opt both out together, not just the CSV). Done when a mine leaves neither a stale CSV nor a stale zip behind in the inbox.
+- **Rider added 2026-08-23, from ARCHIVE fragment `2026-08-22_ARCHIVE_extract-zips-never-moves-r44-evidence.md`.** The missing call is now named rather than inferred: `grep -n "processed_zips\|shutil.move\|os.replace\|rename" tools/extract_inbox_zips.py` returns NOTHING. The tool extracts and returns; it has never relocated a zip. `data/standings/processed_zips/` holds 127 files and every one was moved there **by hand**, which means the hand-move IS this item's mechanism — the loop is not "the mine forgets the zip", it is "nothing in the tooling has ever moved one." The 08-22 pass added 60 more hand-moves, the 128th through 187th in the archive's history. Two constraints on the fix, both already recorded elsewhere: on this mount `rm` is refused and `mv` works (R109), so the fix must MOVE to `processed_zips/` and can never delete; and the cheap independent second guard is to skip a zip whose contest id already has a `data/archive/*/mined_<id>.json`, which is the same exclusion `awaiting_standings.py` already computes.
+
+### R196. `dk_contest_archetypes.csv` has no Solo Shot row (P2, XS — ARCHIVE's write set, not DEV's) | new 2026-08-23, merged from THREE BUILD fragments (`2026-08-19_BUILD_solo-shot-archetype.md`, `..._-recurred.md`, `2026-08-22_BUILD_solo-shot-archetype-3rd-occurrence.md`); THREE occurrences in four days
+
+- **What:** `MLB $2.5K Solo Shot (Night)` (08-19, `2005_3g`) matched no archetype
+  row, so `preflight_upload.py` warned that no archetype could be inferred.
+  Recurred 08-20 on `MLB $500 Solo Shot (Late Night)` (`2005_2g`), where
+  `autobuild.py` REFUSED on attempt 1: "matched no archetype; it would build as
+  large_gpp by fallback, not by identification." Same family, different dollar
+  amount, so the pattern is the family name and not the price.
+- **Why:** the 08-19 instance cost nothing because the posture was supplied
+  explicitly, which is what the ledger Quick Card asks for anyway. The 08-20
+  instance cost a full autobuild round trip on a super-late slate with ~24
+  minutes to first lock. A pattern hit twice under a tightening clock is worth
+  the one row.
+- **Fix:** add the `Solo Shot` family to `data/reference/dk_contest_archetypes.csv`
+  — a Solo Shot is single-entry per DK, so posture `single_entry`, shape
+  `single_entry_gpp`, pattern likely the bare string `Solo Shot`. **This is
+  ARCHIVE's file per the multi-session contract, so it cannot land from a DEV
+  claim; it needs an ARCHIVE session or Ben's explicit grant.** Second, smaller
+  question from the same fragment: `qa_portfolio.py` printed `large_wta ->
+  wta_satellite [COLLAPSED]` for three satellites, so the field model priced
+  them at a coarser shape than the one entered — worth deciding whether the
+  satellite family deserves its own archetype row rather than collapsing.
+- **Third occurrence, 2026-08-22 (`1335_3g`, `MLB $2.5K Solo Shot (Early)`):**
+  `--postures 194183875=single_entry` supplied by hand again, third time paying
+  the same one-line tax on three price points in four days ($2.5K Night, $500
+  Late Night, $2.5K Early). The write-set boundary is the whole reason this
+  keeps recurring: the fix is one CSV row and the role that reads it cannot
+  write it. Worth Ben granting a standing DEV exception for
+  `dk_contest_archetypes.csv` ADDITIONS, or an ARCHIVE session picking it up in
+  the next tranche — either closes it, and nothing else will.
+
+### R201. `MIN_AUTO_TEAM_COVERAGE` is a false negative on a small slate, and it overrides the tier the code's own docstring calls authoritative (P1, S) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_team-coverage-floor-false-negative.md`; head of this workstream's remainder
+
+- **What:** `field_miner.py:491-494` computes `result["team_coverage"] =
+  len(drafted_teams) / len(salary_teams)` and requires it `>= 0.80` for a salary
+  file to be usable. `team_coverage` measures how many of the salary file's
+  teams THIS CONTEST'S FIELD happened to draft — a property of the contest, not
+  of the file. A file can be the exactly correct one, join 100% of the contest's
+  player references, and still be rejected because the field ignored two teams.
+- **Why P1:** it destroys evidence, on the tier that cannot be wrong. Measured
+  on slate `1507_3g` (ledger A-038, 2026-08-13, three games / six teams), where
+  six contests share one manifest row, one `run_id` and one `DKSalaries.csv`:
+  four resolved via the manifest and joined 100%, and two — 193662864 (23
+  entries) and **193707894 (142 entries)** — were declined `standings_only` on
+  `joined 100% with 67% team coverage`, losing their salary, stack and
+  cheap-count tables against a file that is provably right. 142 entries rules
+  out "tiny field". Two things make this worse than a badly chosen threshold.
+  **It fires on the MANIFEST tier**, whose own docstring says it "is the
+  authoritative tier and it exists because scoring cannot find it" — the
+  manifest already knows which file the build used, by construction, and the
+  resolver then scores that answer and throws it away. And **on a small slate
+  the metric cannot land near the threshold**: with six teams the only reachable
+  values are 4/6 = 0.667 and 5/6 = 0.833, so there is nothing between fail and
+  pass and the floor is effectively "the field must touch five of six teams."
+- **Fix:** three, in the order ARCHIVE would take them. (1) **Exempt the
+  manifest tier from `team_coverage` entirely** — the tier exists because
+  scoring is the wrong instrument, so applying a scoring criterion to it
+  reintroduces the problem it was built to avoid; keep the join-rate floor
+  there as a corruption check. (2) Floor `len(salary_teams)` before the metric
+  is meaningful — under eight or ten teams the ratio is too coarse to carry a
+  0.80 threshold and the check should report "not applicable" rather than a
+  plausible-looking 0.67. (3) Report the decline reason distinctly, since
+  `standings_only` currently covers both "no salary file for this slate exists"
+  and "a salary file was found and scored below a floor", which are different
+  facts with different remedies.
+
+### R198. A mine costs 39s and 96% of it is avoidable; the registry rewrite makes a tranche quadratic (P2, S + M) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_mine-cost-is-quadratic-in-the-archive.md`; cProfile-measured, not estimated
+
+- **What:** `cProfile` on one mine on the Cowork mount with `--auto-salary
+  --emit-ledger`: `field_miner.main` 39.444s cumulative, of which
+  `resolve_salary_tiered` is 27.919 and `default_salary_candidates` alone is
+  27.643 (1,121 `posix.stat` calls, 559 `pathlib.glob`), and `update_registry`
+  is 10.421 with `_write_registry`'s `json.dump` at 10.161 for 6.8 MB. Two
+  independent structural costs. **(1)** `default_salary_candidates(root)`
+  re-globs three patterns and stats ~1,000 paths on EVERY mine, the list is
+  identical across mines in one pass (no `DKSalaries*.csv` is created by
+  mining), and it is computed UNCONDITIONALLY — including when the manifest
+  tier is about to answer without ever looking at it, because
+  `resolve_salary_tiered` evaluates it eagerly before it knows if it needs it.
+  **(2)** `_write_registry` rewrites the whole registry per mine, so a tranche
+  of N contests costs O(N × archive_size); at 271 archived contests that was
+  10.4s per mine and it keeps rising.
+- **Why:** a run-scoped memoization of `default_salary_candidates` (verified
+  behaviour-preserving against an uncached call first) took the 108-contest pass
+  from ~39s to ~12-22s per contest — ~70 minutes down to ~25, and on a sandbox
+  with a ~178s call ceiling the difference between 4 mines per call and 8-17.
+  The patch lived in `tools/_scratch_archive0822/` and was swept with the pass,
+  so nothing in the tree improved.
+- **Fix:** make `default_salary_candidates` LAZY inside `resolve_salary_tiered`
+  (that alone removes 27.6s from each of the 47 contests the manifest tier
+  answered in this tranche), and `lru_cache` it per resolved root with the
+  invariant stated in the docstring: no salary file is created during a mining
+  pass. Those two are S and independent. The registry is the M half: the honest
+  fix is an append or keyed update rather than a whole-file `json.dump`, and if
+  that is too large, a bulk-mode flag deferring the registry write to the end of
+  a batch collapses N rewrites into one — `tools/rebuild_registry.py` already
+  proves the batch shape is safe. Price the M half against how often a
+  100-contest tranche actually happens.
+
+### R199. `rebuild_registry.py` sources standings CSVs, so three archived contests can never enter the registry (P2, XS-S) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_registry-rebuild-cannot-see-three-archived-contests.md`
+
+- **What:** ledger 3.19 established, after the R97 rebuild, that `contests_mined`
+  equals the archive's contest ids exactly in both directions. After the 08-22
+  pass: registry 375, distinct archive ids 378 (379 mined files; 192464820 is
+  double-foldered under 07-18 and 07-19 per 3.16), none in the registry absent
+  from the archive, and **three in the archive absent from the registry**:
+  191787184, 191787186, 191823035. All three are 2026-06-29, all schema
+  `0.3-review`, and all three carry BOTH a `contest_id` and a
+  `meta.winning_entry_id`, so R74(a)'s legitimate "no contest identity" decline
+  does not explain them.
+- **Why:** structural, not a bug in the decline logic.
+  `tools/rebuild_registry.py:98` globs `contest-standings-*.csv` — the rebuild's
+  source of truth is the raw export, not the mined record — and
+  `data/archive/2026-06-29/` holds three `mined_*.json` and an
+  `ownership_rows_*.csv` with **no standings CSV at all**. The A-001 seed
+  tranche's raw exports were never retained under that name, so re-running the
+  rebuild can never close the gap, and the exports are 54 days old, which on
+  this tranche's age evidence makes them unrecoverable from DK.
+- **Fix:** two options, not equivalent. (1) Have the rebuild fall back to
+  `mined_*.json` where no standings CSV exists — the mined record carries
+  `entries[]` with `username` and `entry_id`, which is what the registry
+  accumulates, so the fallback is real rather than a stub, and the invariant
+  holds again. (2) Record the three as a known permanent exclusion and restate
+  3.19's invariant as `contests_mined == archive_ids - retained_exclusions`.
+  ARCHIVE recommends (1): the registry is derived data and the archive is the
+  source, and right now the archive holds a source the rebuild declines to
+  read. Three contests of 378 does not justify jumping the queue.
+
+### R200. Three archival mechanisms the docs mandate have run zero, zero, and once (P2, S; one half is Ben's, not code) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_runbook-mechanisms-that-never-ran.md`
+
+- **What:** **(a)** `ls data/archive/*/contest_*.json | wc -l` → **0**. Runbook
+  Job 1 step 2 mandates a per-contest JSON carrying entry fee, field size, paid
+  places, cash line, payout structure, seats and Ben's own entry ids, and calls
+  `paid_places` "required for the posture allocator (an UNRESOLVED tier blocks
+  allocation)." In 379 archived contests it has never been produced once. The
+  consequence is measured: **all 89 own-results records in this tranche carry
+  `paid_places`, `entry_fee` and `winnings_total` null**, so
+  `posture_allocator.classify_tier` returns UNRESOLVED for every one of them,
+  permanently. There are now TWO mechanisms for the same fact and neither is
+  fed — the per-contest JSON (never written) and
+  `--paid-places-from data/reference/dk_contest_paid_places.json`, the parked
+  export, dated 2026-07-29 and covering **0 of these 108 contests**; that file's
+  own `_label` is stale too, claiming "the miner has no `--paid-places` flag,"
+  which was true when it was parked and is not true now. **(b)** Ledger Section
+  5 describes `ownership_rows_<slate_date>.csv` accumulating per slate as step 1
+  of the ownership model's sequence. Exactly one exists,
+  `data/archive/2026-06-29/ownership_rows_2026-06-29.csv`, from the A-001 seed
+  on 2026-07-04; no mine since has written one and no code path does. **(c)** is
+  filed as the R44 rider above.
+- **Why:** a runbook step that has never executed in 379 contests is not a step,
+  and leaving it in makes every archival session believe the field is capturable
+  when it isn't.
+- **Fix:** (a) pick ONE mechanism and retire the other from the runbook — the
+  `--paid-places-from` path has a working CLI and a bulk shape, so the cheap
+  answer is to delete step 2's JSON schema, replace it with "refresh the DK
+  contest entry-history export into
+  `data/reference/dk_contest_paid_places.json`", and say plainly that the export
+  is the only source of `paid_places` and `seats`. **This half has a Ben-side
+  blocker and no code fix: the entry-history export is a manual DK download and
+  the current one ends 2026-07-28.** (b) either delete the claim from Section 5
+  or make the miner emit it — but note first that it may be REDUNDANT now:
+  `player_table` carries player, `pct_drafted` and realized `fpts` per contest
+  and the salary join is available at `coverage: full`, so the long-format table
+  is derivable from what is already archived. Decide that before building an
+  emitter. Related: the R118 rider filed the same day.
 
 ### R38. `tools/net_to_date.py` prints an inconsistent TOTAL (P2, XS) | from ARCHIVE fragment 2026-07-30, merged 2026-08-01
 
@@ -2851,6 +3716,25 @@ Consumed fragment, verbatim:
 ## Closed number stubs
 
 Numbers reserved forever; the records live in CHANGELOG.md.
+
+### R190. FILED AND CLOSED 2026-08-23 -- F4's platoon hand died at three boundaries, entry migrated
+
+Filed and landed in one session, so it never sat on the open board. The number
+is reserved. Three sites, one term: `fetch_slate_bundle.fetch_lineups_feed`
+fetched `batSide` and not `pitchHand`, so every probable left the bundle at
+`hand: None` (30 of 30 on 08-18 and again on 08-19) and the platoon half of F4
+was inert for every hitter while `bat_side` sat populated on all 270;
+`build_slate.showdown_handedness` keyed the hand by the feed's raw team abbrev
+against DK's `Opponent`, so `AZ` never matched `ARI` and one whole side's
+platoon factor collapsed to 1.00; and the brief's `pool` block carried the
+symptom (`f4_platoon_applied: 0`) while dropping both structured pool_report
+facts a reader would join it to. **One mutation SURVIVED and changed the fix
+rather than the test:** normalizing DK's own column as well passed every
+fixture, because no honest fixture can put a non-DK code in a DK column, so
+the symmetric half was dropped and the fix is one-sided — which is also the
+shape of the defect. Merged from three BUILD fragments (08-18, 08-19 ×2) plus
+the 08-19 Showdown fragment's item 1. Gate 1221 -> 1236. Full reasoning in
+CHANGELOG.md.
 
 ### R47. CLOSED 2026-08-09 -- investigated, both mechanisms found, entry migrated
 

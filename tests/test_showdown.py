@@ -1081,5 +1081,219 @@ class OddsFailureMessageTests(unittest.TestCase):
             self.assertIn(phrase, build)
 
 
+class ShowdownHandednessTeamCodeTests(unittest.TestCase):
+    """R190(b). The platoon lookup had a DK code on one side and an API code on
+    the other, and neither was normalized.
+
+    `showdown_handedness` keys the probable's hand by the lineups feed's raw
+    `team_abbrev` and then looks that up against the DK salary file's
+    `Opponent`. The MLB Stats API writes `AZ`; DraftKings writes `ARI`.
+    `DK_ABBREV_REMAP` exists for exactly this and was not called here.
+
+    Measured on the 2026-08-19 1610_1g_sd (ARI @ BOS) build: the feed carried
+    BOTH probable hands (Pfaadt R, Tolle L) and the brief still reported
+    `platoon_unresolved_teams: ["ARI"]` with `teams_with_hand: 1`. Every BOS
+    hitter took a flat 1.00 against RHP Pfaadt instead of 0.94 same-handed or
+    1.04 opposite, a ~10% relative gap between that side's L and R bats,
+    collapsed silently. The failure is ONE-SIDED by construction, which is why
+    it read half-clean: the side whose code needed no remap resolved fine.
+
+    `AZ` is one of seven aliases in the remap; the six FanGraphs spellings
+    (WSN TBR CHW KCR SDP SFG) reach this same boundary from a pasted or
+    FanGraphs-sourced feed.
+    """
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_sd_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    class _Args:
+        lineups = None
+        date = "2026-08-23"
+
+    def _run(self, feed_abbrev, dk_abbrev):
+        import json
+        mod = self._module()
+        feed = {"games": [{
+            "away": {"team_abbrev": feed_abbrev,
+                     "lineup": [{"name": "Corbin Carroll", "bat_side": "L"}],
+                     "probable_pitcher": {"name": "Pfaadt", "hand": "R"}},
+            "home": {"team_abbrev": "BOS",
+                     "lineup": [{"name": "Jarren Duran", "bat_side": "L"}],
+                     "probable_pitcher": {"name": "Tolle", "hand": "L"}}}]}
+        df = pd.DataFrame([
+            {"Name": "Corbin Carroll", "Team": dk_abbrev, "Opponent": "BOS"},
+            {"Name": "Jarren Duran", "Team": "BOS", "Opponent": dk_abbrev}])
+        with tempfile.TemporaryDirectory() as tmp:
+            slate_dir = Path(tmp)
+            (slate_dir / "lineups_feed.json").write_text(
+                json.dumps(feed), encoding="utf-8")
+            return mod.showdown_handedness(self._Args(), slate_dir, df)
+
+    def test_an_api_abbrev_resolves_against_the_dk_abbrev(self):
+        _, facing, note = self._run("AZ", "ARI")
+        self.assertEqual(facing, {"BOS": "L", "ARI": "R"})
+        self.assertEqual(note["teams_with_hand"], 2)
+        self.assertEqual(note["teams_without_hand"], [])
+
+    def test_a_fangraphs_abbrev_resolves_too(self):
+        # Same remap table, a different alias family: the six FanGraphs
+        # spellings are not a hypothetical, a pasted feed uses them.
+        _, facing, note = self._run("SDP", "SD")
+        self.assertEqual(facing, {"BOS": "L", "SD": "R"})
+        self.assertEqual(note["teams_with_hand"], 2)
+
+    def test_a_team_needing_no_remap_is_unaffected(self):
+        # The regression guard: normalizing must not break the codes that
+        # already matched, which is every team but the seven aliased ones.
+        _, facing, note = self._run("BAL", "BAL")
+        self.assertEqual(facing, {"BOS": "L", "BAL": "R"})
+        self.assertEqual(note["teams_without_hand"], [])
+
+    def test_a_genuinely_missing_hand_is_named_not_counted(self):
+        # `teams_with_hand: 1` used to be the only signal, and it could not
+        # distinguish a code mismatch from a hand the feed never had. The new
+        # list names WHICH DK team, so the two causes read differently.
+        import json
+        mod = self._module()
+        feed = {"games": [{
+            "away": {"team_abbrev": "AZ",
+                     "lineup": [{"name": "Corbin Carroll", "bat_side": "L"}],
+                     "probable_pitcher": {"name": "Pfaadt", "hand": None}},
+            "home": {"team_abbrev": "BOS",
+                     "lineup": [{"name": "Jarren Duran", "bat_side": "L"}],
+                     "probable_pitcher": {"name": "Tolle", "hand": "L"}}}]}
+        df = pd.DataFrame([
+            {"Name": "Corbin Carroll", "Team": "ARI", "Opponent": "BOS"},
+            {"Name": "Jarren Duran", "Team": "BOS", "Opponent": "ARI"}])
+        with tempfile.TemporaryDirectory() as tmp:
+            slate_dir = Path(tmp)
+            (slate_dir / "lineups_feed.json").write_text(
+                json.dumps(feed), encoding="utf-8")
+            _, facing, note = mod.showdown_handedness(self._Args(), slate_dir, df)
+        self.assertEqual(facing, {"BOS": "L"})
+        self.assertEqual(note["teams_with_hand"], 1)
+        self.assertEqual(note["teams_without_hand"], ["ARI"])
+
+
+class PoolBriefBlockTests(unittest.TestCase):
+    """R190(c). The brief's pool block held the symptom and dropped the fact.
+
+    On the 2026-08-18 1910_9g build the counts block read
+    `f4_platoon_applied: 0` against `f4_hitters_scored: 162`, with
+    `signal_applied: true`, `degraded: false` and `factors_inert: []` -- every
+    summary line green and the whole platoon term dead. The pool block carried
+    four keys (teams, platoon_source, warnings, blockers) and neither of the
+    two structured facts the engine's pool_report has carried since R117(b)
+    and R143, so a reader who noticed the 0 had nowhere to go.
+    """
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_pool_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_the_two_structured_facts_reach_the_brief(self):
+        mod = self._module()
+        block = mod.pool_brief_block(
+            {"teams": {"ARI": {}, "BOS": {}},
+             "warnings": ["w"], "blockers": [],
+             "opposing_probables_incomplete": {"no_hand": ["ARI", "BOS"],
+                                               "no_mlbam_id": []},
+             "dk_batting_order": {"dk_sides": ["ARI", "BOS"],
+                                  "f4_handedness_unavailable": []}},
+            {"platoon_source": "rotowire"})
+        self.assertEqual(block["opposing_probables_incomplete"]["no_hand"],
+                         ["ARI", "BOS"])
+        self.assertEqual(block["dk_batting_order"]["dk_sides"], ["ARI", "BOS"])
+        # The four that were already there stay, unchanged.
+        self.assertEqual(block["teams"], 2)
+        self.assertEqual(block["platoon_source"], "rotowire")
+        self.assertEqual(block["warnings"], ["w"])
+        self.assertEqual(block["blockers"], [])
+
+    def test_a_pool_report_without_the_keys_still_produces_a_block(self):
+        # The engine's own API path and a refusal payload do not always carry
+        # them, and a KeyError in the brief writer would lose the brief on
+        # exactly the builds that most need one.
+        mod = self._module()
+        block = mod.pool_brief_block({}, {})
+        self.assertEqual(block["opposing_probables_incomplete"], {})
+        self.assertIsNone(block["dk_batting_order"])
+        self.assertEqual(block["teams"], 0)
+
+
+class GateCallCeilingTests(unittest.TestCase):
+    """R190(d). `--gate-budget` was tunable and did nothing on its own.
+
+    `GATE_CALL_CEILING_S = 39.0` capped the child underneath the budget, so
+    raising the budget to 90 still killed the child at 39s — which reads
+    exactly like a test that cannot finish. A unit slower than the ceiling
+    accumulated two "started" records, got marked `oversized`, and the gate
+    became STRUCTURALLY unable to print its clean line.
+    `DeterminismTests.test_solver_inputs_are_identical_across_hash_seeds`
+    measured 11.36s when R152 landed and 36.4s on 2026-08-23 in a container
+    whose own call cap is ~178s. That is R152's own lesson ("the device VM is
+    not a constant and no fixed chunk plan survives it") arriving at the CALL
+    CEILING instead of the chunk plan.
+    """
+
+    def setUp(self):
+        import importlib
+        self.audit = importlib.import_module("tools.audit")
+
+    def test_saying_nothing_keeps_the_device_default(self):
+        # The 45s device_bash figure is unchanged for a caller who does not ask.
+        import os
+        with unittest.mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(self.audit.gate_call_ceiling(),
+                             self.audit.GATE_CALL_CEILING_S)
+
+    def test_an_explicit_ceiling_wins(self):
+        import os
+        with unittest.mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(self.audit.gate_call_ceiling(150.0), 150.0)
+
+    def test_the_environment_is_read_when_no_flag_is_given(self):
+        import os
+        env = {self.audit.GATE_CEILING_ENV: "150"}
+        with unittest.mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(self.audit.gate_call_ceiling(), 150.0)
+        # A flag still beats it, so a host default cannot override a caller.
+        with unittest.mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(self.audit.gate_call_ceiling(200.0), 200.0)
+
+    def test_an_unparseable_environment_value_falls_back_rather_than_raising(self):
+        # The gate is the thing that says whether the tree is sound; a typo in
+        # an environment variable must not be how it stops working.
+        import os
+        env = {self.audit.GATE_CEILING_ENV: "not-a-number"}
+        with unittest.mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(self.audit.gate_call_ceiling(),
+                             self.audit.GATE_CALL_CEILING_S)
+
+    def test_a_raised_budget_can_never_be_capped_underneath(self):
+        # This is the defect itself, as a property: whatever the ceiling says,
+        # the child gets at least the budget it was told it could spend, plus
+        # the reserve an unknown class needs. Without this floor, --gate-budget
+        # 90 against a 39s ceiling is a silent no-op.
+        import os
+        with unittest.mock.patch.dict(os.environ, {}, clear=True):
+            got = self.audit.gate_call_ceiling(budget=90.0)
+        self.assertGreaterEqual(got, 90.0 + self.audit.GATE_UNKNOWN_RESERVE_S)
+        with unittest.mock.patch.dict(os.environ, {}, clear=True):
+            got = self.audit.gate_call_ceiling(20.0, budget=90.0)
+        self.assertGreaterEqual(got, 90.0 + self.audit.GATE_UNKNOWN_RESERVE_S)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
