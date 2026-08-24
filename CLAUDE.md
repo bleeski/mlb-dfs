@@ -53,6 +53,19 @@ This file carries the contracts and the gotchas. Each procedure lives once:
   history from before that date sits under "Imported record" at the bottom.
   Slate outcomes go to the ledger and per-build records to that run's brief;
   neither goes here.
+  **R233. An entry claiming a rule now lives in ONE place carries the grep
+  that enumerates the class at that head, with its hit list.** Seven greenfield
+  editions have found the same event: a fix closes N named sites and the class
+  has N+1. R167 unified four copies of the units rule and the fifth still
+  clamps; R169(a) saved the decision log on the timeout path and the sibling
+  wall-clock exit still destroys it; R153 bound both Showdown caps "on every
+  rung" and the floor rung still drops one; R159 unified two components and
+  minted a new disagreement between its own comment and its own guard. Each
+  was cheap to prevent and expensive to find. The rule is not "grep before
+  fixing" — sessions already do — it is that the enumeration goes in the ENTRY,
+  where the next reader and the next reviewer can check the count instead of
+  re-deriving it. A deliberately-kept copy is fine; it is named in the entry
+  with the reason it survives.
 
 ## Autonomy (Ben, 2026-08-16)
 Ben's instruction: use your intelligence to override, relax and constrain

@@ -25,6 +25,112 @@ performance claim.
 
 ---
 
+## 2026-08-24 — ed7 + Codex double greenfield adjudication: R212-R233 filed, six riders, five board corrections, eight rejections, the queue resequenced to fifteen slots, and R233 closed in this commit
+
+DEV, claim `engine` (bare mutex). Docs and CLAUDE.md only; no engine path
+touched, no test count moved, gate unchanged at `PASS v2.26.0 26 modules 1276
+tests` (this morning's DEV session's chunked-gate assembly, fingerprint-valid at
+this tree). Working-tree dirt was ARCHIVE-owned and untracked archive material,
+classified and left alone per the multi-session contract.
+
+**What this was.** Two independent greenfield reviews written against the same
+commit, adjudicated together for the first time: the seventh edition
+(`docs/2026-08-24_critique_greenfield_spec_ed7.md`, five reviewer lanes plus a
+coordinator) and an outside specification
+(`docs/DFS_SYSTEM_GREENFIELD_SPEC_CODEX.md`, 5 core findings and 36 defects plus
+a full target architecture). Both reviewed `a49bd610`; HEAD did not move during
+either. **Every finding filed here was re-verified by exact-line read against the
+tree in this session before it got a number** — the reviews-race rule, and it
+earned its place: two of the outside spec's claims did not survive it.
+
+**Filed: R212-R233,** entered in their workstreams. Grouped by the class they
+belong to rather than by reviewer: the lost-window remainder (R212 the wall-clock
+exit that writes no decision log, R213 two unguarded front-door JSON reads, R214
+the supervisor replacing rather than merging an operator's controls, R215 the
+units family's three remaining members); the intake seam R159 left (R219 a
+degraded DK side deferring to any nonempty feed lineup, R220 three scoping and
+edge cases, R221 the doubleheader merge, R222 the discarded Savant collision
+report); Showdown (R223 the floor rung dropping the captain cap uncounted, R224
+two cap-resolver smalls); the archive (R225 captain-blind duplication counting at
+three sites, R226 winner-by-points instead of verified rank one, R227 the
+non-atomic registry); the money boundary (R228 promotion fail-open on a missing
+manifest hash); the gate surface (R216 the fingerprint omitting `skills/`, R217
+four operational holes plus missing runtime identity, R218 the last two unbounded
+subprocesses); and hygiene and tests (R229, R230, R231, R232).
+
+**Twenty-one defects were found by both reviews independently.** That is the first
+time this project has had a second reader at the same head, and it is the reason
+several of these moved up: R219 and R225 in particular were reached by different
+methods from different starting points.
+
+**R233, filed and closed in this commit.** CLAUDE.md's changelog contract now
+requires that an entry claiming a rule lives in one place carry the grep that
+enumerates the class at that head, with its hit list. Four of ed7's sharpest
+findings are the same event — R167 unified four copies of the units rule and the
+fifth still clamps (R215(a)); R169(a) saved the decision log on the timeout path
+and the sibling wall-clock stop eight lines above still destroys it (R212); R153
+bound both Showdown caps "on every rung" and the floor rung still drops the
+captain cap (R223); R159 unified two components answering one question and minted
+a fresh disagreement between its own comment and its own guard (R219). The board
+already carried the intuition ("count the copies before believing N"). This is its
+mechanical half: one sentence of DEV discipline, no code, and it moves the
+most-repeated finding shape in seven editions to diff time. A deliberately kept
+copy stays fine; it gets named with the reason it survives.
+
+**Five board corrections, verified.** R191's mechanism is a POINTER read of
+`runs/latest_valid_run.json`, not an mtime scan of `runs/`, which makes the fix a
+scope-or-refuse inside one thirty-line function. R202 is PARTIALLY OVERTAKEN and
+is rewritten in place: `solver_probe` has `--salary` at HEAD plus a Showdown
+geometry refusal, and what survives is the missing draftgroup cross-check and the
+unnamed inputs. R205's "median with a sign guard" option is STRUCK, because the
+code already is a median and on the two-book production fetch a median of two IS
+the arithmetic mean; probability-space de-vig per book, then average, is the fix.
+R192 is NARROWED, and favourably — `advisory()` already person-keys the duplicate
+and overlap halves via R128, so only `top_exposure` counts roles and the fix
+reuses a map the same function already builds. R197 grows: it names one dead read
+and the class has FOUR, one of which returns a constant 12.0 ownership for every
+player into a live scoring term.
+
+**Six riders, no new numbers:** the live 08-23 dedupe fragment merges onto R194 as
+its root cause (it was dropped after the 08-23 consume, so it survived a merge
+session by timing); R198 must split its registry aggregates by contest type; R203
+is blocked by R214 and wants R207 before its detection half; R10 gains R225 as a
+precondition for any Showdown duplication cell; R118 is RE-PRICED cheaper —
+`player_table` with per-player FPTS survives the miner's strip into every archived
+`mined_*.json`, so the head of the EV path needs no miner change and no re-mine;
+R227 absorbs the outside spec's zip-limit and torn-writer notes at reduced
+severity.
+
+**Eight rejections, with reasons, in "Do not build".** The rebuild program is
+rejected for the seventh consecutive edition and the standing grounds are
+unchanged. Three rejections are new in kind, because they reject a review's
+reading of an existing DECISION rather than a program: C04 (the runtime lock
+called a Blocker, when `requirements.lock`'s own header names its scope and
+`requirements.txt` is the cross-platform floor), D29 (roster contracts called
+un-centralised, when the module docstring states the deferral and a test asserts
+CLASSIC against the engine's constants), and D35 (a global-pointer race with a
+second consumer that does not exist, against a module docstring that already
+carries the spec's own doctrine). What survives adjudication of C04 is filed as
+R217(d): the gate record stamps no runtime identity, on a tree whose `__pycache__`
+proves two interpreters have run against it. The EV diagnosis (C01/C02/C05) is
+ACCEPTED and is not new — it is this project's own truthful-labels rule — while
+its ordering is rejected, because Tier 2 reaches the same destination from an
+archive that already exists and R118 just got cheaper.
+
+**Queue resequenced to fifteen slots on impact against technical challenge, per
+Ben's standing instruction, with four dependencies now binding rather than
+advisory:** R214 before R203, R212 before the supervisor batch, R195 before R181
+(they share one line and R181's regex scoping would mask R195's defect behind a
+green eval), R225 before R10's Showdown cells. R216 is ranked High by both reviews
+and deliberately sits at slot 8 rather than slot 1, because fixing it resets
+in-flight gate state and every slot above it wants a warm gate: land it at a
+session boundary.
+
+**Archived:** both review documents now sit in `docs/` beside editions 3 through
+6, per the standing convention. The inbox fragment
+`docs/backlog_inbox/2026-08-24_REVIEW_greenfield-spec-ed7.md` is consumed and
+deleted; the 08-09 curated-archetypes fragment is kept by design.
+
 ## 2026-08-24 — R167 + R168 + R169: the lost-window batch. a units slip cleared the checkpoint and crashed after the bank spend, two build_slate exit doors turned a refusal into a crash, and the supervisor lost its whole decision log on the one run that needed it
 
 DEV, claim `engine` (bare mutex), plus a `ledger` claim for the Quick Card pin
