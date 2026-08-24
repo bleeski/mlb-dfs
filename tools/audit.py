@@ -278,7 +278,19 @@ EXPECTED_SUITE_COUNTS = {
     # it). Nineteen hand-run mutations, all nineteen caught -- two only after
     # the eleventh test was added, because every fixture until then handed the
     # merge an EMPTY feed and the in-feed branch was never executed at all.
-    "tests.test_core": 841,
+    # R167+R168+R169, 2026-08-24: 841 -> 863, the lost-window batch's
+    # twenty-two. Nine on the units rule now living in ONE place (five on the
+    # rule itself including 1.0 staying legal and 0 not being a slip, four on
+    # the override being the only surface validated and count controls being
+    # left alone) plus the closure inside _feasibility_report, which no
+    # assertion could reach without calling the report; three on build_slate's
+    # zero-cost operator gate and its key set covering both contest types;
+    # three on the exit contract as PROPERTIES (no tuple return in main(), no
+    # unguarded fetch_lineups in main()) rather than as the two instances found;
+    # seven on autobuild, which had none at all, driving main() with a patched
+    # subprocess so the timeout, the log's date precedence, the control
+    # allowlist and the passthrough order are each reached by a fixture.
+    "tests.test_core": 863,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -328,7 +340,12 @@ EXPECTED_SUITE_COUNTS = {
     # it dropped (`opposing_probables_incomplete`, `dk_batting_order`) and
     # still producing a block when a report carries neither, since a KeyError
     # there would lose the brief on the refusal path that most needs one.
-    "tests.test_showdown": 77,
+    # R167, 2026-08-24: 77 -> 79, the two that pin the Showdown caps under the
+    # same units rule as the Classic ones. `exposure_cap_count` validated
+    # nothing, so `25` typed for `0.25` returned a cap of 25n, capped nobody,
+    # and left every relaxation counter reading clean -- R153's washout axis
+    # switched off by a keystroke, invisible in the brief.
+    "tests.test_showdown": 79,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

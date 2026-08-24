@@ -337,6 +337,29 @@ class ShowdownDiversityTests(unittest.TestCase):
         self.assertEqual(sd.exposure_cap_count(0.25, 2), 1)
         self.assertIsNone(sd.exposure_cap_count(None, 20))
 
+    def test_a_units_slip_cannot_silently_disable_a_showdown_cap(self):
+        """R167. Both Showdown caps are read straight off --controls-override,
+        and `25` typed for `0.25` returned a cap of 25n: nobody was capped, and
+        every relaxation counter read CLEAN because nothing was ever relaxed.
+        That is R153's washout axis switched off by a keystroke, in the one
+        place the brief cannot show it. Same rule as the Classic caps, from the
+        same function."""
+        for slip in (25, 50, 1.01):
+            with self.assertRaises(ValueError, msg=repr(slip)):
+                sd.exposure_cap_count(slip, 19)
+        # and nothing legal moved: 1.0 is a cap on everyone, not a slip.
+        self.assertEqual(sd.exposure_cap_count(1.0, 19), 19)
+        self.assertEqual(sd.exposure_cap_count(0.25, 19), 4)
+
+    def test_the_showdown_caps_share_the_classic_units_rule(self):
+        """One definition, or the two contest types disagree about what 45
+        means while both print a number."""
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        for value in (0.25, 0.5, 1.0):
+            self.assertEqual(
+                sd.exposure_cap_count(value, 20),
+                max(1, math.floor(assert_fraction_cap(value) * 20)))
+
     def test_player_cap_structural_floor_is_roster_over_pool(self):
         """R153. A cap below roster_size/pool_size cannot hold by counting alone,
         before any MILP runs. Reported rather than auto-raised, because widening

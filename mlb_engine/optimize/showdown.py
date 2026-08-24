@@ -406,10 +406,17 @@ def exposure_cap_count(pct: Optional[float], n: int) -> Optional[int]:
     ``max(1, ...)`` keeps a cap from forbidding every player at tiny ``n`` (at
     n=1, floor(0.50 * 1) is 0, which is not a portfolio control, it is an empty
     bank). ``None`` in means the control is disabled and ``None`` comes back.
+
+    R167. A units slip was the one input this could not survive: ``25`` typed
+    for ``0.25`` returns a cap of 25n, which forbids nobody, and every
+    relaxation counter reads CLEAN because nothing was ever relaxed. That is
+    the R153 washout axis switched off by a keystroke, so the units rule the
+    Classic caps enforce is enforced here, from the same function.
     """
     if not pct:
         return None
-    return max(1, math.floor(float(pct) * max(1, int(n))))
+    from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+    return max(1, math.floor(assert_fraction_cap(pct) * max(1, int(n))))
 
 
 def player_cap_structural_floor(pool_size: int, n_entries: int,

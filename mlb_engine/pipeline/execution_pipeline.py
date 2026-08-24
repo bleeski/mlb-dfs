@@ -166,7 +166,9 @@ from mlb_engine.pipeline.build_state_manager import (
     create_run, promote_run, read_pointer_sha256, register_artifact,
     sha256_file, snapshot_run_inputs, update_run_certification,
 )
-from mlb_engine.allocate.contest_allocator import select_and_assign_entries
+from mlb_engine.allocate.contest_allocator import (
+    assert_fraction_cap, select_and_assign_entries,
+)
 from mlb_engine.contest_shapes import (
     SATELLITE_PAYOUT_TOKENS, SATELLITE_TYPE_TOKENS, WTA_CONSTRUCTION_SHAPES,
     satellite_shape_for, validate_shape,
@@ -2201,6 +2203,24 @@ def _merged_controls_for_build(
     merged: Dict[str, Any] = {}
     pct_keys = ("max_player_exposure_pct", "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct")
     rep_keys = ("max_sp_pair_repetition", "max_shared_players")
+    # R167. The override is the ONLY unvalidated way a control reaches the
+    # build: postures and feasibility floors are engine-authored, an override
+    # is typed by an operator, and `--controls-override
+    # max_pitcher_exposure_pct=45` used to travel all the way to the solve
+    # before anything objected. Validate it HERE, the one boundary both the
+    # build (run_slate) and the swap (late_swap) pass through, and validate it
+    # with the same function the solve enforces so the two cannot disagree.
+    #
+    # `min_five_stack_share_pct` is included because it is the same units
+    # question about a FLOOR: 50 typed for 0.50 is one quota nobody can meet
+    # rather than one cap nobody is under. Ownership percentages elsewhere in
+    # the engine live in 0-100 space and are deliberately NOT in this set;
+    # the four keys named here are the fraction-valued controls the merge
+    # itself produces.
+    _fraction_control_keys = pct_keys + ("min_five_stack_share_pct",)
+    for key, value in dict(override or {}).items():
+        if key in _fraction_control_keys and value is not None:
+            assert_fraction_cap(value, key=key)
     # R34. Floor keys merge by MIN like the ceilings, but for the opposite
     # reason. A ceiling merges to the tightest because one portfolio must
     # satisfy every contest's ceiling. A floor merges to the LEAST demanding
@@ -2535,14 +2555,23 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
         report["checks"].append({"name": "shared_players_floor", "passed": ok, "detail": detail, "remedy": remedy})
 
     # v1.9 pct-cap capacity checks, mirroring the allocator's _cap_count.
+    #
+    # R167: "mirroring" was aspirational. This copy clamped `pct > 1` where
+    # both production copies raise, so the checkpoint printed `45 -> cap 10`
+    # and reported the check PASSED against a control the solver would refuse.
+    # It now calls the same units rule. In practice
+    # `_merged_controls_for_build` has already rejected an override this bad,
+    # so reaching the raise here means a control arrived from somewhere that
+    # bypassed the merge -- worth a hard failure rather than a clamp that
+    # invents a plausible number.
     def _cap_count_local(pct: Any) -> Optional[int]:
         if pct is None:
             return None
-        value = float(pct)
+        value = assert_fraction_cap(pct)
         if value <= 0:
             return None
         from math import floor as _floor
-        return max(1, int(_floor(entries * min(1.0, value) + 1e-9)))
+        return max(1, int(_floor(entries * value + 1e-9)))
 
     if entries > 1:
         n_sps = feas.get("viable_sp_count")

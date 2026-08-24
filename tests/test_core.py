@@ -16161,5 +16161,463 @@ class LeverageControlsTests(unittest.TestCase):
                       report["available_optional_fields"])
 
 
+# ===========================================================================
+# R167 + R168 + R169 -- the lost-window batch, 2026-08-24.
+#
+# One defect class across three files: a failure that arrives AFTER the build
+# window has been spent, or in a form no documented consumer can read. R167 is
+# a units slip that cleared the checkpoint and crashed after the bank spend;
+# R168 is two exit doors in build_slate that turn a refusal into a crash;
+# R169 is the supervisor losing its whole decision log on exactly the run whose
+# post-mortem needs it.
+# ===========================================================================
+
+
+class FractionCapUnitsRuleTests(unittest.TestCase):
+    """R167. The units rule for a fractional exposure control, in one place.
+
+    R71(a) said it fixed "both `_cap_count` copies". There were three, and the
+    third clamped: `_feasibility_report`'s local copy computed
+    `entries * min(1.0, value)`, so `--controls-override
+    max_pitcher_exposure_pct=45` printed `45 -> cap 10`, reported the capacity
+    check PASSED, and then raised uncaught inside `execute_portfolio` after the
+    bank had spent minutes -- run left at status `building`, no diagnostics, at
+    T-time.
+    """
+
+    def test_the_rule_accepts_a_fraction_and_refuses_a_percentage(self):
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        for legal in (0.05, 0.25, 0.45, 0.999, 1.0):
+            self.assertEqual(assert_fraction_cap(legal), float(legal))
+        # 1.0 stays legal: CLAUDE.md's R157 delegation opens all three caps to
+        # 1.0 as the sanity check that the bank can certify at all.
+        for slip in (1.01, 25, 45, 100):
+            with self.assertRaises(ValueError):
+                assert_fraction_cap(slip)
+
+    def test_zero_and_below_are_unset_not_a_units_slip(self):
+        """A ceiling of 0 means "not set" and a floor of 0 means "no quota".
+        Neither is a mistyped percentage, so neither may raise -- every posture
+        ships `min_five_stack_share_pct: 0.0` and every one of them would refuse
+        to build."""
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        self.assertEqual(assert_fraction_cap(0.0), 0.0)
+        self.assertEqual(assert_fraction_cap(-1), -1.0)
+        merged = epi._merged_controls_for_build(
+            {"c1": {"posture": "wta_satellite"}},
+            {"min_five_stack_share_pct": 0.0})
+        self.assertEqual(merged["min_five_stack_share_pct"], 0.0)
+
+    def test_the_message_names_the_control_when_the_caller_knows_it(self):
+        """The operator typed one flag with five possible keys in it. "a cap is
+        > 1.0" makes them re-read their own JSON; naming the key does not."""
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        with self.assertRaises(ValueError) as ctx:
+            assert_fraction_cap(45, key="max_pitcher_exposure_pct")
+        self.assertIn("max_pitcher_exposure_pct", str(ctx.exception))
+        with self.assertRaises(ValueError) as bare:
+            assert_fraction_cap(45)
+        self.assertNotIn("max_pitcher_exposure_pct", str(bare.exception))
+
+    def test_all_three_copies_now_answer_the_units_question_the_same_way(self):
+        """The solve, the post-export validator, and the CHECKPOINT. The third
+        was the one that disagreed, and it was the one the operator read."""
+        from mlb_engine.allocate.contest_allocator import _cap_count as solve_side
+        from mlb_engine.entries.dk_entries_manager import _cap_count as export_side
+        with self.assertRaises(ValueError):
+            solve_side(20, 45)
+        with self.assertRaises(ValueError):
+            export_side(20, 45)
+        # The checkpoint copy is a closure inside _feasibility_report, so the
+        # only way to reach it is through the report itself. This fixture is
+        # the whole point: an assertion about the clamp could not see it.
+        feas = {"available": True, "entries": 9, "viable_sp_count": 6,
+                "stackable_team_count": 4, "floor_player_exposure_count": 3,
+                "largest_contest_entries": 9}
+        with self.assertRaises(ValueError):
+            epi._feasibility_report(feas, {"max_pitcher_exposure_pct": 45})
+
+    def test_the_checkpoint_report_is_unchanged_for_a_legal_control(self):
+        """The clamp removal must not move a single number a legal build sees."""
+        feas = {"available": True, "entries": 9, "viable_sp_count": 6,
+                "stackable_team_count": 4, "floor_player_exposure_count": 3,
+                "largest_contest_entries": 9}
+        report = epi._feasibility_report(feas, {"max_pitcher_exposure_pct": 0.45,
+                                               "max_primary_stack_exposure_pct": 0.35,
+                                               "max_player_exposure_pct": 0.45})
+        by_name = {c["name"]: c for c in report["checks"]}
+        self.assertIn("pitcher_exposure_capacity", by_name)
+        # floor(9 * 0.45) = 4, and 4 * 6 viable SPs = 24 >= 2 * 9 pitcher slots
+        self.assertIn("-> cap 4 x 6 viable SPs = 24 vs 18",
+                      by_name["pitcher_exposure_capacity"]["detail"])
+        self.assertTrue(by_name["pitcher_exposure_capacity"]["passed"])
+
+
+class OverrideUnitsBlockAtTheCheckpointTests(unittest.TestCase):
+    """R167, second half. WHERE the slip is caught, and that it is caught before
+    anything is spent."""
+
+    _POSTURES = {"c1": {"posture": "wta_satellite"}}
+
+    def test_every_fraction_control_is_validated_in_the_override(self):
+        for key in ("max_player_exposure_pct", "max_pitcher_exposure_pct",
+                    "max_primary_stack_exposure_pct", "min_five_stack_share_pct"):
+            with self.assertRaises(ValueError, msg=key) as ctx:
+                epi._merged_controls_for_build(self._POSTURES, {key: 45})
+            self.assertIn(key, str(ctx.exception))
+
+    def test_a_legal_override_and_a_count_control_are_untouched(self):
+        """The guard must not become a second opinion about non-pct controls.
+        `max_shared_players: 8` is a COUNT of players and 8 is the ordinary
+        value R157-class remedies name."""
+        out = epi._merged_controls_for_build(
+            self._POSTURES,
+            {"max_shared_players": 8, "max_sp_pair_repetition": 4,
+             "max_player_exposure_pct": 1.0,
+             "max_pitcher_exposure_pct": None})
+        self.assertEqual(out["max_shared_players"], 8)
+        self.assertEqual(out["max_sp_pair_repetition"], 4)
+        self.assertEqual(out["max_player_exposure_pct"], 1.0)
+        self.assertIsNone(out["max_pitcher_exposure_pct"])
+
+    def test_the_postures_and_the_feasibility_floors_are_not_re_validated(self):
+        """Only the OVERRIDE is operator-typed. A floor is engine-authored and
+        already clipped to 1.0 on its way in; validating it here would turn an
+        engine bug into a refused build with an operator-facing message."""
+        out = epi._merged_controls_for_build(
+            self._POSTURES, None, {"max_player_exposure_pct": 0.9})
+        self.assertEqual(out["max_player_exposure_pct"], 0.9)
+
+    def test_the_swap_passes_through_the_same_boundary_as_the_build(self):
+        """R29(3)'s rule was one implementation for build and swap. The guard
+        sits in that implementation rather than in run_slate, so late_swap's
+        operator override cannot reach the solve with units the build would
+        have refused."""
+        import ast
+        src = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", "") == "_merged_controls_for_build"]
+        self.assertTrue(calls, "late_swap stopped resolving controls through the "
+                              "shared merge; the units guard no longer covers it")
+
+
+class BuildSlateOperatorUnitsGateTests(unittest.TestCase):
+    """R167, the operator-facing half: the slip costs zero seconds."""
+
+    _SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv"
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_units_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_the_key_set_covers_both_contest_types(self):
+        """Showdown never passes through `_merged_controls_for_build`, so this
+        constant is the only boundary that sees a Showdown override at all."""
+        keys = set(self._module().FRACTION_CONTROL_KEYS)
+        self.assertIn("max_cpt_exposure_pct", keys)         # Showdown
+        self.assertIn("max_player_exposure_pct", keys)      # both
+        self.assertIn("max_primary_stack_exposure_pct", keys)  # Classic
+        # Named, never pattern-matched on `_pct`: the engine carries ownership
+        # percentages in 0-100 space and a suffix rule would reject them.
+        self.assertNotIn("max_cumulative_ownership_pct", keys)
+
+    def test_main_refuses_a_slipped_override_before_it_stages_anything(self):
+        import contextlib
+        import io
+        mod = self._module()
+        buf = io.StringIO()
+        argv = ["build_slate.py", "--salary", str(self._SALARY),
+                "--entries", str(self._SALARY),
+                "--controls-override", '{"max_pitcher_exposure_pct": 45}']
+        with unittest.mock.patch.object(sys, "argv", argv):
+            with contextlib.redirect_stdout(buf):
+                code = mod.main()
+        self.assertEqual(code, 4)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["status"], "controls_override_bad_units")
+        self.assertEqual(payload["controls"],
+                         [{"control": "max_pitcher_exposure_pct", "value": 45,
+                           "problem": "above 1.0"}])
+        self.assertIn("Nothing was staged", payload["note"])
+
+    def test_a_legal_override_passes_the_units_gate(self):
+        """Without this the gate could refuse everything and every assertion
+        above would still pass. The build goes on to fail for its own reasons
+        (this fixture's locks passed in July); what matters is that the reason
+        is no longer the units gate."""
+        import contextlib
+        import io
+        mod = self._module()
+        buf = io.StringIO()
+        argv = ["build_slate.py", "--salary", str(self._SALARY),
+                "--entries", str(self._SALARY),
+                "--controls-override", '{"max_pitcher_exposure_pct": 0.45}']
+        with unittest.mock.patch.object(sys, "argv", argv):
+            with contextlib.redirect_stdout(buf):
+                code = mod.main()
+        statuses = [json.loads(line)["status"] for line in [buf.getvalue()]
+                    if line.strip().startswith("{")]
+        self.assertNotIn("controls_override_bad_units", statuses)
+        self.assertNotEqual(payload_status := statuses[0], "controls_override_bad_units")
+        self.assertEqual(payload_status, "past_slate_locks_passed")
+        self.assertEqual(code, 4)
+
+
+class BuildSlateExitContractTests(unittest.TestCase):
+    """R168. Two crash doors in build_slate, both reached on ordinary days."""
+
+    _PATH = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+
+    def _main_node(self):
+        import ast
+        tree = ast.parse(self._PATH.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) and node.name == "main":
+                return node
+        self.fail("build_slate has no main()")
+
+    def test_main_returns_an_int_on_every_path(self):
+        """R168(a). `return 3, {}` in main() -- run_classic and run_showdown
+        legitimately return (code, brief), main() returns an int, and
+        `raise SystemExit((3, {}))` exits 1 with a stray tuple on stderr. Every
+        documented consumer reads that as a crash: autobuild's 0/3/4/5/10
+        contract, the SKILL's rerun-on-10 loop, and build_asserted.py, which
+        inherits main(). The property, not the one instance, because the file
+        has nine tuple returns in the two functions that are allowed them."""
+        import ast
+        node = self._main_node()
+        nested = {n for f in ast.walk(node)
+                  if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
+                  and f is not node
+                  for n in ast.walk(f)}
+        tuples = [n.lineno for n in ast.walk(node)
+                  if isinstance(n, ast.Return) and n not in nested
+                  and isinstance(n.value, ast.Tuple)]
+        self.assertEqual(tuples, [], f"main() returns a tuple at lines {tuples}; "
+                                     f"SystemExit of a tuple is exit 1")
+
+    def test_every_lineups_fetch_in_main_is_guarded(self):
+        """R168(b). The refetch leg has carried a try/except for a while and the
+        platoon-side fetch gained one in the 08-18..22 work. The FIRST fetch of
+        the day did not, so no staged feed + DK's `Starting` not covering the
+        slate + no route to statsapi was a raw URLError traceback, empty stdout,
+        no brief, exit 1 -- and that is the normal pre-lock morning state."""
+        import ast
+        node = self._main_node()
+        parents = {}
+        for n in ast.walk(node):
+            for child in ast.iter_child_nodes(n):
+                parents[child] = n
+        calls = [n for n in ast.walk(node) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", "") == "fetch_lineups"]
+        self.assertTrue(calls, "main() stopped fetching lineups; re-scope this test")
+        for call in calls:
+            cur, guarded = call, False
+            while cur in parents:
+                cur = parents[cur]
+                if isinstance(cur, ast.Try):
+                    guarded = True
+                    break
+            self.assertTrue(guarded, f"fetch_lineups at line {call.lineno} is "
+                                     f"unguarded; a network failure there is a "
+                                     f"raw traceback and no brief")
+
+    def test_the_unavailable_feed_degrades_rather_than_dying(self):
+        """The guard has to leave a feed the front door can use. An empty feed
+        is a degradation, not a loss: DK's `Starting` column still fills posted
+        sides (R143) and the platoon reference still fills TBD teams."""
+        src = self._PATH.read_text(encoding="utf-8")
+        self.assertIn('"status": "lineups_feed_unavailable"', src)
+        self.assertIn("first fetch failed", src)
+
+
+class SupervisorHardeningTests(unittest.TestCase):
+    """R169. autobuild had zero tests. Four rails, each reached by a fixture
+    that drives main() with a patched subprocess."""
+
+    def setUp(self):
+        import importlib
+        self.ab = importlib.import_module("tools.autobuild")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.salary = (REPO / "tests" / "fixtures" / "slates"
+                       / "DKSalaries_frozen_2026-07-29.csv")
+
+    def _run(self, side_effect, extra_argv=()):
+        """Drive autobuild.main() with a patched subprocess and a private REPO,
+        and hand back (exit code, decision log records, commands issued)."""
+        cmds = []
+
+        def fake_run(cmd, **kwargs):
+            cmds.append(list(cmd))
+            return side_effect(len(cmds), cmd, kwargs)
+
+        argv = ["autobuild.py", "--salary", str(self.salary),
+                "--entries", str(self.salary), *extra_argv]
+        root = Path(self.tmp.name)
+        with unittest.mock.patch.object(self.ab, "REPO", root), \
+                unittest.mock.patch.object(self.ab.subprocess, "run", fake_run), \
+                unittest.mock.patch.object(sys, "argv", argv), \
+                unittest.mock.patch.object(self.ab, "assert_classification_in_sync",
+                                           lambda: None):
+            code = self.ab.main()
+        logs = sorted(root.glob("outputs/*/autobuild_decisions.json"))
+        records = []
+        for path in logs:
+            records += json.loads(path.read_text(encoding="utf-8"))["decisions"]
+        return code, records, cmds, logs
+
+    @staticmethod
+    def _proc(returncode, brief=None):
+        return types.SimpleNamespace(
+            returncode=returncode,
+            stdout=json.dumps(brief or {}) if brief is not None else "",
+            stderr="")
+
+    def test_a_timeout_records_the_stop_and_exits_5(self):
+        """R169(a). `subprocess.run(..., timeout=...)` had no handler, and the
+        bank budget floors make an overshoot possible BY CONSTRUCTION. When it
+        fired, `_write` never ran: the ENTIRE decision log was lost and the
+        process exited 1, off the 0/3/4/5/10 contract, on exactly the run whose
+        post-mortem needed it."""
+        def boom(n, cmd, kwargs):
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 0))
+        code, records, _cmds, logs = self._run(boom)
+        self.assertEqual(code, 5)
+        self.assertEqual(len(logs), 1, "the decision log was not written")
+        self.assertEqual([r["action"] for r in records], ["build_timed_out"])
+        self.assertEqual(records[0]["timeout_s"], 20 + 90)
+
+    def test_the_decision_log_dates_from_the_salary_file_not_the_container(self):
+        """R169(b). build_slate's `pool_blocked` and exit-10 payloads carried no
+        `date`, so `_write` fell back to `datetime.now()` -- the container's UTC
+        calendar. After 8pm ET the one artifact explaining why a build never
+        happened filed under TOMORROW. The R65/R95 class."""
+        def boom(n, cmd, kwargs):
+            raise subprocess.TimeoutExpired(cmd, 1)
+        _code, _records, _cmds, logs = self._run(boom)
+        self.assertEqual([p.parent.name for p in logs], ["2026-07-29"],
+                         "the log did not file under the slate's own date")
+
+    def test_the_date_precedence_is_brief_then_salary_then_et(self):
+        self.assertEqual(
+            self.ab._decision_log_date({"date": "2026-08-01"}, str(self.salary)),
+            "2026-08-01", "the build's own answer wins")
+        self.assertEqual(self.ab._decision_log_date({}, str(self.salary)),
+                         "2026-07-29", "the salary file is the same authority "
+                                       "build_slate dates a slate from")
+        from mlb_engine.repo_env import today_et
+        self.assertEqual(self.ab._decision_log_date({}, None), today_et())
+        # An undatable salary file falls through rather than raising.
+        junk = Path(self.tmp.name) / "junk.csv"
+        junk.write_text("not,a,salary,file\n", encoding="utf-8")
+        self.assertEqual(self.ab._decision_log_date({}, str(junk)), today_et())
+
+    def test_a_structural_remedy_naming_another_control_is_refused(self):
+        """R169(c). The applier validated the CHECK name and then applied
+        whatever control the remedy SENTENCE named. Those are two facts. A
+        remedy is free text; the warrant is that the ENGINE classified this
+        control arithmetic. Under the old code a `shared_players_floor` check
+        whose sentence said "raise max_player_exposure_pct to >= 5" moved an
+        exposure cap -- item one under WHAT IT WILL NOT DO, EVER."""
+        brief = {"status": "refused",
+                 "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "shared_players_floor", "passed": False,
+                      "remedy": "raise max_player_exposure_pct to >= 5"}]}}
+        code, records, cmds, _logs = self._run(
+            lambda n, cmd, kwargs: self._proc(3, brief))
+        self.assertEqual(code, 3)
+        self.assertEqual(len(cmds), 1, "it retried against a control it may not move")
+        self.assertEqual(records[-1]["action"], "stop")
+        self.assertIn("max_player_exposure_pct", records[-1]["why"])
+        self.assertIn("max_shared_players", records[-1]["why"])
+
+    def test_the_remedy_the_check_is_actually_about_still_applies(self):
+        """The other half of the same fixture pair: without this, refusing every
+        remedy would pass the test above and retire the supervisor's one job."""
+        brief = {"status": "refused",
+                 "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "shared_players_floor", "passed": False,
+                      "remedy": "raise max_shared_players to >= 7"}]}}
+
+        def side(n, cmd, kwargs):
+            return self._proc(3, brief) if n == 1 else self._proc(0, {
+                "status": "certified", "date": "2026-07-29",
+                "delivered_sha256": "abc123", "delivered_path": "x.csv"})
+        code, records, cmds, _logs = self._run(side)
+        self.assertEqual(code, 0)
+        self.assertEqual([r["action"] for r in records],
+                         ["apply_structural_floor", "certified"])
+        self.assertIn("--controls-override", cmds[1])
+        applied = json.loads(cmds[1][cmds[1].index("--controls-override") + 1])
+        self.assertEqual(applied, {"max_shared_players": 7})
+
+    def test_the_pairing_must_cover_every_structural_check(self):
+        """A structural check with no paired control would reach the applier
+        with nothing this file is willing to vouch for."""
+        self.assertEqual(set(self.ab.STRUCTURAL_CHECKS),
+                         set(self.ab.STRUCTURAL_CONTROL_BY_CHECK))
+        fake_build = Path(self.tmp.name) / "build_slate_stand_in.py"
+        fake_build.write_text(
+            'STRUCTURAL_FEASIBILITY_CHECKS = frozenset({"shared_players_floor", '
+            '"sp_pair_capacity", "a_check_nobody_paired"})\n', encoding="utf-8")
+        with unittest.mock.patch.object(self.ab, "BUILD", fake_build):
+            # Drift alone is caught first, and says so.
+            drift = self.ab.assert_classification_in_sync()
+            self.assertIn("classification drift", drift)
+            with unittest.mock.patch.object(
+                    self.ab, "STRUCTURAL_CHECKS",
+                    {"shared_players_floor", "sp_pair_capacity",
+                     "a_check_nobody_paired"}):
+                msg = self.ab.assert_classification_in_sync()
+        self.assertIsNotNone(msg)
+        self.assertIn("a_check_nobody_paired", msg)
+        self.assertIn("STRUCTURAL_CONTROL_BY_CHECK", msg)
+
+    def test_the_passthrough_is_shlex_split_and_loses_to_the_supervisor(self):
+        """R169(d). Two defects in two lines. `.split()` broke on exactly the
+        argument most worth passing through, a quoted JSON dict. And the
+        passthrough was appended AFTER --controls-override, so argparse's
+        last-wins gave an operator's override the final say over the structural
+        floors this supervisor had just applied -- while the log recorded that
+        they landed."""
+        brief = {"status": "refused", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "sp_pair_capacity", "passed": False,
+                      "remedy": "raise max_sp_pair_repetition to >= 3"}]}}
+
+        def side(n, cmd, kwargs):
+            return self._proc(3, brief) if n == 1 else self._proc(0, {
+                "status": "certified", "date": "2026-07-29"})
+        # Quoted the way an operator quotes it in a shell, which is the form
+        # `.split()` could not survive and shlex was written for.
+        passthrough = """--past-slate-replay --controls-override '{"max_shared_players": 9}'"""
+        self.assertEqual(len(passthrough.split()), 4,
+                         "the naive split makes four tokens of three arguments")
+        _code, _records, cmds, _logs = self._run(
+            side, extra_argv=["--passthrough", passthrough])
+        second = cmds[1]
+        # shlex keeps the JSON dict one argument; .split() made it two.
+        self.assertIn('{"max_shared_players": 9}', second)
+        # and the supervisor's own override is the LAST one argparse sees.
+        positions = [i for i, tok in enumerate(second)
+                     if tok == "--controls-override"]
+        self.assertEqual(len(positions), 2)
+        self.assertEqual(json.loads(second[positions[-1] + 1]),
+                         {"max_sp_pair_repetition": 3})
+        self.assertLess(second.index("--past-slate-replay"), positions[-1])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

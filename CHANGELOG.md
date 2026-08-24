@@ -25,6 +25,163 @@ performance claim.
 
 ---
 
+## 2026-08-24 — R167 + R168 + R169: the lost-window batch. a units slip cleared the checkpoint and crashed after the bank spend, two build_slate exit doors turned a refusal into a crash, and the supervisor lost its whole decision log on the one run that needed it
+
+DEV, claim `engine` (bare mutex), plus a `ledger` claim for the Quick Card pin
+line and nothing else. Ben's instruction: review the backlog, implement the next
+thing, then update the backlog and the changelog. This IS the queue head — slot 2
+of the ed6 sequence, promoted to slot 1 when R159 + R160 closed earlier today.
+Session-start gate green before any edit: `PASS v2.26.0 26 modules 1252 tests`.
+Gate 1252 -> 1276 (`test_core` 841 -> 863 and `test_showdown` 77 -> 79, both
+`grew`). Sixteen hand-run mutations, sixteen caught; the seventeenth is discussed
+at the bottom because it did not deserve to be.
+
+**One defect class across three files, and it is not "wrong answer".** Each of
+these fails AFTER the window that could have absorbed it, or in a shape no
+documented consumer can read. That is a different cost from a wrong number: a
+wrong number gets caught by the next check, and a lost window is gone.
+
+**Premises re-verified at this head before anything was touched**, per the
+standing rule that a backlog entry's premises are claims and not facts.
+`execution_pipeline.py:2545` still clamped; `main()` still had exactly one tuple
+return, at the supplied-feed-rejected path, against nine legitimate ones in
+`run_classic`/`run_showdown`; the first-fetch leg still had no guard while the
+refetch leg above it did; `autobuild.py` still had no `TimeoutExpired` handler,
+still dated its log off `datetime.now()`, still validated only the check name,
+and still appended `--passthrough` last. All four `pool_blocked` / exit-10
+payloads still carried no `date` key.
+
+**R167. The units rule now lives in one place, and there were four copies.**
+R71(a)'s entry says it fixed "both `_cap_count` copies". The third was the
+closure inside `_feasibility_report`, computing `entries * min(1.0, value)` — so
+`--controls-override max_pitcher_exposure_pct=45` (45 typed for 0.45) PASSED the
+checkpoint, and passed it loudly: the report printed `45 -> cap 10` and marked
+`pitcher_exposure_capacity` as passing, which is a check reporting success
+against a control the solver would refuse outright. `_plan_joint_allocation`
+then labelled the invalid control "unchecked: budget". At `approve=True` the bank
+built for minutes and `select_and_assign_entries` raised uncaught inside
+`execute_portfolio`, which had already called `create_run`: status `building`, no
+diagnostics, at T-time. A rule enforced in two of three places is precisely the
+disagreement it exists to prevent.
+
+The rule is now `contest_allocator.assert_fraction_cap(pct, key=None)`, called by
+that module's `_cap_count`, by the checkpoint closure, and by
+`_merged_controls_for_build` on the override. Three consequences worth stating.
+
+*The boundary is the merge, not `run_slate`.* `_merged_controls_for_build` is the
+one function both the build and the swap resolve controls through — R29(3)'s "one
+implementation, because two would diverge and the weaker one would report
+success" — so validating there covers `late_swap.py` for free, and a test pins
+that late_swap still routes through it.
+
+*`build_slate` also refuses, at exit 4, before staging anything.* Redundant with
+the engine boundary on purpose: it is the only check that costs zero seconds, and
+it is the only one Showdown reaches, because Showdown never passes through the
+control merge at all. `FRACTION_CONTROL_KEYS` names the five fraction-valued
+controls of both contest types rather than pattern-matching `_pct`, because the
+engine also carries ownership percentages in 0-100 space and a suffix rule would
+reject those on sight.
+
+*A FOURTH copy was found while landing this, and it is the worst of them.*
+`showdown.exposure_cap_count` validated nothing: `25` typed for `0.25` returned a
+cap of 25n, which forbids nobody, and every R153 relaxation counter read CLEAN
+because nothing was ever relaxed. That is the washout axis switched off by a
+keystroke, invisible in the one artifact written to catch it. It now calls the
+same function. Not filed for later: it is the same defect, the fix is one line,
+and leaving it would have closed R167 with the rule enforced in three of four
+places.
+
+What did NOT change: `1.0` is still legal, because R157's feasibility rescue
+opens all three caps to 1.0 as the sanity check that the bank can certify at all;
+`0` and below are still legal and still mean "not set" for a ceiling and "no
+quota" for a floor, which every posture relies on shipping
+`min_five_stack_share_pct: 0.0`; `dk_entries_manager._cap_count` deliberately
+keeps its own implementation, because
+`test_cap_count_arithmetic_is_floor_and_both_copies_agree` measures the solve side
+against it and collapsing the pair would make that comparison tautological;
+`_game_cap_count`'s clamp stays, because it clamps identically on both the solve
+and the validate side, so the disagreement R167 is about does not exist there.
+
+**R168(a). `main()` returned a tuple, so a refusal read as a crash.** The
+supplied-feed-rejected path ended `return 3, {}` in a function whose contract is
+`int`, and `raise SystemExit((3, {}))` exits 1 with a stray tuple on stderr. Every
+documented consumer reads that as a bug in the build rather than as its verdict:
+`autobuild`'s 0/3/4/5/10 contract, the SKILL's rerun-on-10 loop, and
+`build_asserted.py`, which inherits `main()`. Now `return 3`. The test is the
+PROPERTY — no tuple return anywhere in `main()`, via AST, excluding nested
+functions — rather than the one instance, because the file has nine legitimate
+tuple returns in the two functions that are allowed them and the next one added to
+`main()` by mistake would look exactly like those.
+
+**R168(b). The first lineups fetch of the day was the unguarded one.** The refetch
+leg has carried a try/except for a while and the platoon-side fetch gained one in
+the 08-18..22 work; the fresh-fetch leg never did. So no staged feed + DK's
+`Starting` column not covering the slate + no route to statsapi produced a raw
+`URLError` traceback, empty stdout, no brief and exit 1 — and that combination is
+the ordinary pre-lock morning state, not an edge case. It now degrades to
+`{"games": []}` with `feed_note.status = "lineups_feed_unavailable"`, which is a
+degradation and not a loss: the front door still fills posted sides from DK's
+`Starting` column (R143) and TBD teams from the platoon reference, and the note
+tells the operator to read `dk_order_coverage` before approving. Same AST property
+test: every `fetch_lineups` call in `main()` has a `Try` ancestor.
+
+**R169. Supervisor hardening, and `autobuild.py` had zero tests.** It has seven
+now, all driving `main()` with a patched `subprocess.run` and a private `REPO`, so
+each rail is reached by a fixture rather than asserted about.
+
+*(a)* `subprocess.run(..., timeout=per_build_seconds + 90)` had no
+`TimeoutExpired` handler, and the bank budget floors make an overshoot past
+`--per-build-seconds` possible BY CONSTRUCTION (`resolve_bank_budget` floors the
+budget at a constant regardless of the window asked for). When it fired, `_write`
+never ran: the ENTIRE decision log was lost and the process exited 1, off the
+declared contract, on exactly the run whose post-mortem needed it. Now a
+`build_timed_out` record, then `_write`, then exit 5 — a timeout is out of time.
+
+*(b)* `_write` dated the log `(brief or {}).get("date") or datetime.now()`, and in
+a container `datetime.now()` is UTC, so after 8pm ET every pre-brief stop filed
+its decision log under TOMORROW's `outputs/` — the R65/R95 class, and the one
+artifact explaining why a build never happened landing in a directory nobody
+looks in. Two halves: build_slate's two `pool_blocked` payloads and its exit-10
+`partial` payload now carry `date`, and `_decision_log_date` falls back to the
+salary file (the same authority build_slate dates a slate from, available on every
+stop including the ones that produce no brief) and then to `repo_env.today_et()`,
+never the container's calendar.
+
+*(c)* The structural-floor applier validated that the failing CHECK was in
+`STRUCTURAL_CHECKS` and then applied whatever control the remedy SENTENCE named.
+Those are two different facts. A remedy is free text assembled by
+`_feasibility_report`, and the supervisor's entire warrant is that the ENGINE
+classified this control arithmetic — so a sentence under a structural check's name
+reading "raise max_player_exposure_pct to >= 5" would have moved an exposure cap,
+item one under this file's own WHAT IT WILL NOT DO, EVER. `STRUCTURAL_CONTROL_BY_CHECK`
+pairs each check with the one control it is about
+(`shared_players_floor` → `max_shared_players`, `sp_pair_capacity` →
+`max_sp_pair_repetition`), a mismatch is a stop with both names in the reason, and
+`assert_classification_in_sync` now also refuses when the pairing does not cover
+the split, so a check added to build_slate's frozenset cannot arrive with no
+control this file will vouch for.
+
+*(d)* `--passthrough` was `.split()` — which breaks on exactly the argument most
+worth passing through, a quoted JSON dict — and appended AFTER the supervisor's
+own flags. argparse takes the last occurrence of a repeated flag, so an operator
+`--controls-override` silently outranked the structural floors the supervisor had
+just applied, while the decision log recorded that they landed. Now `shlex.split`,
+and the passthrough goes FIRST so supervisor-owned flags win; the flag's help says
+so and says how to quote. The log has to describe the command that ran.
+
+**On the mutations.** Sixteen applied by hand, each with the tree's `__pycache__`
+cleared either side and each verified to be a real edit before the run, sixteen
+caught. The seventeenth is the note worth keeping: prefixing the bad-units payload
+note with "WARN" survived, and it survived because it changes nothing — same exit
+code, same status, same promise that nothing was staged. A mutation that alters a
+message's prose without altering its claim is not evidence of a coverage gap, and
+recording it as a survivor would be the false-signal family arriving inside the
+mutation harness. It was replaced with two that do change behaviour — dropping
+`max_cpt_exposure_pct` from the key set, and moving the threshold to 100 — and
+both were caught. The fixture lesson landed for the seventh consecutive item, in
+its narrowest form yet: `autobuild`'s four rails could not be reached by any
+assertion, only by a fixture that runs the loop, which is why the file had none.
+
 ## 2026-08-24 — R159 + R160 + R189(1)(2): intake truth on the no-fetch path. one Status flip discarded a posted nine and its pitcher, a TBD game time crashed the front door, and F4's SP-quality term was dead on every paste slate
 
 DEV, claim `engine` (bare mutex), plus a `ledger` claim for the Quick Card pin

@@ -1008,6 +1008,41 @@ def _prefilter_candidates(
     }
 
 
+def assert_fraction_cap(pct: Any, *, key: Optional[str] = None) -> float:
+    """The units rule for a fractional exposure control, in ONE place.
+
+    Returns the value as a float, or raises ``ValueError`` when it is above
+    1.0. A value of 0 or below is returned unchanged; callers read that as
+    "not set" (a ceiling) or "no quota" (a floor), and neither reading is a
+    units slip.
+
+    R167. R71(a) made "both ``_cap_count`` copies" raise instead of clamping,
+    and there was a third copy: ``execution_pipeline._feasibility_report``'s
+    local one still did ``min(1.0, value)``. So a units slip
+    (``max_pitcher_exposure_pct=45``) cleared the checkpoint -- which PRINTED
+    ``45 -> cap 10`` as though it had checked something -- and then raised
+    uncaught inside ``execute_portfolio``, after the bank had spent minutes,
+    leaving the run at status ``building`` with no diagnostics. A rule enforced
+    in two of three places is exactly the disagreement it exists to prevent,
+    so the rule lives here and the copies call it.
+
+    ``dk_entries_manager._cap_count`` deliberately keeps its own
+    implementation: it is the post-export validator, and
+    ``test_cap_count_arithmetic_is_floor_and_both_copies_agree`` measures the
+    solve side against it. Collapsing that pair into one function would make
+    the comparison tautological and retire real coverage.
+    """
+    value = float(pct)
+    if value > 1.0:
+        named = f"{key} " if key else ""
+        raise ValueError(
+            f"exposure cap {named}{value!r} is > 1.0; caps are fractions of the "
+            f"requested count (0.45 for 45%), not percentages -- a bare 45 "
+            f"used to silently disable this cap"
+        )
+    return value
+
+
 def _cap_count(total: int, pct: Optional[float]) -> Optional[int]:
     """Resolve a fractional exposure cap (e.g. 0.45) to a count.
 
@@ -1018,18 +1053,15 @@ def _cap_count(total: int, pct: Optional[float]) -> Optional[int]:
     looser cap someone meant, it is the same mistake every time, so it raises
     here instead of the mirrored ``dk_entries_manager._cap_count`` disagreeing
     silently with what the solver actually enforced.
+
+    R167: the units half of that rule moved to ``assert_fraction_cap`` so the
+    checkpoint enforces the identical rule this solve does.
     """
     if pct is None:
         return None
-    value = float(pct)
+    value = assert_fraction_cap(pct)
     if value <= 0:
         return None
-    if value > 1.0:
-        raise ValueError(
-            f"exposure cap {value!r} is > 1.0; caps are fractions of the "
-            f"requested count (0.45 for 45%), not percentages -- a bare 45 "
-            f"used to silently disable this cap"
-        )
     return max(1, int(math.floor(total * value + 1e-9)))
 
 

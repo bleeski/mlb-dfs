@@ -39,6 +39,53 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-24 (slot 2, same day), DEV, claim `engine` (bare mutex): **the queue head
+is CLOSED again. R167, R168 and R169 are landed and migrated.** Gate 1252 -> 1276
+(`test_core` 841 -> 863, `test_showdown` 77 -> 79, both `grew`); the CHANGELOG
+entry of this date carries the record and the ledger Quick Card pin line moved
+under a DEV-held `ledger` claim, that line and nothing else. Sixteen mutations,
+sixteen caught.
+
+**Slot 3 is now slot 1: R191 + R192, the preflight pair.** Nothing jumped it. They
+were inserted on 2026-08-23 explicitly "beside the lost-window batch, because they
+are lost-window defects", and that is still what they are: the `--salary`
+auto-resolve grabbing a concurrent session's promoted run at the money boundary's
+last check, and the showdown `top exposure` line counting the ROLE so it hides the
+two most concentrated players from the one operator reading it before upload. Then
+R205 (American-odds averaging), then R172 + R176 + R173 (the false-evidence
+batch), and the rest of the ed6 sequence unchanged.
+
+**Three readings from the landing.** First, **the "one rule, N copies" count was
+wrong on the board and it is worth distrusting the next one.** R167 was filed as a
+third copy of a units rule R71(a) had fixed in two places; there were FOUR, and the
+fourth — `showdown.exposure_cap_count` — validated nothing at all, which is worse
+than the clamp the item was about. It was fixed here rather than filed, because the
+fix is one line and closing R167 with the rule enforced in three of four places
+would have reproduced R167. When an item says "the Nth copy", count the copies
+before believing N.
+
+Second, **the defect class here is different from slot 1's and both are worth
+naming.** R159/R160/R189 were two components answering one question differently.
+These three are failures that arrive after the window that could have absorbed
+them: minutes of bank spend before the raise, a refusal shaped like a crash, a
+decision log deleted by the timeout it was written to explain. The remedies differ
+accordingly — the first class wants one definition, this one wants the check moved
+EARLIER, which is why R167 landed at the control merge and at `build_slate`'s
+front door rather than only at the arithmetic.
+
+Third, **`autobuild.py` had zero tests and its four rails were untestable by
+assertion.** Every one of them lives inside `main()`'s retry loop, so nothing could
+be checked without running the loop; the file now has seven tests that drive
+`main()` with a patched `subprocess.run` and a private `REPO`. That is the fixture
+lesson's seventh consecutive appearance and its narrowest form: a branch no fixture
+can reach does not merely go unasserted, it makes the whole file look untestable
+and stay untested.
+
+**One thing for Ben, unchanged and now three days old:** commits on `main` are
+still not on `origin/main` (2 as of this commit, and the audit says so on every
+session-start line). Sessions commit and Ben pushes; until he does, no clone sees
+this week's work.*
+
 *2026-08-24 (slot 1), DEV, claim `engine` (bare mutex): **the queue head is
 CLOSED. R159 and R160 are landed and migrated; R189 loses layers (1) and (2) and
 survives as R189(3).** Gate 1236 -> 1252 (`test_core` 825 -> 841, `grew`); the
@@ -220,13 +267,12 @@ remainder, all S or XS:
    reaching the build, both are Showdown-or-paste rather than the Classic
    no-fetch path, and they batch with R158/R123 for the next Showdown session
    at item 9 rather than holding slot 1.
-2. **R167 + R168 + R169** — the lost-window batch, and the head of this tier as
-   of 2026-08-24: a bad pct override passes
-   the checkpoint and crashes AFTER the bank spend leaving status `building`
-   (R167); build_slate's two remaining exit-1 crash doors (R168, narrowed at
-   landing: the platoon-side fetch got guarded during the week, the main
-   first-fetch and the tuple return did not); the supervisor loses its
-   decision log on timeout and mis-dates pre-brief refusals (R169).
+2. ~~**R167 + R168 + R169**~~ — **CLOSED 2026-08-24**, entries migrated to
+   CHANGELOG.md, along with a fourth `_cap_count`-class copy found at landing
+   (`showdown.exposure_cap_count` validated nothing, so a slipped Showdown cap
+   returned a count of 25n and left every R153 relaxation counter reading
+   clean). **R191 + R192 is now the head of this tier**, per the 2026-08-23
+   insertion that placed it beside this batch as lost-window work.
 3. **R172 + R176 + R173** — the false-evidence batch: every default build
    records `projection_tier: "enriched"` off the value guard (R172, repro'd
    at THIS head, truthful labels on a money-adjacent record); the vacuous
@@ -2248,57 +2294,28 @@ Three scipy-native levers, each of which moves golden bytes and therefore sequen
   into `validate_dk_entries_file` when the control is set. Lands beside
   R115/R98(3) in Tier 3 if not taken at the Tier 1 boundary.
 
-### R167. The third `_cap_count` copy clamps a >1 pct the production copies reject: the checkpoint says feasible, approve=True crashes AFTER the bank spend, and the run is left `building` (P1, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro (composed) at ac8ac05, clamp re-confirmed at ec832cf (`execution_pipeline.py:2545`)
+### R167 + R168 + R169. CLOSED 2026-08-24 -- the lost-window batch, entries migrated to CHANGELOG.md
 
-- **What:** R71(a) fixed "both `_cap_count` copies" — and missed the local
-  one. `_cap_count_local` computes `entries * min(1.0, value)`, so a units
-  slip (`--controls-override max_pitcher_exposure_pct=45`) passes
-  `_feasibility_report` (prints `45 -> cap 10`), `_plan_joint_allocation`
-  mislabels the invalid control "unchecked: budget", and at approve=True the
-  bank builds for minutes before `select_and_assign_entries` raises uncaught
-  inside `execute_portfolio` — status `building`, no diagnostics, at T-time.
-- **Fix:** validate override pct keys once at `_merged_controls_for_build`
-  with the shared `_cap_count` semantics so the slip blocks at the checkpoint;
-  make the local copy raise identically.
-
-### R168. build_slate's exit contract still has two crash doors: a tuple return in main() and an unguarded first fetch (P1, S) | new 2026-08-22, from the greenfield sixth edition; both VERIFIED-repro at ac8ac05, re-scoped at ec832cf
-
-- **What:** (a) `main()`'s supplied-feed-rejected path ends `return 3, {}`
-  (`build_slate.py:3136`; `run_classic`/`run_showdown` legitimately return
-  tuples, `main()`'s contract is int) — `SystemExit((3, {}))` becomes exit 1
-  plus a stray tuple on stderr; every documented-code consumer (autobuild,
-  the SKILL rerun-on-10 loop) reads a crash, and `build_asserted.py` inherits
-  it. (b) the fresh-fetch leg `else: feed = fetch_lineups(args.date,
-  feed_path)` (`:3157`) has no try/except — the refetch leg above it does,
-  and the platoon-side fetch gained a guard during the 08-18..22 work — so no
-  staged feed + `Starting` not covering the slate + no route to statsapi =
-  raw URLError traceback, empty stdout, no brief, exit 1, at the normal
-  pre-lock morning state.
-- **Fix:** (a) `print(...); return 3`. (b) wrap like the refetch leg, emit
-  `{"status": "lineups_feed_unavailable"}` and degrade to an empty feed (DK
-  and platoon still fill orders through the front door) or exit 4.
-
-### R169. Supervisor hardening: a timeout kills the decision log, pre-brief refusals are dated by the UTC clock, and two smaller rails (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a)(b) VERIFIED-read (`autobuild.py` unchanged since the review), (c)(d) PLAUSIBLE mechanism VERIFIED-read
-
-- **What:** (a) `subprocess.run(..., timeout=per_build_seconds+90)` has no
-  `TimeoutExpired` handler; when it fires — and the bank floors make
-  overshoot past `--max-seconds` possible by construction — `_write` never
-  runs and the ENTIRE decision log is lost, exit 1 off the 0/3/4/5 contract,
-  violating the module's own "every decision lands in
-  autobuild_decisions.json" promise on exactly the run a post-mortem needs.
-  (b) build_slate's `pool_blocked` and exit-10 payloads carry no `date` key,
-  so `_write` falls back to container-UTC — after 8pm ET the decision log
-  files under TOMORROW's outputs/ (the R65/R95 class). (c) the
-  structural-floor applier validates the CHECK name, never the control the
-  remedy sentence names — a one-line allowlist closes it. (d) `--passthrough`
-  is split naively (breaks quoted JSON) and appended AFTER supervisor-owned
-  flags, so an operator `--controls-override` silently outranks the floors
-  autobuild just applied while the log claims they landed.
-- **Fix:** catch TimeoutExpired → record a `build_timed_out` stop → `_write`
-  → exit 5; date from the salary file or `repo_env.today_et()` (and add
-  `date` to the pre-brief payloads); the allowlist; `shlex.split` and order
-  passthrough before supervisor-owned flags. Also verified: autobuild has
-  ZERO tests.
+All three landed together because they are one defect class: a failure that
+arrives AFTER the window that could have absorbed it, or in a shape no
+documented consumer can read.
+R167: the units rule for a fractional exposure control now lives in ONE function
+(`contest_allocator.assert_fraction_cap`) called by the solve, by the checkpoint
+closure that used to clamp, and by `_merged_controls_for_build` on the override
+-- the boundary the build and the swap share. `build_slate` also refuses at exit
+4 before staging, which is the only check Showdown reaches. A FOURTH copy was
+found and fixed while landing it: `showdown.exposure_cap_count` validated
+nothing, so a slipped cap returned a count of 25n and left every R153 relaxation
+counter reading clean.
+R168: `main()` no longer returns a tuple on the supplied-feed-rejected path, and
+the first lineups fetch of the day is guarded like the refetch leg -- it degrades
+to an empty feed with `lineups_feed_unavailable` instead of a raw traceback.
+R169: a `TimeoutExpired` records `build_timed_out` and exits 5 instead of losing
+the whole decision log; the log dates from the brief, then the salary file, then
+`today_et`, and the pre-brief payloads carry `date`; a structural remedy may move
+only the control its check is about; `--passthrough` is `shlex.split` and ordered
+before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
+**Numbers reserved; the record is the 2026-08-24 CHANGELOG entry.**
 
 ### R170. build_slate smalls: the preserve-fallback re-mints the borrowed tag, and a missing --odds path silently becomes a live fetch (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read at ec832cf (`build_slate.py:428`, `:772`)
 

@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -62,6 +63,19 @@ GATE_IMPLIED_BY_POOL_OVERRIDE = "lineup_gate_passed"
 # Mirrors build_slate.STRUCTURAL_FEASIBILITY_CHECKS. Kept as a literal so this
 # file does not import the build script, and asserted against it at runtime.
 STRUCTURAL_CHECKS = {"shared_players_floor", "sp_pair_capacity"}
+
+# R169(c). The check name being structural was the only thing validated, and
+# then whatever control the remedy SENTENCE named got applied. Those are two
+# different facts. A remedy is free text assembled by _feasibility_report, and
+# the supervisor's whole warrant is that the engine classified this control
+# arithmetic -- a sentence under a structural check's name that says "raise
+# max_player_exposure_pct" would have moved an exposure cap, which this file's
+# own docstring lists under WHAT IT WILL NOT DO, EVER. So the pairing is
+# explicit: a structural check may move the one control it is about.
+STRUCTURAL_CONTROL_BY_CHECK = {
+    "shared_players_floor": "max_shared_players",
+    "sp_pair_capacity": "max_sp_pair_repetition",
+}
 
 CONTROL_FLOOR_RE = re.compile(r"raise\s+(\w+)\s+to\s*>=\s*(\d+)")
 
@@ -85,6 +99,13 @@ def assert_classification_in_sync() -> Optional[str]:
         return (f"classification drift: build_slate says {sorted(live)}, this "
                 f"supervisor says {sorted(STRUCTURAL_CHECKS)}. Refusing to act on "
                 f"a stale arithmetic/strategy split.")
+    # R169(c): the pairing has to cover the split, or a structural check would
+    # arrive with no control this file is willing to name for it.
+    unpaired = STRUCTURAL_CHECKS - set(STRUCTURAL_CONTROL_BY_CHECK)
+    if unpaired:
+        return (f"structural checks {sorted(unpaired)} have no control paired in "
+                f"STRUCTURAL_CONTROL_BY_CHECK; refusing to apply a remedy whose "
+                f"target this supervisor cannot vouch for.")
     return None
 
 
@@ -144,7 +165,13 @@ def main() -> int:
     ap.add_argument("--stop-after-minutes", type=float, default=12.0,
                     help="wall clock for the whole supervised run")
     ap.add_argument("--passthrough", default="",
-                    help="extra args forwarded to build_slate verbatim")
+                    help="extra args forwarded to build_slate. Split with shlex, "
+                         "so quote a JSON argument the way you would in a shell: "
+                         "--passthrough \"--controls-override '{\\\"max_shared_"
+                         "players\\\": 9}'\". Supervisor-owned flags are appended "
+                         "AFTER these, so a flag named in both is the "
+                         "supervisor's, not yours (R169(d)): the decision log "
+                         "has to describe the command that ran.")
     a = ap.parse_args()
 
     drift = assert_classification_in_sync()
@@ -165,6 +192,21 @@ def main() -> int:
 
         entry = str(ASSERTED) if ignore_pool else str(BUILD)
         cmd = [sys.executable, "-u", entry]
+        # R169(d). The passthrough goes FIRST, and it is split with shlex.
+        #
+        # Order: argparse takes the LAST occurrence of a repeated flag, and the
+        # passthrough used to be appended after --controls-override, so an
+        # operator's own --controls-override silently outranked the structural
+        # floors this supervisor had just applied -- while the decision log
+        # recorded that they landed. The log has to describe the command that
+        # ran. Supervisor-owned flags therefore come last and win.
+        #
+        # shlex: `.split()` broke on exactly the argument most worth passing
+        # through, a quoted JSON dict, turning
+        # `--controls-override {"max_shared_players": 7}` into three tokens and
+        # a parse error the operator reads as a build failure.
+        if a.passthrough:
+            cmd += shlex.split(a.passthrough)
         if ignore_pool:
             cmd += ["--assert-gate", GATE_IMPLIED_BY_POOL_OVERRIDE]
         cmd += ["--salary", a.salary, "--entries", a.entries,
@@ -177,11 +219,27 @@ def main() -> int:
             cmd += ["--controls-override", json.dumps(controls)]
         if ignore_pool:
             cmd += ["--ignore-pool-blockers"]
-        if a.passthrough:
-            cmd += a.passthrough.split()
 
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              cwd=str(REPO), timeout=a.per_build_seconds + 90)
+        # R169(a). The timeout had no handler. The bank budget floors make an
+        # overshoot past --per-build-seconds possible BY CONSTRUCTION
+        # (resolve_bank_budget floors the budget at a constant regardless of the
+        # window asked for), so this fires on real runs, and when it fired
+        # `_write` never ran: the entire decision log was lost and the process
+        # exited 1, off the 0/3/4/5/10 contract -- on exactly the run whose
+        # post-mortem needed it. A timeout is out-of-time, which is 5.
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  cwd=str(REPO), timeout=a.per_build_seconds + 90)
+        except subprocess.TimeoutExpired as exc:
+            dec.add(attempt, "build_timed_out",
+                    f"build_slate exceeded {a.per_build_seconds + 90}s of wall "
+                    f"clock and was killed; no brief was produced, so there is "
+                    f"nothing to classify and nothing to retry against",
+                    timeout_s=a.per_build_seconds + 90,
+                    per_build_seconds=a.per_build_seconds,
+                    controls_in_effect=dict(controls) or None)
+            _write(dec, last_brief, salary=a.salary)
+            return 5
         brief = parse_brief(proc.stdout) or parse_brief(proc.stderr)
         last_brief = brief or last_brief
         code = proc.returncode
@@ -194,7 +252,7 @@ def main() -> int:
 
         if code == 4:
             dec.add(attempt, "stop", "inputs missing; nothing to decide")
-            _write(dec, brief)
+            _write(dec, brief, salary=a.salary)
             return 4
 
         if code == 10:
@@ -213,7 +271,7 @@ def main() -> int:
                 dec.add(attempt, "stop",
                         "pool blocker outside the benign classification; a human "
                         "decides this one", unclassified=unclassified)
-                _write(dec, brief)
+                _write(dec, brief, salary=a.salary)
                 return 3
             ignore_pool = True
             dec.add(attempt, "override_pool_blockers",
@@ -245,15 +303,27 @@ def main() -> int:
                         f"failing check '{c.get('name')}' is a STRATEGY control "
                         f"with no engine-named floor; not mine to move",
                         remedy=c.get("remedy"))
-                _write(dec, brief)
+                _write(dec, brief, salary=a.salary)
                 return 3
             m = CONTROL_FLOOR_RE.search(c["remedy"])
             if not m:
                 dec.add(attempt, "stop", "structural remedy not machine-readable",
                         remedy=c["remedy"])
-                _write(dec, brief)
+                _write(dec, brief, salary=a.salary)
                 return 3
-            applied[m.group(1)] = int(m.group(2))
+            control, floor_to = m.group(1), int(m.group(2))
+            expected = STRUCTURAL_CONTROL_BY_CHECK[c["name"]]
+            if control != expected:
+                dec.add(attempt, "stop",
+                        f"structural check '{c['name']}' named control "
+                        f"'{control}', which is not the control that check is "
+                        f"about ('{expected}'); the classification covers the "
+                        f"check, not any control a remedy sentence happens to "
+                        f"name, so a human decides this one",
+                        remedy=c["remedy"])
+                _write(dec, brief, salary=a.salary)
+                return 3
+            applied[control] = floor_to
         if applied and applied != {k: controls.get(k) for k in applied}:
             controls.update(applied)
             dec.add(attempt, "apply_structural_floor",
@@ -264,15 +334,48 @@ def main() -> int:
 
         dec.add(attempt, "stop", "refused with no remedy this supervisor may take",
                 errors=(brief.get("errors") or [])[:2])
-        _write(dec, brief)
+        _write(dec, brief, salary=a.salary)
         return 3
 
-    _write(dec, last_brief)
+    _write(dec, last_brief, salary=a.salary)
     return 0 if any(d["action"] == "certified" for d in dec.log) else 3
 
 
-def _write(dec: Decisions, brief: Dict[str, Any]) -> None:
-    date = (brief or {}).get("date") or datetime.now().strftime("%Y-%m-%d")
+def _decision_log_date(brief: Dict[str, Any], salary: Optional[str] = None) -> str:
+    """Which outputs/<date>/ this decision log belongs in.
+
+    R169(b). The old fallback was ``datetime.now()``, the container's calendar,
+    which is UTC: after 8pm ET every pre-brief stop filed its decision log under
+    TOMORROW's date, so the one artifact explaining why a build never happened
+    landed in a directory nobody was looking in. The R65/R95 class.
+
+    Three sources, in the order of how much they know. The brief's own ``date``
+    is the build's answer and wins. The salary file is the same authority
+    build_slate itself dates a slate from, and it is available on every stop,
+    including the ones that produce no brief at all. ``today_et`` is last and is
+    the schedule's calendar, never the container's.
+    """
+    date = (brief or {}).get("date")
+    if date:
+        return str(date)
+    if salary:
+        try:
+            from mlb_engine.intake.slate_intake_manager import (
+                parse_dk_salary_csv, parse_game_info_datetime,
+            )
+            for sp in parse_dk_salary_csv(str(salary)):
+                parsed = parse_game_info_datetime(sp.game_info)
+                if parsed is not None:
+                    return parsed.date().isoformat()
+        except Exception:  # noqa: BLE001 - an undatable salary file is not fatal
+            pass
+    from mlb_engine.repo_env import today_et
+    return today_et()
+
+
+def _write(dec: Decisions, brief: Dict[str, Any],
+           salary: Optional[str] = None) -> None:
+    date = _decision_log_date(brief or {}, salary)
     out = REPO / "outputs" / str(date)
     try:
         out.mkdir(parents=True, exist_ok=True)

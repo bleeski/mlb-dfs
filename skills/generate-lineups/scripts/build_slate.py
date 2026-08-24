@@ -114,6 +114,20 @@ BANK_BUDGET_FLOOR_S = 5.0
 # 1910_9g moved three exposure caps from 0.35/0.43 to 0.56.
 STRUCTURAL_FEASIBILITY_CHECKS = frozenset({"shared_players_floor", "sp_pair_capacity"})
 
+# R167. Every control in --controls-override that is a FRACTION of the entered
+# set, Classic and Showdown together. Named rather than pattern-matched on
+# `_pct`: the engine also carries ownership percentages in 0-100 space, and a
+# suffix rule would reject those on sight. Both contest types are listed here
+# because Showdown does not pass through the engine's control merge, so this
+# is the only boundary that sees a Showdown override at all.
+FRACTION_CONTROL_KEYS = (
+    "max_player_exposure_pct",
+    "max_pitcher_exposure_pct",
+    "max_primary_stack_exposure_pct",
+    "min_five_stack_share_pct",
+    "max_cpt_exposure_pct",
+)
+
 
 def resolve_bank_budget(computed_s: float, *, label: str) -> tuple[float, bool]:
     """Return ``(budget_s, floored)`` and SAY SO when the floor wins (R98(1))."""
@@ -1501,6 +1515,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             print(f"POOL BLOCKER: {b}", file=sys.stderr)
         print(json.dumps({
             "status": "pool_blocked",
+            "date": args.date,
             "blockers": hard,
             "soft_blockers": soft,
             "note": "the pool this build would use is structurally wrong for this "
@@ -1522,6 +1537,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             print(f"POOL BLOCKER NOT OVERRIDABLE: {b}", file=sys.stderr)
         print(json.dumps({
             "status": "pool_blocked",
+            "date": args.date,
             "blockers": unoverridable,
             "other_hard_blockers": [b for b in hard if b not in unoverridable],
             "soft_blockers": soft,
@@ -1745,6 +1761,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:
             print(json.dumps({
                 "status": "partial",
+                "date": args.date,
                 "strategy": strategy,
                 "candidates": len(candidates),
                 "needed_at_least": n_entries * 2,
@@ -3077,6 +3094,41 @@ def main() -> int:
         }, indent=1))
         return 4
 
+    # R167. The operator-facing half of the units rule, checked in the same
+    # second the build starts. `--controls-override max_pitcher_exposure_pct=45`
+    # (45 typed for 0.45) used to clear the checkpoint -- which printed
+    # `45 -> cap 10` as though it had checked something -- and then raise
+    # uncaught after the bank had spent minutes, leaving the run at status
+    # `building` with no diagnostics, at T-time. The engine boundary
+    # (`_merged_controls_for_build`) now rejects it too, and this check exists
+    # in addition because it is the only one that costs nothing and because
+    # Showdown never passes through that boundary at all.
+    bad_units = []
+    for key in FRACTION_CONTROL_KEYS:
+        value = (args.controls_override or {}).get(key)
+        if value is None:
+            continue
+        try:
+            float(value)
+        except (TypeError, ValueError):
+            bad_units.append({"control": key, "value": value,
+                              "problem": "not a number"})
+            continue
+        if float(value) > 1.0:
+            bad_units.append({"control": key, "value": value,
+                              "problem": "above 1.0"})
+    if bad_units:
+        print(json.dumps({
+            "status": "controls_override_bad_units",
+            "controls": bad_units,
+            "note": ("these controls are FRACTIONS of the entered set, not "
+                     "percentages: 0.45 for 45%. A value above 1.0 caps nobody, "
+                     "and it used to reach the solve and crash there after the "
+                     "bank had spent. Nothing was staged and no run directory "
+                     "was created."),
+        }, indent=1))
+        return 4
+
     args.date = args.date or slate_date_from_salary(salary)
     contest = detect_contest_type(salary, entries)
     signature = slate_signature(salary)
@@ -3190,7 +3242,15 @@ def main() -> int:
                             "teams, so it is a feed for a different slate. The "
                             "staged feed was NOT overwritten.",
                 }, indent=1))
-                return 3, {}
+                # R168(a). `return 3, {}` here, in main(). run_classic and
+                # run_showdown legitimately return (code, brief) tuples; main()
+                # returns an int, and `raise SystemExit((3, {}))` exits 1 with a
+                # stray tuple on stderr. Every documented consumer reads that as
+                # a crash: autobuild's 0/3/4/5/10 contract, the SKILL's
+                # rerun-on-10 loop, and build_asserted.py, which inherits main().
+                # So the one refusal in this file that says "your feed is for
+                # another slate" arrived looking like a bug in the build.
+                return 3
             staged_feed.write_text(json.dumps(feed), encoding="utf-8")
             feed_note = {"source": str(args.lineups), "age_minutes": feed_age_minutes(feed),
                          "draftgroup_coverage": f"{covered}/{len(slate_teams)}"}
@@ -3211,8 +3271,29 @@ def main() -> int:
             else:
                 feed_note = {"source": str(feed_path), "age_minutes": age}
         else:
-            feed = fetch_lineups(args.date, feed_path)
-            feed_note = {"source": "fetched", "age_minutes": 0.0}
+            # R168(b). The refetch leg above has carried a guard for a while and
+            # the platoon-side fetch gained one in the 08-18..22 work; this leg,
+            # the FIRST fetch of the day, did not. No staged feed + DK's
+            # `Starting` column not covering the slate + no route to statsapi
+            # was a raw URLError traceback, empty stdout, no brief, exit 1 --
+            # and that is the normal pre-lock morning state, not an edge case.
+            # An empty feed is a degradation and not a loss: the front door
+            # still fills orders from the DK salary file (R143) and from the
+            # platoon reference for TBD teams.
+            try:
+                feed = fetch_lineups(args.date, feed_path)
+                feed_note = {"source": "fetched", "age_minutes": 0.0}
+            except Exception as exc:  # network failure must not kill the build
+                feed = {"games": []}
+                feed_note = {"status": "lineups_feed_unavailable",
+                             "source": "none",
+                             "warning": f"first fetch failed: {exc}",
+                             "note": "building on DK's Starting column and the "
+                                     "platoon reference; every side DK has not "
+                                     "posted is a projection, so read "
+                                     "dk_order_coverage in the pool report "
+                                     "before approving"}
+                print(f"lineups feed unavailable: {exc}", file=sys.stderr)
         print(f"lineups feed: {json.dumps(feed_note)}", file=sys.stderr)
         code, brief = run_classic(args, slate_dir, staged_salary, staged_entries,
                                   feed, deadline)
