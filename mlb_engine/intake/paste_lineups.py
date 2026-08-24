@@ -48,10 +48,21 @@ team needs no handedness lookup at all, and F4's platoon component is fully fed
 from the paste. This is the whole reason a paste-primary build can make zero
 network calls.
 
-**Every player carries an MLBAM id in the URL** (``.../jeremy-pena-665161``).
-That is the durable identity: it is the join key to the Savant expected-stats
-tables, and it is what makes a name crosswalk possible. It is not, however, in
-the DK salary file, which is why matching still has to happen by name.
+**An MLBAM id MAY ride in the URL** (``.../jeremy-pena-665161``), and where it
+does it is the durable identity: the join key to the Savant expected-stats
+tables. It is not in the DK salary file, which is why matching still has to
+happen by name.
+
+**R189(1), 2026-08-24: this used to read "EVERY player carries an MLBAM id",
+and that is false for the pastes Ben actually makes.** Verified on the archived
+``paste_1910_6g.txt``: all six games parse ``mlbam_id=None``, because a
+plain-text browser copy keeps the link TEXT and drops the href. So the id is
+optional here and downstream must not assume it. What that assumption cost is
+R189(2), landed the same day: ``compute_f4_factors`` bucketed only probables
+with no NAME, so a named-but-id-less probable scored a silent 1.0 and the F4
+SP-quality term was dead on every plain-text-paste slate while the report read
+``sp_quality_available: True``. It now joins by the Savant
+``last_name, first_name`` key and names whatever it still cannot resolve.
 
 The matching problem, and it is the only real risk here. mlb.com abbreviates
 first names: ``J Peña`` where DK writes ``Jeremy Pena``. An exact normalized

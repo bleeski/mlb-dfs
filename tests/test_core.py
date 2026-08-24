@@ -2874,6 +2874,72 @@ class ProjectionEnrichmentWiringTests(unittest.TestCase):
         self.assertIn("EEE", report["teams_without_opposing_probable"])
         self.assertAlmostEqual(report["league_mean_est_woba"], 0.320, places=6)
 
+    def test_an_id_less_probable_is_named_not_silently_scored_neutral(self):
+        """R189(2). A probable with a NAME but no joinable Savant row took a
+        silent 1.0 and appeared in NO bucket: `teams_without_opposing_probable`
+        counts only missing NAMES, so the report said `sp_quality_available:
+        True` with the SP-quality half of F4 dead. That is every plain-text
+        mlb.com paste (Ben's browser copies carry no MLBAM ids) and, since
+        R159(b), every DK-declared probable, because DK ships none either.
+        """
+        from mlb_engine.projections import projection_builder as pb
+
+        pitching = pd.DataFrame([
+            {"player_id": "900", "pa": 300, "woba": 0.30, "est_woba": 0.360},
+            {"player_id": "901", "pa": 300, "woba": 0.30, "est_woba": 0.320},
+            {"player_id": "902", "pa": 300, "woba": 0.30, "est_woba": 0.280},
+        ])
+        f4, report = pb.compute_f4_factors(
+            {"h1": "AAA", "h2": "CCC"},
+            {"AAA": {"id": "", "name": "Loud Contact", "hand": "R"},
+             "CCC": {"id": "77777", "name": "Nobody", "hand": "L"}},
+            pitching_table=pitching,
+        )
+        self.assertAlmostEqual(f4["h1"], 1.0, places=6)
+        self.assertAlmostEqual(f4["h2"], 1.0, places=6)
+        self.assertEqual([], report["teams_without_opposing_probable"],
+                         "both probables have names; that bucket cannot see "
+                         "this and never could")
+        self.assertTrue(report["sp_quality_available"],
+                        "the table loaded, which is the claim that used to "
+                        "stand in for 'the term applied'")
+        self.assertEqual(0, report["sp_quality_applied"])
+        self.assertEqual(
+            [("AAA", "probable carries no MLBAM id and no Savant name match"),
+             ("CCC", "MLBAM id absent from the pitching expected-stats table")],
+            [(r["team"], r["reason"]) for r in report["sp_quality_unavailable"]],
+            "two different failures, named apart: one has no key, the other "
+            "has a key the table does not hold")
+
+    def test_the_savant_name_join_recovers_an_id_less_probable(self):
+        """The recovery half. Savant ships 'last_name, first_name' and the
+        repo already owns that key plus the highest-PA collision rule, so an
+        id-less probable joins by name instead of scoring 1.0."""
+        from mlb_engine.projections import projection_builder as pb
+
+        pitching = pd.DataFrame([
+            {"last_name, first_name": "Contact, Loud", "player_id": "900",
+             "pa": 300, "woba": 0.30, "est_woba": 0.360},
+            {"last_name, first_name": "Middle, Average", "player_id": "901",
+             "pa": 300, "woba": 0.30, "est_woba": 0.320},
+            {"last_name, first_name": "Ace, Real", "player_id": "902",
+             "pa": 300, "woba": 0.30, "est_woba": 0.280},
+        ])
+        f4, report = pb.compute_f4_factors(
+            {"h1": "AAA"},
+            {"AAA": {"id": "", "name": "Loud Contact", "hand": None}},
+            pitching_table=pitching,
+        )
+        # The same factor the id join would have given.
+        self.assertAlmostEqual(f4["h1"], 1.10, places=6)
+        self.assertEqual([], report["sp_quality_unavailable"])
+        self.assertEqual(1, report["sp_quality_applied"])
+        self.assertEqual(
+            [{"team": "AAA", "probable": "Loud Contact", "matched_id": "900"}],
+            report["sp_quality_name_joined"],
+            "and the join is recorded, because a name match is a weaker claim "
+            "than an id match and the operator should be able to see which ran")
+
     def test_run_slate_surfaces_projection_enrichment(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -14204,22 +14270,36 @@ class DkBattingOrderPrecedenceTests(unittest.TestCase):
         from mlb_engine.intake import live_data_adapters as lda
         return lda
 
-    def _players(self, orders, probables=None):
-        """orders: {team: [name, ...] in slot order}. Returns {pid: obj}."""
+    def _players(self, orders, probables=None, statuses=None,
+                 game_info=None, probable_status=None):
+        """orders: {team: [name, ...] in slot order}. Returns {pid: obj}.
+
+        ``statuses``: {team: {slot: "IL"}} puts a DK Status on one posted slot,
+        which is R159(a)'s whole case. ``game_info`` overrides the Game Info
+        string per team (R160 needs one that parses as a matchup and not a
+        time).
+        """
         from mlb_engine.intake.slate_intake_manager import SalaryPlayer
         out, pid = {}, 1000
+        statuses = statuses or {}
+        game_info = game_info or {}
         for team, names in orders.items():
+            info = game_info.get(team, f"{team}@OPP 08/16/2026 07:05PM ET")
             for slot, name in enumerate(names, start=1):
                 out[str(pid)] = SalaryPlayer(
                     player_id=str(pid), name=name, team=team, positions=("OF",),
-                    salary=3000.0, game_info=f"{team}@OPP 08/16/2026 07:05PM ET",
-                    game_id=f"{team}@OPP", starting=str(slot))
+                    salary=3000.0, game_info=info,
+                    game_id=f"{team}@OPP", starting=str(slot),
+                    status=str(statuses.get(team, {}).get(slot, "")))
                 pid += 1
         for team, name in (probables or {}).items():
             out[str(pid)] = SalaryPlayer(
                 player_id=str(pid), name=name, team=team, positions=("SP",),
-                salary=9000.0, game_info=f"{team}@OPP 08/16/2026 07:05PM ET",
-                game_id=f"{team}@OPP", starting="SP")
+                salary=9000.0,
+                game_info=game_info.get(
+                    team, f"{team}@OPP 08/16/2026 07:05PM ET"),
+                game_id=f"{team}@OPP", starting="SP",
+                status=str((probable_status or {}).get(team, "")))
             pid += 1
         return out
 
@@ -14397,6 +14477,361 @@ class DkBattingOrderPrecedenceTests(unittest.TestCase):
                      if str(v.get("status")) == "confirmed"]
         self.assertEqual(15, len(confirmed))
         self.assertGreaterEqual(out["pool_report"]["hitters_kept"], 135)
+
+
+class DkDegradedSideTests(unittest.TestCase):
+    """R159: one Status=IL flip inside a DK-posted nine, and what it cost.
+
+    `dk_order_coverage` read the RAW salary rows and the pool's merge read the
+    status-FILTERED map, so the two disagreed at exactly the moment the build
+    was deciding whether to spend a fetch. The team read "covered", the fetch
+    was skipped, the merge then saw eight slots, refused the side outright, and
+    the whole posted nine fell to `fallback_top9_appg` -- taking the team's
+    `Starting=SP` arm with it, because the only code that attached a probable
+    ran inside the accepted-side loop. Repro'd at ac8ac05 and again at ec832cf:
+    coverage `(['BOS','NYY'], [])` against `NYY: fallback_top9_appg 9`.
+
+    Three things this has to get right. The disagreement has to be gone at the
+    source rather than papered over at one of the two readers. The surviving
+    eight are OBSERVED and must be seeded as a partial (R60's path), never
+    discarded and never promoted to confirmed. And the shelved player must not
+    reach the pool by any of it.
+    """
+
+    NINE = [f"H{i}" for i in range(1, 10)]
+
+    def _adapters(self):
+        from mlb_engine.intake import live_data_adapters as lda
+        return lda
+
+    def _players(self, **kwargs):
+        return DkBattingOrderPrecedenceTests._players(
+            DkBattingOrderPrecedenceTests(), **kwargs)
+
+    def _degraded(self):
+        return self._players(orders={"NYY": self.NINE, "BOS": self.NINE},
+                             probables={"NYY": "NYY Ace", "BOS": "BOS Ace"},
+                             statuses={"NYY": {5: "IL"}})
+
+    def test_the_side_reading_separates_degraded_from_confirmed(self):
+        lda = self._adapters()
+        readings = lda.dk_side_readings(self._degraded())
+        self.assertEqual("confirmed", readings["BOS"]["state"])
+        self.assertEqual("degraded", readings["NYY"]["state"])
+        self.assertEqual([5], [s["order"] for s in readings["NYY"]["shelved"]])
+        self.assertEqual(["BOS"], sorted(lda.dk_confirmed_sides(self._degraded())),
+                         "a degraded side is not a confirmed one")
+
+    def test_coverage_and_the_merge_now_answer_the_same_question(self):
+        """The defect itself: `covered` said yes and the merge said no. The
+        fetch decision follows coverage, so the disagreement is what spent the
+        build's only chance to fill the ninth slot."""
+        import csv as _csv
+        import tempfile
+        lda = self._adapters()
+        players = self._degraded()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                writer = _csv.DictWriter(fh, fieldnames=[
+                    "Position", "Name + ID", "Name", "ID", "Roster Position",
+                    "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                    "Status", "Starting"])
+                writer.writeheader()
+                for pid, sp in players.items():
+                    writer.writerow({
+                        "Position": sp.positions[0],
+                        "Name + ID": f"{sp.name} ({pid})", "Name": sp.name,
+                        "ID": pid, "Roster Position": sp.positions[0],
+                        "Salary": int(sp.salary), "Game Info": sp.game_info,
+                        "TeamAbbrev": sp.team, "AvgPointsPerGame": "8.0",
+                        "Status": sp.status, "Starting": sp.starting})
+            covered, uncovered = lda.dk_order_coverage(path)
+            report = lda.dk_order_coverage_report(path)
+        self.assertEqual(["BOS"], covered)
+        self.assertIn("NYY", uncovered,
+                      "covered-but-degraded counts as NOT covered, so the "
+                      "build still fetches the side it cannot complete")
+        self.assertEqual(["NYY"], report["degraded"])
+        self.assertEqual([], report["uncovered"],
+                         "degraded is its own bucket, not folded into "
+                         "'DK never posted this team'")
+        self.assertEqual(
+            "IL", report["degraded_detail"][0]["shelved"][0]["status"])
+        merged_sides = lda.merge_dk_starting_into_feed({}, players)[1]
+        self.assertEqual(covered, merged_sides["dk_sides"],
+                         "one input, one reading: whatever coverage calls "
+                         "covered is exactly what the merge sources from DK")
+
+    def test_the_surviving_eight_are_seeded_as_a_partial_not_discarded(self):
+        lda = self._adapters()
+        feed, report = lda.merge_dk_starting_into_feed({}, self._degraded())
+        side = next(g["home"] if g["home"].get("team_abbrev") == "NYY"
+                    else g["away"] for g in feed["games"]
+                    if "NYY" in (g["home"].get("team_abbrev"),
+                                 g["away"].get("team_abbrev")))
+        self.assertEqual("partial", side["lineup_status"],
+                         "eight of nine is a projection, never confirmed")
+        self.assertEqual(8, len(side["lineup"]))
+        self.assertNotIn("H5", [h["name"] for h in side["lineup"]],
+                         "the shelved bat does not take a seat")
+        self.assertEqual([1, 2, 3, 4, 6, 7, 8, 9],
+                         [h["order"] for h in side["lineup"]],
+                         "DK's own slots survive; the gap is where the IL bat was")
+        self.assertEqual(
+            [{"team": "NYY", "posted": 8,
+              "shelved": [{"order": 5, "name": "H5", "dk_id": "1004",
+                           "status": "IL"}]}],
+            report["degraded_sides"])
+
+    def test_the_eight_are_seeded_into_a_game_the_feed_already_has(self):
+        """The same seeding on the OTHER branch. A feed that carries the game
+        but has not posted this side takes DK's eight through the in-feed path,
+        not the synthesize path -- and a test that only ever hands the merge an
+        EMPTY feed never runs that branch at all. Found by mutating the in-feed
+        loop shut and watching every other test here still pass.
+        """
+        lda = self._adapters()
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup": []},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        side = feed["games"][0]["away"]
+        self.assertEqual("partial", side["lineup_status"])
+        self.assertEqual("dk_salary_starting_degraded", side["lineup_source"])
+        self.assertEqual([1, 2, 3, 4, 6, 7, 8, 9],
+                         [h["order"] for h in side["lineup"]])
+        self.assertEqual("NYY Ace", side["probable_pitcher"]["name"])
+        self.assertNotIn("NYY@OPP", report["games_synthesized"],
+                         "NYY's game was already there; this is the in-feed leg")
+        self.assertNotIn("NYY", report["sides_left_to_feed"])
+
+    def test_a_complete_source_still_outranks_eight_of_nine(self):
+        """R143's own rule, applied to the case it did not anticipate: only a
+        COMPLETE 1-9 wins. A feed holding the whole side -- including the bat
+        DK shelved -- is fresher information than DK's eight, so it stands."""
+        lda = self._adapters()
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                     "lineup": [{"order": i, "name": n, "bat_side": "R"}
+                                for i, n in enumerate(
+                                    [f"Feed{i}" for i in range(1, 10)], start=1)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, _ = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        side = feed["games"][0]["away"]
+        self.assertEqual("confirmed", side["lineup_status"])
+        self.assertEqual(["Feed1"], [h["name"] for h in side["lineup"]][:1])
+        self.assertEqual(9, len(side["lineup"]))
+
+    def test_the_degraded_team_keeps_its_declared_probable(self):
+        """R159(c). The arm was collateral damage: `probable_pitcher` was only
+        ever written inside the confirmed-side loop, so a team DK named a
+        starter for got "no probable or declared starter" -- a blocker raised
+        against a fact the authoritative file answers."""
+        lda = self._adapters()
+        feed, report = lda.merge_dk_starting_into_feed({}, self._degraded())
+        sides = {s.get("team_abbrev"): s for g in feed["games"]
+                 for s in (g["away"], g["home"])}
+        self.assertEqual("NYY Ace", sides["NYY"]["probable_pitcher"]["name"])
+        self.assertEqual(["BOS", "NYY"], report["probables_attached"])
+
+    def test_a_probable_reaches_a_team_with_no_posted_order_at_all(self):
+        """The same hole with no lineup involved: `Starting=SP` and nothing
+        else. Nothing used to carry that arm into the feed."""
+        lda = self._adapters()
+        players = self._players(orders={}, probables={"TOR": "TOR Ace"})
+        feed, report = lda.merge_dk_starting_into_feed({}, players)
+        sides = {s.get("team_abbrev"): s for g in feed["games"]
+                 for s in (g["away"], g["home"])}
+        self.assertEqual("TOR Ace", sides["TOR"]["probable_pitcher"]["name"])
+        self.assertEqual(["TOR"], report["probables_attached"])
+
+    def test_a_shelved_arm_is_never_a_declared_probable(self):
+        """The status rule moved INTO `dk_declared_probables` when the front
+        door started handing it raw rows. A rule that only holds for callers
+        who pre-filtered is the defect this item is."""
+        lda = self._adapters()
+        players = self._players(orders={}, probables={"TOR": "TOR Ace"},
+                                probable_status={"TOR": "IL"})
+        self.assertEqual({}, lda.dk_declared_probables(players))
+
+    def test_the_merged_probable_carries_a_name_so_f4_can_see_it(self):
+        """R159(b). The payload was `{"dk_id": ...}` and nothing else. The
+        status map reads either, but `extract_opposing_probables` requires a
+        NAME, so on the no-fetch path it returned {} and every hitter's F4
+        quality term went neutral while the warning blamed a missing probable.
+        """
+        lda = self._adapters()
+        feed, _ = lda.merge_dk_starting_into_feed(
+            {}, self._players(orders={"NYY": self.NINE},
+                              probables={"NYY": "NYY Ace"}))
+        opposing = lda.extract_opposing_probables(feed)
+        self.assertEqual({"OPP"}, set(opposing),
+                         "this used to be {} for the whole slate")
+        self.assertEqual("NYY Ace", opposing["OPP"]["name"])
+        self.assertEqual("", opposing["OPP"]["id"],
+                         "DK ships no MLBAM id; F4 resolves that by name "
+                         "rather than scoring a silent 1.0 (R189(2))")
+
+    def test_partial_handedness_is_named_with_its_count(self):
+        """R159(d). `f4_handedness_unavailable` fires only when a side loses
+        ALL nine hands, and R151's post-mortem records ten hitters losing both
+        F4 terms on one slate with that list still empty."""
+        lda = self._adapters()
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                     "lineup": [{"order": i, "name": n,
+                                 "bat_side": "L" if i <= 6 else ""}
+                                for i, n in enumerate(self.NINE, start=1)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        _, report = lda.merge_dk_starting_into_feed(
+            feed_in, self._players(orders={"NYY": self.NINE}))
+        self.assertEqual([], report["f4_handedness_unavailable"],
+                         "six hands present is not 'unavailable'")
+        self.assertEqual([{"team": "NYY", "hands_present": 6, "of": 9}],
+                         report["f4_handedness_partial"])
+
+    def test_the_pool_seeds_the_eight_and_names_the_shelved_bat(self):
+        """End to end at the front door. Before this the team reported
+        `fallback_top9_appg, 9` -- a bench bat with a better season taking a
+        posted starter's seat, certifying clean and invisible in the output."""
+        import csv as _csv
+        import tempfile
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        players = self._degraded()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                writer = _csv.DictWriter(fh, fieldnames=[
+                    "Position", "Name + ID", "Name", "ID", "Roster Position",
+                    "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                    "Status", "Starting"])
+                writer.writeheader()
+                for pid, sp in players.items():
+                    writer.writerow({
+                        "Position": sp.positions[0],
+                        "Name + ID": f"{sp.name} ({pid})", "Name": sp.name,
+                        "ID": pid, "Roster Position": sp.positions[0],
+                        "Salary": int(sp.salary), "Game Info": sp.game_info,
+                        "TeamAbbrev": sp.team, "AvgPointsPerGame": "8.0",
+                        "Status": sp.status, "Starting": sp.starting})
+                # One spare bat so the ninth slot has something to fall to.
+                writer.writerow({
+                    "Position": "OF", "Name + ID": "Bench (9999)",
+                    "Name": "Bench", "ID": "9999", "Roster Position": "OF",
+                    "Salary": 2500, "Game Info": "NYY@OPP 08/16/2026 07:05PM ET",
+                    "TeamAbbrev": "NYY", "AvgPointsPerGame": "5.0",
+                    "Status": "", "Starting": ""})
+            out = build_slate_pool(
+                str(path), {}, stale_platoon_policy="warn",
+                now=datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc))
+        report = out["pool_report"]
+        self.assertEqual("confirmed", report["teams"]["BOS"]["status"])
+        self.assertTrue(
+            str(report["teams"]["NYY"]["status"]).startswith("posted_partial"),
+            f"the eight are seeded, not thrown away: {report['teams']['NYY']}")
+        self.assertTrue(
+            any("shelved" in w and "NYY" in w for w in report["warnings"]),
+            "the shelved bat is named, with its slot and its status")
+        nyy = sorted(str(r.get("Name")) for r in out["projection_rows"]
+                     if str(r.get("TeamAbbrev") or r.get("Team")) == "NYY")
+        self.assertNotIn("H5", nyy, "and it still never reaches the pool")
+        self.assertIn("Bench", nyy,
+                      "the ninth seat comes from the fallback, as it must")
+
+
+class DkUnparseableGameTimeTests(unittest.TestCase):
+    """R160: a game that parses as a matchup but not a time.
+
+    Real on doubleheader game 2s, which DK ships as "BOS@NYY 08/17/2026 TBD".
+    The merge synthesized the game with an empty `game_date_utc` and the very
+    next read -- the status map's unguarded `_parse_utc("")` -- raised
+    `ValueError: Invalid isoformat string: ''`. A traceback out of the front
+    door, inside the build window, where a blocker belonged.
+    """
+
+    NINE = [f"H{i}" for i in range(1, 10)]
+
+    def _adapters(self):
+        from mlb_engine.intake import live_data_adapters as lda
+        return lda
+
+    def _players(self, **kwargs):
+        return DkBattingOrderPrecedenceTests._players(
+            DkBattingOrderPrecedenceTests(), **kwargs)
+
+    def test_a_timeless_game_is_not_synthesized_and_says_why(self):
+        lda = self._adapters()
+        players = self._players(
+            orders={"NYY": self.NINE},
+            game_info={"NYY": "NYY@OPP 08/17/2026 TBD"})
+        feed, report = lda.merge_dk_starting_into_feed({}, players)
+        self.assertEqual([], report["games_synthesized"])
+        self.assertEqual(
+            [{"game_id": "NYY@OPP", "team": "NYY",
+              "reason": "no parseable start time in the salary Game Info"}],
+            report["games_unsynthesizable"])
+        self.assertEqual([], feed["games"],
+                         "a game with no lock time is left to the feed, never "
+                         "admitted with an empty one")
+
+    def test_the_status_map_survives_a_feed_game_with_no_start_time(self):
+        """The guard belongs at the READ too: the merge is one of several feed
+        sources and a crash here is a lost build window whichever one wrote
+        it."""
+        lda = self._adapters()
+        players = self._players(orders={"NYY": self.NINE})
+        feed = {"games": [
+            {"game_pk": 1, "game_date_utc": "", "status": "Scheduled",
+             "away": {"team_abbrev": "NYY"}, "home": {"team_abbrev": "OPP"}},
+            {"game_pk": 2, "game_date_utc": "not-a-timestamp",
+             "status": "Scheduled",
+             "away": {"team_abbrev": "BOS"}, "home": {"team_abbrev": "TOR"}},
+        ]}
+        status = lda.build_status_map_from_lineups_feed(feed, players)
+        self.assertEqual(
+            ["BOS@TOR", "NYY@OPP"],
+            [r["game_id"] for r in status["games_without_lock_time"]])
+        self.assertEqual({}, status["lock_time_by_game_id"],
+                         "no lock time is guessed for either of them")
+
+    def test_the_pool_blocks_on_the_cause_not_on_the_symptom(self):
+        """Without this the operator reads 'no probable or declared starter'
+        for both sides -- true, and about the wrong thing. The side has no
+        probable because the game was never built, and the game was never
+        built because DK shipped no start time for it."""
+        import csv as _csv
+        import tempfile
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        players = self._players(
+            orders={"NYY": self.NINE}, probables={"NYY": "NYY Ace"},
+            game_info={"NYY": "NYY@OPP 08/17/2026 TBD"})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                writer = _csv.DictWriter(fh, fieldnames=[
+                    "Position", "Name + ID", "Name", "ID", "Roster Position",
+                    "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                    "Status", "Starting"])
+                writer.writeheader()
+                for pid, sp in players.items():
+                    writer.writerow({
+                        "Position": sp.positions[0],
+                        "Name + ID": f"{sp.name} ({pid})", "Name": sp.name,
+                        "ID": pid, "Roster Position": sp.positions[0],
+                        "Salary": int(sp.salary), "Game Info": sp.game_info,
+                        "TeamAbbrev": sp.team, "AvgPointsPerGame": "8.0",
+                        "Status": sp.status, "Starting": sp.starting})
+            out = build_slate_pool(
+                str(path), {}, stale_platoon_policy="warn",
+                now=datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc))
+        blockers = out["pool_report"]["blockers"]
+        self.assertTrue(
+            any("no parseable start time" in b for b in blockers),
+            f"the cause has to be in the blocker list: {blockers}")
 
 
 class SkillCacheDriftTests(unittest.TestCase):

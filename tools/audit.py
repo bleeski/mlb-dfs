@@ -262,7 +262,23 @@ EXPECTED_SUITE_COUNTS = {
     # a hand that still cannot resolve being NAMED in both directions -- no id
     # to join on, and /people answering without pitchHand, which is the case a
     # helpful fixture hides. Three hand-run mutations, all three caught.
-    "tests.test_core": 825,
+    # R159+R160+R189(2), 2026-08-23: 825 -> 841, the sixteen that pin the
+    # intake-truth batch. Eleven on the degraded side (the reading that tells
+    # confirmed from degraded, coverage and the merge finally answering the
+    # same question, the surviving eight seeded as a PARTIAL on both the
+    # in-feed and the synthesize branch, a complete source still outranking
+    # eight-of-nine, the probable reaching a degraded team and a team with no
+    # order at all, a shelved arm never becoming a probable, the merged
+    # probable carrying a NAME, partial handedness named with its count, and
+    # the pool seeding the eight while the shelved bat stays out). Three on the
+    # unparseable game time (not synthesized and says why, the status map
+    # surviving two malformed feed games, and the pool blocking on the CAUSE
+    # rather than on "no probable"). Two on F4's id-less probable (named with
+    # its reason instead of a silent 1.0, and the Savant name join recovering
+    # it). Nineteen hand-run mutations, all nineteen caught -- two only after
+    # the eleventh test was added, because every fixture until then handed the
+    # merge an EMPTY feed and the in-feed branch was never executed at all.
+    "tests.test_core": 841,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

@@ -227,6 +227,10 @@ def refresh_confirmed_lineups(
 # does not double count the implied total (F1) or tonight's park (F5).
 
 XWOBA_REQUIRED_COLUMNS = ("player_id", "pa", "woba", "est_woba")
+
+# Savant's own name header, comma and all. Not required (the id join is the
+# primary route); consumed by R189(2)'s fallback when a probable has no id.
+SAVANT_NAME_COLUMN = "last_name, first_name"
 XWOBA_PA_FULL = 100          # PA at or above which the full correction applies
 XWOBA_PA_MIN = 50            # below this, no correction (raw Base is used)
 XWOBA_BATTER_CLIP = (0.85, 1.15)
@@ -864,6 +868,7 @@ def compute_f4_factors(
     """
     league_mean: Optional[float] = None
     sp_row_by_id: Dict[str, Tuple[float, float]] = {}
+    sp_id_by_name: Dict[str, str] = {}
     if pitching_table is not None and len(pitching_table):
         table = pitching_table.copy()
         table["player_id"] = table["player_id"].astype(str).str.strip()
@@ -875,22 +880,61 @@ def compute_f4_factors(
         for pid, e, p in zip(table["player_id"], est, pa):
             if not pd.isna(e):
                 sp_row_by_id[str(pid)] = (float(e), float(p) if not pd.isna(p) else 0.0)
+        # R189(2): the id-less probable's only way in. Savant ships
+        # "last_name, first_name"; the repo already owns that key and the
+        # highest-PA collision rule in xwoba_base_correction, so this consumes
+        # it rather than deriving a second answer to the same question.
+        if SAVANT_NAME_COLUMN in table.columns:
+            # Deferred: xwoba_base_correction imports this module at load time.
+            from mlb_engine.projections.xwoba_base_correction import (
+                _build_name_to_mlbam,
+            )
+            sp_id_by_name, _ = _build_name_to_mlbam(table, sp_row_by_id)
 
     hands = {str(k): str(v).strip().upper() for k, v in (bat_side_by_player_id or {}).items()}
     quality_by_team: Dict[str, float] = {}
     opp_hand_by_team: Dict[str, Optional[str]] = {}
     teams_without_probable: list = []
+    # R189(2). A probable with a NAME but no joinable Savant row scored a silent
+    # 1.0 and appeared nowhere: `teams_without_opposing_probable` buckets only
+    # missing NAMES, so the report read `sp_quality_available: True` with the
+    # SP-quality half of F4 dead. That is every plain-text-paste slate (real
+    # mlb.com copies carry no MLBAM id) and, since R159(b), every DK-declared
+    # probable too, because DK ships no MLBAM id either. The name join below
+    # recovers most of them; whatever it cannot recover is NAMED here with the
+    # reason instead of being scored neutral in silence.
+    sp_quality_unavailable: list = []
+    sp_quality_name_joined: list = []
     for team in sorted({str(t).strip().upper() for t in team_by_player_id.values()}):
         probable = opp_probable_by_team.get(team) or {}
         opp_hand_by_team[team] = probable.get("hand")
         mlbam = str(probable.get("id") or "").strip()
-        if not probable or not probable.get("name"):
+        name = str(probable.get("name") or "")
+        if not probable or not name:
             teams_without_probable.append(team)
             quality_by_team[team] = 1.0
             continue
         est_pa = sp_row_by_id.get(mlbam)
+        if est_pa is None and not mlbam and sp_id_by_name:
+            from mlb_engine.projections.xwoba_base_correction import (
+                _savant_name_key,
+            )
+            joined = sp_id_by_name.get(_savant_name_key(name))
+            if joined:
+                est_pa = sp_row_by_id.get(joined)
+                if est_pa is not None:
+                    mlbam = joined
+                    sp_quality_name_joined.append(
+                        {"team": team, "probable": name, "matched_id": joined})
         if est_pa is None or league_mean is None:
             quality_by_team[team] = 1.0
+            sp_quality_unavailable.append({
+                "team": team, "probable": name, "id": mlbam,
+                "reason": "no pitching expected-stats table" if league_mean is None
+                else "probable carries no MLBAM id and no Savant name match"
+                if not mlbam
+                else "MLBAM id absent from the pitching expected-stats table",
+            })
             continue
         quality_by_team[team] = opposing_sp_quality_factor(
             est_pa[0], league_mean, est_pa[1], clip=quality_clip, pa_full=pa_full, pa_min=pa_min,
@@ -915,6 +959,15 @@ def compute_f4_factors(
         "hitters_scored": len(f4_by_player),
         "platoon_component_applied": platoon_applied,
         "sp_quality_available": league_mean is not None,
+        # R189(2): "the table loaded" and "the term actually applied" are two
+        # questions, and only the first had an answer. `sp_quality_applied`
+        # counts the teams whose quality factor is genuinely off 1.0;
+        # `sp_quality_unavailable` names the ones that are neutral because
+        # nothing joined, with why.
+        "sp_quality_applied": sum(
+            1 for value in quality_by_team.values() if abs(value - 1.0) > 1e-12),
+        "sp_quality_unavailable": sp_quality_unavailable,
+        "sp_quality_name_joined": sp_quality_name_joined,
         "note": (
             "Deterministic F4 prior: opposing-SP xwOBA-against quality ratio x "
             "platoon hand prior, PA-shrunk and clipped. Labeled prior, never a "

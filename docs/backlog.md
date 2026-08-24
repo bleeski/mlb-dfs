@@ -39,6 +39,43 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-24 (slot 1), DEV, claim `engine` (bare mutex): **the queue head is
+CLOSED. R159 and R160 are landed and migrated; R189 loses layers (1) and (2) and
+survives as R189(3).** Gate 1236 -> 1252 (`test_core` 825 -> 841, `grew`); the
+CHANGELOG entry of this date carries the record and the ledger Quick Card pin
+line moved under a DEV-held `ledger` claim, that line and nothing else.
+
+**Slot 2 is now slot 1: R167 + R168 + R169, the lost-window batch.** Nothing
+jumped it. The only candidate was R161(a), which sits in the same function R159
+rewrote (`build_slate_pool` deriving `slate_date` from the UTC clock on exactly
+this no-fetch path) and would have cost one line — and it stayed out for the
+reason R190's own note gives about R161(b): a clock fix inside an intake fix is
+two changes in one commit, and R161's whole entry is the argument that a clock
+residue deserves its own. It is XS and it is the cheapest thing on the board.
+
+**Three readings from the landing, none of which change the order.** First, the
+defect class was consistent across all three items and it is not "wrong answer",
+it is **two components answering one question differently**: coverage vs the
+merge on what "covered" means (R159a), the status map vs the merge on whether a
+game exists (R160), `sp_quality_available` vs whether the term applied
+(R189(2)). Each disagreement was invisible because both halves reported clean.
+That is the same shape as R172's `projection_tier` and R176's vacuous gates,
+which are slot 3 — evidence for keeping that batch where it is. Second, R189(2)
+was worth more than its S-lift suggested once R159(b) landed: DK ships no MLBAM
+id, so making the DK-declared probable VISIBLE to F4 would have handed it
+straight to the silent-1.0 path. Two items that read independent on the board
+were one item in the code. Third, the mutation survivors this time were a
+FIXTURE gap and not an assertion gap — every test in the class handed the merge
+an empty feed, so the in-feed branch was never executed by anything. Six
+consecutive items have now paid for a fixture lesson; the pattern worth writing
+down is that a branch no fixture reaches is invisible to any number of
+assertions about it.
+
+**One thing for Ben, unchanged and now two days old:** commits on `main` are
+still not on `origin/main` (2 as of this commit, and the audit says so on every
+session-start line). Sessions commit and Ben pushes; until he does, no clone
+sees this week's work.*
+
 *2026-08-23 (fragment merge + R190), DEV, claim `engine` (bare mutex): the ed6
 landing left twenty-two fragments in `docs/backlog_inbox/` explicitly unconsumed
 and named the next fragment-merge session as their owner. That is this session.
@@ -173,15 +210,18 @@ instruction (impact against technical challenge), and the queue MOVES:** the
 verified P1 truth-and-delivery batches run ahead of the pre-existing Tier 1
 remainder, all S or XS:
 
-1. **R159 + R160 + R189 + R122-rider** — intake truth, one surface: a Status
-   flip inside a DK-posted nine silently discards the order, skips the fetch,
-   and drops the probable (R159a, repro'd at THIS head); a TBD game time
-   crashes the front door (R160, repro'd at THIS head); the F4 quality term
-   dies silently on id-less probables — every plain-text paste slate — plus
-   the two paste hand shapes R117's fix did not cover (R189); the Showdown
-   thesis prior claims factors an `all_healthy` pool never applied (R122
-   rider).
-2. **R167 + R168 + R169** — the lost-window batch: a bad pct override passes
+1. ~~**R159 + R160 + R189 + R122-rider**~~ — **R159 and R160 CLOSED
+   2026-08-24**, entries migrated to CHANGELOG.md, along with R189's layers (1)
+   and (2) (the F4 quality term dying silently on id-less probables — every
+   plain-text paste slate, and since R159(b) every DK-declared probable too).
+   **What is left of this slot is R189(3)** (the two paste hand shapes R117's
+   fix did not cover) **and the R122 rider** (the Showdown thesis prior
+   claiming factors an `all_healthy` pool never applied). Both are handedness
+   reaching the build, both are Showdown-or-paste rather than the Classic
+   no-fetch path, and they batch with R158/R123 for the next Showdown session
+   at item 9 rather than holding slot 1.
+2. **R167 + R168 + R169** — the lost-window batch, and the head of this tier as
+   of 2026-08-24: a bad pct override passes
    the checkpoint and crashes AFTER the bank spend leaving status `building`
    (R167); build_slate's two remaining exit-1 crash doors (R168, narrowed at
    landing: the platoon-side fetch got guarded during the week, the main
@@ -210,8 +250,10 @@ remainder, all S or XS:
    against an actual 1221, the file's own staleness class, fourth instance).
 8. **R164** — bank job-grid waste (identical re-solves on pinned late-swap
    entries; provably infeasible opponent-team jobs): T-window recovery.
-9. **R158** — the Showdown time-limit-as-infeasibility inversion, batched
-   with R122/R123 for the next Showdown session (WS1).
+9. **R158 + R189(3)** — the Showdown time-limit-as-infeasibility inversion,
+   batched with R122/R123 for the next Showdown session (WS1); R189(3) joins
+   them as of 2026-08-24 because it is the paste-side half of the same
+   handedness question the R122 rider asks.
 10. Then the pre-existing Tier 1 remainder in its standing order from **R121**
    (still the head of that remainder), R11, the swap-rails batch, R36 F3m +
    F6m-remainder + R120 (with ed6's evidence that mapless builds auto-assume
@@ -298,7 +340,10 @@ and the narrative history accumulates at the bottom, not here.*
    because every one is a verified P1 silent-wrong-output or lost-window
    defect at S/XS lift. Entries live in their workstreams below; the numbered
    items under this line are the tier's landing record and hold their
-   positions.
+   positions. **Advanced 2026-08-24: the first entry is spent. R159 and R160
+   are closed and R189 is down to layer (3), so R167+R168+R169 is the head of
+   this tier and the leftovers (R189(3) + the R122 rider) moved to the
+   Showdown batch at item 9.**
 
 1. **R60 — CLOSED 2026-08-12**, migrated to CHANGELOG.md. Both halves landed
    with the partial-side rule written into the build contract.
@@ -1629,47 +1674,18 @@ Hypothesis-generated mlb.com renders (random posted-side subsets, `1. TBD` place
   `operator_supplied` routing). The fragment's second item (minimum-feasible
   relaxation hint) was folded into R98's remainder, not here.
 
-### R159. The R143 no-fetch path hardening batch: a scratch inside a posted nine silently discards DK's own order, and DK-declared probables never reach F4 (P1, S-M) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro AT THIS HEAD, (b)(c)(d) VERIFIED-read
+### R159 + R160. CLOSED 2026-08-24 -- intake truth on the no-fetch path, entries migrated to CHANGELOG.md
 
-- **What:** (a) `dk_order_coverage` (`live_data_adapters.py`) reads the RAW
-  salary rows while the pool's merge reads the status-FILTERED map, so its own
-  docstring's promise ("One definition of covered, shared") is exactly what is
-  broken. A `Status=IL/O/OUT` flip inside a posted 1-9 leaves the team
-  "covered" (fetch skipped, `feed={"games":[]}`), the merge sees 8 slots,
-  drops the ENTIRE posted side to `fallback_top9_appg`, loses the team's
-  `Starting=SP` arm, and raises "no probable or declared starter" for a fact
-  the authoritative file answers. Repro re-run against ec832cf 2026-08-22:
-  coverage `(['BOS','NYY'], [])`, pool `NYY: fallback_top9_appg 9` plus the
-  blocker. R60's seeding cannot rescue it: the side never enters the feed.
-  (b) merged DK probables carry `{"dk_id"}` only; `extract_opposing_probables`
-  requires `.get("name")`, so on the no-fetch path `opposing_probables == {}`,
-  every hitter's F4 quality term is neutral, and the warning misnames the
-  cause. (c) a team with `Starting=SP` but no complete 1-9 gets its probable
-  merged nowhere (covered sides only). (d) `f4_handedness_unavailable` fires
-  only when a side loses ALL nine hands; 3-of-9 lost is invisible — the code's
-  own comment now narrates the R151 incident and the all-nine limitation.
-- **Why:** the scratch case is the highest-cost intake moment and every leg
-  degrades to silence there; (a) is selection-affecting the way R117 was.
-- **Fix:** (a) compute coverage and the merge from ONE input; a status-dropped
-  player inside an otherwise-complete DK side becomes a NAMED partial (seed
-  the surviving eight like R60 does), and coverage returns covered-but-
-  degraded so the build still fetches. (b) attach `name` + DK id when merging
-  probables; land unjoinable teams in a `sp_quality_unavailable` report (see
-  R189). (c) read `dk_declared_probables` for all teams. (d) per-side
-  `hands_present/9` under `f4_handedness_partial`.
-
-### R160. A merge-synthesized game with an unparseable salary time crashes the front door (P1, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro AT THIS HEAD
-
-- **What:** when Game Info parses as a matchup but not a time (real on DH
-  Game 2s: `"BOS@NYY 08/17/2026 TBD"`), the DK merge synthesizes the game with
-  an empty `game_date_utc` and the status-map read calls `_parse_utc("")`
-  unguarded — `ValueError: Invalid isoformat string: ''`, a traceback instead
-  of a blocker (re-run against ec832cf 2026-08-22: still crashes). Through
-  `tools/ownership_pred.py emit` the same root prints the cryptic
-  `REFUSED: Invalid isoformat string: ''`.
-- **Fix:** in the synthesize branch, skip a gid absent from the salary game
-  times with a named warning (side left to the feed), or guard `_parse_utc`
-  and route the game to a blocker. Rides any R159 session (same surface).
+Both landed together because they are one surface and one session.
+R159's four halves: coverage and the merge now read ONE input (`dk_side_readings`), a shelved player inside a posted 1-9 makes the side
+DEGRADED rather than invisible and its surviving eight are seeded as a partial
+through R60's path, the merged probable carries a NAME so `extract_opposing_probables` can see it, every team DK declares an arm for gets
+one (not only teams with a complete order), and `f4_handedness_partial` reports
+hands present per side instead of firing only when a side loses all nine.
+R160: a game whose salary Game Info parses as a matchup but not a time is no
+longer synthesized, `_parse_utc` is guarded at the status-map read as well, and
+the blocker names the cause rather than the "no probable" consequence.
+**Numbers reserved; the record is the 2026-08-24 CHANGELOG entry.**
 
 ### R161. Two R65-class clock residues: slate_date falls back to the UTC clock, and the bundle's display time hardcodes UTC-4 (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read at ec832cf
 
@@ -3364,29 +3380,34 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   is Ben's grant (mount refuses unlink) — listed in Tier 4 as the decision.
   Any wanted fixture already exists under `evals/inputs/`.
 
-### R189. The F4 quality term dies silently on id-less probables, and two paste hand shapes still drop both probables — R117's verified remainder (P1, S) | new 2026-08-22, from the greenfield sixth edition; layers (1)(2) VERIFIED-repro at ac8ac05 with `projection_builder.py` unchanged since; layer (3) re-scoped at ec832cf
+### R189(3). Two mlb.com paste render shapes still drop both probables — R117's remainder, now R189's (P1, XS-S) | new 2026-08-22, from the greenfield sixth edition; layer (3) re-scoped at ec832cf. **(1) and (2) CLOSED 2026-08-24, migrated to CHANGELOG.md**
 
-- **What:** three layers, two surviving R117's close. (1) Real mlb.com pastes
-  carry NO MLBAM ids (verified on the archived `paste_1910_6g.txt`: all six
-  games parse `mlbam_id=None`) — the module docstring's "every player carries
-  an MLBAM id in the URL" premise is false for Ben's browser copies. (2) A
-  NAMED probable with an empty id is invisible to `compute_f4_factors`'
-  report (it buckets only missing NAMES): quality silently computes 1.0 while
-  `sp_quality_available: True`, and because the platoon half stays alive, the
-  only existing warning (`f4_non_neutral == 0`) never fires — the SP-quality
-  term of F4 is dead on every plain-text-paste slate with zero warnings
-  (repro: a Savant row worth ~1.10 → pure platoon values, no report entry).
-  (3) R117's fix landed `_HAND_WITH_STATS`, so the hand-plus-stats render now
-  parses; still dropping both probables with zero warnings: the one-line
-  `"Name RHP"` render (promotion still requires the hand on its OWN line
-  after a held name) and a clock the `_CLOCK` regex misses (`"7:10 PM CT"` —
-  the regex admits only an optional ET suffix), which also loses the venue.
-- **Fix:** (2) is the load-bearing half: a `sp_quality_unavailable` report in
-  `compute_f4_factors` for named-but-unjoinable probables, plus an optional
-  name-join fallback against the Savant table (it carries
-  `last_name, first_name`) when the id is empty. (3) accept name+hand on one
-  line; widen `_CLOCK` or warn per game when two headers parse and
-  pitchers == 0. Batches with R159 (same surface).
+- **Landed 2026-08-24 and not repeated here:** (1) the paste module's "every
+  player carries an MLBAM id in the URL" premise was false for Ben's browser
+  copies (verified on `paste_1910_6g.txt`: all six games `mlbam_id=None`) and
+  the docstring now says so; (2) a NAMED probable with an empty id scored a
+  silent 1.0 in `compute_f4_factors` with `sp_quality_available: True` and no
+  bucket, so F4's SP-quality term was dead on every plain-text-paste slate —
+  now recovered by the Savant `last_name, first_name` join and, where it still
+  cannot join, named in `sp_quality_unavailable` with a per-team reason. Both
+  rode the R159 + R160 commit, which is why this item keeps its number and
+  loses two thirds of its scope.
+- **What (open):** R117's fix landed `_HAND_WITH_STATS`, so the
+  hand-plus-stats render now parses. Two shapes still drop BOTH probables with
+  zero warnings: the one-line `"Name RHP"` render (promotion still requires
+  the hand on its OWN line after a held name), and a clock the `_CLOCK` regex
+  misses (`"7:10 PM CT"` — the regex admits only an optional ET suffix), which
+  also loses the venue.
+- **Why it did not ride with (2):** the F4 half is a REPORTING fix in the
+  projection builder and this is a PARSER change in `paste_lineups.py`, needing
+  real paste fixtures in both shapes to verify. Landing them together would
+  have put an unverified regex beside a mutation-tested report. It stays P1
+  because a dropped probable is still the F4-dead path, and (2) only softens
+  the cost: the quality term now resolves by name IF a name arrives, and these
+  two shapes are exactly the case where no name arrives at all.
+- **Fix:** accept name+hand on one line; widen `_CLOCK`, or warn per game when
+  two headers parse and pitchers == 0. Batches with the R122 rider (both are
+  handedness reaching the build).
 
 ## Workstream 7 — Archival and ledger tooling
 

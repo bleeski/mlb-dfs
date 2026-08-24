@@ -25,6 +25,124 @@ performance claim.
 
 ---
 
+## 2026-08-24 — R159 + R160 + R189(1)(2): intake truth on the no-fetch path. one Status flip discarded a posted nine and its pitcher, a TBD game time crashed the front door, and F4's SP-quality term was dead on every paste slate
+
+DEV, claim `engine` (bare mutex), plus a `ledger` claim for the Quick Card pin
+line and nothing else. Ben's instruction: review the backlog, implement the next
+thing, then update the backlog and the changelog. This IS the queue head — slot 1,
+"intake truth, one surface" — minus R190, which the previous session pulled out
+of it and landed. Session-start gate green before any edit: `PASS v2.26.0 26
+modules 1236 tests`, assembled over two `--gate-run` calls. Gate 1236 -> 1252
+(`test_core` 825 -> 841, `grew`). Nineteen hand-run mutations, all nineteen
+caught; two of them only after an eleventh test was added, and that is the
+finding at the bottom of this entry.
+
+**Every defect below was re-repro'd at this head before it was touched**, with
+the harness in `tools/_scratch_r159/` (swept at commit). Coverage returned
+`(['BOS','NYY'], [])` while the merge sourced only `BOS`; the status map raised
+`ValueError: Invalid isoformat string: ''`; `extract_opposing_probables` returned
+`{}` on a DK-declared slate.
+
+**R159(a). One reading of a posted side, because there were two.**
+`dk_order_coverage` read the RAW salary rows and `build_slate_pool` handed
+`merge_dk_starting_into_feed` the status-FILTERED map. Those disagree at exactly
+one moment and it is the expensive one: a `Status=IL` flip inside a DK-posted 1-9
+leaves the team reading COVERED, so `build_slate.py` skips the fetch and passes
+`{"games": []}`; the merge then sees eight slots, refuses the side as a partial
+posting, and the team falls to `fallback_top9_appg` — the whole posted order
+sitting on disk, unused, while the pool ranks the roster by AvgPointsPerGame. That
+is R60's defect arriving through a different door, and R60's seeding cannot rescue
+it because the side never enters the feed at all.
+
+New `dk_side_readings` is the single reading: a team appears only with a complete
+1-9, and its `state` is `confirmed` or `degraded` (nine slots, at least one
+shelved). `dk_confirmed_sides` is now a filter over it, so its output is unchanged
+on a clean file. A degraded side is NOT covered for the fetch decision — the ninth
+slot has to come from somewhere — and `dk_order_coverage_report` keeps the three
+buckets apart so "DK posted this and lost a bat" never reads as "DK has not
+posted this team". The front door passes the RAW rows now, which is what earns
+the degraded reading; the merge applies the status rule itself and never seats a
+shelved player. Consequence worth stating: because the raw map reaches
+`dk_declared_probables`, the status filter moved INTO that function. A rule that
+holds only for callers who pre-filtered is the defect this item is.
+
+The surviving eight are seeded as a `partial` with DK's own slots (1,2,3,4,6,7,8,9
+on the fixture), routed through R60's path, and named in the pool report with the
+shelved player, his slot and his status — because that name is what the operator
+goes and looks up. A source holding a COMPLETE nine still outranks DK's eight,
+which is R143's own rule applied to the case it did not anticipate.
+
+**R159(b) and (c). The pitcher was collateral damage.** The merge wrote
+`{"dk_id": ...}` as the probable payload. The status map reads either a name or a
+dk_id (R143 saw to that), but `extract_opposing_probables` requires
+`.get("name")` — so on the no-fetch path it returned `{}` for the whole slate,
+every hitter's F4 quality term went neutral, and the only warning blamed a missing
+probable. The payload now carries the name. And `probable_pitcher` was only ever
+written inside the accepted-side loop, so a team DK named a starter for but posted
+no complete order for got "no probable or declared starter" — a blocker raised
+against a fact the authoritative file answers. Every team DK says anything about
+now gets a pass, and a feed-supplied probable (which has a real MLBAM id and a
+hand) is still never overwritten.
+
+**R159(d). Partial handedness is a different fact from none.**
+`f4_handedness_unavailable` fires only when a side loses ALL nine hands, and
+R151's own post-mortem records ten hitters losing both F4 terms on one slate with
+that list still empty. `f4_handedness_partial` now carries `hands_present/9` per
+side.
+
+**R160. A game with no start time is not built, and cannot crash the read.**
+DK ships doubleheader game 2s as `"BOS@NYY 08/17/2026 TBD"`, which parses as a
+matchup and not a time. The merge synthesized the game with an empty
+`game_date_utc` and the next read — the status map's unguarded `_parse_utc("")` —
+took the front door down with a traceback inside the build window. Two halves,
+deliberately. The merge no longer synthesizes a game it has no start time for; it
+names it in `games_unsynthesizable` and leaves the side to the feed. And
+`_parse_utc` is guarded at the read anyway, because the merge is one of several
+feed sources and a crash there is a lost window whichever one wrote it: such a
+game lands in `games_without_lock_time` and is skipped rather than admitted with a
+guessed time. Both surface as blockers, and the merge's one is emitted FIRST,
+because without it the operator reads "no probable or declared starter" on both
+sides — true, and about the wrong thing.
+
+**R189(2). "The table loaded" is not "the term applied".** A probable with a NAME
+but no joinable Savant row took a silent 1.0 and appeared in no bucket at all:
+`teams_without_opposing_probable` counts only missing NAMES. So the F4 SP-quality
+term was dead on every plain-text-paste slate — R189(1), verified on the archived
+`paste_1910_6g.txt`, is that real mlb.com browser copies carry NO MLBAM ids, all
+six games at `mlbam_id=None` — with the report reading `sp_quality_available:
+True` and no warning anywhere, because the platoon half stayed alive and the only
+existing check was `f4_non_neutral == 0`. Since R159(b) it is every DK-declared
+probable too, DK shipping no MLBAM id either, which is why the two land together.
+`compute_f4_factors` now resolves an id-less probable against the Savant
+`last_name, first_name` key — consuming `xwoba_base_correction`'s existing key
+and highest-PA collision rule rather than deriving a second answer — and reports
+`sp_quality_applied`, `sp_quality_unavailable` (with a distinct reason per team:
+no table, no id and no name match, or an id the table does not hold) and
+`sp_quality_name_joined`, since a name match is a weaker claim than an id match
+and the operator should see which one ran. R189(1) also corrected the module
+docstring that asserted every player carries an id; the false premise is what the
+silent 1.0 was resting on.
+
+**The mutation lesson, sixth consecutive item, and this one is about FIXTURES
+rather than assertions.** Nineteen mutations, seventeen caught immediately. The
+two survivors were "degraded side not seeded" and "degraded side promoted to
+confirmed" — both mutating the IN-FEED branch of the merge, which not one test
+executed, because every fixture in the class handed the merge an EMPTY feed and
+therefore always took the synthesize branch. The assertions were fine; the inputs
+never reached the code. An eleventh test with a feed that carries the game but
+not the side catches both. A branch that no fixture can reach is invisible to any
+number of assertions about it.
+
+**Landed:** `mlb_engine/intake/live_data_adapters.py`,
+`mlb_engine/projections/projection_builder.py`,
+`mlb_engine/intake/paste_lineups.py` (docstring), `tests/test_core.py` (+16),
+`tools/audit.py` (pin 825 -> 841), `CLAUDE.md` and
+`skills/generate-lineups/SKILL.md` (pin line 1236 -> 1252), and the ledger Quick
+Card pin line under a DEV-held `ledger` claim, that line and nothing else.
+**Still open on this item:** R189(3), the two paste render shapes (a one-line
+`"Name RHP"` and a `_CLOCK` regex that misses `"7:10 PM CT"`), and the R122
+rider on the Showdown `all_healthy` pool. Both are named in the backlog's queue.
+
 ## 2026-08-23 — R190: F4's platoon hand was dead at three boundaries, and the fetch that killed it is the one the docs tell a session to copy. the inbox emptied (37 of 38 fragments consumed), R191–R211 filed, six riders
 
 DEV, claim `engine` (bare mutex). Ben's instruction: review and reprioritize the

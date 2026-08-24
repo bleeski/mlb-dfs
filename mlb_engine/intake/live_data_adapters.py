@@ -363,13 +363,33 @@ def salary_game_times(salary_players: Any) -> Dict[str, datetime]:
 DK_ORDER_SLOTS = 9
 
 
-def dk_confirmed_sides(salary_players: Any) -> Dict[str, List[Dict[str, Any]]]:
-    """DK team -> its batting order from the salary file, complete sides only.
+def dk_side_readings(salary_players: Any) -> Dict[str, Dict[str, Any]]:
+    """DK team -> ONE reading of what the ``Starting`` column posted for it.
 
-    A side is returned only when the ``Starting`` column supplies every slot 1
-    through 9 exactly once. Anything short of that is a partial posting and is
-    not a confirmed lineup, so it is not returned at all.
+    ``{"order": [slot rows 1-9], "shelved": [the rows DK marks OUT],
+    "state": "confirmed" | "degraded"}``. A team appears only when the column
+    supplies every slot 1 through 9 exactly once; anything short of that is a
+    partial posting and is not a reading of a posted side at all.
+
+    R159(a). ``state`` is the distinction that did not exist. ``dk_order_coverage``
+    read the RAW salary rows and the pool's merge read the status-FILTERED map,
+    so a single ``Status=IL`` flip inside a posted nine left the team "covered"
+    (fetch skipped, empty feed) while the merge saw eight slots, refused the side
+    outright, and dropped the whole posted lineup to ``fallback_top9_appg`` — plus
+    the team's ``Starting=SP`` arm, which only ever got attached to a side the
+    merge accepted. Repro'd 2026-08-22 and again at this head: coverage
+    ``(['BOS','NYY'], [])`` against a pool reporting ``NYY: fallback_top9_appg 9``.
+    A shelved player inside an otherwise-complete side is now DEGRADED, which is
+    neither "confirmed" nor "never posted": the surviving eight are observed fact
+    and R60's partial path already knows how to seed them.
+
+    Reads status off the row, so passing a map a caller already status-filtered
+    yields exactly the previous behaviour (the shelved row is simply absent and
+    the side is incomplete). Passing the RAW rows is what earns the degraded
+    reading, which is why the front door now passes them.
     """
+    from mlb_engine.intake.slate_intake_manager import salary_status_tier
+
     players = _load_salary_players(salary_players)
     by_team: Dict[str, Dict[int, Dict[str, Any]]] = {}
     for pid, record in players.items():
@@ -386,14 +406,33 @@ def dk_confirmed_sides(salary_players: Any) -> Dict[str, List[Dict[str, Any]]]:
             # the whole side rather than pick one and call it confirmed.
             slots[slot] = None  # type: ignore[assignment]
             continue
+        status = str(_record_get(record, "status") or "").strip().upper()
         slots[slot] = {"order": slot, "dk_id": str(pid),
-                       "name": str(_record_get(record, "name") or "")}
-    out: Dict[str, List[Dict[str, Any]]] = {}
+                       "name": str(_record_get(record, "name") or ""),
+                       "status": status,
+                       "shelved": salary_status_tier(status) == "out"}
+    out: Dict[str, Dict[str, Any]] = {}
     for team, slots in by_team.items():
         if len(slots) != DK_ORDER_SLOTS or any(v is None for v in slots.values()):
             continue
-        out[team] = [slots[i] for i in range(1, DK_ORDER_SLOTS + 1)]
+        order = [slots[i] for i in range(1, DK_ORDER_SLOTS + 1)]
+        shelved = [row for row in order if row["shelved"]]
+        out[team] = {"order": order, "shelved": shelved,
+                     "state": "degraded" if shelved else "confirmed"}
     return out
+
+
+def dk_confirmed_sides(salary_players: Any) -> Dict[str, List[Dict[str, Any]]]:
+    """DK team -> its batting order from the salary file, complete sides only.
+
+    A side is returned only when the ``Starting`` column supplies every slot 1
+    through 9 exactly once AND no slot holds a player DK marks OUT. Anything
+    short of that is a partial posting and is not a confirmed lineup, so it is
+    not returned at all. See ``dk_side_readings`` for the degraded case.
+    """
+    return {team: reading["order"]
+            for team, reading in dk_side_readings(salary_players).items()
+            if reading["state"] == "confirmed"}
 
 
 # SP/P only. PO is an opener and R104 settled that he is not a declared
@@ -404,29 +443,87 @@ DK_STARTING_PROBABLE_TOKENS = frozenset({"SP", "P"})
 
 
 def dk_declared_probables(salary_players: Any) -> Dict[str, str]:
-    """DK team -> Player_ID of the arm DK's ``Starting`` column marks SP/P."""
+    """DK team -> Player_ID of the arm DK's ``Starting`` column marks SP/P.
+
+    A shelved arm is never a probable, whatever the ``Starting`` column says.
+    The status read lives here rather than in the caller because since R159(a)
+    the front door hands this function the RAW salary rows, and a rule that
+    depends on which map a caller happened to pass is the defect R159(a) is.
+    """
+    from mlb_engine.intake.slate_intake_manager import salary_status_tier
+
     players = _load_salary_players(salary_players)
     out: Dict[str, str] = {}
     for pid, record in sorted(players.items(), key=lambda kv: str(kv[0])):
         team = str(_record_get(record, "team") or "").strip().upper()
         token = str(_record_get(record, "starting") or "").strip().upper()
+        if salary_status_tier(_record_get(record, "status")) == "out":
+            continue
         if team and token in DK_STARTING_PROBABLE_TOKENS and team not in out:
             out[team] = str(pid)
     return out
 
 
-def dk_order_coverage(salary_csv: str | Path) -> Tuple[List[str], List[str]]:
-    """(teams DK has posted a full 1-9 for, teams it has not) from a salary CSV.
+def dk_order_coverage_report(salary_csv: str | Path) -> Dict[str, Any]:
+    """The full coverage reading: covered, degraded, uncovered, from ONE input.
 
-    One definition of "covered", shared by the pool and by any caller deciding
-    whether a fetch is worth making, so the build cannot skip a fetch on one
-    rule and then find the pool applying another.
+    R159(a). ``covered`` is a side this build can source from DK and skip the
+    fetch for. ``degraded`` is a side DK posted a complete nine for with a
+    shelved player in it: covered-but-degraded, which counts as NOT covered for
+    the fetch decision (the ninth slot has to come from somewhere) and is named
+    rather than folded into "DK has not posted this team". ``uncovered`` is the
+    rest. The three lists partition the slate's teams.
     """
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
     rows = parse_dk_salary_csv(str(salary_csv))
-    covered = set(dk_confirmed_sides({p.player_id: p for p in rows}))
+    readings = dk_side_readings({p.player_id: p for p in rows})
+    covered = {t for t, r in readings.items() if r["state"] == "confirmed"}
+    degraded = {t for t, r in readings.items() if r["state"] == "degraded"}
     teams = {str(p.team).strip().upper() for p in rows if p.team}
-    return sorted(covered), sorted(teams - covered)
+    return {
+        "covered": sorted(covered),
+        "degraded": sorted(degraded),
+        "uncovered": sorted(teams - covered - degraded),
+        "degraded_detail": [
+            {"team": t,
+             "shelved": [{"order": s["order"], "name": s["name"],
+                          "dk_id": s["dk_id"], "status": s["status"]}
+                         for s in readings[t]["shelved"]]}
+            for t in sorted(degraded)
+        ],
+    }
+
+
+def dk_order_coverage(salary_csv: str | Path) -> Tuple[List[str], List[str]]:
+    """(teams DK has posted a usable full 1-9 for, teams it has not).
+
+    One definition of "covered", shared by the pool and by any caller deciding
+    whether a fetch is worth making, so the build cannot skip a fetch on one
+    rule and then find the pool applying another. A DEGRADED side (nine slots
+    posted, one of them shelved) is reported as NOT covered here, because the
+    fetch it would otherwise skip is the only thing that can fill the ninth
+    slot. ``dk_order_coverage_report`` separates the two.
+    """
+    report = dk_order_coverage_report(salary_csv)
+    return report["covered"], sorted(report["degraded"] + report["uncovered"])
+
+
+def _note_hands(report: Dict[str, Any], team: str,
+                merged: Sequence[Mapping[str, Any]]) -> None:
+    """R159(d). How many of this side's hitters kept a bat side, per side.
+
+    ``f4_handedness_unavailable`` fires only when a side loses ALL of its hands,
+    so three-of-nine lost was invisible -- and R151's post-mortem records ten
+    hitters losing both F4 terms on one slate with that list still empty. A side
+    that is missing SOME hands is a different fact from a side missing all of
+    them and is now named as one, with the count.
+    """
+    present = sum(1 for h in merged if h.get("bat_side"))
+    if present == 0:
+        report["f4_handedness_unavailable"].append(team)
+    elif present < len(merged):
+        report["f4_handedness_partial"].append(
+            {"team": team, "hands_present": present, "of": len(merged)})
 
 
 def merge_dk_starting_into_feed(
@@ -444,19 +541,37 @@ def merge_dk_starting_into_feed(
     ``report`` carries ``dk_sides`` (teams sourced from DK), ``upgraded``
     (sides the feed also had), ``disagreements`` (same side, different names:
     DK wins per Ben's order and the difference is NAMED, never silently
-    resolved), ``f4_handedness_unavailable`` and ``sides_left_to_feed``.
+    resolved), ``degraded_sides`` (R159(a): a posted nine holding a shelved
+    player, seeded as a PARTIAL rather than discarded),
+    ``f4_handedness_unavailable``, ``f4_handedness_partial`` (R159(d)) and
+    ``sides_left_to_feed``.
     """
     players = _load_salary_players(salary_players)
-    sides = dk_confirmed_sides(players)
+    readings = dk_side_readings(players)
+    sides = {t: r["order"] for t, r in readings.items()
+             if r["state"] == "confirmed"}
+    # R159(a). A posted nine with a shelved player in it: the surviving eight
+    # are observed fact, so they are seeded as a partial and routed through
+    # R60's path instead of the whole side being thrown away.
+    degraded = {t: [row for row in r["order"] if not row["shelved"]]
+                for t, r in readings.items() if r["state"] == "degraded"}
     probables = dk_declared_probables(players)
     out_feed: Dict[str, Any] = dict(feed or {})
     games = [dict(g) for g in (out_feed.get("games") or [])]
     report: Dict[str, Any] = {
         "dk_sides": sorted(sides), "upgraded": [], "disagreements": [],
-        "f4_handedness_unavailable": [], "sides_left_to_feed": [],
-        "games_synthesized": [], "source": "dk_salary_starting",
+        "f4_handedness_unavailable": [], "f4_handedness_partial": [],
+        "sides_left_to_feed": [], "degraded_sides": [
+            {"team": t, "posted": len(degraded[t]),
+             "shelved": [{"order": s["order"], "name": s["name"],
+                          "dk_id": s["dk_id"], "status": s["status"]}
+                         for s in readings[t]["shelved"]]}
+            for t in sorted(degraded)
+        ],
+        "probables_attached": [], "games_synthesized": [],
+        "games_unsynthesizable": [], "source": "dk_salary_starting",
     }
-    if not sides:
+    if not sides and not degraded and not probables:
         report["sides_left_to_feed"] = sorted(
             {str(_record_get(r, "team") or "").strip().upper()
              for r in players.values()} - {""})
@@ -479,6 +594,29 @@ def merge_dk_starting_into_feed(
             if to_dk_abbrev(side.get("team_abbrev")) == team:
                 return key
         return None
+
+    def _probable_payload(team: str) -> Dict[str, Any]:
+        """R159(b). A DK-declared probable needs a NAME, not only a DK id.
+
+        The merge used to write ``{"dk_id": ...}`` and nothing else. The status
+        map reads either (R143), but ``extract_opposing_probables`` requires
+        ``.get("name")``, so on the no-fetch path every DK-declared arm was
+        invisible to it, ``opposing_probables`` came back EMPTY, and the F4
+        quality term went neutral for every hitter on the slate while the only
+        warning blamed a missing probable. DK ships no MLBAM id, so ``id`` stays
+        absent and ``compute_f4_factors`` resolves the Savant join by name
+        (R189(2)) instead of silently scoring 1.0.
+        """
+        dk_id = probables[team]
+        record = players.get(dk_id) or players.get(str(dk_id)) or {}
+        return {"dk_id": str(dk_id),
+                "name": str(_record_get(record, "name") or ""),
+                "source": "dk_salary_starting"}
+
+    def _attach_probable(side: Dict[str, Any], team: str) -> None:
+        if probables.get(team) and not side.get("probable_pitcher"):
+            side["probable_pitcher"] = _probable_payload(team)
+            report["probables_attached"].append(team)
 
     covered: set = set()
     for game in games:
@@ -528,19 +666,45 @@ def merge_dk_starting_into_feed(
                 if not row.get("bat_side"):
                     row["bat_side"] = ""
                 merged.append(row)
-            if not any(h.get("bat_side") for h in merged):
-                report["f4_handedness_unavailable"].append(team)
+            _note_hands(report, team, merged)
             side["lineup"] = merged
             side["lineup_status"] = "confirmed"
             side["lineup_source"] = "dk_salary_starting"
-            if probables.get(team) and not side.get("probable_pitcher"):
-                side["probable_pitcher"] = {"dk_id": probables[team]}
+            _attach_probable(side, team)
+            game[key] = side
+
+        # R159(a). The degraded side, in the feed. DK's eight are seeded ONLY
+        # where nothing else has the side: a source holding a complete nine
+        # outranks eight-of-nine, which is R143's own rule ("only a COMPLETE 1-9
+        # counts") applied to the case that rule did not anticipate.
+        for team, order in degraded.items():
+            key = _side_of(game, team)
+            if key is None:
+                continue
+            side = dict(game.get(key) or {})
+            if side.get("lineup"):
+                _attach_probable(side, team)
+                game[key] = side
+                continue
+            covered.add(team)
+            side["lineup"] = [{"order": h["order"], "name": h["name"],
+                               "dk_id": h["dk_id"], "bat_side": ""}
+                              for h in order]
+            side["lineup_status"] = "partial"
+            side["lineup_source"] = "dk_salary_starting_degraded"
+            _attach_probable(side, team)
+            _note_hands(report, team, side["lineup"])
             game[key] = side
 
     # Games DK posted that the feed never mentioned: build them from salary.
-    for team, order in sorted(sides.items()):
+    # Every team DK says something about gets a pass here, not only the teams
+    # with a confirmed side -- R159(c): a team with `Starting=SP` and no
+    # complete 1-9 used to get its probable merged NOWHERE, because the only
+    # code that attached one ran inside the confirmed-side loop.
+    for team in sorted(set(sides) | set(degraded) | set(probables)):
         if team in covered:
             continue
+        order = sides.get(team) or degraded.get(team) or []
         gid = team_game.get(team)
         if not gid or "@" not in gid:
             continue
@@ -551,28 +715,44 @@ def merge_dk_starting_into_feed(
                     None)
         if game is None:
             start = game_times.get(gid)
+            if start is None:
+                # R160. A game whose salary Game Info parses as a matchup but
+                # not a time (real on DH game 2s: "BOS@NYY 08/17/2026 TBD") used
+                # to be synthesized with an empty `game_date_utc`, and the very
+                # next read -- the status map's unguarded `_parse_utc("")` --
+                # took the front door down with `ValueError: Invalid isoformat
+                # string: ''`, a traceback where a blocker belonged. A game with
+                # no start time has no lock time, so it is not synthesized at
+                # all: the side is left to the feed and NAMED here.
+                report["games_unsynthesizable"].append(
+                    {"game_id": gid, "team": team,
+                     "reason": "no parseable start time in the salary Game Info"})
+                continue
             game = {"game_pk": None, "venue": None, "status": "Scheduled",
-                    "game_date_utc": start.astimezone(timezone.utc).isoformat()
-                    if start else "",
+                    "game_date_utc": start.astimezone(timezone.utc).isoformat(),
                     "away": {"team_abbrev": away}, "home": {"team_abbrev": home}}
             games.append(game)
             report["games_synthesized"].append(gid)
         key = "away" if team == away else "home"
         side = dict(game.get(key) or {})
         side["team_abbrev"] = team
-        side["lineup"] = [{"order": h["order"], "name": h["name"],
-                           "dk_id": h["dk_id"], "bat_side": ""} for h in order]
-        side["lineup_status"] = "confirmed"
-        side["lineup_source"] = "dk_salary_starting"
-        if probables.get(team):
-            side["probable_pitcher"] = {"dk_id": probables[team]}
-        report["f4_handedness_unavailable"].append(team)
+        if order and not side.get("lineup"):
+            side["lineup"] = [{"order": h["order"], "name": h["name"],
+                               "dk_id": h["dk_id"], "bat_side": ""} for h in order]
+            side["lineup_status"] = ("confirmed" if team in sides else "partial")
+            side["lineup_source"] = ("dk_salary_starting" if team in sides
+                                     else "dk_salary_starting_degraded")
+            _note_hands(report, team, side["lineup"])
+            covered.add(team)
+        _attach_probable(side, team)
         game[key] = side
-        covered.add(team)
 
     report["upgraded"] = sorted(set(report["upgraded"]))
+    report["probables_attached"] = sorted(set(report["probables_attached"]))
     report["f4_handedness_unavailable"] = sorted(
         set(report["f4_handedness_unavailable"]))
+    report["f4_handedness_partial"] = sorted(
+        report["f4_handedness_partial"], key=lambda r: r["team"])
     report["sides_left_to_feed"] = sorted(set(team_game) - covered)
     out_feed["games"] = games
     return out_feed, report
@@ -625,6 +805,7 @@ def build_status_map_from_lineups_feed(
     confirmed_order: Dict[str, int] = {}
     probable_pitcher_ids: List[str] = []
     partial_lineup_teams: List[Dict[str, Any]] = []
+    games_without_lock_time: List[Dict[str, str]] = []
     unmatched: List[Dict[str, str]] = []
 
     def match_dk_id(name: str, dk_team: str,
@@ -650,7 +831,22 @@ def build_status_map_from_lineups_feed(
         if not away_team or not home_team:
             continue
         game_id = f"{away_team}@{home_team}"
-        lock_time = _parse_utc(game_entry.get("game_date_utc"))
+        # R160. `_parse_utc` was called unguarded here, so any feed carrying a
+        # game with a missing or malformed `game_date_utc` took the front door
+        # down with `ValueError: Invalid isoformat string: ''` instead of
+        # producing a blocker. The merge no longer synthesizes such a game, but
+        # the guard belongs at the READ as well: the merge is one of several
+        # feed sources and a crash here is a lost build window whichever one
+        # supplied it. A game with no lock time cannot be late-swap-checked, so
+        # it is named and skipped rather than admitted with a guessed time.
+        try:
+            lock_time = _parse_utc(game_entry.get("game_date_utc"))
+        except (TypeError, ValueError):
+            games_without_lock_time.append(
+                {"game_id": game_id,
+                 "game_date_utc": str(game_entry.get("game_date_utc") or ""),
+                 "reason": "unparseable game_date_utc; no lock time can be derived"})
+            continue
         lock_time_by_game_id[game_id] = lock_time
         game_meta[game_id] = {
             "game_pk": game_entry.get("game_pk"),
@@ -747,6 +943,8 @@ def build_status_map_from_lineups_feed(
         "uncovered_salary_player_ids": sorted(uncovered),
         "partial_lineup_teams": sorted(partial_lineup_teams,
                                        key=lambda r: (r["team"], r["game_id"])),
+        "games_without_lock_time": sorted(games_without_lock_time,
+                                          key=lambda r: r["game_id"]),
         "doubleheader_legs_dropped": doubleheader_legs_dropped,
         "feed_date": feed.get("date"),
         "feed_fetched_at": feed.get("fetched_at"),
@@ -988,8 +1186,17 @@ def build_slate_pool(
     # place a precedence rule cannot be bypassed by a caller. It only ever adds
     # or upgrades a confirmed side; sides DK has not posted still come from
     # whatever the caller supplied.
+    #
+    # R159(a): the merge reads the RAW rows, shelved players included, because
+    # it is the thing that has to TELL a posted nine holding an IL bat from a
+    # side DK never posted. Feeding it the status-filtered map made those two
+    # cases identical here while `dk_order_coverage` -- reading the raw file --
+    # called the first one covered and skipped the fetch that was the only way
+    # to fill the ninth slot. One input, one reading; the merge applies the
+    # status rule itself and never seats a shelved player.
+    raw_salary_map = {p.player_id: p for p in all_players}
     lineups_feed, dk_order_report = merge_dk_starting_into_feed(
-        lineups_feed, salary_map)
+        lineups_feed, raw_salary_map)
     status = build_status_map_from_lineups_feed(lineups_feed, salary_map)
 
     confirmed_teams = set(status["confirmed_teams"])
@@ -1221,6 +1428,45 @@ def build_slate_pool(
                 f"{rec['hitters_posted']}/9 hitters posted; treated as TBD and "
                 f"stamped Projected_Starter, not confirmed"
             )
+
+    # R159(a): a DK side that lost a player to the Status column is not the same
+    # fact as a side DK never posted, and the operator's next move differs --
+    # one needs a ninth bat, the other needs a lineup. Named with the shelved
+    # player, because that name is what the operator is about to go look up.
+    for rec in dk_order_report.get("degraded_sides") or []:
+        if rec["team"] not in slate_team_set or rec["team"] in excluded_teams:
+            continue
+        shelved = ", ".join(f"{s['name']} (slot {s['order']}, {s['status'] or 'OUT'})"
+                            for s in rec["shelved"])
+        warnings.append(
+            f"{rec['team']}: DK posted a full 1-9 but {len(rec['shelved'])} of them "
+            f"are shelved [{shelved}]; the surviving {rec['posted']} are seeded as a "
+            f"partial and the rest of the side comes from the projection"
+        )
+
+    # R160: named FIRST, because without it the symptom the operator reads is
+    # "no probable or declared starter" for both sides of the game -- true, and
+    # about the wrong thing. The side has no probable because the game was never
+    # built, and the game was never built because DK shipped no start time for
+    # it. A blocker that names a consequence and not the cause is the class this
+    # whole batch is about.
+    for rec in dk_order_report.get("games_unsynthesizable") or []:
+        if rec["team"] in slate_team_set:
+            blockers.append(
+                f"{rec['game_id']}: {rec['reason']}, so the game was not built "
+                f"from the salary file and {rec['team']}'s side has no lock time "
+                f"(DH game 2s ship 'TBD' here); supply a feed covering this game"
+            )
+
+    # R160: a game whose lock time could not be derived is skipped by the status
+    # map, so nothing on it can be late-swap-checked. That is a blocker, not a
+    # warning -- the swap rails are the reason lock times exist.
+    for rec in status.get("games_without_lock_time") or []:
+        blockers.append(
+            f"{rec['game_id']}: {rec['reason']} "
+            f"(game_date_utc={rec['game_date_utc']!r}); supply a feed with a real "
+            f"start time for this game before building it"
+        )
 
     # Feed/draftgroup alignment. Keyed on whether the feed contains the slate's
     # games at all, never on how many lineups have posted, because an early build
