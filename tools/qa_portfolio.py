@@ -442,6 +442,30 @@ def is_showdown_header(hdr: List[str]) -> bool:
     return "CPT" in hdr
 
 
+def showdown_cpt_to_util(sal: Mapping[str, Mapping[str, str]]) -> Dict[str, str]:
+    """{CPT draftable id: the same person's UTIL id} from the salary file.
+
+    R235. An entry row names its captain by CPT id; a prediction file is keyed
+    by the person's UTIL id, because ``ownership_pred`` collapses the two roles
+    at intake so its counts are counts of people. Looking a CPT id up in the
+    prior therefore misses every captain unless the roles are rejoined here,
+    which is what this does -- from DK's own salary file, using the engine's
+    person key rather than a fourth local copy of "same name, same team".
+
+    Only ever called from section 4, which has already returned if the engine
+    will not import.
+    """
+    from mlb_engine.intake.slate_intake_manager import showdown_person_key
+    by_person: Dict[str, Dict[str, str]] = defaultdict(dict)
+    for pid, row in sal.items():
+        role = str(row.get("Roster Position") or "").strip().upper()
+        if role in ("CPT", "UTIL"):
+            key = showdown_person_key(row.get("Name"), row.get("TeamAbbrev"))
+            by_person[key][role] = str(pid)
+    return {roles["CPT"]: roles["UTIL"] for roles in by_person.values()
+            if "CPT" in roles and "UTIL" in roles}
+
+
 def entry_slot_ids(hdr: List[str], row: List[str]) -> Tuple[List[str], Optional[str]]:
     """(all rostered ids, captain id or None) for one entry row.
 
@@ -705,12 +729,15 @@ def section_leverage(
             "CHALK-SUM and LOW-OWNED CARRY: ABSENT for Showdown, and that is a "
             "property of the prior rather than of this portfolio. The prior "
             "budgets 800% across hitters and 200% across pitchers for a "
-            "2-P-plus-8-hitter Classic roster; a Showdown salary file lists "
-            "every player TWICE (a CPT row and a UTIL row, different ids and "
-            "different salaries), so one budget is spread over roughly double "
-            "the rows and split across two rows per person, against a roster "
-            "that seats six. Measured on the 2026-08-14 NYY@TOR file: 186 rows "
-            "for 93 players. A percentage off that is not this contest's crowd.")
+            "2-P-plus-8-hitter Classic roster, against a Showdown roster that "
+            "seats SIX and pays its captain 1.5x. A percentage off that budget "
+            "is not this contest's crowd. R235 closed the other half of this "
+            "reason and it is no longer cited: the salary file's two rows per "
+            "person (a CPT row and a UTIL row, different ids and different "
+            "salaries -- 186 rows for 93 players on the 2026-08-14 NYY@TOR "
+            "file) are collapsed to one person at emit, so the budget is no "
+            "longer spread over double the rows. The roster shape is what "
+            "remains, and it is the prior's own shape.")
         out.append(
             "  CAPTAIN OWN-TIER is what survives, as a RANK. ledger 3.18, "
             "OBSERVED: winner captain %Drafted median 14.8 against a field "
@@ -733,11 +760,15 @@ def section_leverage(
         if showdown:
             hist: Dict[str, int] = defaultdict(int)
             unknown = 0
+            cpt_to_util = showdown_cpt_to_util(sal)
             for row in rows:
                 _, cap = entry_slot_ids(hdr, row)
                 if cap is None:
                     continue
-                tier = tiers.get(cap)
+                # R235. The entry names a ROLE id; the prior is keyed by the
+                # person. Fall back to the raw id so a prediction emitted
+                # before the collapse still reads.
+                tier = tiers.get(cpt_to_util.get(cap, cap), tiers.get(cap))
                 if tier is None:
                     unknown += 1
                 else:

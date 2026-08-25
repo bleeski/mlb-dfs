@@ -290,7 +290,16 @@ EXPECTED_SUITE_COUNTS = {
     # seven on autobuild, which had none at all, driving main() with a patched
     # subprocess so the timeout, the log's date precedence, the control
     # allowlist and the passthrough order are each reached by a fixture.
-    "tests.test_core": 863,
+    # R235, 2026-08-25: 863 -> 876, the thirteen that pin the Showdown role
+    # collapse. Seven on the collapse itself (the shape guard's two clauses
+    # each caught by their own file, the UTIL row being the one that survives,
+    # the posted nine surviving into `dk_side_readings` as confirmed, the R75
+    # ambiguity NOT being swallowed by the person key, and the key's shape);
+    # four at the tool boundary (people counted rather than salary rows, the
+    # crosswalk, the batting-order feature, and the contest type read off the
+    # miner instead of re-derived); two on the leverage panel's captain tier,
+    # which now joins a CPT id to the person and still reads a pre-R235 file.
+    "tests.test_core": 876,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

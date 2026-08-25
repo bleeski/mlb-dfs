@@ -13631,21 +13631,53 @@ class LeveragePanelTests(unittest.TestCase):
     # ---- Showdown
 
     def test_showdown_gets_the_captain_rank_and_no_classic_chalk_sum(self):
-        """The prior budgets 800/200 over a ten-seat Classic roster and a
-        Showdown salary file lists every player twice, so a percentage off it
-        is not that contest's crowd. The RANK survives; the percentage does
-        not, and the panel says which is which."""
-        tiers = {**{f"c{i}": ("High" if i == 0 else "Low") for i in range(6)},
-                 **{f"u{i}": "Mid" for i in range(6)}}
+        """The prior budgets 800/200 over a ten-seat Classic roster against a
+        Showdown roster that seats six, so a percentage off it is not that
+        contest's crowd. The RANK survives; the percentage does not, and the
+        panel says which is which.
+
+        R235 rewrote the fixture as well as the assertion. The prediction file
+        is keyed by PERSON now (the UTIL id), so the tiers live on ``u*`` and
+        the entries still name their captain by CPT id -- which is the join
+        this panel has to make and did not.
+        """
+        tiers = {f"u{i}": ("High" if i == 0 else "Low") for i in range(6)}
         prior = self._prior(shares={k: 5.0 for k in tiers}, tiers=tiers)
         body = [["1", "C", "111", "$1", "c0", "u1", "u2", "u3", "u4", "u5"],
                 ["2", "C", "111", "$1", "c3", "u1", "u2", "u3", "u4", "u5"]]
         text = "\n".join(self._run(prior=prior, body=body, showdown=True,
                                    archetype="wta_satellite"))
         self.assertIn("ABSENT for Showdown", text)
-        self.assertIn("lists every player TWICE", text)
+        self.assertIn("seats SIX", text)
         self.assertIn("captain own-tier: High 1, Low 1", text)
+        self.assertNotIn("not in the prior", text)
         self.assertNotIn("chalk-sum ", text)
+
+    def test_a_pre_r235_prediction_still_reads_its_captain_tiers(self):
+        """The CPT id is tried when the person's UTIL id is not in the file.
+
+        A prediction emitted before R235 carries a row per ROLE, so its tiers
+        are keyed by CPT id. Resolving to the UTIL id unconditionally would
+        have turned every one of those files into "not in the prior N" -- a
+        panel that goes dark on old evidence is the same lost evidence this
+        item is about, one file generation earlier.
+        """
+        tiers = {f"c{i}": ("High" if i == 0 else "Low") for i in range(6)}
+        prior = self._prior(shares={k: 5.0 for k in tiers}, tiers=tiers)
+        body = [["1", "C", "111", "$1", "c0", "u1", "u2", "u3", "u4", "u5"],
+                ["2", "C", "111", "$1", "c3", "u1", "u2", "u3", "u4", "u5"]]
+        text = "\n".join(self._run(prior=prior, body=body, showdown=True,
+                                   archetype="wta_satellite"))
+        self.assertIn("captain own-tier: High 1, Low 1", text)
+
+    def test_an_unpriced_captain_is_still_counted_as_not_in_the_prior(self):
+        """The R235 fallback must not invent a tier for a captain nobody
+        priced: unknown stays unknown and is reported as its own count."""
+        prior = self._prior(shares={"u1": 5.0}, tiers={"u1": "Mid"})
+        body = [["1", "C", "111", "$1", "c0", "u1", "u2", "u3", "u4", "u5"]]
+        text = "\n".join(self._run(prior=prior, body=body, showdown=True,
+                                   archetype="wta_satellite"))
+        self.assertIn("not in the prior 1", text)
 
     def test_salary_left_reads_showdown_slots_and_its_own_medians(self):
         """CPT and UTIL are not in SLOTS, which drives sections 2 and 3, so a
@@ -13688,6 +13720,237 @@ class LeveragePanelTests(unittest.TestCase):
         text = "\n".join(self._run(prior={"schema": "something/v9"}))
         self.assertIn("is schema 'something/v9', not ownership_pred/v1", text)
         self.assertIn("will not guess at a layout", text)
+
+
+class ShowdownRoleCollapseTests(unittest.TestCase):
+    """R235. A DK draftable id is a ROLE; a Showdown export prices every person
+    twice. Everything that counts salary rows counts one player as two.
+
+    Two failures came out of that one fact and they did not look related: the
+    name crosswalk called all 96 people on the 2026-08-19 LAD@COL file
+    ambiguous, and the batting-order read reported INERT on a file that had
+    posted a complete 1-9 for BOTH sides. The second is the sharper one --
+    ``dk_side_readings`` sees slot 1 twice per side and takes its
+    two-players-on-one-slot branch, which is CORRECT on a Classic file and
+    discards a perfectly well-formed Showdown lineup.
+    """
+
+    HDR = ("Position,Name + ID,Name,ID,Roster Position,Salary,Game Info,"
+           "TeamAbbrev,AvgPointsPerGame,Status,Starting")
+
+    def _row(self, name, pid, role, salary, team="AAA", starting="",
+             status="", pos="OF"):
+        return (f"{pos},{name} ({pid}),{name},{pid},{role},{salary},"
+                f"AAA@BBB 08/19/2026 07:10PM ET,{team},5.0,{status},{starting}")
+
+    def _csv(self, tmp, rows, name="DKSalaries.csv"):
+        path = Path(tmp) / name
+        path.write_text("\n".join([self.HDR] + rows) + "\n", encoding="utf-8")
+        return path
+
+    def _showdown_rows(self, teams=("AAA", "BBB")):
+        """A complete two-sided Showdown file: 9 posted bats and one declared
+        arm per team, each priced CPT (1.5x) and UTIL."""
+        rows, pid = [], 1000
+        for team in teams:
+            for slot in range(1, 10):
+                for role, mult in (("CPT", 1.5), ("UTIL", 1.0)):
+                    rows.append(self._row(f"{team} Bat{slot}", pid, role,
+                                          int(4000 * mult), team=team,
+                                          starting=str(slot)))
+                    pid += 1
+            for role, mult in (("CPT", 1.5), ("UTIL", 1.0)):
+                rows.append(self._row(f"{team} Arm", pid, role,
+                                      int(9000 * mult), team=team,
+                                      starting="SP", pos="SP"))
+                pid += 1
+        return rows
+
+    def _collapse(self, path):
+        from mlb_engine.intake.slate_intake_manager import (
+            collapse_showdown_roles, parse_dk_salary_csv,
+        )
+        return collapse_showdown_roles(parse_dk_salary_csv(str(path)))
+
+    def test_a_showdown_file_collapses_to_one_row_per_person(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._csv(tmp, self._showdown_rows())
+            players, report = self._collapse(path)
+        self.assertTrue(report["applied"])
+        self.assertEqual((report["rows_in"], report["rows_out"]), (40, 20))
+        self.assertEqual(report["persons"], 20)
+        self.assertEqual(report["role_kept"], "UTIL")
+        self.assertEqual(report["roles_seen"], ["CPT", "UTIL"])
+        self.assertEqual(report["unpaired"], [])
+        # The UTIL row is the one that survives, and it is the BASE price.
+        self.assertEqual(sorted({p.salary for p in players}), [4000.0, 9000.0])
+
+    def test_a_classic_file_is_returned_untouched_and_says_why(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = [self._row(f"Bat{i}", 2000 + i, "OF", 4000, starting=str(i))
+                    for i in range(1, 10)]
+            path = self._csv(tmp, rows)
+            players, report = self._collapse(path)
+        self.assertFalse(report["applied"])
+        self.assertEqual(len(players), 9)
+        self.assertEqual(report["rows_in"], report["rows_out"])
+        self.assertIsNone(report["role_kept"])
+        self.assertIn("not a Showdown salary file", report["reason"])
+
+    def test_a_util_only_file_is_not_a_captain_mode_file(self):
+        """The shape guard has two clauses and they catch different files.
+
+        ``roles <= {CPT, UTIL}`` alone is true of a file with no CPT row in
+        it at all, and there the collapse would find every key holding a lone
+        UTIL row, pair none of them, and report ``applied`` with every person
+        named unpaired -- a page of findings about a file that has no roles to
+        collapse. The mutation that drops this clause survived every other
+        test in this class, which is why the file exists.
+        """
+        rows = [self._row(f"Bat{i}", 3000 + i, "UTIL", 4000, starting=str(i))
+                for i in range(1, 10)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._csv(tmp, rows)
+            players, report = self._collapse(path)
+        self.assertFalse(report["applied"])
+        self.assertEqual(report["unpaired"], [])
+        self.assertEqual(len(players), 9)
+
+    def test_a_mixed_file_is_left_alone_rather_than_half_collapsed(self):
+        """``_showdown_aware_position_column``'s doctrine, one function later:
+        the branch fires only when the column is ENTIRELY roster slots. A file
+        carrying both CPT/UTIL rows and Classic position rows is not a shape
+        this knows, and half-collapsing it is worse than not collapsing it."""
+        rows = self._showdown_rows()
+        rows.append(self._row("Odd One", 9100, "OF", 4000, starting=""))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._csv(tmp, rows)
+            players, report = self._collapse(path)
+        self.assertFalse(report["applied"])
+        self.assertEqual(len(players), 41)
+        self.assertIn("not a Showdown salary file", report["reason"])
+
+    def test_the_posted_nine_survives_the_collapse_and_is_read_as_confirmed(self):
+        """The batting-order half. Before the collapse both sides are dropped
+        by the duplicate-slot guard; after it both read confirmed."""
+        from mlb_engine.intake.live_data_adapters import dk_side_readings
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._csv(tmp, self._showdown_rows())
+            raw = parse_dk_salary_csv(str(path))
+            collapsed, _ = self._collapse(path)
+        before = dk_side_readings({p.player_id: p for p in raw})
+        after = dk_side_readings({p.player_id: p for p in collapsed})
+        self.assertEqual(before, {})
+        self.assertEqual(sorted(after), ["AAA", "BBB"])
+        self.assertEqual([r["state"] for r in after.values()],
+                         ["confirmed", "confirmed"])
+
+    def test_two_people_sharing_a_name_on_one_team_stay_ambiguous(self):
+        """The R75 class must survive the collapse. Two humans whose names
+        normalize identically on one team give two CPT rows and two UTIL rows;
+        which CPT pairs with which UTIL is not knowable from the name, so the
+        key is left whole and stays ambiguous rather than resolved by
+        guessing."""
+        rows = self._showdown_rows()
+        rows += [self._row("AAA Bat1", 9001, "CPT", 6000, starting=""),
+                 self._row("AAA Bat1", 9002, "UTIL", 4000, starting="")]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._csv(tmp, rows)
+            players, report = self._collapse(path)
+        self.assertTrue(report["applied"])
+        self.assertEqual(len(report["unpaired"]), 1)
+        unpaired = report["unpaired"][0]
+        self.assertEqual(unpaired["person_key"], "aaa bat1|AAA")
+        self.assertEqual(unpaired["roles"], {"CPT": 2, "UTIL": 2})
+        self.assertEqual(len(unpaired["Player_IDs"]), 4)
+        # All four rows are still in the pool, so the crosswalk still sees a
+        # duplicate and still reports it.
+        self.assertEqual(sum(1 for p in players if p.name == "AAA Bat1"), 4)
+
+    def test_the_person_key_is_the_preflight_shape_and_the_join_normalizer(self):
+        """One person key, spelled the same way at both ends of a grade join.
+
+        R234 gave ``preflight_upload.person_key`` the shape ``name_norm|TEAM``;
+        this is the same shape over ``field_miner.normalize_name``, which is
+        the normalizer that produces ``player_norm`` in a mined standings
+        export. A second normalizer here is how the collapse and the join end
+        up disagreeing about who a person is on one file.
+        """
+        from mlb_engine.field.field_miner import normalize_name
+        from mlb_engine.intake.slate_intake_manager import showdown_person_key
+        self.assertEqual(showdown_person_key("José Ramírez Jr.", "cle"),
+                         f"{normalize_name('José Ramírez Jr.')}|CLE")
+        self.assertEqual(showdown_person_key("Jose Ramirez", "CLE"),
+                         showdown_person_key("José Ramírez", "cle"))
+
+
+class OwnershipPredShowdownTests(unittest.TestCase):
+    """R235 at the tool boundary: what ``ownership_pred emit`` now reports.
+
+    Both symptoms in one place, because on a real file they arrive together.
+    """
+
+    def _pred(self, path):
+        from tools.ownership_pred import build_prediction
+        return build_prediction(path, slate_tag="sd")
+
+    def _file(self, tmp):
+        rows = ShowdownRoleCollapseTests()._showdown_rows()
+        return ShowdownRoleCollapseTests()._csv(tmp, rows)
+
+    def test_emit_counts_people_not_salary_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = self._pred(self._file(tmp))
+        self.assertEqual(len(pred["players"]), 20)
+        roles = pred["salary_file"]["showdown_roles"]
+        self.assertTrue(roles["applied"])
+        self.assertEqual((roles["rows_in"], roles["rows_out"]), (40, 20))
+        # The prior's 800/200 budget is spread over people now, not roles.
+        budget = pred["archetypes"]["large_field_gpp"]["budget_check"]
+        self.assertAlmostEqual(budget["hitter_pct_sum"], 800.0, delta=0.5)
+        self.assertAlmostEqual(budget["pitcher_pct_sum"], 200.0, delta=0.5)
+
+    def test_the_crosswalk_is_not_wholly_ambiguous_on_a_showdown_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = self._pred(self._file(tmp))
+        self.assertEqual(pred["crosswalk"]["ambiguous_names"], [])
+        self.assertEqual(len(pred["crosswalk"]["name_norm_to_player_id"]), 20)
+
+    def test_batting_order_applies_on_a_fully_posted_showdown_slate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pred = self._pred(self._file(tmp))
+        order = pred["inputs"]["batting_order"]
+        self.assertTrue(order["applied"])
+        self.assertEqual(order["slots"], 18)
+        self.assertEqual(order["sides_from_dk"], ["AAA", "BBB"])
+        self.assertNotIn("reason", order)
+
+    def test_the_contest_type_is_read_off_the_miner_not_re_derived(self):
+        """R235(b). ``actuals_from_standings`` re-derived the contest type from
+        ``entry['lineup']``, which the miner returns as (slot, name) TUPLES and
+        not as the raw cell ``detect_contest_type`` counts tokens in. Every
+        token missed, the detector took its documented empty-input fallback,
+        and every Showdown contest graded here was labelled 'classic' in the
+        grade's own evidence block."""
+        from tools.ownership_pred import actuals_from_standings
+        header = ("Rank,EntryId,EntryName,TimeRemaining,Points,Lineup,,"
+                  "Player,Roster Position,%Drafted,FPTS")
+        lineup = ("CPT Ann Bee UTIL Cal Dee UTIL Eve Fay UTIL Gus Hay "
+                  "UTIL Ida Jay UTIL Kit Lee")
+        rows = [header,
+                f'1,5001,someone,0,10.5,"{lineup}",,Ann Bee,CPT,25.00%,12',
+                f'2,5002,another,0,9.5,"{lineup}",,Cal Dee,UTIL,50.00%,8']
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contest-standings-1.csv"
+            path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+            own, meta = actuals_from_standings(path)
+        self.assertEqual(meta["contest_type"], "showdown")
+        self.assertEqual(meta["contest_type_source"],
+                         "field_miner.parse_standings_export")
+        self.assertEqual(meta["entries"], 2)
+        self.assertTrue(own)
+
 
 class GitFreshnessTests(unittest.TestCase):
     """R145: session start reads `git log`, and a stale log looks current.

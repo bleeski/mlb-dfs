@@ -282,6 +282,108 @@ def parse_dk_salary_csv(path: str) -> List[SalaryPlayer]:
     return players
 
 
+def showdown_person_key(name: Any, team: Any) -> str:
+    """One human, whatever role their salary row is priced for.
+
+    R235. Deliberately the SAME shape as ``preflight_upload.person_key``
+    (``name_norm|TEAM``) and deliberately built on
+    ``field_miner.normalize_name``, which is the normalizer that produces
+    ``player_norm`` in a mined standings export. Any consumer that collapses
+    roles and then joins to a standings export has to agree with itself about
+    who a person is at both ends; using a second normalizer here is how the
+    collapse and the join drift apart on the same file.
+    """
+    from mlb_engine.field.field_miner import normalize_name
+    return f"{normalize_name(name)}|{str(team or '').strip().upper()}"
+
+
+def collapse_showdown_roles(
+    players: Sequence["SalaryPlayer"],
+) -> Tuple[List["SalaryPlayer"], Dict[str, Any]]:
+    """(one row per PERSON, report). Classic input is returned untouched.
+
+    R235. A DK draftable id is a ROLE, not a person (R234's finding, one file
+    boundary earlier): a Showdown export lists everybody TWICE, a ``CPT`` row
+    and a ``UTIL`` row carrying different ids and different salaries. Anything
+    that treats a salary row as a person therefore counts one player as two,
+    and the two failures that produces are not obviously related to each other:
+
+      * every name resolves to two ids, so a name-keyed crosswalk calls the
+        whole slate ambiguous; and
+      * every posted batting slot 1-9 appears twice per side, so
+        ``dk_side_readings``' two-players-on-one-slot guard -- correct on a
+        Classic file, where that really is a malformed lineup -- discards both
+        sides of a fully posted single game.
+
+    The UTIL row survives, because it is the person's base price; the CPT row
+    is the same person priced for a role at ``1.5x``.
+
+    A key is collapsed only when its rows are EXACTLY one CPT and one UTIL.
+    Two different humans whose names normalize identically on one team produce
+    two of each role, and that is the R75 ambiguity class, which must stay
+    ambiguous rather than be resolved by guessing which CPT belongs to which
+    UTIL. Those rows are returned unchanged and named in ``report['unpaired']``.
+
+    ``report`` carries ``applied``, ``rows_in``, ``rows_out``, ``persons``,
+    ``roles_seen``, ``role_kept`` and ``unpaired``. It never carries a captain
+    PRICE verdict: recomputing the ``1.5x`` is the preflight's job at the money
+    boundary (R234), and a second copy of that rule here is the defect this
+    project keeps paying for.
+    """
+    rows = list(players)
+    roles = {}
+    for p in rows:
+        roles[id(p)] = str((p.raw or {}).get("Roster Position") or "").strip().upper()
+    seen_roles = {r for r in roles.values() if r}
+    report: Dict[str, Any] = {
+        "applied": False,
+        "rows_in": len(rows),
+        "rows_out": len(rows),
+        "persons": len(rows),
+        "roles_seen": sorted(seen_roles),
+        "role_kept": None,
+        "unpaired": [],
+    }
+    if not rows or not seen_roles <= SHOWDOWN_ROSTER_SLOTS or "CPT" not in seen_roles:
+        report["reason"] = (
+            "not a Showdown salary file (Roster Position is not entirely "
+            "CPT/UTIL), so every row is already one person and nothing is "
+            "collapsed")
+        return rows, report
+
+    by_person: Dict[str, List["SalaryPlayer"]] = {}
+    for p in rows:
+        by_person.setdefault(showdown_person_key(p.name, p.team), []).append(p)
+
+    out: List["SalaryPlayer"] = []
+    unpaired: List[Dict[str, Any]] = []
+    for key in sorted(by_person):
+        group = by_person[key]
+        counts = Counter(roles[id(p)] for p in group)
+        if counts == Counter({"CPT": 1, "UTIL": 1}):
+            out.extend(p for p in group if roles[id(p)] == "UTIL")
+            continue
+        unpaired.append({
+            "person_key": key,
+            "roles": dict(sorted(counts.items())),
+            "Player_IDs": sorted(str(p.player_id) for p in group),
+            "names": sorted({str(p.name) for p in group}),
+        })
+        out.extend(group)
+
+    report.update({
+        "applied": True,
+        "rows_out": len(out),
+        "persons": len(by_person),
+        "role_kept": "UTIL",
+        "unpaired": unpaired,
+        "note": "DK prices a Showdown player twice, CPT and UTIL; the UTIL row "
+                "is the person's base price and is what survives. An unpaired "
+                "key is left whole and stays ambiguous downstream.",
+    })
+    return out, report
+
+
 # DK's availability vocabulary. OUT statuses are shelved and must never occupy a
 # roster slot. DTD is playable-but-risky: it warns, and escalates to a blocker
 # only inside a chosen primary stack, because hard-blocking every DTD bat would

@@ -25,6 +25,146 @@ performance claim.
 
 ---
 
+## 2026-08-25 — R194 + the 08-23 dedupe fragment, landed as R235: a Showdown salary row is a ROLE, so the ownership prior was counting every player twice and reading a fully posted slate as unposted
+
+DEV, claim `engine` (re-took `engine_2026-08-25`, released by the previous
+session two hours earlier; `claim.py` says so on the retake and the warning is
+kept). Gate 1292 -> 1305; `test_core` 863 -> 876, state `grew`, every other
+suite on its pin. Working-tree dirt was ARCHIVE-owned (`data/`, `ledger/`) plus
+untracked archive material, classified and left alone. Ten mutations, ten
+caught, the last only after the suite asked for a test the class did not have.
+
+**The queue head, closed.** R194 was slot 1 with the 2026-08-23 BUILD fragment
+merged into it as its root cause, and both migrate here. The fragment file
+`docs/backlog_inbox/2026-08-23_BUILD_ownership_pred_showdown_salary_dedupe.md`
+was consumed by `3d4f05b` before this session and is not on disk; its content
+is the RIDER on R194's entry.
+
+**What was broken, reproduced at this head before anything changed.**
+`tools/ownership_pred.py emit --salary data/slates/2026-08-19/DKSalaries_showdown.csv`
+printed `96 ambiguous name(s), excluded from any grade join` (every person on
+the slate) and `batting_order INERT: no side is posted 1-9 in the salary file`
+on a file that had posted a complete 1-9 for BOTH sides. Same on the 08-20
+NYY@BAL file. One fact explains both: DK prices a Showdown player TWICE, a
+`CPT` row and a `UTIL` row with different ids and different salaries, and every
+reader below the parse is a per-PERSON reader being handed per-ROLE rows. The
+crosswalk sees each name on two ids and calls it ambiguous; `dk_side_readings`
+sees batting slot 1 twice per side and takes its two-players-on-one-slot
+branch, which is CORRECT on a Classic file and discards a well-formed Showdown
+lineup.
+
+**The fix is one collapse at intake, and the surviving evidence is the point.**
+`slate_intake_manager.collapse_showdown_roles` returns one row per person (the
+UTIL row, the base price) with a report, and passes a Classic file through
+untouched. `ownership_pred.build_prediction` calls it immediately after
+`parse_dk_salary_csv`, so the crosswalk, the batting-order read and the prior's
+800/200 budget all count people. Measured end to end against a real archived
+contest — the 2026-08-12 MIL@SD Showdown, `contest-standings-193619824.csv`,
+graded through `grade_prediction` with the collapse disabled and enabled:
+
+    BEFORE  184 rows, 92 ambiguous, order INERT -> joined_players 0
+            ("no overlapping Player_IDs; check the standings join")
+    AFTER    92 rows,  0 ambiguous, order applied (18 slots)
+            -> joined_players 27, mae 13.39pp, spearman 0.323,
+               and the per-feature buckets split order=1-3 / 4-6 / 7-9
+               where every one of them read order=unposted before
+
+That is R194's own stake, which was never a lineup: nothing here reaches the
+optimizer. It is that R135's prediction is graded against archived standings,
+and a file that joins to nothing is unusable evidence rather than weak
+evidence. Every Showdown prediction emitted before today is in that state.
+
+**A collapsed key is one human in two ROLES, never two humans.** The collapse
+fires only when a key holds exactly one CPT row and one UTIL row. Two people
+whose names normalize identically on one team give two of each, which is the
+R75 ambiguity class, and which CPT pairs with which UTIL is not knowable from
+the name — so those rows are left whole, stay ambiguous downstream, and are
+named in `unpaired`. The shape guard is likewise two clauses: the roster column
+must be ENTIRELY CPT/UTIL (a mixed file is not a shape this knows, the same
+doctrine `_showdown_aware_position_column` already applies) and it must contain
+a CPT (a UTIL-only file would otherwise collapse nothing while reporting every
+person unpaired). The mutation dropping the second clause survived all six
+tests written before it, which is why it now has its own.
+
+**R235(b), found while proving the join and fixed in the same file.**
+`actuals_from_standings` re-derived the contest type by calling
+`detect_contest_type` over `entry['lineup']` — which `parse_standings_export`
+returns as `[(slot, name), ...]` TUPLES, not the raw cell text the detector
+counts slot tokens in. Every token missed, the detector took its documented
+empty-input fallback, and **every Showdown contest graded by this tool was
+labelled `classic` in the grade's own evidence block.** The miner already
+decides the contract before parsing a row and returns it; the tool now reads
+that answer and records `contest_type_source`. This is the tool's own stated
+"one definition per fact" rule applied to the one fact where it had quietly
+grown a second implementation.
+
+**The fix breaks a consumer, and catching that is half the work.** A prediction
+file is now keyed by the person's UTIL id, so `qa_portfolio`'s Showdown
+CAPTAIN OWN-TIER panel — which looks a captain up by the CPT id from the entry
+row — would have reported `not in the prior` for every captain on every
+Showdown portfolio. It now rejoins CPT to person through the same engine key,
+falling back to the raw id so a pre-R235 prediction still reads. Its ABSENT
+note for CHALK-SUM was half wrong the moment the collapse landed, and is
+rewritten to cite only the surviving reason: the prior budgets 800/200 for a
+2-P-plus-8-hitter Classic roster against a Showdown roster that seats SIX and
+pays its captain 1.5x. That is the prior's own shape and it is not fixed here.
+
+**R233 enumeration. Three greps, and every hit classified.**
+
+    $ grep -rn "def person_key\|def showdown_person_key\|\"Player_Key\": f" --include=*.py mlb_engine/ tools/
+    mlb_engine/intake/slate_intake_manager.py:285  showdown_person_key  NEW, the one this commit adds
+    mlb_engine/optimize/showdown.py:162            "Player_Key": f"{name}|{team}"   KEPT
+    tools/preflight_upload.py:187                  person_key                        KEPT
+
+Three definitions of "one human", two deliberately kept and both named with
+the reason. `preflight_upload` cannot import the engine (CLAUDE.md's rule for
+it, R234) so its copy is structural. `showdown.py`'s `Player_Key` is an
+intra-file solver key over rows from ONE file that is never joined across
+files; normalizing it would change nothing but the key strings, and the melt it
+belongs to already does the role resolution the solver needs.
+
+    $ grep -rn "detect_contest_type(" --include=*.py mlb_engine/ tools/ | grep -v "def detect_contest_type"
+    mlb_engine/field/field_miner.py:238   the miner's own, over the raw cells
+
+One caller at this head. There were two before this commit and the second was
+the defect above.
+
+    $ grep -rn "dk_side_readings(\|merge_dk_starting_into_feed(\|dk_order_coverage(" \
+        --include=*.py mlb_engine/ tools/ skills/ | grep -v "def "
+    live_data_adapters.py:434,479,550         internal
+    live_data_adapters.py:1198                build_slate_pool, the Classic front door
+    tools/ownership_pred.py:151               collapses first, as of this commit
+    skills/.../build_slate.py:3210            dk_order_coverage, Classic build script
+
+**What was deliberately NOT changed, with the measurement that decided it.**
+The duplicate-slot guard in `dk_side_readings` stays person-blind. Pointed at a
+Showdown file it answers `covered [] | uncovered ['COL','LAD']` — verified at
+this head on both the 08-19 and 08-20 files — and that answer is WRONG but
+CONSISTENT with what the pool's merge does with the same rows. Making the
+coverage reader person-aware without also collapsing inside `build_slate_pool`
+would tell `build_slate.py` to skip the fetch and then hand the pool doubled
+rows it still refuses, which is R159(a)'s defect rebuilt on a new file type.
+The collapse therefore sits at the tool's own intake, where exactly one caller
+needs it, and the shared reader keeps one behaviour for both callers.
+
+**One correction to the board's own reasoning.** R194's Why says "two parsers
+for one fact that can disagree on the same file — `build_slate_pool`'s and
+`ownership_pred.py`'s own". At this head that is not the mechanism: R143 had
+already pointed `ownership_pred` at the engine's readers, so both sides run the
+SAME parser, and the parser is person-blind. The disagreement observed on 08-20
+was between two SOURCES (a feed's posted sides against DK's own column), not
+two implementations. Filed diagnoses keep being right about the symptom and
+wrong about the cause; this is the third consecutive entry to say so.
+
+**One thing for Ben, and it is now DONE rather than outstanding.** The board
+has carried "commits on `main` are still not on `origin/main`" for four days.
+`python tools/sync_check.py` at this head reports `disk main 5f533df / GitHub
+main 5f533df (measured via GH_PAT) / ok disk and GitHub agree`. Ben pushed. The
+note is struck from the queue rather than repeated, per R145's rule about a
+reading nothing on this disk can re-check going stale confidently.
+
+---
+
 ## 2026-08-25 — R191 + R192, landed as R234: the last check before the money boundary stops reading the wrong file and stops counting the wrong noun
 
 DEV, claim `engine` (bare mutex). Gate 1276 -> 1292; `test_upload_integrity`

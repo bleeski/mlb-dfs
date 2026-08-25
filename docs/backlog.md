@@ -39,6 +39,51 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-25 (slot 2, same day), DEV, claim `engine`: **the queue head is CLOSED
+again. R194 and the 08-23 dedupe fragment merged into it are landed as R235 and
+migrated.** Gate 1292 -> 1305 (`test_core` 863 -> 876, `grew`); the CHANGELOG
+entry of this date carries the record, and the numbered list below is
+RENUMBERED rather than annotated, so it is fourteen slots and slot 1 is
+R219 + R220. Ten mutations, ten caught.
+
+**Nothing jumped the queue, and the closed item cost less than the board
+thought because the batching claim had already been struck.** R191's landing
+struck "one helper serves all four"; what was left here was one file, and it
+stayed one file. Two readings worth carrying forward.
+
+First, **the item's Why named the wrong mechanism and its What was right.** It
+said "two parsers for one fact that can disagree" — `build_slate_pool`'s and
+`ownership_pred`'s own. There is one parser: R143 pointed the tool at the
+engine's readers before this item was filed, and that shared reader is
+person-blind, which is the whole defect. The 08-20 disagreement the item cites
+was between two SOURCES (a feed against DK's `Starting` column), not two
+implementations. Three consecutive entries have now corrected a filed cause
+while confirming its symptom, which is an argument for repro-before-fix and
+not for distrusting the board.
+
+Second, **the fix broke a consumer and the enumeration is what caught it.**
+Keying the prediction by person removes the CPT id from the file, and
+`qa_portfolio`'s Showdown captain panel looks a captain up BY the CPT id — so
+the surviving Showdown panel would have read "not in the prior" for every
+entry. Landed together, with the rejoin and a fallback for pre-R235 files.
+That is the N-versus-N+1 shape arriving from the other direction: not a fix
+that misses a member of its class, but a fix that ADDS one. R233's grep answers
+both if it is run over consumers and not only over the defect.
+
+**One board correction, and it retires a standing note.** "Commits on `main`
+are still not on `origin/main`" has led this section for four days. Ben pushed:
+`python tools/sync_check.py` reports `disk main 5f533df / GitHub main 5f533df
+(measured via GH_PAT) / ok disk and GitHub agree`. Struck, not repeated — the
+backlog is the wrong place for it, because sessions commit and Ben pushes, so
+disk running one commit ahead is the NORMAL state and not a finding. This
+landing puts it one ahead again. `sync_check.py` measures it in one call; a
+board note can only go stale between them.
+
+**One stale claim for Ben to arbitrate, unchanged from this morning:**
+`claims/engine_2026-08-20` is still HELD with `released_utc: null`, five days
+old, alongside four stale `slate_*` beacons. Per the contract a stale claim is
+Ben's call; sessions have been working around it by taking the dated name.*
+
 *2026-08-25, DEV, claim `engine` (bare mutex): **the queue head is CLOSED. R191
 and R192 are landed as R234 and migrated.** Gate 1276 -> 1292
 (`test_upload_integrity` 238 -> 254, `grew`); the CHANGELOG entry of this date
@@ -150,68 +195,60 @@ precondition on R10**, not a Tier 5 tidy. `captain_norm` already rides every par
 entry, so the recount is re-derivable from the archived JSONs: no re-mine.
 
 **Resequenced on impact against technical challenge, with the dependencies made
-explicit.** Fifteen slots; every new item is S or XS except where marked.
+explicit.** Fourteen slots as of 2026-08-25, the head having closed; every new
+item is S or XS except where marked.
 
-1. **R194 + the live 08-23 dedupe fragment** — what is left of the old slot 1
-   after R191 + R192 landed as R234 on 2026-08-25. The fragment is the root cause
-   under R194's second symptom and both are one change in `ownership_pred.py`,
-   which DOES import the engine, so `melt_showdown_salary_csv` is available to it
-   directly. **The "one helper serves all four" note that batched these with the
-   preflight pair was wrong** and is struck: the preflight cannot import the
-   engine (CLAUDE.md's own rule for it, restated at five places in that file), so
-   its half is preflight-native `person_key` and shares no code with this half.
-   Two surfaces, two changes; only the defect class was ever shared.
-2. **R219 + R220** — promoted above R205. R219 is zero-day R159 code, both reviews
+1. **R219 + R220** — promoted above R205. R219 is zero-day R159 code, both reviews
    found it, and it is the only new finding that changes which PLAYERS reach the
    pool: a degraded DK side defers to any nonempty feed lineup, so eight observed
    Player_ID-keyed slots lose to a three-hitter mid-repost partial and five seats
    fill from priors. R220 rides the same file.
-3. **R212 + R213 + R214 + R215** — the lost-window remainder, same surfaces the
+2. **R212 + R213 + R214 + R215** — the lost-window remainder, same surfaces the
    08-24 batch just left open. **R214 is a precondition on R203** (Tier 3): the
    supervisor discards the operator's R157 rescue it is being taught to perform.
    **R212 is a precondition on the whole supervisor batch** — the decision log has
    to survive the window to be worth writing.
-4. **R205** — down one slot, otherwise unchanged. Fix note corrected: the code is
+3. **R205** — down one slot, otherwise unchanged. Fix note corrected: the code is
    `statistics.median(sorted(...))`, which on the two-book production fetch IS the
    arithmetic mean, so the entry's "median with a sign guard" option is not a fix
    and is struck. Probability-space de-vig (D16's consensus form) survives any book
    count and is the fix.
-5. **R172 + R176 + R173 + R228** — the false-evidence batch, now carrying the
+4. **R172 + R176 + R173 + R228** — the false-evidence batch, now carrying the
    promotion fail-open. R228 belongs here and not with R174: absent evidence
    promoting silently is the same "presence mistaken for evidence" class, one
    boundary later.
-6. **R165 + R163** — unchanged. R165 and R164(c) are one normalization class two
+5. **R165 + R163** — unchanged. R165 and R164(c) are one normalization class two
    files apart; R55's shared normalizer closes both, so take R164 near this if the
    window allows.
-7. **R174 + R175** — money-boundary parity, minus R228 which moved up.
-8. **R216, alone.** The gate's tree fingerprint omits `skills/` while ~20 gated
+6. **R174 + R175** — money-boundary parity, minus R228 which moved up.
+7. **R216, alone.** The gate's tree fingerprint omits `skills/` while ~20 gated
    tests exec `build_slate.py`, so a split-gate green line can cover records that
    never tested the file that changed three times last week. Both reviews rank it
    High. It sits at 8 rather than 1 for one reason: fixing it resets in-flight gate
    state, and every slot above it wants a warm gate. Land it at a session boundary.
-9. **R195 + R181 + R179** — **R195 lands FIRST or together with R181**: they share
+8. **R195 + R181 + R179** — **R195 lands FIRST or together with R181**: they share
    `execution_pipeline.py:1325`, and R181's regex scoping would mask R195's mapping
    defect behind a green eval. R179 rides the same gate-hygiene surface.
-10. **R180 + R217 + R218** — audit hardening, now absorbing the gate-operational
-    smalls (`--gate-report --output` never writes; `.audit_gate/` is claimless
-    shared state; the complete branch ignores the age the report enforces; no
-    runtime identity in the record, on a tree whose `__pycache__` proves two
-    interpreters have run against it) and the last two unbounded subprocesses.
-11. **R164** — bank job-grid waste. Corroborated by the outside spec (D32).
-12. **Showdown batch: R158 + R223 + R224 + R122-rider + R123 + R189(3) + R208 +
+9. **R180 + R217 + R218** — audit hardening, now absorbing the gate-operational
+   smalls (`--gate-report --output` never writes; `.audit_gate/` is claimless
+   shared state; the complete branch ignores the age the report enforces; no
+   runtime identity in the record, on a tree whose `__pycache__` proves two
+   interpreters have run against it) and the last two unbounded subprocesses.
+10. **R164** — bank job-grid waste. Corroborated by the outside spec (D32).
+11. **Showdown batch: R158 + R223 + R224 + R122-rider + R123 + R189(3) + R208 +
     R210 + R211.** R223 joins because it is R153's founding defect recurring on a
     rung no test drives: the delivered brief reads "0 relaxations" over a breached
     25% captain cap, which is the washout axis reading clean.
-13. **R225 + R226 + R227** — archive integrity, new, and placed AHEAD of the
+12. **R225 + R226 + R227** — archive integrity, new, and placed AHEAD of the
     pre-existing Tier 1 remainder rather than in Tier 5. R225 gates R10; R226 is
     cheap now that rank is known to be parsed and stored; R227 is the registry's
     kill vector, which its own sibling was already hardened against.
-14. **R221 + R222 + R229 + R230 + R231 + R232** — the smalls and hygiene, batched
+13. **R221 + R222 + R229 + R230 + R231 + R232** — the smalls and hygiene, batched
     opportunistically between slots, never instead of them. R231 needs Ben's mv
     grant (1,778 litter directories); R232 is doc truth (MLB_Classic.md names a
     retired manifest as its version authority; MANIFEST.md still reports 12 modules
     and 119 tests).
-15. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged.
+14. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged.
 
 **Tier 2 keeps its order and its head got cheaper**: R118 (no miner change, no
 re-mine) -> R48 + R83 -> R10 (now gated on R225 for any Showdown duplication cell)
@@ -1835,60 +1872,6 @@ a restated priority.
   and never a calibration: roughly 160-170% cumulative ownership and at least 4
   low-owned bats for a top-heavy large field. Grades belong in the ledger,
   which is ARCHIVE's write.
-
-### R194. `ownership_pred.py` cannot read a Showdown salary file: every name is "ambiguous" and `batting_order` reports INERT on a fully posted slate (P2, S) | new 2026-08-23, merged from BUILD fragments `2026-08-19_BUILD_showdown-feed-abbrev-and-ownership-pred.md` item 2 and `2026-08-20_BUILD_ownership-pred-showdown-batting-order-false-inert.md`; TWO occurrences, two slates
-
-- **What:** on the 08-19 ARI@BOS Showdown slate, whose salary file posted 1-9
-  for BOTH sides in the `Starting` column, `emit` reported `crosswalk 95
-  ambiguous name(s), excluded from any grade join` and `batting_order INERT: no
-  side is posted 1-9 in the salary file and no feed supplied one`. Both
-  readings are artifacts of Showdown's file SHAPE, not of the slate: a Showdown
-  salary file lists every player twice, a `CPT` row and a `UTIL` row with
-  different ids and salaries, so every name is a duplicate and the 1-9
-  completeness check fails on the doubled rows. Recurred on 08-20 NYY@BAL,
-  where `build_slate.py` read the same file and reported `pool.basis:
-  declared_starters`, `posted_hitters: 18`, `construction.mode: thesis_ladder`,
-  cross-checked against the MLB Stats API probables endpoint and matched.
-- **Why:** two parsers for one fact that can disagree on the same file —
-  `build_slate_pool`'s (via `merge_dk_starting_into_feed` / `dk_order_coverage`,
-  R143) and `ownership_pred.py`'s own. Nothing downstream is affected because
-  the tool is review-only and reaches no optimizer, so no delivered lineup ever
-  moved. What it costs is EVIDENCE: this prediction is what gets graded against
-  archived standings (R135), and a file with two of four features inert and a
-  crosswalk that excludes all 95 players from any join is unusable evidence
-  rather than weak evidence — every Showdown prediction is silently degraded
-  for no real reason. `qa_portfolio.py` section 4 already declares CHALK-SUM and
-  LOW-OWNED CARRY absent for Showdown for the same double-row reason, so both
-  probably want one fix at one boundary.
-- **Fix:** dedupe on `UTIL` rows before scoring, and point the batting-order
-  read at `dk_order_coverage` — the one definition R143 already established —
-  rather than a second implementation. Fixing the crosswalk and the
-  batting-order read together is what makes the emitted file joinable at grade
-  time. Rides R187 (same tool, same "the CLI says applied while the JSON says
-  otherwise" family).
-- **RIDER 2026-08-24: the live inbox fragment
-  `docs/backlog_inbox/2026-08-23_BUILD_ownership_pred_showdown_salary_dedupe.md`
-  is the ROOT CAUSE under this item's second symptom, and it is merged here
-  rather than given its own number.** Ed7's inbox census caught it: the fragment
-  was dropped by `8082d51` AFTER the 08-23 consume pass ran, so it survived a
-  merge session by timing. It says `ownership_pred.py` counts Showdown CPT and
-  UTIL rows as separate players, which kills the crosswalk and the
-  batting-order feature — the same missing person-resolution that produces this
-  item's "every name is ambiguous". **Batch with R191 + R192:** one shared
-  CPT/UTIL-to-person helper serves this item, R192's `top_exposure`, and the
-  fragment, and `showdown.py`'s melt already implements the resolution for the
-  solver cap.
-- **CORRECTED 2026-08-25, landing R234.** The sentence above is wrong in its
-  operative half and the correction shrinks this item's scope rather than its
-  size. There is NO shared helper across the boundary: `tools/preflight_upload.py`
-  cannot import the engine — that is CLAUDE.md's rule for it and the file
-  restates it at five places — so `melt_showdown_salary_csv` was never reachable
-  from R192 and its half landed as a preflight-native `person_key`. This item is
-  unaffected in substance: `ownership_pred.py` DOES import the engine (it already
-  calls `parse_dk_salary_csv`, `merge_dk_starting_into_feed` and
-  `dk_order_coverage`), so the melt is available to it directly and the fix is
-  the one the Fix line already describes. What is gone is the reason to wait for
-  a sibling: this is now a standalone change on one file, and it is slot 1.
 
 ### R197. `_low_owned_hitter_count` reads a key no writer writes, so it is identically 0 while R154's constraint counts the real thing (P2, XS) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_low-owned-diagnostic-false-signal.md`; VERIFIED-repro by the filing session
 

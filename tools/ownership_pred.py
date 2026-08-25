@@ -26,8 +26,13 @@ Design constraints, all deliberate:
     ranking (``merge_dk_starting_into_feed`` then
     ``build_status_map_from_lineups_feed``), the total split from
     ``projection_builder.implied_team_totals``, actual %Drafted from
-    ``field_miner.own_by_player_norm``, and the join key from
-    ``field_miner.normalize_name``. This tool re-derives none of them
+    ``field_miner.own_by_player_norm``, the join key from
+    ``field_miner.normalize_name``, and the CPT/UTIL role collapse from
+    ``slate_intake_manager.collapse_showdown_roles``. This tool re-derives
+    none of them
+  - one row per PERSON. R235: a Showdown salary export prices everybody twice,
+    so the collapse runs at intake, before anything counts a row. Every count,
+    key and budget below is therefore a count of people
   - absent inputs are NAMED. R127's boundary applies in both directions: a
     missing FILE reports ``applied: false`` with a reason and no list, a
     missing or ambiguous PLAYER is named per player
@@ -345,12 +350,19 @@ def build_prediction(
     """The whole prediction payload for one slate. No writes, no network."""
     from mlb_engine.field import ownership_prior
     from mlb_engine.field.field_miner import normalize_name
-    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+    from mlb_engine.intake.slate_intake_manager import (
+        collapse_showdown_roles, parse_dk_salary_csv,
+    )
 
     salary_csv = Path(salary_csv)
     players = list(parse_dk_salary_csv(str(salary_csv)))
     if not players:
         raise ValueError(f"{salary_csv} parsed to zero players")
+    # R235. Before ANY count: on a Showdown file every person owns two salary
+    # rows, and every reader below -- the crosswalk, the batting-order read, the
+    # prior's 800/200 budget -- is a per-person reader handed per-role rows. A
+    # Classic file passes through untouched.
+    players, showdown_report = collapse_showdown_roles(players)
     players.sort(key=lambda p: str(p.player_id))
 
     slate_teams = sorted({str(p.team).strip().upper() for p in players if p.team})
@@ -427,7 +439,8 @@ def build_prediction(
         "slate_date": slate_date or slate_date_from_salary(salary_csv) or "",
         "slate_tag": str(slate_tag or ""),
         "salary_file": {"path": str(salary_csv), "sha256": _sha256(salary_csv),
-                        "players": len(players)},
+                        "players": len(players),
+                        "showdown_roles": showdown_report},
         "label": "UNCALIBRATED STRUCTURAL PRIOR. Predicted %Drafted per contest "
                  "archetype from features public before lock. Never a win rate, "
                  "an ROI figure, a cash rate, or a probability claim; never fed "
@@ -680,16 +693,28 @@ def _flat_budget_pairs(joined_ids: Sequence[str],
 
 
 def actuals_from_standings(standings_csv: str | Path) -> Tuple[Dict[str, float], Dict[str, Any]]:
-    """{normalized name: actual %Drafted} from a DK standings export."""
+    """{normalized name: actual %Drafted} from a DK standings export.
+
+    R235(b). ``contest_type`` is READ off the miner's own parse, never
+    re-derived here. This function used to call ``detect_contest_type`` a
+    second time over ``entry['lineup']`` -- which ``parse_standings_export``
+    returns as ``[(slot, name), ...]`` tuples, not as the raw cell text the
+    detector counts slot tokens in. Every token missed, so the detector took
+    its documented empty-input fallback and EVERY Showdown contest graded here
+    was labelled ``classic`` in the grade's own evidence block. The miner
+    already decided the contract before parsing a row and returns the answer;
+    this is the tool's stated "one definition per fact" rule applied to the one
+    fact where it had quietly grown a second implementation.
+    """
     from mlb_engine.field.field_miner import (
-        detect_contest_type, own_by_player_norm, parse_standings_export,
+        own_by_player_norm, parse_standings_export,
     )
     standings = parse_standings_export(str(standings_csv))
     own = own_by_player_norm(standings["player_table"])
-    lineups = [e.get("lineup", "") for e in standings.get("entries") or []]
     meta = {
         "path": str(standings_csv),
-        "contest_type": detect_contest_type(lineups) if lineups else "unknown",
+        "contest_type": str(standings.get("contest_type") or "unknown"),
+        "contest_type_source": "field_miner.parse_standings_export",
         "entries": len(standings.get("entries") or []),
         "players_with_a_share": len(own),
     }
@@ -788,6 +813,16 @@ def _emit_cli(args: argparse.Namespace) -> int:
               + (f": {detail}" if detail else "")
               + ("" if detail else
                  f" ({block.get('slots') or block.get('teams') or block.get('count') or block.get('players')})"))
+    roles = prediction["salary_file"].get("showdown_roles") or {}
+    if roles.get("applied"):
+        line = (f"  showdown_roles   COLLAPSED {roles['rows_in']} CPT/UTIL rows "
+                f"to {roles['rows_out']} people; the UTIL row is kept")
+        unpaired = roles.get("unpaired") or []
+        if unpaired:
+            line += (f"; {len(unpaired)} key(s) not a clean CPT+UTIL pair and "
+                     f"left whole: "
+                     + ", ".join(u["person_key"] for u in unpaired))
+        print(line)
     ambiguous = prediction["crosswalk"]["ambiguous_names"]
     if ambiguous:
         print(f"  crosswalk        {len(ambiguous)} ambiguous name(s), excluded "
