@@ -184,6 +184,31 @@ def _norm_name(value: Any) -> str:
     return re.sub(r"[^a-z]", "", text)
 
 
+def person_key(row: Mapping[str, Any]) -> str:
+    """One human, whatever role their salary row is priced for.
+
+    R234. A DK draftable id is a ROLE, not a person: a Showdown export lists
+    everybody twice, a CPT row and a UTIL row carrying different ids and
+    different salaries, so anything that counts ids counts one player as two.
+    Name-plus-team is the identity that survives the split, and it is the one
+    every duplication, exposure and captain-pricing check in this file needs.
+
+    R233 enumeration. This expression was written out by hand at FOUR sites
+    before R234 and the class had no fifth::
+
+        $ grep -n "_norm_name(.*)}|" tools/preflight_upload.py
+        717:  _showdown_legality, captain -> UTIL sibling lookup
+        740:  check_legality, the salary_by_person index
+        770:  check_legality, within-lineup duplicate-person identity
+        1545: advisory, the person map behind duplicates and overlap
+
+    All four now call this, as does ``advisory``'s exposure count, which is the
+    site that had never had it at all.
+    """
+    return (f"{_norm_name(row.get('Name'))}|"
+            f"{str(row.get('TeamAbbrev') or '').upper()}")
+
+
 def _matchup(game_info: Any) -> str:
     text = str(game_info or "").strip()
     head = text.split(" ", 1)[0] if text else ""
@@ -355,22 +380,55 @@ def load_salary(path: Path) -> Dict[str, Dict[str, str]]:
     return out
 
 
-def resolve_salary_from_promoted_run(runs_root: Path) -> Optional[Path]:
-    """The engine snapshots inputs per run; prefer that over the staged copy.
+def salary_export_is_showdown(salary: Mapping[str, Mapping[str, str]]) -> bool:
+    """DK prices a CPT row per player on a Showdown export, never on a Classic one."""
+    for row in salary.values():
+        roles = {r.strip().upper()
+                 for r in str(row.get("Roster Position") or "").split("/")}
+        if "CPT" in roles:
+            return True
+    return False
 
-    The staged ``data/slates/<date>/`` copy is shared and date-keyed, so a later
+
+def resolve_salary_from_promoted_run(
+    runs_root: Path,
+    contest: Optional[str] = None,
+    rostered: Optional[Iterable[str]] = None,
+) -> Tuple[Optional[Path], str]:
+    """(snapshot, refusal reason) for the promoted run, CHECKED against the file.
+
+    The engine snapshots inputs per run; prefer that over the staged copy. The
+    staged ``data/slates/<date>/`` copy is shared and date-keyed, so a later
     build for the same date overwrites it and orphans verification of what was
     actually delivered. The run snapshot cannot be clobbered that way.
 
     ``run_id`` resolves first because the recorded ``run_dir`` is an absolute
     path from the session that wrote it, and that mount is gone in every later
     session.
+
+    R234. What this reads is a POINTER -- ``runs/latest_valid_run.json``, last
+    writer wins -- and it used to hand back whatever that pointer named without
+    ever looking at the file being verified. On a Showdown delivery that is not
+    a race but the expected behaviour: ``build_slate.py`` promotes no run, so
+    the pointer necessarily names some other build. Three field hits, all on
+    clean delivered files at the last check before the money boundary:
+    2026-08-20 ``1835_1g_sd`` and ``2010_1g_sd`` each resolved to a concurrent
+    session's Classic run and exited 2 on ``27 rostered player ID(s) absent``;
+    2026-08-24 ``texcws_sd`` reached back a whole day to
+    ``20260823T200036Z_0fe4a983``. It misfires the other direction too, a
+    Classic preflight taking a stale prior run, whenever the timing lines up.
+
+    So the candidate is now checked on the two facts the caller already holds --
+    contest geometry and the rostered ids -- and a mismatch REFUSES, naming what
+    disagreed. Both are facts that would hard-fail one call later, so this
+    weakens no check: it turns a confident wrong answer into "pass --salary",
+    which costs one flag instead of a delivery.
     """
     pointer = runs_root / "latest_valid_run.json"
     try:
         data = json.loads(pointer.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return None
+        return None, f"no readable run pointer at {pointer}"
     candidates = []
     run_id = str(data.get("run_id") or "").strip()
     if run_id:
@@ -378,14 +436,33 @@ def resolve_salary_from_promoted_run(runs_root: Path) -> Optional[Path]:
     recorded = str(data.get("run_dir") or "").strip()
     if recorded:
         candidates.append(Path(recorded))
+    snap: Optional[Path] = None
     for base in candidates:
         try:
-            snap = base / "inputs" / "DKSalaries.csv"
-            if snap.exists():
-                return snap
+            probe = base / "inputs" / "DKSalaries.csv"
+            if probe.exists():
+                snap = probe
+                break
         except OSError:
             continue
-    return None
+    if snap is None:
+        return None, (f"the run pointer {pointer} names no run carrying "
+                      f"inputs/DKSalaries.csv")
+    try:
+        salary = load_salary(snap)
+    except (OSError, ValueError) as exc:
+        return None, f"{snap} does not read as a salary file ({exc})"
+
+    snap_contest = "showdown" if salary_export_is_showdown(salary) else "classic"
+    if contest and snap_contest != contest:
+        return None, (f"the promoted run's snapshot {snap} is a {snap_contest} "
+                      f"export and these entries are {contest} geometry")
+    missing = sorted({str(pid) for pid in (rostered or ()) if pid} - set(salary))
+    if missing:
+        return None, (f"the promoted run's snapshot {snap} is missing "
+                      f"{len(missing)} of this file's rostered player ID(s) "
+                      f"({missing[:5]}), so it is a different slate")
+    return snap, ""
 
 
 # --------------------------------------------------------------------------
@@ -714,8 +791,7 @@ def _showdown_legality(entry: EntryRow, players: Sequence[Dict[str, str]],
     # Recompute the captain price rather than trust the cell. DK prices the CPT
     # role row at 1.5x the same person's UTIL row; a hand-edited or mismatched
     # file shows up here and nowhere else.
-    key = f"{_norm_name(cpt.get('Name'))}|{str(cpt.get('TeamAbbrev') or '').upper()}"
-    siblings = salary_by_person.get(key, [])
+    siblings = salary_by_person.get(person_key(cpt), [])
     util_rows = [r for r in siblings
                  if "UTIL" in str(r.get("Roster Position") or "").upper()
                  and "CPT" not in str(r.get("Roster Position") or "").upper()]
@@ -737,8 +813,7 @@ def check_legality(contest: str, slots: Sequence[str], entries: Sequence[EntryRo
     """Hard check 4: the rules DK enforces, restated on the file."""
     salary_by_person: Dict[str, List[Dict[str, str]]] = collections.defaultdict(list)
     for row in salary.values():
-        key = f"{_norm_name(row.get('Name'))}|{str(row.get('TeamAbbrev') or '').upper()}"
-        salary_by_person[key].append(row)
+        salary_by_person[person_key(row)].append(row)
 
     width = len(slots)
     details: List[Dict[str, Any]] = []
@@ -767,8 +842,7 @@ def check_legality(contest: str, slots: Sequence[str], entries: Sequence[EntryRo
         if total > SALARY_CAP:
             rep.fail(f"{e.entry_id}: salary {total} over the {SALARY_CAP} cap")
 
-        identity = [f"{_norm_name(p.get('Name'))}|{str(p.get('TeamAbbrev') or '').upper()}"
-                    for p in players]
+        identity = [person_key(p) for p in players]
         if len(set(identity)) != width:
             dupes = sorted({p.get("Name") for p, k in zip(players, identity)
                             if identity.count(k) > 1})
@@ -1533,17 +1607,40 @@ def advisory(contest: str, entries: Sequence[EntryRow],
     out: Dict[str, Any] = {"entries": len(entries), "filled": n}
     if not n:
         return out
-    counts = collections.Counter(pid for e in filled for pid in e.cells if pid)
-    out["top_exposure"] = [
-        {"player": salary.get(pid, {}).get("Name", pid),
-         "team": salary.get(pid, {}).get("TeamAbbrev", "?"),
-         "n": c, "pct": round(100.0 * c / n, 1)}
-        for pid, c in counts.most_common(8)
-    ]
-    persons = {}
+    persons = {pid: person_key(row) for pid, row in salary.items()}
+    display: Dict[str, Tuple[str, str]] = {}
     for pid, row in salary.items():
-        persons[pid] = f"{_norm_name(row.get('Name'))}|{str(row.get('TeamAbbrev') or '').upper()}"
+        display.setdefault(persons[pid], (str(row.get("Name") or pid),
+                                          str(row.get("TeamAbbrev") or "?")))
+
+    def _top(counter: collections.Counter) -> List[Dict[str, Any]]:
+        rows = []
+        for key, c in counter.most_common(8):
+            name, team = display.get(key, (key, "?"))
+            rows.append({"player": name, "team": team,
+                         "n": c, "pct": round(100.0 * c / n, 1)})
+        return rows
+
     sets = [frozenset(persons.get(pid, pid) for pid in e.cells if pid) for e in filled]
+    # R234/R192. This used to count draftable ids. On Classic that is the same
+    # number, because there is no multiplier role; on Showdown it splits one
+    # human across a CPT key and a UTIL key and neither half reaches the printed
+    # five. On the 2026-08-19 LAD@COL delivery that hid the two MOST
+    # concentrated players in the portfolio: Sasaki sat at 9 of 19, exactly the
+    # solver's floor(0.5*19)=9 player cap, and did not appear at all. R153 set
+    # that cap "counting the PLAYER and not the role" because correlated failure
+    # across entries is the washout axis; this is the one line an operator reads
+    # to check it, so it counts what the cap counts. It failed in both
+    # directions -- every captained player under-reported, so a real breach
+    # could read clean.
+    counts = collections.Counter(key for s in sets for key in s)
+    out["top_exposure"] = _top(counts)
+    if contest == "showdown":
+        # The captain cap (0.25) and the player cap (0.50) are separate controls
+        # and an operator checking either against the brief had neither.
+        out["top_captain_exposure"] = _top(collections.Counter(
+            persons.get(e.cells[0], e.cells[0])
+            for e in filled if e.cells and e.cells[0]))
     # R128. The contest each entry belongs to is already in the row; the DK
     # template writes it beside the Entry ID, so the partition needs no new
     # input. Contest ID is the key and the name is the fallback, because a
@@ -1605,11 +1702,14 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     if args.salary:
         salary_path = Path(args.salary)
     else:
-        resolved = resolve_salary_from_promoted_run(REPO_ROOT / "runs")
+        resolved, why = resolve_salary_from_promoted_run(
+            REPO_ROOT / "runs", contest=contest,
+            rostered={pid for e in entries for pid in e.cells if pid})
         if resolved is None:
             raise ValueError(
-                "no --salary given and no salary snapshot found under the promoted "
-                "run's inputs/; pass --salary explicitly")
+                f"no --salary given and the promoted run's snapshot was NOT "
+                f"used: {why}. Pass --salary explicitly; checking these entries "
+                f"against another slate's file answers a different question")
         salary_path = resolved
         rep.info["salary_source"] = "promoted run snapshot"
     rep.info["salary_file"] = str(salary_path)
@@ -1779,7 +1879,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"  first lock: {adv['first_lock_et']}")
         if adv.get("top_exposure"):
             top = ", ".join(f"{x['player']} {x['pct']}%" for x in adv["top_exposure"][:5])
-            print(f"  top exposure: {top}")
+            print(f"  top exposure: {top}  (the PERSON, either role)")
+        if adv.get("top_captain_exposure"):
+            top = ", ".join(f"{x['player']} {x['pct']}%"
+                            for x in adv["top_captain_exposure"][:5])
+            print(f"  top CPT exposure: {top}")
         if adv.get("duplicate_lineup_groups"):
             # R128. Same trigger as before, so no file that prints nothing
             # today starts printing; what changed is that the operator is told

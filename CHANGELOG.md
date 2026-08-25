@@ -25,6 +25,120 @@ performance claim.
 
 ---
 
+## 2026-08-25 — R191 + R192, landed as R234: the last check before the money boundary stops reading the wrong file and stops counting the wrong noun
+
+DEV, claim `engine` (bare mutex). Gate 1276 -> 1292; `test_upload_integrity`
+238 -> 254, state `grew`, every other suite on its pin. Working-tree dirt was
+ARCHIVE-owned (`data/`, `ledger/`) plus untracked archive material, classified
+and left alone per the multi-session contract. Eight mutations, eight caught,
+one of them only after the suite asked for three more tests (below).
+
+**The queue head, closed.** R191 and R192 were slot 1, inserted 2026-08-23 as
+lost-window defects and confirmed independently by the Codex spec (D14, D15).
+Both live in `tools/preflight_upload.py`, the one command CLAUDE.md puts between
+a build and Ben's manual upload. Both entries migrate here.
+
+**R191 — the `--salary` auto-resolve now checks the file it resolved.**
+`resolve_salary_from_promoted_run` reads a POINTER, `runs/latest_valid_run.json`,
+last writer wins, and it never saw the entries file at all. On a Showdown
+delivery that is not a race, it is the guaranteed outcome: `build_slate.py`
+promotes no run, so the pointer necessarily names some other build. Three field
+hits, every one a hard FAIL on a clean delivered file at the last check before
+the money boundary — 2026-08-20 `1835_1g_sd` and `2010_1g_sd` each resolved to a
+concurrent session's Classic run and exited 2 on `27 rostered player ID(s)
+absent from the salary file`, and 2026-08-24 `texcws_sd` reached back a full day
+to `20260823T200036Z_0fe4a983`. The candidate is now checked on the two facts
+the caller already holds — contest geometry (a Showdown export prices a CPT row
+per player and a Classic one never does) and the rostered ids — and a mismatch
+REFUSES with the reason named, exit 3 at the flag instead of exit 2 on a clean
+file. This weakens no check: both facts would hard-fail one call later, so the
+change is only about which answer the operator gets. Ed7's correction to the
+board held up in full — it is a thirty-line pointer read, not a scan of `runs/`,
+so the fix is scope-or-refuse inside one function rather than a search rewrite.
+
+**R192 — exposure counts the person.** A DK draftable id is a ROLE. The Showdown
+export lists everybody twice, so `Counter(pid ...)` split one human across a CPT
+key and a UTIL key and neither half reached the printed five. On the 2026-08-19
+LAD@COL delivery that hid the two most concentrated players in the portfolio:
+Sasaki sat at 9 of 19, exactly the solver's `floor(0.5*19)=9` player cap, and did
+not appear on the line an operator reads to check that cap. R153 set the cap
+"counting the PLAYER and not the role" on the washout argument; this line now
+counts what the cap counts, and it failed in both directions before, so a real
+breach could have read clean. The captain distribution prints on its own line as
+well, because the captain cap (0.25) and the player cap (0.50) are separate
+controls and an operator checking either against the brief had neither. Classic
+is unaffected by construction — no multiplier role, so the two counts coincide —
+and a test pins that rather than assuming it.
+
+**R233's requirement, discharged three times.** The entry claims a rule now
+lives in one place, so it carries the greps that enumerate the class at this
+head:
+
+    $ grep -rn "_norm_name(.*)}|" tools/ mlb_engine/ tests/ --include=*.py
+    tools/preflight_upload.py:199   (the helper's own docstring, quoting this grep)
+    tools/preflight_upload.py:208   person_key, the definition
+
+Four hand-written copies before this commit — `_showdown_legality`'s captain
+lookup, `check_legality`'s sibling index, `check_legality`'s within-lineup
+identity, `advisory`'s person map — all now call `person_key`, and `advisory`'s
+exposure count, which had never had it at all, is the fifth caller.
+
+    $ grep -rn "resolve_salary_from_promoted_run" tools/ --include=*.py
+    tools/preflight_upload.py:393   definition
+    tools/preflight_upload.py:1705  caller, scoped
+    tools/verify_export.py:97       import
+    tools/verify_export.py:466      caller, scoped
+
+**The class had TWO members and R191 named one.** `verify_export.py` imports the
+same resolver and had the identical unguarded call, and by R175 it is the weaker
+checker on exactly the files it exists for, so it would have inherited the
+wrong-slate answer in silence after its sibling was fixed. Both are scoped, and
+a test enumerates `tools/*.py` and fails on a third caller or on either caller
+dropping the arguments — the enumeration is executable, not just recorded.
+
+    $ grep -rn "for pid in e.cells" tools/ --include=*.py     # 9 hits
+    KEPT by id, deliberately: :696 and :1707 (the resolver's rostered set,
+    matched against the salary ID column), :722 (status lookup), :826
+    (salary-row lookup), :1410 (feed check), :1659 (Game Info lock times),
+    verify_export.py:384 (the locked-game introduction ban, where a UTIL->CPT
+    swap of one person IS a new draftable and DK treats it as one).
+    MOVED to the person: :1624, the one set that feeds duplication, overlap and
+    now exposure.
+
+**One mutation survived, and it bought three tests.** Dropping the TeamAbbrev
+half of `person_key` passed all 251 tests. That property had never been asserted
+at any of the four copies either, so this is pre-existing coverage debt the
+unification made visible: it is the R75 class going unmeasured, since two
+players whose names normalize identically are one person only if they are also
+on one team, and collapsing them fails a legal lineup on "the same person
+occupies two slots" while merging their exposures on the line above. Now pinned
+by `R234PersonKeyTests`, and the re-run mutation is caught twice.
+
+**Two riders on open items, both found by doing rather than reading, both the
+same shape as the finding above.** R216's entry says the gate's tree fingerprint
+omits `skills/`; it omits CLAUDE.md too, and two gated tests read CLAUDE.md as
+data, so the corrected file passed when run directly while `--gate-report` went
+on serving the recorded FAIL at an unmoved fingerprint (`423a727fb78749e6` before
+and after) — the `skills/` gap lets a green line cover an untested change, this
+one lets a RED line outlive its own fix. R109's entry says `.git/index.lock` goes
+stale and `rm` cannot clear it; the class is `.git/*.lock`, and a stale
+`HEAD.lock` from the previous evening produced the identical "another git process
+is running" message and cost four calls before the diagnosis widened. Both riders
+name the wider class rather than the one new member.
+
+**Not in this commit, and it is the new queue head.** R194 and the 08-23
+`ownership_pred` dedupe fragment batched with these two on the board under "one
+shared helper serves all four". That premise is FALSE for the preflight half:
+CLAUDE.md's preflight rule is "no engine import", restated at five places in the
+file, so `melt_showdown_salary_csv` was never available to it and `person_key`
+is preflight-native by the same contract that keeps `parse_game_info_datetime`
+there. `ownership_pred.py` does import the engine and can use the melt directly,
+which makes R194 a separate change on a separate surface, P2, review-only, and
+reaching no optimizer. It is the head now; the batching note on the board is
+corrected rather than deleted.
+
+---
+
 ## 2026-08-24 — ed7 + Codex double greenfield adjudication: R212-R233 filed, six riders, five board corrections, eight rejections, the queue resequenced to fifteen slots, and R233 closed in this commit
 
 DEV, claim `engine` (bare mutex). Docs and CLAUDE.md only; no engine path

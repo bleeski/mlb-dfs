@@ -458,11 +458,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.salary:
             salary_path = Path(args.salary)
         else:
-            resolved = resolve_salary_from_promoted_run(REPO_ROOT / "runs")
+            # R234. The SECOND site of the same unvalidated auto-resolve. R191
+            # named only preflight_upload; the class had two members and this
+            # one is the weaker checker on exactly the files it exists for
+            # (R175), so it would have inherited the wrong-slate answer in
+            # silence after the sibling was fixed.
+            resolved, why = resolve_salary_from_promoted_run(
+                REPO_ROOT / "runs", contest=contest,
+                rostered={pid for e in entries for pid in e.cells if pid})
             if resolved is None:
                 raise ValueError(
-                    "no --salary given and no snapshot under the promoted run's "
-                    "inputs/; pass --salary explicitly")
+                    f"no --salary given and the promoted run's snapshot was NOT "
+                    f"used: {why}. Pass --salary explicitly; checking these "
+                    f"entries against another slate's file answers a different "
+                    f"question")
             salary_path = resolved
             rep.info["salary_source"] = "promoted run snapshot"
         salary = load_salary(salary_path)

@@ -4212,3 +4212,312 @@ class IgnorePoolBlockersIsHonestTests(unittest.TestCase):
         self.assertIn("--assume-gates lineup_gate_passed to", src)
         self.assertIn("both together or neither", src.replace(
             '"\n                  "', ""))
+
+
+# ---------------------------------------------------------------------------
+# R234 / R191 / R192. The two things that stand between a build and the money
+# boundary read the wrong file and count the wrong noun.
+# ---------------------------------------------------------------------------
+
+SD_GAME = "AAA@BBB 07/25/2026 07:05PM ET"
+SD_CONTEST = "MLB Showdown Captain Mode $5 (AAA @ BBB)"
+
+
+def write_showdown_salary(path: Path, first_pid: int = 2000) -> dict:
+    """Six players a side, each priced twice: a CPT row and a UTIL row.
+
+    Returns {person label: {"CPT": id, "UTIL": id}} so a test can put the same
+    human in either role and see whether the tool notices it is one person.
+    """
+    rows = [SALARY_HEADER]
+    people: dict = {}
+    pid = first_pid
+    for team in ("AAA", "BBB"):
+        for i in range(6):
+            name = f"{team} {SURNAMES[i]}"
+            util_id, cpt_id = pid, pid + 500
+            pid += 1
+            pos = "P" if i == 0 else "OF"
+            rows.append(_salary_row(util_id, name, team, SD_GAME, pos, "UTIL", 4000))
+            rows.append(_salary_row(cpt_id, name, team, SD_GAME, pos, "CPT", 6000))
+            people[name] = {"UTIL": str(util_id), "CPT": str(cpt_id)}
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    return people
+
+
+def showdown_entry(entry_id, contest_id, lineup, name=SD_CONTEST):
+    return [entry_id, name, contest_id, "$1"] + list(lineup) + ["", "1. instructions"]
+
+
+class R234SalaryAutoResolveIsScopedTests(unittest.TestCase):
+    """The resolver reads a last-writer-wins pointer and never saw the file.
+
+    Three field hits on clean delivered files (2026-08-20 x2, 2026-08-24), each
+    a hard FAIL at the last check before the money boundary because the pointer
+    named somebody else's build. A Showdown preflight is the guaranteed case:
+    build_slate.py promotes no run, so there is never one of its own to find.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.runs = self.root / "runs"
+        (self.runs / "20260823T200036Z_0fe4a983" / "inputs").mkdir(parents=True)
+        self.snapshot = (self.runs / "20260823T200036Z_0fe4a983"
+                         / "inputs" / "DKSalaries.csv")
+        (self.runs / "latest_valid_run.json").write_text(json.dumps({
+            "run_id": "20260823T200036Z_0fe4a983",
+            "run_dir": str(self.runs / "20260823T200036Z_0fe4a983"),
+            "promoted_utc": "2026-08-23T20:00:36+00:00",
+        }), encoding="utf-8")
+        import preflight_upload
+        self.pf = preflight_upload
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_a_showdown_file_refuses_the_classic_snapshot_the_pointer_names(self):
+        write_classic_salary(self.snapshot)
+        sd_salary = self.root / "sd.csv"
+        people = write_showdown_salary(sd_salary)
+        aster = people["AAA Aster"]
+        rostered = [aster["CPT"]] + [people[f"AAA {s}"]["UTIL"] for s in SURNAMES[1:5]]
+        rostered.append(people["BBB Aster"]["UTIL"])
+        path, why = self.pf.resolve_salary_from_promoted_run(
+            self.runs, contest="showdown", rostered=rostered)
+        self.assertIsNone(path)
+        self.assertIn("classic export", why)
+        self.assertIn("showdown geometry", why)
+
+    def test_a_same_geometry_snapshot_from_another_slate_is_refused_by_id(self):
+        """The 08-20 shape: right contest type, wrong night."""
+        write_classic_salary(self.snapshot)
+        other = self.root / "other.csv"
+        # write_classic_salary numbers from 1000; shift this slate's ids so the
+        # two files describe different draftgroups, which is what a second night
+        # actually is.
+        lineup = write_classic_salary(other)
+        shifted = [str(int(pid) + 90000) for pid in lineup]
+        path, why = self.pf.resolve_salary_from_promoted_run(
+            self.runs, contest="classic", rostered=shifted)
+        self.assertIsNone(path)
+        self.assertIn("different slate", why)
+        self.assertIn("rostered player ID", why)
+
+    def test_the_matching_snapshot_still_resolves_and_says_nothing(self):
+        lineup = write_classic_salary(self.snapshot)
+        path, why = self.pf.resolve_salary_from_promoted_run(
+            self.runs, contest="classic", rostered=lineup)
+        self.assertEqual(path, self.snapshot)
+        self.assertEqual(why, "")
+
+    def test_an_unscoped_call_still_resolves_so_the_guard_is_the_callers_job(self):
+        """No contest and no ids is 'I have nothing to check it against', which
+        is a weaker answer than a refusal, not a wrong one. Both callers in tree
+        pass both, and the test below is what keeps that true."""
+        write_classic_salary(self.snapshot)
+        path, why = self.pf.resolve_salary_from_promoted_run(self.runs)
+        self.assertEqual(path, self.snapshot)
+        self.assertEqual(why, "")
+
+    def test_a_corrupt_pointer_names_the_pointer_rather_than_returning_a_bare_none(self):
+        (self.runs / "latest_valid_run.json").write_text("{not json", encoding="utf-8")
+        path, why = self.pf.resolve_salary_from_promoted_run(self.runs)
+        self.assertIsNone(path)
+        self.assertIn("no readable run pointer", why)
+
+    def test_a_pointer_to_a_run_without_a_snapshot_says_so(self):
+        path, why = self.pf.resolve_salary_from_promoted_run(self.runs)
+        self.assertIsNone(path)
+        self.assertIn("no run carrying", why)
+
+    def test_the_cli_exits_3_naming_the_flag_instead_of_2_on_a_clean_file(self):
+        """The whole point. Before R234 this file -- which is legal, and which
+        passes with its own salary file -- exited 2 on 'rostered player ID(s)
+        absent from the salary file', a hard failure caused entirely by the tool
+        picking the wrong input."""
+        import contextlib
+        import io
+
+        write_classic_salary(self.snapshot)
+        sd_salary = self.root / "sd.csv"
+        people = write_showdown_salary(sd_salary)
+        lineup = ([people["AAA Aster"]["CPT"]]
+                  + [people[f"AAA {s}"]["UTIL"] for s in SURNAMES[1:5]]
+                  + [people["BBB Aster"]["UTIL"]])
+        entries = self.root / "DKEntries.csv"
+        write_entries(entries, SHOWDOWN_HEADER,
+                      [showdown_entry("900", "5", lineup)])
+
+        saved = self.pf.REPO_ROOT
+        self.pf.REPO_ROOT = self.root
+        try:
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                code = self.pf.main(["--entries", str(entries), "--no-manifest"])
+        finally:
+            self.pf.REPO_ROOT = saved
+        self.assertEqual(code, 3, err.getvalue())
+        self.assertIn("was NOT used", err.getvalue())
+        self.assertIn("Pass --salary explicitly", err.getvalue())
+        self.assertNotIn("absent from the salary file", err.getvalue())
+
+    def test_both_file_checkers_scope_the_auto_resolve_and_there_is_no_third(self):
+        """R233 enumeration. R191 named preflight_upload; the class had two
+        members, because verify_export imports the same resolver and had the
+        same unguarded call."""
+        import re
+
+        sites = []
+        for name in sorted(p.name for p in (REPO / "tools").glob("*.py")):
+            src = (REPO / "tools" / name).read_text(encoding="utf-8")
+            for call in re.findall(
+                    r"(?<!def )resolve_salary_from_promoted_run"
+                    r"\((?:[^()]|\([^()]*\))*\)", src):
+                sites.append((name, call))
+        self.assertEqual({name for name, _ in sites},
+                         {"preflight_upload.py", "verify_export.py"},
+                         f"a third caller appeared: {sites}")
+        for name, call in sites:
+            self.assertIn("contest=", call, name)
+            self.assertIn("rostered=", call, name)
+
+
+class R192ShowdownExposureCountsThePersonTests(unittest.TestCase):
+    """A draftable id is a role. Counting ids splits one human into two."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.salary_path = self.root / "DKSalaries.csv"
+        self.people = write_showdown_salary(self.salary_path)
+        import preflight_upload
+        self.pf = preflight_upload
+        self.salary = self.pf.load_salary(self.salary_path)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _entry(self, line_no, captain, utils):
+        raw = ["90" + str(line_no), SD_CONTEST, "5", "$1", captain] + list(utils)
+        return self.pf.EntryRow(line_no, raw + ["", "1. instructions"], 6)
+
+    def _portfolio(self):
+        """Four entries. Aster captains two and rides UTIL in the other two, so
+        the person is in 4 of 4 while each ROLE id is in only 2 of 4."""
+        aster = self.people["AAA Aster"]
+        bench = [self.people[f"AAA {s}"]["UTIL"] for s in SURNAMES[1:5]]
+        opp = [self.people[f"BBB {s}"]["UTIL"] for s in SURNAMES[:5]]
+        return [
+            self._entry(1, aster["CPT"], bench[:4] + opp[:1]),
+            self._entry(2, aster["CPT"], bench[:3] + opp[:2]),
+            self._entry(3, self.people["BBB Aster"]["CPT"],
+                        [aster["UTIL"]] + bench[:2] + opp[1:3]),
+            self._entry(4, self.people["BBB Boone"]["CPT"],
+                        [aster["UTIL"]] + bench[2:4] + opp[2:4]),
+        ]
+
+    def test_the_captained_player_is_reported_at_his_real_exposure(self):
+        adv = self.pf.advisory("showdown", self._portfolio(), self.salary)
+        top = {row["player"]: row for row in adv["top_exposure"]}
+        self.assertIn("AAA Aster", top)
+        self.assertEqual(top["AAA Aster"]["n"], 4)
+        self.assertEqual(top["AAA Aster"]["pct"], 100.0)
+        # and he is FIRST, which is the finding: the role-keyed count put him
+        # at 2 of 4 twice and buried him under UTIL-only bats.
+        self.assertEqual(adv["top_exposure"][0]["player"], "AAA Aster")
+
+    def test_a_util_only_bat_is_unchanged_so_the_fix_moved_only_the_captains(self):
+        adv = self.pf.advisory("showdown", self._portfolio(), self.salary)
+        top = {row["player"]: row for row in adv["top_exposure"]}
+        self.assertEqual(top["AAA Boone"]["n"], 3)
+        self.assertEqual(top["AAA Ellis"]["n"], 2)
+        # Aster is the sole 4, so "first" is a fact and not a tie-break.
+        self.assertEqual([r["n"] for r in adv["top_exposure"]].count(4), 1)
+
+    def test_the_captain_distribution_is_reported_on_its_own_line(self):
+        """The captain cap (0.25) and the player cap (0.50) are separate
+        controls and an operator checking either against the brief had neither."""
+        adv = self.pf.advisory("showdown", self._portfolio(), self.salary)
+        cpt = {row["player"]: row for row in adv["top_captain_exposure"]}
+        self.assertEqual(cpt["AAA Aster"]["n"], 2)
+        self.assertEqual(cpt["AAA Aster"]["pct"], 50.0)
+        self.assertEqual(cpt["BBB Aster"]["n"], 1)
+        self.assertNotIn("AAA Boone", cpt)
+
+    def test_classic_gets_no_captain_line_because_it_has_no_multiplier_role(self):
+        salary_path = self.root / "classic.csv"
+        lineup = write_classic_salary(salary_path)
+        salary = self.pf.load_salary(salary_path)
+        row = ["900", "MLB Test Contest", "5", "$1"] + lineup + ["", "1. inst"]
+        adv = self.pf.advisory("classic", [self.pf.EntryRow(1, row, 10)], salary)
+        self.assertNotIn("top_captain_exposure", adv)
+        self.assertEqual(adv["top_exposure"][0]["pct"], 100.0)
+
+    def test_the_printed_lines_say_which_noun_each_one_counts(self):
+        entries = self.root / "DKEntries.csv"
+        rows = [showdown_entry("90" + str(e.line_no), "5", e.cells)
+                for e in self._portfolio()]
+        write_entries(entries, SHOWDOWN_HEADER, rows)
+        result = run_preflight("--entries", str(entries),
+                               "--salary", str(self.salary_path), "--no-manifest")
+        self.assertIn("top exposure:", result.stdout)
+        self.assertIn("(the PERSON, either role)", result.stdout)
+        self.assertIn("top CPT exposure:", result.stdout)
+        self.assertIn("AAA Aster 100.0%", result.stdout)
+
+
+class R234PersonKeyTests(unittest.TestCase):
+    """The team half of the key had no assertion anywhere, at any of the four
+    hand-written copies R234 unified. A mutation dropping it survived the whole
+    suite, which is the R75 class going unmeasured: two players whose names
+    normalize identically are one person only if they are also on one team, and
+    collapsing them fails a legal lineup on 'the same person occupies two
+    slots' while merging their exposures on the line above it."""
+
+    def test_one_name_on_two_teams_is_two_people(self):
+        import preflight_upload as pf
+        a = pf.person_key({"Name": "Will Smith", "TeamAbbrev": "LAD"})
+        b = pf.person_key({"Name": "Will Smith", "TeamAbbrev": "KC"})
+        self.assertNotEqual(a, b)
+        self.assertEqual(a, "willsmith|LAD")
+
+    def test_the_same_person_priced_twice_is_one_key(self):
+        """The Showdown case the key exists for: same human, two roster rows,
+        two draftable ids, two salaries."""
+        import preflight_upload as pf
+        self.assertEqual(
+            pf.person_key({"Name": "Shohei Ohtani", "TeamAbbrev": "LAD",
+                           "Roster Position": "CPT", "Salary": "17400"}),
+            pf.person_key({"Name": "Shohei Ohtani", "TeamAbbrev": "lad",
+                           "Roster Position": "UTIL", "Salary": "11600"}))
+
+    def test_a_lineup_holding_both_will_smiths_is_not_a_duplicate_person(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            import preflight_upload as pf
+            root = Path(tmp)
+            salary = root / "DKSalaries.csv"
+            lineup = write_classic_salary(salary)
+            with salary.open(encoding="utf-8-sig", newline="") as fh:
+                rows = list(csv.reader(fh))
+            # Rename one AAA hitter and one CCC hitter to the same person: one
+            # name, two teams, one legal lineup.
+            need = {"AAA", "CCC"}
+            for row in rows[1:]:
+                if row[7] in need and row[3] in lineup and row[4] != "P":
+                    row[1], row[2] = f"Will Smith ({row[3]})", "Will Smith"
+                    need.discard(row[7])
+                    if not need:
+                        break
+            self.assertEqual(need, set())
+            with salary.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(rows)
+            rep = pf.Report()
+            pf.check_legality("classic", pf.CLASSIC_SLOTS,
+                              [pf.EntryRow(1, [
+                                  "900", "MLB Test Contest", "5", "$1"]
+                                  + lineup + ["", "1. inst"], 10)],
+                              pf.load_salary(salary), rep)
+            self.assertEqual(
+                [f for f in rep.failures if "same person" in f], [], rep.failures)

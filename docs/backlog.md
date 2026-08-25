@@ -39,6 +39,48 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-25, DEV, claim `engine` (bare mutex): **the queue head is CLOSED. R191
+and R192 are landed as R234 and migrated.** Gate 1276 -> 1292
+(`test_upload_integrity` 238 -> 254, `grew`); the CHANGELOG entry of this date
+carries the record. Eight mutations, eight caught.
+
+**Slot 1 is now R194 + the 08-23 dedupe fragment, and it shrank rather than
+moved.** Nothing jumped it. What changed is that the batching argument that put
+four items in one slot does not survive contact: "one shared helper (Showdown
+CPT/UTIL -> person) serves all four" is FALSE across the boundary, because the
+preflight cannot import the engine and `melt_showdown_salary_csv` was therefore
+never available to it. The two halves share a defect CLASS and no code. That is
+the second time in three sessions a batching claim on this board has been wider
+than the code allows, after R167's "third copy" that was a fourth — **a batch
+note asserting shared code is a claim about imports, so check the import wall
+before believing it.**
+
+**Two readings from the landing.** First, **R191's class had two members and the
+item named one.** `verify_export.py` imports the same resolver and had the same
+unguarded call; by R175 it is the weaker checker on exactly the files it exists
+for, so it would have inherited the wrong-slate answer in silence after its
+sibling was fixed. R233 asked for the enumeration in the changelog entry and the
+enumeration is what found it — the discipline paid on its first use. Second,
+**the one surviving mutation was pre-existing debt the unification exposed, not
+debt it created.** Dropping the team half of the person key passed all 251 tests;
+that property had never been asserted at any of the four hand-written copies
+either. Unifying N copies makes one testable thing out of N untestable ones, and
+the test it then asks for is a test the class always owed.
+
+**One fragment note for the next merge pass, so a fixed defect is not re-filed:**
+`docs/backlog_inbox/2026-08-24_BUILD_showdown_contest_assignment.md` item 2 is
+R191's third field occurrence and is CLOSED by this commit. Item 1 of that
+fragment (thesis-to-contest assignment is sequential, so a multi-entry contest
+inherits one side — the washout axis binding one level below the portfolio) is
+open and unnumbered, as is
+`docs/backlog_inbox/2026-08-24_BUILD_actionnetwork-odds-fallback.md` (F1 silently
+neutral behind a proxy-gated odds API, with `factors_inert` conflating "computed
+to neutral" with "never computed"). Both want numbers at the next merge.
+
+**One thing for Ben, unchanged and now four days old:** commits on `main` are
+still not on `origin/main`. Sessions commit and Ben pushes; until he does, no
+clone sees this week's work.*
+
 *2026-08-24 (slot 3, same day), DEV, claim `engine` (bare mutex): **two independent
 greenfield reviews adjudicated together — the seventh edition (`docs/2026-08-24_critique_greenfield_spec_ed7.md`,
 Claude, five lanes) and an outside spec written against the same commit
@@ -110,11 +152,15 @@ entry, so the recount is re-derivable from the archived JSONs: no re-mine.
 **Resequenced on impact against technical challenge, with the dependencies made
 explicit.** Fifteen slots; every new item is S or XS except where marked.
 
-1. **R191 + R192 + R194 + the live 08-23 dedupe fragment** — unchanged head, now
-   better founded and bigger. Both reviews landed on the preflight pair at the money
-   boundary independently (D14, D15). One helper (Showdown CPT/UTIL -> person)
-   serves all four, and the fragment is the root cause under R194's second symptom.
-   R191's What is corrected below: it is a POINTER read, not an mtime scan.
+1. **R194 + the live 08-23 dedupe fragment** — what is left of the old slot 1
+   after R191 + R192 landed as R234 on 2026-08-25. The fragment is the root cause
+   under R194's second symptom and both are one change in `ownership_pred.py`,
+   which DOES import the engine, so `melt_showdown_salary_csv` is available to it
+   directly. **The "one helper serves all four" note that batched these with the
+   preflight pair was wrong** and is struck: the preflight cannot import the
+   engine (CLAUDE.md's own rule for it, restated at five places in that file), so
+   its half is preflight-native `person_key` and shares no code with this half.
+   Two surfaces, two changes; only the defect class was ever shared.
 2. **R219 + R220** — promoted above R205. R219 is zero-day R159 code, both reviews
    found it, and it is the only new finding that changes which PLAYERS reach the
    pool: a degraded DK side defers to any nonempty feed lineup, so eight observed
@@ -1832,6 +1878,17 @@ a restated priority.
   CPT/UTIL-to-person helper serves this item, R192's `top_exposure`, and the
   fragment, and `showdown.py`'s melt already implements the resolution for the
   solver cap.
+- **CORRECTED 2026-08-25, landing R234.** The sentence above is wrong in its
+  operative half and the correction shrinks this item's scope rather than its
+  size. There is NO shared helper across the boundary: `tools/preflight_upload.py`
+  cannot import the engine — that is CLAUDE.md's rule for it and the file
+  restates it at five places — so `melt_showdown_salary_csv` was never reachable
+  from R192 and its half landed as a preflight-native `person_key`. This item is
+  unaffected in substance: `ownership_pred.py` DOES import the engine (it already
+  calls `parse_dk_salary_csv`, `merge_dk_starting_into_feed` and
+  `dk_order_coverage`), so the melt is available to it directly and the fix is
+  the one the Fix line already describes. What is gone is the reason to wait for
+  a sibling: this is now a standalone change on one file, and it is slot 1.
 
 ### R197. `_low_owned_hitter_count` reads a key no writer writes, so it is identically 0 while R154's constraint counts the real thing (P2, XS) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_low-owned-diagnostic-false-signal.md`; VERIFIED-repro by the filing session
 
@@ -3260,100 +3317,9 @@ per attempt. Nothing about these checks requires them to be serial.
 - **Fix:** add `csv.Error` to both except tuples; derive pitcher-ness from
   the salary `Position` column when Roster Position is CPT/UTIL.
 
-### R191. The preflight's `--salary` auto-resolve reaches for the newest promoted run, which on a Showdown slate is another session's Classic build (P1, S) | new 2026-08-23, merged from BUILD fragments `2026-08-20_BUILD_preflight-salary-autoresolve-wrong-run.md` and `..._-laahou.md`; TWO same-day field hits, mechanism VERIFIED-read
+### R191 + R192. CLOSED 2026-08-25 as R234 -- the preflight pair at the money boundary, entries migrated to CHANGELOG.md
 
-- **What:** run `preflight_upload.py --entries <showdown.csv>` with no
-  `--salary`, per the skill's documented "three inputs resolve themselves"
-  path, and the resolution picks the newest `runs/<run_id>/inputs/DKSalaries.csv`
-  on disk, labeled `[promoted run snapshot]`. Twice on 2026-08-20 that was a
-  CONCURRENT session's Classic run: `1835_1g_sd` (NYY@BAL, 19 entries) resolved
-  to `20260820T214749Z_425a71ea`, and `2010_1g_sd` (LAA@HOU, 20 entries) to
-  `20260820T215055Z_4dcbd138`. Both exited 2 with `27 rostered player ID(s)
-  absent from the salary file` and `embedded player pool overlaps the salary
-  file at 0.0% (0/178)`. Both delivered files were clean: passing `--salary`
-  at the originally uploaded file gave 100.0% overlap and exit 0 immediately.
-- **Why:** the resolution assumes the newest run belongs to the file being
-  checked, which holds for Classic because `run_slate` promotes a run per
-  build. Showdown's `build_slate.py` path creates no `runs/<run_id>/` at all,
-  so on a Showdown preflight the search has nothing of its own to find and
-  falls through to whatever run was newest. Two hits on two slates in one day
-  is not a race, it is the expected behaviour any time a Classic build is
-  promoting while a Showdown preflight runs — and it would misfire the other
-  direction too, a Classic preflight resolving to a stale prior run, if the
-  timing lined up. The cost is a hard-blocking WRONG answer, not a warning,
-  at the one check that stands between a build and the money boundary; it
-  cost a round trip to a session that knew to pass the flag and would cost a
-  delivery to one that did not.
-- **Fix:** scope the promoted-run search to a run whose own game set or tag
-  matches the entries file, and REFUSE to auto-resolve rather than reaching
-  past it — a named "could not resolve, pass --salary" is a better answer than
-  a confident wrong file. Alternatively have Showdown builds write their own
-  minimal `runs/<run_id>/inputs/` snapshot so the resolution has something
-  real to find; that is the larger change and it is also what R41 needs
-  anyway. Regression fixture: two runs on one date, the newer one carrying a
-  different draftgroup, and an entries file matching the older.
-- **CORRECTED 2026-08-24 (ed7 §2.4, verified here).** The mechanism in the What
-  above is imprecise in a way that changes the size of the fix. It is not a
-  scan of `runs/` for the newest directory: `resolve_salary_from_promoted_run`
-  (`preflight_upload.py:358-388`) is a POINTER READ of
-  `runs/latest_valid_run.json`, taking `run_id` first and the recorded absolute
-  `run_dir` second. "Newest promoted run" is true only because that pointer is
-  last-writer-wins. The function never sees the entries file at all, so the fix
-  is a scope-or-refuse inside one thirty-line function, not a search rewrite.
-  The Codex spec found the same defect independently (D14) and adds the fuller
-  list of what the resolver never inspects: contest mode, date, draftgroup, and
-  any manifest-bound relationship between the entries bytes and a salary
-  snapshot. Its D35 generalises this to "global `latest` pointers are a
-  cross-session race"; that generalisation is REJECTED (see Do not build) —
-  this pointer has exactly one consumer and it is this one, so R191 IS the
-  general case.
-
-### R192. The preflight's showdown `top exposure` line counts the ROLE, not the PLAYER, so it drops the CPT column (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_preflight-exposure-drops-cpt.md`; reproduced exactly by the filing session
-
-- **What:** on the 2026-08-19 LAD@COL showdown delivery (`2040_1g_sd`, 19
-  entries) `preflight_upload.py` v1.1 printed `top exposure: Andy Pages 47.4%,
-  Zac Veen 47.4%, Mookie Betts 42.1%, Adael Amador 42.1%, Teoscar Hernandez
-  36.8%`. The brief's `player_exposure.by_player` and an independent positional
-  recount of the delivered CSV both give a different set, headed by Roki
-  Sasaki and containing Shohei Ohtani, neither of whom appears in the printed
-  five at all. Counting columns 5-9 (the five UTIL cells) and skipping column 4
-  (CPT) reproduces the printed numbers to the decimal.
-- **Why:** three costs, worst first. The two most concentrated players are
-  INVISIBLE — Sasaki captains 4 of 19 and is in 9 of 19; Ohtani captains 4 and
-  is in 8 — so an operator reading only the preflight sees a portfolio whose
-  most concentrated player is somebody else. It contradicts R153 in the one
-  place a pre-upload operator looks: R153 set `max_player_exposure_pct` at
-  0.50 "counting the PLAYER and not the role" on the same day and for the
-  express reason that correlated failure across entries is the washout axis,
-  the solver now enforces exactly that (realized max 9/19 = 47.4% at the
-  `floor(0.5*19)=9` cap), and the final check then prints a role-scoped number
-  beside it. And it fails in BOTH directions: every captained player is
-  under-reported and the ordering is wrong, so a genuine breach could read as
-  clean. Classic is unaffected — no multiplier role, so the two counts
-  coincide. Scope stated honestly: this is the informational display line, not
-  a hard check; every hard check passed and exit 0 was correct. The defect is
-  that a hand recount before handoff was necessary.
-- **Fix:** in the showdown branch of the exposure summary, resolve each roster
-  cell's draftable id to its player identity before counting, the way
-  `showdown.py` does for the cap, and count columns 4-9. Print the CPT-only
-  distribution on its own line as well, since the captain cap (0.25) and the
-  player cap (0.50) are separate controls and an operator checking either
-  against the brief currently has neither. Regression fixture already exists
-  in the field: the 08-19 LAD@COL portfolio, where Sasaki is 9 total / 5 UTIL,
-  so a player at the cap reads well under it on the UTIL-only count.
-- **NARROWED 2026-08-24 (verified here), and the narrowing is good news.** The
-  Codex spec filed this independently (D15) as `advisory()` counting roster
-  cells throughout. Half of that is already fixed: `advisory`
-  (`preflight_upload.py:1543-1546`) ALREADY builds a person key
-  (`_norm_name(Name)|TeamAbbrev`) and uses it for the duplicate-lineup
-  partition and the overlap histogram, which R128 put there. The role-keyed
-  count survives in exactly one place — `counts = Counter(pid for e in filled
-  for pid in e.cells if pid)`, feeding `top_exposure` — so the fix is to reuse
-  the `persons` map that the same function already computes eight lines later,
-  not to add an identity layer. **Batch with R194 and the live 08-23 dedupe
-  fragment:** all three are the same missing Showdown CPT/UTIL-to-person
-  resolution, and `showdown.py`'s melt already solves it for the solver cap, so
-  one shared helper serves all three surfaces.
+The `--salary` auto-resolve is scoped to the file being checked and refuses rather than reaching past it; the showdown exposure line counts the PERSON and prints the captain distribution on its own line. Landed with `verify_export.py`'s copy of the same unguarded resolve, which R191 had not named, and with `person_key` unifying four hand-written copies of one identity rule. Gate 1276 -> 1292.
 
 ### R228. Promotion's immutability bind is skipped when the run manifest lacks the artifact row: fail-open on missing evidence at the money boundary (P1, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-S7) and independently from the outside spec (D13); VERIFIED-read at `tools/promote_run.py:169-171`, coordinator-re-read, re-read here
 
@@ -3731,6 +3697,22 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
 
 ### R109. `.git/index.lock` goes stale on this mount and `rm` cannot clear it (P2, XS-S) | new 2026-08-10, filed from three incidents that never had a number
 
+- **RIDER 2026-08-25, and it is R233's pattern on a hygiene item: the class is
+  `.git/*.lock`, not `index.lock`.** Landing R234 cost four wasted git calls to a
+  stale `.git/HEAD.lock`, zero bytes, dated 18:25 the previous evening and left by
+  the ed7 session. Every git write refused with the SAME message
+  `index.lock` produces — "Another git process seems to be running" — so the
+  documented remedy was applied to the documented file, correctly, and did not
+  work, because the lock blocking the commit was a different one. Two things this
+  entry should carry. **First, the diagnosis is `ls -la .git/ | grep -iE
+  "\\.lock$"` and not a check of `index.lock`;** the mount held `HEAD.lock` plus a
+  `deadlock_1785618418816161105` from 2026-08-01 that nothing has ever been able
+  to remove. **Second, `mv` and the commit must be ONE call:** a failed `git
+  commit` recreates `index.lock` on its way out and cannot unlink it, so
+  `mv`-then-look-then-commit re-loses the race every time. Fold both into whatever
+  this item ships; CLAUDE.md's session-start note names only `index.lock` and
+  should name the class.
+
 - **What:** the Cowork mount grants create and truncate but not unlink, so an
   interrupted git write leaves a zero-byte `.git/index.lock` that blocks every
   later commit — and git's own documented remedy, deleting the file, is the
@@ -4078,6 +4060,26 @@ batch. The outside spec (D01) additionally proposes fingerprinting
 `data/reference/**` and the requirements files; take that as a SEPARATE decision,
 because an ARCHIVE reference refresh would then redden DEV's gate mid-session, and
 that trade has to be made deliberately rather than as a side effect of this fix.
+
+- **RIDER 2026-08-25, R233's own pattern, observed live rather than read.
+  `skills/` is not the only omission: CLAUDE.md is gated too and is not in the
+  fingerprint either.** `tree_fingerprint` (`tools/audit.py:1031`) hashes `.py`
+  under `mlb_engine`, `tools` and `tests` and nothing else, and TWO gated tests
+  read CLAUDE.md as data —
+  `test_core.AuditSkipHonestyTests.test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes`
+  and `test_core.SplitGateTests.test_a_complete_clean_gate_prints_the_line_claude_md_quotes`,
+  both asserting that the pinned PASS line appears verbatim in CLAUDE.md. Seen
+  in the R234 session: those two failed on the new count, CLAUDE.md was
+  corrected, both passed when run directly, and `--gate-report` went on serving
+  the recorded FAIL because the fingerprint had not moved (`423a727fb78749e6`
+  before and after). That is the same defect in the more dangerous direction —
+  `skills/` means a green line can cover an untested change, this means a RED
+  line can outlive its own fix, and a session that trusts the report re-runs a
+  whole gate for nothing or, worse, edits code to chase a failure that is
+  already repaired. Fold CLAUDE.md into the same fix; it is one more entry in
+  the same tuple and it costs the same one-time reset. Count the class before
+  believing the count: `MLB_Classic.md`, `MANIFEST.md` and the requirements
+  files are read by gated tests too and want the same check.
 
 ### R217. Four audit-gate operational holes, and the gate record does not say which interpreter produced it (P2, S) | new 2026-08-24, from the greenfield seventh edition (GF7-T6, GF7-T7, GF7-T9) and, for (a) and (b), independently from the outside spec (D25); (d) is what survives adjudication of the outside spec's C04
 

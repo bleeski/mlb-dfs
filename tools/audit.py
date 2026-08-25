@@ -393,7 +393,22 @@ EXPECTED_SUITE_COUNTS = {
     # overridable, an ordinary thin-team blocker still being overridable -- the
     # fixture that stops the regex from meaning "refuse everything" -- and the
     # override note naming the second move).
-    "tests.test_upload_integrity": 238,
+    # R234, 2026-08-24: 238 -> 254, the sixteen on the two checks standing at
+    # the money boundary. Seven pin the scoped --salary auto-resolve (a
+    # Showdown file refusing the Classic snapshot the pointer names, a
+    # same-geometry snapshot from another night refused by rostered id, the
+    # matching snapshot still resolving, an unscoped call still resolving so
+    # the guard is provably the CALLER's, a corrupt pointer and a snapshotless
+    # run each naming which, and the CLI exiting 3 at the flag rather than 2 on
+    # a clean file). One is the R233 enumeration: both callers in tools/ scope
+    # the call and a third caller fails the test. Five pin exposure counting
+    # the PERSON (the captained player at his real number and alone at the top,
+    # a UTIL-only bat unmoved, the CPT distribution on its own line, Classic
+    # getting no captain line, and the printed lines naming their noun). Three
+    # pin person_key itself, which is what a surviving mutation asked for: one
+    # name on two teams is two people, one person priced twice is one key, and
+    # a lineup holding both Will Smiths is not a duplicate person.
+    "tests.test_upload_integrity": 254,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from
