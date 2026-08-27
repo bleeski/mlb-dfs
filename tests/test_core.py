@@ -14844,7 +14844,8 @@ class DkDegradedSideTests(unittest.TestCase):
         self.assertEqual(
             [{"team": "NYY", "posted": 8,
               "shelved": [{"order": 5, "name": "H5", "dk_id": "1004",
-                           "status": "IL"}]}],
+                           "status": "IL"}],
+              "resolution": "seeded"}],
             report["degraded_sides"])
 
     def test_the_eight_are_seeded_into_a_game_the_feed_already_has(self):
@@ -14882,11 +14883,193 @@ class DkDegradedSideTests(unittest.TestCase):
                                 for i, n in enumerate(
                                     [f"Feed{i}" for i in range(1, 10)], start=1)]},
             "home": {"team_abbrev": "OPP", "lineup": []}}]}
-        feed, _ = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
         side = feed["games"][0]["away"]
         self.assertEqual("confirmed", side["lineup_status"])
         self.assertEqual(["Feed1"], [h["name"] for h in side["lineup"]][:1])
         self.assertEqual(9, len(side["lineup"]))
+        self.assertEqual(
+            "deferred_to_feed",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"),
+            "R219: the report says the merge DEFERRED, so the pool cannot claim "
+            "a seeding that did not happen")
+
+    def test_dk_eight_beats_a_mid_repost_feed_partial(self):
+        """R219. The guard read `if side.get("lineup")` -- ANY nonempty list --
+        so a three-hitter mid-repost API partial outranked DK's eight OBSERVED,
+        Player_ID-keyed slots and five seats filled from priors instead. Both
+        routes end labelled "partial", so nothing downstream could tell the two
+        apart. This is the only defect in the ed7/Codex pair that changes WHICH
+        PLAYERS reach the pool.
+        """
+        lda = self._adapters()
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "partial",
+                     "lineup": [{"order": i, "name": f"Feed{i}"}
+                                for i in (1, 2, 3)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        side = feed["games"][0]["away"]
+        self.assertEqual("dk_salary_starting_degraded", side["lineup_source"])
+        self.assertEqual([1, 2, 3, 4, 6, 7, 8, 9],
+                         [h["order"] for h in side["lineup"]],
+                         "eight observed slots outrank three projected ones")
+        self.assertEqual([], [h["name"] for h in side["lineup"]
+                              if h["name"].startswith("Feed")])
+        self.assertEqual(
+            "seeded",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"))
+
+    def test_completeness_is_the_order_set_not_the_row_count(self):
+        """Nine rows numbered 1,1,2,3,... is not a lineup, and a row count
+        cannot tell the difference. The predicate is the order SET equalling
+        1-9, which is the same rule `dk_side_readings` applies to DK's own
+        column (one player per slot, exactly once)."""
+        lda = self._adapters()
+        rows = [{"order": i, "name": f"Feed{i}"} for i in range(1, 9)]
+        rows.append({"order": 8, "name": "Feed8b"})
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "partial",
+                     "lineup": rows},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        self.assertEqual(9, len(rows), "nine rows, and still not a 1-9")
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        self.assertEqual("dk_salary_starting_degraded",
+                         feed["games"][0]["away"]["lineup_source"])
+        self.assertEqual(
+            "seeded",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"))
+        # The `confirmed` clause is what a producer shipping order-less rows
+        # relies on: the label is the feed asserting the side is posted, and it
+        # is trusted without re-deriving the slots.
+        feed_in["games"][0]["away"] = {
+            "team_abbrev": "NYY", "lineup_status": "confirmed",
+            "lineup": [{"name": f"Feed{i}"} for i in range(1, 10)]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        self.assertEqual(
+            "deferred_to_feed",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"))
+
+    def test_an_operator_paste_keeps_its_precedence_at_any_length(self):
+        """R32 ranks a lineup Ben pastes above any API pull; R143 narrowed that
+        to "behind a COMPLETE DK 1-9". Neither covers DK-degraded against a
+        short paste, and a paste is short for its own reasons (a `1. TBD`
+        positional hold, or R133's starter DK never listed). Ranking DK's eight
+        over a paste's eight would extend Ben's rule silently inside a fix aimed
+        at a mid-repost API partial, so the paste keeps precedence and the
+        report says the merge DEFERRED.
+        """
+        lda = self._adapters()
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup_status": "partial",
+                     "source": "operator_paste",
+                     "lineup": [{"order": i, "name": f"Paste{i}"}
+                                for i in (1, 2, 3)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, self._degraded())
+        side = feed["games"][0]["away"]
+        self.assertEqual([1, 2, 3], [h["order"] for h in side["lineup"]])
+        self.assertEqual(
+            "deferred_to_feed",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"))
+
+    def test_an_all_shelved_side_seeds_nothing_and_says_so(self):
+        """R220(c). All nine shelved leaves NOTHING to seed, and the merge used
+        to seed `lineup=[]`, count the team as covered, and fire
+        `f4_handedness_unavailable` through `_note_hands` on a side holding no
+        hitters -- a handedness report about a lineup that does not exist.
+        """
+        lda = self._adapters()
+        players = self._players(
+            orders={"NYY": self.NINE}, probables={"NYY": "NYY Ace"},
+            statuses={"NYY": {slot: "IL" for slot in range(1, 10)}})
+        feed, report = lda.merge_dk_starting_into_feed({}, players)
+        side = next(s for g in feed["games"] for s in (g["away"], g["home"])
+                    if s.get("team_abbrev") == "NYY")
+        self.assertEqual([], side.get("lineup") or [],
+                         "no empty partial is seeded")
+        self.assertNotIn("partial", str(side.get("lineup_status") or ""))
+        self.assertEqual([], report["f4_handedness_unavailable"],
+                         "no hands note for a side with no hitters")
+        self.assertEqual(
+            "all_shelved",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"))
+        self.assertEqual("NYY Ace", side["probable_pitcher"]["name"],
+                         "the arm still reaches the side (R159(c))")
+        # And on the IN-FEED route, which is where the guard actually lives: an
+        # empty feed sends this team through the synthesize loop, whose own
+        # `if order` already covered it, so removing the guard survived every
+        # assertion above. Found by mutation, and it is the fixture lesson
+        # again: a branch no fixture reaches is invisible to any number of
+        # assertions about it.
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "away": {"team_abbrev": "NYY", "lineup": []},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        feed, report = lda.merge_dk_starting_into_feed(feed_in, players)
+        side = feed["games"][0]["away"]
+        self.assertEqual([], side.get("lineup") or [],
+                         "no empty partial is seeded on the in-feed route")
+        self.assertNotEqual("partial", side.get("lineup_status"))
+        self.assertEqual([], report["f4_handedness_unavailable"])
+        self.assertEqual(
+            "all_shelved",
+            next(r["resolution"] for r in report["degraded_sides"]
+                 if r["team"] == "NYY"))
+        self.assertIn("NYY", report["sides_left_to_feed"],
+                      "nothing was seeded, so the side is still the feed's to "
+                      "supply")
+
+    def test_the_pool_warning_reads_the_resolution_not_an_assumption(self):
+        """R219's report half. The warning asserted "the surviving N are seeded
+        as a partial" whatever the merge did, so on a deferral it described a
+        seeding that never happened -- and it fired even when the deferral was
+        correct."""
+        import csv as _csv
+        import tempfile
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        players = self._players(
+            orders={"NYY": self.NINE}, probables={"NYY": "NYY Ace"},
+            statuses={"NYY": {5: "IL"}})
+        feed_in = {"games": [{
+            "game_date_utc": "2026-08-16T23:05:00+00:00",
+            "status": "Scheduled",
+            "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                     "lineup": [{"order": i, "name": f"Feed{i}",
+                                 "bat_side": "R"} for i in range(1, 10)]},
+            "home": {"team_abbrev": "OPP", "lineup": []}}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                writer = _csv.DictWriter(fh, fieldnames=[
+                    "Position", "Name + ID", "Name", "ID", "Roster Position",
+                    "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                    "Status", "Starting"])
+                writer.writeheader()
+                for pid, sp in players.items():
+                    writer.writerow({
+                        "Position": sp.positions[0],
+                        "Name + ID": f"{sp.name} ({pid})", "Name": sp.name,
+                        "ID": pid, "Roster Position": sp.positions[0],
+                        "Salary": int(sp.salary), "Game Info": sp.game_info,
+                        "TeamAbbrev": sp.team, "AvgPointsPerGame": "8.0",
+                        "Status": sp.status, "Starting": sp.starting})
+            out = build_slate_pool(
+                str(path), feed_in, stale_platoon_policy="warn",
+                now=datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc))
+        warnings = out["pool_report"]["warnings"]
+        line = next((w for w in warnings if "shelved" in w), "")
+        self.assertIn("were not seeded", line, warnings)
+        self.assertNotIn("are seeded as a partial", line)
 
     def test_the_degraded_team_keeps_its_declared_probable(self):
         """R159(c). The arm was collateral damage: `probable_pitcher` was only
@@ -15034,7 +15217,7 @@ class DkUnparseableGameTimeTests(unittest.TestCase):
         feed, report = lda.merge_dk_starting_into_feed({}, players)
         self.assertEqual([], report["games_synthesized"])
         self.assertEqual(
-            [{"game_id": "NYY@OPP", "team": "NYY",
+            [{"game_id": "NYY@OPP", "teams": ["NYY"],
               "reason": "no parseable start time in the salary Game Info"}],
             report["games_unsynthesizable"])
         self.assertEqual([], feed["games"],
@@ -15060,6 +15243,102 @@ class DkUnparseableGameTimeTests(unittest.TestCase):
             [r["game_id"] for r in status["games_without_lock_time"]])
         self.assertEqual({}, status["lock_time_by_game_id"],
                          "no lock time is guessed for either of them")
+
+    def test_one_timeless_game_emits_one_blocker_not_one_per_side(self):
+        """R220(b). The loop walks TEAMS and the fact is about a GAME, so a DH
+        game 2 with DK data on both sides emitted the record twice and the pool
+        blocked twice on one game."""
+        from dataclasses import replace
+        lda = self._adapters()
+        players = self._players(
+            orders={"NYY": self.NINE, "BOS": self.NINE},
+            game_info={"NYY": "BOS@NYY 08/17/2026 TBD",
+                       "BOS": "BOS@NYY 08/17/2026 TBD"})
+        players = {pid: replace(sp, game_id="BOS@NYY")
+                   for pid, sp in players.items()}
+        _, report = lda.merge_dk_starting_into_feed({}, players)
+        self.assertEqual(
+            [{"game_id": "BOS@NYY", "teams": ["BOS", "NYY"],
+              "reason": "no parseable start time in the salary Game Info"}],
+            report["games_unsynthesizable"],
+            "one game, one record, both teams named")
+
+    def test_a_postponed_game_with_no_time_is_excluded_not_blocked(self):
+        """R220(a), first half. The postponed read sat BELOW the lock-time
+        parse, past the `continue` that skips a timeless game, so a postponed
+        game with a malformed `game_date_utc` was reported as needing "a real
+        start time" and never reached the exclusion that describes it."""
+        lda = self._adapters()
+        players = self._players(orders={"NYY": self.NINE})
+        feed = {"games": [
+            {"game_pk": 1, "game_date_utc": "", "status": "Postponed",
+             "away": {"team_abbrev": "NYY"}, "home": {"team_abbrev": "OPP"}},
+        ]}
+        status = lda.build_status_map_from_lineups_feed(feed, players)
+        self.assertEqual(["NYY@OPP"], status["excluded_game_ids"])
+        self.assertEqual([], status["games_without_lock_time"],
+                         "a postponed game has no lock time because it is not "
+                         "being played; that is not a missing-data blocker")
+
+    def test_the_pool_does_not_block_on_an_off_slate_timeless_game(self):
+        """R220(a), second half. The status map reads whatever feed it is
+        handed and a day-wide feed carries games no draftgroup on this slate can
+        touch. Its sibling loop three lines above has always filtered on
+        `slate_team_set`; this one did not, so one malformed `game_date_utc` on
+        an off-slate game refused a build whose pool cannot reach that game --
+        and nothing the operator does to the slate makes it go away.
+        """
+        import csv as _csv
+        import tempfile
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        players = self._players(
+            orders={"NYY": self.NINE}, probables={"NYY": "NYY Ace"})
+        feed = {"games": [
+            {"game_pk": 1, "game_date_utc": "2026-08-16T23:05:00+00:00",
+             "status": "Scheduled",
+             "away": {"team_abbrev": "NYY", "lineup_status": "confirmed",
+                      "lineup": [{"order": i, "name": n, "bat_side": "R"}
+                                 for i, n in enumerate(self.NINE, start=1)]},
+             "home": {"team_abbrev": "OPP", "lineup": []}},
+            {"game_pk": 2, "game_date_utc": "", "status": "Scheduled",
+             "away": {"team_abbrev": "SEA"}, "home": {"team_abbrev": "TEX"}},
+        ]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                writer = _csv.DictWriter(fh, fieldnames=[
+                    "Position", "Name + ID", "Name", "ID", "Roster Position",
+                    "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                    "Status", "Starting"])
+                writer.writeheader()
+                for pid, sp in players.items():
+                    writer.writerow({
+                        "Position": sp.positions[0],
+                        "Name + ID": f"{sp.name} ({pid})", "Name": sp.name,
+                        "ID": pid, "Roster Position": sp.positions[0],
+                        "Salary": int(sp.salary), "Game Info": sp.game_info,
+                        "TeamAbbrev": sp.team, "AvgPointsPerGame": "8.0",
+                        "Status": sp.status, "Starting": sp.starting})
+            out = build_slate_pool(
+                str(path), feed, stale_platoon_policy="warn",
+                now=datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc))
+        blockers = out["pool_report"]["blockers"]
+        self.assertEqual(
+            [], [b for b in blockers if "SEA@TEX" in b],
+            f"SEA and TEX are not on this slate: {blockers}")
+        # The measurement is unscoped and stays that way: only the BLOCKER is
+        # scoped, so nothing is hidden from the record.
+        status = lda.build_status_map_from_lineups_feed(feed, players)
+        self.assertEqual(
+            ["SEA@TEX"],
+            [r["game_id"] for r in status["games_without_lock_time"]])
+        # Positive control: the same defect on a game that IS on the slate still
+        # blocks, so the filter is a scope and not a suppression.
+        feed["games"][0]["game_date_utc"] = ""
+        status = lda.build_status_map_from_lineups_feed(feed, players)
+        self.assertEqual(
+            ["NYY@OPP", "SEA@TEX"],
+            sorted(r["game_id"] for r in status["games_without_lock_time"]))
 
     def test_the_pool_blocks_on_the_cause_not_on_the_symptom(self):
         """Without this the operator reads 'no probable or declared starter'

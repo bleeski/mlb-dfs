@@ -299,7 +299,20 @@ EXPECTED_SUITE_COUNTS = {
     # crosswalk, the batting-order feature, and the contest type read off the
     # miner instead of re-derived); two on the leverage panel's captain tier,
     # which now joins a CPT id to the person and still reads a pre-R235 file.
-    "tests.test_core": 876,
+    # R219+R220, 2026-08-27: 876 -> 884, the eight that pin the degraded-side
+    # merge and its report. Five on R219 (DK's eight beating a three-hitter
+    # mid-repost partial, a COMPLETE feed nine still winning and being NAMED as
+    # a deferral, completeness being the order SET rather than a row count plus
+    # the confirmed clause an order-less producer relies on, an operator paste
+    # keeping R32's precedence at any length, and the pool warning reading the
+    # resolution instead of asserting a seeding); three on R220 (all nine
+    # shelved seeding nothing and firing no handedness note -- on BOTH routes,
+    # since the in-feed one is where the guard lives and mutation found the
+    # empty-feed fixture never reaching it; one timeless game emitting one
+    # blocker rather than one per side; and a postponed timeless game being
+    # excluded rather than blocked, with the off-slate blocker scope and its
+    # positive control riding the last one).
+    "tests.test_core": 884,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

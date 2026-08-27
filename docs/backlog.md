@@ -39,6 +39,58 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-27, DEV, claim `engine` (`engine_2026-08-27`): **the queue head is
+CLOSED. R219 and R220 are landed and migrated.** Gate 1305 -> 1313 (`test_core`
+876 -> 884, `grew`); the CHANGELOG entry of this date carries the record and the
+R233 enumeration. Ten mutations, ten caught. The numbered list below is
+RENUMBERED rather than annotated, so it is thirteen slots and slot 1 is R212 +
+R213 + R214 + R215.
+
+**Nothing jumped the queue. Two readings, and the first is a rule about filed
+fixes.** R219's Fix line said "defer only on `len(lineup) >= DK_ORDER_SLOTS` or
+`lineup_status == "confirmed"`", and taken literally that would have ranked DK's
+degraded eight above an operator paste's eight — extending R32 and R143 into a
+case neither covers, silently, inside a fix aimed at a mid-repost API partial. A
+paste is short for its own reasons (`1. TBD` holds, R133's starter DK never
+listed), so `source == "operator_paste"` defers at any length and the DK-vs-paste
+question for two incomplete sides stays Ben's. **A filed Fix line is a proposal,
+not a decision: when it would move a ranking Ben wrote, it needs his ruling or a
+narrower fix, and the narrower fix is usually available.** This is the fourth
+consecutive landing to correct something in the item it closed, and the first
+where the correction was in the REMEDY rather than the diagnosis.
+
+**Second, the report defect and the code defect were the same defect.** The guard
+asserted "nothing else has the side" from a nonempty list; the pool warning
+asserted "the surviving N are seeded" from a record that never said what the merge
+did. Both are a consumer inferring a fact its producer did not supply, which is
+R159/R160's "two components answering one question" shape with the second
+component being a HUMAN reading a report. The remedy was the same in both halves:
+one derived value, named at the boundary. Worth carrying into slot 1, where R212's
+decision log has the same shape.
+
+**Four unconsumed fragments, and the inbox is a DIRECTORY — listed, not inferred
+from `git status`.** `docs/backlog_inbox/` holds
+`2026-08-24_BUILD_actionnetwork-odds-fallback.md` (F1 silently neutral behind a
+proxy-gated odds API, with `factors_inert` conflating "computed to neutral" with
+"never computed"), `2026-08-24_BUILD_showdown_contest_assignment.md` item 1
+(thesis-to-contest assignment is sequential, so a multi-entry contest inherits
+one side — the washout axis binding one level below the portfolio; item 2 closed
+with R234), `2026-08-25_BUILD_posture-vocab-and-solo-shot.md` (two intake
+frictions, one of them `build_slate.py --postures` validating against a
+vocabulary that is not `contest_shapes.CONTEST_SHAPES`) and
+`2026-08-26_BUILD_contest_aware_allocation_at_onset.md` (contest-slice blindness,
+second sighting). All four want numbers at the next merge pass; the 08-26 one is
+R206's class (portfolio controls counting the wrong thing at the wrong level) and
+belongs with it in Tier 2's neighbourhood, not in a Tier 5 smalls batch. The
+08-09 curated-archetypes fragment is KEPT by design and is not a missed consume.
+
+**One board note retired, one kept.** `claims/engine_2026-08-20` is still HELD
+with `released_utc: null`, now seven days old, alongside four stale `slate_*`
+beacons; per the contract that is Ben's to arbitrate and sessions keep working
+around it by taking the dated name. The disk-vs-GitHub note stays struck:
+`sync_check.py` measures it in one call, and this landing puts disk one commit
+ahead again, which is the normal state.*
+
 *2026-08-25 (slot 2, same day), DEV, claim `engine`: **the queue head is CLOSED
 again. R194 and the 08-23 dedupe fragment merged into it are landed as R235 and
 migrated.** Gate 1292 -> 1305 (`test_core` 863 -> 876, `grew`); the CHANGELOG
@@ -195,60 +247,56 @@ precondition on R10**, not a Tier 5 tidy. `captain_norm` already rides every par
 entry, so the recount is re-derivable from the archived JSONs: no re-mine.
 
 **Resequenced on impact against technical challenge, with the dependencies made
-explicit.** Fourteen slots as of 2026-08-25, the head having closed; every new
-item is S or XS except where marked.
+explicit.** Thirteen slots as of 2026-08-27, the head having closed twice since;
+every new item is S or XS except where marked.
 
-1. **R219 + R220** — promoted above R205. R219 is zero-day R159 code, both reviews
-   found it, and it is the only new finding that changes which PLAYERS reach the
-   pool: a degraded DK side defers to any nonempty feed lineup, so eight observed
-   Player_ID-keyed slots lose to a three-hitter mid-repost partial and five seats
-   fill from priors. R220 rides the same file.
-2. **R212 + R213 + R214 + R215** — the lost-window remainder, same surfaces the
+1. **R212 + R213 + R214 + R215** — the lost-window remainder, same surfaces the
    08-24 batch just left open. **R214 is a precondition on R203** (Tier 3): the
    supervisor discards the operator's R157 rescue it is being taught to perform.
    **R212 is a precondition on the whole supervisor batch** — the decision log has
    to survive the window to be worth writing.
-3. **R205** — down one slot, otherwise unchanged. Fix note corrected: the code is
+2. **R205** — down two slots since it was filed, otherwise unchanged. Fix note
+   corrected: the code is
    `statistics.median(sorted(...))`, which on the two-book production fetch IS the
    arithmetic mean, so the entry's "median with a sign guard" option is not a fix
    and is struck. Probability-space de-vig (D16's consensus form) survives any book
    count and is the fix.
-4. **R172 + R176 + R173 + R228** — the false-evidence batch, now carrying the
+3. **R172 + R176 + R173 + R228** — the false-evidence batch, now carrying the
    promotion fail-open. R228 belongs here and not with R174: absent evidence
    promoting silently is the same "presence mistaken for evidence" class, one
    boundary later.
-5. **R165 + R163** — unchanged. R165 and R164(c) are one normalization class two
+4. **R165 + R163** — unchanged. R165 and R164(c) are one normalization class two
    files apart; R55's shared normalizer closes both, so take R164 near this if the
    window allows.
-6. **R174 + R175** — money-boundary parity, minus R228 which moved up.
-7. **R216, alone.** The gate's tree fingerprint omits `skills/` while ~20 gated
+5. **R174 + R175** — money-boundary parity, minus R228 which moved up.
+6. **R216, alone.** The gate's tree fingerprint omits `skills/` while ~20 gated
    tests exec `build_slate.py`, so a split-gate green line can cover records that
    never tested the file that changed three times last week. Both reviews rank it
-   High. It sits at 8 rather than 1 for one reason: fixing it resets in-flight gate
+   High. It sits at 6 rather than 1 for one reason: fixing it resets in-flight gate
    state, and every slot above it wants a warm gate. Land it at a session boundary.
-8. **R195 + R181 + R179** — **R195 lands FIRST or together with R181**: they share
+7. **R195 + R181 + R179** — **R195 lands FIRST or together with R181**: they share
    `execution_pipeline.py:1325`, and R181's regex scoping would mask R195's mapping
    defect behind a green eval. R179 rides the same gate-hygiene surface.
-9. **R180 + R217 + R218** — audit hardening, now absorbing the gate-operational
+8. **R180 + R217 + R218** — audit hardening, now absorbing the gate-operational
    smalls (`--gate-report --output` never writes; `.audit_gate/` is claimless
    shared state; the complete branch ignores the age the report enforces; no
    runtime identity in the record, on a tree whose `__pycache__` proves two
    interpreters have run against it) and the last two unbounded subprocesses.
-10. **R164** — bank job-grid waste. Corroborated by the outside spec (D32).
-11. **Showdown batch: R158 + R223 + R224 + R122-rider + R123 + R189(3) + R208 +
+9. **R164** — bank job-grid waste. Corroborated by the outside spec (D32).
+10. **Showdown batch: R158 + R223 + R224 + R122-rider + R123 + R189(3) + R208 +
     R210 + R211.** R223 joins because it is R153's founding defect recurring on a
     rung no test drives: the delivered brief reads "0 relaxations" over a breached
     25% captain cap, which is the washout axis reading clean.
-12. **R225 + R226 + R227** — archive integrity, new, and placed AHEAD of the
+11. **R225 + R226 + R227** — archive integrity, new, and placed AHEAD of the
     pre-existing Tier 1 remainder rather than in Tier 5. R225 gates R10; R226 is
     cheap now that rank is known to be parsed and stored; R227 is the registry's
     kill vector, which its own sibling was already hardened against.
-13. **R221 + R222 + R229 + R230 + R231 + R232** — the smalls and hygiene, batched
+12. **R221 + R222 + R229 + R230 + R231 + R232** — the smalls and hygiene, batched
     opportunistically between slots, never instead of them. R231 needs Ben's mv
     grant (1,778 litter directories); R232 is doc truth (MLB_Classic.md names a
     retired manifest as its version authority; MANIFEST.md still reports 12 modules
     and 119 tests).
-14. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged.
+13. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged.
 
 **Tier 2 keeps its order and its head got cheaper**: R118 (no miner change, no
 re-mine) -> R48 + R83 -> R10 (now gated on R225 for any Showdown duplication cell)
@@ -2157,61 +2205,15 @@ the blocker names the cause rather than the "no probable" consequence.
   observation rather than a proposal because it changes what every projection
   means, not just this parser.
 
-### R219. A degraded DK side defers to ANY nonempty feed lineup, and the pool report then asserts a seeding that never happened (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-E1, VERIFIED-repro pre-outage) and independently from the outside spec (D07); guard re-read here at `a49bd610`
+### R219 + R220. CLOSED 2026-08-27 -- the degraded-side merge deferred to any
+nonempty feed lineup, and three reports on the same surface named something
+other than what was true; entries migrated to CHANGELOG.md
 
-**What.** `live_data_adapters.py:685`. R159(a)'s own comment (`:676-679`) states
-the rule: "DK's eight are seeded ONLY where nothing else has the side: a source
-holding a complete nine outranks eight-of-nine." The guard it ships is:
-
-    side = dict(game.get(key) or {})
-    if side.get("lineup"):
-        _attach_probable(side, team)
-        game[key] = side
-        continue
-
-Any nonempty lineup wins, a one-to-three-hitter mid-repost API partial included.
-Both routes end labelled "partial", so R60's partial path seeds the three posted
-starters instead of DK's eight OBSERVED, `Player_ID`-keyed slots, and fills five
-extra seats from priors. Compounding it, `build_slate_pool` (`:1441-1445`) warns
-"the surviving N are seeded as a partial" off `degraded_sides` without recording
-whether the merge seeded or deferred, so the report claims a seeding that did not
-happen — and fires wrongly even when the deferral was correct.
-
-**Why.** This is R159's own expensive moment: a Status flip inside a posted nine
-while the feed holds a mid-repost partial for the same side. It is the only new
-finding in either review that changes WHICH PLAYERS reach the pool, and it is
-three-day-old code from the batch that closed R159. The reviewer's repro
-(synthetic 9-row NYY salary map, slot 5 IL, 3-hitter feed partial) returned
-`feed side kept rows: 3 ... degraded_sides: [{"team": "NYY", "posted": 8, ...}]`.
-
-**Fix.** Defer only on `len(side.get("lineup") or []) >= DK_ORDER_SLOTS` or
-`lineup_status == "confirmed"`. Add `seeded` vs `deferred_to_feed` to each
-`degraded_sides` record and branch the pool warning on it. The outside spec's
-`merge_partial_orders` shape (D07) goes further than needed here — per-slot
-provenance is a separate question — but its completeness test (the order set
-equals `range(1,10)`) is the right predicate.
-
-### R220. Three degraded-side and blocker-scoping edges on the same intake surface (P1, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-E6, GF7-E7) and, for (a), independently from the outside spec (D09); VERIFIED-read, re-read here
-
-**What.** (a) `live_data_adapters.py:1464-1469`. The R160 `games_without_lock_time`
-blocker is not filtered to the slate. Its sibling loop three lines above filters on
-`slate_team_set` (`:1453-1454`); this one does not, and the postponed-game
-exclusion runs after the skip that feeds it. One malformed off-slate
-`game_date_utc` in a whole-day feed blocks a build whose pool cannot touch that
-game. (b) `:727-730`. `games_unsynthesizable` appends per TEAM, so one DH game 2
-with DK data on both sides emits two blockers for one fact. (c) `:690-696`. An
-all-nine-shelved side seeds an empty "partial" (`lineup=[]`), counts as covered,
-fires a spurious `f4_handedness_unavailable` through `_note_hands`, and the pool
-warning reads "the surviving 0 are seeded".
-
-**Why.** All three are blockers or reports that name something other than what is
-true, on the surface CLAUDE.md sends the operator to read before approving. (a) is
-the expensive one: a refusal on a game that is not on the slate is unanswerable by
-the operator, because nothing they can do to the slate makes it go away.
-
-**Fix.** (a) Apply the same team-set filter the sibling loop uses. (b) Dedupe by
-gid. (c) Skip both the seed and the hands note when the survivor list is empty.
-Rides R219 (same file, same function family); take them together.
+The predicate is now `_side_is_complete` (the order SET equals 1-9, plus the
+feed's own `confirmed` label and R32's operator paste at any length), each
+`degraded_sides` record carries a `resolution`, and all four of the pool's
+blocker loops over an intake report are scoped to the slate. The CHANGELOG
+entry of that date carries the R233 enumeration and the one kept sibling.
 
 ### R221. The DK merge stamps the slate leg's batting order onto every feed leg of a doubleheader and mints wrong-leg disagreements (P2, S) | new 2026-08-24, from the greenfield seventh edition (GF7-E8) and independently from the outside spec (D08); VERIFIED-read mechanism, PLAUSIBLE occurrence
 

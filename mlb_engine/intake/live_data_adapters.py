@@ -526,6 +526,41 @@ def _note_hands(report: Dict[str, Any], team: str,
             {"team": team, "hands_present": present, "of": len(merged)})
 
 
+def _side_is_complete(side: Mapping[str, Any]) -> bool:
+    """R219. Does this feed side already hold a lineup that outranks DK's eight?
+
+    R143's rule is "only a COMPLETE 1-9 counts", and R159(a) applies it to the
+    degraded case: a source holding a complete nine outranks eight-of-nine. The
+    guard that shipped asked ``if side.get("lineup")`` -- ANY nonempty list --
+    so a one-to-three-hitter mid-repost API partial won, DK's eight observed,
+    ``Player_ID``-keyed slots were discarded, and five seats filled from priors
+    while both routes ended labelled "partial". Completeness is the order SET
+    equalling ``range(1, 10)`` (the outside spec's predicate, D07), not a row
+    count: nine rows numbered 1,1,2,... is not a lineup. A side the feed itself
+    calls ``confirmed`` also counts, because that label is the feed asserting the
+    side is posted and the confirmed path elsewhere already trusts it.
+
+    And an OPERATOR PASTE side counts at any length, which is the one place this
+    predicate is deliberately looser than "complete". R32 ranks a lineup Ben
+    pastes above any API pull and R143 narrowed that to "behind a COMPLETE DK
+    1-9" -- neither says what happens when DK's side is degraded and the paste is
+    short, and a paste is short for its own reasons (a `1. TBD` positional hold,
+    or R133's starter DK never listed, both of which leave the side ``partial``).
+    Ranking DK's eight over a paste's eight would extend a rule Ben wrote,
+    silently, in a fix aimed at a mid-repost API partial. It stays where he put
+    it; the DK-vs-paste question for two incomplete sides is his.
+    """
+    rows = side.get("lineup") or []
+    if not rows:
+        return False
+    if str(side.get("lineup_status") or "").strip().lower() == "confirmed":
+        return True
+    if str(side.get("source") or "").strip().lower() == "operator_paste":
+        return True
+    orders = {row.get("order") for row in rows if isinstance(row, dict)}
+    return orders == set(range(1, DK_ORDER_SLOTS + 1))
+
+
 def merge_dk_starting_into_feed(
     feed: Optional[Mapping[str, Any]],
     salary_players: Any,
@@ -542,7 +577,9 @@ def merge_dk_starting_into_feed(
     (sides the feed also had), ``disagreements`` (same side, different names:
     DK wins per Ben's order and the difference is NAMED, never silently
     resolved), ``degraded_sides`` (R159(a): a posted nine holding a shelved
-    player, seeded as a PARTIAL rather than discarded),
+    player, seeded as a PARTIAL rather than discarded, each record carrying the
+    R219 ``resolution``: ``seeded`` | ``deferred_to_feed`` | ``all_shelved`` |
+    ``no_game``),
     ``f4_handedness_unavailable``, ``f4_handedness_partial`` (R159(d)) and
     ``sides_left_to_feed``.
     """
@@ -562,10 +599,15 @@ def merge_dk_starting_into_feed(
         "dk_sides": sorted(sides), "upgraded": [], "disagreements": [],
         "f4_handedness_unavailable": [], "f4_handedness_partial": [],
         "sides_left_to_feed": [], "degraded_sides": [
+            # R219. `resolution` is filled in below, once the loops have run: it
+            # is what the merge DID with this side, and without it every consumer
+            # had to assume "seeded" -- which the pool report duly asserted on
+            # sides that were deferred, or that had nothing left to seed.
             {"team": t, "posted": len(degraded[t]),
              "shelved": [{"order": s["order"], "name": s["name"],
                           "dk_id": s["dk_id"], "status": s["status"]}
-                         for s in readings[t]["shelved"]]}
+                         for s in readings[t]["shelved"]],
+             "resolution": "no_game"}
             for t in sorted(degraded)
         ],
         "probables_attached": [], "games_synthesized": [],
@@ -619,6 +661,10 @@ def merge_dk_starting_into_feed(
             report["probables_attached"].append(team)
 
     covered: set = set()
+    # R219. Teams whose degraded side lost to a source already holding a complete
+    # nine. It is the one resolution that cannot be derived from `covered` after
+    # the fact, so the loop records it and the rest is derived below.
+    deferred_to_feed: set = set()
     for game in games:
         for team, order in sides.items():
             key = _side_of(game, team)
@@ -677,14 +723,29 @@ def merge_dk_starting_into_feed(
         # where nothing else has the side: a source holding a complete nine
         # outranks eight-of-nine, which is R143's own rule ("only a COMPLETE 1-9
         # counts") applied to the case that rule did not anticipate.
+        #
+        # R219. "Nothing else has the side" was written as `if side.get("lineup")`,
+        # which is any nonempty list -- so a one-to-three-hitter mid-repost API
+        # partial outranked DK's eight OBSERVED, Player_ID-keyed slots and five
+        # seats filled from priors instead. `_side_is_complete` is the same
+        # predicate R143 states, applied here: a COMPLETE 1-9, or a side the feed
+        # itself calls confirmed. Anything short of that is a projection and loses
+        # to eight observed slots, exactly as R159(a)'s comment intends.
         for team, order in degraded.items():
             key = _side_of(game, team)
             if key is None:
                 continue
             side = dict(game.get(key) or {})
-            if side.get("lineup"):
+            if _side_is_complete(side):
                 _attach_probable(side, team)
                 game[key] = side
+                deferred_to_feed.add(team)
+                continue
+            # R220(c). An all-nine-shelved side leaves NOTHING to seed. It used
+            # to seed `lineup=[]`, count as covered, and fire
+            # `f4_handedness_unavailable` through `_note_hands` on a side that
+            # holds no hitters -- a report about a lineup that does not exist.
+            if not order:
                 continue
             covered.add(team)
             side["lineup"] = [{"order": h["order"], "name": h["name"],
@@ -724,9 +785,20 @@ def merge_dk_starting_into_feed(
                 # string: ''`, a traceback where a blocker belonged. A game with
                 # no start time has no lock time, so it is not synthesized at
                 # all: the side is left to the feed and NAMED here.
-                report["games_unsynthesizable"].append(
-                    {"game_id": gid, "team": team,
-                     "reason": "no parseable start time in the salary Game Info"})
+                #
+                # R220(b). This loop walks TEAMS, and the fact is about a GAME,
+                # so a DH game 2 with DK data on both sides emitted the record
+                # twice and the pool blocked twice on one game. Keyed by gid,
+                # carrying every team that reached it: one record per game, and
+                # the teams are what the operator needs named.
+                existing = next((r for r in report["games_unsynthesizable"]
+                                 if r["game_id"] == gid), None)
+                if existing is None:
+                    report["games_unsynthesizable"].append(
+                        {"game_id": gid, "teams": [team],
+                         "reason": "no parseable start time in the salary Game Info"})
+                elif team not in existing["teams"]:
+                    existing["teams"] = sorted(existing["teams"] + [team])
                 continue
             game = {"game_pk": None, "venue": None, "status": "Scheduled",
                     "game_date_utc": start.astimezone(timezone.utc).isoformat(),
@@ -754,6 +826,22 @@ def merge_dk_starting_into_feed(
     report["f4_handedness_partial"] = sorted(
         report["f4_handedness_partial"], key=lambda r: r["team"])
     report["sides_left_to_feed"] = sorted(set(team_game) - covered)
+    # R219. What the merge actually DID with each degraded side, in one place and
+    # derived from what happened rather than tracked at four sites. Precedence:
+    # nothing survived to seed outranks everything (neither claim applies);
+    # `covered` is the merge's own record that it seeded the surviving rows, on
+    # whichever of the two loops did it; a deferral is the loop's explicit note;
+    # and a side that reached neither had no game to attach to.
+    for rec in report["degraded_sides"]:
+        team = rec["team"]
+        if not degraded.get(team):
+            rec["resolution"] = "all_shelved"
+        elif team in covered:
+            rec["resolution"] = "seeded"
+        elif team in deferred_to_feed:
+            rec["resolution"] = "deferred_to_feed"
+        else:
+            rec["resolution"] = "no_game"
     out_feed["games"] = games
     return out_feed, report
 
@@ -831,6 +919,17 @@ def build_status_map_from_lineups_feed(
         if not away_team or not home_team:
             continue
         game_id = f"{away_team}@{home_team}"
+        # R220(a). The postponed/cancelled/suspended read used to sit BELOW the
+        # lock-time parse, past the `continue` that skips a game with no parseable
+        # time -- so a postponed game with a malformed `game_date_utc` was named
+        # as a game needing "a real start time" instead of being excluded as
+        # postponed, and the operator got a blocker that nothing they can do to
+        # the slate makes go away. A postponed game has no lock time because it
+        # is not being played; that is the fact, and it is read first.
+        state = str(game_entry.get("status") or "").strip().lower()
+        excluded = ("postpon" in state or "cancel" in state or "suspend" in state)
+        if excluded:
+            excluded_game_ids.append(game_id)
         # R160. `_parse_utc` was called unguarded here, so any feed carrying a
         # game with a missing or malformed `game_date_utc` took the front door
         # down with `ValueError: Invalid isoformat string: ''` instead of
@@ -842,10 +941,11 @@ def build_status_map_from_lineups_feed(
         try:
             lock_time = _parse_utc(game_entry.get("game_date_utc"))
         except (TypeError, ValueError):
-            games_without_lock_time.append(
-                {"game_id": game_id,
-                 "game_date_utc": str(game_entry.get("game_date_utc") or ""),
-                 "reason": "unparseable game_date_utc; no lock time can be derived"})
+            if not excluded:
+                games_without_lock_time.append(
+                    {"game_id": game_id,
+                     "game_date_utc": str(game_entry.get("game_date_utc") or ""),
+                     "reason": "unparseable game_date_utc; no lock time can be derived"})
             continue
         lock_time_by_game_id[game_id] = lock_time
         game_meta[game_id] = {
@@ -854,9 +954,6 @@ def build_status_map_from_lineups_feed(
             "status": game_entry.get("status"),
             "lock_time_utc": lock_time.isoformat(),
         }
-        state = str(game_entry.get("status") or "").strip().lower()
-        if "postpon" in state or "cancel" in state or "suspend" in state:
-            excluded_game_ids.append(game_id)
 
         for side, dk_team in ((away, away_team), (home, home_team)):
             # F17: one reading of the side's lineup state, used for the status
@@ -1433,16 +1530,43 @@ def build_slate_pool(
     # fact as a side DK never posted, and the operator's next move differs --
     # one needs a ninth bat, the other needs a lineup. Named with the shelved
     # player, because that name is what the operator is about to go look up.
+    # R219: and what the merge DID with the surviving rows is a fourth fact,
+    # which this warning used to assert rather than read. It said "the surviving
+    # N are seeded as a partial" unconditionally -- including on a side the merge
+    # deferred to a source holding a complete nine, where nothing was seeded, and
+    # on an all-nine-shelved side where there was nothing to seed. Each
+    # resolution gets the sentence that is true of it, because the operator's
+    # next move differs by resolution and only the first two lines share one.
     for rec in dk_order_report.get("degraded_sides") or []:
         if rec["team"] not in slate_team_set or rec["team"] in excluded_teams:
             continue
         shelved = ", ".join(f"{s['name']} (slot {s['order']}, {s['status'] or 'OUT'})"
                             for s in rec["shelved"])
-        warnings.append(
-            f"{rec['team']}: DK posted a full 1-9 but {len(rec['shelved'])} of them "
-            f"are shelved [{shelved}]; the surviving {rec['posted']} are seeded as a "
-            f"partial and the rest of the side comes from the projection"
-        )
+        head = (f"{rec['team']}: DK posted a full 1-9 but {len(rec['shelved'])} of "
+                f"them are shelved [{shelved}]")
+        resolution = rec.get("resolution") or "seeded"
+        if resolution == "deferred_to_feed":
+            warnings.append(
+                f"{head}; another source holds a complete nine for this side and "
+                f"it is used instead, so DK's surviving {rec['posted']} were not "
+                f"seeded -- check the shelved names against that lineup"
+            )
+        elif resolution == "all_shelved":
+            warnings.append(
+                f"{head}; nothing survived to seed, so the whole side comes from "
+                f"the projection"
+            )
+        elif resolution == "no_game":
+            warnings.append(
+                f"{head}; the merge found no game to attach the side to, so the "
+                f"surviving {rec['posted']} were NOT seeded and the whole side "
+                f"comes from the projection"
+            )
+        else:
+            warnings.append(
+                f"{head}; the surviving {rec['posted']} are seeded as a partial "
+                f"and the rest of the side comes from the projection"
+            )
 
     # R160: named FIRST, because without it the symptom the operator reads is
     # "no probable or declared starter" for both sides of the game -- true, and
@@ -1450,18 +1574,32 @@ def build_slate_pool(
     # built, and the game was never built because DK shipped no start time for
     # it. A blocker that names a consequence and not the cause is the class this
     # whole batch is about.
+    #
+    # R220(b): one record per GAME now, carrying every team that reached it, so
+    # this emits one blocker for one fact instead of one per side.
     for rec in dk_order_report.get("games_unsynthesizable") or []:
-        if rec["team"] in slate_team_set:
+        teams = [t for t in (rec.get("teams") or []) if t in slate_team_set]
+        if teams:
             blockers.append(
                 f"{rec['game_id']}: {rec['reason']}, so the game was not built "
-                f"from the salary file and {rec['team']}'s side has no lock time "
+                f"from the salary file and {', '.join(teams)} "
+                f"{'has' if len(teams) == 1 else 'have'} no lock time "
                 f"(DH game 2s ship 'TBD' here); supply a feed covering this game"
             )
 
     # R160: a game whose lock time could not be derived is skipped by the status
     # map, so nothing on it can be late-swap-checked. That is a blocker, not a
     # warning -- the swap rails are the reason lock times exist.
+    #
+    # R220(a): scoped to the slate, which the sibling loop above always was and
+    # this one was not. The status map reads whatever feed it is handed, and a
+    # day-wide feed carries games no draftgroup on this slate can touch, so one
+    # malformed `game_date_utc` on an off-slate game blocked a build whose pool
+    # cannot reach it -- a refusal the operator has no move against. The record
+    # carries the game, not a team, so the slate filter is on its two sides.
     for rec in status.get("games_without_lock_time") or []:
+        if not (set(str(rec["game_id"]).split("@")) & slate_team_set):
+            continue
         blockers.append(
             f"{rec['game_id']}: {rec['reason']} "
             f"(game_date_utc={rec['game_date_utc']!r}); supply a feed with a real "

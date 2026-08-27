@@ -25,6 +25,118 @@ performance claim.
 
 ---
 
+## 2026-08-27 — R219 + R220: a degraded DK side deferred to ANY nonempty feed lineup, and three reports on the same surface named something other than what was true
+
+DEV, claim `engine` (`engine_2026-08-27`; `engine_2026-08-20` is still HELD and
+stale, five days on, and stays Ben's to arbitrate). Gate 1305 -> 1313;
+`test_core` 876 -> 884, state `grew`, every other suite on its pin. Working-tree
+dirt was ARCHIVE-owned (`data/`, `ledger/`, plus untracked archive material) and
+was classified and left alone. Ten mutations, ten caught — one only after the
+fixture that reaches the guard was added.
+
+**The queue head, closed.** R219 and R220 were slot 1 together, both filed
+2026-08-24 from the seventh greenfield edition and, independently, from the
+outside Codex spec (GF7-E1/E6/E7 = D07/D09). Both entries migrate here.
+
+**What was broken.** R159(a)'s comment states the rule — "DK's eight are seeded
+ONLY where nothing else has the side: a source holding a complete nine outranks
+eight-of-nine" — and the guard it shipped was `if side.get("lineup")`, any
+nonempty list. So a one-to-three-hitter mid-repost API partial outranked DK's
+eight OBSERVED, `Player_ID`-keyed slots, five seats filled from priors, and both
+routes ended labelled `partial`, which is why nothing downstream could tell them
+apart. This was the only finding in either review that changes WHICH PLAYERS
+reach the pool, and it was three-day-old code from the batch that closed R159.
+Verified at `0a21839` before anything changed, then reproduced here: a 9-row NYY
+salary map with slot 5 flipped `IL`, against a 3-hitter feed partial, kept the
+three and dropped the eight.
+
+**The predicate is now the order SET, and it is one function.**
+`_side_is_complete` asks what R143 asks — "only a COMPLETE 1-9 counts" — as
+`{row["order"]} == set(range(1, 10))`, the outside spec's own predicate (D07).
+A row count cannot answer it: nine rows numbered 1,1,2,... is not a lineup, and
+that case has its own test. Two clauses sit beside it. A side the feed itself
+calls `confirmed` defers on the label, because that label IS the feed asserting
+the side is posted. And an **operator paste defers at any length**, which is the
+one place this is deliberately looser than "complete": R32 ranks a paste above
+any API pull, R143 narrowed that to "behind a COMPLETE DK 1-9", and neither says
+what happens when DK is degraded and the paste is short — which it is for its own
+reasons (`1. TBD` positional holds, R133's starter DK never listed, both leaving
+the side `partial`). The filed fix, taken literally, would have ranked DK's eight
+over a paste's eight and extended a rule Ben wrote, silently, inside a fix aimed
+at an API artifact. It stays where he put it; that DK-vs-paste question is his.
+
+**The report half, which is the same defect one layer up.** The pool warning read
+"the surviving N are seeded as a partial" off `degraded_sides` without the merge
+ever recording whether it seeded or deferred — so it asserted a seeding that did
+not happen, and fired even when the deferral was correct. Each record now carries
+a `resolution`: `seeded` | `deferred_to_feed` | `all_shelved` | `no_game`, and the
+warning has a sentence per resolution because the operator's next move differs by
+resolution. It is derived in ONE place from what happened (`covered` is the
+merge's own record that it seeded; only the deferral needed tracking) rather than
+stamped at four sites, so the two loops cannot disagree about it.
+
+**R220, three edges on the same function family.** (a) The
+`games_without_lock_time` blocker was not scoped to the slate while its sibling
+loop three lines above always was, so one malformed `game_date_utc` on an
+off-slate game in a day-wide feed refused a build whose pool cannot reach that
+game — a refusal nothing the operator does to the slate makes go away. Scoped on
+the record's two sides, since the record carries a game and not a team, with a
+positive control pinning that an on-slate game still blocks. Its second half: the
+postponed/cancelled/suspended read sat BELOW the lock-time parse, past the
+`continue` that skips a timeless game, so a postponed game with a malformed time
+was named as needing "a real start time" and never reached the exclusion that
+describes it. A postponed game has no lock time because it is not being played;
+that is read first now. (b) `games_unsynthesizable` appended per TEAM for a fact
+about a GAME, so a DH game 2 with DK data on both sides emitted two blockers for
+one game; keyed by gid, carrying `teams`, and the one consumer names them all.
+(c) An all-nine-shelved side seeded an empty `partial`, counted as covered, and
+fired `f4_handedness_unavailable` through `_note_hands` on a side holding no
+hitters — a handedness report about a lineup that does not exist.
+
+**The mutation that survived is the fixture lesson again, eighth appearance.**
+Deleting R220(c)'s guard passed every assertion in its own test, because an empty
+feed sends that team through the SYNTHESIZE loop, whose own `if order` already
+covered it — the guard lives on the in-feed route and no fixture reached it. The
+test now drives both routes. A branch no fixture reaches is invisible to any
+number of assertions about it.
+
+**R233 enumeration. Two greps, every hit classified.**
+
+    $ grep -rn 'side.get("lineup")' mlb_engine tools | grep -v 'lineup_status\|lineup_source'
+    live_data_adapters.py:534,727   comments (this fix)
+    live_data_adapters.py:553       _side_is_complete, the predicate this commit adds
+    live_data_adapters.py:688       the confirmed loop's carry-forward lookup     NOT A MEMBER
+    live_data_adapters.py:811       the synthesize loop's "do not overwrite"      KEPT, named
+    live_data_adapters.py:969       the status map's F17 read                     NOT A MEMBER
+    live_data_adapters.py:1128      a hitter iteration                            NOT A MEMBER
+
+Two of the six are the same TEXT asking a different question: `:688` is a lookup
+and `:969` splits `confirmed` from partial explicitly and reports the count.
+`:811` is the real sibling — same shape, and it asks "is this side already
+written" rather than "does something outrank DK". It is KEPT unchanged and it is
+unreachable with a partial after this commit: loop 1 now seeds over a partial and
+adds the team to `covered`, and loop 2 runs only for teams NOT in covered, so the
+side it sees is empty (synthesized), complete (deferred), or belongs to an
+all-shelved team whose `order` is empty. Tightening it would change no behaviour.
+`test_a_complete_source_still_outranks_eight_of_nine` covers the deferred team's
+pass through that loop end to end.
+
+    $ grep -n 'for rec in \(status\|dk_order_report\)' -A 1 live_data_adapters.py
+    :1521 partial_lineup_teams      -> rec["team"] in slate_team_set        (was scoped)
+    :1540 degraded_sides            -> rec["team"] in slate_team_set        (was scoped)
+    :1580 games_unsynthesizable     -> teams filtered on slate_team_set     (was scoped)
+    :1600 games_without_lock_time   -> game_id's two sides, THIS COMMIT     (was NOT)
+
+Four blocker/warning loops over an intake report; three were scoped to the slate
+and the fourth is the one R220(a) is about. That is now four of four.
+
+**Not changed, and named rather than left implicit.** R221 owns leg selection at
+the merge, so on a doubleheader the confirmed-merge loop still walks the raw feed
+before legs are selected. A degraded side can therefore be resolved on two legs
+in one pass; `resolution` derives from `covered`, which is a set, so the reading
+is order-independent — but which LEG got seeded is still R221's question, not
+this one's.
+
 ## 2026-08-25 — R194 + the 08-23 dedupe fragment, landed as R235: a Showdown salary row is a ROLE, so the ownership prior was counting every player twice and reading a fully posted slate as unposted
 
 DEV, claim `engine` (re-took `engine_2026-08-25`, released by the previous
