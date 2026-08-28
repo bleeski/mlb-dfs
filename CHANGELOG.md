@@ -25,6 +25,65 @@ performance claim.
 
 ---
 
+## 2026-08-28 — R263 filed + six dated riders: the greenfield standings mine lands on the board (docs only)
+
+ARCHIVE, claims `ledger` + `inbox`, writing `docs/backlog.md` and this file
+under Ben's dated scoped exception for this session (the task existed to update
+the backlog off the session's own findings). Session-start gate green before any
+edit: `PASS  v2.26.0  26 modules  1331 tests`, assembled via `--gate-run` /
+`--gate-report` (records from this morning's R212-R215 session were still valid
+against the unchanged tree, so the gate completed in one call). Working-tree
+dirt was the same ARCHIVE-owned seven files plus two root tarballs the R212-R215
+entry classified; still foreign to this session's writes, still left alone.
+
+**What moved.** Ben's instruction: mine `data/standings/` + `data/archive/`
+greenfield (own conclusions before reading any prior write-up), reconcile
+against the root `STANDINGS_GREENFIELD_FINDINGS_2026-08-28.md` (which he then
+designated the step-2 third-party document as well), and land the result on the
+R251-R262 lane without duplicating it. The evidence lives in ledger 3.21 (610
+contests, 361 Classic / 249 Showdown, 2026-06-03 → 2026-08-27), with dated
+reconciliations of the ledger's own stale lines (4.1 "no ownership prediction
+exists", Section 5's accumulation bar). The adjudication of the root doc:
+zero rejects, three modifies — paid-place coverage is 97/610 via the parked
+`dk_contest_paid_places.json`, not 0/422 (its inventory scope was
+`data/standings/` alone); "our Classic entries were already much chalkier"
+holds on its punt-count metric while cumulative ownership runs −7→−21pp vs
+field mean and drifting down (both metrics now stated); and its Showdown
+prediction DATA BLOCKED call was correct for pre-R235 emits and is stale
+post-R235 (34 contests grade at median rho 0.542 vs pre-fix ≈ 0, a clean
+before/after at one commit boundary).
+
+**Board changes, all evidence and no resequencing.** Riders on: R37(2) — the
+floor-4 tranche measurement its (a) gate has waited on since 08-09 now exists
+and is graded (ours 0.4% 5-2-1 on 5g+ vs field 25.7%; lift replicated both
+halves on 3g+ slates, absent at 1-2g, so the floor stays slate-size-
+conditioned); R10 — accumulation bar met, compression is the error shape, SD
+fits post-R235 only, satellite temperatures drift within a season; R254 — the
+captain-share prior conditions on field size (the chalk-captain sign FLIPS
+between <100 and 1k-10k fields); R258 — seed threshold table by slate size, and
+the satellite threshold IS the win line (75 of 81 paid-known satellite rows pay
+one seat); R225 — third independent confirmation plus interim role-aware dup
+counts; R30 — 97 parked contests backfillable today, and R258 now consumes its
+output. One new item, **R263** (Workstream 2 entry + Tier 4 pointer): the
+satellite chalk-stance and SD captain/split band DECISION, Ben's under the
+autonomy wall, with an S-lift shadow-report build behind it — the three
+measured portfolio-vs-cohort mismatches (chalk stance −7→−21pp against
+chalk-positive cohorts, pitcher-CPT 40% vs winners' 65.5%, 5-1 at 73.4% vs the
+top cohort's 50.2%) that no existing item owned as a decision. R263 was minted
+after a rescan for the current max R-number (R262 at head `b7c2237`; no
+R263+ found anywhere on the board or in fragments).
+
+*The enumeration R233 asks for:* no rule moved to "one place" in this change;
+the one count worth pinning is the adjudication's own — 32 distinct findings/
+recommendations read out of the root doc, 29 accepted (several with
+conditioning sharpened), 3 modified, 0 rejected, and the two pooled-estimator
+numbers of mine it beat (cohort salary-left, winner SP-chalk) are withdrawn in
+3.21 itself, not carried anywhere on the board.
+
+Nothing in this change is an outcome claim; every number above is an observed
+cohort share, a labeled-prior grade, or a deterministic count over archived
+standings.
+
 ## 2026-08-28 — R212 + R213 + R214 + R215: the enumerated-siblings batch. every exit from the supervisor now files its post-mortem, two build_slate reads stop crashing where the guard beside them already handles it, an operator's override is merged rather than dropped, and the units rule reaches its last three sites
 
 DEV, claim `engine` (`engine_2026-08-28`). This IS the queue head — slot 1 of

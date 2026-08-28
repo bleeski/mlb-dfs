@@ -1285,16 +1285,166 @@ going empty.
 Findings (2), (4), (5c) and the mining-cost measurement are filed as `docs/backlog_inbox/2026-08-22_ARCHIVE_*` fragments. (1) and
 (3) are evidence on R118 and R10 and are filed as fragments against those numbers rather than as new items.
 
+### 3.21 The 2026-08-28 greenfield standings review: 610 contests, the shape mismatch, the prior regraded at scale, and the R235 boundary (2026-08-28)
+
+ARCHIVE session, Ben's instruction: mine `data/standings/` + `data/archive/` greenfield — own
+conclusions first, reconcile against the untracked root `STANDINGS_GREENFIELD_FINDINGS_2026-08-28.md`
+(called "the root doc" below) after. Everything here is a deterministic review proxy over observed
+outcomes or a labeled-prior grade; nothing is a win-rate, cash-rate, ROI, or probability claim.
+
+**Corpus.** 610 contests parse clean (361 Classic, 249 Showdown), 2026-06-03 → 2026-08-27:
+every `data/archive/<date>/contest-standings-*.csv` plus the flat inbox (zips read, 13 zero-byte
+excluded). This is a strict superset of the root doc's 422 (it read only `data/standings/`, so it
+missed the June–July mined era; all 187 `processed_zips` ids are in the 610). 599 contests carry
+our entries (1,494 total, matched by Entry ID harvested from `outputs/*/DKEntries*.csv`, username
+`bleeski` confirmed); 557 contests join a salary file at ≥90% (name→team for stack decomposition).
+Discovery/validation split for THIS review: ≤2026-08-08 / ≥2026-08-09, chosen to halve the Classic
+count; the root doc split at 08-13/08-14. Estimator note: lifts below are pooled cohort-share
+minus field-share over kept rows (all top-10% rows, all our rows, ≤300-row field sample per
+contest), NOT the root doc's slate-clustered estimator; where the two disagree on magnitude the
+clustered number is the conservative one and wins. What this pass adds is the bigger corpus and
+the conditioning: family × field-size bucket × slate size, per this file's own rule.
+
+**Classic — field concentration and its drift.** Realized top-5 %Drafted sums by family:
+satellites <100 entries 228pp mean, 100–1k 210pp; portfolio GPPs 206–225pp at 100–10k;
+10k+ MME 180pp. Size bucket, not contest family, is the first-order driver of concentration.
+Within-bucket drift is real and one-directional: Classic <100 satellites 206.4pp (disc) →
+250.7pp (val), +44pp; 100–1k 202.2 → 220.1; Showdown <100 237.9 → 253.1 (of a 600 budget).
+Small-satellite fields got materially chalkier over the season. STABLE DIRECTIONAL (one
+season, one direction, no counter-case).
+
+**Classic — cohort chalk.** Top-decile cohorts are chalk-POSITIVE against their own field mean
+everywhere: satellites +13.7pp cumulative ownership (disc +16.0 / val +10.0 — REPLICATED
+direction), portfolio +5.3, MME +4.8; top cohorts also carry FEWER sub-10% bats (satellites
+top-decile −0.41). Winners split by family: satellite winners chalk-positive (+4.8pp;
+disc +6.9 / val +2.5), while portfolio/MME WINNERS lean leverage in the validation half
+(−11.7 / −19.1pp) on thin n (30/16 wins) — STABLE DIRECTIONAL at best, and it is the
+val-half big-field contests supplying it. Reading: cashing-adjacent cohorts are chalky in
+every family; winner-level leverage is a large-field GPP phenomenon, not a satellite one.
+
+**Classic — stack shapes (hitter counts per team, 8 hitter slots).** By slate size, top-1%+win
+cohort vs field: 1–2g slates favor 5-3 (+16.5pp) and 4-4 (+12.0), with 5-2-1 flat (+1.4);
+3-4g favor 5-2-1 (+8.4); 5-6g 5-2-1 +15.6 (disc +13.1 / val +16.6); 7g+ 5-2-1 +14.5
+(disc +12.9 / val +13.1), 5-1-1-1 +3.8, 5-3 +2.5. Mean primary-stack size: top cohorts
+4.36–4.63 vs field 4.00–4.23 on every slate size. The 5-2-1 lift on 3g+ slates replicates
+across halves in this corpus; the root doc's slate-clustered estimate of the same effect is
++3.84pp and fails its permutation gate, so the joint label is STABLE DIRECTIONAL with
+size-conditioning as the sharpening (the lift lives on 3g+ slates and is absent at 1–2g).
+**Our own Classic entries invert this**: on 5g+ slates we play 4-2-1-1 44.2% and 4-1-1-1-1
+30.0% versus the field's 7.5%/2.6%, and 5-2-1 at 0.4% versus the field's 25.7% and the top
+cohort's ~40%. `min_five_stack_share_pct` ships 0.0 in every posture; nothing in the build
+asks for a five-man primary. This is the single largest observed portfolio-vs-cohort gap.
+
+**Classic — SP pair.** Top-decile carries mildly chalkier SP pairs (+2.4–2.8pp) in all
+families; winner-level SP leverage in GPPs (−4.6/−7.9pp) flips sign across halves (MME win
+disc +12.8 / val −14.3, n tiny). No promotable SP-chalk rule either direction; matches 4.3's
+open status.
+
+**Classic — duplication.** In the satellite fields we actually play, duplication is a
+non-factor: <100 entries, 1% of entries duplicated, winner duplicated in 1% of contests.
+It becomes real only at 10k+ MME (13% duplicated, mean max copies 124, winner duplicated 7%).
+
+**Ownership prior, graded at scale (Classic).** 86 contests on the 28 pre-lock
+`ownership_pred_*.json` emits (all post-08-17, so no disc/val split is possible — say so
+rather than pretend): median per-contest Spearman 0.454 (IQR 0.36–0.53), MAE 8.29pp vs
+flat-budget null 8.81, signed −6.50pp on the drafted-player join. R154's one-contest reading
+replicates as a population fact: ordering usable, level under-predicted (compression), value
+over the flat null real but thin. By archetype: satellites rho 0.40 / signed −7.5; small_gpp
+worst (MAE 12.6, signed −10.3); mme best (MAE 5.2 vs flat 6.0). The root doc grades the same
+emits on the full salary pool including the ~0%-drafted tail and gets MAE 2.70 / corr .599 /
+near-zero mean bias with −9 to −17pp errors in the 10%+ bands — same compression seen from
+the other side of the join; the two gradings agree in substance and differ only in population.
+
+**Ownership prior, Showdown, and the R235 boundary.** SD emits BEFORE the 2026-08-24 R235
+CPT/UTIL dedupe are defective artifacts and grade like it: 54 contests, MAE 16.26 vs flat
+13.72 (WORSE than the null), median rho 0.062, wta_satellite rho −0.01. Emits from 08-25
+onward grade like the Classic prior: 34 contests, MAE 12.63 vs flat 13.90, median rho 0.542,
+signed −1.81. The fix, not a field change, is what moved it — a clean before/after at one
+commit boundary. Grades are person-level (realized CPT+UTIL %Drafted summed). One era never
+calibrates anything, but the post-fix SD prior is no longer flat-dominated and the pre-fix SD
+grades should never be cited as evidence about the current module.
+
+**Showdown — construction cohorts.** Pitcher CPT: 46.0% of field rows, 56.8% of top-decile,
+65.5% of winners; disc/val winner shares .692/.631 — REPLICATED direction, the strongest
+construction signal in either format (root doc concurs from its clustered estimator).
+Team split of the 6 rostered: 5-1 top-1% 50.2% vs field 35.3% (+14.9pp; disc +3.5 / val
++19.9), 3-3 −10.3pp (val −13.9) — direction stable, magnitude unstable across halves:
+STABLE DIRECTIONAL. Captain chalk FLIPS with field size: <100 fields, winners captain a
+45.1%-CPT-owned player vs field 36.3 (chalk captain wins micro-satellites); 1k–10k, winners
+11.3 vs field 14.8 (leverage captain); pooled statements about CPT ownership hide this.
+SD winners are chalk-positive overall (+4.3pp disc / +8.2 val cumulative vs field).
+SD duplication is the opposite of Classic: 1k–10k portfolio fields have 49% of entries
+duplicated, mean max copies 32, winner duplicated 16–28%; our <100 satellites 7%/2%.
+
+**Our Showdown portfolio vs all of that**: 73.4% 5-1 (top cohort ~50, field 35–38);
+40% pitcher CPT (field 46, winners 65.5); mean CPT ownership 16.5% vs field 17.4 pooled —
+and our SD satellite entries sit −4.0pp (disc) → −10.8pp (val) cumulative-ownership vs
+field in the family where winners are +4 to +8 chalk-positive. Same mismatch as Classic
+satellites: we got MORE contrarian over exactly the window the fields got chalkier.
+
+**Win-large vs cash.** `data/reference/dk_contest_paid_places.json` carries OBSERVED paid
+places for 97 of the 610 (source: Ben's 2026-07-29 DK entry-history export) — so paid-place
+coverage is 16%, not zero, but almost entirely ≤07-29. In the dominant family it settles the
+framing question outright: satellites pay 1 seat in 56/59 Classic and 19/22 SD observed rows,
+so "cash" and "win" are the SAME event there and the dual objective's washout axis is the
+portfolio, never the entry. Broad-paid GPP rows with observed places number ~13; cash-band
+composition at scale stays DATA BLOCKED, and per 3.14 every cash figure here is cash-only
+with the promotional channel unmeasured. Our observed seat conversions (2.0% of 153 Classic
+satellite entries, 1.0% of 98 SD, ~4 events total) are too thin to grade — recorded, not read.
+
+**Ours by contest type** (finish cohorts, conditioned, never pooled): Classic satellites are
+our least-bad family — best-entry-per-contest median percentile 73.9 (disc) / 69.5 (val),
+per-entry top-1% rate 1.8%/2.8% against a 1% baseline. SD satellites 75.6/65.2, top-1%
+1.2%/4.8%. GPPs are weak: Classic MME median best-entry percentile 33–41 with zero top-decile
+hits in 19 contests; se_gpp median entry percentile 28.5/10.5. Points thresholds for the
+threshold-mining lane: Classic winning scores average 138.9 (1–2g) / 144.6 (3–4g) / 161.1
+(5–6g) / 162.8 (7g+), top-decile bar 116–129; Showdown winners 83–98 by bucket, top-decile
+bar ~72. Salary→ownership rank correlation (prior's backbone feature): median 0.39–0.49 per
+contest in Classic, 0.24–0.28 in Showdown — the SD field prices salary much more weakly.
+
+**Reconciliation with the root doc** (read only after the above was computed). AGREE, with
+my corpus confirming: anti-forced-contrarian Classic ownership posture (its three replicated
+ownership-count signals match my chalk-positive top cohorts); SD pitcher CPT as the strongest
+replicated construction signal; our SD 5-1 over-concentration; 5-2-1 as directional-not-
+replicated (its permutation gate is the stricter read; my size-conditioning adds where the
+effect lives); salary-left null (my pooled cohort salary-left means are confounded by field
+size and are withdrawn in its favor); uniqueness as prize-split economics, not scoring;
+role-blind duplication keys in `field_miner.py` CONFIRMED in code — `players_norm` (:264) is
+the dup-group key while `captain_norm` (:273) exists beside it unused by the key, so every
+mined SD duplication table understates copies. DISAGREE / MODIFY: (1) its "0/422 verified
+paid places" is true of `data/standings/` alone but false at repo scope — the 97-contest
+observed reference above, plus the satellite seats-=1 fact, which its own framing needs;
+(2) its "our historical Classic entries were already much chalkier than the field" holds on
+its punt-count metric (we avoid sub-5% players) and is FALSE on cumulative ownership, where
+we run −7 to −21pp vs field mean and drifting down — both metrics are real; the correct
+statement is that we avoid punts AND avoid concentrated chalk, landing mid-owned, which is
+exactly what its own calibration-not-more-chalk recommendation needs said precisely;
+(3) its "Showdown prediction error is DATA BLOCKED" was correct for pre-R235 artifacts and
+is STALE: 34 post-R235 contests now grade (rho .542), the block is lifted for the current
+module. Its slate-clustered, FDR-controlled machinery is the more conservative estimator
+throughout and its evidence-class assignments survive contact with the larger corpus.
+
+**What changes upstream of a build**: nothing, from this section alone — every item above is
+review evidence. Actionable candidates are filed on the backlog's R251+ lane (2026-08-28),
+keyed to this section.
+
 ## 4. CALIBRATION CONTENT (INERT until the Section 0 gate opens)
 
 Populate these per slate from the archive. None of it moves a projection today.
 
 ### 4.1 Field model: how the crowd concentrates
 
-**Status: INERT. No ownership prediction exists.** `Ownership_Tier` defaults to a
-flat `Mid` in the build path, so there is currently no per-player ownership
-assumption to nudge. This bucket is blocked on the homegrown ownership model in
-Section 5, not on the standings, which now supply the actuals to grade against.
+**Status: INERT for auto-application; a prediction now EXISTS and is graded.**
+(Reconciled 2026-08-28 by ARCHIVE; the line above read "No ownership prediction
+exists" from before R135.) `tools/ownership_pred.py` emits the v0.1 structural
+prior per slate (R135, 2026-08-17) and 3.21 grades it at scale: Classic median
+per-contest Spearman 0.454 over 86 contests with the level under-predicted by
+−6.5pp on the drafted join (compression, R154's one-contest reading confirmed as
+a population fact); Showdown grades split at the R235 boundary — pre-fix emits
+are worse than a flat-budget null, post-fix (34 contests) rho 0.542. Ordering is
+spendable under R154's two constraints; magnitude still moves nothing, and
+`Ownership_Tier` still defaults flat `Mid` in the build path. The bucket stays
+blocked on the FITTED model in Section 5, whose accumulation bar is now met.
 
 Expressed through this sport's structural drivers: salary, slate size, name
 recognition, and the obvious-play magnets (chalk starting pitchers, cheap bats with
@@ -1363,6 +1513,16 @@ conditioned slates before anything graduates to a structural prior.
 ## 5. Open dependency: the homegrown ownership model
 
 This is the single gating dependency for Section 4.1 and the real next build.
+
+**Accumulation bar met (2026-08-28, ARCHIVE).** Step 3 below asked for 8–15
+small archetype-conditioned slates; the archive now holds 610 parsed contests
+across ~90+ slate groups (3.21), with 86 Classic and 88 Showdown contests
+carrying a graded pre-lock prediction. The fit is unblocked on data. Two facts
+the fit must inherit: SD emits are person-level only since R235 (2026-08-24) —
+never fit on pre-R235 SD artifacts — and the v0.1 prior's error is compression
+(under-predicts the 10%+ bands by −9 to −17pp while over-predicting the tail),
+so the fit's first job is magnitude calibration by archetype and field size,
+not re-ranking.
 
 The accumulating standings archive now supplies actual `%Drafted` every slate. That
 removes the need to buy a projected-ownership feed (Stokastic was the candidate);

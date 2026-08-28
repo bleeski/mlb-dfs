@@ -39,6 +39,25 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-28 (second note this date), ARCHIVE, claims `ledger`+`inbox`, backlog
+write under Ben's dated scoped exception for this session: **the greenfield
+standings mine is in — 610 contests (361 Classic / 249 Showdown, 2026-06-03 →
+2026-08-27, a strict superset of the root doc's 422), filed as ledger 3.21, and
+the root `STANDINGS_GREENFIELD_FINDINGS_2026-08-28.md` is adjudicated
+finding-by-finding: zero rejects, three modifies** (paid-place coverage is
+97/610 via the parked reference json, not 0/422; "ours already much chalkier"
+holds on the punt-count metric only, while cumulative ownership runs −7→−21pp
+vs field and drifting down; the Showdown-prediction DATA BLOCKED call is stale
+post-R235 — 34 contests grade at rho 0.542). Board changes: dated riders on
+R37(2) (the floor-4 tranche measurement its (a) gate asked for now EXISTS),
+R10 (fit unblocked at 610 contests; compression is the error shape; SD fits
+post-R235 only; satellite temperatures drift), R254 (captain chalk FLIPS sign
+with field size), R258 (seed threshold table; the satellite threshold IS the
+win line), R225 (third independent confirmation, interim role-aware counts),
+R30 (97 parked contests backfillable today); one new item, R263 (Tier 4
+decision + S shadow-report build). No queue resequencing; the lane gains
+evidence, not new spine slots.*
+
 *2026-08-28, DEV, claim `engine` (`engine_codex_lev_synthesis_2026-08-28`):
 **the ninth outside edition (Codex, this time reviewing the R251–R262 lane
 itself, zero drift at `0a83cac`) is adjudicated: zero new numbers, twelve
@@ -1311,6 +1330,12 @@ and the narrative history accumulates at the bottom, not here.*
 
 ## Tier 4 — decisions owed, mostly Ben's. Minutes of decision that unblock sessions of work; each listed with what it unlocks.
 
+- **R263's three bands, and R37(2)'s (a) with them (2026-08-28, from the
+  greenfield standings mine, ledger 3.21)** — satellite chalk stance, SD
+  pitcher-CPT share, SD 5-1/4-2 mix: adopt, adjust, or decline the shadow
+  bands; unlocks the S-lift shadow-report build. R37(2)'s floor-5 decision
+  rides the same read: the floor-4 tranche measurement it has waited on since
+  08-09 now exists and is graded.
 - **R41's two decisions** (sequencing vs R37; relaxation policy, now
   carrying the Pool_Basis rider) — unlocks the one L build on the board,
   Showdown certification, roughly a third of entered volume. The build slots
@@ -2036,6 +2061,19 @@ decision, not a control move either.
 
 ### R37(2). The five-stack half: floor 5 at narrow breadth, then the 4-2-x cap (P1, M, staged) | stage 1 landed 2026-08-09
 
+**Rider 2026-08-28 (ARCHIVE, greenfield standings mine; evidence in ledger
+3.21): the measurement (a) gates on now EXISTS.** Stage 1's floor-4 portfolio is
+archived and graded across the 08-09→08-27 half: on 5g+ slates our delivered mix
+ran 4-2-1-1 44.2% / 4-1-1-1-1 30.0% / 5-2-1 0.4% against a field at 25.7% 5-2-1,
+while the top-1%+win cohort's 5-2-1 lift held in BOTH halves (+13.1/+16.6pp on
+5-6g, +12.9/+13.1 on 7g+, pooled estimator; the root greenfield doc's
+slate-clustered estimate on the same corpus is +3.84pp and fails its permutation
+gate, so the joint label stays STABLE DIRECTIONAL). Fourth point for (b)'s
+share-vs-lift series: strong val-half lift on a ~26% field share. Slate-size
+conditioning is binding: 1-2g slates favor 5-3 (+16.5pp) and 4-4 (+12.0) with
+5-2-1 flat (+1.4), so floor-5 stays per-posture and per-slate-size, never
+global. The (a) decision is unblocked and owed (pointer in Tier 4 under R263).
+
 **Stage 1 is DONE and is in the CHANGELOG, not here.** Ben decided this on
 2026-08-09, accepting DEV's 2026-08-05 floor-first recommendation as written and
 amended by the 08-08 third-tranche input. What shipped: `primary_stack_min_size
@@ -2169,6 +2207,19 @@ no-not-yet stands; what would change it is still more finishes to grade, not
 a restated priority.
 
 ### R10. Ownership and duplication, wired and graded (P1, M, gated) | was G3, absorbing RC 1.8/2.5/2.10
+
+**Rider 2026-08-28 (ARCHIVE, ledger 3.21): the accumulation bar is met at
+scale** — 610 parsed contests, 86 Classic + 88 Showdown carrying a graded
+pre-lock prediction. Four facts the fit inherits: (1) the v0.1 error is
+COMPRESSION — median per-contest Spearman 0.454 Classic, drafted-join signed
+−6.5pp, the root doc's full-pool band view −9 to −17pp in the 10%+/20%+ bands —
+so magnitude calibration by archetype × field size is the job, not re-ranking;
+(2) SD fits use post-R235 emits ONLY (pre-fix artifacts grade WORSE than a
+flat-budget null, rho ≈ 0; post-fix rho 0.542 over 34 contests); (3) satellite
+field concentration DRIFTED +20-44pp top-5 within one season, so archetype
+temperatures need a time term or a stated refit cadence; (4) the grading null
+changes with the join population (drafted-only vs full-pool MAEs differ ~2×),
+so the fit declares its null per 3.21 rather than inheriting flat-12.
 
 - **Rider added 2026-08-18, landing R136:** the fitted model owes a column
   back. R136's low-owned-carry column wanted ledger 3.17's absolute sub-10%
@@ -2518,6 +2569,16 @@ condition; the v1 instrument is unchanged.
 
 ### R254. Captain mispricing screen: the Showdown apex lever (P1, S-M once deps land) | new 2026-08-27, from Ben's greenfield instruction; depends R225 (captain-truth), R238 (archetype key), R252
 
+**Rider 2026-08-28 (ARCHIVE, ledger 3.21): the captain-share prior must
+condition on FIELD SIZE, not archetype alone.** Winners in <100-entry satellite
+fields captain a 45.1%-CPT-owned player against a 36.3 field mean (chalk captain
+wins micro fields); winners at 1k-10k captain 11.3 vs a 14.8 field mean
+(leverage captain). A pooled CPT-leverage rule has the SIGN wrong in one of the
+two cells we actually play. The mismatch this screen should price first: our
+pitcher-CPT share is 40% against 65.5% of winners (field 46.0, replicated both
+halves), and we over-index the replicated-NEGATIVE 5-10% CPT-ownership band
+(root doc: ours 19.65% vs field 17.48%).
+
 **What.** In Showdown the top-1% question is mostly "right captain, right
 script." The field's captain share concentrates on the top APPG names; the
 archive holds realized captain ownership per contest (countable correctly
@@ -2610,6 +2671,17 @@ thesis labels → script axis and print per-contest script coverage in the
 R239(c) block. Proxies, labeled as such, in the brief beside apex/washout.
 
 ### R258. The threshold model: mine what top-1% and cashing REQUIRED, then predict it pre-lock and grade it (P1; mining half S rides the R48+R83 batch, predict half M) | new 2026-08-27, from Ben's greenfield instruction; the load-bearing idea of the dual-objective lane
+
+**Rider 2026-08-28 (ARCHIVE, ledger 3.21): a seed threshold table exists, and
+the satellite cell simplifies.** Mean winning / top-decile scores by slate size:
+Classic 138.9/116.2 (1-2g), 144.6/116.4 (3-4g), 161.1/127.3 (5-6g), 162.8/128.8
+(7g+); Showdown winners 83-98 by field bucket, top-decile bar ~72. One
+structural fact collapses T[s,c] where most of our volume sits: observed
+satellites pay ONE seat in 75 of 81 paid-known rows
+(`data/reference/dk_contest_paid_places.json`), so the satellite threshold IS
+the win line and "cash" is not a separate target there — the washout axis stays
+portfolio-level, per the dual objective. Paid-place coverage is 97 of 610
+(16%, all ≤07-29), not zero; R30's data half is what extends it.
 
 **What.** Every archived contest's standings hold the full realized score
 curve. Mine per-contest: winning score, p99 / p95 / p90 lines, cash line,
@@ -2799,6 +2871,40 @@ the base solve grades: coverage-driven column generation — a high-weight
 scenario no candidate covers becomes an ask to the bank generator for a
 legal lineup that covers it — the candidate-bank contract extended, not
 replaced.
+
+### R263. Satellite portfolio posture vs the measured field: chalk stance and the Showdown captain/split bands (P1 decision + S shadow-report build, gated: postures are Ben's) | new 2026-08-28, ARCHIVE greenfield standings mine (ledger 3.21) + root-doc adjudication
+
+- **What.** Three measured mismatches between what we deliver into satellites
+  and what their top cohorts look like, none owned elsewhere as a DECISION:
+  (1) our satellite entries run chalk-NEGATIVE cumulative ownership (−7.6pp
+  disc → −21.4pp val Classic; −4.0 → −10.8 SD, vs each contest's own field
+  mean) while satellite top cohorts are chalk-POSITIVE in both halves (+16.0/
+  +10.0 Classic top-decile; SD winners +4.3/+8.2) and the fields themselves
+  drifted 20-44pp chalkier over the season; (2) our SD pitcher-CPT share is
+  40% against 65.5% of winners (field 46.0), replicated in both halves;
+  (3) our SD 5-1 team-split share is 73.4%, above even the top-1% cohort's
+  50.2% — the one axis where we are OVER-concentrated. Classic five-man share
+  is R37(2)'s and stays there; this item cites 3.21 as that gate's evidence
+  and does not re-own it.
+- **The decision owed (Ben).** Adopt, adjust, or decline shadow bands: the
+  root doc proposes pitcher-CPT 48-52% when both starters are declared (the
+  25% per-player captain cap intact), 5-1 held to 45-55% with 4-2 restored to
+  ≥30%, and this mine adds a satellite chalk-stance band (portfolio mean
+  cumulative ownership at or above the field mean in one-seat fields whose
+  winners are chalk). All three are strategy-exposure changes, so they are
+  Ben's under the autonomy wall, whatever the evidence class.
+- **The build (S, after the decision).** Shadow-report only: `qa_portfolio`
+  already computes the chalk column (R136); add pitcher-CPT share, team-split
+  mix, and the band check per delivered SD portfolio, printed beside the caps,
+  steering nothing. Bands enter theses or postures only on Ben's flip, and any
+  live change grades over ≥12 conditioned slates before a band tightens
+  further (the root doc's promotion gate, adopted as written).
+- **Why.** The dual objective binds washout at the PORTFOLIO level; 73% on one
+  team split is the correlated-failure shape R153's caps were built against
+  arriving through construction rather than exposure, and the chalk-stance gap
+  is the compounding kind — it widened exactly while the fields moved the
+  other way. Observed cohort shares and deterministic review proxies
+  throughout; never a probability claim.
 
 ## Workstream 3 — Intake and pool truth
 
@@ -5262,6 +5368,13 @@ was played can ever be learned from.
 
 ### R30. Miner gap the money backfill exposed — DATA half only (P2, XS) | new 2026-07-29, from an ARCHIVE fragment; (a) tool half and (b) landed 2026-08-05, (c) landed 2026-08-08
 
+**Rider 2026-08-28 (ARCHIVE, ledger 3.21):** the parked
+`dk_contest_paid_places.json` covers 97 of the 610-contest corpus (all ≤07-29)
+and the backfill re-mine is still one `--paid-places-from` command. The Ben-side
+half — a fresh entry-history export past 2026-07-29 — is what moves coverage off
+16%, and R258's threshold model now consumes it directly, which raises this
+item's effective priority without changing its label.
+
 - **What:** three archival-path defects, ordered by what blocks what. None of them touches the certified path, which is why none was taken in the 07-29 evening DEV session.
 - **(a) TOOL HALF LANDED 2026-08-05; the DATA half is open and is Ben's.** The full What/Why/Fix and the landing record moved to CHANGELOG.md. Shipped: `--paid-places`, `--paid-places-from <json>` (both file shapes), `paid_places` / `payout_breadth_observed` / `cashed_entries` on the `own_results` record, and `posture_allocator.classify_tier` resolving instead of returning UNRESOLVED, pinned end to end. **What remains is not code:** `paid_places` coverage still ends at the 2026-07-28 entry-history export, so none of the 94 contests mined 2026-08-04 carries a paid line and the 3.16 cash-line finding stays ungradeable. A fresh export from Ben now has somewhere to go — one `--paid-places-from` re-mine backfills the archive, and the 100 already-parked contests can be backfilled today. **This is no longer what gates R10.**
 - **(b) LANDED 2026-08-05.** Full record in CHANGELOG.md. A money flag (`--entry-fee`, `--winnings`, `--paid-places`, `--paid-places-from`) with no resolvable own entry ids now exits 7 naming the flags, the manifest path and the remedy, instead of exiting 0 having silently consumed nothing.
@@ -5603,6 +5716,15 @@ The open tail is **R61-tail** below.
 ---
 
 ### R225. Showdown duplication counting is captain-blind at all three miner sites, and Tier 2's grading substrate inherits it (P1, S; PRECONDITION ON R10) | new 2026-08-24, from the greenfield seventh edition (GF7-S1) and independently from the outside spec (D20); VERIFIED-read at all three sites, coordinator-re-read, re-read here
+
+**Rider 2026-08-28 (ARCHIVE):** independently confirmed twice more — the root
+greenfield standings doc re-derived the defect from DK lineup semantics without
+reading this board, and ledger 3.21's code read pins it (`players_norm` keys
+`dup_groups` at :770 while `captain_norm` rides every entry unused by the key).
+3.21's own duplication tables hash the raw Lineup string (CPT-aware) and serve
+as interim corrected counts: SD 1k-10k fields run 49% of entries duplicated,
+mean max copies 32, winner duplicated in 16-28% of contests — versus ~1% and
+1% in the <100 Classic satellites we mostly enter.
 
 **What.** `field_miner.py:770`, `:1244`, `:1343`. `players_norm` is a sorted,
 position-blind tuple by design (`:264`, and the R39 comment says so). All three
