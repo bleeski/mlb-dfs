@@ -3802,25 +3802,17 @@ CHANGELOG entry of that date carries the R233 enumeration and the tenth site
 test is the property, not the pair: every `ast.Return` in `main()` must sit
 immediately after a `_write(...)` in its own block.
 
-### R213. Two unguarded reads in build_slate's `main()` are exit-1 crash doors of R168's class, and autobuild logs them as a refusal with no remedy (P1, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-T4) and independently from the outside spec (D06); VERIFIED-read at `build_slate.py:3219`, `:3261`
+### R213. CLOSED 2026-08-28 -- a named feed that cannot be read is bad input at
+exit 4, an unreadable staged cache is ABSENT and falls through to the guarded
+fetch leg; entry migrated to CHANGELOG.md
 
-**What.** `json.loads(Path(args.lineups).read_text(encoding="utf-8"))` at `:3219`
-(a mistyped `--lineups` path raises FileNotFoundError) and
-`json.loads(feed_path.read_text(encoding="utf-8"))` at `:3261` (a torn
-`lineups_feed.json` from a killed call raises JSONDecodeError). R168(b)'s AST test
-pins only `fetch_lineups` call sites, so neither is covered.
-
-**Why.** The lost-window class arriving as a traceback: both escape before the
-brief exists, so the run leaves no diagnostics, and downstream `autobuild` records
-`"refused with no remedy this supervisor may take, errors=[]"` — a crash wearing a
-refusal's label, which is the one thing R168 was filed to stop. The staged-feed
-leg is the worse of the two: a torn cache is a normal consequence of a killed
-Cowork call, and the guarded fetch leg right beside it would have handled it.
-
-**Fix.** A bad `--lineups` refuses at exit 4 with a payload naming the path and the
-parse error. An unreadable staged cache is treated as ABSENT and falls through to
-the guarded fetch leg. Extend R168(b)'s AST test to both call shapes rather than to
-one function name.
+`supplied_feed_unreadable` carries the path and the parse error; the staged read
+moved above the branch chain so the `elif` tests a value rather than a file's
+existence, and a discarded cache is named in `feed_note.staged_feed_unreadable`.
+R168(b)'s AST test was widened in place from one function name to the call
+SHAPE, `fetch_lineups` plus `read_text`. The CHANGELOG entry of that date
+carries the four-site enumeration and the one shape deliberately left out
+(`write_text`).
 
 ### R214. The supervisor's `--controls-override` replaces, never merges, an operator's passthrough override, and the log records only the replacement (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-T5) and independently from the outside spec (D05); VERIFIED-read at `tools/autobuild.py:184`, `:218-219`, re-read here
 

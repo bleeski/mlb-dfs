@@ -3209,6 +3209,26 @@ def main() -> int:
         from mlb_engine.intake.live_data_adapters import dk_order_coverage
         dk_covered, dk_uncovered = dk_order_coverage(staged_salary)
         dk_covers_slate = bool(dk_covered) and not dk_uncovered and not args.lineups
+        # R213. The staged feed is read HERE, before the branch chain, because
+        # an unreadable one has to be ABSENT rather than fatal. A torn
+        # `lineups_feed.json` is the ordinary consequence of a killed Cowork
+        # call, and the unguarded `json.loads` in the branch below raised
+        # JSONDecodeError past every handler: no brief, exit 1, and autobuild
+        # recording "refused with no remedy this supervisor may take,
+        # errors=[]" -- a crash wearing a refusal's label, which is the one
+        # thing R168 was filed to stop. The guarded fetch leg at the bottom of
+        # this chain already handles exactly this situation, so a cache that
+        # cannot be read now falls through to it.
+        staged_feed_read: dict | None = None
+        staged_feed_unreadable: str | None = None
+        if not dk_covers_slate and not args.lineups and feed_path.exists():
+            try:
+                staged_feed_read = json.loads(feed_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                staged_feed_unreadable = f"{type(exc).__name__}: {exc}"
+                print(f"staged lineups_feed.json is unreadable and is being "
+                      f"treated as absent: {staged_feed_unreadable}",
+                      file=sys.stderr)
         if dk_covers_slate:
             feed = {"games": []}
             feed_note = {"source": "dk_salary_starting", "fetched": False,
@@ -3216,7 +3236,27 @@ def main() -> int:
                          "note": "DK posted every side in the salary file; no "
                                  "paste and no API call were needed"}
         elif args.lineups:
-            feed = json.loads(Path(args.lineups).read_text(encoding="utf-8"))
+            # R213. Unguarded, so a mistyped --lineups path was a raw
+            # FileNotFoundError traceback: it escapes before the brief exists,
+            # so the run leaves no diagnostics at all and autobuild logs it as
+            # a refusal with no remedy. A feed the operator named and this
+            # build cannot read is bad input, which is exit 4, and the refusal
+            # names the path and the parse error rather than printing a stack.
+            try:
+                feed = json.loads(Path(args.lineups).read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                print(json.dumps({
+                    "status": "supplied_feed_unreadable",
+                    "feed": str(args.lineups),
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "note": ("--lineups names a file this build cannot read or "
+                             "parse. The staged feed was NOT overwritten, no run "
+                             "directory was created and nothing was solved; the "
+                             "salary and entries files are staged. Fix the path, "
+                             "or drop the flag and let the staged feed and DK's "
+                             "Starting column supply the orders."),
+                }, indent=1))
+                return 4
             # A supplied feed overwrote the staged one unconditionally, so a feed
             # for the wrong day or a hand-edited one destroyed the good copy and
             # left nothing to fall back to. The staged feed is the durable input;
@@ -3254,11 +3294,11 @@ def main() -> int:
             staged_feed.write_text(json.dumps(feed), encoding="utf-8")
             feed_note = {"source": str(args.lineups), "age_minutes": feed_age_minutes(feed),
                          "draftgroup_coverage": f"{covered}/{len(slate_teams)}"}
-        elif feed_path.exists():
+        elif staged_feed_read is not None:
             # Lineups confirm continuously through the afternoon, so a feed left on
             # disk from the morning quietly downgrades confirmed teams to projected
             # orders at exactly the moment better information exists. Age it.
-            feed = json.loads(feed_path.read_text(encoding="utf-8"))
+            feed = staged_feed_read
             age = feed_age_minutes(feed)
             if age is None or age > args.feed_max_age_minutes:
                 try:
@@ -3294,6 +3334,13 @@ def main() -> int:
                                      "dk_order_coverage in the pool report "
                                      "before approving"}
                 print(f"lineups feed unavailable: {exc}", file=sys.stderr)
+        # R213. A cache that could not be read is ABSENT, and the brief has to
+        # say which absence this was: no staged feed at all and a torn one are
+        # different facts, and the second one means a file on disk was
+        # discarded rather than used.
+        if staged_feed_unreadable and isinstance(feed_note, dict):
+            feed_note["staged_feed_unreadable"] = staged_feed_unreadable
+            feed_note["staged_feed_path"] = str(feed_path)
         print(f"lineups feed: {json.dumps(feed_note)}", file=sys.stderr)
         code, brief = run_classic(args, slate_dir, staged_salary, staged_entries,
                                   feed, deadline)

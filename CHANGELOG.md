@@ -79,6 +79,42 @@ a `_write(...)` call in its own block, with a floor of ten returns so the check
 cannot pass by finding none. A new exit door added later fails there instead of
 in a post-mortem that does not exist.
 
+**R213. Two unguarded reads in `build_slate.main()`, both of R168's class, one
+of them beside the guard that already handles it.** A mistyped `--lineups` path
+raised FileNotFoundError and a torn `lineups_feed.json` raised JSONDecodeError,
+each escaping before the brief exists — so the run left no diagnostics and
+`autobuild` recorded `refused with no remedy this supervisor may take,
+errors=[]`. A crash wearing a refusal's label is the one thing R168 was filed to
+stop, and it reappeared eight days later two lines from R168's own fix.
+
+The two get different answers because they are different facts. A feed the
+operator NAMED and this build cannot read is bad input: `supplied_feed_unreadable`
+at exit 4, carrying the path and the parse error, and saying what was and was not
+touched (the salary and entries are staged by this point; the staged feed is not
+overwritten and no run directory exists). A staged cache that cannot be read is
+ABSENT — a torn `lineups_feed.json` is the ordinary consequence of a killed
+Cowork call, and the guarded fetch leg at the bottom of the same chain was
+already written for exactly this state. The read moved above the branch chain so
+the `elif` tests a value rather than a file's existence, and the discarded cache
+is NAMED in `feed_note.staged_feed_unreadable`: no cache at all and a torn cache
+are different, and the second one means a file on disk was thrown away.
+
+*The enumeration.* R168(b) pinned one function NAME, so the class it was
+protecting — main() touching a lineups source that can fail — was never covered.
+Widened in place to the call SHAPE, `fetch_lineups` plus `read_text`, and the
+test renamed with its scope:
+
+    $ python - <<'EOF'   # every fetch_lineups/read_text call in main(), guarded?
+    read_text      line  3226 guarded=True     <- R213, --lineups
+    read_text      line  3246 guarded=True     <- R213, staged cache
+    fetch_lineups  line  3305 guarded=True     (refetch, guarded before R168)
+    fetch_lineups  line  3324 guarded=True     (first fetch, R168(b))
+    EOF
+
+Four sites, four guards, no kept copy. `write_text` in `main()` is deliberately
+NOT in the set: a staging write that fails is a broken workspace rather than a
+degradable input, and turning it into a soft note would hide it.
+
 ## 2026-08-28 — ed9 Codex adjudication (the leverage/portfolio spec): zero new numbers, twelve riders/amendments on the R251–R262 lane, R252 retitled, R258 and R262 re-specified before build, ninth rebuild rejection (docs only)
 
 DEV, claim `engine` (`engine_codex_lev_synthesis_2026-08-28`). Docs-only

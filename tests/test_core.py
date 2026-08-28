@@ -16944,21 +16944,35 @@ class BuildSlateExitContractTests(unittest.TestCase):
         self.assertEqual(tuples, [], f"main() returns a tuple at lines {tuples}; "
                                      f"SystemExit of a tuple is exit 1")
 
-    def test_every_lineups_fetch_in_main_is_guarded(self):
-        """R168(b). The refetch leg has carried a try/except for a while and the
-        platoon-side fetch gained one in the 08-18..22 work. The FIRST fetch of
-        the day did not, so no staged feed + DK's `Starting` not covering the
-        slate + no route to statsapi was a raw URLError traceback, empty stdout,
-        no brief, exit 1 -- and that is the normal pre-lock morning state."""
+    def test_every_lineups_read_in_main_is_guarded(self):
+        """R168(b), extended by R213 from one function name to the CALL SHAPE.
+
+        R168(b) pinned `fetch_lineups` call sites, and the two `read_text` legs
+        beside them stayed unguarded: a mistyped `--lineups` raised
+        FileNotFoundError and a torn `lineups_feed.json` from a killed call
+        raised JSONDecodeError. Both escape before the brief exists, so the run
+        leaves no diagnostics and autobuild logs `refused with no remedy this
+        supervisor may take, errors=[]` -- a crash wearing a refusal's label,
+        which is the one thing R168 was filed to stop. The class is 'main()
+        touches a lineups source that can fail', so the test names the shapes
+        rather than the one function."""
         import ast
         node = self._main_node()
+        nested = {n for f in ast.walk(node)
+                  if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                    ast.Lambda)) and f is not node
+                  for n in ast.walk(f)}
         parents = {}
         for n in ast.walk(node):
             for child in ast.iter_child_nodes(n):
                 parents[child] = n
-        calls = [n for n in ast.walk(node) if isinstance(n, ast.Call)
-                 and getattr(n.func, "id", "") == "fetch_lineups"]
-        self.assertTrue(calls, "main() stopped fetching lineups; re-scope this test")
+        wanted = ("fetch_lineups", "read_text")
+        calls = [n for n in ast.walk(node)
+                 if isinstance(n, ast.Call) and n not in nested
+                 and (getattr(n.func, "id", "")
+                      or getattr(n.func, "attr", "")) in wanted]
+        self.assertGreaterEqual(len(calls), 4, "main() stopped reading its "
+                                               "lineups sources; re-scope this test")
         for call in calls:
             cur, guarded = call, False
             while cur in parents:
@@ -16966,9 +16980,11 @@ class BuildSlateExitContractTests(unittest.TestCase):
                 if isinstance(cur, ast.Try):
                     guarded = True
                     break
-            self.assertTrue(guarded, f"fetch_lineups at line {call.lineno} is "
-                                     f"unguarded; a network failure there is a "
-                                     f"raw traceback and no brief")
+            name = getattr(call.func, "id", "") or getattr(call.func, "attr", "")
+            self.assertTrue(guarded, f"{name} at line {call.lineno} is unguarded; "
+                                     f"a failure there is a raw traceback and no "
+                                     f"brief, which autobuild reads as a refusal "
+                                     f"with no remedy")
 
     def test_the_unavailable_feed_degrades_rather_than_dying(self):
         """The guard has to leave a feed the front door can use. An empty feed
@@ -16977,6 +16993,123 @@ class BuildSlateExitContractTests(unittest.TestCase):
         src = self._PATH.read_text(encoding="utf-8")
         self.assertIn('"status": "lineups_feed_unavailable"', src)
         self.assertIn("first fetch failed", src)
+
+
+class BuildSlateFeedReadGuardTests(unittest.TestCase):
+    """R213. The two lineups reads in main(), driven end to end.
+
+    `REPO` is patched to a temp tree so staging, the slate dir and outputs all
+    land there; `run_classic` is patched so the fixture stops at the feed
+    decision instead of solving; and `fetch_lineups` always raises, so the two
+    legs are told apart by which feed reaches `run_classic` rather than by
+    whether a network call happened."""
+
+    _SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r213_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _run(self, extra_argv=()):
+        """Returns (exit code, stdout, stderr, the feed run_classic received).
+
+        DK covers every side of this fixture, and a covered slate short-circuits
+        the whole feed chain (R143), so coverage is patched to uncovered: these
+        tests are about the legs a slate DK has NOT fully posted reaches."""
+        import contextlib
+        import io
+        from mlb_engine.intake import live_data_adapters as _lda
+        mod = self._module()
+        seen = {}
+
+        def fake_run_classic(args, slate_dir, salary, entries, feed, deadline):
+            seen["feed"] = feed
+            return 3, {}
+
+        def boom(*a, **k):
+            raise OSError("no route to statsapi")
+
+        argv = ["build_slate.py", "--salary", str(self._SALARY),
+                "--entries", str(self._SALARY), "--past-slate-replay",
+                *extra_argv]
+        out, err = io.StringIO(), io.StringIO()
+        with unittest.mock.patch.object(mod, "REPO", self.root), \
+                unittest.mock.patch.object(mod, "run_classic", fake_run_classic), \
+                unittest.mock.patch.object(mod, "fetch_lineups", boom), \
+                unittest.mock.patch.object(_lda, "dk_order_coverage",
+                                           lambda *a, **k: ([], ["NYY", "BOS"])), \
+                unittest.mock.patch.object(sys, "argv", argv):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = mod.main()
+        return code, out.getvalue(), err.getvalue(), seen.get("feed")
+
+    def test_an_unreadable_supplied_feed_refuses_at_exit_4(self):
+        """A mistyped `--lineups` raised FileNotFoundError past every handler.
+        A feed the operator named and this build cannot read is bad input, and
+        the refusal names the path and the parse error."""
+        missing = self.root / "nope" / "lineups_feed.json"
+        code, out, _err, feed = self._run(["--lineups", str(missing)])
+        self.assertEqual(code, 4)
+        self.assertIsNone(feed, "it went on to build against a feed it never read")
+        payload = json.loads(out)
+        self.assertEqual(payload["status"], "supplied_feed_unreadable")
+        self.assertEqual(payload["feed"], str(missing))
+        self.assertIn("FileNotFoundError", payload["error"])
+        self.assertIn("staged feed was NOT overwritten", payload["note"])
+
+    def test_a_malformed_supplied_feed_refuses_with_the_parse_error(self):
+        """The other half of the same leg: JSONDecodeError, not just a missing
+        path, and the operator gets the parse error rather than a stack."""
+        torn = self.root / "half_written.json"
+        torn.write_text('{"games": [{"away":', encoding="utf-8")
+        code, out, _err, _feed = self._run(["--lineups", str(torn)])
+        self.assertEqual(code, 4)
+        payload = json.loads(out)
+        self.assertEqual(payload["status"], "supplied_feed_unreadable")
+        self.assertIn("JSONDecodeError", payload["error"])
+
+    def _stage_feed(self, text):
+        feed_path = self.root / "data" / "slates" / "2026-07-29" / "lineups_feed.json"
+        feed_path.parent.mkdir(parents=True, exist_ok=True)
+        feed_path.write_text(text, encoding="utf-8")
+        return feed_path
+
+    def test_a_torn_staged_feed_is_absent_and_falls_through_to_the_fetch_leg(self):
+        """A torn `lineups_feed.json` is the ordinary consequence of a killed
+        Cowork call, and the guarded fetch leg right beside it would have
+        handled it. Now it does: the cache is ABSENT, the fetch is attempted
+        and fails, and the build degrades to an empty feed rather than dying."""
+        self._stage_feed('{"games": [{"away"')
+        code, _out, err, feed = self._run()
+        self.assertEqual(code, 3, "the build did not survive a torn cache")
+        self.assertEqual(feed, {"games": []},
+                         "a torn cache did not degrade to the empty feed")
+        self.assertIn("staged_feed_unreadable", err)
+        self.assertIn("JSONDecodeError", err)
+        self.assertIn("lineups_feed_unavailable", err)
+
+    def test_a_readable_staged_feed_is_still_used(self):
+        """The positive control. Without it, treating every cache as absent
+        passes the test above and retires the staged feed entirely."""
+        self._stage_feed(json.dumps({"games": [{"away": {"team_abbrev": "NYY"}}]}))
+        code, _out, err, feed = self._run()
+        self.assertEqual(code, 3)
+        self.assertEqual(feed, {"games": [{"away": {"team_abbrev": "NYY"}}]},
+                         "the staged feed was discarded")
+        self.assertNotIn("staged_feed_unreadable", err)
+        # The refetch was attempted and failed, so the stale copy is reused and
+        # says so -- which is the pre-R213 behaviour on this leg, unchanged.
+        self.assertIn("stale feed reused", err)
 
 
 class SupervisorHardeningTests(unittest.TestCase):

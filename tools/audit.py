@@ -319,7 +319,16 @@ EXPECTED_SUITE_COUNTS = {
     # backlog entry did not enumerate), and the AST property that every return
     # in main() sits immediately after a `_write`, so the next exit door added
     # fails here rather than in a post-mortem that was never written.
-    "tests.test_core": 887,
+    # R213, 2026-08-28: 887 -> 891, the four that pin build_slate's two lineups
+    # reads. Two on the supplied feed refusing at exit 4 with the path and the
+    # parse error (a missing path and a torn one, since FileNotFoundError and
+    # JSONDecodeError are different operator mistakes); one on a torn staged
+    # cache being ABSENT and falling through to the guarded fetch leg; one
+    # positive control that a readable cache is still used, without which
+    # discarding every cache passes the test above. R168(b)'s AST test was
+    # widened in place from `fetch_lineups` to the call SHAPE, so it now covers
+    # `read_text` too and its name changed with its scope.
+    "tests.test_core": 891,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
