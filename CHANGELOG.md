@@ -25,6 +25,76 @@ performance claim.
 
 ---
 
+## 2026-08-28 — ed9 Codex adjudication (the leverage/portfolio spec): zero new numbers, twelve riders/amendments on the R251–R262 lane, R252 retitled, R258 and R262 re-specified before build, ninth rebuild rejection (docs only)
+
+DEV, claim `engine` (`engine_codex_lev_synthesis_2026-08-28`). Docs-only
+landing: `docs/backlog.md`, this file, the archived edition at
+`docs/2026-08-28_critique_leverage_portfolio_codex.md` (the untracked root
+copy moved to `_to_delete/`, ed8 precedent; upload and root copy verified
+byte-identical by sha256). Audit: `PASS v2.26.0 26 modules` WITHOUT the
+test gate — ed8's docs-only reasoning, the next code landing runs it
+regardless — plus the audit's own fetch note that two commits await Ben's
+push. Working-tree dirt was ARCHIVE-owned (`data/`, `ledger/`) plus
+untracked standings material, classified and left alone.
+
+**What was adjudicated.** The ninth outside edition (Codex, dated
+2026-08-28), reviewed at exactly this HEAD (`0a83cac`) — the second
+consecutive zero-drift review, and the first aimed at the R251–R262 lane
+rather than the whole engine. Its §1.3 adjudicates the twelve filings one
+by one; its §1.1 list of assets worth preserving is the board's own
+operational stack. Citations spot-checked true: the thesis weights at
+`showdown_theses.py:273-277` (0.26/0.22/0.24/0.16/0.12 verbatim) and the
+unwired ownership constraints at `optimizer_v3.py:889-918` (= R246's
+finding).
+
+**The shape of the landing.** The lane it reviews was filed yesterday and
+none of it is built, so accepted matter lands as dated riders and in-place
+amendments on the entries themselves — correcting a spec before build
+beats minting parallel numbers — and the fifteen-slot queue and Tier 2
+spine order are untouched. Accepted: the conditional threshold `T[s,c]`
+on R258's predict half, with its covariate columns named into the one
+R48+R83+R258 mining batch before that batch runs (the edition's sharpest
+point: own scores and the top-1% line co-move because they arise from the
+same slate, so an independently predicted point threshold biases
+P(own ≥ T)); R262's weighted sum replaced by an epsilon-constraint sweep
+emitting a nondominated frontier (per-contest `A*_c`, retention, three
+washout readings, binding-guardrail cost; zero `A*_c` reads UNKNOWN,
+never divides), operating point chosen once as Tier 4 policy; R261
+clauses — slate-wide shared scenarios, MC error/ESS on every P̂,
+DESIGN/SELECT/REFEREE bank purposes, `T[s,c]` consumption, stratification
+with retained likelihood weights, vectorized-scoring and CPT/UTIL
+single-outcome notes, the three-way realized-washout grade with the promo
+channel named unmeasured; R255's tail-axis + predeclared metrics +
+slate-date splits + the distribution-metric upgrade path; R254's
+captain-OPTIMALITY stage 2 behind R261; R253's market-total ablation
+(park information priced into the total is never counted twice); R260's
+pitcher↔opposing-hitter negative-dependence row with shrinkage and
+per-cell block-bootstrap SEs; R252's vector interface, retitle,
+both-markets doctrine sentence, and the R259-fed tail delta; one-liners
+on R256 (SEAM-style synthetic-comparable shrinkage when pulled), R259
+(explicit opportunity modeling as a pull-conditioned refinement), R10
+(duplication never estimated as an ownership product), R141
+(R261-conditional recourse report, gated, report-only).
+
+**Rejected, reasons in "Do not build (updated)":** the field/settlement
+build-first program (ninth consecutive rejection; its Phases 0–4 map onto
+the funded lane as corrected, which is convergence, not new work),
+contest routing (Ben's manual action behind the money wall; the evidence
+half is R258's table), ensembles/CVaR before any grade exists, §2.4's
+signal shopping list (enters only through R255's residual-priced pull
+condition), the §2.5 register ceremony (its one-line form is R255's
+rider), §8.1's module-cap misread (the audit's module count is an
+inventory pin, not a cap), and §7.3's cap demotion as a present-tense
+change (it is R262's end state, behind the same gates; R153's caps stand
+as shipped).
+
+**The synthesis in one sentence.** The edition endorses the lane's
+sequence and largely re-derives the board's own rules — its "stop doing"
+list is the Truthful-labels rule and the sim-gate clauses restated — and
+the correction that survives contact is the conditional threshold, landed
+on the entry the day before the mining batch would have baked the biased
+version in.
+
 ## 2026-08-27 — R251–R262 filed: the leverage-and-dual-objective lane, from Ben's greenfield instruction; Tier 2 resequenced; the do-not-build sim line narrowed, not deleted (docs only)
 
 DEV, claim `engine` (`engine_backlog_greenfield_2026-08-28`), second docs
