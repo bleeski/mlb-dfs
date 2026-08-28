@@ -312,7 +312,14 @@ EXPECTED_SUITE_COUNTS = {
     # blocker rather than one per side; and a postponed timeless game being
     # excluded rather than blocked, with the off-slate blocker scope and its
     # positive control riding the last one).
-    "tests.test_core": 884,
+    # R212, 2026-08-28: 884 -> 887, the three that pin every exit from
+    # autobuild.main() flushing its decision log -- the wall-clock stop with
+    # `time.monotonic` patched past the deadline, the classification-drift stop
+    # (the tenth exit, which returned before `dec` existed and which the
+    # backlog entry did not enumerate), and the AST property that every return
+    # in main() sits immediately after a `_write`, so the next exit door added
+    # fails here rather than in a post-mortem that was never written.
+    "tests.test_core": 887,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

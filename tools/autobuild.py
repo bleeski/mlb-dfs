@@ -174,20 +174,41 @@ def main() -> int:
                          "has to describe the command that ran.")
     a = ap.parse_args()
 
+    # R212. `dec` is constructed before the first thing that can return, so
+    # every exit from main() has a log to flush. The drift stop below is a
+    # decision like any other -- "refusing to act on a stale arithmetic /
+    # strategy split" -- and it used to reach stderr and nothing else, against
+    # this file's own docstring promise that every decision lands in
+    # outputs/<date>/autobuild_decisions.json.
+    dec = Decisions()
+
     drift = assert_classification_in_sync()
     if drift:
         print(f"autobuild: {drift}", file=sys.stderr)
+        dec.add(0, "stop", drift)
+        _write(dec, {}, salary=a.salary)
         return 4
 
     deadline = time.monotonic() + a.stop_after_minutes * 60.0
-    dec = Decisions()
     controls: Dict[str, Any] = {}
     ignore_pool = False
     last_brief: Dict[str, Any] = {}
 
     for attempt in range(1, a.max_attempts + 1):
         if time.monotonic() > deadline:
-            dec.add(attempt, "stop", "supervised wall clock spent")
+            # R212. This was the one return in main() that did not flush, so
+            # the run that spent its entire window -- precisely the run whose
+            # post-mortem anyone needs -- filed no decision log at all.
+            # R169(a) fixed the identical defect on the TimeoutExpired path
+            # eight lines below, three days earlier, and did not enumerate the
+            # sibling. Reachable by construction on defaults: eight attempts at
+            # up to per_build_seconds + 90 each, against a twelve-minute wall
+            # clock. CLAUDE.md's Autonomy section rests on this log being the
+            # record of every decision; on this path there was no record.
+            dec.add(attempt, "stop", "supervised wall clock spent",
+                    attempts_made=attempt - 1,
+                    stop_after_minutes=a.stop_after_minutes)
+            _write(dec, last_brief, salary=a.salary)
             return 5
 
         entry = str(ASSERTED) if ignore_pool else str(BUILD)

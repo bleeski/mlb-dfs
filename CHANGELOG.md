@@ -25,6 +25,60 @@ performance claim.
 
 ---
 
+## 2026-08-28 — R212 + R213 + R214 + R215: the enumerated-siblings batch. every exit from the supervisor now files its post-mortem, two build_slate reads stop crashing where the guard beside them already handles it, an operator's override is merged rather than dropped, and the units rule reaches its last three sites
+
+DEV, claim `engine` (`engine_2026-08-28`). This IS the queue head — slot 1 of
+the ed7/ed8 sequence, all four P1 and all four VERIFIED-read. Session-start gate
+green before any edit: `PASS v2.26.0 26 modules 1313 tests`, assembled over five
+`--gate-run` calls after a `--gate-reset` (the recorded state was 20.9h old
+against a 6h limit). Working-tree dirt was ARCHIVE-owned (`data/`, `ledger/`)
+plus two untracked root tarballs, classified and left alone.
+
+**Why these four are one batch.** Each is the sibling a previous fix did not
+enumerate. R167 unified four copies of the units rule and R215 is the fifth,
+sixth and seventh sites. R168 guarded one function name in `build_slate.main()`
+and R213 is the two reads beside it. R169(a) saved the decision log on the
+timeout path and R212 is the exit eight lines below it. R169(d) made the
+supervisor's flags win and R214 is what "win" turned out to mean. R233 was
+written for exactly this, so each item below carries the enumeration of its own
+class rather than the count of the sites it happened to fix.
+
+**R212. The supervised wall clock returned 5 without flushing, and it was the
+only exit that did.** Eight attempts at up to `per_build_seconds + 90` against a
+twelve-minute wall clock is reachable by construction on defaults, so the run
+that grew the bank five times and ran out of window was precisely the run that
+filed no post-mortem. `_write(dec, last_brief, salary=a.salary)` now precedes
+the return. CLAUDE.md's Autonomy section rests on `autobuild_decisions.json`
+being the record of every decision; on this path there was no record.
+
+*The enumeration R233 asks for, and there was an eleventh site.* The backlog
+entry named eight flushing exits and one that did not. The class is "a return
+from `main()` that loses the decision log", and reading it off the source found
+a tenth exit the entry did not list: the classification-drift refusal at the top
+returned 4 before `dec` was constructed at all. That is a decision — "refusing
+to act on a stale arithmetic/strategy split" — and it reached stderr and nothing
+else. `dec = Decisions()` moved above it and it flushes like the rest. After
+both fixes:
+
+    $ grep -n '^ *return \|_write(dec' tools/autobuild.py | awk -F: '$1>=155 && $1<=365'
+    189:        _write(dec, {}, salary=a.salary)          | 190: return 4   drift
+    211:        _write(dec, last_brief, salary=a.salary)  | 212: return 5   wall clock  <- R212
+    262:        _write(dec, last_brief, salary=a.salary)  | 263: return 5   timeout (R169(a))
+    276:        _write(dec, brief, salary=a.salary)       | 277: return 4   inputs missing
+    295:        _write(dec, brief, salary=a.salary)       | 296: return 3   pool blocker unclassified
+    327:        _write(dec, brief, salary=a.salary)       | 328: return 3   strategy control
+    333:        _write(dec, brief, salary=a.salary)       | 334: return 3   remedy unreadable
+    345:        _write(dec, brief, salary=a.salary)       | 346: return 3   control mismatch
+    358:        _write(dec, brief, salary=a.salary)       | 359: return 3   no remedy
+    361:    _write(dec, last_brief, salary=a.salary)      | 362: return 0/3 loop exit
+
+Ten exits, ten flushes, no deliberately-kept copy. There is no eleventh: the
+test is the PROPERTY rather than the pair of sites, in R168(a)'s shape — every
+`ast.Return` in `main()`, nested functions excluded, must sit immediately after
+a `_write(...)` call in its own block, with a floor of ten returns so the check
+cannot pass by finding none. A new exit door added later fails there instead of
+in a post-mortem that does not exist.
+
 ## 2026-08-28 — ed9 Codex adjudication (the leverage/portfolio spec): zero new numbers, twelve riders/amendments on the R251–R262 lane, R252 retitled, R258 and R262 re-specified before build, ninth rebuild rejection (docs only)
 
 DEV, claim `engine` (`engine_codex_lev_synthesis_2026-08-28`). Docs-only

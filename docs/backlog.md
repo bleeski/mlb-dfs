@@ -3792,34 +3792,15 @@ before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
   and does not floor the pct caps, which is how 0.35 and 1 arrived on a
   `wta_satellite` slate whose own defaults are 0.45 and 2.
 
-### R212. The supervisor's wall-clock stop destroys the entire decision log: R169(a)'s exact defect on the sibling exit (P1, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-T2) and independently from the outside spec (D04); VERIFIED-read at `tools/autobuild.py:189-191`, re-read here
+### R212. CLOSED 2026-08-28 -- the supervisor's wall-clock exit flushes its
+decision log, and so does the drift exit the entry did not enumerate; entry
+migrated to CHANGELOG.md
 
-**What.**
-
-    if time.monotonic() > deadline:
-        dec.add(attempt, "stop", "supervised wall clock spent")
-        return 5
-
-Every other exit in `main()` flushes through `_write(dec, ...)` (`:241` timeout,
-`:255`, `:274`, `:306`, `:312`, `:324`, `:337`, `:340`). This one returns
-directly, so `outputs/<date>/autobuild_decisions.json` is never written at all.
-
-**Why.** R169(a) fixed this exact defect on the TimeoutExpired path eight lines
-below, three days ago, and the sibling was not enumerated. Reachable by
-construction on defaults: eight attempts at up to `per_build_seconds + 90` against
-a twelve-minute wall clock, so the run that grew the bank five times and ran out of
-window is precisely the run that files no post-mortem. Three independent reads
-agree (ed7's tools lane, its tests lane census, its coordinator) and the tests lane
-confirmed no test matches "wall clock": the seven new `SupervisorHardeningTests`
-drive TimeoutExpired and never this. CLAUDE.md's Autonomy section rests on
-`autobuild_decisions.json` being the record of every decision; on this path there
-is no record.
-
-**Why it is a precondition.** The R203 + R207 + R214 supervisor batch writes MORE
-into this log. The log has to survive the window before it is worth writing to.
-
-**Fix.** `_write(dec, last_brief, salary=a.salary)` before the return. Test: exit 5
-AND `len(logs) == 1`, with `time.monotonic` patched past the deadline.
+Ten exits from `autobuild.main()`, ten `_write` calls, no kept sibling. The
+CHANGELOG entry of that date carries the R233 enumeration and the tenth site
+(the classification-drift refusal, which returned 4 before `dec` existed). The
+test is the property, not the pair: every `ast.Return` in `main()` must sit
+immediately after a `_write(...)` in its own block.
 
 ### R213. Two unguarded reads in build_slate's `main()` are exit-1 crash doors of R168's class, and autobuild logs them as a refusal with no remedy (P1, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-T4) and independently from the outside spec (D06); VERIFIED-read at `build_slate.py:3219`, `:3261`
 

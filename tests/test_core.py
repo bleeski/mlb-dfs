@@ -16991,9 +16991,13 @@ class SupervisorHardeningTests(unittest.TestCase):
         self.salary = (REPO / "tests" / "fixtures" / "slates"
                        / "DKSalaries_frozen_2026-07-29.csv")
 
-    def _run(self, side_effect, extra_argv=()):
+    def _run(self, side_effect, extra_argv=(), sync=lambda: None):
         """Drive autobuild.main() with a patched subprocess and a private REPO,
-        and hand back (exit code, decision log records, commands issued)."""
+        and hand back (exit code, decision log records, commands issued).
+
+        ``sync`` stands in for ``assert_classification_in_sync``; the default
+        is the in-sync answer, and a test that wants the drift exit passes a
+        reason string back instead."""
         cmds = []
 
         def fake_run(cmd, **kwargs):
@@ -17007,7 +17011,7 @@ class SupervisorHardeningTests(unittest.TestCase):
                 unittest.mock.patch.object(self.ab.subprocess, "run", fake_run), \
                 unittest.mock.patch.object(sys, "argv", argv), \
                 unittest.mock.patch.object(self.ab, "assert_classification_in_sync",
-                                           lambda: None):
+                                           sync):
             code = self.ab.main()
         logs = sorted(root.glob("outputs/*/autobuild_decisions.json"))
         records = []
@@ -17159,6 +17163,82 @@ class SupervisorHardeningTests(unittest.TestCase):
         self.assertEqual(json.loads(second[positions[-1] + 1]),
                          {"max_sp_pair_repetition": 3})
         self.assertLess(second.index("--past-slate-replay"), positions[-1])
+
+    def test_the_wall_clock_stop_files_its_decision_log(self):
+        """R212. The supervised wall clock returned 5 directly, so the ENTIRE
+        decision log was lost -- R169(a)'s exact defect on the sibling exit
+        eight lines away, fixed three days earlier and not enumerated. This is
+        the run that grew the bank five times and ran out of window, i.e. the
+        one run whose post-mortem is worth having."""
+        calls = []
+
+        def fake_monotonic():
+            # First read sets the deadline; the loop's read is past it.
+            calls.append(1)
+            return 0.0 if len(calls) == 1 else 10_000.0
+
+        with unittest.mock.patch.object(self.ab.time, "monotonic",
+                                        fake_monotonic):
+            code, records, cmds, logs = self._run(
+                lambda n, cmd, kwargs: self._proc(0, {"status": "certified"}))
+        self.assertEqual(code, 5)
+        self.assertEqual(cmds, [], "it started a build after the window closed")
+        self.assertEqual(len(logs), 1, "the decision log was not written")
+        self.assertEqual([r["action"] for r in records], ["stop"])
+        self.assertIn("wall clock", records[0]["why"])
+
+    def test_the_classification_drift_stop_files_its_decision_log(self):
+        """The same class, one exit earlier: a drift refusal is a decision, and
+        it used to reach stderr only. `dec` is now built before the first thing
+        that can return, so this exit has a log to flush like every other."""
+        code, records, cmds, logs = self._run(
+            lambda n, cmd, kwargs: self._proc(0, {}),
+            sync=lambda: "classification drift: refusing to act")
+        self.assertEqual(code, 4)
+        self.assertEqual(cmds, [])
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(records[0]["action"], "stop")
+        self.assertIn("classification drift", records[0]["why"])
+
+    def test_every_return_in_main_is_preceded_by_a_flush(self):
+        """R212, as the PROPERTY rather than the one site, per R233.
+
+        R169(a) closed the timeout exit and the wall-clock sibling eight lines
+        below it survived, because the fix was written against a site and not
+        against the class. The class is 'a return from main() that loses the
+        decision log', and it is checkable: every return in this function has
+        to sit immediately after a `_write(...)` call in its own block. A new
+        exit door added later fails here rather than in a post-mortem that
+        does not exist."""
+        import ast
+        src = (REPO / "tools" / "autobuild.py").read_text(encoding="utf-8")
+        main = next(n for n in ast.parse(src).body
+                    if isinstance(n, ast.FunctionDef) and n.name == "main")
+        nested = {n for f in ast.walk(main)
+                  if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                    ast.Lambda)) and f is not main
+                  for n in ast.walk(f)}
+        seen, unflushed = [], []
+        for node in ast.walk(main):
+            for field in ("body", "orelse", "finalbody"):
+                block = getattr(node, field, None)
+                if not isinstance(block, list):
+                    continue
+                for i, stmt in enumerate(block):
+                    if not isinstance(stmt, ast.Return) or stmt in nested:
+                        continue
+                    seen.append(stmt.lineno)
+                    prev = block[i - 1] if i else None
+                    if not (isinstance(prev, ast.Expr)
+                            and isinstance(prev.value, ast.Call)
+                            and getattr(prev.value.func, "id", "") == "_write"):
+                        unflushed.append(stmt.lineno)
+        self.assertGreaterEqual(len(seen), 10, "main() lost its exit doors; "
+                                               "re-scope this test")
+        self.assertEqual(unflushed, [],
+                         f"main() returns at lines {unflushed} without flushing "
+                         f"the decision log first; that exit files no "
+                         f"post-mortem (R212, and R169(a) before it)")
 
 
 if __name__ == "__main__":
