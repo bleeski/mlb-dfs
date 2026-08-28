@@ -25,6 +25,69 @@ performance claim.
 
 ---
 
+## 2026-08-27 — R251–R262 filed: the leverage-and-dual-objective lane, from Ben's greenfield instruction; Tier 2 resequenced; the do-not-build sim line narrowed, not deleted (docs only)
+
+DEV, claim `engine` (`engine_backlog_greenfield_2026-08-28`), second docs
+landing this date. No engine, tool, test, or skill surface changed; audit
+rode the previous landing's line (`PASS v2.26.0 26 modules`, test gate
+deliberately deferred to the next code landing, unchanged reasoning).
+
+**Decided (Ben, 2026-08-27, in-session instruction).** Two decisions worth a
+dated record. FIRST, the dual objective's apex end is refined from "large
+wins" to **maximize P(finishing in roughly the top 1% of the field) within
+each entered contest**, and the washout end stays portfolio-level:
+**minimize P(no entry on the slate clears its floor)**. MLB_Classic.md and
+CLAUDE.md's dual-objective paragraphs gain that sentence when R258 lands its
+first threshold numbers, so the authority docs carry a defined quantity
+rather than a slogan. SECOND, a greenfield lane is FUNDED for measurement:
+data-driven mispricing/leverage (R251–R256) and the dual-objective
+machinery (R257–R262), everything shipping as labeled priors or pre-lock
+predictions graded in the ledger BEFORE steering selection; the production
+objective switch (R262) stays a Tier 4 decision that reads the same grades
+R13 wants.
+
+**The design, compressed.** Leverage: one mispricing score per player
+against TWO anchors — salary-implied points (the archive's realized-FPTS
+regression; catches NEWS: line moves since pricing, order promotions) and
+projected ownership (the softer market, where leverage actually lives) —
+component-attributed (platoon/arm, park, xwOBA−wOBA recency gap, line move,
+slot promotion), Showdown-first through R249's flag, captain-leverage as its
+sharpest application (R254), and graded every slate exactly as R135 grades
+ownership (R255). Dual objective: the archive's standings hold every
+contest's realized score curve, so **predict the thresholds instead of
+simulating the field** — mine winning/p99/cash/ticket lines per archetype
+(R258, riding the R48+R83 mining batch), model our own portfolio's joint
+outcomes against them (R259 variance basis from 29,921 archived FPTS rows +
+Statcast shape; R260 empirical teammate/game correlation, minable today),
+emit P̂(top-1%) and P̂(washout) as graded pre-lock predictions (R261), and
+only then let selection optimize coverage of those scenarios (R262,
+set-cover-shaped MILP under `scipy.optimize.milp`, caps demoted to
+guardrails — the structural resolution of R247's skill-blind-cap finding).
+Showdown gets the cheap version first: the script axis IS the thesis
+labels, so R257 + R239(c) deliver per-contest script coverage with no
+sampling at all.
+
+**Filed:** R251 (per-slate input freeze + morning odds capture;
+`data/odds_history/` measured at two files, both July — the capture half
+rides the next slate session), R252 (mispricing score, R137 rides), R253
+(park×hand×profile factor, after R252 grades a cycle), R254 (captain
+mispricing screen; deps R225/R238/R252), R255 (skill-signal grading loop),
+R256 (arsenal-vs-profile matchup, gated on measured residual; raw BvP stays
+banned), R257 (kill-matrix extension: teams, arms, Showdown scripts; rides
+queue slots 6–7), R258 (threshold model: mine + predict + grade; also the
+contest-selection evidence R13 and D2 wait on), R259 (variance basis, sim
+gate clause 3), R260 (correlation structure from the archive — also the
+first empirical grading of the stack-shape beliefs), R261 (own-portfolio
+scenario bank, separate seeded banks + joint own-entry settlement designed
+in, sim gate clause 4), R262 (scenario-coverage selection, production
+switch gated). Tier 2's spine resequenced in place (its new item 0 carries
+the order and the one-mining-batch consolidation); Tier 4 gains R262's
+switch; the do-not-build section gains the dated narrowing paragraph — the
+"no Monte Carlo field-ROI engine" line now carves out own-portfolio banks
+with graded outputs while field simulation, duplication-conditioned prize
+share, and ROI statements stay behind R10 + R13 unchanged. The fifteen-slot
+defect queue is unchanged.
+
 ## 2026-08-27 — ed8 Codex greenfield adjudication: R236–R250 filed, seven scope riders, the rebuild rejected an eighth time, twelve fragments consumed, queue resequenced to fifteen slots (docs only)
 
 DEV, claim `engine` (`engine_backlog_resync_2026-08-28`; `engine_2026-08-20`

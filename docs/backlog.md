@@ -39,6 +39,38 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-27 late, second note (UTC 2026-08-28), DEV, claim `engine`
+(`engine_backlog_greenfield_2026-08-28`): **Ben opened a greenfield lane, by
+dated instruction: find data-driven leverage (skill signals the salary file
+and the field have not priced, Showdown especially), and get materially
+better at the dual objective — which he refined to "maximize P(top ~1% of
+field) per contest; minimize P(total washout) per portfolio." Filed:
+R251–R262, twelve items, all in Tier 2's lane.** The design in one breath:
+the mispricing machine is one score per player against TWO anchors (salary →
+value, projected ownership → leverage), component-attributed and graded every
+slate like the ownership prior already is; and the dual objective stops
+requiring a field simulator, because the archive's standings hold every
+contest's realized score curve — predict the THRESHOLDS (top-1% line, cash
+line, ticket line) per archetype, model our own portfolio's joint outcomes
+against them, and the two goals become one scenario-coverage solve. The
+sim-gate's four clauses become the roadmap's acceptance criteria rather than
+a wall: R259 is the variance basis, R260 the correlation structure (minable
+from archived FPTS today), R261 designs in separate banks and joint
+own-entry settlement, and R10 + R13 still gate anything field-conditioned
+and the production switch (R262, Tier 4 decision). Truthful labels hold
+throughout: everything ships as a labeled prior or a pre-lock prediction
+graded in the ledger BEFORE it is allowed to steer selection.
+
+**The defect queue's fifteen slots are unchanged**, with two rides: R257
+(kill-matrix extension to teams, arms, and the Showdown script axis) rides
+slots 6–7's sessions, same surfaces; and R251's CAPTURE half — the morning
+odds snapshot and the per-slate expected-stats freeze — rides the next
+session that touches a slate, because every slate that passes uncaptured is
+grading data lost forever (R135's own argument; `data/odds_history/` holds
+two files, both July, measured this session). Tier 2's spine is resequenced
+in place; the do-not-build section gains the dated scope paragraph narrowing
+the sim line. Full reasoning: this date's second CHANGELOG entry.*
+
 *2026-08-27 late (UTC 2026-08-28), DEV, claim `engine`
 (`engine_backlog_resync_2026-08-28`): **the eighth greenfield edition is
 adjudicated and the inbox is consumed. Docs only — no code moved.** The outside
@@ -1123,6 +1155,25 @@ and the narrative history accumulates at the bottom, not here.*
 
 ## Tier 2 — the measurement loop. The strategy payoff everything else is gated on, in this order.
 
+0. **Resequenced 2026-08-27 (Ben's greenfield instruction: data-driven
+   leverage, and the dual objective as P(top ~1%) per contest / P(washout)
+   per portfolio).** The tier absorbs R251–R262 and its working order is:
+   **R118** (+the settle rider — now load-bearing twice, since R258 mines
+   thresholds off the same standings and R262 eventually optimizes against
+   them) → **R48 + R83 + R258's mining half + R254's share prior** (ONE
+   mining batch: leverage table, factor-audit persist, contest thresholds,
+   captain shares) → **R251** (input freeze; capture half rides the next
+   slate session, ahead of this position) → **R252** (+R137 riding) →
+   **R255** (grade it) → **R10** (unchanged: the fitted ownership model,
+   still gated on R225 for Showdown cells, now also feeding R254 and R262's
+   eventual prize-share reading) → **R258's predict half** → **R260** →
+   **R259** → **R261** → **R262 (gated, Tier 4)** → **R140**. Hanging off
+   with named conditions: R253 (after R252 grades a cycle), R254 (after
+   R225 + R238), R256 (only on R255-measured residual). R13 stays the
+   umbrella decision and now has a defined evidence stream: R258's
+   threshold-vs-construction table and R261's graded tail predictions are
+   what make the stakes decision decidable on data.
+
 16. **R118** (P1, M, WS7/WS2) — retain the per-player FPTS map the miner
     already computes and strips (`field_miner.py:1961`), and ship the
     counterfactual replay tool. This moves to the head of the tier because
@@ -1299,7 +1350,18 @@ and the narrative history accumulates at the bottom, not here.*
   four worst on 2145_1g_sd). Options on the entry: scale the cap by the
   build's own Base rank, or cap correlated BLOCKS (k-subset sharing) instead
   of persons. Either is a strategy change and Ben's; R247(a-c) lands the
-  measurements that price this decision first.
+  measurements that price this decision first. Note R262 is the structural
+  resolution of this same question — if coverage selection ships, the cap
+  reverts to a guardrail and (d) may not need deciding at all.
+- **R262's production switch (dated 2026-08-27, from the greenfield
+  instruction) — when scenario-coverage selection replaces the
+  Ceiling-proxy objective.** The instruction funds the WALK (R251–R261:
+  capture, grade, model, predict — all measurement, none of it changes what
+  gets built); switching SELECTION to optimize P(top-1%)/P(washout) changes
+  every delivered file and lands only after R261's predictions grade
+  adequately across a stated number of slates, with the threshold Ben's to
+  set. Reads the same evidence R13 wants, so decide them together or in
+  sequence — but the walk does not wait on either.
 - **R34-tail** (three wrong `upload_ready` records in a provenance file),
   **R25-tail** (minimal-repair fast path), **R111(b)** (one GitHub setting:
   default branch to `main`), **Sync-tail** (the PAT; nothing blocks on it,
@@ -2342,6 +2404,221 @@ prior supports, and ledger 3.17 has supersatellites chalk-NEGATIVE for
 winners, so this is a direction to test, never a number to apply. R209 owns
 the objective/calibration half, unchanged.
 
+### R252. The mispricing score: one number per player, two anchors, components attributed (P1, M; S with components (a)–(c) only) | new 2026-08-27, from Ben's greenfield instruction; the 2145_1g_sd session's hand-built BUY/FADE model (consumed into R247/R249) is the prototype
+
+**What.** The enrichment stack adjusts the projection and nothing states the
+DIVERGENCE. Two anchors, because they are different markets: salary-implied
+points (a salary→realized-FPTS regression per format and role, fit on the
+archive's 29,921 player-contest rows) answers "is this player mispriced by
+DK," and the ownership prior answers "is this player underpriced by the
+FIELD." The honest expectation, stated up front: DK prices skill well on
+average, so the salary anchor mostly catches NEWS (components (d)–(e)); the
+ownership anchor is the softer market and is where leverage actually lives.
+Components, each attributed in the output: (a) opposing-arm and platoon delta
+(F4 already computes both), (b) park delta (F5 today, R253's refinement
+later), (c) the xwOBA−wOBA gap and its recent trend — skill leads results,
+salary and field ownership chase results, and Savant carries both columns,
+(d) line movement since salary post (needs R251's morning capture), (e)
+batting-order promotion against the slot expectation APPG embeds. (f) is
+R137's HR-implied-vs-structural-own screen, which RIDES here unchanged,
+quota note intact.
+
+**Why.** This is Ben's thread-1 ask made mechanical. The operator lever
+already exists (R249 `--projections`, R246 `--leverage`) and the LIST feeding
+it is hand-built per session; the 2145_1g_sd build proved both the value and
+the cost of that.
+
+**Fix.** One module emitting the ranked list (BUY and FADE ends) with per-
+component attribution, into the brief and qa as a review surface. LABELED
+PRIOR; no solver input until R255 grades it. Showdown reach through R249's
+flag. Feeds R209's part C and R254. Late-swap application cross-refs R141.
+
+### R253. Park factor conditioned on handedness and profile: the F5 refinement that reprices power for tonight's venue (P2, M) | new 2026-08-27, from Ben's greenfield instruction (his own example: xwOBA that plays up in a specific park)
+
+**What.** F5 is a global park/weather run environment. The example Ben named
+needs park×handedness at minimum (the short-porch LHH case), and Statcast
+publishes the direct instrument: per-park expected HR ("a HR in N of 30
+parks"), which reprices a batter whose season line is suppressed or inflated
+by home park the moment tonight's venue differs.
+
+**Why.** Power is where the spike in nightly FPTS lives (R259's shape
+finding), so park×hand mispricing concentrates exactly where top-1% scores
+come from.
+
+**Fix.** A per-park×hand factor table (S), an optional profile term
+(pull-rate × porch geometry) after; applies as an F5 refinement and R252
+component (b). **Sequenced AFTER R252 grades a cycle:** add components where
+R255's residuals say they matter, not on principle.
+
+### R254. Captain mispricing screen: the Showdown apex lever (P1, S-M once deps land) | new 2026-08-27, from Ben's greenfield instruction; depends R225 (captain-truth), R238 (archetype key), R252
+
+**What.** In Showdown the top-1% question is mostly "right captain, right
+script." The field's captain share concentrates on the top APPG names; the
+archive holds realized captain ownership per contest (countable correctly
+once R225 lands). Join R252's skill list to a captain-share prior by
+archetype and rank CAPTAIN leverage — the BUY-graded mid-salary bat with a
+platoon+park edge at a 2% captain share is the play the ladder should be
+able to name.
+
+**Why.** The 1.5x slot is the highest-leverage seat on the card and the one
+place mispricing pays double; today the ladder captains by thesis template
+and APPG with no attention model at all.
+
+**Fix.** `captain_share_prior` mined by archetype (rides the R48/R258 mining
+batch), joined to R252, output feeding R139's step-2 ladder targets and
+R250's reservation pass. R10's fitted prior upgrades the share model when it
+lands; this ships on the archive's observed shares first.
+
+### R255. Grade the skill signal the way the ownership signal is graded (P1, S) | new 2026-08-27, from Ben's greenfield instruction; the R135 pattern on the projection side
+
+**What.** R135 wired predict-then-grade for ownership; nothing grades the
+projection or R252's mispricing list. Per slate: persist the pre-lock list
+(immutable under R251's freeze), and at archive time grade realized FPTS by
+BUY/FADE bucket and by COMPONENT against the salary-implied baseline —
+counts and deltas on observed outcomes, n stated, never a probability claim.
+Rolling table in the ledger's calibration section; the archival runbook
+gains the step beside the ownership grade (ARCHIVE's half).
+
+**Why.** This is the bar R209 set: a signal earns objective weight by
+grading, and it is what licenses R252 to ever leave review-only. It also
+prices R253/R256's pull conditions instead of arguing them.
+
+**Fix.** `mispricing_grade` beside `ownership grade` in the mine pass; ledger
+section extends 3.17's leverage table with the skill axis.
+
+### R256. Arsenal-vs-profile matchup layer — explicitly NOT raw BvP (P2, L; gated on R255 residuals) | new 2026-08-27, from Ben's greenfield instruction, filed with its pull condition
+
+**What.** Batter run values by pitch class (Statcast) crossed with the
+opposing arm's arsenal mix, shrunk empirical-Bayes toward season skill. Raw
+batter-vs-pitcher stays banned — the samples are noise and the archive's own
+truthful-labels rule applies to inputs too.
+
+**Why/Gate.** Highest-variance idea in the lane, most expensive, and only
+worth building if R255's grading shows matchup-shaped residual AFTER
+(a)–(c) land. Pull condition named per Tier 6 discipline: a measured
+residual, not an argument.
+
+### R257. Extend the kill matrix: teams, arms, and the Showdown script axis (P1, S; rides queue slots 6–7) | new 2026-08-27, from Ben's greenfield instruction; extends R126's shipped washout block
+
+**What.** R126's washout proxy zeroes a GAME's hitters. The events that
+actually kill portfolios are finer: one TEAM quiet (kills its stacks, not
+the game's other side), one of OUR arms blowing up, and in Showdown the
+game SCRIPT — favorite-runaway / close / underdog / duel — which the thesis
+labels already encode, so per-contest script coverage is nearly free once
+R239(c) reports slices.
+
+**Why.** These are the deterministic halves of Ben's washout goal,
+buildable now with no distributions and no gate: the readout is "which
+single event zeroes how many entries in this CONTEST," which is exactly the
+question the 08-24/08-26 fragments kept answering by hand.
+
+**Fix.** Add team-zero and own-arm-blowup rows to R126's kill matrix; map
+thesis labels → script axis and print per-contest script coverage in the
+R239(c) block. Proxies, labeled as such, in the brief beside apex/washout.
+
+### R258. The threshold model: mine what top-1% and cashing REQUIRED, then predict it pre-lock and grade it (P1; mining half S rides the R48+R83 batch, predict half M) | new 2026-08-27, from Ben's greenfield instruction; the load-bearing idea of the dual-objective lane
+
+**What.** Every archived contest's standings hold the full realized score
+curve. Mine per-contest: winning score, p99 / p95 / p90 lines, cash line,
+ticket line for satellites, and duplicate count at the top, into a
+per-archetype × field-size table (preconditions: R226's rank truth; R118's
+draftgroup keying caveat). Then the predict half: pre-lock, predict
+tonight's thresholds from slate features (implied-run environment, field
+size, archetype, format) and grade the prediction per slate in the ledger,
+R135-style.
+
+**Why.** This converts "maximize P(top 1%)" from a field-simulation problem
+into a scalar prediction problem: P(top 1%) = P(own score ≥ p99 line), no
+opponent-lineup generator required — the archive already watched the field
+so we do not have to simulate it. Prize SHARE still needs duplication (R10's
+lane, unchanged). The same table prices contest SELECTION — which archetypes
+post thresholds our construction actually reaches — which is evidence R13
+and D2 have been waiting on, and R40's routing reads it too. A threshold is
+an observed outcome; a predicted threshold graded per slate is exactly the
+label discipline the ledger already runs.
+
+**Fix.** Mining pass emits `contest_thresholds` beside R48's leverage table
+(one batch, one re-mine); predict half is a small model with two baselines
+(archetype median; environment-scaled) so beating naive is demonstrated, not
+asserted.
+
+### R259. The variance basis: per-player nightly FPTS distribution priors, graded distributionally (P1, M) | new 2026-08-27, from Ben's greenfield instruction; satisfies the sim gate's third clause, and is buildable from what the archive already holds
+
+**What.** The sim gate's own text: reopening the ladder without a variance
+basis reproduces the v2.20.0 retirement (sigma as a constant multiple of mu
+is structurally wrong). The basis exists in-house: 29,921 archived
+player-contest FPTS rows bucketed by role, salary band, batting slot,
+implied team total and platoon, with Statcast HR/K rates supplying the spike
+shape — hitter nightly FPTS is zero-heavy and HR-spiked, not Gaussian.
+
+**Why.** Both of Ben's quantities are tail statements; tails come from
+distributions, not point estimates. This is the piece that makes
+P(own ≥ threshold) computable at all.
+
+**Fix.** Empirical bucket distributions + parametric spike overlay; graded
+on held-out slates as stated-quantile coverage COUNTS (a distribution prior,
+graded, never a per-player probability claim until the ledger's n says so).
+R260's bucket findings inform the design, so R260 lands first.
+
+### R260. The correlation structure, mined from the archive (P1, S-M; do this FIRST in the modeling trio) | new 2026-08-27, from Ben's greenfield instruction; pure observed outcomes, no gate interaction
+
+**What.** Teammate co-movement of realized FPTS by batting-slot distance,
+same-team, same-game — measurable today across 26+ slate dates and 5,926
+(slate, player) observations. Nothing in the repo states how correlated
+slots 1–2 versus 1–6 actually are, while every stack rule assumes an answer.
+
+**Why.** Correlation is the washout objective's whole mechanism (entries
+fail TOGETHER through shared factors), the sim gate's joint-structure
+requirement, and — free side effect — the first empirical grading of
+MLB_Classic's stack-shape beliefs (4-2 vs 5-x carry assumptions this table
+confirms or reprices).
+
+**Fix.** One mining pass; a small table in the ledger's calibration
+section (team factor, slot-distance decay, game factor); feeds R259's
+buckets and R261's sampler.
+
+### R261. The own-portfolio scenario bank: predict P(top-1%) and P(washout) pre-lock, grade at archive time, steer nothing until graded (P1, M-L; gated only by its own inputs R258–R260) | new 2026-08-27, from Ben's greenfield instruction; designed inside the sim gate's clauses, not around them
+
+**What.** Sample joint player outcomes (R259 marginals, R260 team/game
+factors), score OUR candidates only, and emit two pre-lock predictions per
+delivery: per-entry P̂(score ≥ its contest's R258 threshold) and portfolio
+P̂(no entry clears its floor). Grade both in the ledger every archived slate
+(predicted vs realized frequency, n stated). NOT a field simulator: no
+opponent lineups, no ROI, no prize-share claims — those stay behind R10
+(dupes/ownership) and R13. The gate's fourth clause is designed in from
+birth: selection and grading run on separate seeded banks, and all own
+entries in one contest settle jointly.
+
+**Why.** This is the direct computation of both quantities Ben named, at a
+tenth the cost of the spec's field-simulation program, and gradeable
+immediately because the archive supplies the answer key every night. The
+Showdown degenerate case is nearly free — one game collapses the scenario
+space to the script grid the thesis ladder already enumerates — so R257
+delivers the format's washout half while this item is still being built.
+
+**Fix.** `scenario_bank` module + two brief fields, both labeled
+predictions-under-grading; ledger gains the rolling calibration table. The
+day its grades are adequate is the day R262 becomes decidable.
+
+### R262. Scenario-coverage selection: the dual objective as one solve (P1, L; PRODUCTION SWITCH GATED — Tier 4 decision, interacts with R13) | new 2026-08-27, from Ben's greenfield instruction
+
+**What.** With R261's hit matrix (candidate × scenario indicators for
+clearing the top threshold and the floor), portfolio assembly becomes:
+maximize scenarios where ≥1 entry clears the TOP line (apex end), plus a
+weighted term for scenarios where ≥1 entry clears its FLOOR (anti-washout),
+subject to the existing legality and cap guardrails — a set-cover-shaped
+MILP `scipy.optimize.milp` expresses directly. Selection then optimizes
+Ben's two stated quantities instead of Ceiling-proxy points, and R247's
+finding becomes structural: coverage replaces flat caps as the washout
+mechanism, caps remain as guardrails.
+
+**Why.** Exposure caps are crude covariance controls (R247 measured them
+demoting the four best players); coverage is the actual objective. Kept
+LAST deliberately: it changes what gets built, so it lands only after
+R261's predictions grade adequately across a stated number of slates AND
+Ben flips the switch (Tier 4; the R13 stakes decision reads the same
+grades).
+
 ## Workstream 3 — Intake and pool truth
 
 The pool is the strategy surface the contract defends hardest. R60 CLOSED
@@ -2650,6 +2927,30 @@ silent no-op), R106 (ticket_count expressiveness), both unchanged.
 **Fix.** Accept both spellings through one mapping owned beside
 `CONTEST_SHAPES`, or have the error name the mapping. Fragment §2 (Solo Shot
 Turbo) is recorded on R196 as the family's fourth occurrence, not here.
+
+### R251. Freeze the skill and market inputs per slate, or every slate is grading data lost forever (P1, S-M; the capture half rides the NEXT session that touches a slate) | new 2026-08-27, from Ben's greenfield instruction; the R135 argument applied to inputs; lands with R83, same discipline
+
+**What.** Grading any skill or mispricing signal needs the inputs AS OF LOCK,
+and two of three input classes are not captured: the expected-stats reference
+tables are mutable latest-files refreshed in place, and the odds exist only
+as the build-time packet — `data/odds_history/` holds two files, both July
+(measured this session), so "the line moved since DK priced the slate" (R252
+component (d)) is currently unmeasurable. The per-slate feed freeze
+(`data/slates/<date>/`) already does this correctly for lineups; extend the
+same discipline.
+
+**Why.** R135's own argument: the emit step exists so the grade step can. A
+backtest on today's season-cumulative Savant file against June slates is
+leakage; the leakage-SAFE retrospective path exists (Statcast queries accept
+date bounds, so season-to-date as-of any past date is reconstructable) and
+should be named in the item so nobody rediscovers or ignores it.
+
+**Fix.** (a) The slate bundle gains dated, hashed copies (or content hashes)
+of every reference table enrichment read — R83's hash-bind is this same
+discipline, land together. (b) A morning odds capture near salary post,
+timestamped, beside the build-time packet; both retained under
+`data/slates/<date>/`. (c) The backtest note: date-bounded Statcast pulls
+for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
@@ -5518,6 +5819,23 @@ captain-budget reservation, cap-cost visibility — are accepted as R239, R247
 and R250, which reach the named harms without the settlement stack. F-50
 restates the money-and-entry wall and is convergence data, treated as ed3-
 ed7's compliance paragraphs were.
+
+The 2026-08-27 greenfield instruction (Ben, dated, in-session) NARROWS one
+line of this list rather than deleting it. "No Monte Carlo field-ROI engine
+or play-by-play simulator until R13 scales stakes and R10's ownership is
+calibrated" now reads with a carve-out: **own-portfolio outcome banks whose
+outputs are pre-lock predictions graded in the ledger (R259–R261) are in
+scope**, because they simulate OUR lineups against archive-mined thresholds,
+not the field — no opponent lineups, no ROI arithmetic, no prize-share
+claims. What stays behind R10 + R13, unchanged: opponent-lineup/field
+simulation, duplication-conditioned prize-share estimates, and any ROI
+statement. The four sim-gate clauses are unchanged in substance and become
+the lane's acceptance criteria: the variance basis is R259 (clause 3),
+separate seeded banks for selection vs grading and joint settlement of own
+entries are R261's design requirements (clause 4), and R13/R10 gate R262's
+production switch (clauses 1–2). Reopening the sim ladder is therefore a
+sequence of graded steps, not an event, and the v2.20.0 retirement's cause
+(sigma as a constant multiple of mu) is the first thing the lane replaces.
 
 # Board history
 
