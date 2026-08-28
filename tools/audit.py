@@ -328,7 +328,17 @@ EXPECTED_SUITE_COUNTS = {
     # discarding every cache passes the test above. R168(b)'s AST test was
     # widened in place from `fetch_lineups` to the call SHAPE, so it now covers
     # `read_text` too and its name changed with its scope.
-    "tests.test_core": 891,
+    # R214, 2026-08-28: 891 -> 895, the four that pin the controls merge. The
+    # defect itself (a structural floor no longer erases the operator's
+    # passthrough override, across attempts, with all three fields in the log
+    # and at its top level); the other half, that a supervisor-owned key still
+    # overwrites the operator's value, without which "merge" becomes "the
+    # operator wins"; the four loud refusals (duplicate, non-JSON, non-object,
+    # no value); and the `--flag=value` spelling, which argparse accepts and
+    # which would otherwise arrive as a second occurrence. R169(d)'s own test
+    # was rewritten in place, not added: both its halves still hold, and the
+    # second is now enforced by merging rather than by ordering.
+    "tests.test_core": 895,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

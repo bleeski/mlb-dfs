@@ -3814,34 +3814,20 @@ SHAPE, `fetch_lineups` plus `read_text`. The CHANGELOG entry of that date
 carries the four-site enumeration and the one shape deliberately left out
 (`write_text`).
 
-### R214. The supervisor's `--controls-override` replaces, never merges, an operator's passthrough override, and the log records only the replacement (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-T5) and independently from the outside spec (D05); VERIFIED-read at `tools/autobuild.py:184`, `:218-219`, re-read here
+### R214. CLOSED 2026-08-28 -- "supervisor-owned flags win" is enforced per KEY
+instead of by replacing the operator's whole dict, and the log carries three
+fields; entry migrated to CHANGELOG.md
 
-**What.** `controls: Dict[str, Any] = {}` (`:184`) starts empty and gains only
-structural floors. It is appended as `cmd += ["--controls-override",
-json.dumps(controls)]` (`:218-219`) AFTER the passthrough, by R169(d)'s deliberate
-design, so argparse last-wins drops the operator's entire dict — not merges it,
-drops it. Attempt 1 honours a passthrough R157 rescue
-(`{"max_player_exposure_pct": 0.55}`); the first structural floor erases it for
-every later attempt, while `autobuild_decisions.json` records only the floors.
+`lift_controls_override` pulls the operator's override out of the tokenized
+passthrough (both spellings), so exactly one `--controls-override` reaches
+build_slate: `{**user, **derived}`. Duplicate, non-JSON, non-object and
+value-less occurrences refuse at exit 4. `user_controls` / `derived_controls` /
+`effective_controls` ride every record that touches controls and sit once at
+the top of `autobuild_decisions.json`.
 
-**Why.** R169(d)'s intent was "supervisor-owned flags win", and that intent is
-right. The implementation makes the supervisor discard operator values for keys it
-does not own. First bad moment: the next 1335_3g-shaped rescue silently reverts to
-posture caps mid-run, with a decision log that says the floors landed and says
-nothing about what left.
-
-**Why it is a precondition on R203.** CLAUDE.md's R157 delegation is currently
-performed by hand through exactly this passthrough. R203 teaches the supervisor to
-perform the rescue itself; until R214 lands, the supervisor cannot even PRESERVE
-the manual version of the thing it is being taught. Fix this first or the two
-changes fight.
-
-**Fix.** Seed `controls` from a `--controls-override` found in the passthrough
-(`shlex` already tokenizes it), then let supervisor-owned keys overwrite per key.
-Reject a duplicate or malformed occurrence loudly rather than silently. Persist
-`user_controls`, `derived_controls` and `effective_controls` as three fields, per
-the outside spec's shape (D05) — one field cannot answer "what did the operator
-ask for" and "what ran" at the same time.
+**Note for R203.** This was R203's precondition and it is now met; R203 is still
+OPEN and unstarted. The supervisor can now preserve the manual R157 rescue it
+will eventually be taught to perform.
 
 ### R215. R167's units family has three more members: the sixth fraction control, the gate's NaN/bool hole, and validate-without-coerce (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-T3, GF7-E2, GF7-T8) and, for (a) and (b), independently from the outside spec (D03); (a) and (b) VERIFIED-read and re-read here, (c) PLAUSIBLE (path read, not executed)
 

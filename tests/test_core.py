@@ -17263,39 +17263,138 @@ class SupervisorHardeningTests(unittest.TestCase):
         self.assertIn("a_check_nobody_paired", msg)
         self.assertIn("STRUCTURAL_CONTROL_BY_CHECK", msg)
 
-    def test_the_passthrough_is_shlex_split_and_loses_to_the_supervisor(self):
-        """R169(d). Two defects in two lines. `.split()` broke on exactly the
-        argument most worth passing through, a quoted JSON dict. And the
-        passthrough was appended AFTER --controls-override, so argparse's
-        last-wins gave an operator's override the final say over the structural
-        floors this supervisor had just applied -- while the log recorded that
-        they landed."""
-        brief = {"status": "refused", "date": "2026-07-29",
-                 "solve": {"bank": {"job_list_exhausted": True}},
-                 "feasibility": {"checks": [
-                     {"name": "sp_pair_capacity", "passed": False,
-                      "remedy": "raise max_sp_pair_repetition to >= 3"}]}}
+    @staticmethod
+    def _refusal(check="sp_pair_capacity",
+                 remedy="raise max_sp_pair_repetition to >= 3"):
+        return {"status": "refused", "date": "2026-07-29",
+                "solve": {"bank": {"job_list_exhausted": True}},
+                "feasibility": {"checks": [
+                    {"name": check, "passed": False, "remedy": remedy}]}}
 
+    def _refuse_then_certify(self, brief):
         def side(n, cmd, kwargs):
             return self._proc(3, brief) if n == 1 else self._proc(0, {
                 "status": "certified", "date": "2026-07-29"})
+        return side
+
+    @staticmethod
+    def _override_in(cmd):
+        """The single --controls-override on a command line, as a dict."""
+        positions = [i for i, tok in enumerate(cmd)
+                     if tok == "--controls-override"]
+        assert len(positions) == 1, (
+            f"expected exactly one --controls-override, found {len(positions)}; "
+            f"two occurrences is argparse silently resolving what R214 merges")
+        return json.loads(cmd[positions[0] + 1])
+
+    def test_the_passthrough_is_shlex_split_and_loses_to_the_supervisor(self):
+        """R169(d), as R214 leaves it. `.split()` broke on exactly the argument
+        most worth passing through, a quoted JSON dict, and the passthrough was
+        appended AFTER --controls-override so argparse's last-wins gave the
+        operator the final say over floors this supervisor had just applied.
+
+        Both halves still hold; the second is now enforced by MERGING rather
+        than by ordering, so there is one occurrence on the line instead of two
+        and 'supervisor-owned flags win' is decided per key."""
         # Quoted the way an operator quotes it in a shell, which is the form
         # `.split()` could not survive and shlex was written for.
         passthrough = """--past-slate-replay --controls-override '{"max_shared_players": 9}'"""
         self.assertEqual(len(passthrough.split()), 4,
                          "the naive split makes four tokens of three arguments")
         _code, _records, cmds, _logs = self._run(
-            side, extra_argv=["--passthrough", passthrough])
+            self._refuse_then_certify(self._refusal()),
+            extra_argv=["--passthrough", passthrough])
         second = cmds[1]
-        # shlex keeps the JSON dict one argument; .split() made it two.
-        self.assertIn('{"max_shared_players": 9}', second)
-        # and the supervisor's own override is the LAST one argparse sees.
-        positions = [i for i, tok in enumerate(second)
-                     if tok == "--controls-override"]
-        self.assertEqual(len(positions), 2)
-        self.assertEqual(json.loads(second[positions[-1] + 1]),
+        # shlex kept the JSON dict one argument; .split() made it two. The
+        # operator's key is still in the merge, so the value survived the trip.
+        self.assertEqual(self._override_in(second),
+                         {"max_shared_players": 9, "max_sp_pair_repetition": 3})
+        # A non-controls passthrough flag still precedes the supervisor's own.
+        self.assertLess(second.index("--past-slate-replay"),
+                        second.index("--controls-override"))
+
+    def test_a_structural_floor_no_longer_erases_the_operators_override(self):
+        """R214, the defect itself. `controls` started empty, gained only the
+        supervisor's floors, and was appended after the passthrough -- so
+        argparse's last-wins DROPPED the operator's whole dict rather than
+        losing to it key by key. Attempt 1 honoured a passthrough R157 rescue
+        and the first structural floor erased it for every later attempt, while
+        the decision log recorded the floors landing and said nothing about
+        what left. This is the 1335_3g shape CLAUDE.md's R157 delegation is
+        performed through by hand."""
+        passthrough = """--controls-override '{"max_player_exposure_pct": 0.55}'"""
+        code, records, cmds, logs = self._run(
+            self._refuse_then_certify(self._refusal()),
+            extra_argv=["--passthrough", passthrough])
+        self.assertEqual(code, 0)
+        # Attempt 1 carries the operator's rescue, and so does attempt 2.
+        self.assertEqual(self._override_in(cmds[0]),
+                         {"max_player_exposure_pct": 0.55})
+        self.assertEqual(self._override_in(cmds[1]),
+                         {"max_player_exposure_pct": 0.55,
+                          "max_sp_pair_repetition": 3})
+        applied = [r for r in records if r["action"] == "apply_structural_floor"]
+        self.assertEqual(applied[0]["user_controls"],
+                         {"max_player_exposure_pct": 0.55})
+        self.assertEqual(applied[0]["derived_controls"],
                          {"max_sp_pair_repetition": 3})
-        self.assertLess(second.index("--past-slate-replay"), positions[-1])
+        self.assertEqual(applied[0]["effective_controls"],
+                         {"max_player_exposure_pct": 0.55,
+                          "max_sp_pair_repetition": 3})
+        # And the same three facts at the top of the log, so a post-mortem does
+        # not have to reconstruct them from the records.
+        block = json.loads(logs[0].read_text(encoding="utf-8"))["controls"]
+        self.assertEqual(block, applied[0]["user_controls"] and {
+            "user_controls": {"max_player_exposure_pct": 0.55},
+            "derived_controls": {"max_sp_pair_repetition": 3},
+            "effective_controls": {"max_player_exposure_pct": 0.55,
+                                   "max_sp_pair_repetition": 3}})
+
+    def test_a_supervisor_owned_key_still_overwrites_the_operators_value(self):
+        """The other half, and R169(d)'s intent unchanged: merging must not
+        become 'the operator wins'. On a key this supervisor owns -- one the
+        engine named a structural floor for -- the floor overwrites."""
+        passthrough = """--controls-override '{"max_shared_players": 4, "max_pitcher_exposure_pct": 0.4}'"""
+        _code, _records, cmds, _logs = self._run(
+            self._refuse_then_certify(
+                self._refusal("shared_players_floor",
+                              "raise max_shared_players to >= 7")),
+            extra_argv=["--passthrough", passthrough])
+        self.assertEqual(self._override_in(cmds[1]),
+                         {"max_shared_players": 7,           # supervisor's
+                          "max_pitcher_exposure_pct": 0.4})  # operator's, kept
+
+    def test_a_duplicate_or_malformed_passthrough_override_is_refused_loudly(self):
+        """Two occurrences is argparse silently keeping the last, which is the
+        same silence this item exists to remove; a non-object is a control dict
+        that never was one. Both refuse at exit 4 before any build starts, and
+        both file a decision log."""
+        for passthrough, needle in (
+                ("""--controls-override '{"a": 1}' --controls-override '{"b": 2}'""",
+                 "2 --controls-override"),
+                ("""--controls-override '{"max_shared_players": '""", "not JSON"),
+                ("""--controls-override '[1, 2]'""", "parsed to a list"),
+                ("""--past-slate-replay --controls-override""", "no value after it")):
+            with self.subTest(passthrough=passthrough):
+                code, records, cmds, logs = self._run(
+                    lambda n, cmd, kwargs: self._proc(0, {}),
+                    extra_argv=["--passthrough", passthrough])
+                self.assertEqual(code, 4)
+                self.assertEqual(cmds, [], "it built against a controls dict it "
+                                           "could not read")
+                self.assertEqual(len(logs), 1)
+                self.assertIn(needle, records[-1]["why"])
+
+    def test_the_key_equals_value_spelling_is_lifted_too(self):
+        """argparse accepts `--flag=value`, so a passthrough written that way
+        would otherwise reach build_slate as a second occurrence and put the
+        merge back where R214 found it."""
+        _code, _records, cmds, _logs = self._run(
+            self._refuse_then_certify(self._refusal()),
+            extra_argv=["--passthrough",
+                        """--controls-override='{"max_shared_players": 9}'"""])
+        self.assertEqual(self._override_in(cmds[1]),
+                         {"max_shared_players": 9, "max_sp_pair_repetition": 3})
 
     def test_the_wall_clock_stop_files_its_decision_log(self):
         """R212. The supervised wall clock returned 5 directly, so the ENTIRE

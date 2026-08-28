@@ -126,9 +126,81 @@ def classify_pool_blocker(text: str) -> Optional[str]:
     return None
 
 
+def lift_controls_override(tokens: List[str]) -> tuple:
+    """Pull an operator's ``--controls-override`` out of the passthrough tokens.
+
+    R214. ``controls`` started empty and gained only the supervisor's own
+    structural floors, and the whole dict was appended AFTER the passthrough by
+    R169(d)'s deliberate design -- so argparse's last-wins DROPPED the
+    operator's dict rather than losing to it key by key. Attempt 1 honoured a
+    passthrough R157 rescue (``{"max_player_exposure_pct": 0.55}``); the first
+    structural floor erased it for every later attempt, and the decision log
+    recorded the floors landing and said nothing about what left.
+
+    R169(d)'s intent -- supervisor-owned flags win -- is right and is kept. It
+    is now enforced per KEY, which is what it meant.
+
+    Returns ``(tokens without the flag, the operator's controls, error)``. A
+    duplicate or malformed occurrence is an error and never a guess: argparse
+    would silently keep the last of two, which is the same silence this item
+    exists to remove.
+    """
+    rest: List[str] = []
+    found: List[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "--controls-override":
+            if i + 1 >= len(tokens):
+                return tokens, {}, ("--controls-override in --passthrough has no "
+                                    "value after it")
+            found.append(tokens[i + 1])
+            i += 2
+            continue
+        if tok.startswith("--controls-override="):
+            found.append(tok.split("=", 1)[1])
+            i += 1
+            continue
+        rest.append(tok)
+        i += 1
+    if not found:
+        return rest, {}, None
+    if len(found) > 1:
+        return rest, {}, (
+            f"--passthrough carries {len(found)} --controls-override "
+            f"occurrences ({found}); argparse would keep only the last and say "
+            f"nothing, so this supervisor refuses rather than choosing for you")
+    try:
+        parsed = json.loads(found[0])
+    except ValueError as exc:
+        return rest, {}, (f"--controls-override in --passthrough is not JSON "
+                          f"({exc}); the value was {found[0]!r}")
+    if not isinstance(parsed, dict):
+        return rest, {}, (f"--controls-override in --passthrough parsed to a "
+                          f"{type(parsed).__name__}, not an object of "
+                          f"control -> value")
+    return rest, parsed, None
+
+
 class Decisions:
     def __init__(self) -> None:
         self.log: List[Dict[str, Any]] = []
+        # R214. Three fields, because one cannot answer "what did the operator
+        # ask for" and "what ran" at the same time -- and the old single dict
+        # answered neither honestly, since it recorded the floors that landed
+        # and never the override they displaced.
+        self.user_controls: Dict[str, Any] = {}
+        self.derived_controls: Dict[str, Any] = {}
+
+    @property
+    def effective_controls(self) -> Dict[str, Any]:
+        """What actually reaches build_slate. Supervisor-owned keys win."""
+        return {**self.user_controls, **self.derived_controls}
+
+    def controls_block(self) -> Dict[str, Any]:
+        return {"user_controls": dict(self.user_controls),
+                "derived_controls": dict(self.derived_controls),
+                "effective_controls": dict(self.effective_controls)}
 
     def add(self, attempt: int, action: str, why: str, **extra: Any) -> None:
         rec = {"attempt": attempt, "action": action, "why": why,
@@ -171,7 +243,13 @@ def main() -> int:
                          "players\\\": 9}'\". Supervisor-owned flags are appended "
                          "AFTER these, so a flag named in both is the "
                          "supervisor's, not yours (R169(d)): the decision log "
-                         "has to describe the command that ran.")
+                         "has to describe the command that ran. A "
+                         "--controls-override here is the exception and is "
+                         "MERGED rather than displaced (R214): your keys are "
+                         "kept, and only the keys this supervisor owns -- the "
+                         "structural floors it applies -- overwrite yours. Two "
+                         "occurrences, or one that is not a JSON object, is a "
+                         "refusal rather than a guess.")
     a = ap.parse_args()
 
     # R212. `dec` is constructed before the first thing that can return, so
@@ -189,8 +267,26 @@ def main() -> int:
         _write(dec, {}, salary=a.salary)
         return 4
 
+    # R214. Tokenized once, and an operator's --controls-override is lifted out
+    # here so exactly ONE reaches build_slate: the merge, not two occurrences
+    # for argparse to silently resolve.
+    passthrough_tokens = shlex.split(a.passthrough) if a.passthrough else []
+    passthrough_tokens, user_controls, controls_error = lift_controls_override(
+        passthrough_tokens)
+    if controls_error:
+        print(f"autobuild: {controls_error}", file=sys.stderr)
+        dec.add(0, "stop", controls_error)
+        _write(dec, {}, salary=a.salary)
+        return 4
+    dec.user_controls = dict(user_controls)
+    if user_controls:
+        dec.add(0, "operator_controls",
+                "read from --passthrough and merged UNDER the supervisor's own "
+                "keys; R169(d)'s 'supervisor-owned flags win' holds per key "
+                "rather than by dropping the operator's whole dict",
+                **dec.controls_block())
+
     deadline = time.monotonic() + a.stop_after_minutes * 60.0
-    controls: Dict[str, Any] = {}
     ignore_pool = False
     last_brief: Dict[str, Any] = {}
 
@@ -226,8 +322,13 @@ def main() -> int:
         # through, a quoted JSON dict, turning
         # `--controls-override {"max_shared_players": 7}` into three tokens and
         # a parse error the operator reads as a build failure.
-        if a.passthrough:
-            cmd += shlex.split(a.passthrough)
+        #
+        # R214. The operator's own --controls-override is no longer among these
+        # tokens; it was lifted out above and merged into the single occurrence
+        # emitted below. Last-wins dropped the operator's ENTIRE dict, which is
+        # not what "supervisor-owned flags win" meant.
+        if passthrough_tokens:
+            cmd += passthrough_tokens
         if ignore_pool:
             cmd += ["--assert-gate", GATE_IMPLIED_BY_POOL_OVERRIDE]
         cmd += ["--salary", a.salary, "--entries", a.entries,
@@ -236,8 +337,9 @@ def main() -> int:
                           ("--postures", a.postures)):
             if val:
                 cmd += [flag, val]
-        if controls:
-            cmd += ["--controls-override", json.dumps(controls)]
+        effective = dec.effective_controls
+        if effective:
+            cmd += ["--controls-override", json.dumps(effective)]
         if ignore_pool:
             cmd += ["--ignore-pool-blockers"]
 
@@ -258,7 +360,7 @@ def main() -> int:
                     f"nothing to classify and nothing to retry against",
                     timeout_s=a.per_build_seconds + 90,
                     per_build_seconds=a.per_build_seconds,
-                    controls_in_effect=dict(controls) or None)
+                    **dec.controls_block())
             _write(dec, last_brief, salary=a.salary)
             return 5
         brief = parse_brief(proc.stdout) or parse_brief(proc.stderr)
@@ -345,12 +447,15 @@ def main() -> int:
                 _write(dec, brief, salary=a.salary)
                 return 3
             applied[control] = floor_to
-        if applied and applied != {k: controls.get(k) for k in applied}:
-            controls.update(applied)
+        if applied and applied != {k: dec.derived_controls.get(k) for k in applied}:
+            dec.derived_controls.update(applied)
+            # R214. Three fields rather than one. `controls=` used to print the
+            # supervisor's floors and call that the answer, so an operator's
+            # override that had just been dropped left no trace anywhere.
             dec.add(attempt, "apply_structural_floor",
                     "engine classified these ARITHMETIC: raising to the named "
                     "floor removes an impossibility and changes nothing else",
-                    controls=dict(controls))
+                    **dec.controls_block())
             continue
 
         dec.add(attempt, "stop", "refused with no remedy this supervisor may take",
@@ -402,6 +507,10 @@ def _write(dec: Decisions, brief: Dict[str, Any],
         out.mkdir(parents=True, exist_ok=True)
         (out / "autobuild_decisions.json").write_text(
             json.dumps({"decisions": dec.log,
+                        # R214. The run's controls as three facts, at the top
+                        # level, so a post-mortem does not have to reconstruct
+                        # "what did the operator ask for" from the records.
+                        "controls": dec.controls_block(),
                         "labels": "deterministic review proxies and labeled priors "
                                   "only; never ROI, win rate, cash rate, or "
                                   "probability"}, indent=1),

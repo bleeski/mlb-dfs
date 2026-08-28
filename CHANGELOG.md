@@ -115,6 +115,40 @@ Four sites, four guards, no kept copy. `write_text` in `main()` is deliberately
 NOT in the set: a staging write that fails is a broken workspace rather than a
 degradable input, and turning it into a soft note would hide it.
 
+**R214. "Supervisor-owned flags win" was implemented as "the supervisor's dict
+replaces yours", and those are different sentences.** R169(d) moved the
+passthrough FIRST so argparse's last-wins gave the supervisor's
+`--controls-override` the final say. It did, and it took everything else with
+it: `controls` starts empty and holds only structural floors, so the first floor
+applied dropped the operator's entire dict for every later attempt. Attempt 1
+honoured a passthrough R157 rescue (`{"max_player_exposure_pct": 0.55}`);
+attempt 2 silently reverted to posture caps, and `autobuild_decisions.json`
+recorded the floors landing and nothing about what left. CLAUDE.md's R157
+delegation is performed by hand through exactly this passthrough today, so the
+next 1335_3g-shaped rescue was going to lose itself mid-run.
+
+R169(d)'s intent is kept and is now enforced per KEY. `lift_controls_override`
+pulls the operator's `--controls-override` out of the shlex-tokenized
+passthrough (both the `--flag value` and `--flag=value` spellings, since
+argparse takes either and the second would otherwise arrive as a second
+occurrence), so exactly ONE reaches `build_slate`: `{**user, **derived}`, where
+a key the supervisor owns overwrites and every key it does not own survives. A
+duplicate occurrence, a value that is not JSON, a value that is not an object,
+and a flag with nothing after it are all refusals at exit 4 before any build
+starts — argparse would keep the last of two and say nothing, which is the same
+silence this item is about.
+
+The log carries three fields, `user_controls` / `derived_controls` /
+`effective_controls`, on every record that touches controls and once at the top
+level. One field could not answer "what did the operator ask for" and "what ran"
+at the same time, and the old single `controls=` answered neither honestly: it
+printed the floors and called that the state.
+
+This was filed as a precondition on R203, which teaches the supervisor to
+perform the R157 rescue itself. R203 is not in this batch. Until R214 landed the
+supervisor could not even PRESERVE the manual version of what R203 will
+automate, so the two would have fought.
+
 ## 2026-08-28 — ed9 Codex adjudication (the leverage/portfolio spec): zero new numbers, twelve riders/amendments on the R251–R262 lane, R252 retitled, R258 and R262 re-specified before build, ninth rebuild rejection (docs only)
 
 DEV, claim `engine` (`engine_codex_lev_synthesis_2026-08-28`). Docs-only
