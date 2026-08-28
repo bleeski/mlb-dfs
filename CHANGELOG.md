@@ -25,6 +25,121 @@ performance claim.
 
 ---
 
+## 2026-08-27 — ed8 Codex greenfield adjudication: R236–R250 filed, seven scope riders, the rebuild rejected an eighth time, twelve fragments consumed, queue resequenced to fifteen slots (docs only)
+
+DEV, claim `engine` (`engine_backlog_resync_2026-08-28`; `engine_2026-08-20`
+is STILL HELD with `released_utc: null`, eight days, Ben's to arbitrate).
+Docs-only landing: `docs/backlog.md`, this file, the spec file, and the inbox.
+No engine, tool, test, or skill surface changed. Audit this session:
+`PASS v2.26.0 26 modules` WITHOUT `--run-tests` — the test gate was
+deliberately not run because no gated surface moved and the next code landing
+runs it regardless; the last full gate line at this head is 2026-08-27's
+`PASS v2.26.0 26 modules 1313 tests`. Working-tree dirt was ARCHIVE-owned
+(`data/`, `ledger/`) plus untracked archive material, classified and left
+alone.
+
+**What was adjudicated.** The eighth greenfield edition
+(`DFS_SYSTEM_GREENFIELD_SPEC_CODEX.md`, Codex, 2026-08-27), reviewed at
+exactly this HEAD (`245de51`) — the first outside review with zero drift
+against the live tree — carrying 50 findings, a target architecture, and a
+DO_NOT_UPLOAD-as-EV verdict that restates the project's own Truthful-labels
+rule. Plus the thirteen inbox fragments, of which twelve are consumed by this
+entry and one (`2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`)
+is KEPT by design: it carries Ben's dated decision and waits on ARCHIVE.
+The ed8 spec REPLACES the ed7 edition at
+`docs/DFS_SYSTEM_GREENFIELD_SPEC_CODEX.md` (same path, git history carries
+ed7; the untracked root copy was moved to `_to_delete/`). Its §1.9 maintained
+a resolved-defects list instead of re-reporting repaired work (R219/R220,
+R234, R235 all correctly excluded), which no prior outside edition did.
+
+**Filed, R236–R250, entries in the backlog's workstreams:** R236 (odds paste
+tool, the R32 pattern on the proxy-gated odds source; rides R205 so it is not
+born with the averaging bug), R237 (uncomputed vs computed-neutral factor
+states across `factors_inert`, the brief, and qa — F-38/F-43's accepted half),
+R238 (Showdown resolves contest shapes; every archetype currently UNRESOLVED),
+R239 (contest-aware entry assignment: round-robin dealing, per-contest-slice
+caps, per-contest reporting — controls PROVABLY cannot reach a slice, three
+sightings in four days), R240 (punt-captain template, decision-first, Tier 4),
+R241 (`--postures` rejects the canonical shape vocabulary), R242 (preflight
+salary resolver prefers same-slate evidence before refusing), R243
+(container-build recipe into the sync protocol), R244 (R157's rescue opens
+only the cap the 1.0 sanity check names, then bisects downward — 0.43
+dominated 0.50 outright on 1905_5g; feeds R203), R245 (`upload_manifest.json`
+concurrency: per-tag split or merge-by-key, after a live near-miss between two
+same-date sessions), R246 (`--leverage` passthrough making R154's constraints
+reachable), R247 (cap cost visible: weak-tail flags, reassignment proxy
+deltas, correlated-block line; the skill-aware-cap direction is Ben's, Tier
+4), R248 (preflight feed matcher has no AZ→ARI crosswalk and silently demotes
+ten hard checks), R249 (Showdown `--projections` input with provenance in the
+brief, so the salary file stops being the injection point), R250 (captain
+budget reserved before UTIL spends it; `clean` recomputed from realized caps).
+
+**Seven scope riders on existing entries:** R216 (+F-01: fingerprint also
+covers the locks and `reference_manifest.json`, record stamped with runtime
+identity), R176 (+F-34: exit code computed before the manifest stamp), R174
+(+F-31: `late_swap.py` runs the referee on its own bytes before claiming
+success), R230 (+(d), F-28: the game-cap test passes with the constraint
+deleted), R118 (+F-48 ADOPTED: replays settle at the archived payout curve —
+exact accounting over observed fields, dollars not points; the one piece of
+the spec's economic core the board's own sequence can use now), R229 (+F-24's
+severity: an incomplete clock reads UNKNOWN for swap authority), R196 (+the
+fourth and fifth Solo Shot occurrences). R227 needed nothing: its existing
+riders already carry ed8's F-23 (zip quotas) and F-21 (atomic writes), filed
+2026-08-24 from the same findings' D-numbered versions.
+
+**Corroborated at HEAD, no new number — twenty-nine of fifty findings:**
+F-01→R216, F-02→R218, F-03→R215, F-04→R212, F-05→R214, F-06→R221, F-07→R222,
+F-08→R158, F-09→R223, F-10→R228, F-12→R205 (third independent confirmation),
+F-13→R172, F-14→R173, F-15→R209/R154, F-16→R225, F-17→R226, F-19→R227,
+F-21→R227(b), F-22→R217, F-23→R227(a), F-24→R229(b), F-25→R229(a),
+F-28→R230(d), F-29→R164, F-30→R206, F-32→R176(c), F-44→R232+R76,
+F-45→R231/R77/R107/R188, F-49→Tier 2's own loop, F-50→the money-and-entry
+wall. Eleven more are the week's own BUILD fragments read back with line
+numbers (F-33, F-35 through F-42, and F-11's sliver), filed above on the
+fragments' evidence.
+
+**Rejected, eight, reasons in the backlog's "Do not build (updated)" dated
+paragraph:** the phased rebuild program (eighth consecutive, same ordering
+argument: it builds the scenario/field/settlement machine first and measures
+second, while Tier 2 reaches the measuring substrate from the archive that
+exists; R13 remains the funding gate), F-26 (documented deferral, D29's
+re-file), F-27 (no named measurement), F-46 (the lock's own header scopes it,
+C04's re-file; R217(d) keeps the sliver), F-49-as-artifact, and the
+joint-portfolio replacements inside F-30/F-35/F-36/F-37/F-41, whose
+operational halves ARE the accepts (R239, R247, R250). Also declined: F-15's
+delete-the-dormant-controls alternative (R246 connects them instead) and
+F-18's registry-database rebuild (the per-contest archive already holds
+immutable observations at full context; R140 conditions its views on it).
+
+**Twelve fragments consumed, enumerated per R233's spirit (moved to
+`_to_delete/backlog_inbox_consumed_20260828/`):**
+`2026-08-24_BUILD_actionnetwork-odds-fallback.md` →R236+R237;
+`2026-08-24_BUILD_showdown_contest_assignment.md` §1→R239 (§2 closed by R234);
+`2026-08-25_BUILD_posture-vocab-and-solo-shot.md` §1→R241, §2→R196;
+`2026-08-26_BUILD_contest_aware_allocation_at_onset.md` →R239+R240+R242;
+`2026-08-27_BUILD_container-bank-and-r157-single-cap.md` →R243+R244+R245+R246;
+`2026-08-27_BUILD_player-exposure-cap-is-skill-blind.md` →R247;
+`2026-08-27_BUILD_preflight-az-ari-crosswalk.md` →R248;
+`2026-08-27_BUILD_showdown-has-no-projection-input.md` →R249;
+`2026-08-27_BUILD_showdown_entry_to_contest_assignment_is_positional.md`
+→R238+R239;
+`2026-08-27_BUILD_showdown_f1_and_archetype_gaps.md` §1→R237, §2→R238,
+§3→R250; `2026-08-27_BUILD_showdown_tightened_cap_degrades_bank_tail_uncounted.md`
+→R247; `2026-08-27_BUILD_thesis-ladder-spends-cap-in-util-before-captain.md`
+→R250. The 08-09 curated-archetypes fragment stays in the inbox, kept.
+
+**Why the queue moved.** Eight of the twelve consumed fragments are Showdown,
+from three builds in four days, converging on one fact: the format has no
+contest awareness, and its caps hold while inverting captain leverage and
+degrading the tail invisibly. The 08-26 fragment PROVED the control surface
+cannot reach a contest slice, and two live deliveries have shipped via
+hand-permutation with waived identity checks. The Showdown cluster (two
+slots: ladder truth, then contest awareness) therefore runs directly behind
+the money-boundary batch, which itself grew two field-hit preflight defects
+(R248, R242). Slot 1 is unchanged — the lost-window batch is corroborated by
+this same spec and unblocks R203. Full fifteen-slot order with reasons and
+dependencies: the 2026-08-27-late note atop "What do we tackle next".
+
 ## 2026-08-27 — R219 + R220: a degraded DK side deferred to ANY nonempty feed lineup, and three reports on the same surface named something other than what was true
 
 DEV, claim `engine` (`engine_2026-08-27`; `engine_2026-08-20` is still HELD and
