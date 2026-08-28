@@ -31,8 +31,14 @@ DEV, claim `engine` (`engine_2026-08-28`). This IS the queue head — slot 1 of
 the ed7/ed8 sequence, all four P1 and all four VERIFIED-read. Session-start gate
 green before any edit: `PASS v2.26.0 26 modules 1313 tests`, assembled over five
 `--gate-run` calls after a `--gate-reset` (the recorded state was 20.9h old
-against a 6h limit). Working-tree dirt was ARCHIVE-owned (`data/`, `ledger/`)
-plus two untracked root tarballs, classified and left alone.
+against a 6h limit). Gate 1313 -> 1331, all eighteen in `test_core`
+(884 -> 902, `grew`). Twelve hand-run mutations, twelve caught. Working-tree
+dirt was ARCHIVE-owned (`data/`, `ledger/`) plus two untracked root tarballs,
+classified and left alone.
+
+CLAUDE.md's session-start step quotes the clean audit line byte for byte and two
+tests pin that it does, so the count there moved with the suite; that is the
+whole of this batch's CLAUDE.md change. No contract text was touched.
 
 **Why these four are one batch.** Each is the sibling a previous fix did not
 enumerate. R167 unified four copies of the units rule and R215 is the fifth,
@@ -148,6 +154,75 @@ This was filed as a precondition on R203, which teaches the supervisor to
 perform the R157 rescue itself. R203 is not in this batch. Until R214 landed the
 supervisor could not even PRESERVE the manual version of what R203 will
 automate, so the two would have fought.
+
+**R215. R167's units family had three more members, and they land together
+because splitting them is how R167 closed with the rule enforced in three of
+four places.**
+
+*(a) The sixth fraction control.* `max_game_exposure_pct_by_game` was in neither
+key set — not `build_slate.FRACTION_CONTROL_KEYS`, not the merge's
+`_fraction_control_keys` — while all three `_game_cap_count` sites clamped with
+`min(1.0, max(0.0, float(pct)))`. So `{"401234": 40}` for 0.40 passed the
+zero-cost gate, passed the merge, and capped nobody in the solve AND in the
+post-export validator, with no counter and no warning. R167's entry kept that
+clamp on the reasoning that the solve and the validator agree. Agreement does
+not answer SILENT DISABLE, which is verbatim the harm `assert_fraction_cap`'s
+own docstring names, and `late_swap.py:197` steers operators at exactly this
+control. It is dict-valued, so each VALUE routes through the rule and the error
+names the game: `max_game_exposure_pct_by_game[401235]`.
+
+*(b) The gate's own NaN and bool holes — the lost-window class arriving through
+the checkpoint built to stop it.* `float("nan") > 1.0` is False, because every
+comparison against NaN is, so a NaN cleared the gate at every boundary and died
+later inside `math.floor(total * value)` with an unnamed ValueError, after the
+bank had spent. Infinity passed the same way. And `bool` is a subclass of `int`,
+so `assert_fraction_cap(True)` returned 1.0 in silence: a cap switched off with
+nothing named. The bool is rejected BEFORE the `float()`, because after it a
+`True` is indistinguishable from the legitimate 1.0 that R157's rescue sanity
+check ships.
+
+*(c) Validate without coerce.* The gate float-TESTED a copy and forwarded the
+raw value; the merge asserted and stored the raw. Classic re-coerced downstream
+at `_cap_count` and Showdown did not, so
+`--controls-override '{"max_player_exposure_pct": "0.5"}'` raised TypeError at
+`"0.5" >= 0.33` in brief assembly and ValueError at `f"{pct:.0%}"` — both after
+the full solve. Both boundaries now store `float(value)` back, build_slate's in
+place on `args.controls_override` so what passed the gate is what travels.
+
+*The enumeration R233 asks for.* Every fraction-control site in the engine,
+after the fix:
+
+    $ grep -rn 'assert_fraction_cap|FRACTION_CONTROL_(DICT_)?KEYS|_fraction_control_(dict_)?keys|fraction_or_problem|_game_cap_count|min\(1\.0, max\(0\.0' --include=*.py mlb_engine tools skills
+
+    THE RULE
+      contest_allocator.py:1011   assert_fraction_cap             <- (b) lands here
+    CALLERS OF THE RULE (compliant)
+      contest_allocator.py:1090   _cap_count (solve side)
+      showdown.py:418-419         exposure_cap_count (R167's fourth copy)
+      execution_pipeline.py:2245  the merge, scalar keys          <- (c) coerces
+      execution_pipeline.py:2252  the merge, by-game values       <- (a) new
+      execution_pipeline.py:2602  _feasibility_report's closure
+    THE OPERATOR-FACING MIRROR (no engine import, zero seconds)
+      build_slate.py:143          fraction_or_problem             <- (a)(b)(c)
+      build_slate.py:123,138      FRACTION_CONTROL_KEYS + _DICT_KEYS
+      build_slate.py:3152,3164    the gate, scalar and by-game
+    CLAMPS DELIBERATELY KEPT, each named with why it survives
+      contest_allocator.py:911    by-game headroom
+      contest_allocator.py:2572   by-game MILP bound
+      dk_entries_manager.py:767   _game_cap_count, post-export validator
+      contest_allocator.py:2535   five_share, an already-asserted key
+
+Four clamps survive and none of them is now reachable with a bad value, because
+the boundary above them rejects it: `max_game_exposure_pct_by_game` arrives ONLY
+from an operator override (verified — nothing engine-authored produces it), and
+`min_five_stack_share_pct` is asserted at the merge. They stay because they
+clamp identically on the solve and the validate side, which is R167's own
+reasoning for keeping them, and because R61's floor-at-0 contract lives in that
+arithmetic. `dk_entries_manager._cap_count` also keeps its separate
+implementation, unchanged and for R167's stated reason:
+`test_cap_count_arithmetic_is_floor_and_both_copies_agree` measures the solve
+side against it, and collapsing the pair would make that comparison
+tautological.
 
 ## 2026-08-28 — ed9 Codex adjudication (the leverage/portfolio spec): zero new numbers, twelve riders/amendments on the R251–R262 lane, R252 retitled, R258 and R262 re-specified before build, ninth rebuild rejection (docs only)
 

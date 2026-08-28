@@ -2217,10 +2217,40 @@ def _merged_controls_for_build(
     # the engine live in 0-100 space and are deliberately NOT in this set;
     # the four keys named here are the fraction-valued controls the merge
     # itself produces.
+    #
+    # R215(a). `max_game_exposure_pct_by_game` is the sixth fraction control
+    # and was in neither key set, here or in build_slate's gate, while all
+    # three `_game_cap_count` sites still clamped with `min(1.0, max(0.0, ...))`.
+    # So a per-game units slip (`{"401234": 40}` for 0.40) passed the zero-cost
+    # gate, passed this merge, and capped nobody in the solve AND in the
+    # post-export validator, with no counter and no warning. R167 kept that
+    # clamp on the reasoning that the solve and the validator agree; agreement
+    # does not answer SILENT DISABLE, and `late_swap.py` steers operators to
+    # override exactly this control. It is dict-valued, so each VALUE is routed
+    # through the same rule.
+    #
+    # R215(c). This validated a copy and then stored the RAW value below, which
+    # is a checkpoint that lets the bad value past after saying it looked.
+    # Classic re-coerced at `_cap_count` and Showdown did not, so a string
+    # `"0.5"` raised TypeError at `"0.5" >= 0.33` in brief assembly and
+    # ValueError at `f"{pct:.0%}"` -- both after the full solve. The coerced
+    # float is what gets stored.
     _fraction_control_keys = pct_keys + ("min_five_stack_share_pct",)
-    for key, value in dict(override or {}).items():
-        if key in _fraction_control_keys and value is not None:
-            assert_fraction_cap(value, key=key)
+    _fraction_control_dict_keys = ("max_game_exposure_pct_by_game",)
+    coerced_override: Dict[str, Any] = dict(override or {})
+    for key, value in list(coerced_override.items()):
+        if value is None:
+            continue
+        if key in _fraction_control_keys:
+            coerced_override[key] = assert_fraction_cap(value, key=key)
+        elif key in _fraction_control_dict_keys:
+            if not isinstance(value, Mapping):
+                raise ValueError(
+                    f"{key} must be an object of game id -> fraction, not "
+                    f"{type(value).__name__}")
+            coerced_override[key] = {
+                gid: assert_fraction_cap(v, key=f"{key}[{gid}]")
+                for gid, v in dict(value).items()}
     # R34. Floor keys merge by MIN like the ceilings, but for the opposite
     # reason. A ceiling merges to the tightest because one portfolio must
     # satisfy every contest's ceiling. A floor merges to the LEAST demanding
@@ -2278,7 +2308,9 @@ def _merged_controls_for_build(
             merged[key] = min(1.0, max(float(merged[key]), float(floor_val)))
         else:
             merged[key] = max(int(merged[key]), int(floor_val))
-    merged.update(dict(override or {}))
+    # R215(c). The COERCED override, not the raw one: validating a copy and
+    # storing the original is a gate that looks and then lets the value past.
+    merged.update(coerced_override)
     return merged
 
 

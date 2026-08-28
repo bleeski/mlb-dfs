@@ -16844,6 +16844,89 @@ class OverrideUnitsBlockAtTheCheckpointTests(unittest.TestCase):
                               "shared merge; the units guard no longer covers it")
 
 
+class UnitsRuleRemainingMembersTests(unittest.TestCase):
+    """R215. R167's units family had three more members, and they land together
+    because they are one class: splitting them reproduces R167, which closed
+    with the rule enforced in three of four places.
+
+    (a) the sixth fraction control, dict-valued and in no key set;
+    (b) the gate's own NaN/bool hole -- the lost-window class arriving THROUGH
+        the checkpoint built to stop it;
+    (c) validate-without-coerce, a gate that looks and then lets the value past.
+    """
+
+    _POSTURES = {"c1": {"posture": "wta_satellite"}}
+
+    def test_nan_and_infinity_no_longer_clear_the_gate(self):
+        """R215(b). `float("nan") > 1.0` is False -- every comparison against
+        NaN is -- so NaN passed every boundary and died later inside
+        `math.floor(total * value)` with an unnamed ValueError, after the bank
+        had spent. That is verbatim the harm this function's own docstring
+        names, arriving through the function itself."""
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=bad):
+                with self.assertRaises(ValueError) as ctx:
+                    assert_fraction_cap(bad, key="max_player_exposure_pct")
+                self.assertIn("not a finite number", str(ctx.exception))
+                self.assertIn("max_player_exposure_pct", str(ctx.exception))
+
+    def test_a_bool_is_a_cap_switched_off_with_no_name(self):
+        """R215(b). `bool` is a subclass of `int`, so `assert_fraction_cap(True)`
+        returned 1.0 in silence. Rejected BEFORE the float(), because after it
+        a True is indistinguishable from the legitimate 1.0 that R157's rescue
+        sanity check ships."""
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        for bad in (True, False):
+            with self.subTest(value=bad):
+                with self.assertRaises(ValueError) as ctx:
+                    assert_fraction_cap(bad)
+                self.assertIn("bool", str(ctx.exception))
+        # The positive control for the same edge: 1.0 and 0 are still legal,
+        # and they are what a bool would have been mistaken for.
+        self.assertEqual(assert_fraction_cap(1.0), 1.0)
+        self.assertEqual(assert_fraction_cap(0), 0.0)
+
+    def test_the_merge_stores_the_coerced_value_not_the_raw_one(self):
+        """R215(c). The gate float-TESTED a copy and stored the original.
+        Classic re-coerced downstream at `_cap_count`; Showdown did not, so a
+        string reached `"0.5" >= 0.33` in brief assembly (TypeError) and
+        `f"{pct:.0%}"` (ValueError) -- both after the full solve."""
+        out = epi._merged_controls_for_build(
+            self._POSTURES, {"max_player_exposure_pct": "0.5"})
+        self.assertIsInstance(out["max_player_exposure_pct"], float)
+        self.assertEqual(out["max_player_exposure_pct"], 0.5)
+
+    def test_the_sixth_fraction_control_is_validated_per_game(self):
+        """R215(a). `max_game_exposure_pct_by_game` was in neither key set while
+        all three `_game_cap_count` sites clamped, so `{"401234": 40}` for 0.40
+        passed the zero-cost gate, passed this merge, and capped nobody in the
+        solve AND in the post-export validator, with no counter and no warning.
+        `late_swap.py` steers operators to override exactly this control."""
+        with self.assertRaises(ValueError) as ctx:
+            epi._merged_controls_for_build(
+                self._POSTURES,
+                {"max_game_exposure_pct_by_game": {"401234": 0.4, "401235": 40}})
+        self.assertIn("max_game_exposure_pct_by_game[401235]", str(ctx.exception))
+        # The non-dict spelling is its own mistake and says so.
+        with self.assertRaises(ValueError) as bad_shape:
+            epi._merged_controls_for_build(
+                self._POSTURES, {"max_game_exposure_pct_by_game": 0.4})
+        self.assertIn("game id -> fraction", str(bad_shape.exception))
+
+    def test_a_legal_by_game_dict_survives_the_merge_coerced(self):
+        """The positive control. Rejecting every by-game dict would pass the
+        test above and retire the control; and `pct <= 0` keeps its meaning,
+        which for this cap is an explicit zero (R61: it floors at 0, not 1)."""
+        out = epi._merged_controls_for_build(
+            self._POSTURES,
+            {"max_game_exposure_pct_by_game": {"401234": "0.4", "401235": 0}})
+        self.assertEqual(out["max_game_exposure_pct_by_game"],
+                         {"401234": 0.4, "401235": 0.0})
+        self.assertIsInstance(
+            out["max_game_exposure_pct_by_game"]["401234"], float)
+
+
 class BuildSlateOperatorUnitsGateTests(unittest.TestCase):
     """R167, the operator-facing half: the slip costs zero seconds."""
 
@@ -16887,6 +16970,74 @@ class BuildSlateOperatorUnitsGateTests(unittest.TestCase):
                          [{"control": "max_pitcher_exposure_pct", "value": 45,
                            "problem": "above 1.0"}])
         self.assertIn("Nothing was staged", payload["note"])
+
+    def test_the_gate_covers_the_dict_valued_control_and_the_quiet_slips(self):
+        """R215(a)(b), at the boundary that costs zero seconds and is the only
+        one Showdown reaches at all. Each case names what is wrong with it
+        rather than lumping everything under 'above 1.0'."""
+        import contextlib
+        import io
+        mod = self._module()
+        self.assertEqual(mod.FRACTION_CONTROL_DICT_KEYS,
+                         ("max_game_exposure_pct_by_game",))
+        cases = (
+            ({"max_game_exposure_pct_by_game": {"401234": 40}},
+             "max_game_exposure_pct_by_game[401234]", "above 1.0"),
+            ({"max_game_exposure_pct_by_game": 0.4},
+             "max_game_exposure_pct_by_game", "not an object of game id -> fraction"),
+            ({"max_player_exposure_pct": True},
+             "max_player_exposure_pct", "a boolean, not a fraction"),
+            ({"max_player_exposure_pct": float("nan")},
+             "max_player_exposure_pct", "not a finite number"),
+        )
+        for override, control, problem in cases:
+            with self.subTest(override=override):
+                buf = io.StringIO()
+                argv = ["build_slate.py", "--salary", str(self._SALARY),
+                        "--entries", str(self._SALARY),
+                        "--controls-override", json.dumps(override)]
+                with unittest.mock.patch.object(sys, "argv", argv):
+                    with contextlib.redirect_stdout(buf):
+                        code = mod.main()
+                self.assertEqual(code, 4)
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload["status"], "controls_override_bad_units")
+                self.assertEqual(
+                    [(c["control"], c["problem"]) for c in payload["controls"]],
+                    [(control, problem)])
+
+    def test_the_gate_coerces_in_place_rather_than_testing_a_copy(self):
+        """R215(c). It float-TESTED a copy and forwarded the raw value, so what
+        passed the gate was not what travelled. `run_classic` receives `args`,
+        so the coerced override can be read where the build would read it."""
+        import contextlib
+        import io
+        mod = self._module()
+        seen = {}
+
+        def fake_run_classic(args, *rest):
+            seen["override"] = args.controls_override
+            return 3, {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            argv = ["build_slate.py", "--salary", str(self._SALARY),
+                    "--entries", str(self._SALARY), "--past-slate-replay",
+                    "--controls-override",
+                    json.dumps({"max_player_exposure_pct": "0.5",
+                                "max_shared_players": 8,
+                                "max_game_exposure_pct_by_game": {"401234": "0.4"}})]
+            with unittest.mock.patch.object(mod, "REPO", Path(tmp)), \
+                    unittest.mock.patch.object(mod, "run_classic", fake_run_classic), \
+                    unittest.mock.patch.object(sys, "argv", argv):
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    mod.main()
+        self.assertEqual(seen["override"]["max_player_exposure_pct"], 0.5)
+        self.assertIsInstance(seen["override"]["max_player_exposure_pct"], float)
+        self.assertEqual(seen["override"]["max_game_exposure_pct_by_game"],
+                         {"401234": 0.4})
+        # A count control is not a fraction and is left exactly as typed.
+        self.assertEqual(seen["override"]["max_shared_players"], 8)
 
     def test_a_legal_override_passes_the_units_gate(self):
         """Without this the gate could refuse everything and every assertion

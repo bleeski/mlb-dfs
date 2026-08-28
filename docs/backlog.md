@@ -140,27 +140,32 @@ identity checks, which is a money-boundary hazard, not a style problem. The
 Showdown cluster therefore runs directly behind the money-boundary batch
 instead of at slot 10.
 
-**Fifteen slots. Dependencies bind where stated.**
+**Fourteen slots. Dependencies bind where stated.**
 
-1. **R212 + R213 + R214 + R215** — unchanged head; ed8 corroborates all three
-   surfaces (F-04, F-05, F-03). R212 before the supervisor batch; R214 before
-   R203.
-2. **R205, with R236 riding immediately behind** — de-vig first (third
+*Amendment 2026-08-28, DEV, claim `engine` (`engine_2026-08-28`): slot 1 is
+CLOSED. R212, R213, R214 and R215 all landed in that order, entries migrated to
+CHANGELOG.md, gate 1313 -> 1331. The list is RENUMBERED rather than annotated,
+per the standing rule, so it is fourteen slots and slot 1 is R205 + R236.
+**R203's precondition is met**: R214 landed, so the supervisor now preserves an
+operator's `--controls-override` instead of dropping it, and slot 10's R207 +
+R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
+
+1. **R205, with R236 riding immediately behind** — de-vig first (third
    independent confirmation, F-12, plus the 08-24 fragment's operator
    hand-averaging incident), then the odds paste tool is born correct instead
    of inheriting the averaging bug through a new door.
-3. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
+2. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
    F-14, F-10). R176 gains ed8's F-34 as a rider: exit code computed before
    the manifest stamp, so success can return unstamped.
-4. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by two
+3. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by two
    field hits from this week: the preflight's feed matcher has no AZ→ARI
    crosswalk and silently demotes ten hard checks to warnings (R248, F-33),
    and the salary auto-resolve still reaches across draftgroups before
    refusing (R242, F-11's surviving sliver). F-31 rides R174: `late_swap.py`
    prints the preflight command and returns success without running it.
-5. **R165 + R163** — unchanged content, down one: its evidence is unchanged
+4. **R165 + R163** — unchanged content, down one: its evidence is unchanged
    while slot 4 gained two live hits.
-6. **Showdown ladder truth: R158 + R223 + R250 + R247 + R237 + R224** —
+5. **Showdown ladder truth: R158 + R223 + R250 + R247 + R237 + R224** —
    solver status first (F-08), because everything downstream trusts solve
    results; then the captain-budget reservation (R250, F-36: UTIL spends a
    named captain's budget before his rungs solve — Eldridge capped at nine,
@@ -169,7 +174,7 @@ instead of at slot 10.
    $6,100-left tail lineup shipped with every counter clean), and the
    uncomputed-vs-neutral factor split (R237, F-38/F-43) that both qa reads
    need.
-7. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
+6. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
    shapes before assignment (R239's shape-aware half consumes R238; its
    round-robin dealing half can land first and alone). R249 gives the path a
    projection input so the salary file stops being the injection point
@@ -177,31 +182,32 @@ instead of at slot 10.
    standing batch tail keeps its members and order: R208, R122-rider, R123,
    R189(3), R210, R211. R240 (punt-captain template) is Tier 4,
    decision-first.
-8. **R216** — unchanged reason: lands alone at a session boundary because it
+7. **R216** — unchanged reason: lands alone at a session boundary because it
    resets in-flight gate state. Gains F-01's widening as a rider: the
    behavior manifest should also cover the lock files and
    `reference_manifest.json`, and record runtime identity (R217(d)'s half).
-9. **R195 + R181 + R179** — unchanged; R195 before R181.
-10. **R180 + R217 + R218** — audit hardening, unchanged (F-02, F-22).
-11. **R207 + R244** — the R203 feeder pair, now explicit: R207 makes the
+8. **R195 + R181 + R179** — unchanged; R195 before R181.
+9. **R180 + R217 + R218** — audit hardening, unchanged (F-02, F-22).
+10. **R207 + R244** — the R203 feeder pair, now explicit: R207 makes the
     refusal name the binding cap, R244 makes the rescue open ONLY that cap
     and bisect downward (the 08-27 container fragment measured 0.43
     dominating 0.50 outright — the first value that certifies is not the
-    value to ship). R203 unblocks when slot 1 lands R214; its entry gains
+    value to ship). R203's R214 precondition is MET (landed 2026-08-28), so
+    this pair is all that stands between the board and R203; its entry gains
     R244's design.
-12. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
+11. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
     the bank job grid (F-29) and the `--leverage` passthrough that makes
     R154's two constraints reachable from the slate's own prediction file
     (F-15's narrow accept; Ben has now asked for leverage twice in-slate and
     the answer was "built but not connected").
-13. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
+12. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
     atomic-writer copy, so ed8 adds no scope.
-14. **Smalls, batched opportunistically:** R221, R222, R229 (+F-24's severity
+13. **Smalls, batched opportunistically:** R221, R222, R229 (+F-24's severity
     note on the (b) half), R230 (+(d), the game-cap test that passes with the
     constraint deleted, F-28), R231, R232, R241, R243.
-15. **The pre-existing Tier 1 remainder from R121**, standing order,
+14. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged.
 
 **Tier 2 keeps its order and gains one rider:** R118 → R48 + R83 → R10 (still
@@ -3829,41 +3835,16 @@ the top of `autobuild_decisions.json`.
 OPEN and unstarted. The supervisor can now preserve the manual R157 rescue it
 will eventually be taught to perform.
 
-### R215. R167's units family has three more members: the sixth fraction control, the gate's NaN/bool hole, and validate-without-coerce (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-T3, GF7-E2, GF7-T8) and, for (a) and (b), independently from the outside spec (D03); (a) and (b) VERIFIED-read and re-read here, (c) PLAUSIBLE (path read, not executed)
+### R215. CLOSED 2026-08-28 -- (a)(b)(c) landed together: the sixth fraction
+control is validated per game id, NaN/inf/bool no longer clear the rule, and
+both boundaries store the coerced float; entry migrated to CHANGELOG.md
 
-**What.** (a) `max_game_exposure_pct_by_game` is absent from
-`FRACTION_CONTROL_KEYS` (`build_slate.py:123-129`, five keys, confirmed here) and
-from `_merged_controls_for_build`'s `_fraction_control_keys`
-(`execution_pipeline.py:2220`), while all three `_game_cap_count` sites still
-clamp: `min(1.0, max(0.0, float(pct)))` (`contest_allocator.py:2544`, `:911`;
-`dk_entries_manager.py:767`). A per-game units slip (`{"401234": 40}` for 0.40)
-passes the zero-cost gate, passes the merge, and caps nobody in the solve AND in
-the post-export validator, with no counter and no warning. (b)
-`assert_fraction_cap` (`contest_allocator.py:1035-1036`) does `value = float(pct)`
-then `if value > 1.0: raise`. `float("nan") > 1.0` is False, so NaN clears the gate
-at every boundary and dies later inside `math.floor(total * value)` with an
-unnamed ValueError, after the bank has spent. `assert_fraction_cap(True)` returns
-1.0 silently, because `bool` is `int`: a cap switched off with no name. (c) The
-gate float-TESTS a copy and forwards the raw value; the merge asserts and stores
-the raw (`execution_pipeline.py:2281`). Classic re-coerces at `_cap_count`;
-Showdown does not, so `--controls-override '{"max_player_exposure_pct": "0.5"}'`
-raises TypeError at `"0.5" >= 0.33` in brief assembly and ValueError at
-`f"{pct:.0%}"` — both after the full solve.
-
-**Why.** R167's entry kept the by-game clamp on the reasoning that solve and
-validator agree. Agreement does not answer SILENT DISABLE, which is verbatim the
-harm `assert_fraction_cap`'s own docstring names, and `late_swap.py:197` steers
-operators to override exactly this control. (b) is the lost-window class arriving
-THROUGH the gate built to stop it. (c) is a gate that validates and does not
-normalize, which is a checkpoint that lets the bad value past after saying it
-looked.
-
-**Fix.** (a) Route each by-game value through `assert_fraction_cap` at the merge;
-add the dict-valued key to build_slate's gate; keep `pct <= 0` semantics. (b)
-`if not math.isfinite(value) or value > 1.0: raise`, plus explicit bool rejection
-before the `float()` (the outside spec's `fraction()` parser, D03, is this shape).
-(c) Store `float(value)` back at both boundaries. Land (a)(b)(c) together: they
-are one class and splitting them reproduces R167.
+`FRACTION_CONTROL_DICT_KEYS` and `fraction_or_problem` are build_slate's half;
+`_fraction_control_dict_keys` and `coerced_override` are the merge's;
+`assert_fraction_cap` rejects a bool before the `float()` and a non-finite after
+it. The CHANGELOG entry of that date carries the R233 enumeration of all
+thirteen fraction-control sites and names the four clamps deliberately kept with
+the reason each survives.
 
 ### R237. An uncomputed factor and a computed-neutral factor are different facts, and three surfaces conflate them (P1, S) | new 2026-08-27, merged from BUILD fragments `2026-08-24_BUILD_actionnetwork-odds-fallback.md` §1 and `2026-08-27_BUILD_showdown_f1_and_archetype_gaps.md` §1; corroborated by the outside spec ed8 (F-38, F-43)
 

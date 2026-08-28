@@ -128,6 +128,42 @@ FRACTION_CONTROL_KEYS = (
     "max_cpt_exposure_pct",
 )
 
+# R215(a). The sixth fraction control, and the reason it needs its own tuple:
+# it is a mapping of game id -> fraction, so the units question is about each
+# VALUE. It was in neither key set while all three `_game_cap_count` sites
+# clamped, so `{"401234": 40}` for 0.40 passed this gate, passed the engine
+# merge, and capped nobody in the solve or in the post-export validator, with
+# no counter and no warning. `late_swap.py` steers operators to override
+# exactly this control.
+FRACTION_CONTROL_DICT_KEYS = (
+    "max_game_exposure_pct_by_game",
+)
+
+
+def fraction_or_problem(value: Any) -> tuple:
+    """``(coerced float, None)`` or ``(None, why it is not a fraction)``.
+
+    The operator-facing mirror of ``contest_allocator.assert_fraction_cap``:
+    same four rejections, no engine import, and it costs no seconds. A value
+    of 0 or below is legal and means "not set" for a ceiling or "no quota" for
+    a floor, which every posture relies on shipping.
+    """
+    if isinstance(value, bool):
+        # bool is a subclass of int, so `True` used to coerce to 1.0 in
+        # silence: a cap switched off with no name (R215(b)).
+        return None, "a boolean, not a fraction"
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError):
+        return None, "not a number"
+    if coerced != coerced or coerced in (float("inf"), float("-inf")):
+        # NaN clears every `> 1.0` test and dies later inside math.floor,
+        # after the bank has spent (R215(b)).
+        return None, "not a finite number"
+    if coerced > 1.0:
+        return None, "above 1.0"
+    return coerced, None
+
 
 def resolve_bank_budget(computed_s: float, *, label: str) -> tuple[float, bool]:
     """Return ``(budget_s, floored)`` and SAY SO when the floor wins (R98(1))."""
@@ -3103,20 +3139,43 @@ def main() -> int:
     # (`_merged_controls_for_build`) now rejects it too, and this check exists
     # in addition because it is the only one that costs nothing and because
     # Showdown never passes through that boundary at all.
+    #
+    # R215(c). This used to float-TEST a copy and forward the raw value, which
+    # is a checkpoint that lets the bad value past after saying it looked.
+    # Classic re-coerced downstream at `_cap_count`; Showdown did not, so
+    # `--controls-override '{"max_player_exposure_pct": "0.5"}'` raised
+    # TypeError at `"0.5" >= 0.33` in brief assembly and ValueError at
+    # `f"{pct:.0%}"` -- both after the full solve. The coerced float is now
+    # written back, so what passed the gate is what travels.
     bad_units = []
+    override = args.controls_override or {}
     for key in FRACTION_CONTROL_KEYS:
-        value = (args.controls_override or {}).get(key)
+        value = override.get(key)
         if value is None:
             continue
-        try:
-            float(value)
-        except (TypeError, ValueError):
+        coerced, problem = fraction_or_problem(value)
+        if problem:
             bad_units.append({"control": key, "value": value,
-                              "problem": "not a number"})
+                              "problem": problem})
+        else:
+            override[key] = coerced
+    # R215(a). The sixth control is dict-valued: the units question is about
+    # each per-game VALUE, and the key was in no gate at all.
+    for key in FRACTION_CONTROL_DICT_KEYS:
+        by_game = override.get(key)
+        if by_game is None:
             continue
-        if float(value) > 1.0:
-            bad_units.append({"control": key, "value": value,
-                              "problem": "above 1.0"})
+        if not isinstance(by_game, dict):
+            bad_units.append({"control": key, "value": by_game,
+                              "problem": "not an object of game id -> fraction"})
+            continue
+        for gid, value in list(by_game.items()):
+            coerced, problem = fraction_or_problem(value)
+            if problem:
+                bad_units.append({"control": f"{key}[{gid}]", "value": value,
+                                  "problem": problem})
+            else:
+                by_game[gid] = coerced
     if bad_units:
         print(json.dumps({
             "status": "controls_override_bad_units",
@@ -3124,8 +3183,11 @@ def main() -> int:
             "note": ("these controls are FRACTIONS of the entered set, not "
                      "percentages: 0.45 for 45%. A value above 1.0 caps nobody, "
                      "and it used to reach the solve and crash there after the "
-                     "bank had spent. Nothing was staged and no run directory "
-                     "was created."),
+                     "bank had spent. A bool and a NaN did the same thing more "
+                     "quietly: both cleared the `> 1.0` test and disabled the "
+                     "cap with nothing named. 0 or below is legal and means "
+                     "'not set' for a ceiling, 'no quota' for a floor. Nothing "
+                     "was staged and no run directory was created."),
         }, indent=1))
         return 4
 

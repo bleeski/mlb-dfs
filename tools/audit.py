@@ -338,7 +338,19 @@ EXPECTED_SUITE_COUNTS = {
     # which would otherwise arrive as a second occurrence. R169(d)'s own test
     # was rewritten in place, not added: both its halves still hold, and the
     # second is now enforced by merging rather than by ordering.
-    "tests.test_core": 895,
+    # R215, 2026-08-28: 895 -> 902, the seven that close R167's units family.
+    # Five in UnitsRuleRemainingMembersTests: NaN/inf rejected at the rule
+    # (every comparison against NaN is False, so it cleared `> 1.0` and died
+    # inside math.floor after the bank spent), bool rejected before the float()
+    # with 1.0 and 0 kept legal as its positive control, the merge storing the
+    # COERCED value, the sixth control validated per game id and its non-dict
+    # spelling named, and a legal by-game dict surviving coerced (without which
+    # rejecting every one of them passes the test above). Two on build_slate's
+    # zero-cost gate, the only boundary Showdown reaches: the dict-valued key
+    # plus the two quiet slips each naming its own problem, and the gate
+    # coercing IN PLACE rather than testing a copy, read off the args
+    # `run_classic` receives.
+    "tests.test_core": 902,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

@@ -1031,10 +1031,38 @@ def assert_fraction_cap(pct: Any, *, key: Optional[str] = None) -> float:
     ``test_cap_count_arithmetic_is_floor_and_both_copies_agree`` measures the
     solve side against it. Collapsing that pair into one function would make
     the comparison tautological and retire real coverage.
+
+    R215(b). Two values used to clear this gate and disable a cap anyway, which
+    is verbatim the harm the paragraphs above name -- the lost-window class
+    arriving THROUGH the checkpoint built to stop it.
+
+    ``float("nan") > 1.0`` is False, so a NaN passed every boundary and died
+    later inside ``math.floor(total * value)`` with an unnamed ValueError,
+    after the bank had spent. Infinity passes the same way and floors to a cap
+    nobody is under.
+
+    ``bool`` is a subclass of ``int``, so ``assert_fraction_cap(True)``
+    returned 1.0 in silence: a cap switched off with no name, which is the one
+    outcome this function exists to prevent. It is rejected before the
+    ``float()`` rather than after, because after it is indistinguishable from
+    a legitimate 1.0 (R157's rescue sanity check ships exactly that value).
     """
+    named = f"{key} " if key else ""
+    if isinstance(pct, bool):
+        raise ValueError(
+            f"exposure cap {named}{pct!r} is a bool, not a fraction; bool is a "
+            f"subclass of int, so this used to coerce to {float(pct)} and "
+            f"disable the cap without naming it. Pass the fraction you mean "
+            f"(0.45 for 45%), or 0 for 'not set'."
+        )
     value = float(pct)
+    if not math.isfinite(value):
+        raise ValueError(
+            f"exposure cap {named}{value!r} is not a finite number; it cleared "
+            f"the `> 1.0` test (every comparison against NaN is False) and "
+            f"then raised inside math.floor after the bank had spent"
+        )
     if value > 1.0:
-        named = f"{key} " if key else ""
         raise ValueError(
             f"exposure cap {named}{value!r} is > 1.0; caps are fractions of the "
             f"requested count (0.45 for 45%), not percentages -- a bare 45 "
