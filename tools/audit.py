@@ -350,7 +350,17 @@ EXPECTED_SUITE_COUNTS = {
     # plus the two quiet slips each naming its own problem, and the gate
     # coercing IN PLACE rather than testing a copy, read off the args
     # `run_classic` receives.
-    "tests.test_core": 902,
+    # R205, 2026-08-28: 902 -> 911, the nine that pin cross-book consensus in
+    # probability space -- the ATL@MIN straddle that filed it (with the old
+    # rule's -2.0 stated so the bug stays legible), the consensus already being
+    # vig-free so every consumer's second de-vig is identity, one book being its
+    # own de-vigged consensus rather than its posted price, a one-sided book
+    # named and excluded, a game no book priced two ways named rather than
+    # invented, a NaN/inf/zero price excluded by name (R215's discipline on this
+    # surface), book order not moving the answer, and the price/probability
+    # round trip -- plus the one member of the class that survives on purpose,
+    # the total's cross-book median, which is linear and says so.
+    "tests.test_core": 911,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -486,7 +496,16 @@ EXPECTED_SUITE_COUNTS = {
     # list with a blocked side in neither, and such a side still being `partial`
     # rather than `confirmed`, which is what the module docstring claimed for
     # three slates and the code has never done.
-    "tests.test_paste_lineups": 87,
+    # R236, 2026-08-28: 87 -> 98, the eleven that pin the odds paste, the second
+    # source a cloud session cannot fetch -- every slate game priced per named
+    # book off a constructed fixture, the payload parsing back through the
+    # engine's own parser, each book's posted pair surviving beside the derived
+    # consensus (the straddle, from this end), the salary file's start stamped
+    # rather than the paste's silence, and six refusals: an unnamed book, an
+    # unresolved team, a slate game with no priced row, two rows for one book
+    # that disagree (against an exact repeat, which does not block), a price
+    # inside the +/-100 gap, and a header the parser cannot read.
+    "tests.test_paste_lineups": 98,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this

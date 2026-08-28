@@ -6,6 +6,14 @@ DKSalaries.csv. A parser for a pasted format has to be tested against the format
 as it really arrives, because the failure mode is not an exception: it is a
 plausible-looking lineup attached to the wrong team.
 
+R236 widened this suite from one paste source to the paste PATH: the odds table
+is the second source that cannot be fetched from a cloud session, and it lands
+here rather than beside the odds parser because what it shares with the lineups
+paste -- the refusal rules, the salary file as the authority on slate
+membership, and the zero-network contract below -- is the whole of its design.
+Its fixture is CONSTRUCTED and says so in its own first line; the real capture
+is the open remainder of that item.
+
 Nothing here reaches the network. Nothing here imports scipy.
 """
 from __future__ import annotations
@@ -16,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -392,7 +401,9 @@ class PasteWinsOverTheApiFeedTests(unittest.TestCase):
         forbidden = {"urllib", "urllib.request", "requests", "http",
                      "http.client", "socket", "aiohttp", "httpx"}
         for path in ((REPO / "tools" / "lineups_from_paste.py"),
-                     (REPO / "mlb_engine" / "intake" / "paste_lineups.py")):
+                     (REPO / "mlb_engine" / "intake" / "paste_lineups.py"),
+                     (REPO / "tools" / "odds_from_paste.py"),
+                     (REPO / "mlb_engine" / "intake" / "paste_odds.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imported = set()
             for node in ast.walk(tree):
@@ -435,6 +446,7 @@ class PasteWinsOverTheApiFeedTests(unittest.TestCase):
         probe = (
             "import sys, json\n"
             "import tools.lineups_from_paste\n"
+            "import tools.odds_from_paste\n"
             "capable = {'urllib.request', 'http.client', 'requests', 'httpx', 'aiohttp'}\n"
             "print(json.dumps(sorted(capable & set(sys.modules))))\n"
         )
@@ -444,7 +456,7 @@ class PasteWinsOverTheApiFeedTests(unittest.TestCase):
         pulled = json.loads(result.stdout.strip().splitlines()[-1])
         self.assertEqual(
             pulled, [],
-            f"the paste tool's import graph now reaches {pulled}; the "
+            f"a paste tool's import graph now reaches {pulled}; the "
             "zero-network contract is a property of the graph, not of one file")
 
 
@@ -1401,3 +1413,179 @@ class PartialSideCauseTests(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         self.assertEqual(POSTED_LINEUP_SLOTS, mod.POSTED_LINEUP_SLOTS)
+
+
+# --------------------------------------------------------------------------
+# R236: the odds table is the second source that cannot be fetched
+# --------------------------------------------------------------------------
+
+ODDS_PASTE = REPO / "tests" / "fixtures" / "paste" / "odds_table_2026-07-30_1910_6g.txt"
+ODDS_SALARY = (REPO / "tests" / "fixtures" / "slates"
+               / "DKSalaries_1910_6g_frozen_2026-07-30.csv")
+STAMP = "2026-07-30T22:00:00Z"
+
+
+class OddsPasteTests(unittest.TestCase):
+    """R236. `api.the-odds-api.com` is proxy-gated in cloud sessions exactly as
+    `statsapi.mlb.com` is, and on 1940_7g a certified file shipped with
+    `f1_games_priced: 0` while `enrichment.signal_applied` read true. The
+    workaround was averaging seven book columns by eye, which is R205's bug
+    executed by hand and unauditable afterwards.
+
+    The fixture is CONSTRUCTED and says so on its own first line. What it pins
+    is the tool's contract, not any book's prices.
+    """
+
+    def _resolve(self, text=None, salary=None, book=None):
+        from mlb_engine.intake.paste_odds import resolve_paste_to_odds_payload
+        return resolve_paste_to_odds_payload(
+            text if text is not None else ODDS_PASTE.read_text(encoding="utf-8"),
+            str(salary or ODDS_SALARY), default_book=book, fetched_at=STAMP)
+
+    def _run(self, text, extra=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "odds.json"
+            result = subprocess.run(
+                [sys.executable, str(REPO / "tools" / "odds_from_paste.py"),
+                 "--salary", str(ODDS_SALARY), "--paste", "-", "--out", str(out),
+                 *(extra or [])],
+                input=text, capture_output=True, text=True, cwd=str(REPO))
+            return result, out.exists()
+
+    def test_the_paste_prices_every_slate_game_and_keeps_the_books_apart(self):
+        report = self._resolve()["report"]
+        self.assertEqual(report["blockers"], [])
+        self.assertEqual(report["games_priced"], 6)
+        self.assertEqual(report["slate_games"], 6)
+        self.assertEqual(report["books"], ["draftkings", "fanduel"])
+        self.assertEqual(report["books_by_game"]["BOS@ATH"],
+                         ["draftkings", "fanduel"])
+        # Codes, another book's codes, a full name and a nickname all resolve.
+        self.assertIn("SF@SD", report["books_by_game"])
+        self.assertIn("SEA@LAD", report["books_by_game"])
+        # The source table carries the whole day; filtering it is the tool's job.
+        self.assertEqual(report["games_off_slate_dropped"], ["TB@TOR"])
+        self.assertEqual(report["duplicate_rows_ignored"],
+                         ["MIA@NYM draftkings (lines 25 and 26)"])
+
+    def test_the_payload_parses_back_through_the_engines_own_parser(self):
+        """The round trip is the whole claim: a file the engine cannot read is
+        worse than no file, because the build reports odds it did not use."""
+        from mlb_engine.intake.live_data_adapters import (
+            normalize_odds_payload, parse_the_odds_api_totals, salary_game_times)
+        from mlb_engine.intake.paste_odds import payload_matches_paste
+        result = self._resolve()
+        raw, shape = normalize_odds_payload(result["events"])
+        self.assertEqual(shape, "raw_events_list")
+        packet = parse_the_odds_api_totals(
+            raw, slate_game_times=salary_game_times(str(ODDS_SALARY)))
+        self.assertEqual(payload_matches_paste(packet, result["report"]), [])
+        self.assertEqual(sorted(packet["odds_by_game_id"]),
+                         ["BOS@ATH", "MIA@NYM", "PIT@CIN", "SEA@LAD", "SF@SD",
+                          "WSH@ATL"])
+
+    def test_each_books_posted_price_survives_and_only_the_consensus_is_derived(self):
+        """R205's other half, seen from this end. BOS@ATH in the fixture is the
+        straddle: -104/-104 against -108/+100. What ships is the vig-free
+        consensus, and what the operator could not keep by hand -- each book's
+        own posted pair -- is in the packet beside it."""
+        from mlb_engine.intake.live_data_adapters import (
+            normalize_odds_payload, parse_the_odds_api_totals)
+        raw, _ = normalize_odds_payload(self._resolve()["events"])
+        entry = parse_the_odds_api_totals(raw)["odds_by_game_id"]["BOS@ATH"]
+        self.assertEqual(entry["moneyline_books"],
+                         {"draftkings": {"BOS": -104.0, "ATH": -104.0},
+                          "fanduel": {"BOS": -108.0, "ATH": 100.0}})
+        self.assertAlmostEqual(entry["moneyline"]["BOS"], -101.904762)
+        self.assertEqual(entry["moneyline_basis"],
+                         "devig_per_book_then_average_probability")
+        # The number the hand-average produced for this shape was -2.0.
+        self.assertNotIn(-2.0, entry["moneyline"].values())
+
+    def test_commence_time_comes_from_the_salary_file_not_the_paste(self):
+        """The paste carries no start times, and the salary file is authoritative
+        for which leg of a doubleheader is on the slate. Stamping the salary
+        file's own start is what makes the packet's leg selection agree with the
+        lineups feed's by construction rather than by luck."""
+        from mlb_engine.intake.live_data_adapters import salary_game_times
+        events = {event["id"]: event for event in self._resolve()["events"]}
+        times = salary_game_times(str(ODDS_SALARY))
+        for game_id, start in times.items():
+            stamped = events[f"paste:{game_id}"]["commence_time"]
+            self.assertEqual(
+                stamped,
+                start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"))
+        self.assertEqual(self._resolve()["report"]["games_without_a_salary_start"],
+                         [])
+
+    def test_a_row_with_no_book_refuses_and_writes_nothing(self):
+        result, written = self._run(
+            "away\thome\taway_ml\thome_ml\ttotal\nPIT\tCIN\t+135\t-155\t9.5\n")
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(written, "a blocked run must write nothing")
+        self.assertIn("no book named", result.stderr)
+
+    def test_one_named_book_may_be_supplied_for_a_paste_that_has_no_column(self):
+        text = ("away\thome\taway_ml\thome_ml\ttotal\n"
+                "PIT\tCIN\t+135\t-155\t9.5\nBOS\tATH\t-104\t-104\t8.5\n"
+                "SEA\tLAD\t+180\t-220\t7.5\nSF\tSD\t+115\t-135\t7.0\n"
+                "MIA\tNYM\t+145\t-170\t8.0\nWSH\tATL\t+120\t-140\t9.0\n")
+        report = self._resolve(text=text, book="draftkings")["report"]
+        self.assertEqual(report["blockers"], [])
+        self.assertEqual(report["books"], ["draftkings"])
+        result, written = self._run(text, extra=["--book", "draftkings"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(written)
+
+    def test_an_unresolved_team_refuses_and_names_the_value(self):
+        result, written = self._run(
+            "book\taway\thome\taway_ml\thome_ml\ttotal\n"
+            "draftkings\tPIT\tCINCY\t+135\t-155\t9.5\n")
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(written)
+        self.assertIn("'CINCY'", result.stderr)
+
+    def test_a_slate_game_with_no_priced_row_refuses(self):
+        """A partial packet reaches F1 looking like a slate where those teams
+        have no market, and the even split it produces is indistinguishable
+        from the honest one."""
+        result, written = self._run(
+            "book\taway\thome\taway_ml\thome_ml\ttotal\n"
+            "draftkings\tPIT\tCIN\t+135\t-155\t9.5\n")
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(written)
+        self.assertIn("no priced row for BOS@ATH", result.stderr)
+
+    def test_two_rows_for_one_book_disagreeing_refuses_but_an_exact_repeat_does_not(self):
+        head = "book\taway\thome\taway_ml\thome_ml\ttotal\n"
+        row = "draftkings\tPIT\tCIN\t+135\t-155\t9.5\n"
+        clash = self._resolve(text=head + row +
+                              "draftkings\tPIT\tCIN\t+140\t-160\t9.5\n")["report"]
+        self.assertTrue(any("appears twice" in b for b in clash["blockers"]))
+        repeat = self._resolve(text=head + row + row)["report"]
+        self.assertFalse(any("appears twice" in b for b in repeat["blockers"]))
+        self.assertEqual(repeat["duplicate_rows_ignored"],
+                         ["PIT@CIN draftkings (lines 2 and 3)"])
+
+    def test_a_price_inside_the_plus_minus_100_gap_refuses(self):
+        """R205's fabricated -2.0 as an INPUT. No book posts a price closer to
+        zero than 100, so one in the paste is a transcription error, and the
+        cheapest place to catch it is before it is written to a packet."""
+        report = self._resolve(
+            text="book\taway\thome\taway_ml\thome_ml\ttotal\n"
+                 "draftkings\tPIT\tCIN\t-2\t-155\t9.5\n")["report"]
+        self.assertTrue(any("well-formed American price" in b
+                            for b in report["blockers"]), report["blockers"])
+
+    def test_a_header_the_parser_cannot_read_names_what_it_found(self):
+        for text, expected in (
+                ("book\taway\thome\ttotal\ndraftkings\tPIT\tCIN\t9.5\n",
+                 "expected a header"),
+                ("book\taway\thome\taway_ml\thome_ml\ndraftkings\tPIT\tCIN\t+135\t-155\n",
+                 "no total column")):
+            report = self._resolve(text=text)["report"]
+            self.assertTrue(any(expected in b for b in report["blockers"]),
+                            report["blockers"])
+            # Every refusal path fills the same report keys; the CLI formats one
+            # report and should not have to know which failure produced it.
+            self.assertEqual(report["rows_parsed"], 0)

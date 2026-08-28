@@ -81,3 +81,35 @@ def to_dk_abbrev(api_abbrev: str) -> str:
 def team_name_to_dk_abbrev(team_name: str) -> Optional[str]:
     key = " ".join(str(team_name or "").strip().lower().replace(".", ". ").split())
     return MLB_TEAM_NAME_TO_DK.get(key) or MLB_TEAM_NAME_TO_DK.get(key.replace(". ", " ").replace(".", ""))
+
+
+# DK code -> the first full name in the map above that spells it. DERIVED from
+# that dict rather than typed a second time, so the two cannot drift: the only
+# property a reverse name needs is that ``team_name_to_dk_abbrev`` maps it back,
+# and every key here does by construction.
+DK_TO_TEAM_NAME = {}
+for _name, _code in MLB_TEAM_NAME_TO_DK.items():
+    DK_TO_TEAM_NAME.setdefault(_code, _name.title())
+del _name, _code
+
+
+def dk_abbrev_to_team_name(dk_abbrev: str) -> Optional[str]:
+    """DK abbreviation -> a full team name the-odds-api parsers resolve.
+
+    R236. A paste names teams however the operator's source does, and the odds
+    packet's parser keys on full names. A tool that emits a v4 events list from
+    a paste therefore needs this direction; without it the payload it writes is
+    one the engine's own parser cannot read.
+    """
+    return DK_TO_TEAM_NAME.get(to_dk_abbrev(dk_abbrev))
+
+
+def is_dk_abbrev(value: str) -> bool:
+    """True when the text is a team code DraftKings itself uses.
+
+    ``to_dk_abbrev`` passes an unknown code through unchanged by design (R82
+    owns making that loud), so a caller that needs to REFUSE an unresolvable
+    team has to ask this question separately rather than reading a passthrough
+    as a resolution.
+    """
+    return to_dk_abbrev(value) in DK_TO_TEAM_NAME

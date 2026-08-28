@@ -1,0 +1,33 @@
+# CONSTRUCTED, not captured. Prices here are hand-written to exercise the
+# parser against the 1910_6g salary fixture (2026-07-30); they are not a record
+# of what any book posted that night, and nothing may cite them as one. The
+# real Action Network capture the fragment behind R236 describes is not on disk;
+# pinning this format against one is the open remainder of that item.
+#
+# Shapes deliberately mixed: DK codes, another book's codes (SFG/SDP), a full
+# name, a nickname, a header synonym, an off-slate row, and an exact duplicate.
+
+sportsbook	away	home	away_ml	home_ml	over_under
+draftkings	PIT	CIN	+135	-155	9.5
+fanduel	PIT	CIN	+130	-150	9.0
+
+# BOS@ATH is the straddle: DK juices both sides, FD prices the road team at
+# even money. In American space the two collapse to a price no book posted.
+draftkings	BOS	ATH	-104	-104	8.5
+fanduel	BOS	ATH	-108	+100	8.5
+
+draftkings	Seattle Mariners	Dodgers	+180	-220	7.5
+fanduel	Seattle Mariners	Dodgers	+175	-210	7.5
+
+draftkings	SFG	SDP	+115	-135	7.0
+fanduel	SFG	SDP	+118	-140	7.0
+
+draftkings	MIA	NYM	+145	-170	8.0
+draftkings	MIA	NYM	+145	-170	8.0
+
+draftkings	WSH	ATL	+120	-140	9.0
+fanduel	WSH	ATL	+122	-142	9.0
+
+# Not on this slate: the source table carries the whole day, in-progress games
+# included, and filtering that is the tool's job rather than the operator's.
+draftkings	TB	TOR	-110	-110	8.5

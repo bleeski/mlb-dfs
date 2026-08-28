@@ -25,6 +25,182 @@ performance claim.
 
 ---
 
+## 2026-08-28 — R205 + R236: the cross-book consensus stops being computed in a scale that has a hole in it, and the odds get a paste path
+
+DEV, claim `engine` (`engine_2026-08-28`, re-taken), queue slot 1. Session-start
+gate green before any edit: `PASS  v2.26.0  26 modules  1331 tests`, assembled
+via `--gate-run` / `--gate-report` (one call: the R212-R215 records still matched
+the tree). Gate after: `PASS  v2.26.0  27 modules  1351 tests`. Working-tree dirt
+was the same ARCHIVE-owned seven files, two root tarballs, the untracked
+greenfield findings doc and the standings zips this morning's entries classified;
+foreign to this session's writes, left alone. `claim.py dirt --role DEV` clean.
+
+**R205. `parse_the_odds_api_totals` averaged moneylines across books in
+American-odds space, which is not a linear scale and is not even continuous.**
+-104 and +100 are adjacent prices, both about half, and their arithmetic mean is
+-2.0, which as an American price reads as a 98% favorite. The filed repro,
+ATL@MIN on 2026-08-19 (`1235_4g`, run `20260819T153118Z_49f8ec18`): DK posted
+ATL -104 / MIN -104, FD posted ATL -108 / MIN +100, the parser emitted
+`{'ATL': -106.0, 'MIN': -2.0}`, and the 8.5 total split ATL 5.36 / MIN 3.14.
+Everything below the parser was correct and was handed a price no book posted.
+
+Two things about the shape of it. The blast radius is INVERTED: the closer a game
+is to a coin flip, the more likely two books straddle +/-100 and the larger the
+fabricated split, so the worst damage landed on exactly the games carrying no
+real edge — and F1 clips at 0.85/1.15, so a pick'em could take the maximum boost
+on one side and the maximum penalty on the other. And the "median" the code took
+was an average: `statistics.median` of an even count is the mean of the two
+middle values, so on the production two-book fetch (`draftkings,fanduel`) the two
+words named one operation. A sign guard bolted onto it would have fixed nothing,
+which is why ed7 struck that option from the item on 2026-08-24.
+
+There was a second defect underneath, unfiled and found while reading: the median
+ran PER SIDE over `moneyline_books["away"]` and `moneyline_books["home"]`
+independently, so the away price could come from one set of books and the home
+price from another. The vig relationship that makes a two-way pair mean anything
+was already broken before the median ran.
+
+What ships is the item's recommended fix, which the Codex spec reached
+independently (D16): de-vig EACH COMPLETE BOOK to a two-way pair first, then
+average the normalized probabilities. That ordering is the whole of it —
+de-vig-then-average is correct at any book count, average-then-de-vig
+reintroduces the same boundary problem in a smaller way. `consensus_two_way_
+probabilities` is the one implementation, `implied_prob_to_american` carries the
+result back into the packet's existing American-price field, and averaging
+normalized pairs is itself normalized, so every consumer's second de-vig
+(`implied_team_totals`, `showdown_theses._no_vig`) is now identity rather than a
+second bite. On the filed repro the split becomes ATL 4.261 / MIN 4.239, within
+0.02 of the 4.25 / 4.25 the filing session got by hand by keeping DK alone.
+
+**The emitted moneyline is DERIVED, and the packet says so rather than implying a
+book posted it.** Each entry gained `moneyline_basis`, `moneyline_probabilities`,
+`moneyline_books` (every book's raw posted pair, unaveraged, so a delivered file
+audits back to a book), `moneyline_books_used` and `moneyline_books_incomplete`.
+A book that posts one side, or a price this scale cannot read (0, NaN, inf — R215's
+discipline on a second surface), is named and excluded, never averaged. A game no
+book priced two ways carries NO moneyline and is named in the parser's
+`moneyline_incomplete`, which `build_slate.load_odds_packet` turns into a warning:
+F1 splits that total evenly, which is honest, and an even split with nothing
+naming the one-sided market it came from is R29(5b)'s silence again.
+`build_f1_factors` carries the basis into `games_used` so the brief's f1 block
+says which arithmetic produced the number it is showing.
+
+**R233 enumeration. The class is "cross-book aggregation of a market price", and
+after this change it has exactly one member left, deliberately:**
+
+```
+$ grep -rnE "statistics\.(median|mean|fmean)|sum\(.*\bprice|/ len\(.*book" \
+      --include=*.py mlb_engine tools skills
+mlb_engine/field/field_miner.py:761   chalk_score = statistics.fmean(owned)
+mlb_engine/field/field_miner.py:1094  chalk_score_vs_field = statistics.fmean(owned)
+mlb_engine/field/field_miner.py:1259  statistics.median(ranks) ... / field_size
+mlb_engine/intake/live_data_adapters.py:2451  "total": median(sorted(books.values()))
+```
+
+Three field_miner hits are ownership percentages and finish ranks, not prices:
+out of class, and they stay. The fourth is the KEPT copy and here is why it
+survives — a game total is a linear quantity with no discontinuity anywhere in
+its range, so a cross-book median means there what it fails to mean one field
+above. It is still a derived line rather than a posted one (DK 8.5 + FD 8.0 ->
+8.25 is a line neither book posts), so it now carries `total_basis:
+median_across_books` and `books` still holds what each book posted. Also checked
+and out of class by construction: `build_props_implied_table` takes the BEST
+price per player and de-vigs against the SAME book at the SAME point, never
+across books.
+
+**R236. `api.the-odds-api.com` is proxy-gated in cloud sessions exactly as
+`statsapi.mlb.com` is, and F1 dying there is silent.** On 2026-08-24's 1940_7g a
+certified file shipped with `f1_games_priced: 0` while
+`enrichment.signal_applied` read true, because five other factors had moved rows.
+The measured delta on the F1-live rebuild was a selection change, not cosmetics:
+apex mean 144.0 -> 149.48, CIN stacks 3 -> 1 on the slate's second-weakest
+environment. `tools/odds_from_paste.py` plus `mlb_engine/intake/paste_odds.py`
+are R32's paste path on that second source: a delimiter-tolerant, header-driven
+table, ONE ROW PER GAME PER BOOK, emitted as an ordinary the-odds-api v4 events
+list that `normalize_odds_payload` and `parse_the_odds_api_totals` consume
+unchanged.
+
+It refuses rather than half-prices: an unnamed book column, an unresolved team, a
+slate game with no priced row, a one-sided or unreadable moneyline, a missing
+total (the packet's contract is keyed on it), and two rows for one book that
+disagree. An exact repeat is deduped and named instead. Rows for games the salary
+file does not carry are dropped and reported, because the source table covers the
+whole day including in-progress games. `commence_time` is stamped from the SALARY
+file's start, so the packet's doubleheader leg selection agrees with the lineups
+feed's by construction. And the emitted payload is READ BACK through the engine's
+own parser before anything is written (`payload_matches_paste`), so a file the
+build cannot parse is never left on disk.
+
+The ordering mattered: the fragment behind R236 asked for ONE named book until
+R205 landed, because a tool emitting N books into the old parser would have
+reintroduced the averaging bug through a new door. R205 landed first in this same
+session, so the tool emits every book the paste names and the parser does the
+arithmetic correctly. What it replaces is the operator reading seven book columns
+across and averaging by eye — R205's bug executed by hand, and worse, because no
+per-book record survived it.
+
+`skills/generate-lineups/SKILL.md` gained the four lines the fragment asked for
+(the odds API is proxy-gated in cloud sessions, `signal_applied: true` does not
+mean F1 ran, read `counts.f1_games_priced` directly, and the paste fallback with
+its command) plus one on quoting `moneyline_books` rather than the consensus when
+the question is what the market said.
+
+**Not built, and R236 is REWRITTEN in `docs/backlog.md` to hold only this
+remainder rather than being migrated whole:** the paste format is the tool's own
+long table, not raw Action Network page text. The fragment's four browser facts
+are recorded and the real captured table text is not on disk, and a parser for a
+pasted format has to be pinned against the format as it really arrives — that is
+this suite's founding rule (R32), not a preference. The fixture added here says
+CONSTRUCTED in its own first line and its prices are not a record of any book.
+`factors_inert` splitting "computed to neutral" from "never computed" was never
+this item's; it is R237's and stays cross-referenced.
+
+**Filed, both P2/XS, both to the smalls slot.** R264: three independent
+American-odds -> probability implementations now sit in the tree
+(`live_data_adapters.american_to_implied_prob`, `projection_builder._american_to_
+prob`, and the arithmetic inlined in `showdown_theses._no_vig`), which is the
+R159 class on a rule R205 has just made load-bearing; no attempt was made to
+unify them here, because doing it inside this change would have put an untested
+refactor of three modules behind a P1 fix. R265: the paste tools' zero-network
+contract is checked on the MODULE-SCOPE import graph, and both of them
+(`paste_lineups` at its `salary_game_times` import, `paste_odds` at `_slate_games`)
+reach `live_data_adapters` lazily at call time, which does pull `urllib.request`
+into a running paste. Nothing calls it, so the claim is true in the sense that
+matters and imprecise in the sense the test asserts; either state it precisely or
+move the helper to a network-free module the way `team_codes` was moved.
+
+**Tests.** test_core 902 -> 911, test_paste_lineups 87 -> 98, both pinned in
+`EXPECTED_SUITE_COUNTS` with their reasons; test_showdown holds at 79 (R29(5b)'s
+packet test is REWRITTEN, not added to — its old assertion, the -143.0/121.0
+cross-book median, was the bug, and it now pins the vig-free consensus, the raw
+per-book pairs, and the consensus lying between the two books on each side).
+`tools/team_codes.py` gained `dk_abbrev_to_team_name` and `is_dk_abbrev`, both
+DERIVED from the existing name map rather than typed a second time; the paste
+tool needs the reverse direction to emit a payload the engine's own parser can
+read, and `to_dk_abbrev` passes an unknown code through by design (R82), so
+refusing an unresolvable team needs the separate question.
+
+**Migrated from `docs/backlog.md`, verbatim, R205 in full:**
+
+> ### R205. Cross-book American-odds averaging produces prices no book ever posted, worst on exactly the games with no edge (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_f1-implied-split-wrong-on-a-pickem-game.md`; root cause CONFIRMED with a repro, not inferred
+>
+> - **What:** `live_data_adapters.parse_the_odds_api_totals` averages moneylines across books ARITHMETICALLY. American odds are discontinuous at ±100: -104 and +100 are adjacent prices, both about 50%, and their arithmetic mean is **-2.0**, which as an American price reads as a 98% favorite. ATL@MIN on 2026-08-19 (`1235_4g`, run `20260819T153118Z_49f8ec18`): DK posted ATL -104 / MIN -104, FD posted ATL -108 / MIN +100, and the parser emitted `{'ATL': -106.0, 'MIN': -2.0}`. ATL averaged cleanly because both books were negative; MIN straddled the boundary. Downstream: `american_to_implied_prob(-2.0)` = 0.0196, devig → p_away 0.963 / p_home 0.037, margin -2.22, split ATL 5.36 / MIN 3.14 on an 8.5 total. Everything below the parser is CORRECT — it is handed a price no book posted.
+> - **Why P1, and why the blast radius is inverted:** the closer a game is to a coin flip the more wrong F1 gets, so it is exactly the games with no real edge that receive the largest fabricated split, and F1 clips at 0.85/1.15, so a pick'em can deliver the maximum boost to one side and the maximum penalty to the other. Reproduce with any game where two books straddle ±100, which on a near-pick'em is the NORMAL shape (one book juices both sides to -104/-104, another posts -108/+100). `total` is averaged the same way (DET@PIT: DK 8.5, FD 8.0 → 8.25) — at least a real number, but a line neither book posts, and the half-run grid exists for a reason.
+> - **Fix:** stop averaging in American-odds space at any distance from ±100, the scale is not linear there either. Defensible alternatives, pick one: a single-book read, ~~a median with a sign guard~~, or averaging in PROBABILITY space and converting back. The last is the most faithful and is the same arithmetic `vig_free_probabilities` already does.
+> - **Fix note CORRECTED 2026-08-24 (ed7 §2.4, verified at `live_data_adapters.py:2271`): the median option is struck, because the code already IS a median.** The line is `statistics.median(sorted(...))`, and on an even count the median of two values is their arithmetic mean — so on the two-book production fetch that produced the ATL@MIN repro, "median" and "average" are the same operation and a sign guard bolted onto it would fix nothing. Two options survive, not three. Probability-space averaging is the recommended one and the Codex spec reached it independently (D16), with the sharper form: de-vig EACH COMPLETE BOOK to a two-way pair first, then average the normalized probabilities, and raise `EvidenceUnknown` when no book posts a complete two-way. That ordering matters — de-vig-then-average is correct at any book count, average-then-devig reintroduces the same boundary problem in a smaller way.
+> - **The half worth reading twice, and it is not a bug.** The filing session fixed it at the input (filter `odds_raw_totals` to draftkings only — one book cannot straddle itself, giving the correct ATL 4.25 / MIN 4.25), rebuilt, and then **REJECTED the corrected build and delivered the original.** Correcting MIN from 3.14 to 4.25 is a 35% swing and it moved the build hard into MIN bats — but MIN had not posted a lineup, so those bats came off a 14.6-day-old platoon reference. The corrected build carried 17 projected-order hitters against the original's 8, put the weakest arm on the slate in 4 of 8 entries against 2, and dropped the apex contest's ceiling from 149.9 to 133.4. **The number got more honest and the portfolio got worse**, because the team the correction promoted is the team with the least reliable roster data. That is not an argument against fixing this. It is evidence that F1 accuracy and lineup-source confidence interact and nothing in the build reconciles them: a confirmed-lineup team and a platoon-projected team are treated as equally knowable once F1 has spoken. **Whether a TBD team should carry a confidence discount F1 cannot override is Ben's**, and it is filed here as an observation rather than a proposal because it changes what every projection means, not just this parser.
+
+Two notes on that text, since it is now the record. The `EvidenceUnknown` raise
+is NOT what shipped: this repo names rather than raises at intake (the pool
+report's whole shape), and raising would lose a build over one game with a
+one-sided market, so the game is named in `moneyline_incomplete` and F1 splits
+its total evenly. And the item's last paragraph — whether a TBD team should carry
+a confidence discount F1 cannot override — is Ben's, is untouched by this
+change, and is CARRIED FORWARD as a rider on R10 rather than closed with the
+parser; it was never this item's to build.
+
+---
+
 ## 2026-08-28 — R263 filed + six dated riders: the greenfield standings mine lands on the board (docs only)
 
 ARCHIVE, claims `ledger` + `inbox`, writing `docs/backlog.md` and this file

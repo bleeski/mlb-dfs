@@ -979,6 +979,184 @@ class LiveDataAdapterTests(unittest.TestCase):
         self.assertAlmostEqual(hr_rows[0]["implied_prob"], 1.0 / 1.30, places=6)
 
 
+class DevigBeforeAveragingTests(unittest.TestCase):
+    """R205. Cross-book consensus is computed in probability space, never in
+    American-odds space, because American odds are discontinuous at +/-100.
+
+    The filed case, ATL@MIN 2026-08-19 (`1235_4g`, run
+    `20260819T153118Z_49f8ec18`): DK posted ATL -104 / MIN -104 and FD posted
+    ATL -108 / MIN +100. The old per-side median emitted `{'ATL': -106.0,
+    'MIN': -2.0}` -- a price no book posted, reading as a 98% favorite -- and
+    the 8.5 total split 5.36 / 3.14. Everything below the parser was correct
+    and was handed a fabricated price. The blast radius is INVERTED: the closer
+    a game is to a coin flip, the more likely two books straddle the boundary
+    and the larger the fabricated split, so the worst damage lands on exactly
+    the games carrying no real edge.
+    """
+
+    @staticmethod
+    def _event(books, away="Atlanta Braves", home="Minnesota Twins", total=8.5):
+        """One raw the-odds-api event. ``books`` maps key -> (away, home) price."""
+        bookmakers = []
+        for key, (away_price, home_price) in books.items():
+            outcomes = []
+            if away_price is not None:
+                outcomes.append({"name": away, "price": away_price})
+            if home_price is not None:
+                outcomes.append({"name": home, "price": home_price})
+            markets = [{"key": "totals", "outcomes": [
+                {"name": "Over", "point": total, "price": -110},
+                {"name": "Under", "point": total, "price": -110}]}]
+            if outcomes:
+                markets.insert(0, {"key": "h2h", "outcomes": outcomes})
+            bookmakers.append({"key": key, "markets": markets})
+        return [{"id": "ev", "commence_time": "2026-08-19T17:35:00Z",
+                 "home_team": home, "away_team": away, "bookmakers": bookmakers}]
+
+    def _atl_min(self, books=None):
+        raw = self._event(books or {"draftkings": (-104, -104),
+                                    "fanduel": (-108, 100)})
+        return lda.parse_the_odds_api_totals(raw)
+
+    def test_the_straddle_that_filed_this_no_longer_fabricates_a_price(self):
+        """Sabotage check: restore the per-side
+        ``statistics.median(sorted(prices.values()))`` and MIN reads -2.0 again,
+        so the implied split below returns to 5.36 / 3.14."""
+        from mlb_engine.projections.projection_builder import implied_team_totals
+        entry = self._atl_min()["odds_by_game_id"]["ATL@MIN"]
+        # The old rule, stated so the bug stays legible: -104 and +100 are
+        # adjacent prices, both about half, and their mean is -2.0.
+        self.assertAlmostEqual((-104.0 + 100.0) / 2.0, -2.0)
+        self.assertAlmostEqual(lda.american_to_implied_prob(-2.0), 0.0196, places=4)
+        self.assertNotIn(-2.0, entry["moneyline"].values())
+        away_total, home_total = implied_team_totals(
+            entry["total"], entry["moneyline"]["ATL"], entry["moneyline"]["MIN"])
+        self.assertAlmostEqual(away_total, 4.261, places=3)
+        self.assertAlmostEqual(home_total, 4.239, places=3)
+        # The filing session's hand fix was to keep DK alone, since one book
+        # cannot straddle itself. The two-book answer must land on top of it.
+        dk_only = self._atl_min({"draftkings": (-104, -104)})["odds_by_game_id"]["ATL@MIN"]
+        dk_split = implied_team_totals(dk_only["total"], dk_only["moneyline"]["ATL"],
+                                       dk_only["moneyline"]["MIN"])
+        self.assertAlmostEqual(dk_split[0], 4.25, places=2)
+        self.assertLess(abs(away_total - dk_split[0]), 0.02)
+
+    def test_the_consensus_is_already_vig_free_so_a_second_devig_is_identity(self):
+        """Averaging normalized pairs yields a normalized pair. Every consumer
+        de-vigs the packet's moneyline again (``implied_team_totals``,
+        ``showdown_theses._no_vig``), and that second pass must not move it."""
+        from mlb_engine.projections.projection_builder import devig_two_way
+        entry = self._atl_min()["odds_by_game_id"]["ATL@MIN"]
+        again = devig_two_way(entry["moneyline"]["ATL"], entry["moneyline"]["MIN"])
+        self.assertAlmostEqual(again[0], entry["moneyline_probabilities"]["ATL"], places=6)
+        self.assertAlmostEqual(again[1], entry["moneyline_probabilities"]["MIN"], places=6)
+        self.assertAlmostEqual(sum(entry["moneyline_probabilities"].values()), 1.0, places=6)
+
+    def test_one_book_is_its_own_consensus_and_the_price_is_its_devigged_pair(self):
+        """A single book still gets de-vigged, so the emitted price is the fair
+        price and not the posted one. R236's paste path emits named books into
+        this parser, and its whole point is that what ships can be audited back
+        to a book: ``moneyline_books`` is where the posted price lives."""
+        entry = self._atl_min({"draftkings": (150, -170)})["odds_by_game_id"]["ATL@MIN"]
+        p_away = lda.american_to_implied_prob(150)
+        p_home = lda.american_to_implied_prob(-170)
+        fair_away, fair_home = lda.vig_free_probabilities(p_away, p_home)
+        self.assertAlmostEqual(entry["moneyline_probabilities"]["ATL"], round(fair_away, 6))
+        self.assertAlmostEqual(entry["moneyline"]["ATL"],
+                               round(lda.implied_prob_to_american(fair_away), 6))
+        self.assertNotEqual(entry["moneyline"]["ATL"], 150.0)
+        self.assertEqual(entry["moneyline_books"]["draftkings"],
+                         {"ATL": 150.0, "MIN": -170.0})
+        self.assertEqual(entry["moneyline_books_used"], ["draftkings"])
+
+    def test_a_book_posting_one_side_is_named_and_excluded_never_averaged(self):
+        """The old code took a median per SIDE independently, so the away price
+        could come from one set of books and the home price from another --
+        the vig relationship that makes a pair mean anything was already broken
+        before the median ran."""
+        parsed = self._atl_min({"draftkings": (-104, -104),
+                                "fanduel": (-108, None)})
+        entry = parsed["odds_by_game_id"]["ATL@MIN"]
+        self.assertEqual(entry["moneyline_books_used"], ["draftkings"])
+        self.assertEqual(entry["moneyline_books_incomplete"], {"fanduel": "away_only"})
+        self.assertAlmostEqual(entry["moneyline_probabilities"]["ATL"], 0.5)
+        # FD's lone price is still in the packet; it is excluded, not erased.
+        self.assertEqual(entry["moneyline_books"]["fanduel"], {"ATL": -108.0})
+        self.assertEqual(parsed["moneyline_incomplete"], [])
+
+    def test_a_slate_game_no_book_priced_two_ways_is_named_not_invented(self):
+        """An even split downstream is honest. An even split with nothing naming
+        the one-sided market it came from is R29(5b)'s silence again."""
+        parsed = self._atl_min({"draftkings": (-104, None), "fanduel": (None, 105)})
+        entry = parsed["odds_by_game_id"]["ATL@MIN"]
+        self.assertEqual(entry["moneyline"], {})
+        self.assertEqual(entry["moneyline_basis"],
+                         "unpriced: no book posted a complete two-way")
+        self.assertEqual(parsed["moneyline_incomplete"], [{
+            "game_id": "ATL@MIN",
+            "books_incomplete": {"draftkings": "away_only", "fanduel": "home_only"},
+            "reason": "no book posted a complete two-way"}])
+        # The game still prices as an environment: the total survives.
+        self.assertEqual(entry["total"], 8.5)
+
+    def test_a_price_this_scale_cannot_read_is_excluded_by_name(self):
+        """R215's discipline on a second surface. A NaN price compares False
+        against everything and would contribute a NaN probability to the
+        average, poisoning it without failing anything."""
+        nan, inf = float("nan"), float("inf")
+        parsed = self._atl_min({"draftkings": (-104, -104), "fanduel": (nan, 100),
+                                "betmgm": (inf, -110), "caesars": (0, -110)})
+        entry = parsed["odds_by_game_id"]["ATL@MIN"]
+        self.assertEqual(entry["moneyline_books_used"], ["draftkings"])
+        self.assertEqual(sorted(entry["moneyline_books_incomplete"]),
+                         ["betmgm", "caesars", "fanduel"])
+        for book in ("betmgm", "caesars", "fanduel"):
+            self.assertIn("unusable_price", entry["moneyline_books_incomplete"][book])
+        self.assertEqual(entry["moneyline_probabilities"]["ATL"], 0.5)
+
+    def test_the_consensus_does_not_depend_on_book_order(self):
+        """Determinism: the books arrive in whatever order the API listed them."""
+        forward = {"draftkings": (-104, -104), "fanduel": (-108, 100)}
+        reverse = {"fanduel": (-108, 100), "draftkings": (-104, -104)}
+        fields = ("moneyline", "moneyline_probabilities", "moneyline_books",
+                  "moneyline_books_used", "moneyline_books_incomplete", "source")
+        one = self._atl_min(forward)["odds_by_game_id"]["ATL@MIN"]
+        two = self._atl_min(reverse)["odds_by_game_id"]["ATL@MIN"]
+        self.assertEqual({k: one[k] for k in fields}, {k: two[k] for k in fields})
+
+    def test_price_and_probability_round_trip_and_the_domain_is_guarded(self):
+        for price in (-104, -108, 100, 150, -170, 9900, -9900):
+            prob = lda.american_to_implied_prob(price)
+            self.assertAlmostEqual(lda.implied_prob_to_american(prob), float(price),
+                                   places=6)
+        # A half is +100 by convention; both spellings imply exactly a half.
+        self.assertEqual(lda.implied_prob_to_american(0.5), 100.0)
+        self.assertAlmostEqual(lda.american_to_implied_prob(-100), 0.5)
+        # -2.0 does NOT round-trip, and that is the bug in one line: every
+        # well-formed American price is at least 100 away from zero, so the old
+        # mean of -104 and +100 was not merely wrong, it was outside the scale.
+        # Its canonical spelling is +5000, a 2% underdog.
+        self.assertAlmostEqual(
+            lda.implied_prob_to_american(lda.american_to_implied_prob(-2.0)), 5000.0)
+        for bad in (0.0, 1.0, -0.1, 1.5, float("nan")):
+            with self.assertRaises(ValueError):
+                lda.implied_prob_to_american(bad)
+
+    def test_the_total_keeps_its_cross_book_median_and_says_so(self):
+        """The one member of this class that survives deliberately. A game total
+        is linear with no discontinuity anywhere in its range, so a cross-book
+        median is sound there in a way it is not one field above; what is owed
+        is that the packet not present a derived line as a posted one."""
+        parsed = self._atl_min({"draftkings": (-104, -104), "fanduel": (-108, 100)})
+        raw = self._event({"draftkings": (-104, -104)}, total=8.5)
+        raw[0]["bookmakers"].append({"key": "fanduel", "markets": [
+            {"key": "totals", "outcomes": [{"name": "Over", "point": 8.0, "price": -110}]}]})
+        entry = lda.parse_the_odds_api_totals(raw)["odds_by_game_id"]["ATL@MIN"]
+        self.assertEqual(entry["total"], 8.25)
+        self.assertEqual(entry["books"], {"draftkings": 8.5, "fanduel": 8.0})
+        self.assertEqual(entry["total_basis"], "median_across_books")
+        self.assertEqual(parsed["odds_by_game_id"]["ATL@MIN"]["total_basis"],
+                         "median_across_books")
 
 
 class FixedExposureOffsetTests(unittest.TestCase):

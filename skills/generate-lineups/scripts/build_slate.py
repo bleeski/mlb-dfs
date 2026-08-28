@@ -881,6 +881,17 @@ def load_odds_packet(args, salary_csv=None) -> tuple[dict, dict]:
             f"game on this slate; check the date and the team names")
     if leg_note:
         note["leg_resolution_note"] = leg_note
+    # R205. A game priced one-sided is not a game with no market, and the
+    # operator sees the difference here or nowhere: both end as an even split.
+    incomplete = parsed.get("moneyline_incomplete") or []
+    if incomplete:
+        note["moneyline_incomplete"] = incomplete
+        note["warning"] = (
+            f"{len(incomplete)} game(s) had a moneyline posted on one side only "
+            f"and no book posted a complete two-way, so F1 splits their total "
+            f"evenly: "
+            + "; ".join(f"{row['game_id']} ({row['books_incomplete']})"
+                        for row in incomplete))
     dropped = parsed.get("doubleheader_legs_dropped") or []
     if dropped:
         note["doubleheader_legs_dropped"] = dropped

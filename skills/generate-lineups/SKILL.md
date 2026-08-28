@@ -207,6 +207,28 @@ before lock, run them first and pass the results in:
   game-environment factor. When `--odds` is omitted the script fetches totals
   and moneylines itself if `THE_ODDS_API_KEY` is set, and leaves F1 at 1.0 for
   everyone if it is not.
+  **`api.the-odds-api.com` is proxy-gated in cloud sessions**, exactly as
+  `statsapi.mlb.com` is: the fetch dies with a 403 tunnel error, the build
+  says `F1 stays neutral` in one stderr line, and everything downstream
+  certifies. `enrichment.signal_applied: true` does NOT mean F1 ran -- five
+  other factors moving rows set it -- so read `enrichment.counts.f1_games_priced`
+  directly, and treat a 0 there as a build to fix rather than to present.
+  The fallback when the API is unreachable is a paste, same as for lineups:
+  read an odds table (`https://www.actionnetwork.com/mlb/odds` works; the page
+  is client-rendered, so Chrome rather than `web_fetch`, and `__NEXT_DATA__`
+  carries no prices), then
+
+  ```bash
+  python tools/odds_from_paste.py --salary <DKSalaries.csv> --paste - \
+      --out data/slates/<date>/odds_from_paste.json
+  ```
+
+  One row per game PER BOOK, and the book column is required. Never average
+  the book columns yourself: American odds are discontinuous at +/-100, the
+  collapsed number is a price no book posted, and no per-book record survives
+  it (R205, R236). The tool refuses an unnamed book, an unresolved team, a
+  slate game with no priced row, and a payload the engine's own parser cannot
+  read back.
 
 ### One extra step before lock: emit the ownership prediction (R135)
 
@@ -266,7 +288,11 @@ which is a fact about the slate rather than a gap in the build.
 
 On F1 specifically: the books post a game total but not per-team totals, so the
 split is DERIVED from the total and the moneyline. Say "implied team total"
-rather than implying DraftKings published it. Hitter F1 is the team's implied
+rather than implying DraftKings published it. The MONEYLINE in the packet is
+derived too (R205): each book that posts a complete two-way is de-vigged, the
+probabilities are averaged, and the price carried forward is the vig-free one
+implying that average. `moneyline_books` holds what each book actually posted;
+quote that, not the consensus, if Ben asks what the market said. Hitter F1 is the team's implied
 total over the slate's mean, clipped to 0.85-1.15; pitcher F1 stays 1.0 in v1 so
 the opposing-team total is not counted twice. `enrichment.f1_implied_total_by_team`
 carries the numbers if Ben asks which games the build liked.

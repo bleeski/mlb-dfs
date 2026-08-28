@@ -911,14 +911,44 @@ class OddsPayloadShapeTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["home_team"], "Tampa Bay Rays")
 
-    def test_the_games_schema_parses_to_the_same_moneyline_the_market_had(self):
+    def test_the_games_schema_parses_to_a_priced_two_way_and_keeps_every_book(self):
+        """R29(5b) is that the market reaches the packet at all. R205 changed
+        WHAT reaches it: not a cross-book median of American prices (which was
+        -143.0 / 121.0 here) but the vig-free price implying the average of each
+        book's de-vigged probability, with both books' raw pairs preserved.
+
+        Hand arithmetic, independent of the implementation. DK TB -144 / TEX
+        +122 de-vigs to 0.5671303 / 0.4328697; FD -142 / +120 to 0.5634921 /
+        0.4365079. The averages are 0.5653112 / 0.4346888, and the prices
+        implying those exactly are -130.049622 / +130.049622.
+        """
         events, _ = self.lda.normalize_odds_payload(_skill_games_payload())
         parsed = self.lda.parse_the_odds_api_totals(events)
         entry = parsed["odds_by_game_id"]["TEX@TB"]
         self.assertEqual(entry["total"], 7.5)
-        # Median across DK -144 and FD -142; TEX median of 122 and 120.
-        self.assertEqual(entry["moneyline"]["TB"], -143.0)
-        self.assertEqual(entry["moneyline"]["TEX"], 121.0)
+        self.assertEqual(entry["moneyline"]["TB"], -130.049622)
+        self.assertEqual(entry["moneyline"]["TEX"], 130.049622)
+        self.assertEqual(entry["moneyline_probabilities"],
+                         {"TB": 0.565311, "TEX": 0.434689})
+        self.assertEqual(entry["moneyline_basis"],
+                         "devig_per_book_then_average_probability")
+        # The posted prices survive per book, unaveraged, so a delivered file's
+        # F1 can be audited back to a book. That is what the hand-averaging
+        # incident behind R236 could not do.
+        self.assertEqual(entry["moneyline_books"],
+                         {"draftkings": {"TEX": 122.0, "TB": -144.0},
+                          "fanduel": {"TEX": 120.0, "TB": -142.0}})
+        self.assertEqual(entry["moneyline_books_used"], ["draftkings", "fanduel"])
+        self.assertEqual(entry["moneyline_books_incomplete"], {})
+        self.assertEqual(parsed["moneyline_incomplete"], [])
+        # The consensus is a consensus: it sits between the two books on each
+        # side and equals neither posted price.
+        for side, book_probs in (("TB", (0.5671303, 0.5634921)),
+                                 ("TEX", (0.4328697, 0.4365079))):
+            self.assertLess(min(book_probs) - 1e-6,
+                            entry["moneyline_probabilities"][side])
+            self.assertGreater(max(book_probs) + 1e-6,
+                               entry["moneyline_probabilities"][side])
 
     def test_the_raw_flag_output_still_parses_identically(self):
         """--raw wraps the API's own events under 'raw'. Both routes must agree,

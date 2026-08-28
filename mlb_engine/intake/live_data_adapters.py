@@ -48,6 +48,7 @@ Design rules:
 from __future__ import annotations
 
 import json
+import math
 import statistics
 import urllib.error
 import urllib.parse
@@ -2347,6 +2348,16 @@ def parse_the_odds_api_totals(
     consensus total is the median across books. Merge each entry under the
     matching game's ``odds`` key in the slate context packet.
 
+    R205. The MONEYLINE consensus is not a median and is not computed in
+    American-odds space at all: each book that posts a complete two-way is
+    de-vigged first, the normalized probabilities are averaged, and the pair is
+    carried back into ``moneyline`` as the vig-free price implying it. That
+    price is derived, so the entry states its ``moneyline_basis``, the
+    probabilities themselves, every book's raw posted pair in
+    ``moneyline_books``, and which books were excluded and why. See
+    ``consensus_two_way_probabilities`` for the arithmetic and the ATL@MIN
+    case that paid for it.
+
     F18. A doubleheader ships two events under one ``AWAY@HOME`` key and this
     dict assignment used to be last-write-wins, so the matinee draftgroup could
     be priced off the night game's total with nothing saying so. The lineups
@@ -2402,11 +2413,24 @@ def parse_the_odds_api_totals(
                         moneyline_books["away"][key] = float(price)
                     elif side == home:
                         moneyline_books["home"][key] = float(price)
+        # R205. The consensus is computed in probability space, per book, and
+        # only from books that posted a COMPLETE two-way. What lands in
+        # ``moneyline`` is the vig-free price implying that consensus -- a
+        # derived number, never a posted one, which is why the entry carries
+        # its basis and every book's raw pair beside it.
+        consensus = consensus_two_way_probabilities(moneyline_books)
+        probabilities = consensus["probabilities"]
         moneyline: Dict[str, float] = {}
+        moneyline_probabilities: Dict[str, float] = {}
+        if probabilities:
+            for side_key, team_code in (("away", away), ("home", home)):
+                prob = probabilities[side_key]
+                moneyline[team_code] = round(implied_prob_to_american(prob), 6)
+                moneyline_probabilities[team_code] = round(prob, 6)
+        raw_by_book: Dict[str, Dict[str, float]] = {}
         for side_key, team_code in (("away", away), ("home", home)):
-            prices = moneyline_books[side_key]
-            if prices:
-                moneyline[team_code] = float(statistics.median(sorted(prices.values())))
+            for book_key, price in moneyline_books[side_key].items():
+                raw_by_book.setdefault(book_key, {})[team_code] = price
 
         if not books:
             continue
@@ -2414,7 +2438,18 @@ def parse_the_odds_api_totals(
         parsed_events.append({
             "game_id": game_id,
             "moneyline": moneyline,
+            "moneyline_basis": (consensus["basis"] if probabilities
+                                else "unpriced: no book posted a complete two-way"),
+            "moneyline_probabilities": moneyline_probabilities,
+            "moneyline_books": {b: raw_by_book[b] for b in sorted(raw_by_book)},
+            "moneyline_books_used": consensus["books_used"],
+            "moneyline_books_incomplete": consensus["books_incomplete"],
+            # A game total is a linear quantity with no discontinuity anywhere
+            # in its range, so a cross-book median is sound here in a way it is
+            # not one field above. It is still a derived line rather than a
+            # posted one; ``books`` carries what each book actually posted.
             "total": float(statistics.median(sorted(books.values()))),
+            "total_basis": "median_across_books",
             "source": "the-odds-api:" + ",".join(sorted(books)),
             "fetched_at": stamp,
             "books": books,
@@ -2446,12 +2481,25 @@ def parse_the_odds_api_totals(
         "start_utc": record["start_utc"],
         "reason": record["reason"],
     } for record in dropped_raw]
+    # R205. A game where some book posted a price and none posted a complete
+    # two-way is a DIFFERENT fact from a game with no h2h market at all, and
+    # the packet says which. Downstream the moneyline is simply absent and the
+    # split is even, which is honest; what would not be honest is that outcome
+    # arriving with nothing naming the one-sided market it came from.
+    moneyline_incomplete = [
+        {"game_id": game_id,
+         "books_incomplete": entry["moneyline_books_incomplete"],
+         "reason": "no book posted a complete two-way"}
+        for game_id, entry in sorted(odds_by_game_id.items())
+        if not entry.get("moneyline") and entry.get("moneyline_books_incomplete")
+    ]
     return {
         "odds_by_game_id": odds_by_game_id,
         "unmapped_teams": unmapped,
         "doubleheader_legs_dropped": dropped,
         "legs_by_game_id": {k: v for k, v in sorted(legs_by_game_id.items())
                             if len(v) > 1},
+        "moneyline_incomplete": moneyline_incomplete,
     }
 
 
@@ -2518,6 +2566,126 @@ def vig_free_probabilities(prob_a: float, prob_b: float) -> Tuple[float, float]:
     if total <= 0:
         raise ValueError("probabilities must be positive")
     return float(prob_a) / total, float(prob_b) / total
+
+
+def implied_prob_to_american(prob: float) -> float:
+    """A probability -> the American price that implies exactly it.
+
+    The inverse of ``american_to_implied_prob``, exact for every price the
+    books post. Used to carry a consensus BACK into the packet's American-price
+    field so no consumer has to change shape; the price it returns is vig-free
+    and is labeled as such where it is stored, because no book posted it.
+
+    p == 0.5 returns +100 rather than -100. Both imply a half and the two are
+    the same price; picking one keeps the function deterministic.
+    """
+    value = float(prob)
+    if not (value > 0.0) or not (value < 1.0) or value != value:
+        raise ValueError(
+            f"probability must be strictly between 0 and 1, got {prob!r}")
+    if value > 0.5:
+        return -100.0 * value / (1.0 - value)
+    return 100.0 * (1.0 - value) / value
+
+
+CONSENSUS_TWO_WAY_BASIS = "devig_per_book_then_average_probability"
+
+
+def consensus_two_way_probabilities(
+    prices_by_side: Mapping[str, Mapping[str, Any]],
+    side_keys: Tuple[str, str] = ("away", "home"),
+) -> Dict[str, Any]:
+    """Cross-book consensus for a two-way market, computed in PROBABILITY space.
+
+    R205. American odds are discontinuous at +/-100 -- -104 and +100 are
+    adjacent prices, both about half -- so their arithmetic mean is -2.0, which
+    reads as a 98% favorite. Averaging (or taking a median of an even count,
+    which is the same operation) ACROSS BOOKS in American space therefore
+    fabricates prices no book posted, and it is worst on exactly the games
+    closest to a coin flip, where two books routinely straddle the boundary.
+    ATL@MIN on 2026-08-19: DK ATL -104 / MIN -104, FD ATL -108 / MIN +100
+    produced ``{'ATL': -106.0, 'MIN': -2.0}`` and an implied split of 5.36/3.14
+    on an 8.5 total, against 4.26/4.24 here.
+
+    The order is the fix. De-vig EACH COMPLETE BOOK to a two-way pair first,
+    THEN average the normalized probabilities: correct at any book count,
+    where average-then-de-vig reintroduces the same boundary problem in a
+    smaller way. Averaging normalized pairs yields a normalized pair, so the
+    result is itself vig-free and a consumer that de-vigs again gets identity.
+
+    A book contributes only when it posts BOTH sides. That is not fastidiousness:
+    the old code took a median per SIDE independently, so the away price could
+    come from one set of books and the home price from another, and the vig
+    relationship that makes a pair mean anything was broken before the median
+    ever ran. A book missing a side, or quoting a price this scale cannot read
+    (0, NaN, inf), is NAMED in ``books_incomplete`` and excluded.
+
+    When no book posts a complete two-way, ``probabilities`` is None. The caller
+    omits the moneyline and names the game, which is what the downstream F1
+    already handles honestly (an even split says "this is a run environment and
+    we do not know which side is favored"). Inventing a one-sided price from a
+    one-sided market would be R205 with a different arithmetic.
+    """
+    away_key, home_key = side_keys
+    raw_by_book: Dict[str, Dict[str, Any]] = {}
+    for side in (away_key, home_key):
+        for book, price in (prices_by_side.get(side) or {}).items():
+            raw_by_book.setdefault(str(book), {})[side] = price
+
+    per_book: Dict[str, Dict[str, float]] = {}
+    incomplete: Dict[str, str] = {}
+    for book in sorted(raw_by_book):
+        posted = raw_by_book[book]
+        if away_key not in posted or home_key not in posted:
+            side_posted = away_key if away_key in posted else home_key
+            incomplete[book] = f"{side_posted}_only"
+            continue
+        try:
+            probs = [_finite_american_to_prob(posted[side])
+                     for side in (away_key, home_key)]
+        except (TypeError, ValueError) as exc:
+            incomplete[book] = f"unusable_price: {exc}"
+            continue
+        p_away, p_home = vig_free_probabilities(probs[0], probs[1])
+        per_book[book] = {away_key: p_away, home_key: p_home}
+
+    if not per_book:
+        return {
+            "probabilities": None,
+            "basis": CONSENSUS_TWO_WAY_BASIS,
+            "books_used": [],
+            "books_incomplete": incomplete,
+            "per_book_probabilities": {},
+        }
+
+    books_used = sorted(per_book)
+    n = float(len(books_used))
+    averaged = {side: sum(per_book[b][side] for b in books_used) / n
+                for side in (away_key, home_key)}
+    # Averaging normalized pairs is already normalized; the renormalization is
+    # float hygiene, not a second de-vig.
+    p_away, p_home = vig_free_probabilities(averaged[away_key], averaged[home_key])
+    return {
+        "probabilities": {away_key: p_away, home_key: p_home},
+        "basis": CONSENSUS_TWO_WAY_BASIS,
+        "books_used": books_used,
+        "books_incomplete": incomplete,
+        "per_book_probabilities": {b: {k: round(v, 6) for k, v in pair.items()}
+                                   for b, pair in per_book.items()},
+    }
+
+
+def _finite_american_to_prob(price: Any) -> float:
+    """``american_to_implied_prob`` with the non-numbers rejected by name.
+
+    R215's discipline on a second surface: a NaN price propagates through every
+    comparison as False and would leave a book in the consensus contributing a
+    NaN probability, which poisons the average without failing anything.
+    """
+    value = float(price)
+    if not math.isfinite(value):
+        raise ValueError(f"{price!r} is not a finite American price")
+    return american_to_implied_prob(value)
 
 
 def parse_the_odds_api_event_props(raw_event: Mapping[str, Any]) -> List[Dict[str, Any]]:

@@ -39,6 +39,55 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-28 (third note this date), DEV, claim `engine` (bare mutex, re-taken):
+**the queue head is CLOSED. R205 landed and is migrated; R236 landed in part and
+its entry is REWRITTEN as R236(b) to hold only the remainder.** Gate 1331 -> 1351
+(`test_core` 902 -> 911 and `test_paste_lineups` 87 -> 98, both `grew`), and the
+MODULE count moved for the first time in this file's history, 26 -> 27, on
+`mlb_engine/intake/paste_odds.py`. The CHANGELOG entry of this date carries the
+record, the migrated R205 text, and the R233 enumeration. The list below is
+RENUMBERED rather than annotated, so it is thirteen slots and slot 1 is R172 +
+R176 + R173 + R228; every slot moved up one and nothing jumped.
+
+**Two readings, and the first is about batching.** R205 and R236 were filed as
+"one rides the other" and that was RIGHT for once, in the direction the fragment
+argued: a paste tool emitting N book columns into the old parser would have
+reintroduced the averaging bug through a new door, so the fragment asked for one
+named book until R205 landed. Landing R205 first made the second half emit every
+book instead, which is strictly better input. That is the opposite of the last
+three sessions' batching lesson (R234's "one shared helper" that was two, R167's
+"third copy" that was a fourth): a batch justified by an ORDERING dependency held,
+where the ones justified by a shared surface did not.
+
+**Second, and it is the reason R236 did not close.** The item's fix list is an
+acceptance list, and one line of it — "the Action Network odds table text" —
+could not be built honestly, because the real captured text is not on disk and a
+parser for a pasted format has to be pinned against the format as it arrives
+(R32's founding rule for that suite). What shipped is the tool, its refusals, the
+round trip and the SKILL.md lines; what stayed is one capture and one fixture.
+The entry was rewritten to hold that remainder rather than migrated whole, per
+the partial-landing practice.
+
+**Two new numbers, both P2/XS, both into the smalls slot: R264** (three
+independent American-odds -> probability implementations, the R159 class on the
+rule R205 just made load-bearing) **and R265** (the paste tools' zero-network
+contract is asserted at module scope while both reach the fetchers lazily at call
+time). They are one move — the `team_codes` boundary again — and are filed to be
+landed together. **One rider on R10**, carrying forward R205's own observation
+that F1 accuracy and lineup-source confidence interact; it was always Ben's and
+was never the parser's to fix.
+
+**Board corrections.** `claims/engine_2026-08-20` is STILL HELD with
+`released_utc: null`, eight days old, alongside four stale `slate_*` beacons and
+`slate_2026-08-13_1310_6g`, whose hand-written RELEASED marker does not release
+it (R102). Unchanged, still Ben's to arbitrate; this session took the bare
+`engine` mutex, which re-took the released dated name rather than minting a
+sibling. `tools/_scratch_1835_9g/`, `_scratch_archive0822/` and `_scratch_r159/`
+are still on disk from closed slates — gitignored, so they block nobody, but the
+sweep rule says a patch that outlives its slate is a hazard rather than clutter.
+Not this session's to delete; named so the next DEV session does not rediscover
+them.*
+
 *2026-08-28 (second note this date), ARCHIVE, claims `ledger`+`inbox`, backlog
 write under Ben's dated scoped exception for this session: **the greenfield
 standings mine is in — 610 contests (361 Classic / 249 Showdown, 2026-06-03 →
@@ -159,7 +208,7 @@ identity checks, which is a money-boundary hazard, not a style problem. The
 Showdown cluster therefore runs directly behind the money-boundary batch
 instead of at slot 10.
 
-**Fourteen slots. Dependencies bind where stated.**
+**Thirteen slots. Dependencies bind where stated.**
 
 *Amendment 2026-08-28, DEV, claim `engine` (`engine_2026-08-28`): slot 1 is
 CLOSED. R212, R213, R214 and R215 all landed in that order, entries migrated to
@@ -169,22 +218,18 @@ per the standing rule, so it is fourteen slots and slot 1 is R205 + R236.
 operator's `--controls-override` instead of dropping it, and slot 10's R207 +
 R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
 
-1. **R205, with R236 riding immediately behind** — de-vig first (third
-   independent confirmation, F-12, plus the 08-24 fragment's operator
-   hand-averaging incident), then the odds paste tool is born correct instead
-   of inheriting the averaging bug through a new door.
-2. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
+1. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
    F-14, F-10). R176 gains ed8's F-34 as a rider: exit code computed before
    the manifest stamp, so success can return unstamped.
-3. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by two
+2. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by two
    field hits from this week: the preflight's feed matcher has no AZ→ARI
    crosswalk and silently demotes ten hard checks to warnings (R248, F-33),
    and the salary auto-resolve still reaches across draftgroups before
    refusing (R242, F-11's surviving sliver). F-31 rides R174: `late_swap.py`
    prints the preflight command and returns success without running it.
-4. **R165 + R163** — unchanged content, down one: its evidence is unchanged
+3. **R165 + R163** — unchanged content, down one: its evidence is unchanged
    while slot 4 gained two live hits.
-5. **Showdown ladder truth: R158 + R223 + R250 + R247 + R237 + R224** —
+4. **Showdown ladder truth: R158 + R223 + R250 + R247 + R237 + R224** —
    solver status first (F-08), because everything downstream trusts solve
    results; then the captain-budget reservation (R250, F-36: UTIL spends a
    named captain's budget before his rungs solve — Eldridge capped at nine,
@@ -193,7 +238,7 @@ R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
    $6,100-left tail lineup shipped with every counter clean), and the
    uncomputed-vs-neutral factor split (R237, F-38/F-43) that both qa reads
    need.
-6. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
+5. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
    shapes before assignment (R239's shape-aware half consumes R238; its
    round-robin dealing half can land first and alone). R249 gives the path a
    projection input so the salary file stops being the injection point
@@ -201,32 +246,32 @@ R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
    standing batch tail keeps its members and order: R208, R122-rider, R123,
    R189(3), R210, R211. R240 (punt-captain template) is Tier 4,
    decision-first.
-7. **R216** — unchanged reason: lands alone at a session boundary because it
+6. **R216** — unchanged reason: lands alone at a session boundary because it
    resets in-flight gate state. Gains F-01's widening as a rider: the
    behavior manifest should also cover the lock files and
    `reference_manifest.json`, and record runtime identity (R217(d)'s half).
-8. **R195 + R181 + R179** — unchanged; R195 before R181.
-9. **R180 + R217 + R218** — audit hardening, unchanged (F-02, F-22).
-10. **R207 + R244** — the R203 feeder pair, now explicit: R207 makes the
+7. **R195 + R181 + R179** — unchanged; R195 before R181.
+8. **R180 + R217 + R218** — audit hardening, unchanged (F-02, F-22).
+9. **R207 + R244** — the R203 feeder pair, now explicit: R207 makes the
     refusal name the binding cap, R244 makes the rescue open ONLY that cap
     and bisect downward (the 08-27 container fragment measured 0.43
     dominating 0.50 outright — the first value that certifies is not the
     value to ship). R203's R214 precondition is MET (landed 2026-08-28), so
     this pair is all that stands between the board and R203; its entry gains
     R244's design.
-11. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
+10. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
     the bank job grid (F-29) and the `--leverage` passthrough that makes
     R154's two constraints reachable from the slate's own prediction file
     (F-15's narrow accept; Ben has now asked for leverage twice in-slate and
     the answer was "built but not connected").
-12. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
+11. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
     atomic-writer copy, so ed8 adds no scope.
-13. **Smalls, batched opportunistically:** R221, R222, R229 (+F-24's severity
+12. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221, R222, R229 (+F-24's severity
     note on the (b) half), R230 (+(d), the game-cap test that passes with the
     constraint deleted, F-28), R231, R232, R241, R243.
-14. **The pre-existing Tier 1 remainder from R121**, standing order,
+13. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged.
 
 **Tier 2 keeps its order and gains one rider:** R118 → R48 + R83 → R10 (still
@@ -2208,6 +2253,21 @@ a restated priority.
 
 ### R10. Ownership and duplication, wired and graded (P1, M, gated) | was G3, absorbing RC 1.8/2.5/2.10
 
+**Rider 2026-08-28 (DEV, carried forward from R205 at its landing rather than
+closed with it): F1 accuracy and lineup-source confidence interact, and nothing
+in the build reconciles them.** R205's filing session corrected the ATL@MIN
+moneyline, rebuilt, and then REJECTED the corrected build and delivered the
+original: correcting MIN 3.14 -> 4.25 moved the portfolio hard into MIN bats,
+but MIN had not posted a lineup, so those bats came off a 14.6-day-old platoon
+reference — 17 projected-order hitters against 8, the slate's weakest arm in 4
+of 8 entries against 2, apex ceiling 149.9 -> 133.4. The number got more honest
+and the portfolio got worse, because the team the correction promoted is the team
+with the least reliable roster data. A confirmed-lineup team and a
+platoon-projected team are currently equally knowable once F1 has spoken.
+**Whether a TBD team should carry a confidence discount F1 cannot override is
+Ben's**, and it belongs here rather than on the parser: it changes what every
+projection means. The parser fix landed 2026-08-28 and did not touch this.
+
 **Rider 2026-08-28 (ARCHIVE, ledger 3.21): the accumulation bar is met at
 scale** — 610 parsed contests, 86 Classic + 88 Showdown carrying a graded
 pre-lock prediction. Four facts the fit inherits: (1) the v0.1 error is
@@ -3037,64 +3097,39 @@ the blocker names the cause rather than the "no probable" consequence.
   is manual by decision.
 - **Fix:** raise (mirroring the K-rate guard) or report `qualified=0` loudly.
 
-### R205. Cross-book American-odds averaging produces prices no book ever posted, worst on exactly the games with no edge (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_f1-implied-split-wrong-on-a-pickem-game.md`; root cause CONFIRMED with a repro, not inferred
+### R264. Three independent American-odds -> probability implementations, on a rule R205 has just made load-bearing (P2, XS) | new 2026-08-28, found while landing R205; VERIFIED by grep, no field incident
 
-- **What:** `live_data_adapters.parse_the_odds_api_totals` averages moneylines
-  across books ARITHMETICALLY. American odds are discontinuous at ±100: -104
-  and +100 are adjacent prices, both about 50%, and their arithmetic mean is
-  **-2.0**, which as an American price reads as a 98% favorite. ATL@MIN on
-  2026-08-19 (`1235_4g`, run `20260819T153118Z_49f8ec18`): DK posted ATL -104 /
-  MIN -104, FD posted ATL -108 / MIN +100, and the parser emitted `{'ATL':
-  -106.0, 'MIN': -2.0}`. ATL averaged cleanly because both books were negative;
-  MIN straddled the boundary. Downstream: `american_to_implied_prob(-2.0)` =
-  0.0196, devig → p_away 0.963 / p_home 0.037, margin -2.22, split ATL 5.36 /
-  MIN 3.14 on an 8.5 total. Everything below the parser is CORRECT — it is
-  handed a price no book posted.
-- **Why P1, and why the blast radius is inverted:** the closer a game is to a
-  coin flip the more wrong F1 gets, so it is exactly the games with no real
-  edge that receive the largest fabricated split, and F1 clips at 0.85/1.15, so
-  a pick'em can deliver the maximum boost to one side and the maximum penalty
-  to the other. Reproduce with any game where two books straddle ±100, which on
-  a near-pick'em is the NORMAL shape (one book juices both sides to -104/-104,
-  another posts -108/+100). `total` is averaged the same way (DET@PIT: DK 8.5,
-  FD 8.0 → 8.25) — at least a real number, but a line neither book posts, and
-  the half-run grid exists for a reason.
-- **Fix:** stop averaging in American-odds space at any distance from ±100, the
-  scale is not linear there either. Defensible alternatives, pick one: a
-  single-book read, ~~a median with a sign guard~~, or averaging in PROBABILITY
-  space and converting back. The last is the most faithful and is the same
-  arithmetic `vig_free_probabilities` already does.
-- **Fix note CORRECTED 2026-08-24 (ed7 §2.4, verified at
-  `live_data_adapters.py:2271`): the median option is struck, because the code
-  already IS a median.** The line is
-  `statistics.median(sorted(...))`, and on an even count the median of two
-  values is their arithmetic mean — so on the two-book production fetch that
-  produced the ATL@MIN repro, "median" and "average" are the same operation and
-  a sign guard bolted onto it would fix nothing. Two options survive, not
-  three. Probability-space averaging is the recommended one and the Codex spec
-  reached it independently (D16), with the sharper form: de-vig EACH COMPLETE
-  BOOK to a two-way pair first, then average the normalized probabilities, and
-  raise `EvidenceUnknown` when no book posts a complete two-way. That ordering
-  matters — de-vig-then-average is correct at any book count, average-then-devig
-  reintroduces the same boundary problem in a smaller way.
-- **The half worth reading twice, and it is not a bug.** The filing session
-  fixed it at the input (filter `odds_raw_totals` to draftkings only — one book
-  cannot straddle itself, giving the correct ATL 4.25 / MIN 4.25), rebuilt, and
-  then **REJECTED the corrected build and delivered the original.** Correcting
-  MIN from 3.14 to 4.25 is a 35% swing and it moved the build hard into MIN
-  bats — but MIN had not posted a lineup, so those bats came off a 14.6-day-old
-  platoon reference. The corrected build carried 17 projected-order hitters
-  against the original's 8, put the weakest arm on the slate in 4 of 8 entries
-  against 2, and dropped the apex contest's ceiling from 149.9 to 133.4. **The
-  number got more honest and the portfolio got worse**, because the team the
-  correction promoted is the team with the least reliable roster data. That is
-  not an argument against fixing this. It is evidence that F1 accuracy and
-  lineup-source confidence interact and nothing in the build reconciles them: a
-  confirmed-lineup team and a platoon-projected team are treated as equally
-  knowable once F1 has spoken. **Whether a TBD team should carry a confidence
-  discount F1 cannot override is Ben's**, and it is filed here as an
-  observation rather than a proposal because it changes what every projection
-  means, not just this parser.
+**What.** The conversion from an American price to an implied probability, and
+the two-way normalization on top of it, exist three times:
+
+```
+$ grep -rn "def .*american.*prob\|def _american_to_prob\|def _no_vig\|def devig_two_way\|def vig_free_probabilities\|def implied_prob_to_american" --include=*.py mlb_engine tools skills
+mlb_engine/intake/live_data_adapters.py:2555  american_to_implied_prob
+mlb_engine/intake/live_data_adapters.py:2564  vig_free_probabilities
+mlb_engine/intake/live_data_adapters.py:2571  implied_prob_to_american
+mlb_engine/intake/live_data_adapters.py:2678  _finite_american_to_prob   (wraps the first)
+mlb_engine/optimize/showdown_theses.py:126    _no_vig                    (arithmetic inlined)
+mlb_engine/projections/projection_builder.py:569  devig_two_way
+mlb_engine/projections/projection_builder.py:588  _american_to_prob
+```
+
+Three of those are the same four lines written three times:
+`american_to_implied_prob`, `projection_builder._american_to_prob`, and the
+expression inside `showdown_theses._no_vig`. They agree today, checked.
+
+**Why.** The R159 class -- two components answering one question -- and R205 is
+what makes it matter rather than untidy. The packet's moneyline is now a DERIVED
+vig-free consensus whose correctness depends on the de-vig being the same
+operation at the producer and at both consumers; the whole point of
+de-vig-then-average is that the second de-vig downstream is identity, and
+identity is a property of two implementations agreeing. Three copies is where
+R167's units family started (`_cap_count`, "both copies" that were four).
+
+**Fix.** One owner. `american_to_implied_prob` and `vig_free_probabilities` are
+the obvious ones and already sit together, but `live_data_adapters` imports
+`urllib.request` at module scope, so a network-free consumer cannot take them
+from there -- which is exactly the move `team_codes` made in R59/R82 and the
+precedent to follow. Land it with R265, same reasoning, same boundary.
 
 ### R219 + R220. CLOSED 2026-08-27 -- the degraded-side merge deferred to any
 nonempty feed lineup, and three reports on the same surface named something
@@ -3169,34 +3204,35 @@ can only ever present as "F5 did nothing".
 the report. (b) Count and name the unparsed rows; any incomplete clock says so
 rather than answering with the games it managed to read. (b) lands with R121.
 
-### R236. Odds cannot be fetched from a cloud session and the fallback is a hand-average: `tools/odds_from_paste.py`, the R32 pattern on a second source (P1, S-M) | new 2026-08-27, merged from BUILD fragment `2026-08-24_BUILD_actionnetwork-odds-fallback.md` §§1-4, 6-7, on Ben's verbatim instruction; rides R205 in the queue
+### R236(b). The odds paste tool reads its own long table, not a raw Action Network capture (P2, S) | REWRITTEN 2026-08-28 to hold only the remainder; the tool, its refusals, and the SKILL.md lines LANDED that date and are migrated to CHANGELOG.md
 
-**What.** `api.the-odds-api.com` is proxy-gated in cloud sessions exactly as
-`statsapi.mlb.com` is, and on 1940_7g a certified file shipped with
-`f1_games_priced: 0` while `enrichment.signal_applied` read true (five other
-factors moved rows). The measured delta on the F1-live rebuild: apex mean
-144.0→149.48, CIN stacks 3→1 on the slate's second-weakest environment — a
-selection change, not cosmetics. Action Network is reachable and the fragment
-pinned the four browser facts (client-rendered, `__NEXT_DATA__` carries no
-odds, second `<select>` is the market picker, table includes off-slate games).
-The operator's workaround was averaging seven book columns BY EYE — R205's
-bug executed by hand, unauditable back to any book.
+**What.** `tools/odds_from_paste.py` and `mlb_engine/intake/paste_odds.py` ship
+and are the supported fallback when the odds API is proxy-gated. What they
+accept is the tool's OWN format -- a delimiter-tolerant, header-driven table,
+one row per game per book -- so an operator reading
+`https://www.actionnetwork.com/mlb/odds` transcribes the page's rows into it
+rather than pasting the page. Transcription is where a hand error lives, and the
+per-book columns bound it (nothing is averaged, and every price is attributed),
+but they do not remove it.
 
-**Why.** F1 is the only market signal in the projection and the enrichment
-stack is the differentiation layer (R119); a source that dies silently in the
-environment builds now run in needs the paste path the repo already trusts.
+**Why it stopped here.** A parser for a pasted format has to be pinned against
+the format as it really arrives -- that is R32's founding rule for this suite,
+not a preference, and the failure mode is not an exception but a plausible-looking
+number attached to the wrong game. The real captured table text is not on disk:
+the fragment recorded four browser facts about the page and the artifact it left
+(`data/slates/2026-08-24/odds_actionnetwork_1940_7g.json`) is a hand-built v4
+payload, not the page text. Writing a parser for a format nobody can show it is
+the fabrication CLAUDE.md forbids, so the tool's fixture
+(`tests/fixtures/paste/odds_table_2026-07-30_1910_6g.txt`) says CONSTRUCTED in
+its own first line and its prices are not a record of any book.
 
-**Fix.** Per the fragment's acceptance list: `tools/odds_from_paste.py` emits
-a the-odds-api v4 events list into `data/slates/<date>/`, round-trips through
-`normalize_odds_payload` → `parse_the_odds_api_totals` (verified accepting a
-hand-built payload), refuses unresolved teams, unpriced slate games, and an
-unnamed book column; emits ONE named book until R205 lands (after which
-multi-book emission improves for free); filters to the salary file's game set
-with doubleheader legs by start time. SKILL.md gains the four lines: odds API
-proxy-gated, `signal_applied: true` does not mean F1 ran, read
-`counts.f1_games_priced`, Action Network fallback. The tonight-artifact
-(`odds_actionnetwork_1940_7g.json`) is a shape reference, not a price fixture.
-The factors_inert split is R237's, cross-referenced not duplicated.
+**Fix.** Capture one real Action Network odds table as text (Chrome, not
+`web_fetch` -- the page is client-rendered; the market selector is the SECOND
+`<select>` and needs the native value setter plus a bubbling `change` event, then
+~3s; `__NEXT_DATA__` carries no prices), commit it as a fixture, and teach
+`parse_odds_paste` that shape beside the long table. The slate filter, the leg
+stamping, the refusals and the round-trip check are already built and do not
+change. **[BEN: one capture, any slate, pasted as text is enough.]**
 
 ### R241. `--postures` rejects the canonical shape vocabulary its own authority file defines (P2, XS-S) | new 2026-08-27, merged from BUILD fragment `2026-08-25_BUILD_posture-vocab-and-solo-shot.md` §1; the outside spec's F-47 names the same duplication class
 
@@ -4358,6 +4394,30 @@ faces (stale git locks, `rm` reclaiming nothing, `cp` failing over an existing
 file) and worth reading once before improvising against it. R91 is the
 systematic form of half this stream; R79 is its worked example list. R9 and
 R12 are the context and process ideas; they slot in opportunistically.
+
+### R265. The paste tools' zero-network contract is asserted on the module-scope import graph while both reach the fetchers at call time (P2, XS) | new 2026-08-28, found while landing R236; VERIFIED-read, no field incident
+
+**What.** `test_paste_lineups.test_the_zero_network_contract_holds_TRANSITIVELY`
+imports the paste tools in a fresh interpreter and asserts that no
+connection-capable module is in `sys.modules`. Both tools pass, and both import
+`live_data_adapters` -- which pulls `urllib.request` at module scope -- LAZILY
+inside a function: `paste_lineups.py:721` for `salary_game_times`, and
+`paste_odds._slate_games` for the same helper. So a paste RUN does load a live
+HTTP client; nothing calls it, and the test cannot see it.
+
+**Why.** The claim is true in the sense that matters (nothing fetches) and
+imprecise in the sense the test asserts (the graph is clean). That gap is the
+thing R59 wrote this test to close, arriving one level down, and the test's own
+docstring says the contract "is about the whole graph and not one file". A
+future reader trusting the test would be trusting a weaker fact than it states.
+
+**Fix.** Either state the claim precisely -- the test asserts no network import
+at MODULE scope, and the run-time graph is a separate question -- or move
+`salary_game_times` and the two helpers it needs (`_record_get`,
+`_load_salary_players`) to the network-free `slate_intake_manager`, re-exporting
+from `live_data_adapters` so all eight existing callers are unchanged. The
+second is the `team_codes` precedent and is what R264 wants anyway; land them
+together.
 
 ### R78. Environment floors and lock brittleness: pandas 3 breaks the Excluded guard tests today (P2, S) | audit 2026-08-04, reproduced in container
 

@@ -710,6 +710,12 @@ def build_f1_factors(
             "deparked_implied": {away: round(split[0] / divisor, 2),
                                  home: round(split[1] / divisor, 2)},
             "source": (entry or {}).get("source"),
+            # R205. The split is only as good as the price it came from, and
+            # the packet's moneyline is a DERIVED vig-free consensus, not a
+            # posted price. Carrying its basis here means the brief's f1 block
+            # says which arithmetic produced the number it is showing.
+            "moneyline_basis": (entry or {}).get("moneyline_basis"),
+            "moneyline_books_used": (entry or {}).get("moneyline_books_used"),
         }
 
     report: Dict[str, Any] = {
