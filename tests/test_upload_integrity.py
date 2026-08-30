@@ -927,6 +927,56 @@ class LineupGateEvidenceTests(unittest.TestCase):
         ])
         self.assertEqual(epi.batting_orders_by_team(frame), {"AAA": 2})
 
+    # ---- R173: a truthy report is not a checkable one --------------------
+
+    def test_a_metadata_only_pool_report_does_not_certify_the_gate(self):
+        """R173. `if report:` was a truthiness test standing in for a content
+        check, so a stub carrying only metadata certified True and wrote "0
+        blockers, 0 team(s) under 5 hitters" -- evidence for a check that had
+        nothing to check. The WEAKER input certified while `pool_report=None`
+        correctly blocked."""
+        gates, why = self._gates(
+            pool_report={"generated_at": "2026-08-30T00:00:00Z", "note": "stub"},
+            order_by_team={})
+        self.assertIsNone(gates["lineup_gate_passed"],
+                          "a report that states nothing checkable is not evidence")
+        self.assertNotIn("0 blockers", why["lineup_gate_passed"])
+
+    def test_the_uncheckable_report_is_named_rather_than_called_absent(self):
+        """Falling through must not swap one false evidence string for another:
+        'no pool report supplied' is itself untrue when a report arrived and
+        carried nothing readable. Two upstream states, and the record says which."""
+        gates, why = self._gates(
+            pool_report={"generated_at": "2026-08-30T00:00:00Z"},
+            order_by_team={"AAA": 9, "BBB": 9})
+        self.assertTrue(gates["lineup_gate_passed"],
+                        "the assembled frame is real evidence and still decides")
+        self.assertIn("supplied but carries neither", why["lineup_gate_passed"])
+        self.assertNotIn("no pool report supplied", why["lineup_gate_passed"])
+        # And with no frame either, the None branch says the same thing.
+        _, why_none = self._gates(
+            pool_report={"generated_at": "2026-08-30T00:00:00Z"}, order_by_team={})
+        self.assertIn("supplied but carries neither", why_none["lineup_gate_passed"])
+
+    def test_a_genuinely_absent_report_still_says_absent(self):
+        gates, why = self._gates(pool_report=None, order_by_team={"AAA": 9})
+        self.assertIn("no pool report supplied", why["lineup_gate_passed"])
+        self.assertNotIn("supplied but carries neither", why["lineup_gate_passed"])
+        self.assertTrue(gates["lineup_gate_passed"])
+
+    def test_either_checkable_key_alone_is_enough_to_use_the_report(self):
+        """`teams` and `blockers` are the two keys the branch actually reads, so
+        they are what checkable means here. Naming any other key would mint a
+        third definition of the pool report's shape."""
+        blockers_only, why_b = self._gates(
+            pool_report={"blockers": ["thin pool"]}, order_by_team={"AAA": 9})
+        self.assertFalse(blockers_only["lineup_gate_passed"])
+        self.assertIn("pool report", why_b["lineup_gate_passed"])
+        teams_only, why_t = self._gates(
+            pool_report={"teams": {"AAA": {"hitters": 9}}}, order_by_team={})
+        self.assertTrue(teams_only["lineup_gate_passed"])
+        self.assertIn("pool report", why_t["lineup_gate_passed"])
+
 
 class PreflightFeedDefaultTests(unittest.TestCase):
     """R4: the strongest check stops being opt-in twice.

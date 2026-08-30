@@ -613,7 +613,12 @@ EXPECTED_SUITE_COUNTS = {
     # enrichment. A second test in the same class changed its assertion rather
     # than being added: it pinned the defect ("enriched" for a guard-only build),
     # which is why the count moves by one and not two.
-    "tests.test_upload_integrity": 277,
+    # R173, 2026-08-30: 277 -> 281, the four that pin a truthy pool report as not
+    # a checkable one -- a metadata-only stub no longer certifies the lineup gate,
+    # the fall-through names it as supplied-but-uncheckable rather than absent (in
+    # both the frame branch and the None branch), a genuinely absent report still
+    # says absent, and either checkable key alone is enough to use the report.
+    "tests.test_upload_integrity": 281,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

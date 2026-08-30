@@ -4729,18 +4729,17 @@ same commit. R172's citation was stale by ~460 lines (`4202`; the function is at
 4661); its substantive claims all re-verified. What it missed: a test PINNED the
 defect, so the wrong behaviour had a green guard. Gate 1468 -> 1469.
 
-### R173. The lineup gate certifies True on a truthy pool_report that carries no checkable keys — the R53 class, on the branch R53 did not touch (P1, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro at ac8ac05, branch re-confirmed at ec832cf (`execution_pipeline.py:1168`)
+### R173. CLOSED 2026-08-30 -- a truthy pool report no longer stands in for a checkable one; entry migrated to CHANGELOG.md
 
-- **What:** `_derive_workflow_gates` takes `report = dict(pool_report or {})`
-  then `if report:` → a metadata-only stub (`{"generated_at": ..., "note":
-  ...}`) certifies with fabricated evidence ("0 blockers, 0 team(s) under
-  nine hitters") while `pool_report=None` correctly None-blocks. Latent on
-  the sanctioned path (build_slate passes a real report), live on the
-  engine-API leg and on upstream key drift — the 07-22 "certified with 0/9
-  posted" class re-opened.
-- **Fix:** the branch requires checkable content (`"teams" in report or
-  "blockers" in report`) else fall through to the None branch; pin with a
-  stub-report test.
+`checkable = "teams" in report or "blockers" in report` guards the branch, and
+both fall-through branches name a supplied-but-uncheckable report rather than
+calling it absent, so the fix does not swap one false evidence string for another.
+Citation was close (`1168`; the function opens at 1120, the assignment sat at
+1170). One premise stale: the entry quotes "0 team(s) under NINE hitters" and
+R133(3) moved that bar to `MAX_HITTERS_PER_TEAM` on 2026-08-18, so the string had
+already become "under 5 hitters"; the defect was unaffected. R233 scan found one
+remaining site of the shape, `if roles:` ten lines below, deliberately kept because
+its keys ARE the content. R177/F16 stays open as the same family. Gate 1469 -> 1473.
 
 ### R174. The locked-team introduction ban is enforced only pre-solve; no post-export gate re-derives it from the exported file (P1, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read (`late_swap_manager.py`/`dk_entries_manager.py` unchanged since the review). **Rider 2026-08-27 (ed8 F-31), same batch, same argument:** `tools/late_swap.py` writes, records and promotes the swap CSV, then PRINTS the preflight command and returns success — the independent referee is optional human follow-up on exactly the path with the least time to follow up. Have the tool run the preflight (or `verify_export`) on its own final bytes and report the verdict before claiming success; the T-minutes case is where a skipped check ships.
 

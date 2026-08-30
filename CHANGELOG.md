@@ -25,6 +25,77 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R173: a truthy pool report stops standing in for a checkable one
+
+**What moved.** `_derive_workflow_gates` guarded its pool-report branch with `if
+report:`. It now guards it with `checkable = "teams" in report or "blockers" in
+report`, and carries `supplied_uncheckable` into both fall-through branches so the
+evidence names which upstream state produced it.
+
+**Why.** A pool report carrying only metadata (`{"generated_at": ..., "note":
+...}`) is truthy, so `report.get("blockers")` returned None and
+`report.get("teams")` returned `{}`: the gate certified `lineup_gate_passed=True`
+and wrote "0 blockers, 0 team(s) under 5 hitters" into the immutable diagnostics.
+Evidence for a check that had nothing to check. The shape of the failure is what
+makes it worth the entry: `pool_report=None` correctly None-blocked, so the WEAKER
+input certified and the absent one blocked. That inversion is the R53 class on the
+branch R53 did not touch, and R53's own ancestor is the 07-22 "certified with 0/9
+lineups posted" incident. Latent on the sanctioned path, because `build_slate`
+passes a real report; live on the engine-API leg and on any upstream key drift,
+which is exactly how it would stay invisible.
+
+**`teams` and `blockers`, and no third key.** Those are the two keys this branch
+actually reads, so they are what "checkable" means here. Naming any other key
+would mint a third definition of the pool report's shape, which is the mistake
+R133(3) spent an entry undoing.
+
+**Not trading one false string for another.** Falling through to the frame branch
+would have written "no pool report supplied" for a report that WAS supplied and
+carried nothing readable. Both fall-through branches now distinguish the two
+states in the evidence itself. A fix for a false evidence string that emits a
+different false evidence string is worse than leaving it, so this is pinned by
+its own test rather than left to review.
+
+**R233 enumeration — truthiness standing in for a content check.** A regex scan
+rather than a grep, because the shape is two lines apart:
+
+    normalize `X = dict/list/set(Y or {}|[])`, then look ahead 12 lines
+    for `if X:` / `elif X:`                                        -> 1 site remains
+
+FIXED (1): `execution_pipeline.py:1178` (the item), which the scan no longer
+matches because the test is now on `checkable`.
+
+DELIBERATELY KEPT (1): `execution_pipeline.py:1269`, `roles = dict(pitcher_roles
+or {})` then `if roles:`, ten lines below the one just fixed and structurally
+different. The keys of `roles` ARE the content — every key a pitcher id, every
+value a role the branch then checks against `ALLOWED_PITCHER_ROLES_FOR_GATE` — so
+a non-empty dict necessarily carries the thing being checked and `f"{len(roles)}
+declared arms"` is a true count of what was inspected. There is no metadata-only
+variant to slip through. `report` was mixed metadata and content, which is what
+made truthiness meaningless there and meaningful here.
+
+STILL OPEN, same family, not this batch: R177 / F16, `dk_entries_manager.py:884`,
+where `confirmed = {...for x in (confirmed_hitter_ids or [])}` then `if confirmed:`
+reads an explicitly EMPTY id set as "check nothing" rather than "allow nothing".
+It has its own backlog entry (P2, XS) and is left there.
+
+**Premises.** R173's citation (`execution_pipeline.py:1168`) was close: the
+function opens at 1120 and the assignment sits at 1170 pre-change. Its repro held
+verbatim, including the fabricated evidence string, except that the string now
+reads "under 5 hitters" rather than the "under nine hitters" the entry quotes —
+R133(3) moved the bar to `MAX_HITTERS_PER_TEAM` after R173 was written, so the
+entry quotes a string the tree stopped producing on 2026-08-18. The defect it
+describes was unaffected.
+
+**Mutations.** Eight, all killed. Two were re-run alone (M12b, M13b) because the
+first pass killed them via an evidence-STRING assertion in a neighbouring test,
+which would have left the gate-VALUE claim unproven. Both die to the value
+assertion by itself.
+
+**Gate.** 1469 -> 1473. `PASS  v2.26.0  27 modules  1473 tests`.
+
+---
+
 ## 2026-08-30 — R172: the value guard stops counting as enrichment
 
 **What moved.** `"value_guard"` is out of `manifest_projection_tier`'s key list.

@@ -1175,7 +1175,23 @@ def _derive_workflow_gates(
     )
 
     report = dict(pool_report or {})
-    if report:
+    # R173, 2026-08-30. This branch was guarded by `if report:` -- a truthiness test
+    # standing in for a content check, which is the R53/R177/F16 shape. A pool
+    # report carrying only metadata (`{"generated_at": ..., "note": ...}`) is
+    # truthy, so `report.get("blockers")` returned None and `report.get("teams")`
+    # returned {}: the gate certified True and wrote "0 blockers, 0 team(s) under 5
+    # hitters" into the immutable diagnostics, evidence for a check that had nothing
+    # to check. `pool_report=None` correctly None-blocked, so the WEAKER input
+    # certified and the absent one blocked. Latent on the sanctioned path
+    # (build_slate passes a real report), live on the engine-API leg and on any
+    # upstream key drift, which is the 07-22 "certified with 0/9 posted" class.
+    #
+    # `teams` and `blockers` are the two keys this branch actually reads, so they
+    # are what "checkable" means here; naming any other key would be a third
+    # definition of the pool report's shape.
+    checkable = "teams" in report or "blockers" in report
+    supplied_uncheckable = bool(report) and not checkable
+    if checkable:
         # R133(3): this was the THIRD reader of "how short is too short" and it
         # held the strictest bar of the three -- any team under nine failed the
         # gate, while the pool report's own confirmed path called 5 through 8 a
@@ -1225,8 +1241,15 @@ def _derive_workflow_gates(
         gates["lineup_gate_passed"] = not partial
         covered = ", ".join(f"{t} {n}" for t, n in sorted(order_by_team.items()))
         why["lineup_gate_passed"] = (
-            f"no pool report supplied; batting orders on the assembled frame by "
-            f"team: {covered}"
+            # R173: "no pool report supplied" would itself be false for a report
+            # that arrived and carried nothing readable. Two different upstream
+            # states, and the record says which one it was in.
+            (f"a pool report was supplied but carries neither 'teams' nor "
+             f"'blockers', so nothing in it is checkable; batting orders on the "
+             f"assembled frame by team: {covered}"
+             if supplied_uncheckable else
+             f"no pool report supplied; batting orders on the assembled frame by "
+             f"team: {covered}")
             + (f". Under nine: {', '.join(partial)}" if partial else "")
             + ". A team absent here carries no order at all and cannot be "
               "distinguished from one excluded on purpose without a pool report"
@@ -1234,6 +1257,10 @@ def _derive_workflow_gates(
     else:
         gates["lineup_gate_passed"] = None
         why["lineup_gate_passed"] = (
+            "a pool report was supplied but carries neither 'teams' nor "
+            "'blockers', and there are no batting orders either; nothing here "
+            "states that the lineups behind this build were reviewed"
+            if supplied_uncheckable else
             "no pool report and no batting orders; nothing states that the "
             "lineups behind this build were reviewed"
         )
