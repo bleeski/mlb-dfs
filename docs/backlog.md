@@ -2161,38 +2161,6 @@ the batch's named rider and did not get pulled.
   through the greedy fallback uncertified, with a diagnostic naming the wrong
   cause. Nobody currently reads it as a timeout, so the misdiagnosis is silent.
 
-### R223. R153's founding defect recurs on the ladder rung no test drives: the floor rung drops the captain cap and nothing counts it (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-E3) and independently from the outside spec (D12); VERIFIED-read at `a49bd610` by both, re-read here
-
-**What.** `showdown_theses.py:722-725`. Every other rung of `solve_ladder` passes
-`cpt_excludes=cpt_excludes` (`:670`, `:674`, `:681`, `:688`, `:695`, `:708`,
-kwarg census run here). The floor rung's call does not:
-
-    lu = build_showdown_lineup(work, forbidden_sets=prior or None,
-                               excludes=without_cap, **kw)
-
-and nothing counts the omission. `cpt_relaxed` (`:585`, incremented at `:700`,
-`:715`, `:732`) counts LOCK SUBSTITUTIONS only, and is emitted as
-`"captain_lock_relaxed"` at `:756`. No `cpt_cap_relaxed` exists.
-
-**Why.** R153's own founding case, exactly. That item was filed because "the
-overlap bound was clean, the captain cap was clean" while one bat sat in 12 of 19
-entries: a washout axis reading clean because nothing was measuring it. R153's
-landing claim was "the cap is enforced there now, on every rung"; at this rung it
-is not, and the delivered brief reads `0 relaxations` over a breached 25% cap. Two
-tails. A floor-rung solve may re-seat the exact captain that `cpt_cap_reassigned`
-records as removed, so two records in the same brief contradict each other. And
-the tests lane confirmed the caps-on fixtures and the floor-rung-forcing fixtures
-are disjoint BY DESIGN, so no existing test can reach this branch — the fixture
-lesson's eighth consecutive appearance.
-
-**Fix.** Pass `cpt_excludes` at the floor rung behind a counted `cpt_cap_relaxed`,
-ordered after player exposure per the documented relaxation order (overlap, player
-exposure, captain lock, thesis). Drop the reassignment record when the floor solve
-re-seats that captain. Add the missing fixture: floor rung reached WITH
-`cpt_excludes` present. The outside spec's separate-counters shape (D12) is the
-right one — player cap, captain cap, captain lock and overlap are four counters,
-not three.
-
 ### R224. Two Showdown cap-resolver smalls, both on surfaces R157 sends operators to read (P2, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-E4, GF7-E5); VERIFIED-read, re-read here
 
 **What.** (a) `showdown.py:423-437`. `player_cap_structural_floor(pool_size,

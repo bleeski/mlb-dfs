@@ -2504,6 +2504,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                              + list(solve_diag.get("contest_cpt_reassigned") or []))
         player_locks_dropped = list(solve_diag.get("player_cap_locks_dropped") or [])
         contest_cap_relaxed = solve_diag.get("contest_cap_relaxed") or 0
+        # R223. The fourth counter, and the withdrawal count beside it.
+        cpt_cap_relaxed = solve_diag.get("cpt_cap_relaxed") or 0
+        cap_reassignments_withdrawn = solve_diag.get("cap_reassignments_withdrawn") or 0
+        # R158. Compute facts from the ladder's own solves.
+        solver_timeouts = solve_diag.get("solver_timeouts") or 0
+        time_limited_accepted = solve_diag.get("time_limited_accepted") or 0
+        solver_timeout_detail = list(solve_diag.get("solver_timeout_detail") or [])
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
@@ -2546,6 +2553,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # undefined; the per_contest REPORT still runs on this path, so a breach
         # here is visible even though no control prevented it.
         contest_cap_relaxed = 0
+        # R223. The portfolio captain cap relaxation lives in `solve_ladder`,
+        # which this path does not use; its single cap mechanism is already
+        # reported as `captain_relaxed_slots` above. Stated as 0 rather than left
+        # undefined, same discipline as `contest_cap_relaxed`.
+        cpt_cap_relaxed = 0
+        cap_reassignments_withdrawn = 0
+        # R158. The bank ladder DOES report these, and on this path they are the
+        # only solver-status facts there are.
+        solver_timeouts = cpt_diagnostics.get("solver_timeouts") or 0
+        time_limited_accepted = cpt_diagnostics.get("time_limited_accepted") or 0
+        solver_timeout_detail = []
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
     # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
     # report, but it does build lineups, and the contest each one is entered into
@@ -2686,10 +2704,35 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # leave a blank reserved row. A relaxation, so it is counted like
             # one; `contest_cpt_reassigned` beside it is NOT one and is not here.
             "contest_cap_relaxed_slots": contest_cap_relaxed,
+            # R223. The PORTFOLIO captain cap giving way, which until now nothing
+            # counted: the floor rung dropped it in silence, so a brief could read
+            # `0 relaxations` over a breached 25% cap. Distinct from
+            # `captain_relaxed_slots` above, which on the ladder path is the
+            # APPORTIONMENT step (R113's split) and on the bank path is that
+            # path's single cap mechanism.
+            "cpt_cap_relaxed_slots": cpt_cap_relaxed,
+            # R223. NOT a relaxation and deliberately outside `clean`: a
+            # reassignment record withdrawn because a lower rung re-seated the
+            # captain it named. It is reported so the reader knows a record was
+            # removed rather than never written.
+            "cap_reassignments_withdrawn": cap_reassignments_withdrawn,
             "clean": (not (relaxed_slots or overlap_relaxed or both_relaxed
                            or player_relaxed or ignored_locks
-                           or contest_cap_relaxed)
+                           or contest_cap_relaxed or cpt_cap_relaxed)
                       and not (per_contest.get("over_cap") or [])),
+        },
+        # R158. Compute facts, deliberately NOT inside `counted_relaxations` and
+        # deliberately not in `clean`. A timeout is an infrastructure limit, not a
+        # control giving way, and folding it into the relaxation verdict would
+        # recreate the exact conflation R158 removed from the ladder. A brief with
+        # `clean: true` and `solver_timeouts` nonzero is saying the controls all
+        # held and the clock ran out: raise the time limit, do not touch a control
+        # and do not reduce the pool.
+        "solver_compute": {
+            "solver_timeouts": solver_timeouts,
+            "time_limited_accepted": time_limited_accepted,
+            "timeout_detail": solver_timeout_detail,
+            "label": "infrastructure limits, never a strategy change",
         },
         "construction": ({
             "mode": "thesis_ladder",

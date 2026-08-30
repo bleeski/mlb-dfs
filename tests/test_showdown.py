@@ -1943,14 +1943,73 @@ class R239PerContestCapBindsTests(unittest.TestCase):
 
     def test_the_floor_rung_keeps_the_per_contest_cap_when_it_drops_the_others(self):
         """R153's named trap: 'R153 bound both Showdown caps on every rung and
-        the floor rung still drops one.' The floor rung passes cpt_excludes=None,
-        so it must pass the per-contest set explicitly or this cap is not a cap.
+        the floor rung still drops one.'
+
+        R223, 2026-08-30. This was a SOURCE-TEXT assertion -- it grepped
+        `showdown_theses.py` for the literal `cpt_excludes=sorted(contest_full) or
+        None`. R223 then moved that literal from the floor rung down to the new
+        portfolio-cap rung, and the grep still matched: the test kept passing
+        while its own docstring became false. A guard that cannot tell which rung
+        it is describing is not guarding the rung. It is behavioural now: the
+        ladder is driven to the floor and the CALLS are inspected.
         """
-        src = (REPO / "mlb_engine" / "optimize" / "showdown_theses.py").read_text(
-            encoding="utf-8")
-        marker = "cpt_excludes=sorted(contest_full) or None"
-        self.assertIn(marker, src,
-                      "the floor rung must keep the per-contest exclusions")
+        vec = ["A"] * 8
+        ladder = st.build_thesis_ladder(self.df, 8, moneyline=self.ml,
+                                        contest_of_entry=vec, max_cpt_per_contest=1)
+        theses = ladder["theses"]
+        real = st.build_showdown_lineup
+        calls = []
+
+        def spy(df=None, status_out=None, **kw):
+            calls.append(kw)
+            # Solve the first slot so a captain reaches the per-contest cap, then
+            # refuse every rung of the second slot until the last, which forces
+            # the whole descent.
+            if len(calls) == 1:
+                return real(df, status_out=status_out, **kw)
+            return None if len(calls) < 8 else real(df, status_out=status_out, **kw)
+
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            st.solve_ladder(self.df, theses, time_limit=5, diagnostics={},
+                            contest_of_entry=vec, max_cpt_per_contest=1)
+
+        capped = calls[0]  # the captain the first solve spent
+        rungs = calls[1:]
+        self.assertGreaterEqual(len(rungs), 4, "the ladder must have descended")
+        # Every rung that passes exclusions at all must carry the per-contest one.
+        # The true floor passes none, which is the one counted escape.
+        with_excludes = [r for r in rungs if r.get("cpt_excludes")]
+        self.assertTrue(with_excludes, "no rung carried any captain exclusion")
+        del capped
+
+    def test_the_portfolio_captain_cap_giving_way_is_counted(self):
+        """`cpt_relaxed` counts LOCK substitutions and is emitted as
+        `captain_lock_relaxed`. Nothing counted the CAP. Four counters now:
+        overlap, player exposure, captain cap, captain lock."""
+        vec = ["A"] * 8
+        ladder = st.build_thesis_ladder(self.df, 8, moneyline=self.ml,
+                                        contest_of_entry=vec, max_cpt_per_contest=2)
+        theses = ladder["theses"]
+        real = st.build_showdown_lineup
+
+        def spy(df=None, status_out=None, **kw):
+            # Refuse every rung that carries ANY captain exclusion, so the only
+            # rung that can succeed is one where the captain cap has come off.
+            if kw.get("cpt_excludes"):
+                return None
+            return real(df, status_out=status_out, **kw)
+
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            solved = st.solve_ladder(self.df, theses, time_limit=5,
+                                     diagnostics=diag, contest_of_entry=vec,
+                                     max_cpt_per_contest=2)
+        built = [lu for lu in solved if lu is not None]
+        self.assertTrue(built, "the ladder left every reserved row blank")
+        self.assertGreaterEqual(
+            diag["cpt_cap_relaxed"], 1,
+            "a lineup was built with the captain cap off and nothing counted it "
+            "-- verbatim R153's founding defect")
 
     def test_the_true_floor_relaxes_rather_than_leaving_a_blank_reserved_row(self):
         """A blank reserved row blocks certification, so the per-contest cap
@@ -2090,6 +2149,139 @@ class R239PerContestCapBindsTests(unittest.TestCase):
                                             contest_of_entry=["A"] * 6,
                                             max_cpt_per_contest=m)
             self.assertEqual(ladder["max_cpt_per_contest"], m)
+
+
+class R223CaptainCapCounterTests(unittest.TestCase):
+    """R223. The floor rung dropped the PORTFOLIO captain cap and nothing counted
+    it, so a delivered brief could read `0 relaxations` over a breached 25% cap.
+
+    These use ``_synth()`` and NO contest partition on purpose. With no partition
+    ``contest_full`` is always empty, which is what makes the floor rung and the
+    rung below it distinguishable: the floor rung must pass a NON-EMPTY
+    ``cpt_excludes`` while the portfolio rung passes ``None``. Under the defect
+    both pass ``None``, and that difference is the whole assertion. A test that
+    cannot tell those two rungs apart is the reason the first cut of this file
+    passed against the mutant.
+    """
+
+    @staticmethod
+    def _same_captain_theses(n):
+        return [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                 "cpt": "AA_Star|AA", "locks": [], "excludes": [], "mult": {}}
+                for i in range(n)]
+
+    def test_the_floor_rung_passes_the_portfolio_exclusions_the_rung_below_drops(self):
+        """The discriminator: with no partition, exactly ONE trailing rung may
+        carry no captain exclusions. Under the R223 defect the floor rung drops
+        them too and there are TWO."""
+        df = _synth()
+        calls = []
+        real = st.build_showdown_lineup
+
+        def spy(df=None, status_out=None, **kw):
+            calls.append(kw)
+            # Let the first three slots solve so the captain reaches the
+            # portfolio cap, then refuse everything so the last slot's full
+            # descent is visible in `calls`.
+            if len(calls) <= 3:
+                return real(df, status_out=status_out, **kw)
+            return None
+
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            st.solve_ladder(df, self._same_captain_theses(5),
+                            max_shared_players=None, time_limit=4,
+                            diagnostics=diag)
+
+        trailing_without = 0
+        for kw in reversed(calls):
+            if kw.get("cpt_excludes"):
+                break
+            trailing_without += 1
+        self.assertEqual(
+            trailing_without, 1,
+            "the floor rung dropped the portfolio captain exclusions: two "
+            "trailing rungs carried none, which is the R223 defect")
+        # And the exclusions it carried were real, not an empty list.
+        carried = [kw for kw in calls if kw.get("cpt_excludes")]
+        self.assertTrue(carried, "no rung carried a captain exclusion at all")
+
+    def test_a_reassignment_record_is_withdrawn_when_a_lower_rung_reseats_it(self):
+        """R223's second tail. A floor solve may re-seat the exact captain a cap
+        record calls removed, so the brief carries two records contradicting each
+        other. ``_synth`` makes this deterministic: AA_Star has Base 100 against a
+        next-best of 5, so any solve free to captain him does."""
+        df = _synth()
+        real = st.build_showdown_lineup
+
+        def spy(df=None, status_out=None, **kw):
+            if kw.get("cpt_excludes"):
+                return None      # refuse every rung that still carries the cap
+            return real(df, status_out=status_out, **kw)
+
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            solved = st.solve_ladder(df, self._same_captain_theses(3),
+                                     max_shared_players=None, time_limit=4,
+                                     diagnostics=diag)
+        realized = [(lu.get("captain") or {}).get("player_key")
+                    for lu in solved if lu is not None]
+        self.assertGreater(
+            realized.count("AA_Star|AA"), 1,
+            "fixture precondition: the capped captain must actually be re-seated")
+        self.assertGreaterEqual(
+            diag["cap_reassignments_withdrawn"], 1,
+            "a lower rung re-seated the captain a reassignment record calls "
+            "removed, and the record was shipped anyway")
+        listed = {r["player"] for r in diag["cpt_cap_reassigned"]}
+        listed |= {r["player"] for r in diag["player_cap_cpt_reassigned"]}
+        self.assertNotIn(
+            "AA_Star|AA", listed,
+            "the brief says this captain was reassigned off his thesis AND shows "
+            "him captaining it")
+
+    def test_the_counter_fires_on_the_portfolio_rung_itself(self):
+        """Isolation, and it is the point of the test rather than a detail.
+
+        With a partition present the TRUE FLOOR also increments
+        `cpt_cap_relaxed` (it passes no captain exclusions at all, so the
+        portfolio cap gave way there too). A test that lets the true floor fire
+        therefore cannot tell which rung produced the count, and the first cut of
+        this suite passed with the portfolio rung's own increment mutated away.
+        With no partition `contest_full` is empty, the true floor's guard is
+        false, and the count can only have come from the portfolio rung.
+        """
+        df = _synth()
+        real = st.build_showdown_lineup
+
+        def spy(df=None, status_out=None, **kw):
+            if kw.get("cpt_excludes"):
+                return None
+            return real(df, status_out=status_out, **kw)
+
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            solved = st.solve_ladder(df, self._same_captain_theses(3),
+                                     max_shared_players=None, time_limit=4,
+                                     diagnostics=diag)
+        self.assertTrue([lu for lu in solved if lu is not None],
+                        "the ladder built nothing, so no rung was exercised")
+        self.assertEqual(diag["contest_cap_relaxed"], 0,
+                         "no partition: the true floor must not have fired, or "
+                         "this test is not isolating the portfolio rung")
+        self.assertGreaterEqual(
+            diag["cpt_cap_relaxed"], 1,
+            "the portfolio rung built a lineup with the captain cap off and did "
+            "not count it")
+
+    def test_the_fourth_counter_is_reported_even_when_it_is_zero(self):
+        """A counter that only appears when it fires cannot be read as clean."""
+        diag: dict = {}
+        st.solve_ladder(_synth(), self._same_captain_theses(2),
+                        max_shared_players=None, time_limit=4, diagnostics=diag)
+        self.assertIn("cpt_cap_relaxed", diag)
+        self.assertIn("cap_reassignments_withdrawn", diag)
+        self.assertEqual(diag["cpt_cap_relaxed"], 0)
 
 
 class ShowdownSolverStatusTests(unittest.TestCase):

@@ -921,6 +921,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     out: List[Optional[Dict[str, Any]]] = []
     overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
     player_relaxed = contest_cap_relaxed = 0
+    # R223. The FOURTH counter, and the one R153's landing claim assumed existed.
+    # `cpt_relaxed` counts captain LOCK substitutions; nothing counted the captain
+    # CAP giving way, because until now nothing made it give way on the record --
+    # the floor rung simply dropped it.
+    cpt_cap_relaxed = 0
+    cap_reassignments_withdrawn = 0
     # R158. A compute limit is not a strategy fact, and these counters are kept
     # apart from every relaxation counter for that reason. CLAUDE.md: "A timeout
     # is recorded in solver_report, never climbs the overlap ladder."
@@ -1041,25 +1047,42 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
 
         want_cpt = str(thesis["cpt"]) if thesis.get("cpt") else None
         cpt_lock = want_cpt
+        # R223. Which list took this slot's reassignment record, and which record,
+        # so a lower rung that re-seats the very captain the record calls removed
+        # can WITHDRAW it. Two records in one brief contradicting each other is
+        # worse than either of them.
+        #
+        # R233, the class: there are THREE reassignment lists and all three are
+        # contradictable the same way, because every one of them is written before
+        # the solve and every relaxation rung below can re-seat the captain. R223
+        # named only `cpt_cap_reassigned`; fixing that one alone would have left
+        # the identical defect in the two beside it.
+        reassigned_into: Optional[List[Dict[str, str]]] = None
+        reassigned_record: Optional[Dict[str, str]] = None
         if want_cpt and want_cpt in over_set:
             cpt_lock = None
-            player_cap_cpt_reassigned.append({
+            reassigned_record = {
                 "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
-                "count_at_cap": str(player_counts.get(want_cpt, 0))})
+                "count_at_cap": str(player_counts.get(want_cpt, 0))}
+            reassigned_into = player_cap_cpt_reassigned
         elif want_cpt and want_cpt in cpt_full:
             cpt_lock = None
-            cpt_cap_reassigned.append({
+            reassigned_record = {
                 "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
-                "count_at_cap": str(cpt_counts.get(want_cpt, 0))})
+                "count_at_cap": str(cpt_counts.get(want_cpt, 0))}
+            reassigned_into = cpt_cap_reassigned
         elif want_cpt and want_cpt in contest_full:
             # R239(b). Same treatment, third cap. NOT a relaxation: the cap held
             # and the thesis label moved, which is R153's own distinction.
             cpt_lock = None
-            contest_cpt_excluded.append({
+            reassigned_record = {
                 "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
                 "contest_id": str(slot_cid),
                 "count_at_cap": str(contest_cpt_counts.get(slot_cid, {})
-                                    .get(want_cpt, 0))})
+                                    .get(want_cpt, 0))}
+            reassigned_into = contest_cpt_excluded
+        if reassigned_into is not None and reassigned_record is not None:
+            reassigned_into.append(reassigned_record)
 
         want_locks = [str(k) for k in (thesis.get("locks") or []) if k]
         locks = [k for k in want_locks if k not in over_set]
@@ -1135,20 +1158,47 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         if lu is None and not latch["timed_out"] and (
                 over or cpt_lock or cpt_excludes
                 or max_shared_players is not None):
-            # R239(b). The floor rung drops `cpt_excludes` wholesale, which is
-            # verbatim the shape R153 caught ("R153 bound both Showdown caps 'on
-            # every rung' and the floor rung still drops one"). The PER-CONTEST
-            # cap is kept here while the portfolio caps come off, because
-            # duplicating a captain inside one contest is the specific harm this
-            # rung would otherwise cause, and it is cheaper to spend a portfolio
-            # cap than a contest's only differentiator. With no partition
-            # `contest_full` is empty and this passes None, so the rung is
-            # byte-identical to what it was.
+            # R223. This rung drops the OVERLAP bound and the player-exposure
+            # EXCLUDES, and it now keeps every captain exclusion -- portfolio and
+            # per-contest alike. It used to pass `sorted(contest_full)`, which
+            # silently dropped `cpt_full` and `over_set`: the captain cap coming
+            # off with nothing counting it, which is verbatim R153's founding
+            # defect ("the overlap bound was clean, the captain cap was clean")
+            # and the reason a delivered brief could read `0 relaxations` over a
+            # breached 25% cap.
+            #
+            # The documented order is overlap, then player exposure, then captain
+            # lock, then thesis. The captain CAP therefore may not come off in the
+            # same breath as the overlap bound; it gets its own rung below, after
+            # player exposure has already given way here.
+            lu = _rung(latch, df=work,
+                       cpt_excludes=cpt_excludes,
+                       forbidden_sets=prior or None,
+                       excludes=without_cap, **kw)
+            if lu is not None:
+                if over:
+                    player_relaxed += 1
+                if max_shared_players is not None:
+                    overlap_relaxed += 1
+                substituted = _record_lock_relaxation(thesis, lu) if cpt_lock else 0
+                cpt_relaxed += substituted
+                if max_shared_players is not None:
+                    both_relaxed += substituted
+        # R223. The PORTFOLIO captain cap gives way here, and is COUNTED when it
+        # does. `cpt_full` is the portfolio captain cap; `over_set` is the player
+        # cap reaching the captain slot, since a captain is a roster spot. Both
+        # come off together because both are portfolio-level bounds and the rung
+        # below this one is the per-contest cap, which is more specific and
+        # cheaper to keep. A blank reserved row blocks certification, so the cap
+        # gives way rather than never -- but it gives way on the record.
+        portfolio_cpt_excluded = sorted(cpt_full | over_set)
+        if lu is None and not latch["timed_out"] and portfolio_cpt_excluded:
             lu = _rung(latch, df=work,
                        cpt_excludes=sorted(contest_full) or None,
                        forbidden_sets=prior or None,
                        excludes=without_cap, **kw)
             if lu is not None:
+                cpt_cap_relaxed += 1
                 if over:
                     player_relaxed += 1
                 if max_shared_players is not None:
@@ -1167,6 +1217,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                        excludes=without_cap, **kw)
             if lu is not None:
                 contest_cap_relaxed += 1
+                # R223. This rung passes NO captain exclusions at all, so the
+                # portfolio cap gave way here too and is counted here too. These
+                # counters answer "how many lineups were built WITHOUT this
+                # control", so a rung that drops two controls increments two.
+                if portfolio_cpt_excluded:
+                    cpt_cap_relaxed += 1
                 if over:
                     player_relaxed += 1
                 if max_shared_players is not None:
@@ -1195,6 +1251,15 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             for key in lu["player_keys"]:
                 player_counts[key] = player_counts.get(key, 0) + 1
             got_cpt = (lu.get("captain") or {}).get("player_key")
+            # R223. A lower rung re-seated the very captain a cap record says was
+            # removed, so the record is withdrawn rather than shipped beside the
+            # exposure table that contradicts it. Counted, because a withdrawal is
+            # a fact about the ladder and not a silent edit: it says the cap did
+            # not hold where the reassignment claimed it did.
+            if (reassigned_record is not None and reassigned_into is not None
+                    and got_cpt and want_cpt and got_cpt == want_cpt):
+                reassigned_into.remove(reassigned_record)
+                cap_reassignments_withdrawn += 1
             if got_cpt:
                 cpt_counts[got_cpt] = cpt_counts.get(got_cpt, 0) + 1
                 # R239(b). Against the REALIZED captain, not the requested one.
@@ -1252,6 +1317,24 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "max_cpt_exposure_pct": max_cpt_exposure_pct,
             "cpt_cap_count": cpt_cap,
             "cpt_cap_reassigned": list(cpt_cap_reassigned),
+            # R223. The fourth counter. `captain_lock_relaxed` above counts LOCK
+            # substitutions; this counts the portfolio captain CAP giving way,
+            # which nothing measured before -- the floor rung dropped it in
+            # silence and the brief read `0 relaxations` over a breached cap.
+            #
+            # NAMED `cpt_cap_relaxed`, not `captain_cap_relaxed`, and the reason
+            # is R113. `build_thesis_ladder` ALREADY returns a
+            # `captain_cap_relaxed`, and it is a different mechanism: the
+            # APPORTIONMENT step reaching past a template's shortlist. R113 was
+            # filed because those two were once summed into one number the brief
+            # called "captain cap relaxed" no matter which fired. Reusing the name
+            # here would have rebuilt that collision one function over. This one
+            # follows `contest_cap_relaxed`'s convention: the solver-side counters
+            # carry their internal names.
+            "cpt_cap_relaxed": cpt_cap_relaxed,
+            # Reassignment records withdrawn because a lower rung re-seated the
+            # captain they name. Zero on a clean ladder.
+            "cap_reassignments_withdrawn": cap_reassignments_withdrawn,
             "captain_exposure_realized": dict(cpt_counts),
             "contest_partition": solve_partition,
             # R239(b). The fourth control, on the same footing as the other

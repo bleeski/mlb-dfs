@@ -25,6 +25,100 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R223: the captain cap gives way on the record, not in silence
+
+**What moved.** The floor rung of `solve_ladder` now passes the full
+`cpt_excludes` — portfolio captain cap, player cap reaching the captain slot, and
+per-contest cap alike. It used to pass only the per-contest slice, so `cpt_full`
+and `over_set` came off there with nothing counting it. A new rung below it drops
+the portfolio captain exclusions and increments `cpt_cap_relaxed`, and the true
+floor increments it too, because that rung passes no captain exclusions at all.
+The documented relaxation order is honoured: overlap and player exposure give way
+at the floor rung, the captain cap only on the rung after.
+
+**Why.** R153's founding case, exactly. That item was filed because "the overlap
+bound was clean, the captain cap was clean" while one bat sat in 12 of 19 entries
+— a washout axis reading clean because nothing measured it. R153's landing claim
+was "the cap is enforced there now, on every rung"; at this rung it was not, and a
+delivered brief could read `0 relaxations` over a breached 25% cap.
+
+**The name is `cpt_cap_relaxed` and not `captain_cap_relaxed`, which is R113
+avoided rather than repeated.** `build_thesis_ladder` already returns a
+`captain_cap_relaxed`, and it is a different mechanism: the APPORTIONMENT step
+reaching past a template's shortlist. R113 exists because those two were once
+summed into one number the brief called "captain cap relaxed" no matter which
+fired. `build_slate.py` reads both into the same brief, so reusing the name would
+have rebuilt that collision one function over. The solver-side counters carry
+their internal names, matching `contest_cap_relaxed`.
+
+**The second tail: contradicted records are withdrawn.** A floor solve can
+re-seat the exact captain a reassignment record calls removed, leaving two
+records in one brief contradicting each other. The record is now withdrawn and
+the withdrawal counted in `cap_reassignments_withdrawn` — reported, but
+deliberately outside `clean`, since a withdrawal is not a control giving way.
+
+**R233 enumeration, the kwarg census.** Nine rungs in `solve_ladder`, and what
+each passes for `cpt_excludes` at this head:
+
+| rung | `cpt_excludes` |
+|---|---|
+| 1 full | `cpt_excludes` |
+| 2 overlap off | `cpt_excludes` |
+| 3 player-cap excludes off | `cpt_excludes` |
+| 4 both off | `cpt_excludes` |
+| 5 lock off | `cpt_excludes` |
+| 6 lock + overlap off | `cpt_excludes` |
+| 7 floor | `cpt_excludes` **(was `sorted(contest_full) or None` — the defect)** |
+| 8 portfolio cap off (NEW) | `sorted(contest_full) or None`, counted |
+| 9 true floor | none, counted twice |
+
+**R233 enumeration, the cap-event counters the brief emits.** Eleven, and the
+class R223 named only one member of: the three REASSIGNMENT lists
+(`player_cap_cpt_reassigned`, `cpt_cap_reassigned`, `contest_cpt_reassigned`) are
+all written before the solve and all contradictable by any rung below, so all
+three route through one withdrawal path rather than the one R223 named. Fixing
+`cpt_cap_reassigned` alone would have left the identical defect in the two beside
+it. The relaxation counters are `overlap_relaxed`, `player_relaxed`,
+`captain_lock_relaxed`, `both_relaxed`, `contest_cap_relaxed` and the new
+`cpt_cap_relaxed`; `player_cap_locks_dropped` and `cap_reassignments_withdrawn`
+are reported and are not relaxations.
+
+**A guard that had stopped guarding, found by moving the code under it.**
+`test_the_floor_rung_keeps_the_per_contest_cap_when_it_drops_the_others` (R239(b),
+2026-08-29) was a SOURCE-TEXT assertion: it grepped `showdown_theses.py` for the
+literal `cpt_excludes=sorted(contest_full) or None`. R223 moved that literal from
+the floor rung down to the new rung, and the grep still matched — the test kept
+passing while its own docstring became false. It is behavioural now. A test that
+cannot tell which rung it is describing is not testing that rung.
+
+**Mutations: three, and all three survived the first pass.** Every one was a
+wrong test. (1) The floor-rung mutant survived because the test let the rung
+BELOW the floor supply the same outcome; it now runs with no contest partition,
+where `contest_full` is empty and the floor rung must pass a non-empty
+`cpt_excludes` while the rung below passes `None` — the assertion counts trailing
+rungs carrying no exclusions and requires exactly one. (2) The counter mutant
+survived because with a partition the TRUE FLOOR also increments
+`cpt_cap_relaxed`, so the count did not come from the rung being mutated; the
+test now isolates it with no partition, where the true floor cannot fire. (3) The
+withdrawal mutant survived because the assertion was conditional and the
+condition never held; it now uses `_synth()`, where one player has Base 100
+against a next-best of 5, so a solve free to captain him deterministically does.
+All three killed after the rewrites.
+
+**Gate.** `PASS v2.26.0 27 modules 1449 tests` -> `PASS v2.26.0 27 modules 1454
+tests`, and CLAUDE.md's quoted line with it.
+
+**Correction to R223's own text.** The item cited `showdown_theses.py:722-725` and
+quoted the floor rung as passing no `cpt_excludes` at all. That quotation was
+already stale when this session opened it: R239(b) had landed on 2026-08-29, the
+floor rung had moved to roughly 1105 and already passed
+`cpt_excludes=sorted(contest_full) or None`, and a NEW true-floor rung sat below
+it. The defect R223 described was still real — `cpt_full` and `over_set` were
+still dropped there uncounted — but its quoted code did not match the tree. The
+backlog entry has been corrected as it closed.
+
+---
+
 ## 2026-08-30 — R158: a Showdown compute limit stops being read as a strategy fact
 
 **What moved.** `build_showdown_lineup` no longer discards every non-success

@@ -506,7 +506,13 @@ EXPECTED_SUITE_COUNTS = {
     # roster-shape check, the timeout latch stopping the descent on both the
     # thesis ladder and the bank ladder, the infeasibility contrast that proves
     # the latch is what stops it, and the clean-solve path unchanged.
-    "tests.test_showdown": 139,
+    # R223, 2026-08-30: 139 -> 144, the five that pin the fourth counter -- the
+    # floor rung carrying the portfolio captain exclusions the rung below drops,
+    # the counter firing on the portfolio rung in ISOLATION (with a partition the
+    # true floor also increments it, which is how the first cut passed against a
+    # mutated increment), the withdrawal of a reassignment record a lower rung
+    # contradicts, and the counter being present when it reads zero.
+    "tests.test_showdown": 144,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
