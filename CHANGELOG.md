@@ -25,6 +25,33 @@ performance claim.
 
 ---
 
+## 2026-08-30 — Board: slot 1 closed and refilled, not vacated
+
+**What moved.** `docs/backlog.md` only. The four entries above closed the whole
+of slot 1, and the slot keeps its position holding R273 (positioned, not built)
+and R275 (filed here). The queue stays at fourteen and nothing below moved:
+promoting slot 2 over two verified P1 silent-wrong-output defects a file from the
+money boundary would put a weaker claim first, and vacating would renumber
+thirteen entries for no gain.
+
+**Why it gets an entry rather than riding one.** The changelog's scope is the
+whole DEV write set, docs included, and `audit.changelog_debt` reads exactly that.
+An entry here is cheaper than the next session chasing a warning to a board note.
+
+**The finding this batch is worth remembering for.** Two of the four defects had
+a PASSING TEST over them: R64(b) pinned `guard-only == "enriched"`, and
+`test_unevidenced_gates_block_and_are_named` pinned the exact evidence string
+R176 filed as false, on the exact path the item says never opens the salary file.
+A third, adjacent case: a neighbouring test's precondition moved underneath the
+R176(a) fix and silently converted a REFUSAL test into an assumption test. Neither
+greenfield review nor an R233 grep finds this class, because the enumeration
+counts SITES and a test pinning a site reads as coverage. The only thing that
+surfaced all three was changing the behaviour and reading which tests complained.
+
+**Gate.** Unchanged at 1489; no code file moved in this commit.
+
+---
+
 ## 2026-08-30 — R176: four records stop asserting what nothing checked, and a zero exit stops meaning "recorded"
 
 **(a) The salary gate reads the salary file.** It read

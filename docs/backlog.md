@@ -39,6 +39,56 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-30 (second note this date), DEV, claim `engine` (`engine_2026-08-30`,
+re-taken): **slot 1 is CLOSED and REFILLED, not vacated. All four of R228, R172,
+R173 and R176 shipped, in that order, as four separate commits with the gate run
+between each.** Gate 1461 -> 1489 (`test_upload_integrity` 269 -> 297, `grew`).
+The CHANGELOG entries of this date carry the migrated text and the R233
+enumerations. **The queue is still FOURTEEN slots and nothing below moved.**
+
+**Why the slot did not vacate.** Its four items' own R233 enumerations produced
+two replacements of the same class, both P1/S, both a file from the money
+boundary: R273 (filed 08-30 from R158's enumeration; the Classic joint allocator
+records a clock expiry as `direct_constraint_failure`) and R275 (filed here; the
+preflight skips its contest cross-check on an empty `contest_ids`, and a row with
+no `certification` still earns `upload_ready`, the one label CLAUDE.md reserves).
+Promoting slot 2 over those would put a weaker claim at the head, and vacating
+would renumber thirteen entries for no gain. R273 was deliberately NOT folded into
+this batch: it is on the Classic certified path, it needs its own coverage, and
+four items was the commit's limit.
+
+**What this batch is, in one line each.** R228: an absent artifacts row promoted a
+run in silence where a hash MISMATCH refused loudly, at the one boundary CLAUDE.md
+calls immutable; fail-closed, with a `--force-unbound` that exits 4 and writes the
+unverified bind onto the row. R172: the value guard is an internal Base cap, not
+enrichment, so every default build stamped `projection_tier: "enriched"` on a
+permanent record including builds with zero external data. R173: `if report:` was a
+truthiness test doing a content check's job, so a metadata-only stub certified the
+lineup gate while `pool_report=None` correctly blocked — the weaker input
+certified. R176: the salary gate read the PROJECTION schema under an evidence
+string naming a salary validation that never ran, two assertable gates went
+unrecorded, a certification key was a literal, two excepts were silent, and the
+preflight's exit code was computed before the stamp that makes it durable.
+
+**The finding worth carrying forward: two of the four defects had a PASSING TEST
+over them.** R172's `guard-only == "enriched"` was pinned by R64(b); R176(a)'s
+`assertIn("salary CSV schema validation", ...)` pinned the exact string the item
+filed as false, on the exact path the item says never opens the salary file. This
+board already knows a test can stop guarding what its docstring claims (R223,
+08-30). This is the harder version: a test that guards the defect itself, green,
+for weeks. Both are now inverted with the reason written beside them. A third
+case is adjacent and different — `GateAssumptionVersusOverrideTests._merge`'s
+precondition moved underneath the R176(a) fix and quietly converted a REFUSAL
+test into an assumption test; the precondition was restored rather than the
+assertion relaxed. **Neither greenfield review nor R233's grep finds this class:
+the enumeration counts SITES, and a test pinning a site reads as coverage.**
+
+**Board corrections.** `claims/engine_2026-08-20` and `engine_2026-08-28` are both
+still HELD with `released_utc: null`; unchanged, Ben's to arbitrate. R274 (the
+suite appends to `outputs/2026-06-03/` and `outputs/2026-06-11/` manifests on every
+run) is untouched here and is ARCHIVE's. The `tools/_scratch_*` directories from
+closed slates are still on disk; this session swept its own.*
+
 *2026-08-29 (second note this date), DEV, claim `engine` (`engine_2026-08-29`,
 re-taken): **one more BUILD fragment, from the `1305_12g` repair slate, and it
 is the first this month to force a RESEQUENCING rather than a rider. Six new
@@ -405,9 +455,24 @@ written for it; R274's cleanup half is ARCHIVE's.*
 SOURCE-TEXT grep for a literal. R223 moved that literal to a different rung and
 the test kept passing while its docstring went false. Rewritten behavioural.*
 
-1. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
-   F-14, F-10). R176 gains ed8's F-34 as a rider: exit code computed before
-   the manifest stamp, so success can return unstamped.
+1. **R273 + R275** — the false-evidence slot, REFILLED 2026-08-30 rather than
+   vacated. **R172, R176 (with ed8's F-34 rider), R173 and R228 all SHIPPED
+   2026-08-30** (see CHANGELOG.md), in that order and as four separate commits.
+   What replaces them is the same class found by their own R233 enumerations,
+   both P1 and both S: **R273**, the Classic joint allocator discarding a
+   time-limited incumbent and recording `direct_constraint_failure: True` for a
+   clock event (found by R158's enumeration at `00f0995`, and R158's fix for the
+   Showdown face of it is the template); and **R275**, the preflight's own
+   fail-open pair, where an empty `contest_ids` skips the contest cross-check and
+   a row with no `certification` still earns `upload_ready`.
+   **The slot keeps its position and the queue stays at fourteen.** Both
+   replacements meet this tier's stated criterion (verified P1 silent-wrong-output
+   at S lift) and both sit one file from the money boundary, so promoting slot 2
+   over them would put a weaker claim first; and refilling costs no renumbering
+   where vacating would move thirteen entries for no gain. R273 is the heavier of
+   the two: it is on the Classic certified path, it needs its own Classic coverage,
+   and the 08-30 batch deliberately did not fold it in on the grounds that four
+   items was already the commit's limit.
 2. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by
    two field hits from this week: the preflight's feed matcher has no AZ→ARI
    crosswalk and silently demotes ten hard checks to warnings (R248, F-33,
@@ -2167,7 +2232,7 @@ the batch's named rider and did not get pulled.
   declared_starters` unable to coexist with `posted_hitters: 0`: that pair is
   the misleading half and it is a one-line assertion.
 
-### R273. The Classic joint allocator files a clock expiry as a constraint failure (P1, S) | new 2026-08-30, found by R158's R233 enumeration at `00f0995`; VERIFIED-read
+### R273. The Classic joint allocator files a clock expiry as a constraint failure (P1, S) | new 2026-08-30, found by R158's R233 enumeration at `00f0995`; VERIFIED-read | **POSITIONED 2026-08-30 into slot 1**, with R275, when the false-evidence batch closed: same class, Classic certified path, and R158's Showdown fix is the template to follow rather than re-derive
 
 - **What:** `contest_allocator.py:1276-1290`. The joint MILP reads
   `if not result.success or result.x is None:` and, on any non-success, falls
