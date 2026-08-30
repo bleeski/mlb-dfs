@@ -25,6 +25,116 @@ performance claim.
 
 ---
 
+## 2026-08-29 — R239(b): the captain cap binds where the roster spot is spent
+
+### R239(b)(i). `max_cpt_per_contest`, enforced at both points that fill a captain slot
+
+**What moved.** `build_thesis_ladder` apportions captains under the per-contest
+bar as well as the portfolio one, and `solve_ladder` enforces the same bar inside
+the loop that assembles `cpt_excludes` — the place roster spots are actually
+spent. A captain at his contest's bar comes off the thesis's own captain slot
+before the solve (`contest_cpt_reassigned`, not a relaxation: the cap held and
+the label moved) and is excluded from every relaxation rung.
+
+**Both enforcement points, because R153 already proved one is not enough.**
+`solve_ladder` previously trusted the apportionment and then substituted captains
+on its own rungs with no cap awareness, which is how a captain reached 26.3%
+under a 25% cap with every counter reading clean. A per-contest cap living only
+in the apportionment would have repeated that verbatim.
+
+**The floor rung needed its own handling, which is R153's other finding.** The
+floor rung drops `cpt_excludes` wholesale — "R153 bound both Showdown caps on
+every rung and the floor rung still drops one". It now keeps the per-contest
+exclusions while the portfolio caps come off, because duplicating a captain
+inside one contest is the specific harm that rung would otherwise cause. A TRUE
+floor sits below it that gives the per-contest cap up as well, counted as
+`contest_cap_relaxed`, because a blank reserved row blocks certification and the
+cap giving way last is better than never.
+
+### The correction to the design decision, found by building it
+
+**A flat cap of 2 does not do what the number 2 was chosen to do.** The decision
+was "2 kills the 2-entry contest at 100% and the 3-of-7 at 42.9%". Flat, it kills
+only the second: in a 2-entry contest `min(2, 2) = 2` PERMITS both entries on one
+captain, which is the measured 100% on contest 194553034 passing a cap written to
+stop it.
+
+The bar is therefore `max(1, min(m, n - 1))`, in one place
+(`showdown.per_contest_cap_count`), and `n - 1` guarantees at least two distinct
+captains in any multi-entry contest. At the shipped default: n=2 -> 1, n=3 -> 2,
+n=7 -> 2. Both measured breaches blocked, 2-of-7 deliberately left alone, which
+is the R247 trade the decision was making.
+
+**This also caught a builder/checker disagreement.** R266 (shipped earlier the
+same session) derived its bar from `max_cpt_exposure_pct`, which was the best
+available input before the named control existed. Once it existed the two
+disagreed at n=3 — the engine builds to 2, the pct reading warns above 1 — so the
+preflight would have flagged files the engine was specified to produce. Noise on
+the one surface whose job is to be believed at T-5, and this project's named
+two-implementations-of-one-rule failure landing between the builder and the
+checker. `preflight_upload.per_contest_captain_cap` now mirrors
+`showdown.per_contest_cap_count` and a test pins them equal at every size from 1
+to 24 and at m in (1, 2, 3). R266's pct mirror and its local units-rule copy are
+removed rather than left unreachable: a guarded copy nothing calls reads as
+protection and is not.
+
+### R239(b)(ii). The feasibility precondition, generalized
+
+`captain_assignment_feasible` sums capacity against each contest's OWN bar rather
+than a flat m, since the bar depends on contest size. At m=1 it reproduces
+R239's measured numbers exactly (the 08-28 bank fails at k=3, needed 14 against
+capacity 13) and the 08-28 bank is feasible at the shipped default.
+
+### R233 enumeration — and a correction to R239's own
+
+The class is "a cap computed against the entered TOTAL when the prize resolves
+per contest." Re-run at this head:
+
+    $ grep -rn 'exposure_cap_count' mlb_engine/ tools/ skills/ tests/   ->  20 hits
+      6 call sites: showdown.py:541,542; showdown_theses.py:692,926,927,1315
+      + definition showdown.py:465, import showdown_theses.py:43,
+        comment tools/audit.py:444, 11 in tests/
+
+    $ grep -rn 'per_contest_cap_count|per_contest_captain_cap' mlb_engine/ tools/ skills/  ->  10 hits
+      definition showdown.py:85; import showdown_theses.py:44;
+      uses showdown_theses.py:560,621,707,949 (report, Gale-Ryser, both
+      enforcement points); mirror tools/preflight_upload.py:1616 + use 1687
+
+**R239's entry says of the six call sites: "No copy is deliberately kept; all six
+take the same correction in (b)." That is wrong, and all six ARE deliberately
+kept.** They compute the PORTFOLIO captain and player caps, which R153 established
+as portfolio-level controls and which are correct against the entered total —
+`max_cpt_exposure_pct` means "a quarter of the entered set" and should. The defect
+was never that those six used the wrong denominator; it was that no per-contest
+cap existed at all. The fix is a fourth control alongside them, not a correction
+to them, and the effective bound on one captain in one contest is
+`min(portfolio cap count, per-contest cap count)` because both sets feed the same
+exclusion list. R239's remaining text is corrected in the backlog.
+
+### Verification
+
+Six mutations, six killed, zero survivors: the per-contest set never reaching
+`cpt_excludes`; the floor rung dropping it; the apportionment ignoring the
+contest count; counting the requested captain instead of the realized one;
+Gale-Ryser using a flat bar; and the `n - 1` rule removed.
+
+**Two of those needed the tests rewritten, because they survived first.** An
+end-to-end assertion cannot see the solve-side exclusion: on the MIN@CHC fixture
+the overlap bound diversifies captains on its own, so removing the guard changes
+no outcome and it looks unnecessary. It is load-bearing on the rung that drops
+`cpt_lock` and lets the solver choose a substitute, which is exactly where R153's
+26.3% came from, so that rung is now driven directly with a mocked solver. The
+entry count is load-bearing too: at n=2 the portfolio cap already excludes the
+captain, so the test uses eight entries, where a captain used once is under the
+portfolio cap and over the per-contest cap and this guard is the only thing
+holding.
+
+**Gate.** `1425 -> 1443 tests`. `tests.test_showdown` 114 -> 133,
+`tests.test_upload_integrity` 270 -> 269 (three R266 tests retired with the
+pct-derived bar they covered, two added for the mirrored one).
+
+---
+
 ## 2026-08-29 — R239(c): the per-contest slice, and a clean verdict that answers to it
 
 ### R239(c). What was entered, sliced by the contest that pays it

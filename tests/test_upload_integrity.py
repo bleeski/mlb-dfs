@@ -4450,46 +4450,37 @@ class R266PerContestCaptainDiversityTests(unittest.TestCase):
         ]
 
     # -- the arithmetic ----------------------------------------------------
-    def test_the_per_contest_bar_is_the_engines_own_clamp_on_the_contests_own_n(self):
-        """max(1, floor(pct * n)), never round or ceil: a cap is an UPPER bound."""
-        self.assertEqual(self.pf.per_contest_captain_cap(2, 0.25), 1)
-        self.assertEqual(self.pf.per_contest_captain_cap(7, 0.25), 1)
-        self.assertEqual(self.pf.per_contest_captain_cap(8, 0.25), 2)
-        self.assertEqual(self.pf.per_contest_captain_cap(20, 0.25), 5)
-        # pct * n < 1 clamps to 1 rather than forbidding everyone, matching
-        # showdown.exposure_cap_count. Without it a 2-entry contest at 0.25
-        # would admit no captain at all.
-        self.assertEqual(self.pf.per_contest_captain_cap(1, 0.25), 1)
-        self.assertEqual(self.pf.per_contest_captain_cap(3, 0.10), 1)
+    def test_the_bar_is_max_1_min_m_n_minus_1(self):
+        """The ``n - 1`` is the load-bearing part: a flat m permits a 2-entry
+        contest to put both entries on one captain, which is the measured 100%
+        this whole item exists to catch."""
+        self.assertEqual(self.pf.per_contest_captain_cap(1, 2), 1)
+        self.assertEqual(self.pf.per_contest_captain_cap(2, 2), 1)
+        self.assertEqual(self.pf.per_contest_captain_cap(3, 2), 2)
+        self.assertEqual(self.pf.per_contest_captain_cap(7, 2), 2)
+        self.assertEqual(self.pf.per_contest_captain_cap(20, 2), 2)
+        # A tighter control tightens the bar; a looser one is still bounded by
+        # n - 1, so no multi-entry contest can be owned by one captain.
+        self.assertEqual(self.pf.per_contest_captain_cap(7, 1), 1)
+        self.assertEqual(self.pf.per_contest_captain_cap(3, 99), 2)
 
-    def test_a_units_slip_raises_instead_of_disabling_the_check_silently(self):
-        """R167's harm at the money boundary: 25 typed for 0.25 forbids nobody.
-
-        The check would then report every contest clean, which is the failure
-        mode the units rule exists to stop, one surface further out.
+    def test_the_checker_bar_equals_the_builder_bar_at_every_size(self):
+        """R79(d). Preflight cannot import the engine, so the copy is pinned
+        equal rather than left to agree by luck -- and this test is what caught
+        the pct-derived bar disagreeing with the named control at n=3.
         """
-        for slip in (25, 25.0, 100, float("nan"), float("inf")):
-            with self.assertRaises(ValueError):
-                self.pf.per_contest_captain_cap(7, slip)
-        with self.assertRaises(ValueError):
-            self.pf.per_contest_captain_cap(7, True)
-
-    def test_the_local_units_rule_agrees_with_the_engines(self):
-        """The copy is guarded rather than left to hold by luck (R79(d))."""
-        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
-        for good in (0.0, 0.08, 0.25, 0.5, 1.0):
-            self.assertEqual(self.pf.assert_fraction_cap_local(good),
-                             assert_fraction_cap(good))
-        for bad in (1.01, 25, float("nan"), float("inf")):
-            with self.assertRaises(ValueError):
-                assert_fraction_cap(bad)
-            with self.assertRaises(ValueError):
-                self.pf.assert_fraction_cap_local(bad)
+        from mlb_engine.optimize import showdown as sd
+        for m in (1, 2, 3):
+            for n in range(1, 25):
+                self.assertEqual(
+                    self.pf.per_contest_captain_cap(n, m),
+                    sd.per_contest_cap_count(n, m),
+                    f"n={n} m={m}: the checker and the builder must agree")
 
     def test_the_mirrored_default_equals_the_engines(self):
         from mlb_engine.optimize import showdown as sd
-        self.assertEqual(self.pf.DEFAULT_MAX_CPT_EXPOSURE_PCT,
-                         sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
+        self.assertEqual(self.pf.DEFAULT_MAX_CPT_PER_CONTEST,
+                         sd.DEFAULT_MAX_CPT_PER_CONTEST)
 
     # -- the finding -------------------------------------------------------
     def test_one_captain_across_a_two_entry_contest_is_reported_at_100_pct(self):

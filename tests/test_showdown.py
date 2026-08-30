@@ -1575,56 +1575,69 @@ class R239ContestPartitionSeamTests(unittest.TestCase):
         self.assertEqual(diag["contest_partition"]["contest_of_entry"], self.vec)
         self.assertEqual(diag["contest_partition"]["n_contests"], 7)
 
-    # -- and changes nothing ----------------------------------------------
-    def test_the_ladder_is_identical_with_and_without_the_partition(self):
+    # -- and changes nothing WHEN NO PARTITION IS SUPPLIED ------------------
+    #
+    # These three pinned "identical with and without the partition" while the
+    # seam was the only thing landed, and that reading was true at the seam
+    # commit. R239(b) then made the partition BIND, so the with-vs-without
+    # comparison now correctly differs and the invariant worth keeping moved
+    # with it: a build that supplies no partition must behave exactly as it did
+    # before R239 existed. That is what protects every caller that never passes
+    # one, and it is the reading these now hold.
+
+    def test_the_key_set_does_not_move_with_or_without_a_partition(self):
+        """`contest_partition` is present on BOTH, carrying the UNAVAILABLE
+        block when no vector was supplied. A key that appears only when an
+        argument is passed makes every consumer write a `.get`, and the
+        missing-key and no-partition cases then read the same -- which is the
+        distinction the block exists to keep."""
         without = st.build_thesis_ladder(self.df, 21, moneyline=self.ml)
         with_ = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
                                        contest_of_entry=self.vec)
-        self.assertEqual(json.dumps(without["theses"], sort_keys=True, default=str),
-                         json.dumps(with_["theses"], sort_keys=True, default=str))
-        for key in ("allocation", "captain_cap_count", "captain_cap_relaxed",
-                    "shape", "win_share_basis"):
-            self.assertEqual(json.dumps(without[key], sort_keys=True, default=str),
-                             json.dumps(with_[key], sort_keys=True, default=str), key)
-        # The key set does not move either: `contest_partition` is present on
-        # BOTH, carrying the UNAVAILABLE block when no vector was supplied. A
-        # key that appears only when an argument is passed makes every consumer
-        # write a `.get`, and the missing-key and no-partition cases then read
-        # the same, which is the distinction the block exists to keep.
         self.assertEqual(set(without), set(with_))
         self.assertFalse(without["contest_partition"]["available"])
         self.assertTrue(with_["contest_partition"]["available"])
 
-    def test_the_solved_bank_is_identical_with_and_without_the_partition(self):
+    def test_without_a_partition_the_ladder_is_unchanged_from_pre_R239(self):
+        """No partition means no per-contest cap can bind, so every captain,
+        every count and every relaxation counter must read as it did before."""
+        a = st.build_thesis_ladder(self.df, 21, moneyline=self.ml)
+        b = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
+                                   contest_of_entry=None)
+        self.assertEqual(json.dumps(a["theses"], sort_keys=True, default=str),
+                         json.dumps(b["theses"], sort_keys=True, default=str))
+        self.assertEqual(a["captain_cap_relaxed"], b["captain_cap_relaxed"])
+        # Nothing was widened and nothing was relaxed per contest, because
+        # neither concept applies without a partition.
+        self.assertEqual(a["captain_pool_widened"], [])
+        self.assertEqual(a["captain_contest_cap_relaxed"], 0)
+
+    def test_without_a_partition_the_solved_bank_is_unchanged_from_pre_R239(self):
         ladder = st.build_thesis_ladder(self.df, 12, moneyline=self.ml)
-        vec = (["A"] * 7) + ["C", "C"] + ["E", "F", "G"]
         d1, d2 = {}, {}
         a = st.solve_ladder(self.df, ladder["theses"], time_limit=5, diagnostics=d1)
         b = st.solve_ladder(self.df, ladder["theses"], time_limit=5, diagnostics=d2,
-                            contest_of_entry=vec)
+                            contest_of_entry=None)
         self.assertEqual(json.dumps(a, sort_keys=True, default=str),
                          json.dumps(b, sort_keys=True, default=str))
         self.assertEqual(set(d1), set(d2))
-        # Every diagnostic except the partition itself is unchanged -- including
-        # every relaxation counter, which is what "no behavior change" has to
-        # mean on this path.
         for key in d1:
-            if key == "contest_partition":
-                continue
             self.assertEqual(json.dumps(d1[key], sort_keys=True, default=str),
                              json.dumps(d2[key], sort_keys=True, default=str), key)
-        self.assertFalse(d1["contest_partition"]["available"])
-        self.assertTrue(d2["contest_partition"]["available"])
+        # And the per-contest control reports itself inert rather than absent.
+        self.assertEqual(d1["contest_cap_relaxed"], 0)
+        self.assertEqual(d1["contest_cpt_reassigned"], [])
+        self.assertEqual(d1["captain_exposure_by_contest"], {})
 
-    def test_no_captain_moves_yet_which_is_the_point_of_landing_this_alone(self):
-        """The 08-28 bank is the fixture R239(b) has to fix. It must still be
-        exactly as broken after the seam lands as it was before -- otherwise the
-        next stage cannot tell its own change from this one's."""
+    def test_supplying_a_partition_DOES_move_captains_which_is_R239b(self):
+        """The seam's own commit pinned the opposite, correctly, because the
+        partition was inert then. This is the change R239(b) is."""
         without = st.build_thesis_ladder(self.df, 21, moneyline=self.ml)
         with_ = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
-                                       contest_of_entry=self.vec)
-        self.assertEqual([t["cpt"] for t in without["theses"]],
-                         [t["cpt"] for t in with_["theses"]])
+                                       contest_of_entry=self.vec,
+                                       max_cpt_per_contest=1)
+        self.assertNotEqual([t["cpt"] for t in without["theses"]],
+                            [t["cpt"] for t in with_["theses"]])
 
 
 class R239PerContestReportTests(unittest.TestCase):
@@ -1675,6 +1688,51 @@ class R239PerContestReportTests(unittest.TestCase):
                                     max_cpt_per_contest=2)
         self.assertTrue(out["clean"])
         self.assertEqual(out["over_cap"], [])
+
+    def test_a_flat_cap_of_2_would_permit_the_worst_measured_case(self):
+        """The correction found while building R239(b), 2026-08-29.
+
+        `min(m, n)` in a 2-entry contest is 2, which PERMITS both entries on one
+        captain -- the measured 100% on contest 194553034 passing a cap written
+        to stop it. `n - 1` is what makes the control do what it was specified to
+        do. The number 2 was chosen to kill "the 2-entry contest at 100% and the
+        3-of-7 at 42.9%"; flat, it kills only the second.
+        """
+        self.assertEqual(sd.per_contest_cap_count(2, 2), 1)
+        self.assertEqual(min(2, 2), 2)   # what a flat cap would have allowed
+
+    def test_the_shipped_default_blocks_both_measured_breaches(self):
+        m = sd.DEFAULT_MAX_CPT_PER_CONTEST
+        self.assertGreater(2, sd.per_contest_cap_count(2, m))   # x2 in a 2-entry
+        self.assertGreater(3, sd.per_contest_cap_count(7, m))   # x3 in a 7-entry
+        # and deliberately leaves 2-of-7 alone, which is the R247 trade: the
+        # value that kills this too is 1, and that is Ben's Tier 4 call.
+        self.assertLessEqual(2, sd.per_contest_cap_count(7, m))
+
+    def test_at_least_two_distinct_captains_in_any_multi_entry_contest(self):
+        for n in range(2, 12):
+            self.assertLess(sd.per_contest_cap_count(n, 2), n,
+                            f"n={n} must not permit one captain to own it")
+
+    def test_a_single_entry_contest_caps_at_one(self):
+        self.assertEqual(sd.per_contest_cap_count(1, 2), 1)
+        self.assertEqual(sd.per_contest_cap_count(1, 5), 1)
+
+    def test_the_engine_bar_and_the_preflight_bar_agree_at_every_size(self):
+        """Two implementations of one rule is this project's named failure, and
+        this test is what caught it: R266's original pct-derived bar warned above
+        1 at n=3 while the engine deliberately builds to 2, so the checker would
+        have flagged files the builder was specified to produce."""
+        import sys
+        sys.path.insert(0, str(REPO / "tools"))
+        import preflight_upload as pf
+        self.assertEqual(pf.DEFAULT_MAX_CPT_PER_CONTEST,
+                         sd.DEFAULT_MAX_CPT_PER_CONTEST)
+        for m in (1, 2, 3):
+            for n in range(1, 25):
+                self.assertEqual(sd.per_contest_cap_count(n, m),
+                                 pf.per_contest_captain_cap(n, m),
+                                 f"n={n} m={m}")
 
     def test_the_cap_never_exceeds_the_contests_own_size(self):
         """A 1-entry contest cannot breach a cap of 2, and must not report as
@@ -1788,6 +1846,250 @@ class R239PerContestReportTests(unittest.TestCase):
         self.assertEqual(sd.DEFAULT_MAX_CPT_PER_CONTEST, 2)
         self.assertNotEqual(sd.DEFAULT_MAX_CPT_PER_CONTEST,
                             sd.exposure_cap_count(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT, 7))
+
+
+class R239PerContestCapBindsTests(unittest.TestCase):
+    """R239(b). The cap binds where the roster spot is spent, not in a report.
+
+    R153's second pass is the standard this has to meet: a cap enforced anywhere
+    other than where the slot is actually filled is not a cap. `solve_ladder`
+    substitutes captains on its own relaxation rungs, so a per-contest cap that
+    lived only in `build_thesis_ladder`'s apportionment would repeat verbatim the
+    26.3%-under-a-25%-cap failure R153 found.
+    """
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+        self.ml = {"MIN": -150, "CHC": 130}
+
+    def _realized_by_contest(self, vec, n, m):
+        ladder = st.build_thesis_ladder(self.df, n, moneyline=self.ml,
+                                        contest_of_entry=vec,
+                                        max_cpt_per_contest=m)
+        diag = {}
+        solved = st.solve_ladder(self.df, ladder["theses"], time_limit=5,
+                                 diagnostics=diag, contest_of_entry=vec,
+                                 max_cpt_per_contest=m)
+        out = {}
+        for cid, lu in zip(vec, solved):
+            if lu is not None:
+                out.setdefault(cid, collections.Counter())[
+                    lu["captain"]["player_key"]] += 1
+        return out, ladder, diag, solved
+
+    def test_the_2_entry_contest_that_shipped_at_100_pct_no_longer_can(self):
+        """The measured 08-28 case: contest 194553034, 2 entries, 1 captain."""
+        vec = ["A", "A"] + ["B"] * 6
+        realized, _, diag, _ = self._realized_by_contest(vec, 8, 1)
+        self.assertEqual(len(realized["A"]), 2, "two entries, two captains")
+        self.assertEqual(max(realized["A"].values()), 1)
+        self.assertEqual(diag["contest_cap_relaxed"], 0)
+
+    def test_no_captain_exceeds_the_per_contest_cap_in_any_contest(self):
+        vec = (["A"] * 7) + (["B"] * 7) + ["C", "C"] + ["D", "D"] + ["E", "F", "G"]
+        for m in (1, 2):
+            realized, _, diag, _ = self._realized_by_contest(vec, 21, m)
+            for cid, counts in realized.items():
+                allowed = min(m, sum(counts.values()))
+                self.assertLessEqual(
+                    max(counts.values()), max(allowed, diag["contest_cap_relaxed"] + m),
+                    f"contest {cid} at m={m}: {dict(counts)}")
+            if not diag["contest_cap_relaxed"]:
+                for cid, counts in realized.items():
+                    self.assertLessEqual(max(counts.values()), m,
+                                         f"contest {cid} at m={m}: {dict(counts)}")
+
+    def test_the_cap_binds_against_the_REALIZED_captain_not_the_apportioned_one(self):
+        """R153's finding, restated on the new axis: the counter must read what
+        came back from the solve, not what the ladder asked for."""
+        vec = ["A", "A", "A", "B", "B", "B"]
+        realized, _, diag, solved = self._realized_by_contest(vec, 6, 1)
+        by_contest = diag["captain_exposure_by_contest"]
+        for cid, counts in realized.items():
+            self.assertEqual(dict(counts), by_contest[cid],
+                             "the diagnostic must equal the solved reality")
+
+    def test_widening_the_pool_is_recorded_and_is_not_a_relaxation(self):
+        """R239: a per-contest bind is answered by building more distinct
+        captains, never by refusing and never by relaxing in silence."""
+        vec = ["A"] * 9
+        ladder = st.build_thesis_ladder(self.df, 9, moneyline=self.ml,
+                                        contest_of_entry=vec,
+                                        max_cpt_per_contest=1)
+        self.assertEqual(len(set(t["cpt"] for t in ladder["theses"])), 9,
+                         "nine entries in one contest under a cap of 1 needs "
+                         "nine distinct captains")
+        # Whatever it took, it is named, and it is not counted as a relaxation.
+        self.assertIsInstance(ladder["captain_pool_widened"], list)
+        self.assertEqual(ladder["captain_contest_cap_relaxed"], 0)
+
+    def test_the_feasibility_precondition_rides_the_ladder_it_describes(self):
+        vec = (["A"] * 7) + (["B"] * 7) + ["C", "C"] + ["D", "D"] + ["E", "F", "G"]
+        ladder = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
+                                        contest_of_entry=vec,
+                                        max_cpt_per_contest=2)
+        feas = ladder["captain_assignment_feasibility"]
+        self.assertIn("feasible", feas)
+        self.assertEqual(feas["max_cpt_per_contest"], 2)
+        # The apportionment this ladder just produced satisfies its own bar.
+        self.assertTrue(feas["feasible"], feas)
+
+    def test_no_partition_reports_the_precondition_as_unanswerable(self):
+        ladder = st.build_thesis_ladder(self.df, 12, moneyline=self.ml)
+        feas = ladder["captain_assignment_feasibility"]
+        self.assertIsNone(feas["feasible"])
+        self.assertIn("contest sizes", feas["reason"])
+
+    def test_the_floor_rung_keeps_the_per_contest_cap_when_it_drops_the_others(self):
+        """R153's named trap: 'R153 bound both Showdown caps on every rung and
+        the floor rung still drops one.' The floor rung passes cpt_excludes=None,
+        so it must pass the per-contest set explicitly or this cap is not a cap.
+        """
+        src = (REPO / "mlb_engine" / "optimize" / "showdown_theses.py").read_text(
+            encoding="utf-8")
+        marker = "cpt_excludes=sorted(contest_full) or None"
+        self.assertIn(marker, src,
+                      "the floor rung must keep the per-contest exclusions")
+
+    def test_the_true_floor_relaxes_rather_than_leaving_a_blank_reserved_row(self):
+        """A blank reserved row blocks certification, so the per-contest cap
+        gives way LAST rather than never -- and it is counted when it does."""
+        src = (REPO / "mlb_engine" / "optimize" / "showdown_theses.py").read_text(
+            encoding="utf-8")
+        self.assertIn("contest_cap_relaxed += 1", src)
+
+    def test_solve_ladder_holds_the_cap_when_the_APPORTIONMENT_does_not(self):
+        """R153's second pass, on the new axis, and the test three mutations
+        needed.
+
+        The apportionment and the solve are two enforcement points and only one
+        of them spends roster spots. R153 found `solve_ladder` trusting
+        `build_thesis_ladder`'s captain assignment and then substituting with no
+        cap awareness (26.3% realized under a 25% cap, every counter clean). So
+        the per-contest cap has to hold HERE even when it is handed theses that
+        would duplicate: this feeds it four theses all naming the SAME captain,
+        all in one contest, which is precisely what the apportionment is supposed
+        to prevent and therefore precisely what must not be relied on.
+        """
+        keys = list(self.df["Player_Key"])
+        same = keys[0]
+        theses = [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                   "cpt": same, "locks": [], "excludes": [], "mult": {}}
+                  for i in range(4)]
+        diag = {}
+        solved = st.solve_ladder(self.df, theses, time_limit=5, diagnostics=diag,
+                                 contest_of_entry=["A"] * 4,
+                                 max_cpt_per_contest=1)
+        got = [lu["captain"]["player_key"] for lu in solved if lu is not None]
+        self.assertTrue(got, "the fixture must solve at least one lineup")
+        if not diag["contest_cap_relaxed"]:
+            self.assertEqual(len(set(got)), len(got),
+                             f"one contest, cap 1, captains were {got}")
+        # And the reassignment is NAMED rather than silent.
+        self.assertTrue(diag["contest_cpt_reassigned"] or len(set(got)) == len(got))
+
+    def test_a_capped_captain_is_excluded_on_EVERY_rung_but_the_true_floor(self):
+        """R153's "on every rung", pinned where it actually lives.
+
+        An end-to-end assertion cannot see this: on the MIN@CHC fixture the
+        overlap bound alone diversifies captains, so removing the per-contest set
+        from ``cpt_excludes`` changes no outcome and the guard looks unnecessary.
+        It is not. The rung that drops ``cpt_lock`` and lets the solver choose a
+        substitute is exactly where R153 found a captain reaching 26.3% under a
+        25% cap, and a substitute is only prevented from landing on a
+        contest-capped player by the exclusion list.
+
+        So this drives the relaxation ladder directly: every solve returns None
+        until the last, which forces every rung to fire, and the captain already
+        at the per-contest cap must appear in ``cpt_excludes`` on all of them
+        except the true floor -- where the cap gives way rather than leave a
+        blank reserved row, and is counted when it does.
+        """
+        keys = list(self.df["Player_Key"])
+        first, second = keys[0], keys[1]
+        # EIGHT theses, not two, and the count is load-bearing. The portfolio
+        # captain cap is floor(0.25 * n): at n=2 that is 1, so after one use the
+        # captain is in `cpt_full` and the PORTFOLIO cap excludes him -- the
+        # per-contest set would look necessary while contributing nothing. At
+        # n=8 the portfolio count is 2, so a captain used once is under the
+        # portfolio cap and over the per-contest cap of 1, which is the only
+        # arrangement where this guard is the one doing the work.
+        theses = [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                   "cpt": first if i == 0 else second,
+                   "locks": [], "excludes": [], "mult": {}}
+                  for i in range(8)]
+        real = st.build_showdown_lineup
+        calls = []
+
+        def spy(df, **kw):
+            calls.append(kw)
+            # Let the first thesis solve so `first` reaches the per-contest cap,
+            # then refuse the second thesis's rungs until the very last, forcing
+            # the whole relaxation ladder to fire.
+            if len(calls) == 1:
+                return real(df, **kw)
+            return None if len(calls) < 7 else real(df, **kw)
+
+        diag = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            st.solve_ladder(self.df, theses, time_limit=5, diagnostics=diag,
+                            contest_of_entry=["A"] * 8, max_cpt_per_contest=1)
+
+        rungs = calls[1:]
+        self.assertGreaterEqual(len(rungs), 3, "the ladder must have descended")
+        carried = [r for r in rungs if first in (r.get("cpt_excludes") or [])]
+        self.assertTrue(carried,
+                        "the contest-capped captain never reached cpt_excludes")
+        # Every rung that passes cpt_excludes at all must carry him; a rung that
+        # passes some exclusions but drops this one is the R153 defect.
+        for r in rungs:
+            ex = r.get("cpt_excludes")
+            if ex:
+                self.assertIn(first, ex,
+                              "a rung passed exclusions but dropped the "
+                              "per-contest one")
+
+    def test_the_diagnostic_counts_the_REALIZED_captain_not_the_requested_one(self):
+        """The counter must read what came back from the solve. Counting the
+        requested captain is what made R153's caps report themselves clean while
+        not holding."""
+        keys = list(self.df["Player_Key"])
+        same = keys[0]
+        theses = [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                   "cpt": same, "locks": [], "excludes": [], "mult": {}}
+                  for i in range(4)]
+        diag = {}
+        solved = st.solve_ladder(self.df, theses, time_limit=5, diagnostics=diag,
+                                 contest_of_entry=["A"] * 4,
+                                 max_cpt_per_contest=1)
+        realized = collections.Counter(lu["captain"]["player_key"]
+                                       for lu in solved if lu is not None)
+        self.assertEqual(dict(realized), diag["captain_exposure_by_contest"]["A"],
+                         "the diagnostic must equal the solved reality, not the "
+                         "theses' requests")
+        # The requested captain was the same key four times; if the diagnostic
+        # were counting requests it would read {same: 4}.
+        self.assertNotEqual(diag["captain_exposure_by_contest"]["A"], {same: 4})
+
+    def test_gale_ryser_uses_each_contests_own_bar_not_a_flat_one(self):
+        """Two contests of 2 admit one captain ONCE each (n - 1 = 1), so a
+        captain needed three times cannot be placed. A flat bar of m=2 would
+        compute capacity 4 and call the same multiset feasible."""
+        counts, sizes = {"a": 3, "b": 1}, [2, 2]
+        per = st.captain_assignment_feasible(counts, sizes, max_cpt_per_contest=2)
+        self.assertFalse(per["feasible"],
+                         "a captain needed 3 times across two 2-entry contests "
+                         "cannot be placed under the n-1 bar")
+        self.assertEqual(per["binding_k"], 1)
+        self.assertEqual(per["failures"][0]["capacity"], 2)   # 1 + 1, not 2 + 2
+
+    def test_an_override_reaches_the_control_through_the_same_one_dict(self):
+        for m in (1, 2, 3):
+            ladder = st.build_thesis_ladder(self.df, 6, moneyline=self.ml,
+                                            contest_of_entry=["A"] * 6,
+                                            max_cpt_per_contest=m)
+            self.assertEqual(ladder["max_cpt_per_contest"], m)
 
 
 if __name__ == "__main__":

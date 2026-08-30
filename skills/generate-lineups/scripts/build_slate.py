@@ -2330,6 +2330,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # dict as the other two, so the escape hatch is one flag rather than three.
     player_cap_pct = overrides.get("max_player_exposure_pct",
                                    sd.DEFAULT_MAX_PLAYER_EXPOSURE_PCT)
+    # R239(b). The fourth, and the first that binds per contest. Same one dict.
+    cpt_per_contest = overrides.get("max_cpt_per_contest",
+                                    sd.DEFAULT_MAX_CPT_PER_CONTEST)
 
     # Handedness and the moneyline are what make the ladder more than a relabeled
     # points-max bank, so gather them before deciding the path. Both are
@@ -2363,13 +2366,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         priced = st.apply_base_prior(df, bat_side=bat_side, pitcher_hand=pitcher_hand)
         ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
                                              max_cpt_exposure_pct=cpt_cap,
-                                             contest_of_entry=contest_of_entry)
+                                             contest_of_entry=contest_of_entry,
+                                             max_cpt_per_contest=cpt_per_contest)
         theses = ladder_meta["theses"]
         solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
                                  max_player_exposure_pct=player_cap_pct,
                                  max_cpt_exposure_pct=cpt_cap,
                                  diagnostics=solve_diag,
-                                 contest_of_entry=contest_of_entry)
+                                 contest_of_entry=contest_of_entry,
+                                 max_cpt_per_contest=cpt_per_contest)
         if any(lu is None for lu in solved):
             print(json.dumps({"status": "ladder_infeasible",
                               "unsolved": [t["name"] for t, lu in zip(theses, solved)
@@ -2495,8 +2500,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # the cap could hold. Named because the thesis then built with a captain its
         # label does not imply.
         cap_reassignments = (list(solve_diag.get("player_cap_cpt_reassigned") or [])
-                             + list(solve_diag.get("cpt_cap_reassigned") or []))
+                             + list(solve_diag.get("cpt_cap_reassigned") or [])
+                             + list(solve_diag.get("contest_cpt_reassigned") or []))
         player_locks_dropped = list(solve_diag.get("player_cap_locks_dropped") or [])
+        contest_cap_relaxed = solve_diag.get("contest_cap_relaxed") or 0
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
@@ -2534,6 +2541,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # No thesis on this path, so nothing can be reassigned off one.
         cap_reassignments = []
         player_locks_dropped = []
+        # R239(b). The per-contest cap is enforced in solve_ladder, which this
+        # path does not use, so nothing relaxed it. Stated as 0 rather than left
+        # undefined; the per_contest REPORT still runs on this path, so a breach
+        # here is visible even though no control prevented it.
+        contest_cap_relaxed = 0
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
     # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
     # report, but it does build lineups, and the contest each one is entered into
@@ -2670,8 +2682,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # it is counted separately and ANDed rather than folded into the
             # relaxation counts.
             "per_contest_cap_breaches": len(per_contest.get("over_cap") or []),
+            # R239(b). The true floor gave the per-contest cap up rather than
+            # leave a blank reserved row. A relaxation, so it is counted like
+            # one; `contest_cpt_reassigned` beside it is NOT one and is not here.
+            "contest_cap_relaxed_slots": contest_cap_relaxed,
             "clean": (not (relaxed_slots or overlap_relaxed or both_relaxed
-                           or player_relaxed or ignored_locks)
+                           or player_relaxed or ignored_locks
+                           or contest_cap_relaxed)
                       and not (per_contest.get("over_cap") or [])),
         },
         "construction": ({

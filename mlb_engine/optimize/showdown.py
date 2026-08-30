@@ -81,6 +81,42 @@ DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25
 # against R247's frontier instead of guessed.
 DEFAULT_MAX_CPT_PER_CONTEST = 2
 
+
+def per_contest_cap_count(n: int, max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST
+                          ) -> int:
+    """How many times one captain may hold the slot inside a contest of ``n``.
+
+    ``max(1, min(m, n - 1))``, and the ``n - 1`` is the part that matters.
+
+    A FLAT cap of m does not do what the control was specified to do, and the
+    demonstration is the case that prompted the whole item: in a 2-entry contest
+    ``min(2, 2) = 2`` permits BOTH entries to carry the same captain, which is
+    the measured 100% on contest 194553034 (2026-08-28) passing a cap written to
+    stop it. The number 2 was chosen to kill "the 2-entry contest at 100% and the
+    3-of-7 at 42.9%"; flat, it kills only the second. Measured while building
+    R239(b), 2026-08-29.
+
+    ``n - 1`` guarantees at least two distinct captains in any multi-entry
+    contest while leaving m in force wherever the contest is big enough for m to
+    be the binding number:
+
+        n=2 -> 1   (distinct, which is the whole point)
+        n=3 -> 2   (2 of 3 permitted at m=2)
+        n=7 -> 2   (kills the measured x3 at 42.9%)
+        n=1 -> 1   (a single entry cannot duplicate anything)
+
+    This also puts the engine and `tools/preflight_upload.py` back in agreement.
+    The preflight derives its bar as ``max(1, floor(pct * n))``, which at 0.25
+    gives 1 for a 2-entry contest -- so a flat engine cap of 2 would have built
+    a file the preflight then warned about, which is this project's named
+    two-implementations-of-one-rule failure arriving between the builder and the
+    checker.
+    """
+    n = max(1, int(n))
+    if n == 1:
+        return 1
+    return max(1, min(int(max_cpt_per_contest), n - 1))
+
 # Ben, 2026-08-19 (R153). No single PLAYER, in any role, fills more than half the
 # entered set. This is the portfolio-level washout control CLAUDE.md's dual
 # objective names and the module did not have: the overlap bound stops two

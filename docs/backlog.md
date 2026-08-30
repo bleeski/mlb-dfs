@@ -341,6 +341,33 @@ instead of at slot 10.
 08-27; slot 3, the repair path, was inserted that date and everything below it
 moved down one). **Dependencies bind where stated.**
 
+*Amendment 2026-08-29, DEV, claim `engine` (scope `r239_captain_partition`):
+**R266 and R239(b)+(c) all SHIPPED.** Gate `1386 -> 1443`
+(`tests.test_showdown` 91 -> 133, `tests.test_upload_integrity` 254 -> 269).
+Four commits, each landed and gated on its own: R266 the preflight guard, the
+R239 partition seam, R239(c) the per-contest slice, R239(b) the cap that binds.
+Reasoning and the R233 enumerations are in CHANGELOG.md.*
+
+***The queue did NOT resequence and is still fourteen slots.*** Nothing moved
+up or down; two slots lost members. **Slot 2** drops R266 and is now
+R174 + R175 + R248 + R242 — it landed alone exactly as its own note said, and
+its landing changed nothing about the other four. **Slot 6** keeps its position
+behind the money-boundary batch and its R238-first order, but the R239 half of
+it is now **R239(a) alone**, the round-robin deal, which still consumes R238.
+**Slot 3, the repair path, is untouched and remains slot 3.*
+
+*Three corrections R239's own text needed, all made in its entry: its R233
+enumeration claimed all six `exposure_cap_count` call sites "take the same
+correction" and in fact all six are deliberately kept (they are the PORTFOLIO
+caps, correct against the entered total; the defect was that no per-contest cap
+existed); `max_cpt_per_contest` is a named control at 2 rather than the 1 the pct
+would derive; and a FLAT cap of 2 does not kill the 2-entry-at-100% case it was
+chosen to kill, so the bar is `max(1, min(m, n - 1))`. **One open decision for
+Ben, already in Tier 4:** whether that control becomes 1 (fully distinct captains
+in any contest up to seven entries). It is a one-value change, and the realized
+per-contest counts now ship in every brief so it can be priced against R247's
+frontier. R240 (punt-captain template) becomes load-bearing if the answer is 1.*
+
 *Amendment 2026-08-28, DEV, claim `engine` (`engine_2026-08-28`): slot 1 is
 CLOSED. R212, R213, R214 and R215 all landed in that order, entries migrated to
 CHANGELOG.md, gate 1313 -> 1331. The list is RENUMBERED rather than annotated,
@@ -352,18 +379,15 @@ R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
 1. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
    F-14, F-10). R176 gains ed8's F-34 as a rider: exit code computed before
    the manifest stamp, so success can return unstamped.
-2. **R174 + R175 + R248 + R242 + R266** — the money-boundary batch, grown by
+2. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by
    two field hits from this week: the preflight's feed matcher has no AZ→ARI
    crosswalk and silently demotes ten hard checks to warnings (R248, F-33,
    and it hit a SECOND slate 08-28), and the salary auto-resolve still reaches
    across draftgroups before refusing (R242, F-11's surviving sliver). F-31
    rides R174: `late_swap.py` prints the preflight command and returns success
-   without running it. **R266 is new (2026-08-29) and lands ALONE inside this
-   slot** — it crosses two checks `preflight_upload.py` already holds six lines
-   apart to catch per-contest captain duplication at T-5, needs nothing the
-   other four build, and rides the slot for the shared test pass only. It is
-   the guard that closes R239's fourth sighting today, months before R239's
-   engine work; do it first in the slot if the slot gets split.
+   without running it. **R266 SHIPPED 2026-08-29 and is out of this slot**; it
+   landed alone as its own note said it would, and its landing changed nothing
+   about the other four.
 3. **The repair path: R267 + R272, then R268, R204's ceiling half rides** —
    **INSERTED 2026-08-29, the one resequencing this date; everything below
    moved down one and nothing else changed.** The argument is the same one that
@@ -398,12 +422,13 @@ R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
    need.
 6. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
    shapes before assignment (R239's shape-aware half consumes R238).
-   **R239's internal order was CORRECTED 2026-08-29 and this slot's old note
-   was the thing corrected:** "its round-robin dealing half can land first and
-   alone" is false wherever contest size approaches the bank's distinct-captain
-   count, which is the normal satellite case, and the 08-29 slate proved it
-   with a bank that admitted no valid assignment at all. The order is (c)
-   report, then (b) bind at construction, then (a) deal. R249 gives the path a
+   **R239(b) and (c) SHIPPED 2026-08-29** (see CHANGELOG.md); what is left in
+   this slot is **R239(a) alone**, the round-robin deal, and it still consumes
+   R238 for its shape conditioning. The old note that "its round-robin dealing
+   half can land first and alone" was corrected on 08-29 and remains false: (b)
+   landing does not license it either, because dealing cannot create diversity
+   the bank does not contain. (a) must now READ the Gale-Ryser verdict (b)
+   shipped rather than assume a deal is available. R249 gives the path a
    projection input so the salary file stops being the injection point
    (F-40). R245 fixes the one file two same-date builds both write. The
    standing batch tail keeps its members and order: R208, R122-rider, R123,
@@ -1641,18 +1666,29 @@ and the narrative history accumulates at the bottom, not here.*
   players to the worst-graded ones with every counter clean, so the cost of
   full distinctness should be priced against R247's frontier before it is
   adopted as a default. **A per-contest cap of 2 is the obvious weaker
-  alternative and is not obviously worse.** Unlocks R239(b)'s binding value;
-  R239(c)'s report and R266's warning are worth landing either way, since both
-  only state the fact. If the answer is "distinct," R240 (punt-captain
-  template) stops being optional — a 7-entry contest needs 7 captains and the
-  ladder constructs none below $5,800, so the deep captains it would be forced
-  onto are exactly the class R240 says no cap value can reach.
+  alternative and is not obviously worse.** If the answer is "distinct," R240
+  (punt-captain template) stops being optional — a 7-entry contest needs 7
+  captains and the ladder constructs none below $5,800, so the deep captains it
+  would be forced onto are exactly the class R240 says no cap value can reach.
+  **STATUS 2026-08-29: this question is now a ONE-VALUE change, not a rebuild.**
+  R239(b) shipped `max_cpt_per_contest` as a NAMED control defaulting to **2**,
+  deliberately not derived from the pct, precisely so this decision stays yours
+  and stays cheap. R239(c)'s report and R266's warning both shipped, so realized
+  per-contest captain counts are in every brief and the cost of moving to 1 can
+  be priced against R247's frontier instead of guessed. Two things to know
+  before answering: the effective bar is `max(1, min(m, n - 1))`, so **2 already
+  forces distinct captains in any 2-entry contest** (a flat 2 did not, which is
+  a defect found and fixed on 08-29); and the 08-28 delivered bank was
+  INFEASIBLE at 1 and feasible at 2 by the Gale-Ryser precondition, so answering
+  "distinct" makes captain-pool widening the normal path rather than the
+  exception.
 - **R266's severity (same date, same fragment) — does the per-contest captain
   check ever BLOCK, and at what per-contest share?** It ships WARN by default
   because a deliberate double-up is a legitimate play and CLAUDE.md reserves
-  concentration to Ben. Making it a hard failure is a `--strict-contest-
-  diversity` flag, not a default change. Costs one sentence to answer and
-  nothing waits on it.
+  concentration to Ben. **SHIPPED 2026-08-29 as specified:** WARN by default,
+  with the hard failure behind `--strict-contest-diversity`, which is wired to
+  nothing. Turning it on is a flag, not a default change. Costs one sentence to
+  answer and nothing waits on it.
 - **R262's production switch (dated 2026-08-27, from the greenfield
   instruction) — when scenario-coverage selection replaces the
   Ceiling-proxy objective.** The instruction funds the WALK (R251–R261:
@@ -2193,129 +2229,60 @@ CLI override (`--postures <id>=<shape>`), write `contest_shape` per contest
 into the brief, and give qa section 4 its key. Unmatched names keep Classic's
 behavior (block with the named row, per the Quick Card rule). No solver change.
 
-### R239. Entry-to-contest assignment is positional, controls provably cannot reach a contest slice, and nothing reports per contest (P1, M; (c) is S and lands FIRST, (a) depends on (b)) | new 2026-08-27, merged from BUILD fragments `2026-08-24_BUILD_showdown_contest_assignment.md` §1, `2026-08-26_BUILD_contest_aware_allocation_at_onset.md`, and `2026-08-27_BUILD_showdown_entry_to_contest_assignment_is_positional.md`; corroborated by the outside spec ed8 (F-41, F-30); FOUR sightings, the fourth on the captain axis 2026-08-29 — **sequencing corrected that date, see below**
+### R239(a), remainder. Entry-to-contest assignment is still POSITIONAL: theses are not dealt to contests (P1, S-M; depends on nothing further, but see the warning below) | new 2026-08-27, FOUR sightings; (b) and (c) SHIPPED 2026-08-29, see CHANGELOG.md; **this entry rewritten that date to its remainder**
 
-**What.** `run_showdown` assigns lineups with `zip(rows, bank)`: the Nth blank
-reserved row gets the Nth lineup off the ladder, so which construction lands in
-which CONTEST is an artifact of two orderings that know nothing about each
-other. Measured three times: texcws_sd's two 7-entry satellites each inherited
-one side (CWS 5/2 and TEX 5/2); hounyy_sd's $1 Solo Shot drew bank #21 (a
-cap-reassigned captain) while the $0.10 Dime Time pair drew #1 and #2; and the
-08-26 proof — v1 (0.25/0.50) and v2 (0.15/0.38) control sets produced an
-IDENTICAL 20-entry Dime Time slice while all diversification landed on entries
-21–39. Grisham sat at 60.0% of the slice under a 0.50 cap reading clean.
-`Contest ID` appears in the engine six times, all header assertions, zero
-reads.
+**What SHIPPED on 2026-08-29, so the next reader does not rebuild it.**
+- **(c)**, the per-contest slice: `per_contest` in the brief on both build paths,
+  `counted_relaxations.clean` answering to it, `qa_portfolio` refusing a clean
+  verdict without it.
+- **(b)**, the cap that binds where the slot is spent: `max_cpt_per_contest`, a
+  named control defaulting to 2, enforced in BOTH `build_thesis_ladder`'s
+  apportionment and `solve_ladder`'s exclusion list, on every rung including the
+  floor. Plus the Gale-Ryser precondition (b)(ii), which R239 did not have.
+- The seam that both needed: the entry-to-contest partition threaded from
+  `run_showdown` into both ladder functions.
 
-**Fourth sighting, 2026-08-29, on the CAPTAIN axis** (merged from BUILD
-fragment `2026-08-29_BUILD_r239_fourth_sighting_captain_axis.md`; slate
-`2215_1g_sd`, ARI@SF, 21 entries, 7 contests, delivered 2026-08-28, sha256
-`68528791e00d`). Raised by Ben in post-mortem, by no counter in the artifact:
+**Three corrections to this entry's own text, made while building it.**
+1. **The R233 enumeration was wrong.** This entry said of the six
+   `exposure_cap_count` call sites: "No copy is deliberately kept; all six take
+   the same correction in (b)." All six are deliberately KEPT. They compute the
+   PORTFOLIO captain and player caps, which R153 established and which are
+   correct against the entered total. The defect was never a wrong denominator
+   in those six; it was that no per-contest cap existed. The fix is a fourth
+   control beside them.
+2. **`max_cpt_per_contest` is a named control, not `max(1, floor(pct * n))`.**
+   Deriving it gives 1 for every contest up to seven entries, which is full
+   distinctness arriving as an accident of arithmetic. R247 measured what
+   tightening a cap costs. Ben set it at 2; whether it becomes 1 is his Tier 4
+   call and is a one-value change.
+3. **A FLAT cap of 2 does not kill the 100% case it was chosen to kill.** In a
+   2-entry contest `min(2, 2) = 2` permits both entries on one captain. The bar
+   is `max(1, min(m, n - 1))`.
 
-| contest | n | distinct CPT | repeats | worst realized |
-|---|---|---|---|---|
-| 194551988 (satellite) | 7 | 4 | Drake x3, Carroll x2 | **42.9%** |
-| 194551987 (satellite) | 7 | 5 | Tidwell x2, Devers x2 | 28.6% |
-| 194553034 (Quarter Jukebox) | 2 | **1** | Tidwell x2 | **100%** |
-| 194551981 (Dime Time) | 2 | 2 | none | 50% |
+**What REMAINS: (a), the round-robin deal.** `run_showdown` still assigns with
+`zip(rows, bank)`, so which CONSTRUCTION lands in which contest is still an
+artifact of two orderings that know nothing about each other. The per-contest
+captain cap now stops the worst consequence (one contest's entries sharing the
+highest-leverage slot), but it does not make the deal deliberate: team shape,
+game script and thesis family are still distributed by position. Deal theses to
+contests round-robin across game states so every multi-entry contest carries
+entries live under either script; until shapes resolve, order reserved rows so
+the largest buy-in draws from the most differentiated end of the bank.
 
-Portfolio-wide the same build reads `captain_exposure.realized_max_pct 23.8`
-under a 0.25 cap, `cap_relaxed_slots 0`, `counted_relaxations.clean true`. All
-true, none of it describing what was entered. The prior three measurements are
-on the PLAYER cap; the captain slot carries 1.5x and is the largest single
-differentiator on a six-man roster, so it is the axis where per-contest
-correlation costs most and where the arithmetic gap is widest —
-`floor(0.25 x 7) = 1` is the cap this project's own value implies inside a
-7-entry contest, against 3 realized.
+**The warning that survives, restated.** (a) was once noted as able to "land
+first and alone". That is still wrong, and (b) landing does not make it right:
+dealing cannot create diversity the bank does not contain. The Gale-Ryser
+precondition now shipped is the test for exactly that, and the 08-28 bank failed
+it at k=3 (14 > 13) with fully distinct captains required. (a) must read the
+feasibility verdict rather than assume a deal is available. Its shape
+conditioning still consumes R238.
 
-**Why.** The washout objective binds PER CONTEST in a one-ticket satellite, and
-no control setting is a substitute for the assignment fix — the 08-26 fragment
-proved the control surface cannot reach the slice at all. Two live deliveries
-have now shipped via hand-permutation of the delivered file, each costing a
-waived identity check (`--no-manifest`, sha verified by hand), which is the
-argument for an engine surface rather than a session habit.
-
-**Fix, in three parts — ORDER CORRECTED 2026-08-29** (from BUILD fragment
-`2026-08-29_BUILD_per_contest_captain_duplication_fix.md`, which is the fix
-spec to the sighting above). The order is now **(c), then (b), then (a)**.
-
-**(c) lands first.** Per-contest block in the brief — keyed by contest id:
-`n`, `distinct_captains`, `captain_counts`, top player exposure, max pairwise
-overlap, team-shape spread — and `qa_portfolio` refuses a clean verdict
-without it; the delivery report carries the slice numbers always, the full qa
-pass stays time-gated. `counted_relaxations.clean` must go FALSE when any
-per-contest cap is exceeded, because today it reports true on a portfolio that
-violated the cap's own value inside two contests. The fact is already derivable
-from `certification.write_report.assignment_log`
-(`entry_id -> contest_id -> roster_ids`); nothing states it. It costs nothing
-and it is what makes the next two measurable instead of assumed.
-
-**(b), CORRECTED: "evaluate" is too weak and will not fix this.** A cap
-evaluated after `solve_ladder` has chosen captains can only report a bind it is
-too late to satisfy — R153's finding with population substituted for
-enforcement point. Two parts. **(i) Binding value:** at the moment a captain
-slot is filled the cap is `min(portfolio_cap_count, per_contest_cap_count)`,
-the per-contest count using the contest's own n through the existing clamp
-`max(1, floor(pct * n_contest))`. At the shipped 0.25 that yields 1 for every
-contest of size 1–7, so today's value means DISTINCT captains inside any
-contest up to seven entries; state that consequence out loud rather than
-letting it arrive as a surprise, and see the decision below. **(ii) Feasibility
-precondition on the bank, which R239 did not have:** a captain multiset admits
-a per-contest-distinct assignment only if, for every k, the sum of the k
-largest captain counts is at most `sum over contests of min(n_j, k)`
-(Gale-Ryser on counts against contest sizes). The 08-29 bank failed it at k=3 —
-counts (5,5,4,4,1,1,1) against sizes (7,7,2,2,1,1,1) give 14 > 13 — so the
-delivered bank admitted NO valid assignment and no permutation of it could have
-produced a clean file. The apportionment must take the contest size vector as
-an input and satisfy this test BEFORE solving. **The enabling seam already
-exists:** `run_showdown` parses reserved rows into `{"row_index", "entry_id",
-"contest_id", "contest_name"}` at `mlb_engine/optimize/showdown.py:728`, before
-any bank is built, and then drops it. Passing that partition into
-`build_thesis_ladder` / `solve_ladder` is a signature change with no behavior
-change; do that first and alone if the rest has to wait.
-
-**(a) goes LAST and depends on (b).** Deal theses to contests round-robin
-across game states so every multi-entry contest carries entries live under
-either script — an assignment-order change, no lineup altered, no control or
-pool change; until shapes resolve, order reserved rows so the largest buy-in
-draws from the most differentiated end of the bank. **The board's prior note
-that (a) "can land first and alone" is WRONG wherever contest size approaches
-the bank's distinct-captain count, which is the normal satellite case:** the
-08-29 slate's two largest contests were 7 and 7 against exactly 7 distinct
-captains, three of them singletons. Dealing cannot create diversity the bank
-does not contain. Landing (a) alone would improve the numbers, leave the
-finding intact, and read as closed. (b) and (c)'s shape conditioning consumes
-R238.
-
-**R233 enumeration — the class is "a cap computed against the entered TOTAL
-when the prize resolves per contest."** Every call site of
-`exposure_cap_count`, the only cap-count derivation on the Showdown path, all
-six passing a portfolio total, re-verified by grep at this head 2026-08-29:
-
-    mlb_engine/optimize/showdown.py:477        cap        = f(pct, n_target)
-    mlb_engine/optimize/showdown.py:478        player_cap = f(pct, n_target)
-    mlb_engine/optimize/showdown_theses.py:496 cap        = f(pct, int(n_entries))
-    mlb_engine/optimize/showdown_theses.py:636 player_cap = f(pct, len(theses))
-    mlb_engine/optimize/showdown_theses.py:637 cpt_cap    = f(pct, len(theses))
-    mlb_engine/optimize/showdown_theses.py:943 per_player = f(pct, n)
-
-There is no seventh: `grep -rn 'exposure_cap_count' mlb_engine/ tools/ skills/`
-returns these plus the definition at `showdown.py:401` and one comment at
-`tools/audit.py:444`. **No copy is deliberately kept**; all six take the same
-correction in (b). **The class does NOT extend to Classic, and the asymmetry is
-the useful part:** `contest_allocator.py` already carries the partition as a
-first-class object (`per_contest_selected` 480/498/1118/1313,
-`by_contest_entries` 2572, `signatures_by_contest` 2445) and already enforces
-`no_duplicates_within_contest`, default True, at 493 and 1190; the same grep
-returns 0 on both Showdown modules. So the principle is shipped and defaulted
-ON one path, and the Showdown ladder is the path that never got it. This is an
-existing invariant to extend, not a new idea to design.
-
-**Session obligation until R266 lands:** per-contest distinct-captain counts go
-in the delivery report by hand, for every contest holding more than one entry.
-The 08-29 session read the assignment log for team-lean balance across the
-portfolio and did not slice captains by contest — the same granularity error
-the engine makes, and why the finding reached Ben instead of the report.
+**Measured evidence for (a), still open.** texcws_sd's two 7-entry satellites
+each inherited one side (CWS 5/2 and TEX 5/2); hounyy_sd's $1 Solo Shot drew bank
+#21 while the $0.10 Dime Time pair drew #1 and #2; and the 08-26 proof, where two
+different control sets produced an IDENTICAL 20-entry Dime Time slice with all
+diversification landing on entries 21-39. None of those is a captain finding, so
+none is closed by (b).
 
 ### R240. No punt-captain template: below $5,800 the ladder never captains anyone, so a whole class of broad-field finish is unreachable at any cap value (P2, S-M; decision-first, Ben's) | new 2026-08-27, from `2026-08-26_BUILD_contest_aware_allocation_at_onset.md` §4(d)
 

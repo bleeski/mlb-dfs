@@ -88,7 +88,6 @@ import collections
 import csv
 import hashlib
 import json
-import math
 import re
 import sys
 import unicodedata
@@ -121,12 +120,18 @@ WARN_STATUSES = frozenset({"DTD", "GTD", "Q"})
 ARCHETYPES_CSV = REPO_ROOT / "data" / "reference" / "dk_contest_archetypes.csv"
 SHOWDOWN_NAME_TOKENS = ("showdown", "captain mode")
 
-# R266. A verbatim copy of showdown.DEFAULT_MAX_CPT_EXPOSURE_PCT, pinned equal by
-# test, on the same reasoning as ARCHETYPE_TYPE_PRECEDENCE below: preflight cannot
-# import the engine, and a preflight applying a different captain cap than the
-# engine built to would be R79(d)'s no-op failure class on the money boundary.
-# Override per run with --max-cpt-exposure-pct when a build used a different value.
-DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25
+# R239(b)/R266, corrected 2026-08-29 in the same session R266 shipped. The
+# per-contest captain bar is this NAMED control, mirrored from
+# showdown.DEFAULT_MAX_CPT_PER_CONTEST and pinned equal by test.
+#
+# R266 originally derived the bar from the pct above, because the named control
+# did not exist yet. Once it did, the two disagreed: at n=3 the engine
+# deliberately builds to 2 while the pct reading warns above 1, so the checker
+# would have flagged files the builder was specified to produce -- noise on the
+# one surface whose job is to be believed at T-5, and this project's named
+# two-implementations-of-one-rule failure arriving between the builder and the
+# checker. Caught by a test written to compare them.
+DEFAULT_MAX_CPT_PER_CONTEST = 2
 
 # A verbatim copy of dk_entries_manager.ARCHETYPE_TYPE_PRECEDENCE, pinned equal
 # by test. Preflight cannot import the engine, and resolving the same contest
@@ -1608,50 +1613,34 @@ def partition_duplicate_lineups(rows: Iterable[Tuple[str, Any]]) -> Dict[str, in
     }
 
 
-def assert_fraction_cap_local(pct: Any) -> float:
-    """R167/R215(b)'s units rule, mirrored for a tool that cannot import the engine.
-
-    A local copy of ``contest_allocator.assert_fraction_cap``'s contract, pinned
-    equal by test. Copying a rule is this project's named no-op failure class, so
-    the copy is guarded rather than left to hold by luck -- but the alternative
-    here is worse than a guarded copy: without the rule, ``25`` typed for ``0.25``
-    yields a per-contest cap of 25n, which forbids nobody, and the R266 check
-    reports every contest CLEAN. That is R167's exact harm (a control switched off
-    by a keystroke while its counter reads clean) arriving at the money boundary.
-
-    Raises ValueError above 1.0, on NaN, on infinity, and on bool. Zero and below
-    are returned unchanged and read by the caller as "not set".
-    """
-    if isinstance(pct, bool):
-        raise ValueError(f"exposure cap must be a number, got bool {pct!r}")
-    value = float(pct)
-    if math.isnan(value) or math.isinf(value):
-        raise ValueError(f"exposure cap must be finite, got {pct!r}")
-    if value > 1.0:
-        raise ValueError(
-            f"exposure cap {pct!r} is above 1.0; these are FRACTIONS, so 0.25 "
-            f"means 25%. A units slip here disables the check silently: a cap "
-            f"of 25 forbids nobody and every contest then reads clean")
-    return value
-
-
-def per_contest_captain_cap(n: int, cap_pct: float) -> int:
+def per_contest_captain_cap(n: int,
+                            max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST
+                            ) -> int:
     """How many times one captain may appear inside a contest of ``n`` entries.
 
-    The engine's own clamp, applied to the contest's own n instead of the entered
-    total: ``max(1, floor(pct * n))``. The ``max(1, ...)`` matches
-    ``showdown.exposure_cap_count``'s rule that ``pct * n < 1`` clamps to 1 rather
-    than forbidding everyone -- without it a 2-entry contest at 0.25 would admit
-    no captain at all rather than admitting one. ``math.floor``, never round or
-    ceil, for the same reason the engine gives: a cap is an UPPER bound.
+    A mirror of ``showdown.per_contest_cap_count``, pinned equal by test:
+    ``max(1, min(m, n - 1))``. Preflight cannot import the engine, and a checker
+    applying a different bar than the builder built to is R79(d)'s no-op failure
+    class landing on the money boundary, so the copy is guarded rather than left
+    to agree by luck.
+
+    The ``n - 1`` is the load-bearing part. A flat ``m`` permits a 2-entry contest
+    to put BOTH entries on one captain (``min(2, 2) = 2``), which is the measured
+    100% on contest 194553034, 2026-08-28 -- a cap written to stop that case
+    passing it. ``n - 1`` guarantees at least two distinct captains in any
+    multi-entry contest.
     """
-    return max(1, math.floor(assert_fraction_cap_local(cap_pct) * max(1, int(n))))
+    n = max(1, int(n))
+    if n == 1:
+        return 1
+    return max(1, min(int(max_cpt_per_contest), n - 1))
 
 
 def per_contest_captain_exposure(filled: Sequence[EntryRow],
                                  persons: Mapping[str, str],
                                  display: Mapping[str, Tuple[str, str]],
-                                 cap_pct: float) -> List[Dict[str, Any]]:
+                                 max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+                                 ) -> List[Dict[str, Any]]:
     """Count captains per CONTEST rather than per file (R266).
 
     This crosses the two checks ``advisory`` already held six lines apart and
@@ -1695,7 +1684,7 @@ def per_contest_captain_exposure(filled: Sequence[EntryRow],
                 counts[persons.get(e.cells[0], e.cells[0])] += 1
         if not counts:
             continue
-        cap = per_contest_captain_cap(n, cap_pct)
+        cap = per_contest_captain_cap(n, max_cpt_per_contest)
         over = [
             {"player": display.get(k, (k, "?"))[0],
              "team": display.get(k, (k, "?"))[1],
@@ -1753,7 +1742,8 @@ def check_contest_captain_diversity(adv: Mapping[str, Any], rep: Report,
 
 def advisory(contest: str, entries: Sequence[EntryRow],
              salary: Dict[str, Dict[str, str]],
-             cap_pct: float = DEFAULT_MAX_CPT_EXPOSURE_PCT) -> Dict[str, Any]:
+             max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+             ) -> Dict[str, Any]:
     filled = [e for e in entries if not e.is_blank]
     n = len(filled)
     out: Dict[str, Any] = {"entries": len(entries), "filled": n}
@@ -1797,8 +1787,8 @@ def advisory(contest: str, entries: Sequence[EntryRow],
         # instead of against the file. The line above and R128's partition below
         # sat six lines apart and never crossed; this is the crossing.
         out["per_contest_captains"] = per_contest_captain_exposure(
-            filled, persons, display, cap_pct)
-        out["per_contest_captain_cap_pct"] = cap_pct
+            filled, persons, display, max_cpt_per_contest)
+        out["max_cpt_per_contest"] = int(max_cpt_per_contest)
     # R128. The contest each entry belongs to is already in the row; the DK
     # template writes it beside the Entry ID, so the partition needs no new
     # input. Contest ID is the key and the name is the fallback, because a
@@ -1937,8 +1927,8 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     # at dict-construction time. Built inline, a --strict failure would land in
     # `rep.failures` after `passed` had already read it as True.
     adv = advisory(contest, entries, salary,
-                   cap_pct=getattr(args, "max_cpt_exposure_pct",
-                                   DEFAULT_MAX_CPT_EXPOSURE_PCT))
+                   max_cpt_per_contest=getattr(args, "max_cpt_per_contest",
+                                               DEFAULT_MAX_CPT_PER_CONTEST))
     check_contest_captain_diversity(
         adv, rep, strict=bool(getattr(args, "strict_contest_diversity", False)))
 
@@ -1994,11 +1984,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--strict-contest-diversity", action="store_true",
                     help="turn the R266 per-contest captain finding into a hard "
                          "failure instead of a warning")
-    ap.add_argument("--max-cpt-exposure-pct", type=float,
-                    default=DEFAULT_MAX_CPT_EXPOSURE_PCT,
-                    help="captain exposure cap the build used; the per-contest "
-                         "bar is max(1, floor(pct * contest entries)) "
-                         f"(default {DEFAULT_MAX_CPT_EXPOSURE_PCT})")
+    ap.add_argument("--max-cpt-per-contest", type=int,
+                    default=DEFAULT_MAX_CPT_PER_CONTEST,
+                    help="per-contest captain bar the build used; the effective "
+                         "bar is max(1, min(m, contest entries - 1)) "
+                         f"(default {DEFAULT_MAX_CPT_PER_CONTEST})"),
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="print failures and exit 4 (acknowledged, not clean); "

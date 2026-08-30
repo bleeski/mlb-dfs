@@ -41,6 +41,7 @@ from mlb_engine.optimize.showdown import (
     build_showdown_lineup,
     certify_showdown,
     exposure_cap_count,
+    per_contest_cap_count,
     player_cap_structural_floor,
 )
 
@@ -556,7 +557,7 @@ def per_contest_report(df: pd.DataFrame,
             {t: sum(1 for k in s if teams.get(k) == t)
              for t in sorted({teams.get(k, "") for k in s})}.items()))
             for s in sets}
-        cap = max(1, min(int(max_cpt_per_contest), n))
+        cap = per_contest_cap_count(n, max_cpt_per_contest)
         breaches = [{"contest_id": cid, "player": p, "n": c, "cap": cap,
                      "pct": round(100.0 * c / n, 1)}
                     for p, c in sorted(cpts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -614,11 +615,16 @@ def captain_assignment_feasible(captain_counts: Mapping[str, int],
     counts = sorted((int(c) for c in captain_counts.values()), reverse=True)
     sizes = [int(s) for s in contest_sizes]
     m = max(1, int(max_cpt_per_contest))
-    total, capacity = sum(counts), sum(min(s, len(counts) * m) for s in sizes)
+    # The per-contest bar depends on the contest's own size (`n - 1` keeps a
+    # 2-entry contest from being filled by one captain), so capacity is summed
+    # against each contest's OWN bar, not against a flat m.
+    bars = [per_contest_cap_count(s, m) for s in sizes]
+    total = sum(counts)
+    capacity = sum(min(s, len(counts) * b) for s, b in zip(sizes, bars))
     failures: List[Dict[str, int]] = []
     for k in range(1, len(counts) + 1):
         lhs = sum(counts[:k])
-        rhs = sum(min(s, k * m) for s in sizes)
+        rhs = sum(min(s, k * b) for s, b in zip(sizes, bars))
         if lhs > rhs:
             failures.append({"k": k, "needed": lhs, "capacity": rhs,
                              "short_by": lhs - rhs})
@@ -645,6 +651,7 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                         implied_totals: Optional[Mapping[str, float]] = None,
                         max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
                         contest_of_entry: Optional[Sequence[str]] = None,
+                        max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
                         ) -> Dict[str, Any]:
     """Generate ``n_entries`` thesis specs, allocated across game states and with
     captains rotated so no captain exceeds the cap.
@@ -688,24 +695,95 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     theses: List[Dict[str, Any]] = []
     allocation: Dict[str, int] = {}
 
+    # R239(b)(i). The per-contest cap, applied at the moment the captain slot is
+    # apportioned rather than evaluated after the fact -- R153's finding with
+    # population substituted for enforcement point. `partition["size_of_entry"]`
+    # is aligned to the ladder order, so slot j knows its own contest.
+    partition = contest_partition(contest_of_entry, int(n_entries))
+    per_contest_cap = max(1, int(max_cpt_per_contest))
+    # The bar is per CONTEST, because it depends on that contest's own size:
+    # `n - 1` is what stops a 2-entry contest being allowed both its entries on
+    # one captain. See showdown.per_contest_cap_count.
+    cap_for_contest = {cid: per_contest_cap_count(size, per_contest_cap)
+                       for cid, size in (partition.get("sizes") or {}).items()}
+    contest_cpt_counts: Dict[str, Dict[str, int]] = {}
+    # Widening the captain pool is NOT a relaxation and is counted apart from
+    # one: the cap held, the ladder simply reached past a template's own
+    # shortlist to hold it. R239 is explicit that a per-contest bind is answered
+    # by building more distinct captains, never by refusing (a blank reserved row
+    # blocks certification) and never by relaxing in silence.
+    pool_widened: List[Dict[str, str]] = []
+    contest_cap_relaxed = 0
+    # Slate-wide fallback captains, best Base first, for when a template's own
+    # ladder is exhausted. Deterministic: Base descending, then key, so a tie
+    # never depends on frame order.
+    base_by_key = shape["_base"]
+    wide_ladder = [k for k, _ in sorted(base_by_key.items(),
+                                        key=lambda kv: (-float(kv[1]), str(kv[0])))]
+
+    def _under_caps(cand: str, cid: Optional[str]) -> bool:
+        if cap is not None and cpt_counts.get(cand, 0) >= cap:
+            return False
+        if cid is not None:
+            here = contest_cpt_counts.get(cid, {})
+            # The effective bound on one captain inside one contest is
+            # min(portfolio cap, per-contest cap); both are checked, so the min
+            # holds without being computed.
+            if here.get(cand, 0) >= cap_for_contest.get(cid, per_contest_cap):
+                return False
+        return True
+
     # Round-robin the templates so a truncated build still spans game states
     # rather than filling every entry from the first template in the list.
     order = _round_robin(counts)
-    for idx in order:
+    for slot, idx in enumerate(order):
         spec = specs[idx]
         built = spec["build"]()
         allocation[spec["id"]] = allocation.get(spec["id"], 0) + 1
+        cid = None
+        if partition["available"] and partition["contest_of_entry"] is not None:
+            if slot < len(partition["contest_of_entry"]):
+                cid = partition["contest_of_entry"][slot]
         cpt = None
-        for cand in built.get("cpt_ladder") or []:
-            if cap is None or cpt_counts.get(cand, 0) < cap:
+        own_ladder = list(built.get("cpt_ladder") or [])
+        for cand in own_ladder:
+            if _under_caps(cand, cid):
                 cpt = cand
                 break
+        if cpt is None and cid is not None:
+            # The template's own shortlist is exhausted under the caps. Widen
+            # before giving anything up: a captain outside this template's
+            # ladder is still a legal captain, and the thesis label moving is a
+            # far smaller cost than two entries in one contest sharing a slot.
+            for cand in wide_ladder:
+                if cand not in own_ladder and _under_caps(cand, cid):
+                    cpt = cand
+                    pool_widened.append({
+                        "template": str(spec["id"]),
+                        "contest_id": str(cid),
+                        "captain": str(cand),
+                        "reason": "template ladder exhausted under the per-contest cap",
+                    })
+                    break
         if cpt is None:                       # every eligible captain at cap
-            ladder = built.get("cpt_ladder") or []
+            ladder = own_ladder
             cpt = ladder[0] if ladder else None
-            cap_relaxed += 1
+            # Which cap actually bound decides which counter moves. A
+            # per-contest bind that survived the widening above is a different
+            # event from the portfolio cap running out of captains, and folding
+            # them into one number is how a reader loses the ability to tell a
+            # thin pool from a thin contest.
+            if cid is not None and cpt is not None and not _under_caps(cpt, None):
+                cap_relaxed += 1
+            elif cid is not None:
+                contest_cap_relaxed += 1
+            else:
+                cap_relaxed += 1
         if cpt is not None:
             cpt_counts[cpt] = cpt_counts.get(cpt, 0) + 1
+            if cid is not None:
+                bucket = contest_cpt_counts.setdefault(cid, {})
+                bucket[cpt] = bucket.get(cpt, 0) + 1
         # More entries than live templates means templates repeat. The rosters
         # still differ (the overlap bound guarantees it), but two rows sharing a
         # thesis name reads as a duplicate in the brief when it is not one, so
@@ -740,8 +818,27 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             "allocation": allocation,
             "captain_cap_count": cap,
             "captain_cap_relaxed": cap_relaxed,
-            # R239 seam. Carried, not consumed: no branch above reads it.
-            "contest_partition": contest_partition(contest_of_entry, int(n_entries)),
+            "contest_partition": partition,
+            # R239(b). The per-contest cap and what it cost to hold.
+            "max_cpt_per_contest": per_contest_cap,
+            # NOT a relaxation: the cap held and the ladder reached past a
+            # template's own shortlist to hold it, so the thesis built with a
+            # captain its label does not imply. Same treatment R153 gave
+            # `cap_reassignments`, and named for the same reason.
+            "captain_pool_widened": pool_widened,
+            # A per-contest bind that survived the widening. Distinct from
+            # `captain_cap_relaxed` (the PORTFOLIO cap running out) so a reader
+            # can tell a thin pool from a thin contest.
+            "captain_contest_cap_relaxed": contest_cap_relaxed,
+            # R239(b)(ii). The precondition, on the apportionment this function
+            # just produced. Reported rather than raised: the caller decides,
+            # and a blank reserved row is worse than a named infeasibility.
+            "captain_assignment_feasibility": captain_assignment_feasible(
+                cpt_counts, list((partition.get("sizes") or {}).values()),
+                max_cpt_per_contest=per_contest_cap)
+            if partition["available"] else {
+                "feasible": None,
+                "reason": "no contest partition; the precondition needs contest sizes"},
             "win_share_basis": shape["win_share_basis"]}
 
 
@@ -779,6 +876,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                  time_limit: int = 8,
                  diagnostics: Optional[Dict[str, Any]] = None,
                  contest_of_entry: Optional[Sequence[str]] = None,
+                 max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
                  ) -> List[Optional[Dict[str, Any]]]:
     """Solve each thesis under its own constraints, enforcing the overlap bound
     and the player-exposure cap against every lineup already built.
@@ -822,7 +920,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     prior: List[List[str]] = []
     out: List[Optional[Dict[str, Any]]] = []
     overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
-    player_relaxed = 0
+    player_relaxed = contest_cap_relaxed = 0
     player_counts: Dict[str, int] = {}
     cpt_counts: Dict[str, int] = {}
     player_cap = exposure_cap_count(max_player_exposure_pct, len(theses))
@@ -840,6 +938,18 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     # cannot show a lock substitution because it is not an exposure event.
     name_by_key = dict(zip(df["Player_Key"], df["Name"]))
     lock_relaxation_detail: List[Dict[str, str]] = []
+    # R239(b)(i). The per-contest cap enforced HERE, where the roster spot is
+    # actually spent. R153's second pass is the whole reason: `solve_ladder`
+    # trusted `build_thesis_ladder`'s apportionment and then substituted captains
+    # on its own relaxation rungs with no cap awareness, which is how a captain
+    # reached 26.3% under a 25% cap with every counter clean. A per-contest cap
+    # that lived only in the apportionment would repeat that exactly.
+    solve_partition = contest_partition(contest_of_entry, len(theses))
+    per_contest_cap = max(1, int(max_cpt_per_contest))
+    cap_for_contest = {cid: per_contest_cap_count(size, per_contest_cap)
+                       for cid, size in (solve_partition.get("sizes") or {}).items()}
+    contest_cpt_counts: Dict[str, Dict[str, int]] = {}
+    contest_cpt_excluded: List[Dict[str, str]] = []
 
     def _record_lock_relaxation(thesis: Mapping[str, Any], solved: Mapping[str, Any]) -> int:
         """Record a captain substitution and return 1, or 0 if none happened.
@@ -861,7 +971,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         })
         return 1
 
-    for thesis in theses:
+    for slot, thesis in enumerate(theses):
         work = df.copy()
         mult = thesis.get("mult") or {}
         if mult:
@@ -879,9 +989,23 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         over_set = set(over)
         cpt_full = {k for k, c in cpt_counts.items()
                     if cpt_cap is not None and c >= cpt_cap}
+        # R239(b)(i). This slot's own contest, and who is already at the
+        # per-contest cap inside it. The effective bound on one captain in one
+        # contest is min(portfolio cap count, per-contest cap count); both sets
+        # feed the same exclusion list, so the min holds without being computed
+        # and without either cap being able to override the other.
+        slot_cid = None
+        if solve_partition["available"] and solve_partition["contest_of_entry"]:
+            if slot < len(solve_partition["contest_of_entry"]):
+                slot_cid = solve_partition["contest_of_entry"][slot]
+        contest_full: set = set()
+        if slot_cid is not None:
+            here = contest_cpt_counts.get(slot_cid, {})
+            bar = cap_for_contest.get(slot_cid, per_contest_cap)
+            contest_full = {k for k, c in here.items() if c >= bar}
         # A player at the PLAYER cap cannot take a captain slot either, since the
         # captain is a roster spot. Union, not just the captain counts.
-        cpt_excludes = sorted(cpt_full | over_set) or None
+        cpt_excludes = sorted(cpt_full | over_set | contest_full) or None
 
         want_cpt = str(thesis["cpt"]) if thesis.get("cpt") else None
         cpt_lock = want_cpt
@@ -895,6 +1019,15 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             cpt_cap_reassigned.append({
                 "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
                 "count_at_cap": str(cpt_counts.get(want_cpt, 0))})
+        elif want_cpt and want_cpt in contest_full:
+            # R239(b). Same treatment, third cap. NOT a relaxation: the cap held
+            # and the thesis label moved, which is R153's own distinction.
+            cpt_lock = None
+            contest_cpt_excluded.append({
+                "thesis": tname, "player": name_by_key.get(want_cpt, want_cpt),
+                "contest_id": str(slot_cid),
+                "count_at_cap": str(contest_cpt_counts.get(slot_cid, {})
+                                    .get(want_cpt, 0))})
 
         want_locks = [str(k) for k in (thesis.get("locks") or []) if k]
         locks = [k for k in want_locks if k not in over_set]
@@ -960,7 +1093,18 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # and the alternative is a blank reserved row, which blocks certification.
         if lu is None and (over or cpt_lock or cpt_excludes
                            or max_shared_players is not None):
-            lu = build_showdown_lineup(work, forbidden_sets=prior or None,
+            # R239(b). The floor rung drops `cpt_excludes` wholesale, which is
+            # verbatim the shape R153 caught ("R153 bound both Showdown caps 'on
+            # every rung' and the floor rung still drops one"). The PER-CONTEST
+            # cap is kept here while the portfolio caps come off, because
+            # duplicating a captain inside one contest is the specific harm this
+            # rung would otherwise cause, and it is cheaper to spend a portfolio
+            # cap than a contest's only differentiator. With no partition
+            # `contest_full` is empty and this passes None, so the rung is
+            # byte-identical to what it was.
+            lu = build_showdown_lineup(work,
+                                       cpt_excludes=sorted(contest_full) or None,
+                                       forbidden_sets=prior or None,
                                        excludes=without_cap, **kw)
             if lu is not None:
                 if over:
@@ -971,6 +1115,21 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                 cpt_relaxed += substituted
                 if max_shared_players is not None:
                     both_relaxed += substituted
+        # R239(b). The TRUE floor, reachable only when a per-contest cap is
+        # actually binding. A blank reserved row blocks certification, so the
+        # per-contest cap gives way last rather than never -- and it is counted,
+        # because a portfolio is clean when the relaxation counts are zero, not
+        # when the gates passed.
+        if lu is None and contest_full:
+            lu = build_showdown_lineup(work, forbidden_sets=prior or None,
+                                       excludes=without_cap, **kw)
+            if lu is not None:
+                contest_cap_relaxed += 1
+                if over:
+                    player_relaxed += 1
+                if max_shared_players is not None:
+                    overlap_relaxed += 1
+                cpt_relaxed += _record_lock_relaxation(thesis, lu) if cpt_lock else 0
         if lu is None:
             infeasible += 1
         else:
@@ -980,6 +1139,13 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             got_cpt = (lu.get("captain") or {}).get("player_key")
             if got_cpt:
                 cpt_counts[got_cpt] = cpt_counts.get(got_cpt, 0) + 1
+                # R239(b). Against the REALIZED captain, not the requested one.
+                # R153's finding was that the ladder's apportionment is not what
+                # the solver spends, so the per-contest counter reads what came
+                # back from the solve, the same as `cpt_counts` above.
+                if slot_cid is not None:
+                    bucket = contest_cpt_counts.setdefault(slot_cid, {})
+                    bucket[got_cpt] = bucket.get(got_cpt, 0) + 1
             # R54(c). A thesis lock the melt never carried used to no-op in
             # silence, and cpt_counts then accounted against captains that were
             # never enforced.
@@ -1018,12 +1184,20 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "cpt_cap_count": cpt_cap,
             "cpt_cap_reassigned": list(cpt_cap_reassigned),
             "captain_exposure_realized": dict(cpt_counts),
-            # R239 seam. Carried, not consumed: no rung above reads it, and the
-            # solved bank is byte-identical with and without it. The per-contest
-            # cap that WILL read it has to bind inside the loop above, at the
-            # moment cpt_excludes is assembled -- R153's finding with population
-            # substituted for enforcement point.
-            "contest_partition": contest_partition(contest_of_entry, len(theses)),
+            "contest_partition": solve_partition,
+            # R239(b). The fourth control, on the same footing as the other
+            # three so "clean" can mean all four held.
+            "max_cpt_per_contest": per_contest_cap,
+            # NOT a relaxation: a captain at the per-contest cap taken off this
+            # thesis's own captain slot so the cap could hold.
+            "contest_cpt_reassigned": list(contest_cpt_excluded),
+            # A relaxation, and the last one available: the true floor gave the
+            # per-contest cap up rather than leave a blank reserved row.
+            "contest_cap_relaxed": contest_cap_relaxed,
+            "captain_exposure_by_contest": {
+                cid: dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+                for cid, counts in sorted(contest_cpt_counts.items())
+            },
         })
     return out
 

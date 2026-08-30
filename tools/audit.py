@@ -489,7 +489,18 @@ EXPECTED_SUITE_COUNTS = {
     # is the evidence for the default being named rather than derived). Four on
     # qa_portfolio refusing a clean verdict without the block, and leaving
     # Classic alone.
-    "tests.test_showdown": 114,
+    # R239(b), 2026-08-29: 114 -> 133, the nineteen that pin the cap binding
+    # where the slot is spent. Five on the `n - 1` correction found while
+    # building it (a flat cap of 2 permits a 2-entry contest to put BOTH entries
+    # on one captain -- the measured 100% passing a cap written to stop it), one
+    # of which pins the checker's bar equal to the builder's at every size and is
+    # what caught the disagreement. Three on the solve side, driven through the
+    # relaxation ladder with a mocked solver because the fixture's overlap bound
+    # diversifies captains on its own: an end-to-end assertion cannot see the
+    # guard, and R153's failure lives on exactly the rung it protects. Eight
+    # entries, not two, because at n=2 the PORTFOLIO cap already excludes the
+    # captain and the per-contest set would look necessary while doing nothing.
+    "tests.test_showdown": 133,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -565,7 +576,13 @@ EXPECTED_SUITE_COUNTS = {
     # neither. Two end to end, one of them pinning that the advisory is computed
     # BEFORE the report dict, because built inline a strict failure lands in
     # rep.failures after `passed` has already read it as True.
-    "tests.test_upload_integrity": 270,
+    # R239(b), 2026-08-29: 270 -> 269. R266's pct-derived bar is retired for the
+    # named control it disagreed with at n=3, so the two units-rule tests and the
+    # pct-mirror test go with the code they covered (the mirror was unreachable
+    # once the bar changed, and a guarded copy nothing calls reads as protection
+    # and is not). Two tests replace three: the bar's own arithmetic, and the
+    # checker pinned equal to the builder at every size.
+    "tests.test_upload_integrity": 269,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from
