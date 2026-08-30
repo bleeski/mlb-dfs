@@ -156,6 +156,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence
@@ -1029,6 +1030,34 @@ PRE_EXPORT_GATE_NAMES = (
 OVERRIDABLE_GATES = ("lineup_gate_passed",)
 
 
+def caller_asserted_gates(supplied: Mapping[str, Any],
+                          gates: Mapping[str, Any]) -> List[str]:
+    """Which gate values in the final set came from the caller rather than evidence.
+
+    F4 made this "only the gates a caller actually supplied"; the label had named
+    six gates nobody had asserted.
+
+    R176(b), 2026-08-30. It then filtered to ``PRE_EXPORT_GATE_NAMES``, the six
+    DERIVED names, while ``run_slate`` merges ``{**gate_defaults, **supplied}`` and
+    ``gate_defaults`` also carries ``projection_schema_gate_passed`` and
+    ``optimizer_gate_passed``. A caller supplying either had it win the merge
+    silently and never appear in ``caller_asserted_gates`` -- an unchecked
+    assertion with no recorded escape hatch. Same class as a fabricated evidence
+    string, with the falsehood in what the artifact OMITS.
+
+    Derived from the merge RESULT, not from a list of names. A fourth hand-kept
+    tuple is how R167 and R159 both went wrong, and the two that already exist
+    disagree: ``dk_entries_manager.PRE_EXPORT_GATES`` holds nine, including
+    ``selection_certified``, a certification this pipeline derives and no caller
+    may assert. ``set(gates)`` is definitionally every name an assertion can
+    reach, and it cannot drift from the merge it reads.
+
+    Extracted from ``run_slate`` for the same reason ``resolve_gate_assertions``
+    was: a test over a copy of the logic pins the copy.
+    """
+    return sorted(set(supplied or {}) & set(gates or {}))
+
+
 def resolve_gate_assertions(
     gate_defaults: Mapping[str, Any],
     supplied: Mapping[str, Any],
@@ -1124,6 +1153,44 @@ def _applied(block: Any) -> Optional[bool]:
     return None
 
 
+def validate_salary_export(salary_csv: Any) -> Dict[str, Any]:
+    """Structural check of the DKSalaries CSV itself. R176(a), 2026-08-30.
+
+    ``salary_gate_passed`` used to read ``validate_projection_schema(projections)``
+    -- the same value as ``projection_schema_gate_passed``, one check wearing two
+    gate names -- while its evidence string said "salary CSV schema validation".
+    Nothing had validated the salary CSV. On the ``projections_override`` path the
+    salary file was never even opened by this leg, and the gate still said it had
+    been checked.
+
+    The check is deliberately structural and generous: the export parses, and it
+    carries at least one player row with an id and a positive salary. Anything the
+    engine can already build a pool from passes. A stricter bar would be inventing
+    a new refusal on the certified path under cover of fixing a label, and the
+    DKSalaries CSV is authoritative by contract -- this says whether it READ, not
+    whether its contents are right.
+    """
+    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+
+    try:
+        rows = list(parse_dk_salary_csv(str(salary_csv)))
+    except Exception as exc:  # noqa: BLE001 - any parse failure is the finding
+        return {"passed": False, "rows": 0, "usable": 0,
+                "summary": f"DKSalaries export at {salary_csv} did not parse ({exc})"}
+    usable = sum(
+        1 for sp in rows
+        if str(getattr(sp, "player_id", "") or "").strip()
+        and float(getattr(sp, "salary", 0) or 0) > 0
+    )
+    if not usable:
+        return {"passed": False, "rows": len(rows), "usable": 0,
+                "summary": f"DKSalaries export parsed {len(rows)} row(s) and none "
+                           f"carries both a player id and a positive salary"}
+    return {"passed": True, "rows": len(rows), "usable": usable,
+            "summary": f"DKSalaries export parsed; {usable} of {len(rows)} row(s) "
+                       f"carry a player id and a positive salary"}
+
+
 def _derive_workflow_gates(
     *,
     schema: Mapping[str, Any],
@@ -1134,6 +1201,7 @@ def _derive_workflow_gates(
     projection_enrichment: Mapping[str, Any],
     pool_report: Optional[Mapping[str, Any]] = None,
     order_by_team: Optional[Mapping[str, int]] = None,
+    salary_schema: Optional[Mapping[str, Any]] = None,
 ) -> Tuple[Dict[str, Optional[bool]], Dict[str, str]]:
     """Derive the six pre-export gates from evidence already on hand.
 
@@ -1158,20 +1226,39 @@ def _derive_workflow_gates(
     gates: Dict[str, Optional[bool]] = {}
     why: Dict[str, str] = {}
 
-    gates["salary_gate_passed"] = bool(schema.get("passed"))
-    why["salary_gate_passed"] = f"salary CSV schema validation: {schema.get('summary')}"
+    # R176(a), 2026-08-30. This read `bool(schema.get("passed"))` -- the PROJECTION
+    # schema, the identical value `projection_schema_gate_passed` carries two lines
+    # below -- under an evidence string that said "salary CSV schema validation".
+    # One check wearing two gate names, and the second name describing work nobody
+    # had done: on the `projections_override` path this leg never opened the salary
+    # file at all. The gate is now derived from the salary export itself, and says
+    # None when no such check was supplied rather than borrowing another gate's
+    # verdict.
+    if salary_schema is None:
+        gates["salary_gate_passed"] = None
+        why["salary_gate_passed"] = (
+            "no salary export check was supplied; nothing states that the "
+            "DKSalaries CSV behind this build was read")
+    else:
+        gates["salary_gate_passed"] = bool(salary_schema.get("passed"))
+        why["salary_gate_passed"] = str(salary_schema.get("summary") or "")
 
     reserved = list(entry_requirements or [])
-    grid_ok = bool(reserved) and all(
-        str(r.get("contest_id") or "").strip() for r in reserved
-    )
+    # R176(a), second half. The old second conjunct was `all(contest_id for row)`,
+    # and it cannot fail: `parse_dk_entry_rows` skips any row whose contest id is
+    # not all digits, so a row without one never reaches here. Verified at this
+    # head at dk_entries_manager.py:303-305 rather than taken from the item. A
+    # conjunct that cannot fail is not a check, and evidence saying "every row
+    # carrying a contest id" claims one happened. Rather than invent a check, the
+    # evidence now states the fact and where it comes from.
+    grid_ok = bool(reserved)
     gates["entry_grid_gate_passed"] = grid_ok
     why["entry_grid_gate_passed"] = (
         f"{len(reserved)} reserved entries parsed across "
-        f"{len(posture_by_contest)} contests, every row carrying a contest id"
+        f"{len(posture_by_contest)} contests; the parser admits only all-digit "
+        f"contest ids, so every row here carries one by construction"
         if grid_ok else
-        f"{len(reserved)} reserved entries parsed; the grid is empty or a row "
-        f"carries no contest id"
+        "no reserved entries parsed; the entry grid is empty"
     )
 
     report = dict(pool_report or {})
@@ -4329,6 +4416,10 @@ def run_slate(
         projection_enrichment=projection_enrichment,
         pool_report=(source_metadata or {}).get("pool_report"),
         order_by_team=batting_orders_by_team(projections),
+        # R176(a): the salary gate reads the salary file now. Computed here rather
+        # than inside the gate function so the projections_override path -- which
+        # never otherwise opens it -- checks the same bytes as every other path.
+        salary_schema=validate_salary_export(salary_csv),
     )
     gate_defaults = {
         **derived_gates,
@@ -4357,9 +4448,7 @@ def run_slate(
     # no and was overruled", which is the whole point of the labels rule.
     gates, assumed, overridden_gates, gates_assumption_refused = resolve_gate_assertions(
         gate_defaults, supplied, assume_gates, derived_gates, gate_evidence)
-    # Only the gates a caller actually supplied are caller-asserted. The label
-    # used to name six gates nobody had asserted.
-    caller_asserted = sorted(set(supplied) & set(PRE_EXPORT_GATE_NAMES))
+    caller_asserted = caller_asserted_gates(supplied, gates)
 
     base_payload = {
         "checkpoint_plan": checkpoint,
@@ -4603,8 +4692,16 @@ def run_slate(
             from mlb_engine.entries.upload_manifest import repo_relative, sha256_file
             result["delivered_path_repo"] = repo_relative(result["delivered_path"])
             result["delivered_sha256"] = sha256_file(result["delivered_path"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            # R176(d). `pass` dropped the one fact the multi-session contract says
+            # every brief must state: "Every brief states the delivered file's
+            # sha256, and Ben checks it at upload before entering anything." A
+            # missing sha that nothing explains is indistinguishable from a brief
+            # that simply did not carry the field.
+            result["delivered_sha256_error"] = f"{type(exc).__name__}: {exc}"
+            print(f"DELIVERED SHA NOT COMPUTED  {type(exc).__name__}: {exc}; the "
+                  f"brief cannot state the sha256 Ben checks at upload",
+                  file=sys.stderr)
     return result
 
 
@@ -4657,9 +4754,19 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         if outcome["error"]:
             print(f"MANIFEST NOT RECORDED  {outcome['error']}")
         return str(outcome["path"])
-    except Exception:  # noqa: BLE001 - a mirror must never fail a certified build
+    except Exception as exc:  # noqa: BLE001 - a mirror must never fail a certified build
+        # R176(d), 2026-08-30. This swallowed the reason. `delivered_path` came
+        # back None, the brief carried no delivery and no explanation, and the
+        # multi-session contract requires every brief to state the delivered
+        # file's sha256 -- which cannot be stated about a delivery nobody can see
+        # failed. The build still must not fail on a mirror, so the exception is
+        # still caught; it is now NAMED on the record and said out loud once.
         if isinstance(result, dict):
             result.setdefault("manifest_recorded", False)
+            result["mirror_error"] = f"{type(exc).__name__}: {exc}"
+        print(f"MIRROR FAILED  {type(exc).__name__}: {exc}; the export stays in "
+              f"runs/<run_id>/final/ and nothing was delivered to outputs/",
+              file=sys.stderr)
         return None
 
 

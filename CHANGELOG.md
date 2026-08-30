@@ -25,6 +25,133 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R176: four records stop asserting what nothing checked, and a zero exit stops meaning "recorded"
+
+**(a) The salary gate reads the salary file.** It read
+`bool(schema.get("passed"))` -- `validate_projection_schema(projections)`, the
+identical value `projection_schema_gate_passed` carries two lines below -- under
+an evidence string reading "salary CSV schema validation: ...". One check wearing
+two gate names, and the second name describing work nobody had done. On the
+`projections_override` path this leg never opened the salary file at all and the
+gate still said it had been checked. New `validate_salary_export` parses the
+DKSalaries CSV and reports whether it read and how many rows carry a player id
+and a positive salary; `run_slate` computes it and passes it in, so the override
+path checks the same bytes as every other path. Absent, the gate is None, and
+None blocks.
+
+The check is deliberately structural and generous: anything the engine can
+already build a pool from passes. A stricter bar would be a new refusal on the
+certified path smuggled in under a label fix, and the DKSalaries CSV is
+authoritative by contract. It says the file READ, not that its contents are right.
+
+**(a), second half: the entry-grid conjunct.** `all(contest_id for row)` cannot
+fail. `parse_dk_entry_rows` skips any row whose contest id is not all digits
+(`dk_entries_manager.py:303-305`, read at this head rather than taken from the
+item), so a row without one never reaches the gate. The conjunct is dropped and
+the evidence states the fact and where it comes from, rather than claiming a
+check happened. No check was invented to replace it.
+
+**(b) An assertion a caller can make is an assertion on the record.**
+`caller_asserted` filtered `supplied` against `PRE_EXPORT_GATE_NAMES`, the six
+DERIVED names, while the merge is `{**gate_defaults, **supplied}` and
+`gate_defaults` also carries `projection_schema_gate_passed` and
+`optimizer_gate_passed`. A caller supplying either won the merge silently and
+never appeared in `caller_asserted_gates`.
+
+This is not hypothetical. `tools/late_swap.py:97` sets exactly those two as
+literals in its `WORKFLOW_GATES`, with a comment saying it names them "so the
+list is reviewable in one place", and `:752-753` adds `salary_gate_passed` and
+`entry_grid_gate_passed`. Two of that tool's four assertions reached the artifact
+and two did not, so every late-swap record has been carrying half its own
+assertions. Extracted as `caller_asserted_gates(supplied, gates)` and derived
+from the merge RESULT rather than from a list of names, for the reason
+`resolve_gate_assertions` was extracted in R133(4): a test over a copy of the
+logic pins the copy. A fourth hand-kept tuple is how R167 and R159 both went
+wrong, and the two that exist already disagree -- `PRE_EXPORT_GATE_NAMES` holds
+six, `dk_entries_manager.PRE_EXPORT_GATES` holds nine, the ninth being
+`selection_certified`, which no caller may assert.
+
+**(c) The forced-swap key is deleted.** `late_swap_certification` returned
+`forced_swap_validation_passed: True` on both modes, unconditionally, for a
+validation that exists nowhere in the tree. Deleted rather than renamed: there is
+nothing to name. It was harmless only because nothing read it, which is a fact
+about today's callers and not about the record. `MLB_Classic.md` updated, since
+it documented the key.
+
+**(d) The delivery-evidence path stops failing silently.**
+`mirror_to_outputs`'s outer `except Exception: return None` swallowed the reason,
+so the brief carried no delivery and no explanation; it now records
+`mirror_error` and says one line on stderr, and still never fails the build. The
+`delivered_sha256` `except: pass` dropped the one fact the multi-session contract
+requires every brief to state -- "Every brief states the delivered file's sha256,
+and Ben checks it at upload" -- and now records `delivered_sha256_error`.
+
+**Rider (2026-08-27, ed8 F-34): a zero exit has to mean recorded.**
+`preflight_upload` computed its exit code BEFORE `stamp_manifest_status`, and
+every way that stamp could fail was soft: an unreadable manifest and an unmatched
+row both returned in silence, and the write's `OSError` only warned. So
+`upload_ready` could exit 0 without being bound to the delivery, and the manifest
+row is what the next session, the late swap, and this tool's own re-run all read.
+The stamp now REPORTS what it did, a new `committed_manifest_status` re-reads the
+row from disk, and for any verdict that would exit zero a mismatch is a hard
+failure that downgrades the verdict. Read back rather than trust the write:
+trusting the writer is the thing this batch is about.
+
+**R233 enumeration — three classes, and the item named four sites.**
+
+    grep -rn 'why\["' mlb_engine tools --include=*.py                         -> 10
+    grep -rnE '"[a-z_]+(passed|certified|valid)"\s*:\s*True' mlb_engine tools -> 8 (post-fix)
+    silent except -> pass|return None in execution_pipeline / upload_manifest -> 5 remaining
+
+CLASS 1, evidence strings: 10, all in `_derive_workflow_gates`. TWO were false
+and both are fixed here (salary, entry-grid). The other eight are derived:
+`lineup_gate_passed` x3 (R173 made two of them name their own upstream state
+earlier today), `pitcher_audit_gate_passed` x2 off the declared-arms dict,
+`weather_gate_passed` and `odds_gate_passed` off `_enrichment_note`.
+
+CLASS 2, literal-True gate and certification keys: 8 remaining lines, none a
+defect, and each checked rather than assumed. Four are `late_swap.py`'s own
+caller assertions, deliberately named there and now fully recorded by (b).
+`contest_allocator.py:3146-3147` and `execution_pipeline.py:568` sit AFTER a
+guard that establishes them -- 568 is unreachable unless
+`certification["workflow_valid"]` is true, because line 536 returns on the
+negation. `contest_allocator.py:2295-2296` certifies a no-entries early return,
+which is vacuous rather than false; it is the one of the eight worth a second
+look and it needs allocator coverage, so it is named here and not touched.
+
+CLASS 3, silent excepts: 2 fixed (both above). The five remaining in these two
+files are numeric coercions and a diagnostic that must not block a run
+(`execution_pipeline.py:244`, `1675`, `1691`, `1779`, `2099`), none of them on the
+delivery-evidence path.
+
+**A second test pinned a defect, and this one pinned the exact string R176 filed
+as false.** `test_unevidenced_gates_block_and_are_named` asserted
+`assertIn("salary CSV schema validation", evidence["salary_gate_passed"])` -- the
+fabricated string, with a green test over it, on a `projections_override` build,
+which is the precise path the item says never opens the salary file. Updated to
+assert what actually ran, plus `assertNotIn` on the old string. That is two of
+this batch's four items whose defect was protected by a passing test.
+
+**And one neighbouring test's precondition moved underneath it.**
+`GateAssumptionVersusOverrideTests._merge` supplied no salary check, so
+`salary_gate_passed` used to derive True for free off the projection schema. It
+now derives None, which silently converted
+`test_another_gate_against_a_false_derivation_is_refused_not_silent` from a test
+about REFUSALS into one about assumptions -- it needs a derived-TRUE
+non-overridable gate for its case to exist at all. The helper now supplies a
+salary check: precondition restored, assertion untouched.
+
+**Mutations.** Thirteen. Twelve killed on the first pass; M27 SURVIVED, and it
+was neither a wrong test nor a wrong guard but an unreachable combination --
+reporting a superseded row's status as the mapped verdict only matters on the
+read-back, and a superseded file hard-fails preflight before the exit code can be
+zero. Pinned at the function instead of the tool, where the claim actually lives,
+and killed there.
+
+**Gate.** 1473 -> 1489. `PASS  v2.26.0  27 modules  1489 tests`.
+
+---
+
 ## 2026-08-30 — R173: a truthy pool report stops standing in for a checkable one
 
 **What moved.** `_derive_workflow_gates` guarded its pool-report branch with `if

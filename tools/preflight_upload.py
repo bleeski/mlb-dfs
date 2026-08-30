@@ -1042,9 +1042,29 @@ def status_for_verdict(verdict: str) -> str:
     }.get(str(verdict), "candidate")
 
 
+def committed_manifest_status(manifest_path: Path, entries_sha256: str,
+                              entries_name: str = "") -> Optional[str]:
+    """Re-read the manifest from disk and return the status now on this file's row.
+
+    R176 rider, 2026-08-30. The only way to know a stamp PERSISTED is to read it
+    back: ``stamp_manifest_status`` can return early on an unreadable manifest or
+    an unmatched row, and its write failure was a warning. None means "no row for
+    these bytes", which is a different answer from a row carrying a status.
+    """
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    records = payload if isinstance(payload, list) else payload.get("deliveries", [])
+    target = match_manifest_record(records, str(entries_sha256), str(entries_name))
+    if target is None:
+        return None
+    return str(target.get("status") or "")
+
+
 def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
                           status: str, failures: Sequence[str], rep: Report,
-                          entries_name: str = "") -> None:
+                          entries_name: str = "") -> Dict[str, Any]:
     """Write the preflight verdict onto the matching manifest record.
 
     R3(c). "Upload-ready", "blocked" and "acknowledged" lived only in the
@@ -1071,12 +1091,14 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
     """
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return
+    except (OSError, ValueError) as exc:
+        return {"stamped": False, "status": None,
+                "reason": f"manifest at {manifest_path} is unreadable ({exc})"}
     records = payload if isinstance(payload, list) else payload.get("deliveries", [])
     target = match_manifest_record(records, str(entries_sha256), str(entries_name))
     if target is None:
-        return
+        return {"stamped": False, "status": None,
+                "reason": f"no manifest record in {manifest_path} matches these bytes"}
     record_status = status_for_verdict(status)
     if str(target.get("status") or "") == "superseded":
         # R129. A supersession is a fact about this record's relationship to a
@@ -1115,9 +1137,18 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
         # verdict here is what made the divergence invisible.
         rep.info["manifest_status_stamped"] = record_status
         rep.info["manifest_verdict_recorded"] = status
+        # The status the ROW now carries, which on a superseded row is
+        # 'superseded' and not `record_status` -- that branch deliberately holds
+        # the status and records the verdict beside it. Returning `record_status`
+        # here would make the caller's read-back comparison fail on the one case
+        # the code is getting right.
+        return {"stamped": True, "status": str(target.get("status") or ""),
+                "reason": ""}
     except OSError as exc:
         rep.warn(f"manifest status not stamped ({exc}); the verdict is this "
                  f"output only")
+        return {"stamped": False, "status": None,
+                "reason": f"the manifest write failed ({exc})"}
 
 
 def resolve_feed_for_slate(entries: Sequence[EntryRow],
@@ -2028,9 +2059,35 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     report["verdict"] = verdict
     manifest_file = report["info"].get("manifest_file")
     if manifest_file:
-        stamp_manifest_status(Path(manifest_file), report["info"]["entries_sha256"],
-                              verdict, report["failures"], rep,
-                              entries_name=Path(args.entries).name)
+        stamp = stamp_manifest_status(
+            Path(manifest_file), report["info"]["entries_sha256"],
+            verdict, report["failures"], rep,
+            entries_name=Path(args.entries).name)
+        # R176 rider (ed8 F-34), 2026-08-30. `code` is computed above, BEFORE this
+        # write, and every way the stamp could fail was a warning: an unreadable
+        # manifest and an unmatched row both returned in silence, and the write's
+        # OSError only warned. So a shipping verdict could return 0 while never
+        # being durably bound to the delivery -- and the manifest row is what the
+        # next session, a late swap and this tool's own re-run all read. For a
+        # verdict that exits zero, failed persistence is a hard failure.
+        #
+        # Read back rather than trust the write: that is the only evidence the
+        # bytes landed, and this batch is about not asserting what nobody checked.
+        if code == 0:
+            committed = committed_manifest_status(
+                Path(manifest_file), report["info"]["entries_sha256"],
+                entries_name=Path(args.entries).name)
+            if not stamp["stamped"] or committed != stamp["status"]:
+                rep.fail(
+                    f"verdict {verdict!r} was not durably recorded on the manifest "
+                    f"({stamp['reason'] or 'the row on disk reads ' + repr(committed)}"
+                    f"); a verdict that exits zero has to be bound to the delivery, "
+                    f"because the row is what the next session and the late swap "
+                    f"read. Fix the manifest and re-run rather than uploading on "
+                    f"this output alone")
+                verdict = "acknowledged" if args.force else "blocked"
+                report["verdict"] = verdict
+                code = verdict_exit_code(report["failures"], args.force)
 
     if args.json:
         print(json.dumps(report, indent=1, default=str))

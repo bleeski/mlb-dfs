@@ -372,9 +372,15 @@ def validate_late_swap_delta(source_path: str | Path, candidate_path: str | Path
 def late_swap_certification(mode: str, optimization_result: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     if mode not in LATE_SWAP_MODES:
         raise ValueError(f"mode must be one of {sorted(LATE_SWAP_MODES)}")
+    # R176(c), 2026-08-30. Both branches used to return
+    # `forced_swap_validation_passed: True`, written unconditionally, for a
+    # validation that does not exist anywhere in this tree. A certification key
+    # whose value is a literal is not evidence, and it is worse than an absent key
+    # because a later reader can treat it as one. It was harmless only because
+    # nothing read it, which is a property of today's callers rather than of the
+    # record. Deleted rather than renamed: there is no validation to name.
     if mode == "validate_only":
         return {
-            "forced_swap_validation_passed": True,
             "late_swap_optimization_performed": False,
             "selection_certified": False,
             "allocation_certified": False,
@@ -382,7 +388,6 @@ def late_swap_certification(mode: str, optimization_result: Optional[Mapping[str
     result = dict(optimization_result or {})
     passed = bool(result.get("passed")) and bool(result.get("selection_certified")) and bool(result.get("allocation_certified"))
     return {
-        "forced_swap_validation_passed": True,
         "late_swap_optimization_performed": True,
         "selection_certified": passed,
         "allocation_certified": passed,

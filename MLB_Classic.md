@@ -438,6 +438,10 @@ It must report:
 - `selection_certified=False`
 - `allocation_certified=False`
 
+It no longer reports `forced_swap_validation_passed` (R176(c), 2026-08-30). That
+key was written as a literal `True` on both modes for a validation that does not
+exist in the tree, so it stated nothing and could be mistaken for evidence.
+
 Manual comparison or catcher-only pivot review cannot inherit certification.
 
 ## 12. Canonical execution commands

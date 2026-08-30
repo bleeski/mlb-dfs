@@ -1837,7 +1837,16 @@ class RunSlateFrontDoorTests(unittest.TestCase):
                 self.assertIn(gate, errors)
             # and every gate says why it reads the way it does
             evidence = built["workflow_gate_evidence"]
-            self.assertIn("salary CSV schema validation", evidence["salary_gate_passed"])
+            # R176(a), 2026-08-30: this asserted "salary CSV schema validation",
+            # which is the string the item filed as FALSE -- the gate read the
+            # projection schema and no salary validation ran. The pinning test is
+            # why it survived: a fabricated evidence string with a green test over
+            # it. This is a `projections_override` build, the exact path where the
+            # salary file used to go unopened, and the evidence now names what was
+            # actually read.
+            self.assertIn("DKSalaries export parsed", evidence["salary_gate_passed"])
+            self.assertNotIn("salary CSV schema validation",
+                             evidence["salary_gate_passed"])
             self.assertIn("no map supplied", evidence["odds_gate_passed"])
 
     def test_blocks_on_bad_schema(self):

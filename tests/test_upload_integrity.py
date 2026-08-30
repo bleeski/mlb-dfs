@@ -675,6 +675,130 @@ class PreflightManifestBindingTests(unittest.TestCase):
         self.assertEqual(record["preflight"]["verdict"], "upload_ready")
         self.assertEqual(record["preflight"]["failures"], [])
 
+    # ---- R176 rider (ed8 F-34): a zero exit has to be durably recorded ----
+
+    def _preflight_in_process(self, *extra):
+        """The real main(), in-process, so the stamp can be made to fail.
+
+        The subprocess helper cannot reach into the tool, and chmod is not honoured
+        on this mount, so there is no way to break the write from outside. Patching
+        one function and running the REAL main() exercises the wiring that was
+        wrong; reimplementing the decision here would pin a copy of it.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_preflight_under_test", REPO / "tools" / "preflight_upload.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module, list(extra)
+
+    def test_a_verdict_that_cannot_be_recorded_does_not_exit_zero(self):
+        from unittest import mock
+
+        self._write_manifest()
+        module, _ = self._preflight_in_process()
+        argv = ["--entries", str(self.entries), "--salary", str(self.salary)]
+        self.assertEqual(module.main(list(argv)), 0,
+                         "control: this file is clean and its row matches")
+        with mock.patch.object(module, "stamp_manifest_status",
+                               return_value={"stamped": False, "status": None,
+                                             "reason": "the manifest write failed"}):
+            code = module.main(list(argv))
+        self.assertEqual(code, 2,
+                         "the exit code was computed BEFORE the stamp and every "
+                         "way the stamp could fail was a warning, so a shipping "
+                         "verdict could return 0 without being bound to the "
+                         "delivery the next session reads")
+
+    def test_the_unrecordable_verdict_is_acknowledgeable_like_any_failure(self):
+        from unittest import mock
+
+        self._write_manifest()
+        module, _ = self._preflight_in_process()
+        argv = ["--entries", str(self.entries), "--salary", str(self.salary),
+                "--force"]
+        with mock.patch.object(module, "stamp_manifest_status",
+                               return_value={"stamped": False, "status": None,
+                                             "reason": "the manifest write failed"}):
+            code = module.main(list(argv))
+        self.assertEqual(code, 4, "--force acknowledges; it never returns 0")
+
+    def test_a_stamp_that_claims_success_is_still_read_back(self):
+        """The half a 'did the stamp report failure' check cannot cover. A writer
+        that returns success without the bytes landing is exactly the state this
+        batch says not to take on trust, so the row is re-read and compared."""
+        from unittest import mock
+
+        self._write_manifest()
+        module, _ = self._preflight_in_process()
+        argv = ["--entries", str(self.entries), "--salary", str(self.salary)]
+        with mock.patch.object(module, "stamp_manifest_status",
+                               return_value={"stamped": True,
+                                             "status": "upload_ready",
+                                             "reason": ""}):
+            code = module.main(list(argv))
+        self.assertEqual(code, 2,
+                         "the stamp claimed upload_ready; the row on disk still "
+                         "reads 'candidate', and only reading it back says so")
+
+    def test_committed_manifest_status_reads_the_row_back_from_disk(self):
+        import hashlib
+
+        self._write_manifest()
+        module, _ = self._preflight_in_process()
+        manifest = self.outputs / "upload_manifest.json"
+        digest = hashlib.sha256(self.entries.read_bytes()).hexdigest()
+        self.assertEqual(
+            module.committed_manifest_status(manifest, digest,
+                                             entries_name=self.entries.name),
+            "candidate", "the status actually on disk before any stamp")
+        self.assertIsNone(
+            module.committed_manifest_status(manifest, "0" * 64),
+            "no row for these bytes is a different answer from a row's status")
+        self.assertIsNone(
+            module.committed_manifest_status(self.outputs / "absent.json", digest))
+
+    def test_the_stamp_reports_what_it_did_rather_than_returning_nothing(self):
+        import hashlib
+
+        self._write_manifest()
+        module, _ = self._preflight_in_process()
+        manifest = self.outputs / "upload_manifest.json"
+        digest = hashlib.sha256(self.entries.read_bytes()).hexdigest()
+        rep = module.Report()
+        landed = module.stamp_manifest_status(manifest, digest, "upload_ready", [],
+                                              rep, entries_name=self.entries.name)
+        self.assertTrue(landed["stamped"])
+        self.assertEqual(landed["status"], "upload_ready")
+        unmatched = module.stamp_manifest_status(manifest, "0" * 64, "upload_ready",
+                                                 [], rep)
+        self.assertFalse(unmatched["stamped"])
+        self.assertIn("no manifest record", unmatched["reason"])
+
+    def test_the_stamp_reports_the_status_on_the_row_not_the_verdict_it_mapped(self):
+        """A superseded row deliberately HOLDS 'superseded' and records the verdict
+        beside it (R129). Reporting the mapped verdict here would make the caller's
+        read-back comparison disagree with a disk it agrees with, and turn the one
+        case this code gets right into a spurious failure. Pinned at the function,
+        because main() never reaches the combination: a superseded file hard-fails
+        earlier, so the exit code is not zero and the read-back does not run."""
+        import hashlib
+
+        self._write_manifest(status="superseded",
+                             superseded_by="outputs/_test_r3/later.csv")
+        module, _ = self._preflight_in_process()
+        manifest = self.outputs / "upload_manifest.json"
+        digest = hashlib.sha256(self.entries.read_bytes()).hexdigest()
+        rep = module.Report()
+        held = module.stamp_manifest_status(manifest, digest, "upload_ready", [],
+                                            rep, entries_name=self.entries.name)
+        self.assertTrue(held["stamped"])
+        self.assertEqual(held["status"], "superseded")
+        self.assertEqual(
+            module.committed_manifest_status(manifest, digest,
+                                             entries_name=self.entries.name),
+            held["status"], "what the stamp reports and what the row says agree")
+
     def test_a_forced_run_records_acknowledged_with_the_failures(self):
         write_entries(self.entries, CLASSIC_HEADER, [blank_classic_entry("900", "5")])
         self._write_manifest()
@@ -976,6 +1100,173 @@ class LineupGateEvidenceTests(unittest.TestCase):
             pool_report={"teams": {"AAA": {"hitters": 9}}}, order_by_team={})
         self.assertTrue(teams_only["lineup_gate_passed"])
         self.assertIn("pool report", why_t["lineup_gate_passed"])
+
+
+class GateEvidenceHonestyTests(unittest.TestCase):
+    """R176. Four records that asserted what nothing had checked.
+
+    (a) `salary_gate_passed` read the PROJECTION schema -- the identical value
+    `projection_schema_gate_passed` carries -- under an evidence string saying
+    "salary CSV schema validation", and on the projections_override path the
+    salary file was never opened by that leg at all. (b) two gates a caller can
+    assert had no recorded escape hatch. (c) a constant-True certification key for
+    a validation that does not exist in the tree. (d) two silent excepts on the
+    delivery-evidence path.
+    """
+
+    def _gates(self, **over):
+        from mlb_engine.pipeline import execution_pipeline as epi
+        kwargs = dict(
+            schema={"passed": True, "summary": "projection schema ok"},
+            entry_requirements=[{"entry_id": "1", "contest_id": "5"}],
+            posture_by_contest={"5": {"posture": "large_gpp"}},
+            projected_order={}, pitcher_roles=None, projection_enrichment={},
+            pool_report={"blockers": [], "teams": {"AAA": {"hitters": 9}}},
+            order_by_team={"AAA": 9},
+        )
+        kwargs.update(over)
+        return epi._derive_workflow_gates(**kwargs)
+
+    # ---- (a) the salary gate reads the salary file ------------------------
+
+    def test_validate_salary_export_reads_the_salary_file(self):
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        with tempfile.TemporaryDirectory() as tmp:
+            good = Path(tmp) / "DKSalaries.csv"
+            write_classic_salary(good)
+            check = epi.validate_salary_export(good)
+            self.assertTrue(check["passed"])
+            self.assertGreater(check["usable"], 0)
+            self.assertIn("DKSalaries export parsed", check["summary"])
+
+            missing = epi.validate_salary_export(Path(tmp) / "nope.csv")
+            self.assertFalse(missing["passed"])
+            self.assertIn("did not parse", missing["summary"])
+
+    def test_the_salary_gate_no_longer_moves_with_the_projection_schema(self):
+        """The defect in one assertion: the two gates were the same value. A
+        salary export that reads while the projection schema fails, and the
+        reverse, must now give opposite answers."""
+        salary_ok = {"passed": True, "summary": "DKSalaries export parsed; 9 of 9"}
+        salary_bad = {"passed": False, "summary": "DKSalaries export did not parse"}
+        gates, why = self._gates(schema={"passed": False, "summary": "bad frame"},
+                                 salary_schema=salary_ok)
+        self.assertTrue(gates["salary_gate_passed"])
+        gates, _ = self._gates(schema={"passed": True, "summary": "ok"},
+                               salary_schema=salary_bad)
+        self.assertFalse(gates["salary_gate_passed"])
+        self.assertNotIn("salary CSV schema validation", why["salary_gate_passed"],
+                         "the old evidence named a check that never ran")
+
+    def test_no_salary_check_supplied_is_None_and_None_blocks(self):
+        gates, why = self._gates()
+        self.assertIsNone(gates["salary_gate_passed"],
+                          "borrowing another gate's verdict is what this closed; "
+                          "absent evidence is None and None blocks")
+        self.assertIn("nothing states that the DKSalaries CSV",
+                      why["salary_gate_passed"])
+
+    def test_the_entry_grid_evidence_stops_claiming_a_check_that_cannot_fail(self):
+        """`all(contest_id for row)` cannot fail: parse_dk_entry_rows skips any row
+        whose contest id is not all digits (dk_entries_manager.py:303-305, read at
+        this head). A conjunct that cannot fail is not a check, and the evidence
+        said one had happened."""
+        _, why = self._gates()
+        self.assertNotIn("every row carrying a contest id", why["entry_grid_gate_passed"])
+        self.assertIn("by construction", why["entry_grid_gate_passed"])
+        gates, why_empty = self._gates(entry_requirements=[])
+        self.assertFalse(gates["entry_grid_gate_passed"])
+        self.assertIn("empty", why_empty["entry_grid_gate_passed"])
+
+    # ---- (b) an assertion a caller can make is an assertion on the record --
+
+    def test_caller_asserted_covers_every_gate_an_assertion_can_reach(self):
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        gates = {"lineup_gate_passed": True, "salary_gate_passed": True,
+                 "projection_schema_gate_passed": True, "optimizer_gate_passed": True}
+        supplied = {"projection_schema_gate_passed": True,
+                    "optimizer_gate_passed": True}
+        self.assertEqual(
+            epi.caller_asserted_gates(supplied, gates),
+            ["optimizer_gate_passed", "projection_schema_gate_passed"],
+            "both win the merge, so both are assertions and both go on the record")
+        self.assertEqual(epi.caller_asserted_gates({}, gates), [])
+        self.assertEqual(
+            epi.caller_asserted_gates({"not_a_gate": True}, gates), [],
+            "a key that reaches no gate is not an assertion about one")
+
+    def test_the_asserted_set_is_derived_from_the_merge_not_a_fourth_list(self):
+        """The two name lists that already exist disagree: PRE_EXPORT_GATE_NAMES
+        holds six and dk_entries_manager.PRE_EXPORT_GATES holds nine, the ninth
+        being selection_certified, which no caller may assert. Reading the merge
+        result is what makes a third disagreement impossible."""
+        from mlb_engine.entries.dk_entries_manager import PRE_EXPORT_GATES
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        self.assertNotEqual(set(epi.PRE_EXPORT_GATE_NAMES), set(PRE_EXPORT_GATES),
+                            "if these ever agree, this test's premise is stale")
+        every_gate = {name: True for name in PRE_EXPORT_GATES}
+        self.assertEqual(
+            epi.caller_asserted_gates({"selection_certified": True}, every_gate),
+            ["selection_certified"],
+            "whatever reaches the merge is recorded; the guard against asserting "
+            "a certification lives in FORBIDDEN_CALLER_ASSERTIONS, not here")
+
+    # ---- (c) a constant-True certification key is not evidence -------------
+
+    def test_the_forced_swap_certification_key_is_gone_from_both_modes(self):
+        from mlb_engine.swap.late_swap_manager import late_swap_certification
+
+        for mode, opt in (("validate_only", None),
+                          ("reoptimize", {"passed": True,
+                                          "selection_certified": True,
+                                          "allocation_certified": True})):
+            cert = late_swap_certification(mode, opt)
+            self.assertNotIn("forced_swap_validation_passed", cert,
+                             f"{mode}: a key written as a literal True for a "
+                             f"validation that exists nowhere in the tree states "
+                             f"nothing and can be mistaken for evidence")
+        self.assertFalse(
+            late_swap_certification("validate_only")["selection_certified"],
+            "the keys that DO carry a derived fact are untouched")
+
+    def test_the_reoptimize_certification_still_derives_from_the_solve(self):
+        """Deleting the constant key must not touch the ones that carry a derived
+        fact: a failed optimization still certifies neither half."""
+        from mlb_engine.swap.late_swap_manager import late_swap_certification
+
+        failed = late_swap_certification("reoptimize", {"passed": False,
+                                                        "selection_certified": True,
+                                                        "allocation_certified": True})
+        self.assertFalse(failed["selection_certified"])
+        self.assertFalse(failed["allocation_certified"])
+        self.assertTrue(failed["late_swap_optimization_performed"])
+
+    # ---- (d) the delivery-evidence path stops failing silently -------------
+
+    def test_a_failed_mirror_names_its_reason_on_the_record(self):
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        with tempfile.TemporaryDirectory() as tmp:
+            export = Path(tmp) / "DKEntries.csv"
+            export.write_text("Entry ID\n1\n", encoding="utf-8")
+            result = {"output_path": str(export), "passed": True}
+            returned = epi.mirror_to_outputs(result, Path(tmp) / "no_such_salary.csv")
+        self.assertIsNone(returned, "a mirror still never fails a certified build")
+        self.assertIn("mirror_error", result,
+                      "`except Exception: return None` dropped the reason, and the "
+                      "brief then carried no delivery and no explanation")
+        self.assertFalse(result["manifest_recorded"])
+
+    def test_a_successful_mirror_records_no_error(self):
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        result = {"output_path": "", "passed": True}
+        self.assertIsNone(epi.mirror_to_outputs(result, "irrelevant.csv"))
+        self.assertNotIn("mirror_error", result,
+                         "nothing was attempted, so nothing failed")
 
 
 class PreflightFeedDefaultTests(unittest.TestCase):
@@ -4253,7 +4544,19 @@ class GateAssumptionVersusOverrideTests(unittest.TestCase):
             projected_order={"requested": 0}, pitcher_roles=None,
             projection_enrichment={},
             pool_report=self.BLOCKED_POOL if pool_report is None else pool_report,
-            order_by_team=None)
+            order_by_team=None,
+            # R176(a), 2026-08-30. This helper supplied no salary check, and
+            # before that change `salary_gate_passed` derived from the PROJECTION
+            # schema two arguments up, so it read True for free. It now reads None
+            # without one, which would quietly turn
+            # test_another_gate_against_a_false_derivation_is_refused_not_silent
+            # into a test about assumptions rather than refusals -- its subject is
+            # a request against a gate that is neither None nor overridable, and
+            # that gate has to be derived-True for the case to exist. The
+            # precondition is restored rather than the assertion relaxed.
+            salary_schema={"passed": True,
+                           "summary": "DKSalaries export parsed; 9 of 9 row(s) "
+                                      "carry a player id and a positive salary"})
         defaults = {**derived, "projection_schema_gate_passed": True,
                     "optimizer_gate_passed": True}
         gates, assumed, over, refused = epi.resolve_gate_assertions(

@@ -618,7 +618,17 @@ EXPECTED_SUITE_COUNTS = {
     # the fall-through names it as supplied-but-uncheckable rather than absent (in
     # both the frame branch and the None branch), a genuinely absent report still
     # says absent, and either checkable key alone is enough to use the report.
-    "tests.test_upload_integrity": 281,
+    # R176, 2026-08-30: 281 -> 297. Ten in a new GateEvidenceHonestyTests -- the
+    # salary gate derived from the salary export and no longer moving with the
+    # projection schema, None without one, the entry-grid evidence dropping a
+    # claim about a conjunct that cannot fail, caller_asserted covering every gate
+    # an assertion reaches, the constant-True forced-swap key gone from both swap
+    # modes with the derived keys untouched, and a failed mirror naming its reason.
+    # Six on the preflight rider: a verdict that cannot be durably recorded no
+    # longer exits zero (and is acknowledgeable at 4), a stamp that CLAIMS success
+    # is still read back, the read-back's own contract, the stamp's new return, and
+    # a superseded row reporting the status it holds rather than the verdict.
+    "tests.test_upload_integrity": 297,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

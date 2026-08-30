@@ -4770,25 +4770,24 @@ its keys ARE the content. R177/F16 stays open as the same family. Gate 1469 -> 1
   fold verify_export into preflight as a `--parent` mode — it already imports
   20 preflight symbols.
 
-### R176. Gate-evidence honesty batch: a vacuous salary gate with a false evidence string, two assertable-but-unrecorded gates, a constant-True certification key, and two silent excepts on the delivery-evidence path (P2, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro (a) at ac8ac05, evidence string re-confirmed at ec832cf (`execution_pipeline.py:1153`). **Rider 2026-08-27 (ed8 F-34), same class one boundary later:** `preflight_upload.py` computes the successful exit code BEFORE `stamp_manifest_status`, and stamp failures are warnings, so an `upload_ready` verdict can return 0 without being durably bound to the delivery; for a shipping verdict, failed persistence is a hard failure — re-read the committed status and compare the subject hash before returning zero.
+### R176. CLOSED 2026-08-30 -- all four parts and the 2026-08-27 rider; entry migrated to CHANGELOG.md
 
-- **What:** (a) `salary_gate_passed` is `validate_projection_schema(projections)`
-  twice-labeled: identical to `projection_schema_gate_passed`, constant-True
-  at certification, evidence claims "salary CSV schema validation" that never
-  ran — and on the `projections_override` path the salary file is never
-  schema-checked while the gate says it was. The entry-grid gate's second
-  conjunct is vacuous the same way. (b) `projection_schema_gate_passed` and
-  `optimizer_gate_passed` are caller-overridable via `workflow_gates` but
-  `caller_asserted` filters to the six F4 names — an unchecked assertion with
-  no recorded escape hatch. (c) `forced_swap_validation_passed: True` is
-  written unconditionally for a validation that does not exist anywhere in
-  the tree. (d) `mirror_to_outputs`'s outer `except Exception: return None`
-  and the delivered-sha `except: pass` silently drop the delivery and the sha
-  the multi-session contract requires every brief to state.
-- **Fix:** derive the salary gate from the salary file or delete it; truthful
-  entry-grid evidence; compute `caller_asserted` against the full pre-export
-  set; delete or rename the forced-swap key; house-pattern `mirror_error`
-  plus one stderr line.
+(a) the salary gate reads the salary file via a new `validate_salary_export`, and
+the entry-grid evidence drops a claim about a conjunct that cannot fail (verified
+at `dk_entries_manager.py:303-305`, not assumed). (b) `caller_asserted_gates` is
+extracted and derived from the merge RESULT, not a fourth list of names; the live
+consequence is `tools/late_swap.py`, which has been recording two of its own four
+assertions. (c) the forced-swap key is deleted, `MLB_Classic.md` with it. (d)
+`mirror_error` and `delivered_sha256_error` replace two silent excepts. Rider: the
+preflight re-reads the committed row and a verdict that would exit zero without
+being durably recorded is now a hard failure.
+
+Citation was stale (`1153`; the gate sat at 1154 pre-change). A test pinned the
+exact false string the item filed, and a neighbouring test's precondition moved
+underneath the fix. R233: three classes, 23 sites, 4 fixed, 1 named for a later
+look (`contest_allocator.py:2295-2296`), the rest kept with reasons. Thirteen
+mutations, one survivor that was an unreachable combination, killed at the
+function. Gate 1473 -> 1489.
 
 ### R177. Empty `confirmed_hitter_ids` and None are conflated fail-open — the F16 class on a sibling check (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read (`dk_entries_manager.py` unchanged since the review)
 
