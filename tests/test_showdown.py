@@ -2092,5 +2092,182 @@ class R239PerContestCapBindsTests(unittest.TestCase):
             self.assertEqual(ladder["max_cpt_per_contest"], m)
 
 
+class ShowdownSolverStatusTests(unittest.TestCase):
+    """R158. A compute limit is not a strategy fact.
+
+    Every solve here is a deterministic review proxy; none of it is a win rate,
+    an ROI, or a probability claim. The defect these pin: ``build_showdown_lineup``
+    discarded every non-success result, so a status-1 time limit holding a
+    perfectly feasible incumbent was thrown away and the ladder then relaxed its
+    controls -- recording a clock expiry as a control giving way.
+    """
+
+    @staticmethod
+    def _wrap_milp(mutate):
+        """Run the real solver, then present its result as scipy presents a
+        time-limited one. ``mutate`` gets the real ``x`` and returns the ``x``
+        the fake result should carry, so a test can hand back either the genuine
+        incumbent or a corrupted one."""
+        import scipy.optimize as so
+        real_milp = so.milp
+
+        class _Res:
+            pass
+
+        def fake(*args, **kwargs):
+            real = real_milp(*args, **kwargs)
+            out = _Res()
+            out.x = mutate(real.x)
+            out.success = False          # what scipy reports under a time limit
+            out.status = 1               # SCIPY_MILP_STATUS -> 'time_limit'
+            out.message = "time limit reached"
+            out.mip_gap = 0.02
+            return out
+
+        return so, fake
+
+    def test_a_verified_time_limited_incumbent_is_accepted_and_tagged(self):
+        """The whole of R158's first half: the incumbent is kept, not discarded."""
+        so, fake = self._wrap_milp(lambda x: x)
+        status: dict = {}
+        with unittest.mock.patch.object(so, "milp", fake):
+            lu = sd.build_showdown_lineup(_synth(), status_out=status)
+        self.assertIsNotNone(lu, "a feasible incumbent under the clock was discarded")
+        self.assertEqual(lu["optimality"], "time_limited")
+        self.assertEqual(status["status"], "time_limit")
+        self.assertTrue(status["timed_out"])
+        self.assertFalse(status["incumbent_rejected"])
+        self.assertEqual(status["optimality"], "time_limited")
+        # Still a legal lineup: acceptance is verification, not trust.
+        self.assertTrue(sd.certify_showdown(dict(lu), _synth())["passed"])
+
+    def test_an_incumbent_that_violates_the_matrix_is_rejected(self):
+        """Accepting a time-limited incumbent UNVERIFIED would be worse than
+        discarding it.
+
+        The mutation has to be one ONLY the constraint check can catch, and
+        getting that wrong is how this test first passed against a mutant with the
+        verification removed. A second captain is caught downstream by the
+        roster-shape check (``len(cpt_i) != 1``), so it proves nothing about the
+        matrix. Role exclusivity does: the captain is ALSO placed at UTIL and one
+        real UTIL is dropped, which leaves the shape at exactly 1 CPT and 5 UTIL
+        and violates only the ``cpt_i + util_i <= 1`` row.
+
+        The discriminator is the recorded status. The matrix check leaves it
+        ``time_limit``; the roster-shape check overwrites it with
+        ``roster_size_mismatch``. Asserting on that is what makes this test
+        reach the guard it names.
+        """
+        def role_overlap(x):
+            bad = x.copy()
+            half = len(bad) // 2
+            cpt_sel = [i for i in range(half) if bad[i] > 0.5]
+            util_sel = [i for i in range(half) if bad[half + i] > 0.5]
+            captain = cpt_sel[0]
+            bad[half + captain] = 1.0        # captain now also at UTIL
+            bad[half + util_sel[0]] = 0.0    # keep the count at five
+            return bad
+
+        so, fake = self._wrap_milp(role_overlap)
+        status: dict = {}
+        with unittest.mock.patch.object(so, "milp", fake):
+            lu = sd.build_showdown_lineup(_synth(), status_out=status)
+        self.assertIsNone(lu, "an infeasible incumbent must not be rostered")
+        self.assertTrue(status["incumbent_rejected"])
+        self.assertTrue(status["timed_out"])
+        self.assertIsNone(status["optimality"])
+        self.assertEqual(status["status"], "time_limit",
+                         "rejected by the roster-shape check, not the constraint "
+                         "matrix: this test is not reaching the verification")
+
+    def test_a_timeout_does_not_climb_the_relaxation_ladder(self):
+        """CLAUDE.md: 'A timeout is recorded in solver_report, never climbs the
+        overlap ladder.' One rung per slot, and every relaxation counter clean."""
+        df = _synth()
+        theses = [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                   "cpt": None, "locks": [], "excludes": [], "mult": {}}
+                  for i in range(3)]
+        calls = []
+
+        def spy(df=None, status_out=None, **kw):
+            calls.append(kw)
+            if status_out is not None:
+                status_out.update({"timed_out": True, "incumbent_rejected": False,
+                                   "message": "time limit reached",
+                                   "optimality": None})
+            return None
+
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            st.solve_ladder(df, theses, max_shared_players=4, time_limit=4,
+                            diagnostics=diag)
+        self.assertEqual(len(calls), 3,
+                         "the ladder descended on a clock expiry: one rung per "
+                         "slot is the whole point of the latch")
+        self.assertEqual(diag["solver_timeouts"], 3)
+        self.assertEqual(diag["infeasible"], 0,
+                         "a timeout is not evidence the pool has no lineup")
+        for counter in ("overlap_relaxed", "player_relaxed", "captain_lock_relaxed",
+                        "both_relaxed", "contest_cap_relaxed"):
+            self.assertEqual(diag[counter], 0,
+                             f"{counter} moved on a compute limit")
+        self.assertEqual(len(diag["solver_timeout_detail"]), 3)
+
+    def test_a_genuine_infeasibility_still_descends_and_counts_as_infeasible(self):
+        """The contrast that proves the guard is what stops the descent, not the
+        None. Same spy, same theses, timeout flag OFF."""
+        df = _synth()
+        theses = [{"template": "t0", "name": "t0", "why": "",
+                   "cpt": None, "locks": [], "excludes": [], "mult": {}}]
+        calls = []
+
+        def spy(df=None, status_out=None, **kw):
+            calls.append(kw)
+            return None
+
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            st.solve_ladder(df, theses, max_shared_players=4, time_limit=4,
+                            diagnostics=diag)
+        self.assertGreater(len(calls), 1,
+                           "an infeasible rung must still relax and retry")
+        self.assertEqual(diag["infeasible"], 1)
+        self.assertEqual(diag["solver_timeouts"], 0)
+
+    def test_the_bank_ladder_gets_the_same_guard(self):
+        """R158's second consumer. `build_showdown_bank` runs its own ladder and
+        failed the same way."""
+        calls = []
+
+        def spy(df=None, status_out=None, **kw):
+            calls.append(kw)
+            if status_out is not None:
+                status_out.update({"timed_out": True, "incumbent_rejected": False})
+            return None
+
+        diag: dict = {}
+        with unittest.mock.patch.object(sd, "build_showdown_lineup", spy):
+            bank = sd.build_showdown_bank(_synth(), n=4, diagnostics=diag)
+        self.assertEqual(bank, [])
+        self.assertEqual(len(calls), 1, "the bank ladder descended on a timeout")
+        self.assertEqual(diag["solver_timeouts"], 1)
+        for counter in ("relaxed_slots", "overlap_relaxed_slots",
+                        "both_relaxed_slots", "player_relaxed_slots"):
+            self.assertEqual(diag[counter], 0,
+                             f"{counter} moved on a compute limit")
+
+    def test_an_ordinary_solve_is_tagged_optimal_and_reports_no_timeout(self):
+        """The default path keeps its old behaviour: nothing about a clean solve
+        changes, which is what makes the new fields safe to read."""
+        status: dict = {}
+        lu = sd.build_showdown_lineup(_synth(), status_out=status)
+        self.assertIsNotNone(lu)
+        self.assertEqual(lu["optimality"], "optimal")
+        self.assertEqual(status["status"], "optimal")
+        self.assertFalse(status["timed_out"])
+        self.assertFalse(status["incumbent_rejected"])
+        self.assertIsNotNone(status["elapsed_s"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

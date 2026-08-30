@@ -21,6 +21,7 @@ import csv
 import math
 import os
 import re
+import time as _time
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -299,6 +300,46 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
 # --------------------------------------------------------------------------- #
 # MILP: 1 CPT + 5 UTIL, role exclusivity, both teams, salary cap
 # --------------------------------------------------------------------------- #
+def _new_showdown_solver_status() -> Dict[str, Any]:
+    """A fresh, fully-populated Showdown solver record. Never partially filled.
+
+    R158. The field names mirror Classic's ``_new_solver_status`` deliberately, so
+    one vocabulary describes a solve in both formats and a reader of a Showdown
+    brief is not learning a second set of words for the same facts.
+    """
+    return {
+        "backend": "scipy_milp",
+        "status": "not_run",
+        "scipy_status": None,
+        "message": "",
+        "timed_out": False,
+        "proven_infeasible": False,
+        "optimality": None,
+        "mip_gap": None,
+        "time_limit_s": None,
+        "elapsed_s": None,
+        "incumbent_rejected": False,
+    }
+
+
+def _record_showdown_status(status_out: Optional[Dict[str, Any]],
+                            **fields: Any) -> Dict[str, Any]:
+    """Fill ``status_out`` in place and return it.
+
+    R158. Classic's ``_record_solver_status`` is deliberately NOT reused, and this
+    is the one place the two formats keep separate machinery on purpose: that
+    function mirrors every solve into Classic's ``LAST_SOLVER_*`` module globals,
+    so calling it from here would let a Showdown solve overwrite the record of
+    Classic's last solve. The status VOCABULARY is shared (``SCIPY_MILP_STATUS``
+    is imported, not copied); only the mutating recorder is separate.
+    """
+    record = status_out if status_out is not None else _new_showdown_solver_status()
+    for key in _new_showdown_solver_status():
+        record.setdefault(key, None)
+    record.update(fields)
+    return record
+
+
 def build_showdown_lineup(
     df: pd.DataFrame,
     contract: RosterContract = SHOWDOWN,
@@ -309,6 +350,7 @@ def build_showdown_lineup(
     forbidden_sets: Optional[Sequence[Sequence[str]]] = None,
     max_shared_players: Optional[int] = None,
     time_limit: int = 20,
+    status_out: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Solve one legal Showdown lineup maximizing projected points (CPT at 1.5x).
     Returns None if infeasible. Deterministic scipy.milp; a review proxy.
@@ -320,9 +362,32 @@ def build_showdown_lineup(
     lineup", which is what stops a portfolio of near-duplicates that differ only
     by a punt bat. Overlap counts the PLAYER, not the role: moving someone from
     UTIL to CPT is not a differentiated lineup, and pretending otherwise is how
-    a portfolio looks diverse in a report and is not diverse on the board."""
+    a portfolio looks diverse in a report and is not diverse on the board.
+
+    R158. ``status_out`` is an optional dict this fills in place with WHY a solve
+    ended, because ``None`` alone cannot tell a caller whether the pool is
+    infeasible or the clock ran out, and those two facts demand opposite
+    responses. Before this, every non-success result was discarded -- so a
+    ``status-1`` time limit holding a perfectly feasible incumbent in ``res.x``
+    was thrown away and the ladder stepped its relaxation rungs, recording a
+    compute limit as a strategy change and re-paying the full time limit on each
+    relaxed rung. CLAUDE.md's rule is the governing sentence: an infrastructure
+    limit may reduce search effort, it may never reduce the legal player set.
+
+    A time-limited incumbent is therefore verified rather than trusted: every
+    variable here is binary, so the incumbent is checked for integrality and then
+    its rounded form is checked against the same constraint matrix the solver was
+    given. Accepted, it is tagged ``optimality='time_limited'``; rejected, that is
+    recorded as ``incumbent_rejected``. The record says "time limit at gap X" or
+    "proven infeasible", never both."""
     from scipy.optimize import Bounds, LinearConstraint, milp
     from scipy.sparse import coo_matrix
+
+    # R158. The status VOCABULARY is shared with Classic rather than copied, so
+    # there is one mapping from a scipy status code to a word in this repo. Lazy,
+    # matching the existing `assert_fraction_cap` import below: it keeps
+    # `import showdown` from pulling in the Classic solver at module load.
+    from mlb_engine.optimize.optimizer_v3 import SCIPY_MILP_STATUS
 
     excl = {str(x) for x in (excludes or [])}
     work = df[~df["Player_Key"].isin(excl)].reset_index(drop=True) if excl else df.reset_index(drop=True)
@@ -415,20 +480,68 @@ def build_showdown_lineup(
             if val:
                 ri.append(rnum); ci.append(col); dv.append(float(val))
     matrix = coo_matrix((dv, (ri, ci)), shape=(len(rows), n_vars)).tocsr()
+    lb_array = np.array(lbs)
+    ub_array = np.array(ubs)
+    solve_started = _time.monotonic()
     res = milp(
         c=c, integrality=np.ones(n_vars, dtype=int),
         bounds=Bounds(np.zeros(n_vars), np.ones(n_vars)),
-        constraints=LinearConstraint(matrix, np.array(lbs), np.array(ubs)),
+        constraints=LinearConstraint(matrix, lb_array, ub_array),
         options={"time_limit": time_limit, "disp": False},
     )
-    if not res.success or res.x is None:
+    elapsed = _time.monotonic() - solve_started
+    scipy_status = getattr(res, "status", None)
+    status_name = SCIPY_MILP_STATUS.get(scipy_status, "other")
+    timed_out = status_name == "time_limit"
+    base_fields = dict(
+        status=status_name, scipy_status=scipy_status,
+        message=str(getattr(res, "message", scipy_status)),
+        timed_out=timed_out, proven_infeasible=(status_name == "infeasible"),
+        mip_gap=getattr(res, "mip_gap", None),
+        time_limit_s=time_limit, elapsed_s=round(elapsed, 4),
+    )
+    if res.x is None:
+        _record_showdown_status(status_out, **base_fields)
         return None
-    cpt_i = [i for i in range(n) if res.x[cpt(i)] > 0.5]
-    util_i = [i for i in range(n) if res.x[util(i)] > 0.5]
+
+    # R158. A time-limited solve reports success=False even when res.x holds a
+    # feasible incumbent, and discarding it is what made a clock look like an
+    # infeasible pool. Accepting it unverified would be worse. Every variable in
+    # this model is binary, so the check is the whole vector: integral to
+    # tolerance, then the rounded form satisfied against the same matrix the
+    # solver was handed.
+    x = np.asarray(res.x, dtype=float)
+    rounded = np.round(x)
+    integral = bool(np.max(np.abs(x - rounded)) <= 1e-5) if x.size else False
+    feasible = False
+    if integral:
+        lhs = matrix @ rounded
+        feasible = bool(np.all(lhs >= lb_array - 1e-6)
+                        and np.all(lhs <= ub_array + 1e-6))
+    if not (res.success or (timed_out and integral and feasible)):
+        _record_showdown_status(
+            status_out,
+            incumbent_rejected=bool(timed_out and not (integral and feasible)),
+            **base_fields,
+        )
+        return None
+    cpt_i = [i for i in range(n) if rounded[cpt(i)] > 0.5]
+    util_i = [i for i in range(n) if rounded[util(i)] > 0.5]
     if len(cpt_i) != 1 or len(util_i) != n_util:
+        _record_showdown_status(
+            status_out, incumbent_rejected=True,
+            **{**base_fields, "status": "roster_size_mismatch"},
+        )
         return None
-    return _assemble_lineup(work, cpt_i[0], util_i, cpt_mult, contract,
-                            ignored_locks=ignored_locks)
+    optimality = "time_limited" if timed_out else "optimal"
+    _record_showdown_status(status_out, optimality=optimality, **base_fields)
+    lineup = _assemble_lineup(work, cpt_i[0], util_i, cpt_mult, contract,
+                              ignored_locks=ignored_locks)
+    # R158. The tag rides the lineup as well as the status record, because the
+    # lineup is what survives into the brief and a reader asking "was this solved
+    # to optimality" should not have to have kept the status dict.
+    lineup["optimality"] = optimality
+    return lineup
 
 
 def _assemble_lineup(work, cpt_i, util_i, cpt_mult, contract,
@@ -546,6 +659,29 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
     player_relaxed_slots = 0
     ignored_locks: List[str] = []
     caller_excludes = [str(x) for x in (kwargs.pop("excludes", None) or [])]
+    # R158. The bank ladder is the second consumer of the solver-status defect and
+    # it fails the same way: a slow solve walked every rung, re-paying the time
+    # limit, and each control it passed was recorded as relaxed. These counters sit
+    # beside the relaxation counters and are never summed into them.
+    solver_timeouts = 0
+    time_limited_accepted = 0
+
+    def _rung(latch: Dict[str, Any], **call_kw: Any) -> Optional[Dict[str, Any]]:
+        """One bank rung, latching a clock expiry as distinct from infeasibility.
+
+        R158. Same reasoning as ``solve_ladder``'s twin: relaxing a control cannot
+        make the clock longer, so a timed-out rung must stop the descent rather
+        than spend the remaining rungs and mislabel the result.
+        """
+        nonlocal time_limited_accepted
+        st_out: Dict[str, Any] = {}
+        got = build_showdown_lineup(status_out=st_out, **call_kw)
+        if got is None:
+            if st_out.get("timed_out"):
+                latch["timed_out"] = True
+        elif st_out.get("optimality") == "time_limited":
+            time_limited_accepted += 1
+        return got
 
     def _over_cap() -> List[str]:
         """Players who have already filled their allowed share of the bank."""
@@ -560,16 +696,18 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # that relaxes, so the two are kept separate rather than merged once.
         with_cap = (caller_excludes + [k for k in over if k not in caller_excludes]) or None
         without_cap = caller_excludes or None
-        lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                   cpt_excludes=cpt_excludes, excludes=with_cap,
-                                   max_shared_players=max_shared_players, **kwargs)
+        # R158. One latch per slot; every rung below is additionally guarded on it.
+        latch: Dict[str, Any] = {"timed_out": False}
+        lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                   cpt_excludes=cpt_excludes, excludes=with_cap,
+                   max_shared_players=max_shared_players, **kwargs)
         # Relax the overlap bound before the captain cap. Captain concentration
         # is the failure this module was built to prevent, so it is the last
         # control to give way.
-        if lu is None and max_shared_players is not None:
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       cpt_excludes=cpt_excludes, excludes=with_cap,
-                                       **kwargs)
+        if lu is None and not latch["timed_out"] and max_shared_players is not None:
+            lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                       cpt_excludes=cpt_excludes, excludes=with_cap,
+                       **kwargs)
             if lu is not None:
                 overlap_relaxed_slots += 1
         # R153. The player-exposure cap sits between the overlap bound and the
@@ -581,16 +719,17 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # relaxing the captain cap concentrates the single highest-leverage slot.
         # Captain last, unchanged, because captain concentration is the failure
         # this module was built to prevent.
-        if lu is None and over:
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       cpt_excludes=cpt_excludes, excludes=without_cap,
-                                       max_shared_players=max_shared_players, **kwargs)
+        if lu is None and not latch["timed_out"] and over:
+            lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                       cpt_excludes=cpt_excludes, excludes=without_cap,
+                       max_shared_players=max_shared_players, **kwargs)
             if lu is not None:
                 player_relaxed_slots += 1
-        if lu is None and over and max_shared_players is not None:
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       cpt_excludes=cpt_excludes, excludes=without_cap,
-                                       **kwargs)
+        if (lu is None and not latch["timed_out"] and over
+                and max_shared_players is not None):
+            lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                       cpt_excludes=cpt_excludes, excludes=without_cap,
+                       **kwargs)
             if lu is not None:
                 player_relaxed_slots += 1
                 overlap_relaxed_slots += 1
@@ -601,10 +740,10 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # captain at 100%, diagnostics {'relaxed_slots': 2,
         # 'overlap_relaxed_slots': 0}. The bound is passed through now, so this
         # rung relaxes exactly the one control it names.
-        if lu is None and cpt_excludes:
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       excludes=with_cap,
-                                       max_shared_players=max_shared_players, **kwargs)
+        if lu is None and not latch["timed_out"] and cpt_excludes:
+            lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                       excludes=with_cap,
+                       max_shared_players=max_shared_players, **kwargs)
             if lu is not None:
                 relaxed_slots += 1
         # R54(a). The fourth rung, which did not exist. It is counted in every
@@ -612,9 +751,10 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # WITHOUT this control", not "which rung fired", because the first
         # question is the one the brief's clean/relaxed claim rests on. A clean
         # portfolio is all three at zero.
-        if lu is None and cpt_excludes and max_shared_players is not None:
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       excludes=with_cap, **kwargs)
+        if (lu is None and not latch["timed_out"] and cpt_excludes
+                and max_shared_players is not None):
+            lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                       excludes=with_cap, **kwargs)
             if lu is not None:
                 both_relaxed_slots += 1
                 overlap_relaxed_slots += 1
@@ -623,9 +763,10 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # honoured. A slot that needs this is a slot where no control held, and it
         # is counted in all four places rather than under one new name, because the
         # counters answer "how many lineups were built WITHOUT this control".
-        if lu is None and (over or cpt_excludes or max_shared_players is not None):
-            lu = build_showdown_lineup(df, contract=contract, forbidden_sets=forbidden,
-                                       excludes=without_cap, **kwargs)
+        if lu is None and not latch["timed_out"] and (
+                over or cpt_excludes or max_shared_players is not None):
+            lu = _rung(latch, df=df, contract=contract, forbidden_sets=forbidden,
+                       excludes=without_cap, **kwargs)
             if lu is not None:
                 if over:
                     player_relaxed_slots += 1
@@ -636,6 +777,11 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
                 if cpt_excludes and max_shared_players is not None:
                     both_relaxed_slots += 1
         if lu is None:
+            # R158. A bank that stops here stops for one of two reasons, and the
+            # caller needs to know which: no lineup exists under these controls, or
+            # the clock ran out. Only the first is a fact about the pool.
+            if latch["timed_out"]:
+                solver_timeouts += 1
             break
         # R54(c). A lock the melt never carried used to no-op in silence.
         for key in (lu.get("ignored_locks") or []):
@@ -665,6 +811,12 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         diagnostics["player_relaxed_slots"] = player_relaxed_slots
         diagnostics["player_cap_structural_floor"] = player_cap_structural_floor(
             len(df), n_target, contract)
+        # R158. Compute facts, never summed into the relaxation counters above. A
+        # bank short with `solver_timeouts` nonzero and every relaxation at zero is
+        # reporting an infrastructure limit: raise the time limit, do not touch a
+        # control and do not reduce the pool.
+        diagnostics["solver_timeouts"] = solver_timeouts
+        diagnostics["time_limited_accepted"] = time_limited_accepted
     return bank
 
 

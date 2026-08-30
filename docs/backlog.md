@@ -2132,23 +2132,34 @@ the batch's named rider and did not get pulled.
   declared_starters` unable to coexist with `posted_hitters: 0`: that pair is
   the misleading half and it is a one-line assertion.
 
-### R158. A Showdown solver time-limit is read as infeasibility, and the ladder relaxes controls on a compute limit (P1, S) | new 2026-08-22, from the greenfield sixth edition (reviewed at ac8ac05, re-verified at ec832cf); VERIFIED-read
+### R273. The Classic joint allocator files a clock expiry as a constraint failure (P1, S) | new 2026-08-30, found by R158's R233 enumeration at `00f0995`; VERIFIED-read
 
-- **What:** `showdown.py:360` treats every non-success `milp` result as `None`
-  — `if not res.success or res.x is None: return None` — so a status-1
-  time-limit WITH a feasible incumbent in `res.x` is discarded, and the bank
-  ladder then steps the overlap and captain rungs: a compute limit recorded as
-  a strategy change, each relaxed rung re-paying the full time limit. No
-  `optimality` tag exists on this path.
-- **Why:** the exact F13 inversion Classic v3.20 removed, on a surface
-  CLAUDE.md's F13 rule covers; Classic's incumbent-verification pattern is
-  ready to port (optimizer_v3.py, verified present). Latent today (~60
-  binaries, ms solves), live the day a big Showdown MME accumulates a large
-  forbidden-set count — and the R153-landed exposure caps add rows.
-- **Fix:** port the Classic pattern — verify and accept the rounded incumbent
-  on status 1, else return a status so the ladder can BREAK on a timeout
-  instead of relaxing; count timeouts separately from relaxations. Batches
-  with R122/R123 (same surface, same session).
+- **What:** `contest_allocator.py:1276-1290`. The joint MILP reads
+  `if not result.success or result.x is None:` and, on any non-success, falls
+  back to `_assign_lineups_greedy_fallback` while setting
+  `direct_constraint_failure: True` and `selection_certified: False`. A status-1
+  time limit holding a feasible incumbent is therefore discarded AND recorded as
+  a CONSTRAINT failure. That is R158's inversion with a worse label: the fallback
+  is correct behaviour for an infeasible model and wrong for a slow one, and the
+  operator reading `direct_constraint_failure` is told the controls are
+  impossible when the clock simply ran out.
+- **Why it was left on 2026-08-30:** R158 fixed the Showdown twin the same day
+  and named this site rather than touching it. It sits on the CLASSIC certified
+  path behind the golden replay, and changing what `selection_certified` reports
+  is not a change that belongs in a Showdown stage with no Classic coverage
+  written for it.
+- **Fix:** the pattern is already in this same file at `:2745`, which verifies
+  its incumbent and emits a `solver_report` — port that, not `optimizer_v3`'s,
+  since it is the nearer neighbour. Then the fallback fires on a proven
+  infeasibility and a verified time-limited incumbent is accepted and tagged,
+  with the timeout counted separately from `direct_constraint_failure`.
+  Note `:2745` carries its own inline `{0: "optimal", 1: "time_limit", ...}`
+  dict, a second copy of `optimizer_v3.SCIPY_MILP_STATUS`; unify to the import
+  while here, which makes the vocabulary one definition across all four `milp`
+  call sites.
+- **Cost of leaving it:** a Classic build whose joint MILP times out ships
+  through the greedy fallback uncertified, with a diagnostic naming the wrong
+  cause. Nobody currently reads it as a timeout, so the misdiagnosis is silent.
 
 ### R223. R153's founding defect recurs on the ladder rung no test drives: the floor rung drops the captain cap and nothing counts it (P1, S) | new 2026-08-24, from the greenfield seventh edition (GF7-E3) and independently from the outside spec (D12); VERIFIED-read at `a49bd610` by both, re-read here
 

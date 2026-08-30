@@ -25,6 +25,103 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R158: a Showdown compute limit stops being read as a strategy fact
+
+**What moved.** `build_showdown_lineup` no longer discards every non-success
+`milp` result. It reads the scipy status, and on a time limit (`status 1`) it
+verifies the incumbent rather than throwing it away: every variable in the model
+is binary, so the incumbent is checked for integrality and its rounded form is
+checked against the same constraint matrix the solver was handed. Verified, it is
+accepted and tagged `optimality='time_limited'`; unverified, it is rejected and
+recorded as `incumbent_rejected`. A new optional `status_out` dict carries the
+reason out to the caller, which is the channel that did not exist before — `None`
+alone cannot say whether the pool is infeasible or the clock ran out, and those
+two facts demand opposite responses.
+
+**Why it mattered.** Both Showdown ladders relax controls when a rung returns
+`None`. With a timeout indistinguishable from an infeasibility, a single slow
+solve walked the entire ladder, re-paying the full time limit at every rung, and
+each control it passed on the way down was recorded as having been relaxed. That
+is a compute limit written into the brief as a strategy change, and it is the
+inversion CLAUDE.md's rule names directly: an infrastructure limit may reduce
+search effort, it may never reduce the legal player set. Latent today at roughly
+sixty binaries and millisecond solves; live the day a large Showdown field
+accumulates a big forbidden-set count, and the R153 exposure caps add rows.
+
+**The ladders now break instead of descending.** `solve_ladder` and
+`build_showdown_bank` each carry a per-slot latch, and every relaxation rung is
+additionally guarded on it. A timed-out slot is counted in `solver_timeouts` and
+never in `infeasible`, because `infeasible` is a claim about the CONSTRAINTS and
+attributing a clock expiry to it is the same inversion one level up. CLAUDE.md:
+the allocator says "time limit at gap X" or "proven infeasible", never both.
+`time_limited_accepted` counts the other outcome — a slot that DID produce a
+lineup from a verified incumbent under the clock, legal and delivered and simply
+not proven optimal. A brief showing every relaxation at zero and `solver_timeouts`
+nonzero is reporting an infrastructure limit: raise the time limit, do not touch
+a control and do not reduce the pool.
+
+**R233 enumeration, class 1: every site that calls `milp` and decides success.**
+`grep -rn "= milp(" --include=*.py mlb_engine/ tools/ skills/` — **four** sites,
+not the two this item implied:
+
+1. `optimizer_v3.py:1027` — already correct; this is the pattern that was ported.
+2. `showdown.py:486` — **fixed here.**
+3. `contest_allocator.py:2745` — already carries the verification and a
+   `solver_report`. Left as-is, but it holds its own inline
+   `{0: "optimal", 1: "time_limit", ...}` dict, a second copy of the status
+   vocabulary. `showdown.py` deliberately does NOT mint a third: it imports
+   `SCIPY_MILP_STATUS` from `optimizer_v3` (lazily, inside the function, matching
+   the existing `assert_fraction_cap` import, so the module graph at import time
+   is unchanged).
+4. `contest_allocator.py:1276` — **the same defect, found and DELIBERATELY LEFT.**
+   `if not result.success or result.x is None:` discards a time-limited incumbent,
+   falls back to the greedy allocator, and records
+   `direct_constraint_failure: True` with `selection_certified: False` — a clock
+   event filed as a constraint failure, which is R158's inversion with a worse
+   label. Left because it sits on the CLASSIC certified path behind the golden
+   replay, and changing what `selection_certified` reports does not belong in a
+   Showdown stage with no Classic coverage written for it. Filed as **R273**.
+
+What is NOT reused from Classic: `_record_solver_status`. That function mirrors
+every solve into Classic's `LAST_SOLVER_*` module globals, so calling it from
+Showdown would let a Showdown solve overwrite the record of Classic's last solve.
+The vocabulary is shared; only the mutating recorder is separate, and the reason
+is written at the function.
+
+**R233 enumeration, class 2: every relaxation rung consuming a `None`.**
+`grep -rn "lu is None" --include=*.py mlb_engine/ tools/ skills/` — 23 hits, of
+which the relaxation rungs are two ladders and both are fixed:
+`build_showdown_bank` (6 rungs + terminal break, all guarded) and `solve_ladder`
+(8 rungs + terminal, all guarded). The remaining hits are not rungs and are
+deliberately untouched: `showdown_theses.py:1444` (`portfolio_report`, a report
+loop over already-solved lineups), `execution_pipeline.py:4018` (a variant
+candidate builder that `continue`s and has no ladder), and
+`build_slate.py:2378/2381` (reads the solved list to refuse a build).
+
+**Tests, and the one that had to be rewritten.** Six new, `test_showdown`
+133 -> 139. The mutation pass ran five mutants; four were killed on the first
+attempt and **one survived**, which was a wrong test rather than a wrong
+docstring. `test_an_incumbent_that_violates_the_matrix_is_rejected` originally
+corrupted the incumbent by setting a second captain — caught downstream by the
+roster-shape check (`len(cpt_i) != 1`), so the test passed with the constraint
+verification removed and proved nothing about the matrix. It now violates role
+exclusivity instead (the captain also placed at UTIL, one real UTIL dropped),
+which leaves the shape at exactly 1 CPT and 5 UTIL and can only be caught by the
+matrix, and it asserts on the recorded status to discriminate: the matrix check
+leaves `time_limit`, the roster-shape check overwrites it with
+`roster_size_mismatch`. All five mutants killed after the rewrite.
+
+**Gate.** `PASS v2.26.0 27 modules 1443 tests` -> `PASS v2.26.0 27 modules 1449
+tests`. CLAUDE.md's quoted session-start line moved with it, since
+`test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes` asserts the audit's clean
+output appears verbatim in that file.
+
+**Correction to R158's own text.** The item cited `showdown.py:360`. The code was
+unchanged in substance but sat at line 424 when this session opened it; the
+backlog entry has been corrected as it closed.
+
+---
+
 ## 2026-08-29 — R239(b): the captain cap binds where the roster spot is spent
 
 ### R239(b)(i). `max_cpt_per_contest`, enforced at both points that fill a captain slot

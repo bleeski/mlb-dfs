@@ -500,7 +500,13 @@ EXPECTED_SUITE_COUNTS = {
     # guard, and R153's failure lives on exactly the rung it protects. Eight
     # entries, not two, because at n=2 the PORTFOLIO cap already excludes the
     # captain and the per-contest set would look necessary while doing nothing.
-    "tests.test_showdown": 133,
+    # R158, 2026-08-30: 133 -> 139, the six that pin the Showdown solver-status
+    # split -- a verified time-limited incumbent accepted and tagged, an
+    # unverified one rejected by the constraint matrix rather than the
+    # roster-shape check, the timeout latch stopping the descent on both the
+    # thesis ladder and the bank ladder, the infeasibility contrast that proves
+    # the latch is what stops it, and the clean-solve path unchanged.
+    "tests.test_showdown": 139,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
