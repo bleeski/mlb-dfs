@@ -376,6 +376,35 @@ per the standing rule, so it is fourteen slots and slot 1 is R205 + R236.
 operator's `--controls-override` instead of dropping it, and slot 10's R207 +
 R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
 
+*Amendment 2026-08-30, DEV, claim `engine` (`engine_2026-08-30`, scope
+`r250_captain_budget`): **slot 5 is DRAINED of its first three items.** R158,
+R223 and R250 all landed, in that order and in three separate commits, entries
+migrated to CHANGELOG.md. Gate **1443 -> 1461** (R158 +6, R223 +5, R250 +7);
+CLAUDE.md's quoted session-start line moved with it each time.*
+
+*Slot 5 KEEPS its position and is now **R247 + R237 + R224**. It does not move up:
+the three that closed were the ones with a dependency argument for going first
+(solver status before anything trusting a solve result, the fourth counter before
+`clean` was recomputed from realized caps), and what remains is visibility and
+smalls — R247 reports a trade it does not change, R237 is a factor split for two
+qa reads, R224 is XS. Nothing above slot 5 gained or lost evidence this date, so
+renumbering would be churn. Still fourteen slots.*
+
+*Two items FILED this date, both found by the R233 enumerations rather than by
+review, and both deliberately left rather than fixed: **R273** (the Classic joint
+allocator at `contest_allocator.py:1276` files a clock expiry as
+`direct_constraint_failure` — R158's inversion with a worse label, on the
+certified Classic path behind the golden replay) and **R274** (the test suite
+appends to `outputs/2026-06-03/` and `outputs/2026-06-11/` manifests on every
+run; ~1400 fixture deliveries now sit in the tree the archival miner globs).
+Neither belongs in a Showdown stage. R273 is DEV's and wants Classic coverage
+written for it; R274's cleanup half is ARCHIVE's.*
+
+*One correction to the record, in the R239(b) family: its guard
+`test_the_floor_rung_keeps_the_per_contest_cap_when_it_drops_the_others` was a
+SOURCE-TEXT grep for a literal. R223 moved that literal to a different rung and
+the test kept passing while its docstring went false. Rewritten behavioural.*
+
 1. **R172 + R176 + R173 + R228** — false-evidence batch, unchanged (F-13,
    F-14, F-10). R176 gains ed8's F-34 as a rider: exit code computed before
    the manifest stamp, so success can return unstamped.
@@ -411,15 +440,21 @@ R244 pair is unchanged. R216 (slot 7 now) still lands alone.*
    ordering argument rather than a shared-surface convenience.
 4. **R165 + R163** — unchanged content, down one: its evidence is unchanged
    while the Showdown slot gained two live hits.
-5. **Showdown ladder truth: R158 + R223 + R250 + R247 + R237 + R224** —
-   solver status first (F-08), because everything downstream trusts solve
-   results; then the captain-budget reservation (R250, F-36: UTIL spends a
-   named captain's budget before his rungs solve — Eldridge capped at nine,
-   captained zero), cap-cost visibility (R247, F-35/F-37: a tightened cap
-   moved twelve slots from the four best players to the four worst, and a
-   $6,100-left tail lineup shipped with every counter clean), and the
+5. **Showdown ladder truth: R247 + R237 + R224** — **R158, R223 and R250 all
+   SHIPPED 2026-08-30** (see CHANGELOG.md), in that order and separately; what
+   is left in this slot is the visibility half. The solver-status precondition
+   (F-08) is met, so anything here may now trust a solve result and read a
+   timeout as a timeout. Remaining: cap-cost visibility (R247, F-35/F-37: a
+   tightened cap moved twelve slots from the four best players to the four
+   worst, and a $6,100-left tail lineup shipped with every counter clean), the
    uncomputed-vs-neutral factor split (R237, F-38/F-43) that both qa reads
-   need.
+   need, and R224's two XS cap-resolver smalls. **R247 gains a rider from
+   R250's landing**: `clean` now excludes the apportionment shortfall and
+   includes `captain_budget_inversions`, so R247's "every counter read clean
+   over a degraded tail" is measured against a different verdict than the one
+   it was filed against — re-verify its premise before building it, per the
+   standing rule that a backlog entry's premises are checked against the tree
+   rather than taken from the entry.
 6. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
    shapes before assignment (R239's shape-aware half consumes R238).
    **R239(b) and (c) SHIPPED 2026-08-29** (see CHANGELOG.md); what is left in
@@ -2330,30 +2365,34 @@ long-term answer (Showdown through the Classic enrichment stack) is R41's and
 unchanged; this is the cheap intermediate that also serves operator priors
 after R41 lands.
 
-### R250. The ladder spends a named captain's budget in UTIL before his rungs solve, and the relaxation counter fires on caps that held (P1, S-M) | new 2026-08-27, merged from BUILD fragments `2026-08-27_BUILD_thesis-ladder-spends-cap-in-util-before-captain.md` and `2026-08-27_BUILD_showdown_f1_and_archetype_gaps.md` §3; corroborated by the outside spec ed8 (F-36, F-42)
+### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 
-**What.** Two ladder-order facts. Eldridge: named captain by three theses,
-cheap enough that every SF-leaning rung took him as UTIL salary relief first,
-finished at the player cap (9 of 23) with ZERO captain slots — the cap
-overruled the ladder's own captain judgment on arrival order, not merits, and
-the portfolio spent his entire budget at 1.0x and none at 1.5x. Separately,
-`counted_relaxations.clean` came back false on `captain_relaxed_slots: 1`
-while realized captain exposure was 21.7% under a 25% cap: an apportionment
-shortfall counted as a relaxation the realized set never breached.
+- **What:** `outputs/2026-06-03/upload_manifest.json` and
+  `outputs/2026-06-11/upload_manifest.json` are written by the test suite on
+  every run. They now carry **393** and **1025** deliveries respectively. Today's
+  run appended 16 and 27; rows are also dated 08-27, 08-28 and 08-29, so this is
+  long-standing rather than new. Both directories also hold test-built
+  `DKEntries_*.csv` files. `outputs/2026-06-11` is unambiguously fixture output
+  (contest id `900`, contest name `Test WTA`); `outputs/2026-06-03` carries
+  real-looking contest names and ids but its `run_id` values are July timestamps,
+  so it is fixture output living in a real-looking date directory.
+- **Why it matters:** the archival miner reads `outputs/<date>/upload_manifest.json`.
+  Nothing has ingested these yet, but the tree it globs contains roughly 1400
+  fixture deliveries presented in exactly the shape a real delivery takes. This
+  is the same class as the 2026-08-29 incident where an end-to-end run dropped a
+  fixture file into `outputs/2026-08-29/` and appended a row to that date's
+  manifest -- with the difference that these two dates are old enough that nobody
+  has noticed.
+- **Why it was not fixed on 2026-08-30:** `outputs/` is gitignored, so none of it
+  reaches the repo and no commit is carrying it. Deciding which rows are fixture
+  and which (if any) are history is ARCHIVE's call, not DEV's, and this mount
+  cannot unlink so a cleanup is a `mv` that wants its own session.
+- **Fix:** point the fixtures at a temp directory or at the `_test_r3_*` sandbox
+  convention the rest of the suite already uses -- twenty other manifests under
+  `outputs/_test_r3_*/` show the pattern exists and these two escaped it. Then
+  have ARCHIVE arbitrate the two accumulated files. A test that writes into the
+  tree the miner reads is the defect; the accumulated rows are its symptom.
 
-**Why.** The captain slot is the highest-leverage seat on the card; inverting
-it silently is the dual objective's apex half quietly traded away. And a
-`clean` flag that can read false over held caps (this) while reading true over
-a degraded tail (R247) is measuring procedure, not the portfolio.
-
-**Fix.** Reserve captain budget before UTIL spends it: walk the ladder once,
-collect named captains, hold one unit of each such player's budget per naming
-rung (up to the captain cap), then solve; or the cheaper variant, order rungs
-naming a scarce captain ahead of rungs that merely allow him. Report the
-specific condition "at player cap, named captain ≥1 rung, captained zero" as
-its own caution sentence. Recompute `clean` from REALIZED caps only;
-apportionment shortfalls get their own named count (they are R153's
-`cap_reassignments` family, not relaxations).
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 

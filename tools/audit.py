@@ -512,7 +512,14 @@ EXPECTED_SUITE_COUNTS = {
     # true floor also increments it, which is how the first cut passed against a
     # mutated increment), the withdrawal of a reassignment record a lower rung
     # contradicts, and the counter being present when it reads zero.
-    "tests.test_showdown": 144,
+    # R250, 2026-08-30: 144 -> 151, the seven that pin the captain-budget hold --
+    # the named captain reaching the captain slot at the player cap, the budget
+    # MOVING from UTIL to captain rather than growing (total exposure unchanged),
+    # the apex caution's exact condition, the hold shrinking as it is spent (a
+    # hold that never releases strands the budget), the hold bounded by the
+    # captain cap, the hold not being counted as a relaxation, and `util_excludes`
+    # blocking the UTIL seat while leaving the captain seat.
+    "tests.test_showdown": 151,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

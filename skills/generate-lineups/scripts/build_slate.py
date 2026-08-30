@@ -2476,12 +2476,23 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # cap_relaxed is the thesis-apportionment step running out of eligible
         # captains under the exposure cap; lock_relaxed is the SOLVER dropping
         # a thesis's assigned captain because no feasible lineup existed with
-        # it locked. relaxed_slots (the sum) is kept for the "clean" verdict
-        # below, which only cares whether ANY relaxation happened.
+        # it locked.
+        #
+        # R250. They are no longer summed for the `clean` verdict, and that sum
+        # was the defect. R113 split these two in the diagnostics and this line
+        # re-joined them one function later, so `clean` came back FALSE on
+        # `captain_relaxed_slots: 1` while realized captain exposure was 21.7%
+        # under a 25% cap -- an APPORTIONMENT shortfall reported as a relaxation
+        # the realized set never breached. `clean` now reads realized facts only.
+        # The apportionment shortfall keeps its own name below: it is real, it is
+        # worth reading, and it is not a control giving way. A `clean` flag that
+        # reads false over held caps (this) while reading true over a degraded
+        # tail (R247) is measuring procedure rather than the portfolio.
         cap_relaxed = ladder_meta.get("captain_cap_relaxed") or 0
         lock_relaxed = solve_diag.get("captain_lock_relaxed") or 0
         lock_relaxation_detail = list(solve_diag.get("lock_relaxation_detail") or [])
-        relaxed_slots = cap_relaxed + lock_relaxed
+        apportionment_shortfall = cap_relaxed
+        relaxed_slots = lock_relaxed
         overlap_relaxed = solve_diag.get("overlap_relaxed") or 0
         # R54(a)/(b)/(c). Both new facts, on both paths.
         both_relaxed = solve_diag.get("both_relaxed") or 0
@@ -2511,6 +2522,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         solver_timeouts = solve_diag.get("solver_timeouts") or 0
         time_limited_accepted = solve_diag.get("time_limited_accepted") or 0
         solver_timeout_detail = list(solve_diag.get("solver_timeout_detail") or [])
+        # R250. The apex caution, carried straight through from the ladder.
+        captain_budget_inversions = list(
+            solve_diag.get("captain_budget_inversions") or [])
+        captain_budget_reserved = dict(
+            solve_diag.get("captain_budget_reserved") or {})
+        captain_budget_util_blocks = solve_diag.get("captain_budget_util_blocks") or 0
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
@@ -2534,6 +2551,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         cap_relaxed = relaxed_slots
         lock_relaxed = 0
         lock_relaxation_detail = []
+        # R250. This path has no apportionment step -- `build_showdown_bank`
+        # rotates a cpt_exclude list and its relaxations ARE realized, so
+        # `relaxed_slots` stays in `clean` here and nothing is carved out.
+        apportionment_shortfall = 0
         overlap_relaxed = cpt_diagnostics.get("overlap_relaxed_slots") or 0
         both_relaxed = cpt_diagnostics.get("both_relaxed_slots") or 0
         ignored_locks = list(cpt_diagnostics.get("ignored_locks") or [])
@@ -2564,6 +2585,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         solver_timeouts = cpt_diagnostics.get("solver_timeouts") or 0
         time_limited_accepted = cpt_diagnostics.get("time_limited_accepted") or 0
         solver_timeout_detail = []
+        # R250. No thesis on this path, so no rung NAMES a captain and the
+        # inversion condition cannot arise. Stated as empty rather than left
+        # undefined, same discipline as `contest_cap_relaxed`.
+        captain_budget_inversions = []
+        captain_budget_reserved = {}
+        captain_budget_util_blocks = 0
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
     # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
     # report, but it does build lineups, and the contest each one is entered into
@@ -2716,9 +2743,20 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # captain it named. It is reported so the reader knows a record was
             # removed rather than never written.
             "cap_reassignments_withdrawn": cap_reassignments_withdrawn,
+            # R250. Reported, deliberately OUTSIDE `clean`. The thesis
+            # apportionment ran short of eligible captains under the cap; the
+            # REALIZED set never breached anything, and calling that a relaxation
+            # is what made `clean` read false over caps that held.
+            "captain_apportionment_shortfall": apportionment_shortfall,
+            # R250. The apex condition, named rather than left to be derived by
+            # crossing three tables: a player named captain by at least one rung
+            # who finished at the player cap having captained zero times. His
+            # whole exposure budget was spent at 1.0x and none of it at 1.5x.
+            "captain_budget_inversions": captain_budget_inversions,
             "clean": (not (relaxed_slots or overlap_relaxed or both_relaxed
                            or player_relaxed or ignored_locks
-                           or contest_cap_relaxed or cpt_cap_relaxed)
+                           or contest_cap_relaxed or cpt_cap_relaxed
+                           or captain_budget_inversions)
                       and not (per_contest.get("over_cap") or [])),
         },
         # R158. Compute facts, deliberately NOT inside `counted_relaxations` and
@@ -2728,6 +2766,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # `clean: true` and `solver_timeouts` nonzero is saying the controls all
         # held and the clock ran out: raise the time limit, do not touch a control
         # and do not reduce the pool.
+        # R250. The hold as planned and as it actually bound. NOT a relaxation and
+        # NOT a cap breach -- nothing gave way; a player several rungs name as
+        # captain was stopped from spending the last of his own exposure budget at
+        # 1.0x before those rungs solved. Reported so the reader can see the
+        # allocation the ladder made on purpose.
+        "captain_budget": {
+            "reserved": captain_budget_reserved,
+            "util_blocked_slots": captain_budget_util_blocks,
+            "label": "an allocation of exposure between the 1.5x and 1.0x seats, "
+                     "never a change to any cap value",
+        },
         "solver_compute": {
             "solver_timeouts": solver_timeouts,
             "time_limited_accepted": time_limited_accepted,

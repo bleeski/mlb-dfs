@@ -8,6 +8,7 @@ from the Classic solver, so test_golden_replay is unaffected.
 from __future__ import annotations
 
 import collections
+import contextlib
 import json
 import math
 import tempfile
@@ -2149,6 +2150,200 @@ class R239PerContestCapBindsTests(unittest.TestCase):
                                             contest_of_entry=["A"] * 6,
                                             max_cpt_per_contest=m)
             self.assertEqual(ladder["max_cpt_per_contest"], m)
+
+
+def _apex_pool():
+    """R250's measured shape: one cheap, genuinely good player every points-max
+    solve wants at UTIL, two expensive stars, and a deep flat supporting cast so
+    the player cap is arithmetically reachable rather than structurally
+    impossible. A short pool relaxes the cap instead of binding it, and then the
+    fixture is testing the relaxation ladder rather than the budget."""
+    rows = [
+        _p("Cheap|AA", "AA", 18, 2000, 3000, "1001", "2001"),
+        _p("AA_Big|AA", "AA", 20, 11000, 16500, "1002", "2002"),
+        _p("BB_Big|BB", "BB", 19, 11000, 16500, "1003", "2003"),
+    ]
+    for i in range(9):
+        rows.append(_p(f"AA_{i}|AA", "AA", 11.0 - i * 0.2, 7000, 10500,
+                       f"11{i:02d}", f"21{i:02d}"))
+        rows.append(_p(f"BB_{i}|BB", "BB", 10.9 - i * 0.2, 7000, 10500,
+                       f"12{i:02d}", f"22{i:02d}"))
+    return pd.DataFrame(rows)
+
+
+class R250CaptainBudgetTests(unittest.TestCase):
+    """R250. The ladder spent a named captain's budget in UTIL before his rungs
+    solved.
+
+    The measured case: a player named captain by three theses, cheap enough that
+    every earlier rung took him as salary relief, finished at the player cap
+    (9 of 23) with ZERO captain slots. The cap overruled the ladder's own captain
+    judgment on arrival order rather than merits, and the portfolio spent his
+    entire exposure budget at 1.0x and none at 1.5x.
+
+    Nothing here is a win rate, an ROI, or a probability claim. Captain slots and
+    exposure counts are deterministic properties of the delivered set.
+    """
+
+    N = 12
+    CHEAP = "Cheap|AA"
+
+    def _theses(self, n, cheap_from):
+        out = []
+        for i in range(n):
+            cpt = (self.CHEAP if i >= cheap_from
+                   else ("AA_Big|AA" if i % 2 else "BB_Big|BB"))
+            out.append({"template": f"t{i}", "name": f"t{i}", "why": "",
+                        "cpt": cpt, "locks": [], "excludes": [], "mult": {}})
+        return out
+
+    def _run(self, n=None, cheap_from=None, hold=True):
+        """Solve the ladder with the budget hold on, or with it stripped at the
+        solver boundary, which is exactly the pre-R250 behaviour."""
+        n = n or self.N
+        cheap_from = cheap_from if cheap_from is not None else n // 2
+        real = st.build_showdown_lineup
+
+        def without_hold(df=None, util_excludes=None, **kw):
+            return real(df, **kw)
+
+        diag: dict = {}
+        ctx = (unittest.mock.patch.object(st, "build_showdown_lineup", without_hold)
+               if not hold else contextlib.nullcontext())
+        with ctx:
+            solved = st.solve_ladder(_apex_pool(), self._theses(n, cheap_from),
+                                     max_shared_players=None, time_limit=5,
+                                     diagnostics=diag)
+        captains = [(lu.get("captain") or {}).get("player_key")
+                    for lu in solved if lu is not None]
+        uses = sum(1 for lu in solved
+                   if lu is not None and self.CHEAP in lu["player_keys"])
+        return captains, uses, diag
+
+    def test_a_named_captain_at_the_player_cap_still_reaches_the_captain_slot(self):
+        """The payload. Without the hold this player captains ZERO times while
+        sitting at the player cap; with it he captains his own rungs."""
+        captains, uses, diag = self._run()
+        self.assertEqual(uses, diag["player_cap_count"],
+                         "fixture precondition: he must actually reach the cap")
+        self.assertGreaterEqual(
+            captains.count(self.CHEAP), 1,
+            "a player named captain by half the ladder finished at the player "
+            "cap with no captain slot: the cap overruled the ladder's captain "
+            "judgment on arrival order")
+        self.assertEqual(diag["captain_budget_inversions"], [])
+
+    def test_the_budget_moves_from_util_to_captain_it_does_not_grow(self):
+        """The honest statement of the fix, and the one that keeps it from
+        reading as a cap relaxation. TOTAL exposure is unchanged; what changes is
+        where it is spent -- 1.5x instead of 1.0x."""
+        held_caps, held_uses, held_diag = self._run(hold=True)
+        base_caps, base_uses, base_diag = self._run(hold=False)
+        self.assertEqual(held_uses, base_uses,
+                         "the hold changed total exposure, which would make it a "
+                         "cap change rather than an allocation change")
+        self.assertGreater(
+            held_caps.count(self.CHEAP), base_caps.count(self.CHEAP),
+            "the hold recovered no captain slots, so it is doing nothing")
+        self.assertEqual(base_caps.count(self.CHEAP), 0,
+                         "fixture precondition: the baseline must actually invert")
+        self.assertEqual(held_diag["player_relaxed"], 0)
+        self.assertEqual(base_diag["player_relaxed"], 0)
+
+    def test_the_caution_names_the_exact_condition_that_would_have_caught_it(self):
+        """'At player cap, named captain >=1 rung, captained zero.' Driven
+        against a portfolio built WITHOUT the hold, which is the historical
+        shape the caution exists to detect."""
+        _, _, diag = self._run(hold=False)
+        inversions = diag["captain_budget_inversions"]
+        self.assertEqual(len(inversions), 1, inversions)
+        row = inversions[0]
+        self.assertEqual(row["player"], self.CHEAP)
+        self.assertEqual(row["captain_slots"], "0")
+        self.assertGreaterEqual(int(row["named_by_rungs"]), 1)
+        self.assertEqual(row["player_count"], row["player_cap_count"])
+
+    def test_the_hold_shrinks_as_it_is_spent(self):
+        """A hold that never releases blocks the player out of UTIL seats for the
+        rest of the ladder once his captain rungs are done, which strands the very
+        budget the reservation exists to place. The captain rungs come FIRST here
+        on purpose: with them last, the hold is never observed after being spent
+        and the release cannot be seen at all.
+        """
+        real = st.build_showdown_lineup
+        theses = [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                   "cpt": (self.CHEAP if i < 3
+                           else ("AA_Big|AA" if i % 2 else "BB_Big|BB")),
+                   "locks": [], "excludes": [], "mult": {}}
+                  for i in range(12)]
+        diag: dict = {}
+        st.solve_ladder(_apex_pool(), theses, max_shared_players=None,
+                        time_limit=5, diagnostics=diag)
+        by_player: dict = {}
+        for row in diag["captain_budget_block_detail"]:
+            by_player.setdefault(row["player"], []).append(int(row["held"]))
+        self.assertTrue(by_player, "the hold never bound, so this proves nothing")
+        for player, held in by_player.items():
+            self.assertEqual(held, sorted(held, reverse=True),
+                             f"{player}'s hold went UP, which cannot happen")
+        self.assertTrue(
+            any(held[-1] < held[0] for held in by_player.values()),
+            "no player's hold ever shrank: the hold is not being spent when the "
+            "captain seat it was held for is filled, so the player stays "
+            "UTIL-blocked for the rest of the ladder and the budget is stranded")
+        del real
+
+    def test_the_hold_never_reserves_more_than_the_captain_cap(self):
+        """Reserving beyond the captain cap would strand budget: he cannot
+        captain more often than the cap allows, so the extra units would block
+        UTIL seats for a captaincy that can never happen."""
+        _, _, diag = self._run()
+        cap = diag["cpt_cap_count"]
+        for player, held in diag["captain_budget_reserved"].items():
+            self.assertLessEqual(held, cap, f"{player} holds {held} over cap {cap}")
+
+    def test_the_hold_is_reported_and_is_not_counted_as_a_relaxation(self):
+        """Nothing gave way, so it must not read as a relaxation -- the same
+        distinction R153 drew for `cap_reassignments`."""
+        _, _, diag = self._run()
+        self.assertIn("captain_budget_reserved", diag)
+        self.assertIn("captain_budget_util_blocks", diag)
+        self.assertGreater(diag["captain_budget_util_blocks"], 0,
+                           "the hold never bound, so this fixture proves nothing")
+        for counter in ("overlap_relaxed", "player_relaxed", "cpt_cap_relaxed",
+                        "contest_cap_relaxed"):
+            self.assertEqual(diag[counter], 0,
+                             f"{counter} moved: the hold relaxed a control")
+
+    def test_util_excludes_blocks_the_util_seat_and_leaves_the_captain_seat(self):
+        """The constraint R250 needed and the module did not have. `excludes`
+        drops a player from the pool entirely, so it cannot say 'keep him
+        captainable, stop him taking a UTIL seat'."""
+        df = _apex_pool()
+        # The captain slot is locked elsewhere so the only seat he can take is a
+        # UTIL one. Without that lock the unconstrained optimum CAPTAINS him --
+        # he is the best points-per-dollar on the board -- and "not in utils"
+        # would then hold whether or not the constraint exists, which is how the
+        # first cut of this test passed with the constraint mutated to `pass`.
+        free = sd.build_showdown_lineup(df, cpt_lock="AA_0|AA", time_limit=5)
+        self.assertIsNotNone(free)
+        self.assertIn(
+            self.CHEAP, [p["player_key"] for p in free["utils"]],
+            "fixture precondition: with the captain slot taken, the solve must "
+            "want him at UTIL, or this test constrains nothing")
+        blocked = sd.build_showdown_lineup(df, cpt_lock="AA_0|AA",
+                                           util_excludes=[self.CHEAP],
+                                           time_limit=5)
+        self.assertIsNotNone(blocked)
+        self.assertNotIn(self.CHEAP, [p["player_key"] for p in blocked["utils"]],
+                         "the UTIL block did not hold")
+        # And he is still legal at captain, which `excludes` could not express:
+        # dropping him from the pool would have made this solve infeasible.
+        captained = sd.build_showdown_lineup(df, util_excludes=[self.CHEAP],
+                                             cpt_lock=self.CHEAP, time_limit=5)
+        self.assertIsNotNone(captained,
+                             "the UTIL block also removed him from the pool")
+        self.assertEqual(captained["captain"]["player_key"], self.CHEAP)
 
 
 class R223CaptainCapCounterTests(unittest.TestCase):

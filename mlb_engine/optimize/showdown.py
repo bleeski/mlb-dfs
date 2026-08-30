@@ -347,6 +347,7 @@ def build_showdown_lineup(
     excludes: Optional[Sequence[str]] = None,
     cpt_lock: Optional[str] = None,
     cpt_excludes: Optional[Sequence[str]] = None,
+    util_excludes: Optional[Sequence[str]] = None,
     forbidden_sets: Optional[Sequence[Sequence[str]]] = None,
     max_shared_players: Optional[int] = None,
     time_limit: int = 20,
@@ -456,6 +457,17 @@ def build_showdown_lineup(
     for ck in (cpt_excludes or []):                            # exposure cap: still
         if ck in key_row:                                      # eligible at UTIL,
             add({cpt(keys.index(ck)): 1.0}, 0.0, 0.0)           # just not as CPT
+    # R250. The mirror of `cpt_excludes`, and the constraint the module did not
+    # have. `excludes` drops a player from the pool entirely, so it cannot express
+    # "keep him captainable but stop him taking a UTIL seat" -- and that sentence
+    # is the whole of R250's fix. A player several theses name as captain, who is
+    # cheap enough that earlier rungs take him as salary relief, reaches the
+    # player cap at 1.0x and is then excluded from the captain slot he was named
+    # for. Blocking only the UTIL variable reserves his remaining budget for the
+    # 1.5x seat without reducing the legal pool by one player.
+    for uk in (util_excludes or []):
+        if uk in key_row:
+            add({util(keys.index(uk)): 1.0}, 0.0, 0.0)
     # Prior lineups. Default is exact-set forbidding; max_shared_players turns it
     # into an overlap bound. A partial set (some members excluded from this solve)
     # is still a valid overlap bound, so unlike the exact-set form it is not

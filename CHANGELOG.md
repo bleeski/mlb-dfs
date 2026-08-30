@@ -25,6 +25,99 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R250: captain budget is reserved before UTIL can spend it
+
+**What moved.** `solve_ladder` walks the theses once before solving, counts how
+many NAME each player as captain, and holds one unit of that player's player-cap
+budget per naming rung, bounded by the captain cap. While a hold is outstanding
+the player is blocked from the UTIL slot only — never from the pool, never from
+the captain slot — so the reserved budget is still there when his own rungs
+solve. The hold rides with the player cap: applied on every rung carrying
+`with_cap`, dropped the moment the player cap itself relaxes, and spent when the
+captain seat it was held for is filled.
+
+**Why.** The measured case: a player named captain by three theses, cheap enough
+that every earlier rung took him as UTIL salary relief, finished at the player cap
+(9 of 23) with ZERO captain slots. The cap overruled the ladder's own captain
+judgment on ARRIVAL ORDER rather than merits, and the portfolio spent his entire
+exposure budget at 1.0x and none of it at 1.5x. The captain slot carries 1.5x and
+is the largest single differentiator on a six-man roster, so inverting it silently
+trades away the apex half of the dual objective.
+
+**The new constraint, and why one was needed.** `excludes` drops a player from the
+pool entirely, so it could not express "keep him captainable, stop him taking a
+UTIL seat" — and that sentence is the whole fix. `build_showdown_lineup` gains
+`util_excludes`, the mirror of `cpt_excludes`, forbidding the UTIL variable and
+leaving CPT free. No player leaves the legal pool, which is what keeps this
+outside CLAUDE.md's ban on reducing the player set.
+
+**Measured on the fixture, both ways.** Twelve entries, a 21-player pool, the
+cheap player named captain by the last six rungs. Without the hold: **0 captain
+slots**, 6 uses at a player cap of 6, one inversion. With the hold: **3 captain
+slots**, the same 6 uses, no inversion, and `player_relaxed` 0 on both runs. Total
+exposure is identical; what changes is where it is spent. That is the honest
+statement of the fix and it is pinned by a test, because "the hold grew his
+exposure" would make this a cap change rather than an allocation change.
+
+**The design decision, recorded so it can be overturned on evidence.** R250
+offered a cheaper variant: reorder the rungs so those naming a scarce captain
+solve ahead of those that merely allow him. **Rejected, and it was free when R250
+was written on 2026-08-27 but is not now.** R239 landed 2026-08-29 and changed
+what a rung's POSITION means: `contest_of_entry = [r["contest_id"] for r in
+rows[:n_entries]]`, `bank = list(solved)`, and `assignments = ... zip(rows, bank)`,
+so ladder slot j lands in `rows[j]`'s contest. Verified in `build_slate.py` this
+session rather than taken from the docstring that asserts it. Reordering rungs
+would therefore redeal entries between prize pools as an invisible side effect of
+a captain-leverage fix, and would do it underneath the per-contest captain cap
+that binds on that same mapping. A hold moves no slot, so the partition is
+untouched. If a later session wants reordering back it has to be reordering WITHIN
+a contest, and it has to show the partition is preserved.
+
+**`clean` now reads REALIZED caps only.** `build_slate.py` computed
+`relaxed_slots = cap_relaxed + lock_relaxed` — re-joining, one function later, the
+two mechanisms R113 had split. That sum fed `clean`, so `clean` came back FALSE on
+`captain_relaxed_slots: 1` while realized captain exposure was 21.7% under a 25%
+cap: an apportionment shortfall reported as a relaxation the realized set never
+breached. The apportionment count is now
+`counted_relaxations.captain_apportionment_shortfall`, reported and outside
+`clean`; only realized facts remain inside it. On the bank path nothing is carved
+out, because `build_showdown_bank`'s relaxations ARE realized. A `clean` flag that
+reads false over held caps (this) while reading true over a degraded tail (R247)
+is measuring procedure rather than the portfolio.
+
+**The apex caution.** `captain_budget_inversions` names the exact condition — at
+the player cap, named captain by at least one rung, captained zero times — rather
+than leaving a reader to derive it by crossing three tables. It is the sentence
+that would have caught the measured case, and it is inside `clean`.
+
+**Mutations: six, two survived the first pass, both wrong tests.** (1) The
+`util_excludes` mutant survived because the unconstrained optimum CAPTAINS the
+cheap player — he is the best points-per-dollar on the board — so "not in utils"
+held whether or not the constraint existed. The test now locks the captain slot
+elsewhere so a UTIL seat is the only one he can take. It locks a MID-priced
+captain, not the 16500 star, because with the only cheap player blocked the rest
+of the pool is flat at 7000 and the expensive lock makes the salary cap itself
+infeasible — a failure that would have had nothing to do with the constraint under
+test. (2) The "hold is spent" mutant survived because with the captain rungs LAST
+the release is never observed: once he starts captaining, every further use is a
+captain use and the UTIL block never bites differently. Its test now puts the
+captain rungs FIRST and asserts the recorded hold shrinks, since a hold that never
+releases blocks the player out of UTIL for the rest of the ladder and strands the
+budget the reservation exists to place. All six killed after the rewrites.
+
+**Gate.** `PASS v2.26.0 27 modules 1454 tests` -> `PASS v2.26.0 27 modules 1461
+tests`, and CLAUDE.md's quoted line with it.
+
+**Found while verifying slate isolation, and filed rather than fixed: R274.** The
+test suite writes into two REAL-dated output directories, `outputs/2026-06-03/`
+and `outputs/2026-06-11/`, appending to their `upload_manifest.json` on every run.
+They now hold 393 and 1025 deliveries; 16 and 27 of those were appended today, and
+rows are dated 08-27, 08-28 and 08-29 as well, so this predates this session and
+is not a regression from these three stages. `outputs/` is gitignored so nothing
+reaches the repo, but the archival miner globs that tree. Filed as R274.
+
+---
+
 ## 2026-08-30 — R223: the captain cap gives way on the record, not in silence
 
 **What moved.** The floor rung of `solve_ladder` now passes the full
