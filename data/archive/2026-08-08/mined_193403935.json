@@ -1,0 +1,4173 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193403935",
+ "slate_date": "2026-08-08",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 118,
+  "entries_complete_lineups": 118,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 156.5,
+  "winning_entry_id": "5211925082",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 103,
+  "entries_in_duplicated_lineups": 24,
+  "share_duplicated_pct": 20.3,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 94,
+   "2": 3,
+   "3": 6
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2100,
+  "at_cap_entries": 35,
+  "at_cap_share_pct": 29.7,
+  "salary_left_histogram": {
+   "> 1500": 19,
+   "101-300": 14,
+   "301-700": 34,
+   "701-1500": 16,
+   "1-100": 13,
+   "<= 0": 22
+  },
+  "max_stack_histogram": {
+   "2": 4,
+   "3": 13,
+   "4": 35,
+   "5": 66
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Chris Sale",
+     "Sandy Alcantara"
+    ],
+    "count": 33,
+    "field_share_pct": 28.0
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Gerrit Cole"
+    ],
+    "count": 18,
+    "field_share_pct": 15.3
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Walbert Urena"
+    ],
+    "count": 13,
+    "field_share_pct": 11.0
+   },
+   {
+    "pair": [
+     "Jake Bennett",
+     "Sandy Alcantara"
+    ],
+    "count": 12,
+    "field_share_pct": 10.2
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Jake Bennett"
+    ],
+    "count": 12,
+    "field_share_pct": 10.2
+   },
+   {
+    "pair": [
+     "Gerrit Cole",
+     "Sandy Alcantara"
+    ],
+    "count": 6,
+    "field_share_pct": 5.1
+   },
+   {
+    "pair": [
+     "Chris Sale",
+     "Gage Jump"
+    ],
+    "count": 6,
+    "field_share_pct": 5.1
+   },
+   {
+    "pair": [
+     "Gerrit Cole",
+     "Walbert Urena"
+    ],
+    "count": 4,
+    "field_share_pct": 3.4
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Chris Sale",
+    "pct_drafted": 69.49
+   },
+   {
+    "player": "Caleb Durbin",
+    "pct_drafted": 62.71
+   },
+   {
+    "player": "Ceddanne Rafaela",
+    "pct_drafted": 61.86
+   },
+   {
+    "player": "Sandy Alcantara",
+    "pct_drafted": 47.46
+   },
+   {
+    "player": "Andruw Monasterio",
+    "pct_drafted": 41.53
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1180,
+  "roster_slots_expected": 1180,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 999.9,
+  "dk_table_deficit_pts": 0.1,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5211925082",
+   "username": "drunkonpappy",
+   "points": 156.5,
+   "salary_used": 43100,
+   "salary_left": 6900,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "ceddanne rafaela",
+    "george lombard",
+    "gerrit cole",
+    "heliot ramos",
+    "jahmai jones",
+    "jose caballero",
+    "paul goldschmidt",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5212235561",
+   "username": "gitsum40",
+   "points": 155.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 36.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "drake baldwin",
+    "griffin conine",
+    "jahmai jones",
+    "otto lopez",
+    "sandy alcantara",
+    "tyler soderstrom",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5212089332",
+   "username": "mrclean913",
+   "points": 154.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 16.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "gerrit cole",
+    "heliot ramos",
+    "jacob wilson",
+    "jonah heim",
+    "jose caballero",
+    "sandy alcantara",
+    "spencer jones",
+    "trent grisham",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5212037902",
+   "username": "m0neymykah",
+   "points": 153.45,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 32.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "drake baldwin",
+    "gerrit cole",
+    "henry bolte",
+    "jacob wilson",
+    "jahmai jones",
+    "jakob marsee",
+    "matt olson",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5212235569",
+   "username": "gitsum40",
+   "points": 147.65,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 31.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "henry bolte",
+    "jakob marsee",
+    "jonah heim",
+    "nick sogard",
+    "otto lopez",
+    "sandy alcantara",
+    "tyler soderstrom",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5211923502",
+   "username": "titanhawks",
+   "points": 146.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "jahmai jones",
+    "jakob marsee",
+    "jonah heim",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5212250497",
+   "username": "m0neymykah",
+   "points": 146.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "jahmai jones",
+    "jakob marsee",
+    "jonah heim",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5211930082",
+   "username": "Mason7488",
+   "points": 145.65,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jakob marsee",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5211930083",
+   "username": "Mason7488",
+   "points": 145.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "jahmai jones",
+    "otto lopez",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5211959376",
+   "username": "jdub.14",
+   "points": 145.65,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jakob marsee",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5212045978",
+   "username": "m0neymykah",
+   "points": 145.65,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jakob marsee",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5212106748",
+   "username": "iamtheky",
+   "points": 145.65,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 43.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "henry bolte",
+    "jahmai jones",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5212146913",
+   "username": "salatso22",
+   "points": 142.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jakob marsee",
+    "matt olson",
+    "ronald acuna",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "14",
+   "entry_id": "5212250676",
+   "username": "beccapatt",
+   "points": 134.45,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "henry bolte",
+    "jahmai jones",
+    "jonah heim",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5212116051",
+   "username": "stock2mail",
+   "points": 133.65,
+   "salary_used": 44800,
+   "salary_left": 5200,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "chris sale",
+    "jahmai jones",
+    "jakob marsee",
+    "jarren duran",
+    "javier sanoja",
+    "joe mack",
+    "kyle stowers",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5212003743",
+   "username": "zandwich",
+   "points": 133.5,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brian serven",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "eli white",
+    "gerrit cole",
+    "jakob marsee",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5212204708",
+   "username": "Extraqtt",
+   "points": 133.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 38.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "eli white",
+    "gerrit cole",
+    "jacob wilson",
+    "jahmai jones",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5212146915",
+   "username": "salatso22",
+   "points": 132.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "connor wong",
+    "jahmai jones",
+    "michael harris",
+    "otto lopez",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5211882174",
+   "username": "seaone",
+   "points": 132.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 37.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "henry bolte",
+    "jakob marsee",
+    "jonah heim",
+    "kyle stowers",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5212216700",
+   "username": "rynstien",
+   "points": 130.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 28.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "george lombard",
+    "gerrit cole",
+    "heliot ramos",
+    "mike trout",
+    "nick sogard",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5212222870",
+   "username": "bleeski",
+   "points": 130.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "gerrit cole",
+    "griffin conine",
+    "jarren duran",
+    "jonah heim",
+    "otto lopez",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5212204706",
+   "username": "Extraqtt",
+   "points": 128.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "griffin conine",
+    "jakob marsee",
+    "kyle stowers",
+    "otto lopez",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5212116196",
+   "username": "meyers2305",
+   "points": 128.45,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 37.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "gerrit cole",
+    "henry bolte",
+    "jahmai jones",
+    "willson contreras",
+    "xavier edwards",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "24",
+   "entry_id": "5212050069",
+   "username": "vinny1979",
+   "points": 124.2,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "gerrit cole",
+    "jacob wilson",
+    "jahmai jones",
+    "jonah heim",
+    "nick sogard",
+    "tyler soderstrom",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "25",
+   "entry_id": "5212152165",
+   "username": "bigsmoothjeremy",
+   "points": 123.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 36.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "ben rice",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jake bennett",
+    "owen caissie",
+    "ronald acuna",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5211952358",
+   "username": "AngerTornado",
+   "points": 121.95,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5212056407",
+   "username": "SDOD1",
+   "points": 121.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "griffin conine",
+    "jonah heim",
+    "kyle stowers",
+    "michael harris",
+    "otto lopez",
+    "ronald acuna",
+    "sandy alcantara",
+    "tommy white",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5212056416",
+   "username": "SDOD1",
+   "points": 121.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "griffin conine",
+    "jonah heim",
+    "kyle stowers",
+    "michael harris",
+    "otto lopez",
+    "ronald acuna",
+    "sandy alcantara",
+    "tommy white",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5212065597",
+   "username": "SDOD1",
+   "points": 121.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "griffin conine",
+    "jonah heim",
+    "kyle stowers",
+    "michael harris",
+    "otto lopez",
+    "ronald acuna",
+    "sandy alcantara",
+    "tommy white",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5211663045",
+   "username": "RDB78",
+   "points": 120.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "joe mack",
+    "owen caissie",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5212180577",
+   "username": "gwbrown1956",
+   "points": 120.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 33.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "mauricio dubon",
+    "michael harris",
+    "nick sogard",
+    "tyler soderstrom",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5212188351",
+   "username": "gwbrown1956",
+   "points": 120.45,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 33.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "mauricio dubon",
+    "michael harris",
+    "nick sogard",
+    "tyler soderstrom",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5212115918",
+   "username": "TrueNorth79",
+   "points": 119.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jarren duran",
+    "joe mack",
+    "kyle stowers",
+    "otto lopez",
+    "sandy alcantara",
+    "tyler soderstrom",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5212115919",
+   "username": "TrueNorth79",
+   "points": 119.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jarren duran",
+    "joe mack",
+    "kyle stowers",
+    "otto lopez",
+    "sandy alcantara",
+    "tyler soderstrom",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5212115920",
+   "username": "TrueNorth79",
+   "points": 119.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jarren duran",
+    "joe mack",
+    "kyle stowers",
+    "otto lopez",
+    "sandy alcantara",
+    "tyler soderstrom",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "36",
+   "entry_id": "5212233809",
+   "username": "Cobra777666777",
+   "points": 118.95,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "matt olson",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5211983542",
+   "username": "memphizen",
+   "points": 118.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Gage Jump",
+    "Gerrit Cole"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 16.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "gage jump",
+    "gerrit cole",
+    "heliot ramos",
+    "jakob marsee",
+    "jonah heim",
+    "mike trout",
+    "tommy white",
+    "xavier edwards",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "38",
+   "entry_id": "5212116195",
+   "username": "meyers2305",
+   "points": 118.05,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "Gage Jump",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "ben rice",
+    "drake baldwin",
+    "gage jump",
+    "heriberto hernandez",
+    "jakob marsee",
+    "jim jarvis",
+    "michael harris",
+    "ozzie albies",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5212205870",
+   "username": "jc000000",
+   "points": 117.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 36.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "griffin conine",
+    "jake bennett",
+    "kyle stowers",
+    "otto lopez",
+    "ronald acuna",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "40",
+   "entry_id": "5211919928",
+   "username": "mcafeend",
+   "points": 117.649994,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 25.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brian serven",
+    "chris sale",
+    "jarren duran",
+    "lawrence butler",
+    "nick sogard",
+    "sandy alcantara",
+    "tommy white",
+    "tyler soderstrom",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5211844066",
+   "username": "Billyboy10",
+   "points": 115.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Gage Jump"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 29.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "gage jump",
+    "griffin conine",
+    "kyle stowers",
+    "michael harris",
+    "otto lopez",
+    "ronald acuna",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "42",
+   "entry_id": "5211952359",
+   "username": "AngerTornado",
+   "points": 114.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "matt olson",
+    "mike yastrzemski",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5211910350",
+   "username": "flipflop8048",
+   "points": 114.649994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "jakob marsee",
+    "jim jarvis",
+    "kyle stowers",
+    "michael harris",
+    "ronald acuna",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5212231467",
+   "username": "bleeski",
+   "points": 114.649994,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "drake baldwin",
+    "griffin conine",
+    "jarren duran",
+    "mauricio dubon",
+    "nick sogard",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "45",
+   "entry_id": "5212030326",
+   "username": "howardwi",
+   "points": 113.45,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 34.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "jonah heim",
+    "josh lowe",
+    "kyle stowers",
+    "trent grisham",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5211919930",
+   "username": "mcafeend",
+   "points": 112.45,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 25.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "chris sale",
+    "denzer guzman",
+    "gerrit cole",
+    "jahmai jones",
+    "jakob marsee",
+    "kyle stowers",
+    "moises ballesteros",
+    "otto lopez",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "47",
+   "entry_id": "5212088032",
+   "username": "redyodagirl",
+   "points": 112.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Gage Jump"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 25.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "gage jump",
+    "henry bolte",
+    "jacob wilson",
+    "jonah heim",
+    "kyle stowers",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "48",
+   "entry_id": "5212165207",
+   "username": "Stadtusquo",
+   "points": 110.5,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 25.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "gerrit cole",
+    "griffin conine",
+    "heliot ramos",
+    "javier sanoja",
+    "jonah heim",
+    "kyle stowers",
+    "sandy alcantara",
+    "xavier edwards",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5212059310",
+   "username": "theincog",
+   "points": 110.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gage Jump"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gage jump",
+    "jake rogers",
+    "matt olson",
+    "ronald acuna",
+    "wilyer abreu",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5211983543",
+   "username": "memphizen",
+   "points": 109.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 44.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "michael harris",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5212237538",
+   "username": "MrHarper21",
+   "points": 109.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "drake baldwin",
+    "george lombard",
+    "jake bennett",
+    "jakob marsee",
+    "matt olson",
+    "michael harris",
+    "nick sogard",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5211741993",
+   "username": "cheffrank",
+   "points": 108.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "eli white",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5211741994",
+   "username": "cheffrank",
+   "points": 108.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "eli white",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5211741995",
+   "username": "cheffrank",
+   "points": 108.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "alika williams",
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "eli white",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5212232744",
+   "username": "smitty42x",
+   "points": 108.649994,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 40.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "heriberto hernandez",
+    "matt olson",
+    "michael harris",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5211972005",
+   "username": "tigolebitties91",
+   "points": 108.45,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "gerrit cole",
+    "jakob marsee",
+    "kyle stowers",
+    "mike trout",
+    "nick sogard"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5212056289",
+   "username": "wazzu24",
+   "points": 108.45,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "connor wong",
+    "gerrit cole",
+    "jahmai jones",
+    "jarren duran",
+    "mike trout",
+    "nick sogard",
+    "nolan schanuel",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5212116197",
+   "username": "meyers2305",
+   "points": 108.45,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "gerrit cole",
+    "heriberto hernandez",
+    "jakob marsee",
+    "javier sanoja",
+    "joe mack",
+    "nolan schanuel",
+    "wade meckler",
+    "xavier edwards",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5212116050",
+   "username": "stock2mail",
+   "points": 107.75,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Jake Bennett"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 15.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "amed rosario",
+    "austin wells",
+    "gerrit cole",
+    "jake bennett",
+    "jose caballero",
+    "mike trout",
+    "nick sogard",
+    "spencer jones",
+    "wade meckler",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5211910349",
+   "username": "flipflop8048",
+   "points": 107.649994,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "heriberto hernandez",
+    "jakob marsee",
+    "matt olson",
+    "mauricio dubon",
+    "michael harris",
+    "sandy alcantara",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "61",
+   "entry_id": "5211869313",
+   "username": "whoisjohngalt420",
+   "points": 106.649994,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "brian serven",
+    "chris sale",
+    "jakob marsee",
+    "mauricio dubon",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "61",
+   "entry_id": "5211869314",
+   "username": "whoisjohngalt420",
+   "points": 106.649994,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "brian serven",
+    "chris sale",
+    "jakob marsee",
+    "mauricio dubon",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "61",
+   "entry_id": "5211869315",
+   "username": "whoisjohngalt420",
+   "points": 106.649994,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "brian serven",
+    "chris sale",
+    "jakob marsee",
+    "mauricio dubon",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5212003742",
+   "username": "zandwich",
+   "points": 105.9,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "chris sale",
+    "connor wong",
+    "griffin conine",
+    "heriberto hernandez",
+    "jake bennett",
+    "jakob marsee",
+    "otto lopez",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "65",
+   "entry_id": "5212056288",
+   "username": "wazzu24",
+   "points": 105.649994,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "henry bolte",
+    "michael harris",
+    "ozzie albies",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "66",
+   "entry_id": "5211952360",
+   "username": "AngerTornado",
+   "points": 104.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jake bennett",
+    "matt olson",
+    "mike yastrzemski",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "67",
+   "entry_id": "5211890707",
+   "username": "soloboxeo",
+   "points": 102.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Jake Bennett"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "gerrit cole",
+    "heliot ramos",
+    "jake bennett",
+    "otto lopez",
+    "paul goldschmidt",
+    "trent grisham",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "68",
+   "entry_id": "5212003744",
+   "username": "zandwich",
+   "points": 101.9,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 36.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "chris sale",
+    "drake baldwin",
+    "jake bennett",
+    "jakob marsee",
+    "javier sanoja",
+    "kyle stowers",
+    "michael harris",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "69",
+   "entry_id": "5211910348",
+   "username": "flipflop8048",
+   "points": 101.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "eli white",
+    "matt olson",
+    "michael harris",
+    "nick sogard",
+    "ronald acuna",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5212087770",
+   "username": "gburn4",
+   "points": 99.9,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 31.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "amed rosario",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "matt olson",
+    "mauricio dubon",
+    "michael harris",
+    "ronald acuna",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5211720721",
+   "username": "hokesfight24",
+   "points": 98.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jake bennett",
+    "matt olson",
+    "mauricio dubon",
+    "michael harris",
+    "nick sogard",
+    "ronald acuna",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "72",
+   "entry_id": "5212050071",
+   "username": "vinny1979",
+   "points": 98.399994,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Sandy Alcantara",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "mauricio dubon",
+    "nick sogard",
+    "ronald acuna",
+    "sandy alcantara",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "73",
+   "entry_id": "5211980390",
+   "username": "ARBNW21",
+   "points": 97.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jake bennett",
+    "matt olson",
+    "mike yastrzemski",
+    "nick sogard",
+    "spencer jones",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5211983544",
+   "username": "memphizen",
+   "points": 96.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "michael harris",
+    "ozzie albies",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "75",
+   "entry_id": "5212059309",
+   "username": "theincog",
+   "points": 96.0,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Chris Sale",
+    "Gage Jump"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.32,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "ceddanne rafaela",
+    "chris sale",
+    "gage jump",
+    "jake rogers",
+    "javier sanoja",
+    "mike trout",
+    "willson contreras",
+    "wilyer abreu",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5211890709",
+   "username": "soloboxeo",
+   "points": 95.649994,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 32.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "george lombard",
+    "griffin conine",
+    "matt olson",
+    "max muncy",
+    "michael harris",
+    "ozzie albies",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "77",
+   "entry_id": "5212250674",
+   "username": "beccapatt",
+   "points": 94.3,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Gage Jump",
+    "Jake Bennett"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 17.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "drake baldwin",
+    "gage jump",
+    "heliot ramos",
+    "jake bennett",
+    "jim jarvis",
+    "jose caballero",
+    "ozzie albies",
+    "ronald acuna",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5211922239",
+   "username": "proone",
+   "points": 93.95,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 32.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "jake bennett",
+    "kyle stowers",
+    "otto lopez",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5211924188",
+   "username": "Mugatu",
+   "points": 92.95,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "jake bennett",
+    "jarren duran",
+    "joe mack",
+    "mike trout",
+    "sandy alcantara",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "80",
+   "entry_id": "5212129778",
+   "username": "clags22",
+   "points": 91.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "jahmai jones",
+    "jake bennett",
+    "matt olson",
+    "mike trout",
+    "xavier edwards",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5211925081",
+   "username": "drunkonpappy",
+   "points": 91.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Gage Jump"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "gage jump",
+    "henry bolte",
+    "josh lowe",
+    "matt olson",
+    "ozzie albies",
+    "ronald acuna",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5211925083",
+   "username": "drunkonpappy",
+   "points": 90.45,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "denzer guzman",
+    "gerrit cole",
+    "jakob marsee",
+    "josh lowe",
+    "kyle stowers",
+    "mike trout",
+    "moises ballesteros",
+    "xavier edwards",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5212129780",
+   "username": "clags22",
+   "points": 90.35,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "jahmai jones",
+    "matt olson",
+    "ozzie albies",
+    "ronald acuna",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5211673043",
+   "username": "HanSoloJr",
+   "points": 89.9,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "jake bennett",
+    "jarren duran",
+    "kyle stowers",
+    "ronald acuna",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "85",
+   "entry_id": "5212129779",
+   "username": "clags22",
+   "points": 89.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "gerrit cole",
+    "jake bennett",
+    "jarren duran",
+    "mike trout",
+    "moises ballesteros",
+    "willson contreras",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "86",
+   "entry_id": "5212187498",
+   "username": "coleproffer",
+   "points": 89.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Gage Jump",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "amed rosario",
+    "drake baldwin",
+    "gage jump",
+    "heliot ramos",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "87",
+   "entry_id": "5212059311",
+   "username": "theincog",
+   "points": 89.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Chris Sale",
+    "Gage Jump"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "andruw monasterio",
+    "austin riley",
+    "ceddanne rafaela",
+    "chris sale",
+    "gage jump",
+    "jake rogers",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5211797943",
+   "username": "Bankster17",
+   "points": 88.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "jake bennett",
+    "matt olson",
+    "ozzie albies",
+    "ronald acuna",
+    "sandy alcantara",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5211959377",
+   "username": "jdub.14",
+   "points": 87.649994,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jarren duran",
+    "mauricio dubon",
+    "michael harris",
+    "nick sogard",
+    "sandy alcantara",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "90",
+   "entry_id": "5211890708",
+   "username": "soloboxeo",
+   "points": 82.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "jake bennett",
+    "joe mack",
+    "matt olson",
+    "michael harris",
+    "mike trout",
+    "otto lopez",
+    "ozzie albies",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5211988337",
+   "username": "ted040176",
+   "points": 82.65,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Jake Bennett",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "jarren duran",
+    "ozzie albies",
+    "ronald acuna",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5212209517",
+   "username": "y2kFrog",
+   "points": 82.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "gerrit cole",
+    "jarren duran",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "93",
+   "entry_id": "5211746219",
+   "username": "jpeyton1219",
+   "points": 81.399994,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sandy Alcantara",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 30.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "jacob wilson",
+    "matt olson",
+    "mike trout",
+    "sandy alcantara",
+    "walbert urena",
+    "wilyer abreu",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "94",
+   "entry_id": "5211972004",
+   "username": "tigolebitties91",
+   "points": 80.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jake bennett",
+    "jarren duran",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "sandy alcantara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "95",
+   "entry_id": "5211720722",
+   "username": "hokesfight24",
+   "points": 79.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "austin riley",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "eli white",
+    "jake bennett",
+    "nick sogard",
+    "ronald acuna",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "96",
+   "entry_id": "5211988338",
+   "username": "ted040176",
+   "points": 79.65,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "Jake Bennett",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "matt olson",
+    "michael harris",
+    "nick sogard",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "97",
+   "entry_id": "5212146914",
+   "username": "salatso22",
+   "points": 78.9,
+   "salary_used": 47500,
+   "salary_left": 2500,
+   "sp_pair": [
+    "Chris Sale",
+    "Jake Bennett"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 33.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jahmai jones",
+    "jake bennett",
+    "jarren duran",
+    "kyle stowers",
+    "moises ballesteros",
+    "ozzie albies",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5212088031",
+   "username": "redyodagirl",
+   "points": 78.35,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "drake baldwin",
+    "jahmai jones",
+    "matt olson",
+    "mauricio dubon",
+    "michael harris",
+    "ozzie albies",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "99",
+   "entry_id": "5211882175",
+   "username": "seaone",
+   "points": 77.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jake Bennett",
+    "Sandy Alcantara"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 24.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "jake bennett",
+    "jarren duran",
+    "joe mack",
+    "mike trout",
+    "otto lopez",
+    "ronald acuna",
+    "sandy alcantara",
+    "vaughn grissom",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5212222869",
+   "username": "bleeski",
+   "points": 77.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 27.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "gerrit cole",
+    "heliot ramos",
+    "jarren duran",
+    "jonah heim",
+    "mike trout",
+    "nick sogard",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "101",
+   "entry_id": "5212236287",
+   "username": "Cowboys082288",
+   "points": 75.65,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Jake Bennett",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "drake baldwin",
+    "jahmai jones",
+    "jake bennett",
+    "jarren duran",
+    "ozzie albies",
+    "trent grisham",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5212250675",
+   "username": "beccapatt",
+   "points": 74.399994,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Sandy Alcantara",
+    "Walbert Urena"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 20.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "jacob wilson",
+    "javier sanoja",
+    "joe mack",
+    "matt olson",
+    "mike trout",
+    "sandy alcantara",
+    "tyler soderstrom",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "103",
+   "entry_id": "5212204707",
+   "username": "Extraqtt",
+   "points": 73.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "eli white",
+    "gerrit cole",
+    "jarren duran",
+    "matt olson",
+    "ozzie albies",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5212089331",
+   "username": "mrclean913",
+   "points": 72.35,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 16.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "henry bolte",
+    "jacob wilson",
+    "jonah heim",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "tyler soderstrom",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "105",
+   "entry_id": "5211919929",
+   "username": "mcafeend",
+   "points": 71.45,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Chris Sale",
+    "Gerrit Cole"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 19.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "connor wong",
+    "denzer guzman",
+    "gerrit cole",
+    "griffin conine",
+    "heriberto hernandez",
+    "kyle stowers",
+    "mike trout",
+    "vaughn grissom",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "106",
+   "entry_id": "5212050070",
+   "username": "vinny1979",
+   "points": 66.2,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 12.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "amed rosario",
+    "austin wells",
+    "gerrit cole",
+    "heliot ramos",
+    "mike trout",
+    "nick sogard",
+    "paul goldschmidt",
+    "trent grisham",
+    "walbert urena",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5212056290",
+   "username": "wazzu24",
+   "points": 62.35,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "austin riley",
+    "brian serven",
+    "chris sale",
+    "eli white",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5212088030",
+   "username": "redyodagirl",
+   "points": 61.35,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "drake baldwin",
+    "josh lowe",
+    "mauricio dubon",
+    "ozzie albies",
+    "ronald acuna",
+    "wade meckler",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "109",
+   "entry_id": "5211988339",
+   "username": "ted040176",
+   "points": 60.65,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jake Bennett",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "drake baldwin",
+    "eli white",
+    "jake bennett",
+    "ozzie albies",
+    "ronald acuna",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "110",
+   "entry_id": "5211980391",
+   "username": "ARBNW21",
+   "points": 60.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 24.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "austin riley",
+    "ben rice",
+    "ceddanne rafaela",
+    "chris sale",
+    "joe mack",
+    "mike yastrzemski",
+    "vaughn grissom",
+    "walbert urena",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5211998709",
+   "username": "browns1234",
+   "points": 59.35,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "matt olson",
+    "mauricio dubon",
+    "michael harris",
+    "nick sogard",
+    "ronald acuna",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5211998710",
+   "username": "browns1234",
+   "points": 59.35,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "matt olson",
+    "mauricio dubon",
+    "michael harris",
+    "nick sogard",
+    "ronald acuna",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5212133414",
+   "username": "hgh13",
+   "points": 59.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jonah heim",
+    "michael harris",
+    "nolan schanuel",
+    "ozzie albies",
+    "wade meckler",
+    "walbert urena",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5212133575",
+   "username": "hgh13",
+   "points": 59.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jonah heim",
+    "michael harris",
+    "nolan schanuel",
+    "ozzie albies",
+    "wade meckler",
+    "walbert urena",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5212137108",
+   "username": "hgh13",
+   "points": 59.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "jonah heim",
+    "michael harris",
+    "nolan schanuel",
+    "ozzie albies",
+    "wade meckler",
+    "walbert urena",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "116",
+   "entry_id": "5212089333",
+   "username": "mrclean913",
+   "points": 57.199997,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Gerrit Cole",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 18.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "ceddanne rafaela",
+    "connor wong",
+    "denzer guzman",
+    "gerrit cole",
+    "mike trout",
+    "vaughn grissom",
+    "wade meckler",
+    "walbert urena",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "117",
+   "entry_id": "5211998708",
+   "username": "browns1234",
+   "points": 52.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "chris sale",
+    "connor wong",
+    "jarren duran",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5212116049",
+   "username": "stock2mail",
+   "points": 49.35,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Chris Sale",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "connor wong",
+    "jarren duran",
+    "jim jarvis",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna",
+    "walbert urena",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Chris Sale",
+   "player_norm": "chris sale",
+   "roster_position": "P",
+   "pct_drafted": 69.49,
+   "fpts": 19.3
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 62.71,
+   "fpts": 14.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 61.86,
+   "fpts": 3.0
+  },
+  {
+   "player": "Sandy Alcantara",
+   "player_norm": "sandy alcantara",
+   "roster_position": "P",
+   "pct_drafted": 47.46,
+   "fpts": 33.35
+  },
+  {
+   "player": "Xavier Edwards",
+   "player_norm": "xavier edwards",
+   "roster_position": "2B",
+   "pct_drafted": 41.53,
+   "fpts": 18.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "SS",
+   "pct_drafted": 41.53,
+   "fpts": 11.0
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "1B",
+   "pct_drafted": 40.68,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "OF",
+   "pct_drafted": 39.83,
+   "fpts": 14.0
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "C",
+   "pct_drafted": 38.98,
+   "fpts": 3.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "OF",
+   "pct_drafted": 33.05,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ozzie Albies",
+   "player_norm": "ozzie albies",
+   "roster_position": "2B",
+   "pct_drafted": 29.66,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jake Bennett",
+   "player_norm": "jake bennett",
+   "roster_position": "P",
+   "pct_drafted": 27.12,
+   "fpts": 8.6
+  },
+  {
+   "player": "Gerrit Cole",
+   "player_norm": "gerrit cole",
+   "roster_position": "P",
+   "pct_drafted": 27.12,
+   "fpts": 30.15
+  },
+  {
+   "player": "Jahmai Jones",
+   "player_norm": "jahmai jones",
+   "roster_position": "OF",
+   "pct_drafted": 27.12,
+   "fpts": 27.0
+  },
+  {
+   "player": "Matt Olson",
+   "player_norm": "matt olson",
+   "roster_position": "1B",
+   "pct_drafted": 25.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jakob Marsee",
+   "player_norm": "jakob marsee",
+   "roster_position": "OF",
+   "pct_drafted": 22.03,
+   "fpts": 14.0
+  },
+  {
+   "player": "Walbert Urena",
+   "player_norm": "walbert urena",
+   "roster_position": "P",
+   "pct_drafted": 20.34,
+   "fpts": -2.95
+  },
+  {
+   "player": "Kyle Stowers",
+   "player_norm": "kyle stowers",
+   "roster_position": "1B",
+   "pct_drafted": 19.49,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 18.64,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 18.64,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "2B",
+   "pct_drafted": 18.64,
+   "fpts": 13.0
+  },
+  {
+   "player": "Austin Riley",
+   "player_norm": "austin riley",
+   "roster_position": "3B",
+   "pct_drafted": 17.8,
+   "fpts": 3.0
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "OF",
+   "pct_drafted": 16.95,
+   "fpts": 2.0
+  },
+  {
+   "player": "Otto Lopez",
+   "player_norm": "otto lopez",
+   "roster_position": "SS",
+   "pct_drafted": 16.95,
+   "fpts": 14.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "C",
+   "pct_drafted": 16.95,
+   "fpts": 7.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "SS",
+   "pct_drafted": 15.25,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mauricio Dubon",
+   "player_norm": "mauricio dubon",
+   "roster_position": "SS",
+   "pct_drafted": 11.86,
+   "fpts": 7.0
+  },
+  {
+   "player": "Griffin Conine",
+   "player_norm": "griffin conine",
+   "roster_position": "OF",
+   "pct_drafted": 11.02,
+   "fpts": 8.0
+  },
+  {
+   "player": "Joe Mack",
+   "player_norm": "joe mack",
+   "roster_position": "C",
+   "pct_drafted": 9.32,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Soderstrom",
+   "player_norm": "tyler soderstrom",
+   "roster_position": "OF",
+   "pct_drafted": 9.32,
+   "fpts": 16.0
+  },
+  {
+   "player": "Eli White",
+   "player_norm": "eli white",
+   "roster_position": "OF",
+   "pct_drafted": 8.47,
+   "fpts": 2.0
+  },
+  {
+   "player": "Gage Jump",
+   "player_norm": "gage jump",
+   "roster_position": "P",
+   "pct_drafted": 8.47,
+   "fpts": 30.7
+  },
+  {
+   "player": "Henry Bolte",
+   "player_norm": "henry bolte",
+   "roster_position": "OF",
+   "pct_drafted": 8.47,
+   "fpts": 14.0
+  },
+  {
+   "player": "Heliot Ramos",
+   "player_norm": "heliot ramos",
+   "roster_position": "OF",
+   "pct_drafted": 8.47,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jacob Wilson",
+   "player_norm": "jacob wilson",
+   "roster_position": "SS",
+   "pct_drafted": 6.78,
+   "fpts": 14.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "2B",
+   "pct_drafted": 6.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ben Rice",
+   "player_norm": "ben rice",
+   "roster_position": "1B",
+   "pct_drafted": 5.93,
+   "fpts": 14.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "1B",
+   "pct_drafted": 5.93,
+   "fpts": 3.0
+  },
+  {
+   "player": "Wade Meckler",
+   "player_norm": "wade meckler",
+   "roster_position": "OF",
+   "pct_drafted": 5.93,
+   "fpts": 8.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brian Serven",
+   "player_norm": "brian serven",
+   "roster_position": "C",
+   "pct_drafted": 5.08,
+   "fpts": 5.0
+  },
+  {
+   "player": "Trent Grisham",
+   "player_norm": "trent grisham",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 7.0
+  },
+  {
+   "player": "Heriberto Hernandez",
+   "player_norm": "heriberto hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 7.0
+  },
+  {
+   "player": "Tommy White",
+   "player_norm": "tommy white",
+   "roster_position": "3B",
+   "pct_drafted": 4.24,
+   "fpts": 3.0
+  },
+  {
+   "player": "Moises Ballesteros",
+   "player_norm": "moises ballesteros",
+   "roster_position": "C",
+   "pct_drafted": 4.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Austin Wells",
+   "player_norm": "austin wells",
+   "roster_position": "C",
+   "pct_drafted": 4.24,
+   "fpts": 12.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 4.24,
+   "fpts": 9.0
+  },
+  {
+   "player": "Alika Williams",
+   "player_norm": "alika williams",
+   "roster_position": "2B",
+   "pct_drafted": 3.39,
+   "fpts": 6.0
+  },
+  {
+   "player": "George Lombard Jr.",
+   "player_norm": "george lombard",
+   "roster_position": "SS",
+   "pct_drafted": 3.39,
+   "fpts": 21.0
+  },
+  {
+   "player": "Jim Jarvis",
+   "player_norm": "jim jarvis",
+   "roster_position": "SS",
+   "pct_drafted": 3.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Denzer Guzman",
+   "player_norm": "denzer guzman",
+   "roster_position": "3B",
+   "pct_drafted": 3.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Josh Lowe",
+   "player_norm": "josh lowe",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Mike Yastrzemski",
+   "player_norm": "mike yastrzemski",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 13.0
+  },
+  {
+   "player": "Amed Rosario",
+   "player_norm": "amed rosario",
+   "roster_position": "3B",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Paul Goldschmidt",
+   "player_norm": "paul goldschmidt",
+   "roster_position": "1B",
+   "pct_drafted": 2.54,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jose Caballero",
+   "player_norm": "jose caballero",
+   "roster_position": "3B",
+   "pct_drafted": 2.54,
+   "fpts": 7.0
+  },
+  {
+   "player": "Spencer Jones",
+   "player_norm": "spencer jones",
+   "roster_position": "OF",
+   "pct_drafted": 2.54,
+   "fpts": 24.0
+  },
+  {
+   "player": "Jake Rogers",
+   "player_norm": "jake rogers",
+   "roster_position": "C",
+   "pct_drafted": 2.54,
+   "fpts": 0.0
+  },
+  {
+   "player": "Owen Caissie",
+   "player_norm": "owen caissie",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 5.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "3B",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Lawrence Butler",
+   "player_norm": "lawrence butler",
+   "roster_position": "OF",
+   "pct_drafted": 0.85,
+   "fpts": 14.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "OF",
+   "pct_drafted": 0.85,
+   "fpts": 9.0
+  },
+  {
+   "player": "Mauricio Dubon",
+   "player_norm": "mauricio dubon",
+   "roster_position": "OF",
+   "pct_drafted": 0.85,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jose Caballero",
+   "player_norm": "jose caballero",
+   "roster_position": "SS",
+   "pct_drafted": 0.85,
+   "fpts": 7.0
+  }
+ ],
+ "own_results": {
+  "matched": 3,
+  "requested": 3,
+  "field_size": 118,
+  "best_rank": 20,
+  "worst_rank": 100,
+  "best_finish_percentile": 83.9,
+  "median_finish_percentile": 64.41,
+  "best_points": 130.5,
+  "winning_points": 156.5,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

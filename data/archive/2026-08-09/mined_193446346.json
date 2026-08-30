@@ -1,0 +1,4194 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193446346",
+ "slate_date": "2026-08-09",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 118,
+  "entries_complete_lineups": 118,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 112.8,
+  "winning_entry_id": "5213107346",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 109,
+  "entries_in_duplicated_lineups": 16,
+  "share_duplicated_pct": 13.6,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 102,
+   "2": 5,
+   "3": 2
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2300,
+  "at_cap_entries": 50,
+  "at_cap_share_pct": 42.4,
+  "salary_left_histogram": {
+   "1-100": 17,
+   "301-700": 25,
+   "<= 0": 33,
+   "101-300": 26,
+   "701-1500": 16,
+   "> 1500": 1
+  },
+  "max_stack_histogram": {
+   "2": 11,
+   "3": 22,
+   "4": 39,
+   "5": 46
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Ian Seymour",
+     "Troy Melton"
+    ],
+    "count": 24,
+    "field_share_pct": 20.3
+   },
+   {
+    "pair": [
+     "Ian Seymour",
+     "Logan Webb"
+    ],
+    "count": 15,
+    "field_share_pct": 12.7
+   },
+   {
+    "pair": [
+     "Emerson Hancock",
+     "Logan Webb"
+    ],
+    "count": 11,
+    "field_share_pct": 9.3
+   },
+   {
+    "pair": [
+     "Emerson Hancock",
+     "Troy Melton"
+    ],
+    "count": 11,
+    "field_share_pct": 9.3
+   },
+   {
+    "pair": [
+     "Logan Webb",
+     "Troy Melton"
+    ],
+    "count": 9,
+    "field_share_pct": 7.6
+   },
+   {
+    "pair": [
+     "Justin Wrobleski",
+     "Troy Melton"
+    ],
+    "count": 9,
+    "field_share_pct": 7.6
+   },
+   {
+    "pair": [
+     "Justin Wrobleski",
+     "Logan Webb"
+    ],
+    "count": 7,
+    "field_share_pct": 5.9
+   },
+   {
+    "pair": [
+     "Ian Seymour",
+     "Justin Wrobleski"
+    ],
+    "count": 7,
+    "field_share_pct": 5.9
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Troy Melton",
+    "pct_drafted": 47.46
+   },
+   {
+    "player": "Ian Seymour",
+    "pct_drafted": 46.61
+   },
+   {
+    "player": "Andy Pages",
+    "pct_drafted": 42.37
+   },
+   {
+    "player": "Logan Webb",
+    "pct_drafted": 38.98
+   },
+   {
+    "player": "Shohei Ohtani",
+    "pct_drafted": 38.98
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 4.23,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1180,
+  "roster_slots_expected": 1180,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 995.7,
+  "dk_table_deficit_pts": 4.3,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 4.3 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5213107346",
+   "username": "Bankster17",
+   "points": 112.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 27.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "chandler simpson",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ian seymour",
+    "jonathan aranda",
+    "ketel marte",
+    "liam hicks",
+    "nolan arenado",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5213547036",
+   "username": "kojo3",
+   "points": 112.3,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ian seymour",
+    "jonathan aranda",
+    "ketel marte",
+    "liam hicks",
+    "logan webb",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5213096436",
+   "username": "mcafeend",
+   "points": 107.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dominic canzone",
+    "eduardo rodriguez",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ketel marte",
+    "randy arozarena",
+    "tim tawa",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5213448159",
+   "username": "auweglman",
+   "points": 106.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 26.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corbin carroll",
+    "daniel susac",
+    "dominic canzone",
+    "ian seymour",
+    "ketel marte",
+    "liam hicks",
+    "logan webb",
+    "mookie betts",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5213516000",
+   "username": "Raiderfanatic2195",
+   "points": 106.05,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 17.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "cole young",
+    "eduardo rodriguez",
+    "jonathan aranda",
+    "junior caminero",
+    "liam hicks",
+    "randy arozarena",
+    "taylor walls",
+    "taylor ward",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5213179364",
+   "username": "stock2mail",
+   "points": 105.3,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "ian seymour",
+    "junior caminero",
+    "kyle tucker",
+    "liam hicks",
+    "logan webb",
+    "mookie betts",
+    "richie palacios",
+    "teoscar hernandez",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5213405483",
+   "username": "Triangular",
+   "points": 104.05,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "corbin carroll",
+    "eduardo rodriguez",
+    "geraldo perdomo",
+    "ildemaro vargas",
+    "jonathan aranda",
+    "liam hicks",
+    "max clark",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5213624855",
+   "username": "jenna23",
+   "points": 103.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 27.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "chandler simpson",
+    "kike hernandez",
+    "liam hicks",
+    "logan webb",
+    "mookie betts",
+    "richie palacios",
+    "teoscar hernandez",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "9",
+   "entry_id": "5213405482",
+   "username": "Triangular",
+   "points": 102.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Ian Seymour"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "chandler simpson",
+    "colt keith",
+    "dillon dingler",
+    "eduardo rodriguez",
+    "gleyber torres",
+    "ian seymour",
+    "kevin mcgonigle",
+    "riley greene",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5213559893",
+   "username": "olrat14",
+   "points": 102.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 21.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt emerson",
+    "dominic canzone",
+    "jonathan aranda",
+    "julio rodriguez",
+    "ketel marte",
+    "liam hicks",
+    "logan webb",
+    "taylor ward",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5213529067",
+   "username": "ccasetta",
+   "points": 102.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "gabriel moreno",
+    "ian seymour",
+    "ketel marte",
+    "kike hernandez",
+    "kyle tucker",
+    "logan webb",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5213591053",
+   "username": "bleeski",
+   "points": 100.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 22.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "eduardo rodriguez",
+    "geraldo perdomo",
+    "jonathan aranda",
+    "julio rodriguez",
+    "ketel marte",
+    "liam hicks",
+    "logan webb",
+    "randy arozarena",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5213617863",
+   "username": "dmann8888",
+   "points": 98.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "dillon dingler",
+    "geraldo perdomo",
+    "ian seymour",
+    "junior caminero",
+    "richie palacios",
+    "riley greene",
+    "troy melton",
+    "yandy diaz",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "14",
+   "entry_id": "5213515975",
+   "username": "cw1tt",
+   "points": 98.55,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 20.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "corbin carroll",
+    "eduardo rodriguez",
+    "jung hoo lee",
+    "junior caminero",
+    "liam hicks",
+    "logan webb",
+    "osleivis basabe",
+    "rafael devers",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5213556680",
+   "username": "wittwerjoe",
+   "points": 98.3,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 28.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "gabriel moreno",
+    "ian seymour",
+    "jonathan aranda",
+    "ketel marte",
+    "logan webb",
+    "mookie betts",
+    "teoscar hernandez",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5213624888",
+   "username": "bfeinber42",
+   "points": 97.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "chandler simpson",
+    "dillon dingler",
+    "geraldo perdomo",
+    "ian seymour",
+    "jonathan aranda",
+    "ryan waldschmidt",
+    "tommy edman",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5213179365",
+   "username": "stock2mail",
+   "points": 96.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 25.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "colt keith",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ian seymour",
+    "ketel marte",
+    "riley greene",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5213625915",
+   "username": "RonnieS1971",
+   "points": 93.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 25.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "gabriel moreno",
+    "gleyber torres",
+    "ian seymour",
+    "jonathan aranda",
+    "julio rodriguez",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "troy melton",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5213632102",
+   "username": "RunWired",
+   "points": 93.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 28.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ian seymour",
+    "ketel marte",
+    "kevin mcgonigle",
+    "logan webb",
+    "rafael devers",
+    "taylor ward",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5213618227",
+   "username": "jefftheho",
+   "points": 91.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 30.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ian seymour",
+    "ketel marte",
+    "kike hernandez",
+    "logan webb",
+    "nolan arenado",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "21",
+   "entry_id": "5213606990",
+   "username": "jefftheho",
+   "points": 90.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ian seymour",
+    "ketel marte",
+    "nolan arenado",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5213622507",
+   "username": "RoobK19",
+   "points": 90.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "eduardo rodriguez",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jung hoo lee",
+    "junior caminero",
+    "ketel marte",
+    "logan webb",
+    "rafael devers",
+    "ryan waldschmidt"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5213271353",
+   "username": "flintmonster",
+   "points": 89.8,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 29.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "chandler simpson",
+    "dillon dingler",
+    "geraldo perdomo",
+    "ian seymour",
+    "josh naylor",
+    "kevin mcgonigle",
+    "max clark",
+    "richie palacios",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5213271373",
+   "username": "flintmonster",
+   "points": 89.8,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 29.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "chandler simpson",
+    "dillon dingler",
+    "geraldo perdomo",
+    "ian seymour",
+    "josh naylor",
+    "kevin mcgonigle",
+    "max clark",
+    "richie palacios",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "25",
+   "entry_id": "5213544186",
+   "username": "drunkonpappy",
+   "points": 88.55,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "eduardo rodriguez",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "julio rodriguez",
+    "jung hoo lee",
+    "ketel marte",
+    "logan webb",
+    "nolan arenado",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5213631867",
+   "username": "joflanne",
+   "points": 88.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 27.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "colt keith",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "julio rodriguez",
+    "logan webb",
+    "osleivis basabe",
+    "riley greene",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5213556682",
+   "username": "wittwerjoe",
+   "points": 88.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "geraldo perdomo",
+    "ian seymour",
+    "liam hicks",
+    "logan webb",
+    "richie palacios",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "28",
+   "entry_id": "5212656305",
+   "username": "SpeakoftheDevs",
+   "points": 88.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Ian Seymour"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-1-1-1-1-1",
+   "chalk_score": 30.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "emerson hancock",
+    "geraldo perdomo",
+    "ian seymour",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "liam hicks",
+    "osleivis basabe",
+    "shohei ohtani",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "29",
+   "entry_id": "5213096437",
+   "username": "mcafeend",
+   "points": 86.8,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ian seymour",
+    "ketel marte",
+    "nolan arenado",
+    "shohei ohtani",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5213015426",
+   "username": "whoisjohngalt420",
+   "points": 86.3,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ian seymour",
+    "junior caminero",
+    "liam hicks",
+    "logan webb",
+    "richie palacios",
+    "tyler locklear",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5213485750",
+   "username": "Extraqtt",
+   "points": 86.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 25.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "daniel susac",
+    "ian seymour",
+    "kike hernandez",
+    "logan webb",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "willy adames",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "32",
+   "entry_id": "5213570608",
+   "username": "ideagirl13",
+   "points": 84.9,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 23.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "chandler simpson",
+    "emerson hancock",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jonathan aranda",
+    "ketel marte",
+    "logan webb",
+    "nolan arenado",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5213625749",
+   "username": "RonnieS1971",
+   "points": 84.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Ian Seymour"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 24.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dillon dingler",
+    "eduardo rodriguez",
+    "geraldo perdomo",
+    "ian seymour",
+    "richie palacios",
+    "riley greene",
+    "shohei ohtani",
+    "weston wilson",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "34",
+   "entry_id": "5213631863",
+   "username": "umrebel3092",
+   "points": 83.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cole young",
+    "gabriel moreno",
+    "ian seymour",
+    "kyle tucker",
+    "logan webb",
+    "mookie betts",
+    "nolan arenado",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "35",
+   "entry_id": "5213630668",
+   "username": "GuitarBet1",
+   "points": 82.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "eduardo valencia",
+    "gleyber torres",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "kevin mcgonigle",
+    "max clark",
+    "troy melton",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "36",
+   "entry_id": "5212656304",
+   "username": "SpeakoftheDevs",
+   "points": 82.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 19.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "cole young",
+    "eduardo rodriguez",
+    "gabriel moreno",
+    "jung hoo lee",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "shohei ohtani",
+    "taylor ward",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5213552814",
+   "username": "kylehaeussler",
+   "points": 82.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "geraldo perdomo",
+    "ian seymour",
+    "ketel marte",
+    "liam hicks",
+    "logan webb",
+    "nolan arenado",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "38",
+   "entry_id": "5213441776",
+   "username": "auweglman",
+   "points": 82.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-1-1-1-1",
+   "chalk_score": 22.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "eduardo valencia",
+    "justin wrobleski",
+    "ketel marte",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "liam hicks",
+    "logan webb",
+    "taylor ward",
+    "teoscar hernandez",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5213223523",
+   "username": "wrabl",
+   "points": 81.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 29.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cal raleigh",
+    "ian seymour",
+    "jonathan aranda",
+    "ketel marte",
+    "kevin mcgonigle",
+    "nolan arenado",
+    "riley greene",
+    "teoscar hernandez",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "40",
+   "entry_id": "5213218567",
+   "username": "mrclean913",
+   "points": 81.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "ian seymour",
+    "kike hernandez",
+    "liam hicks",
+    "logan webb",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5213590876",
+   "username": "bleeski",
+   "points": 80.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Ian Seymour"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 20.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dillon dingler",
+    "eduardo rodriguez",
+    "ian seymour",
+    "jung hoo lee",
+    "junior caminero",
+    "osleivis basabe",
+    "rafael devers",
+    "riley greene",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "42",
+   "entry_id": "5213599716",
+   "username": "Oxyfide",
+   "points": 80.8,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "eduardo valencia",
+    "freddie freeman",
+    "ian seymour",
+    "kike hernandez",
+    "richie palacios",
+    "shohei ohtani",
+    "taylor walls",
+    "teoscar hernandez",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5213593354",
+   "username": "peterjpacheco",
+   "points": 80.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 29.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "josh naylor",
+    "kevin mcgonigle",
+    "logan webb",
+    "max clark",
+    "osleivis basabe",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5213628090",
+   "username": "xshonuff03x",
+   "points": 80.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 25.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jonathan aranda",
+    "jung hoo lee",
+    "kyle tucker",
+    "logan webb",
+    "tommy edman",
+    "troy melton",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "45",
+   "entry_id": "5213274145",
+   "username": "ar12gbp",
+   "points": 79.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "liam hicks",
+    "mookie betts",
+    "ryan waldschmidt",
+    "tommy edman",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "45",
+   "entry_id": "5213281990",
+   "username": "ar12gbp",
+   "points": 79.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "liam hicks",
+    "mookie betts",
+    "ryan waldschmidt",
+    "tommy edman",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "47",
+   "entry_id": "5213434844",
+   "username": "auweglman",
+   "points": 79.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 23.13,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "junior caminero",
+    "justin wrobleski",
+    "kyle tucker",
+    "osleivis basabe",
+    "riley greene",
+    "troy melton",
+    "willy adames",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "48",
+   "entry_id": "5213603557",
+   "username": "137666",
+   "points": 79.2,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Ian Seymour"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.2,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "corbin carroll",
+    "emerson hancock",
+    "ian seymour",
+    "ketel marte",
+    "kyle tucker",
+    "nolan arenado",
+    "shohei ohtani",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5213370843",
+   "username": "BUdropout",
+   "points": 78.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "cedric mullins",
+    "drew gilbert",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "justin wrobleski",
+    "liam hicks",
+    "richie palacios",
+    "shohei ohtani",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5213605060",
+   "username": "fenway2015",
+   "points": 77.8,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 26.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "dillon dingler",
+    "ian seymour",
+    "kevin mcgonigle",
+    "richie palacios",
+    "riley greene",
+    "spencer torkelson",
+    "tim tawa",
+    "troy melton",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5213405481",
+   "username": "Triangular",
+   "points": 76.1,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "drew gilbert",
+    "jung hoo lee",
+    "junior caminero",
+    "justin wrobleski",
+    "liam hicks",
+    "logan webb",
+    "osleivis basabe",
+    "rafael devers",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5212656306",
+   "username": "SpeakoftheDevs",
+   "points": 75.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.63,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "corbin carroll",
+    "geraldo perdomo",
+    "ian seymour",
+    "kevin mcgonigle",
+    "osleivis basabe",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "53",
+   "entry_id": "5213631890",
+   "username": "Overheated84",
+   "points": 75.65,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 19.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "eduardo rodriguez",
+    "gleyber torres",
+    "julio rodriguez",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "liam hicks",
+    "rafael devers",
+    "randy arozarena",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "54",
+   "entry_id": "5213627081",
+   "username": "dagrinch",
+   "points": 75.6,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "dominic canzone",
+    "justin wrobleski",
+    "kike hernandez",
+    "kyle tucker",
+    "liam hicks",
+    "mookie betts",
+    "teoscar hernandez",
+    "tommy edman",
+    "troy melton",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5213015427",
+   "username": "whoisjohngalt420",
+   "points": 74.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "emerson hancock",
+    "gabriel moreno",
+    "ketel marte",
+    "mookie betts",
+    "nolan arenado",
+    "ryan waldschmidt",
+    "shohei ohtani",
+    "troy melton",
+    "tyler locklear"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5213519273",
+   "username": "scrub69",
+   "points": 73.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "gabriel moreno",
+    "ian seymour",
+    "jung hoo lee",
+    "junior caminero",
+    "logan webb",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5213242881",
+   "username": "JRaab",
+   "points": 73.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Ian Seymour"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corbin carroll",
+    "emerson hancock",
+    "gabriel moreno",
+    "ian seymour",
+    "kyle tucker",
+    "mookie betts",
+    "nolan arenado",
+    "osleivis basabe",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "58",
+   "entry_id": "5212906968",
+   "username": "jrice54",
+   "points": 73.1,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "cole young",
+    "dominic canzone",
+    "jonathan aranda",
+    "junior caminero",
+    "justin wrobleski",
+    "liam hicks",
+    "logan webb",
+    "victor mesa",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5213218566",
+   "username": "mrclean913",
+   "points": 72.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "emerson hancock",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jung hoo lee",
+    "ketel marte",
+    "kyle tucker",
+    "logan webb",
+    "nolan arenado",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5213520333",
+   "username": "pdmac23",
+   "points": 72.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 26.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "dillon dingler",
+    "geraldo perdomo",
+    "ian seymour",
+    "ildemaro vargas",
+    "kevin mcgonigle",
+    "liam hicks",
+    "ryan waldschmidt",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "61",
+   "entry_id": "5213370845",
+   "username": "BUdropout",
+   "points": 72.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 28.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "geraldo perdomo",
+    "jonathan aranda",
+    "liam hicks",
+    "logan webb",
+    "nolan arenado",
+    "randy arozarena",
+    "richie palacios",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "62",
+   "entry_id": "5213168508",
+   "username": "howardwi",
+   "points": 72.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 28.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "dillon dingler",
+    "ian seymour",
+    "jonathan aranda",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "richie palacios",
+    "teoscar hernandez",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "63",
+   "entry_id": "5213622800",
+   "username": "Cisco1781",
+   "points": 71.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cal raleigh",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "max clark",
+    "mookie betts",
+    "richie palacios",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "63",
+   "entry_id": "5213629185",
+   "username": "Cisco1781",
+   "points": 71.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cal raleigh",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "max clark",
+    "mookie betts",
+    "richie palacios",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "65",
+   "entry_id": "5213630678",
+   "username": "Hindu321",
+   "points": 71.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-1-1-1-1-1",
+   "chalk_score": 21.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cedric mullins",
+    "colt emerson",
+    "eduardo valencia",
+    "gleyber torres",
+    "ildemaro vargas",
+    "jung hoo lee",
+    "kevin mcgonigle",
+    "logan webb",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "66",
+   "entry_id": "5213617765",
+   "username": "TeamDetroit85",
+   "points": 69.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 23.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "dillon dingler",
+    "geraldo perdomo",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "osleivis basabe",
+    "spencer torkelson",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "66",
+   "entry_id": "5213617771",
+   "username": "TeamDetroit85",
+   "points": 69.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 23.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "chandler simpson",
+    "dillon dingler",
+    "geraldo perdomo",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "osleivis basabe",
+    "spencer torkelson",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "68",
+   "entry_id": "5213559895",
+   "username": "olrat14",
+   "points": 69.5,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 22.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "dominic canzone",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "ildemaro vargas",
+    "josh naylor",
+    "julio rodriguez",
+    "logan webb",
+    "nolan arenado",
+    "randy arozarena",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "69",
+   "entry_id": "5213036798",
+   "username": "Ozarkian",
+   "points": 69.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "freddie freeman",
+    "geraldo perdomo",
+    "ian seymour",
+    "justin wrobleski",
+    "kike hernandez",
+    "liam hicks",
+    "richie palacios",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5213523477",
+   "username": "MSUCREW",
+   "points": 68.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "colt keith",
+    "corbin carroll",
+    "dillon dingler",
+    "ian seymour",
+    "kevin mcgonigle",
+    "richie palacios",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5213523482",
+   "username": "MSUCREW",
+   "points": 68.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "colt keith",
+    "corbin carroll",
+    "dillon dingler",
+    "ian seymour",
+    "kevin mcgonigle",
+    "richie palacios",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5213530733",
+   "username": "MSUCREW",
+   "points": 68.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "colt keith",
+    "corbin carroll",
+    "dillon dingler",
+    "ian seymour",
+    "kevin mcgonigle",
+    "richie palacios",
+    "riley greene",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5213556681",
+   "username": "wittwerjoe",
+   "points": 68.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 29.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "geraldo perdomo",
+    "ian seymour",
+    "jonathan aranda",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "max clark",
+    "teoscar hernandez",
+    "tommy edman",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5213603556",
+   "username": "137666",
+   "points": 68.8,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ian Seymour",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "ian seymour",
+    "kevin mcgonigle",
+    "max clark",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "troy melton",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "75",
+   "entry_id": "5213394654",
+   "username": "Aoteoroa",
+   "points": 68.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Logan Webb",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 23.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cal raleigh",
+    "josh naylor",
+    "julio rodriguez",
+    "kyle tucker",
+    "logan webb",
+    "mookie betts",
+    "tommy edman",
+    "troy melton",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5213630671",
+   "username": "GuitarBet1",
+   "points": 67.45,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Emerson Hancock"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 18.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "dillon dingler",
+    "eduardo rodriguez",
+    "emerson hancock",
+    "julio rodriguez",
+    "kevin mcgonigle",
+    "osleivis basabe",
+    "randy arozarena",
+    "taylor ward",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "77",
+   "entry_id": "5213593356",
+   "username": "peterjpacheco",
+   "points": 66.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Ian Seymour"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 28.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "dillon dingler",
+    "emerson hancock",
+    "ian seymour",
+    "jonathan aranda",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "osleivis basabe",
+    "shohei ohtani",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5213515976",
+   "username": "cw1tt",
+   "points": 64.4,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "ian seymour",
+    "jonathan aranda",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "liam hicks",
+    "richie palacios",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "victor mesa",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5213519274",
+   "username": "scrub69",
+   "points": 64.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "emerson hancock",
+    "josh naylor",
+    "julio rodriguez",
+    "ketel marte",
+    "kevin mcgonigle",
+    "nolan arenado",
+    "randy arozarena",
+    "taylor ward",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5213624367",
+   "username": "GuitarBet1",
+   "points": 64.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ian seymour",
+    "jung hoo lee",
+    "justin wrobleski",
+    "kike hernandez",
+    "liam hicks",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5213485749",
+   "username": "Extraqtt",
+   "points": 63.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 23.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "corbin carroll",
+    "emerson hancock",
+    "gabriel moreno",
+    "jung hoo lee",
+    "ketel marte",
+    "logan webb",
+    "rafael devers",
+    "shohei ohtani",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5213497039",
+   "username": "soloboxeo",
+   "points": 63.6,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 25.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "dominic canzone",
+    "geraldo perdomo",
+    "jonathan aranda",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "liam hicks",
+    "max clark",
+    "taylor ward",
+    "tommy edman",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5213593355",
+   "username": "peterjpacheco",
+   "points": 63.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "eduardo valencia",
+    "geraldo perdomo",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "max clark",
+    "osleivis basabe",
+    "shohei ohtani",
+    "troy melton",
+    "tyler locklear"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5213565098",
+   "username": "ideagirl13",
+   "points": 63.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.02,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "corbin carroll",
+    "ian seymour",
+    "julio rodriguez",
+    "kyle tucker",
+    "logan webb",
+    "mookie betts",
+    "nolan arenado",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "85",
+   "entry_id": "5213544187",
+   "username": "drunkonpappy",
+   "points": 62.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 23.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "corbin carroll",
+    "emerson hancock",
+    "geraldo perdomo",
+    "josh naylor",
+    "julio rodriguez",
+    "ketel marte",
+    "kevin mcgonigle",
+    "tim tawa",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "86",
+   "entry_id": "5213559336",
+   "username": "kydoffixial",
+   "points": 62.1,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 21.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "jung hoo lee",
+    "junior caminero",
+    "justin wrobleski",
+    "liam hicks",
+    "logan webb",
+    "max clark",
+    "osleivis basabe",
+    "shohei ohtani",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "87",
+   "entry_id": "5213547037",
+   "username": "kojo3",
+   "points": 61.199997,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Ian Seymour"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "colt keith",
+    "dillon dingler",
+    "emerson hancock",
+    "gleyber torres",
+    "ian seymour",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "riley greene"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5213631650",
+   "username": "DonBlues91",
+   "points": 59.6,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 24.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "colt keith",
+    "eduardo valencia",
+    "jonathan aranda",
+    "justin wrobleski",
+    "kyle tucker",
+    "mookie betts",
+    "richie palacios",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5213298086",
+   "username": "ar12gbp",
+   "points": 58.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 27.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ian seymour",
+    "jonathan aranda",
+    "junior caminero",
+    "justin wrobleski",
+    "liam hicks",
+    "mookie betts",
+    "teoscar hernandez",
+    "tommy edman",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "90",
+   "entry_id": "5213096435",
+   "username": "mcafeend",
+   "points": 57.4,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 23.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "cole young",
+    "corbin carroll",
+    "dominic canzone",
+    "emerson hancock",
+    "geraldo perdomo",
+    "josh naylor",
+    "julio rodriguez",
+    "kevin mcgonigle",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5213559403",
+   "username": "jc000000",
+   "points": 56.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "emerson hancock",
+    "gleyber torres",
+    "kike hernandez",
+    "max clark",
+    "mookie betts",
+    "shohei ohtani",
+    "spencer torkelson",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5213520019",
+   "username": "Swampdonkey018",
+   "points": 55.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.86,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "daniel susac",
+    "drew gilbert",
+    "emerson hancock",
+    "freddie freeman",
+    "logan webb",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5213520264",
+   "username": "Swampdonkey018",
+   "points": 55.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.86,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "daniel susac",
+    "drew gilbert",
+    "emerson hancock",
+    "freddie freeman",
+    "logan webb",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5213527781",
+   "username": "Swampdonkey018",
+   "points": 55.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.86,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "daniel susac",
+    "drew gilbert",
+    "emerson hancock",
+    "freddie freeman",
+    "logan webb",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "95",
+   "entry_id": "5213559894",
+   "username": "olrat14",
+   "points": 55.4,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 21.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "dominic canzone",
+    "emerson hancock",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "gleyber torres",
+    "josh naylor",
+    "julio rodriguez",
+    "nolan arenado",
+    "randy arozarena",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "96",
+   "entry_id": "5213544185",
+   "username": "drunkonpappy",
+   "points": 54.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "cal raleigh",
+    "corbin carroll",
+    "emerson hancock",
+    "geraldo perdomo",
+    "julio rodriguez",
+    "ketel marte",
+    "logan webb",
+    "nolan arenado",
+    "randy arozarena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "97",
+   "entry_id": "5212906969",
+   "username": "jrice54",
+   "points": 53.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "emerson hancock",
+    "gabriel moreno",
+    "jung hoo lee",
+    "logan webb",
+    "nolan arenado",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "97",
+   "entry_id": "5213547035",
+   "username": "kojo3",
+   "points": 53.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 25.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "emerson hancock",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jung hoo lee",
+    "logan webb",
+    "nolan arenado",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "99",
+   "entry_id": "5213565299",
+   "username": "Aoteoroa",
+   "points": 52.6,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 20.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole young",
+    "colt emerson",
+    "dillon dingler",
+    "josh naylor",
+    "julio rodriguez",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "kyle tucker",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5213515998",
+   "username": "Raiderfanatic2195",
+   "points": 52.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Eduardo Rodriguez",
+    "Emerson Hancock"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 18.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "dominic canzone",
+    "eduardo rodriguez",
+    "emerson hancock",
+    "gleyber torres",
+    "julio rodriguez",
+    "kevin mcgonigle",
+    "rafael devers",
+    "randy arozarena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "101",
+   "entry_id": "5213607514",
+   "username": "Jesse1014",
+   "points": 50.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Ian Seymour",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 24.07,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "daniel susac",
+    "freddie freeman",
+    "geraldo perdomo",
+    "ian seymour",
+    "justin wrobleski",
+    "randy arozarena",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5213631669",
+   "username": "MrChowon23",
+   "points": 49.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 25.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "jonathan aranda",
+    "justin wrobleski",
+    "kike hernandez",
+    "liam hicks",
+    "mookie betts",
+    "richie palacios",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "troy melton",
+    "victor mesa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "103",
+   "entry_id": "5213513916",
+   "username": "cw1tt",
+   "points": 49.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dominic canzone",
+    "eduardo valencia",
+    "emerson hancock",
+    "gleyber torres",
+    "josh naylor",
+    "kevin mcgonigle",
+    "randy arozarena",
+    "riley greene",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5212928644",
+   "username": "gburn4",
+   "points": 48.4,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 20.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "cal raleigh",
+    "cole young",
+    "emerson hancock",
+    "grant mccray",
+    "kevin mcgonigle",
+    "riley greene",
+    "shohei ohtani",
+    "spencer torkelson",
+    "taylor walls",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "105",
+   "entry_id": "5213524905",
+   "username": "Footballchamp1967",
+   "points": 48.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 22.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "cole young",
+    "colt keith",
+    "emerson hancock",
+    "justin wrobleski",
+    "liam hicks",
+    "randy arozarena",
+    "shohei ohtani",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "106",
+   "entry_id": "5213519272",
+   "username": "scrub69",
+   "points": 47.199997,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Ian Seymour"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "emerson hancock",
+    "gabriel moreno",
+    "gleyber torres",
+    "ian seymour",
+    "kevin mcgonigle",
+    "max clark",
+    "riley greene",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5213579348",
+   "username": "Footballchamp1967",
+   "points": 44.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 22.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole young",
+    "colt keith",
+    "dillon dingler",
+    "dominic canzone",
+    "emerson hancock",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "troy melton",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5213515999",
+   "username": "Raiderfanatic2195",
+   "points": 43.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "emerson hancock",
+    "gabriel moreno",
+    "ildemaro vargas",
+    "logan webb",
+    "mookie betts",
+    "nolan arenado",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5213570795",
+   "username": "ideagirl13",
+   "points": 43.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "corbin carroll",
+    "emerson hancock",
+    "kyle tucker",
+    "logan webb",
+    "max clark",
+    "mookie betts",
+    "nolan arenado",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "110",
+   "entry_id": "5212906967",
+   "username": "jrice54",
+   "points": 42.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "colt keith",
+    "dillon dingler",
+    "dominic canzone",
+    "emerson hancock",
+    "gleyber torres",
+    "josh naylor",
+    "kevin mcgonigle",
+    "max clark",
+    "randy arozarena",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5213370844",
+   "username": "BUdropout",
+   "points": 39.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.4,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "cal raleigh",
+    "christian koss",
+    "justin wrobleski",
+    "logan webb",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5213485751",
+   "username": "Extraqtt",
+   "points": 39.1,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.4,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "cal raleigh",
+    "christian koss",
+    "justin wrobleski",
+    "logan webb",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "113",
+   "entry_id": "5213605197",
+   "username": "sharkey78",
+   "points": 37.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Troy Melton"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 21.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "emerson hancock",
+    "freddie freeman",
+    "max clark",
+    "mookie betts",
+    "nolan arenado",
+    "randy arozarena",
+    "teoscar hernandez",
+    "tommy edman",
+    "troy melton"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5213572581",
+   "username": "Aoteoroa",
+   "points": 33.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Justin Wrobleski",
+    "Logan Webb"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 20.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel susac",
+    "julio rodriguez",
+    "jung hoo lee",
+    "junior caminero",
+    "justin wrobleski",
+    "logan webb",
+    "mookie betts",
+    "rafael devers",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "115",
+   "entry_id": "5213015428",
+   "username": "whoisjohngalt420",
+   "points": 31.0,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "dillon dingler",
+    "dominic canzone",
+    "emerson hancock",
+    "gleyber torres",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "max clark",
+    "riley greene",
+    "willy adames"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "115",
+   "entry_id": "5213179366",
+   "username": "stock2mail",
+   "points": 31.0,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 19.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "emerson hancock",
+    "gleyber torres",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "riley greene",
+    "spencer torkelson",
+    "taylor ward",
+    "teoscar hernandez",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "117",
+   "entry_id": "5213591054",
+   "username": "bleeski",
+   "points": 28.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 23.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "emerson hancock",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "max clark",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "randy arozarena",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5213218568",
+   "username": "mrclean913",
+   "points": 27.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Emerson Hancock",
+    "Justin Wrobleski"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "colt keith",
+    "dillon dingler",
+    "emerson hancock",
+    "justin wrobleski",
+    "kevin mcgonigle",
+    "max clark",
+    "osleivis basabe",
+    "riley greene",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Troy Melton",
+   "player_norm": "troy melton",
+   "roster_position": "P",
+   "pct_drafted": 47.46,
+   "fpts": 20.5
+  },
+  {
+   "player": "Ian Seymour",
+   "player_norm": "ian seymour",
+   "roster_position": "P",
+   "pct_drafted": 46.61,
+   "fpts": 25.3
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "OF",
+   "pct_drafted": 42.37,
+   "fpts": 10.0
+  },
+  {
+   "player": "Logan Webb",
+   "player_norm": "logan webb",
+   "roster_position": "P",
+   "pct_drafted": 38.98,
+   "fpts": 17.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "SS",
+   "pct_drafted": 35.59,
+   "fpts": 5.0
+  },
+  {
+   "player": "Emerson Hancock",
+   "player_norm": "emerson hancock",
+   "roster_position": "P",
+   "pct_drafted": 29.66,
+   "fpts": 5.9
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "OF",
+   "pct_drafted": 27.97,
+   "fpts": 2.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 27.12,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "SS",
+   "pct_drafted": 26.27,
+   "fpts": 2.0
+  },
+  {
+   "player": "Justin Wrobleski",
+   "player_norm": "justin wrobleski",
+   "roster_position": "P",
+   "pct_drafted": 25.42,
+   "fpts": 2.1
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "C",
+   "pct_drafted": 25.42,
+   "fpts": 12.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "OF",
+   "pct_drafted": 23.73,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jonathan Aranda",
+   "player_norm": "jonathan aranda",
+   "roster_position": "1B",
+   "pct_drafted": 23.73,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "C",
+   "pct_drafted": 22.88,
+   "fpts": 9.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 22.03,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ketel Marte",
+   "player_norm": "ketel marte",
+   "roster_position": "2B",
+   "pct_drafted": 22.03,
+   "fpts": 16.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "3B",
+   "pct_drafted": 21.19,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nolan Arenado",
+   "player_norm": "nolan arenado",
+   "roster_position": "3B",
+   "pct_drafted": 20.34,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "OF",
+   "pct_drafted": 19.49,
+   "fpts": 10.0
+  },
+  {
+   "player": "Riley Greene",
+   "player_norm": "riley greene",
+   "roster_position": "OF",
+   "pct_drafted": 19.49,
+   "fpts": 2.0
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "2B",
+   "pct_drafted": 19.49,
+   "fpts": 0.0
+  },
+  {
+   "player": "Richie Palacios",
+   "player_norm": "richie palacios",
+   "roster_position": "2B",
+   "pct_drafted": 18.64,
+   "fpts": 3.0
+  },
+  {
+   "player": "Willy Adames",
+   "player_norm": "willy adames",
+   "roster_position": "SS",
+   "pct_drafted": 17.8,
+   "fpts": 5.0
+  },
+  {
+   "player": "Osleivis Basabe",
+   "player_norm": "osleivis basabe",
+   "roster_position": "2B",
+   "pct_drafted": 16.95,
+   "fpts": 7.0
+  },
+  {
+   "player": "Max Clark",
+   "player_norm": "max clark",
+   "roster_position": "OF",
+   "pct_drafted": 16.95,
+   "fpts": 2.0
+  },
+  {
+   "player": "Junior Caminero",
+   "player_norm": "junior caminero",
+   "roster_position": "3B",
+   "pct_drafted": 16.95,
+   "fpts": 4.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "SS",
+   "pct_drafted": 15.25,
+   "fpts": 3.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "1B",
+   "pct_drafted": 15.25,
+   "fpts": 0.0
+  },
+  {
+   "player": "Chandler Simpson",
+   "player_norm": "chandler simpson",
+   "roster_position": "OF",
+   "pct_drafted": 15.25,
+   "fpts": 16.0
+  },
+  {
+   "player": "Julio Rodriguez",
+   "player_norm": "julio rodriguez",
+   "roster_position": "OF",
+   "pct_drafted": 15.25,
+   "fpts": 2.0
+  },
+  {
+   "player": "Randy Arozarena",
+   "player_norm": "randy arozarena",
+   "roster_position": "OF",
+   "pct_drafted": 14.41,
+   "fpts": 0.0
+  },
+  {
+   "player": "Victor Mesa Jr.",
+   "player_norm": "victor mesa",
+   "roster_position": "OF",
+   "pct_drafted": 14.41,
+   "fpts": 0.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "1B",
+   "pct_drafted": 14.41,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jung Hoo Lee",
+   "player_norm": "jung hoo lee",
+   "roster_position": "OF",
+   "pct_drafted": 13.56,
+   "fpts": 0.0
+  },
+  {
+   "player": "Yandy Diaz",
+   "player_norm": "yandy diaz",
+   "roster_position": "3B",
+   "pct_drafted": 12.71,
+   "fpts": 16.0
+  },
+  {
+   "player": "Colt Keith",
+   "player_norm": "colt keith",
+   "roster_position": "3B",
+   "pct_drafted": 12.71,
+   "fpts": 0.0
+  },
+  {
+   "player": "Eduardo Rodriguez",
+   "player_norm": "eduardo rodriguez",
+   "roster_position": "P",
+   "pct_drafted": 11.86,
+   "fpts": 29.55
+  },
+  {
+   "player": "Gleyber Torres",
+   "player_norm": "gleyber torres",
+   "roster_position": "2B",
+   "pct_drafted": 11.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dominic Canzone",
+   "player_norm": "dominic canzone",
+   "roster_position": "OF",
+   "pct_drafted": 11.86,
+   "fpts": 6.0
+  },
+  {
+   "player": "Cal Raleigh",
+   "player_norm": "cal raleigh",
+   "roster_position": "C",
+   "pct_drafted": 11.02,
+   "fpts": 0.0
+  },
+  {
+   "player": "Josh Naylor",
+   "player_norm": "josh naylor",
+   "roster_position": "1B",
+   "pct_drafted": 10.17,
+   "fpts": 5.0
+  },
+  {
+   "player": "Cedric Mullins",
+   "player_norm": "cedric mullins",
+   "roster_position": "OF",
+   "pct_drafted": 9.32,
+   "fpts": 11.0
+  },
+  {
+   "player": "Taylor Ward",
+   "player_norm": "taylor ward",
+   "roster_position": "OF",
+   "pct_drafted": 8.47,
+   "fpts": 10.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "1B",
+   "pct_drafted": 8.47,
+   "fpts": 5.0
+  },
+  {
+   "player": "Cole Young",
+   "player_norm": "cole young",
+   "roster_position": "2B",
+   "pct_drafted": 7.63,
+   "fpts": 8.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "3B",
+   "pct_drafted": 7.63,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ben Rortvedt",
+   "player_norm": "ben rortvedt",
+   "roster_position": "C",
+   "pct_drafted": 6.78,
+   "fpts": 3.0
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 5.93,
+   "fpts": 6.0
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "1B",
+   "pct_drafted": 5.93,
+   "fpts": 5.0
+  },
+  {
+   "player": "Yandy Diaz",
+   "player_norm": "yandy diaz",
+   "roster_position": "1B",
+   "pct_drafted": 5.93,
+   "fpts": 16.0
+  },
+  {
+   "player": "Christian Koss",
+   "player_norm": "christian koss",
+   "roster_position": "3B",
+   "pct_drafted": 5.93,
+   "fpts": 3.0
+  },
+  {
+   "player": "Eduardo Valencia",
+   "player_norm": "eduardo valencia",
+   "roster_position": "C",
+   "pct_drafted": 5.93,
+   "fpts": 7.0
+  },
+  {
+   "player": "Daniel Susac",
+   "player_norm": "daniel susac",
+   "roster_position": "C",
+   "pct_drafted": 5.93,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ryan Waldschmidt",
+   "player_norm": "ryan waldschmidt",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 2.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "OF",
+   "pct_drafted": 5.08,
+   "fpts": 13.0
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "1B",
+   "pct_drafted": 4.24,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ildemaro Vargas",
+   "player_norm": "ildemaro vargas",
+   "roster_position": "2B",
+   "pct_drafted": 3.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Taylor Walls",
+   "player_norm": "taylor walls",
+   "roster_position": "SS",
+   "pct_drafted": 2.54,
+   "fpts": 3.0
+  },
+  {
+   "player": "Tyler Locklear",
+   "player_norm": "tyler locklear",
+   "roster_position": "1B",
+   "pct_drafted": 2.54,
+   "fpts": 7.0
+  },
+  {
+   "player": "Weston Wilson",
+   "player_norm": "weston wilson",
+   "roster_position": "3B",
+   "pct_drafted": 2.54,
+   "fpts": 2.0
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "1B",
+   "pct_drafted": 2.54,
+   "fpts": 12.0
+  },
+  {
+   "player": "Colt Emerson",
+   "player_norm": "colt emerson",
+   "roster_position": "SS",
+   "pct_drafted": 2.54,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 7.0
+  },
+  {
+   "player": "Weston Wilson",
+   "player_norm": "weston wilson",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 2.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "OF",
+   "pct_drafted": 1.69,
+   "fpts": 7.0
+  },
+  {
+   "player": "Grant McCray",
+   "player_norm": "grant mccray",
+   "roster_position": "OF",
+   "pct_drafted": 0.85,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ildemaro Vargas",
+   "player_norm": "ildemaro vargas",
+   "roster_position": "1B",
+   "pct_drafted": 0.85,
+   "fpts": 3.0
+  }
+ ],
+ "own_results": {
+  "matched": 3,
+  "requested": 3,
+  "field_size": 118,
+  "best_rank": 12,
+  "worst_rank": 117,
+  "best_finish_percentile": 90.68,
+  "median_finish_percentile": 66.1,
+  "best_points": 100.55,
+  "winning_points": 112.8,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

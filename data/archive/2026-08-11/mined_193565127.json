@@ -1,0 +1,1247 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193565127",
+ "slate_date": "2026-08-11",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 41,
+  "entries_complete_lineups": 40,
+  "roster_size": 6,
+  "entries_unparsed": 1,
+  "winning_points": 67.6,
+  "winning_entry_id": "5215499501",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 35,
+  "entries_in_duplicated_lineups": 9,
+  "share_duplicated_pct": 22.5,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 31,
+   "2": 3,
+   "3": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 13,
+  "at_cap_share_pct": 32.5,
+  "salary_left_histogram": {
+   "101-300": 7,
+   "301-700": 8,
+   "701-1500": 7,
+   "<= 0": 12,
+   "> 1500": 5,
+   "1-100": 1
+  },
+  "max_stack_histogram": {
+   "3": 7,
+   "4": 22,
+   "5": 11
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Ryan Weathers",
+    "pct_drafted": 80.49
+   },
+   {
+    "player": "Bryan Woo",
+    "pct_drafted": 60.98
+   },
+   {
+    "player": "George Lombard Jr.",
+    "pct_drafted": 51.22
+   },
+   {
+    "player": "Ryan McMahon",
+    "pct_drafted": 46.34
+   },
+   {
+    "player": "Taylor Ward",
+    "pct_drafted": 43.9
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Bryan Woo",
+    "captain_count": 17,
+    "captain_share_pct": 42.5,
+    "pct_drafted": 60.98
+   },
+   {
+    "player": "Ryan Weathers",
+    "captain_count": 11,
+    "captain_share_pct": 27.5,
+    "pct_drafted": 80.49
+   },
+   {
+    "player": "Ben Rice",
+    "captain_count": 4,
+    "captain_share_pct": 10.0,
+    "pct_drafted": 36.59
+   },
+   {
+    "player": "Randy Arozarena",
+    "captain_count": 2,
+    "captain_share_pct": 5.0,
+    "pct_drafted": 19.51
+   },
+   {
+    "player": "Luis Garcia Jr.",
+    "captain_count": 1,
+    "captain_share_pct": 2.5,
+    "pct_drafted": 14.63
+   },
+   {
+    "player": "Brendan Donovan",
+    "captain_count": 1,
+    "captain_share_pct": 2.5,
+    "pct_drafted": 19.51
+   },
+   {
+    "player": "Dominic Canzone",
+    "captain_count": 1,
+    "captain_share_pct": 2.5,
+    "pct_drafted": 17.07
+   },
+   {
+    "player": "Spencer Jones",
+    "captain_count": 1,
+    "captain_share_pct": 2.5,
+    "pct_drafted": 21.95
+   }
+  ],
+  "winner_captain": {
+   "player": "Luis Garcia Jr.",
+   "pct_drafted": 14.63,
+   "captain_share_pct": 2.5,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0244,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 240,
+  "roster_slots_expected": 240,
+  "recomputed_total_pct": 585.4,
+  "dk_table_total_pct": 585.4,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5215499501",
+   "username": "MichaelB9B",
+   "points": 67.6,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "brendan donovan",
+    "bryan woo",
+    "george lombard",
+    "luis garcia",
+    "ryan mcmahon",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "luis garcia"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5215642421",
+   "username": "Revel8",
+   "points": 66.48,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.87,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "cole young",
+    "ryan mcmahon",
+    "ryan weathers",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5215629735",
+   "username": "Apples00",
+   "points": 61.03,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 51.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "bryan woo",
+    "george lombard",
+    "ryan mcmahon",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5215597426",
+   "username": "bengals23",
+   "points": 60.28,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 28.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "brendan donovan",
+    "bryan woo",
+    "cole young",
+    "luis garcia",
+    "randy arozarena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5215524535",
+   "username": "yaya0130",
+   "points": 60.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cal raleigh",
+    "george lombard",
+    "ryan mcmahon",
+    "ryan weathers",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5215642302",
+   "username": "qbjjj",
+   "points": 59.48,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 51.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "bryan woo",
+    "george lombard",
+    "ryan mcmahon",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5215043984",
+   "username": "jep4576",
+   "points": 59.03,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 48.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "cal raleigh",
+    "george lombard",
+    "ryan mcmahon",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5215460206",
+   "username": "josephje",
+   "points": 58.35,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 28.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "brendan donovan",
+    "bryan woo",
+    "cal raleigh",
+    "jazz chisholm",
+    "randy arozarena",
+    "ryan mcmahon"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brendan donovan"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5215036753",
+   "username": "Stree",
+   "points": 58.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 47.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "julio rodriguez",
+    "ryan mcmahon",
+    "ryan weathers",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5215623203",
+   "username": "Handcuff2006",
+   "points": 58.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 47.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "julio rodriguez",
+    "ryan mcmahon",
+    "ryan weathers",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5215628504",
+   "username": "Rallycap",
+   "points": 58.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 47.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "julio rodriguez",
+    "ryan mcmahon",
+    "ryan weathers",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5215543877",
+   "username": "Never_2Late",
+   "points": 56.03,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 45.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cal raleigh",
+    "colt emerson",
+    "george lombard",
+    "ryan mcmahon",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5215641690",
+   "username": "GuitarBet1",
+   "points": 55.03,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cal raleigh",
+    "cole young",
+    "ryan mcmahon",
+    "ryan weathers",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5215619660",
+   "username": "gene64",
+   "points": 54.63,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 26.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brendan donovan",
+    "colt emerson",
+    "luis garcia",
+    "ryan weathers",
+    "spencer jones",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5215511694",
+   "username": "huggs07",
+   "points": 54.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "dominic canzone",
+    "george lombard",
+    "ryan weathers",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5215636413",
+   "username": "Harvesters0812",
+   "points": 52.48,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.69,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "george lombard",
+    "heliot ramos",
+    "ryan weathers",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5215135699",
+   "username": "wittwerjoe",
+   "points": 52.03,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 50.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "george lombard",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5215169422",
+   "username": "Relaunch",
+   "points": 52.03,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "brendan donovan",
+    "bryan woo",
+    "george lombard",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5215168192",
+   "username": "howardwi",
+   "points": 50.48,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "brendan donovan",
+    "bryan woo",
+    "george lombard",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5215560863",
+   "username": "beccapatt",
+   "points": 50.03,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "colt emerson",
+    "ryan weathers",
+    "spencer jones",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5215276115",
+   "username": "jazzyj0619",
+   "points": 49.03,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "brendan donovan",
+    "bryan woo",
+    "cal raleigh",
+    "colt emerson",
+    "ryan weathers",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5215602146",
+   "username": "druff000",
+   "points": 49.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.72,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "bryan woo",
+    "cal raleigh",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5215116905",
+   "username": "KristianFTM",
+   "points": 47.63,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "george lombard",
+    "heliot ramos",
+    "jazz chisholm",
+    "ryan mcmahon",
+    "ryan weathers",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "24",
+   "entry_id": "5215084919",
+   "username": "Celticsnc",
+   "points": 47.1,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "dominic canzone",
+    "george lombard",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dominic canzone"
+  },
+  {
+   "rank": "25",
+   "entry_id": "5215182782",
+   "username": "jrice54",
+   "points": 46.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "colt emerson",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "25",
+   "entry_id": "5215585757",
+   "username": "137666",
+   "points": 46.03,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan woo",
+    "cole young",
+    "colt emerson",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryan woo"
+  },
+  {
+   "rank": "27",
+   "entry_id": "5215635718",
+   "username": "eddiezappa",
+   "points": 45.63,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.65,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "cole young",
+    "george lombard",
+    "randy arozarena",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5215400163",
+   "username": "pat_the_hat2",
+   "points": 44.75,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "cole young",
+    "george lombard",
+    "randy arozarena",
+    "ryan mcmahon",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ben rice"
+  },
+  {
+   "rank": "29",
+   "entry_id": "5215306040",
+   "username": "corruption79",
+   "points": 44.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 26.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "julio rodriguez",
+    "luis garcia",
+    "randy arozarena",
+    "ryan mcmahon",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ben rice"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5215049477",
+   "username": "whoisjohngalt420",
+   "points": 43.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "bryan woo",
+    "colt emerson",
+    "randy arozarena",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "randy arozarena"
+  },
+  {
+   "rank": "31",
+   "entry_id": "5215613006",
+   "username": "DFSdegen",
+   "points": 42.63,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "dominic canzone",
+    "george lombard",
+    "ryan mcmahon",
+    "ryan weathers",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "32",
+   "entry_id": "5215069252",
+   "username": "whammy22",
+   "points": 41.75,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "brendan donovan",
+    "george lombard",
+    "luis garcia",
+    "ryan weathers",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "spencer jones"
+  },
+  {
+   "rank": "33",
+   "entry_id": "5215557860",
+   "username": "Darkmen715",
+   "points": 40.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 23.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "heliot ramos",
+    "julio rodriguez",
+    "randy arozarena",
+    "ryan mcmahon",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "julio rodriguez"
+  },
+  {
+   "rank": "34",
+   "entry_id": "5215602097",
+   "username": "LUMBERJAX",
+   "points": 38.63,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "julio rodriguez",
+    "ryan mcmahon",
+    "ryan weathers",
+    "taylor ward",
+    "weston wilson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "34",
+   "entry_id": "5215636862",
+   "username": "jericho911",
+   "points": 38.63,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "cole young",
+    "ryan mcmahon",
+    "ryan weathers",
+    "spencer jones",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "36",
+   "entry_id": "5215454152",
+   "username": "Quin8000",
+   "points": 37.63,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 32.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wells",
+    "ben rice",
+    "dominic canzone",
+    "heliot ramos",
+    "ryan weathers",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ryan weathers"
+  },
+  {
+   "rank": "37",
+   "entry_id": "5215584117",
+   "username": "bleeski",
+   "points": 31.0,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "cal raleigh",
+    "dominic canzone",
+    "george lombard",
+    "julio rodriguez",
+    "randy arozarena",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "randy arozarena"
+  },
+  {
+   "rank": "38",
+   "entry_id": "5215638992",
+   "username": "davidlobo4",
+   "points": 30.75,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "cole young",
+    "dominic canzone",
+    "george lombard",
+    "ryan weathers",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ben rice"
+  },
+  {
+   "rank": "39",
+   "entry_id": "5215612761",
+   "username": "InsideInfo",
+   "points": 25.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "dominic canzone",
+    "george lombard",
+    "julio rodriguez",
+    "luis garcia",
+    "taylor ward"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ben rice"
+  },
+  {
+   "rank": "40",
+   "entry_id": "5215358468",
+   "username": "Smackler27",
+   "points": 24.25,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "george lombard",
+    "jose caballero",
+    "josh naylor",
+    "julio rodriguez",
+    "ryan weathers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "george lombard"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Ryan Weathers",
+   "player_norm": "ryan weathers",
+   "roster_position": "UTIL",
+   "pct_drafted": 80.49,
+   "fpts": 15.75
+  },
+  {
+   "player": "Bryan Woo",
+   "player_norm": "bryan woo",
+   "roster_position": "UTIL",
+   "pct_drafted": 60.98,
+   "fpts": 18.85
+  },
+  {
+   "player": "George Lombard Jr.",
+   "player_norm": "george lombard",
+   "roster_position": "UTIL",
+   "pct_drafted": 51.22,
+   "fpts": 3.0
+  },
+  {
+   "player": "Ryan McMahon",
+   "player_norm": "ryan mcmahon",
+   "roster_position": "UTIL",
+   "pct_drafted": 46.34,
+   "fpts": 9.0
+  },
+  {
+   "player": "Taylor Ward",
+   "player_norm": "taylor ward",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ben Rice",
+   "player_norm": "ben rice",
+   "roster_position": "UTIL",
+   "pct_drafted": 36.59,
+   "fpts": 2.0
+  },
+  {
+   "player": "Weston Wilson",
+   "player_norm": "weston wilson",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.71,
+   "fpts": 2.0
+  },
+  {
+   "player": "Austin Wells",
+   "player_norm": "austin wells",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.71,
+   "fpts": 3.0
+  },
+  {
+   "player": "Cole Young",
+   "player_norm": "cole young",
+   "roster_position": "UTIL",
+   "pct_drafted": 24.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Julio Rodriguez",
+   "player_norm": "julio rodriguez",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.95,
+   "fpts": 2.0
+  },
+  {
+   "player": "Spencer Jones",
+   "player_norm": "spencer jones",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.95,
+   "fpts": 4.0
+  },
+  {
+   "player": "Randy Arozarena",
+   "player_norm": "randy arozarena",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.51,
+   "fpts": 14.0
+  },
+  {
+   "player": "Cal Raleigh",
+   "player_norm": "cal raleigh",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.51,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brendan Donovan",
+   "player_norm": "brendan donovan",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.51,
+   "fpts": 3.0
+  },
+  {
+   "player": "Dominic Canzone",
+   "player_norm": "dominic canzone",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.07,
+   "fpts": 5.0
+  },
+  {
+   "player": "Colt Emerson",
+   "player_norm": "colt emerson",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.07,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Garcia Jr.",
+   "player_norm": "luis garcia",
+   "roster_position": "UTIL",
+   "pct_drafted": 14.63,
+   "fpts": 12.0
+  },
+  {
+   "player": "Heliot Ramos",
+   "player_norm": "heliot ramos",
+   "roster_position": "UTIL",
+   "pct_drafted": 9.76,
+   "fpts": 0.0
+  },
+  {
+   "player": "Trent Grisham",
+   "player_norm": "trent grisham",
+   "roster_position": "UTIL",
+   "pct_drafted": 7.32,
+   "fpts": 12.0
+  },
+  {
+   "player": "Jazz Chisholm Jr.",
+   "player_norm": "jazz chisholm",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.88,
+   "fpts": 12.0
+  },
+  {
+   "player": "Jose Caballero",
+   "player_norm": "jose caballero",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Josh Naylor",
+   "player_norm": "josh naylor",
+   "roster_position": "UTIL",
+   "pct_drafted": 2.44,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 41,
+  "best_rank": 37,
+  "worst_rank": 37,
+  "best_finish_percentile": 12.2,
+  "median_finish_percentile": 12.2,
+  "best_points": 31.0,
+  "winning_points": 67.6,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

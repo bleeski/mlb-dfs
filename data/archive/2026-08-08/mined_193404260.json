@@ -1,0 +1,842 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193404260",
+ "slate_date": "2026-08-08",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 77.05,
+  "winning_entry_id": "5212011081",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 20,
+  "entries_in_duplicated_lineups": 5,
+  "share_duplicated_pct": 21.7,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 18,
+   "2": 1,
+   "3": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 4000,
+  "at_cap_entries": 7,
+  "at_cap_share_pct": 30.4,
+  "salary_left_histogram": {
+   "> 1500": 1,
+   "301-700": 8,
+   "101-300": 6,
+   "<= 0": 3,
+   "1-100": 4,
+   "701-1500": 1
+  },
+  "max_stack_histogram": {
+   "3": 2,
+   "4": 9,
+   "5": 12
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Clay Holmes",
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Tyrone Taylor",
+    "pct_drafted": 60.87
+   },
+   {
+    "player": "Kyle Isbel",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Pete Crow-Armstrong",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Seiya Suzuki",
+    "pct_drafted": 47.83
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Clay Holmes",
+    "captain_count": 9,
+    "captain_share_pct": 39.1,
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Seth Lugo",
+    "captain_count": 3,
+    "captain_share_pct": 13.0,
+    "pct_drafted": 30.43
+   },
+   {
+    "player": "Pete Crow-Armstrong",
+    "captain_count": 3,
+    "captain_share_pct": 13.0,
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Ian Happ",
+    "captain_count": 2,
+    "captain_share_pct": 8.7,
+    "pct_drafted": 30.43
+   },
+   {
+    "player": "Tyrone Taylor",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 60.87
+   },
+   {
+    "player": "Bobby Witt Jr.",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 34.78
+   },
+   {
+    "player": "John Rave",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 21.74
+   },
+   {
+    "player": "Carter Jensen",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 4.35
+   }
+  ],
+  "winner_captain": {
+   "player": "Seth Lugo",
+   "pct_drafted": 30.43,
+   "captain_share_pct": 13.0,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5212011081",
+   "username": "austin60915",
+   "points": 77.05,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "clay holmes",
+    "isaac collins",
+    "jac caglianone",
+    "kyle isbel",
+    "nick loftin",
+    "seth lugo"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "seth lugo"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5211864916",
+   "username": "whoisjohngalt420",
+   "points": 56.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "jac caglianone",
+    "michael busch",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyrone taylor"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5212560461",
+   "username": "DicVec",
+   "points": 53.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "isaac collins",
+    "john rave",
+    "seiya suzuki",
+    "seth lugo",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "seth lugo"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5212307150",
+   "username": "Idonotcare76",
+   "points": 51.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "dansby swanson",
+    "ian happ",
+    "nick loftin",
+    "nico hoerner",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ian happ"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5212541740",
+   "username": "oaktownchamps",
+   "points": 51.05,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.23,
+   "n_cheap": 2,
+   "players_norm": [
+    "bobby witt",
+    "clay holmes",
+    "john rave",
+    "josh rojas",
+    "kyle isbel",
+    "seth lugo"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "seth lugo"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5211939674",
+   "username": "wittwerjoe",
+   "points": 45.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "carson kelly",
+    "ian happ",
+    "kyle isbel",
+    "michael busch",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bobby witt"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5212557775",
+   "username": "DFSdegen",
+   "points": 40.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "clay holmes",
+    "ian happ",
+    "nick loftin",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ian happ"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5211597591",
+   "username": "SportsJoker12",
+   "points": 40.2,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "clay holmes",
+    "ian happ",
+    "isaac collins",
+    "pete crow armstrong",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "pete crow armstrong"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5212438422",
+   "username": "friedbaconbits",
+   "points": 37.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "clay holmes",
+    "isaac collins",
+    "michael massey",
+    "seth lugo",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5212541641",
+   "username": "corina123",
+   "points": 37.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "clay holmes",
+    "isaac collins",
+    "josh rojas",
+    "seth lugo",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5211810214",
+   "username": "Aoteoroa",
+   "points": 37.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "isaac collins",
+    "john rave",
+    "michael massey",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "john rave"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5212487668",
+   "username": "pat_the_hat2",
+   "points": 36.0,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 24.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "carter jensen",
+    "isaac collins",
+    "john rave",
+    "michael busch",
+    "michael massey"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "carter jensen"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5211793799",
+   "username": "aramisj22",
+   "points": 32.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.2,
+   "n_cheap": 1,
+   "players_norm": [
+    "carson kelly",
+    "clay holmes",
+    "kyle isbel",
+    "michael busch",
+    "seth lugo",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5212441536",
+   "username": "Extraqtt",
+   "points": 32.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.2,
+   "n_cheap": 1,
+   "players_norm": [
+    "carson kelly",
+    "clay holmes",
+    "kyle isbel",
+    "michael busch",
+    "seth lugo",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5212491402",
+   "username": "morganslupper",
+   "points": 26.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "bobby witt",
+    "john rave",
+    "kyle isbel",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "alex bregman"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5211853678",
+   "username": "Stree",
+   "points": 24.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 48.55,
+   "n_cheap": 1,
+   "players_norm": [
+    "clay holmes",
+    "ian happ",
+    "kyle isbel",
+    "michael busch",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5212108460",
+   "username": "mrclean913",
+   "points": 24.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 48.55,
+   "n_cheap": 1,
+   "players_norm": [
+    "clay holmes",
+    "ian happ",
+    "kyle isbel",
+    "michael busch",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5212464364",
+   "username": "jrice54",
+   "points": 24.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 48.55,
+   "n_cheap": 1,
+   "players_norm": [
+    "clay holmes",
+    "ian happ",
+    "kyle isbel",
+    "michael busch",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5212460678",
+   "username": "KILLANADZ24",
+   "points": 17.2,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "isaac collins",
+    "nick loftin",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "seiya suzuki"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5212523626",
+   "username": "RFinch_Kings",
+   "points": 17.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "dansby swanson",
+    "isaac collins",
+    "nico hoerner",
+    "pete crow armstrong",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "pete crow armstrong"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5212373078",
+   "username": "MIKEMETAL",
+   "points": 13.0,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "dansby swanson",
+    "kyle isbel",
+    "nico hoerner",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "pete crow armstrong"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5212552159",
+   "username": "Ron_Rodocker",
+   "points": 8.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.03,
+   "n_cheap": 2,
+   "players_norm": [
+    "clay holmes",
+    "dansby swanson",
+    "josh rojas",
+    "kyle isbel",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5212573950",
+   "username": "bleeski",
+   "points": 8.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "clay holmes",
+    "dansby swanson",
+    "kyle isbel",
+    "pete crow armstrong",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "clay holmes"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Clay Holmes",
+   "player_norm": "clay holmes",
+   "roster_position": "UTIL",
+   "pct_drafted": 65.22,
+   "fpts": -1.8
+  },
+  {
+   "player": "Tyrone Taylor",
+   "player_norm": "tyrone taylor",
+   "roster_position": "UTIL",
+   "pct_drafted": 60.87,
+   "fpts": 5.0
+  },
+  {
+   "player": "Kyle Isbel",
+   "player_norm": "kyle isbel",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.17,
+   "fpts": 0.0
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 4.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 0.0
+  },
+  {
+   "player": "Isaac Collins",
+   "player_norm": "isaac collins",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Bobby Witt Jr.",
+   "player_norm": "bobby witt",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 7.0
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 3.0
+  },
+  {
+   "player": "Seth Lugo",
+   "player_norm": "seth lugo",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 17.9
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 19.0
+  },
+  {
+   "player": "Dansby Swanson",
+   "player_norm": "dansby swanson",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "John Rave",
+   "player_norm": "john rave",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 12.0
+  },
+  {
+   "player": "Carson Kelly",
+   "player_norm": "carson kelly",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 9.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Michael Massey",
+   "player_norm": "michael massey",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Josh Rojas",
+   "player_norm": "josh rojas",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jac Caglianone",
+   "player_norm": "jac caglianone",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 42.0
+  },
+  {
+   "player": "Carter Jensen",
+   "player_norm": "carter jensen",
+   "roster_position": "CPT",
+   "pct_drafted": 4.35,
+   "fpts": 6.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 22,
+  "worst_rank": 22,
+  "best_finish_percentile": 8.7,
+  "median_finish_percentile": 8.7,
+  "best_points": 8.3,
+  "winning_points": 77.05,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

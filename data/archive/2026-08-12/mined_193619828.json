@@ -1,0 +1,847 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193619828",
+ "slate_date": "2026-08-12",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 82.23,
+  "winning_entry_id": "5216417230",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 22,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 8.7,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 21,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 7,
+  "at_cap_share_pct": 30.4,
+  "salary_left_histogram": {
+   "301-700": 6,
+   "1-100": 7,
+   "> 1500": 1,
+   "101-300": 3,
+   "701-1500": 6
+  },
+  "max_stack_histogram": {
+   "3": 4,
+   "4": 10,
+   "5": 9
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Dustin May",
+    "pct_drafted": 78.26
+   },
+   {
+    "player": "Jackson Chourio",
+    "pct_drafted": 56.52
+   },
+   {
+    "player": "Robbie Ray",
+    "pct_drafted": 56.52
+   },
+   {
+    "player": "Jake Cronenworth",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Brandon Lockridge",
+    "pct_drafted": 39.13
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Dustin May",
+    "captain_count": 12,
+    "captain_share_pct": 52.2,
+    "pct_drafted": 78.26
+   },
+   {
+    "player": "Robbie Ray",
+    "captain_count": 5,
+    "captain_share_pct": 21.7,
+    "pct_drafted": 56.52
+   },
+   {
+    "player": "Xander Bogaerts",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 13.04
+   },
+   {
+    "player": "Gary Sanchez",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 26.09
+   },
+   {
+    "player": "Manny Machado",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 21.74
+   },
+   {
+    "player": "Jackson Merrill",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 30.43
+   },
+   {
+    "player": "Brice Turang",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 21.74
+   },
+   {
+    "player": "Andrew Vaughn",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 34.78
+   }
+  ],
+  "winner_captain": {
+   "player": "Dustin May",
+   "pct_drafted": 78.26,
+   "captain_share_pct": 52.2,
+   "was_top_owned_captain": true
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5216417230",
+   "username": "CyclopeanCyborg",
+   "points": 82.23,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "dustin may",
+    "gary sanchez",
+    "gavin sheets",
+    "jake cronenworth",
+    "luis rengifo",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5215889484",
+   "username": "Celticsnc",
+   "points": 76.23,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "dustin may",
+    "gary sanchez",
+    "gavin sheets",
+    "jackson chourio",
+    "joey ortiz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5216364307",
+   "username": "Ezilodi",
+   "points": 67.0,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 21.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "gary sanchez",
+    "jackson merrill",
+    "jake bauers",
+    "william contreras",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "xander bogaerts"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5216146773",
+   "username": "KILLANADZ24",
+   "points": 65.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "dustin may",
+    "gary sanchez",
+    "jackson chourio",
+    "jackson merrill",
+    "manny machado"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "gary sanchez"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5216227703",
+   "username": "KristianFTM",
+   "points": 63.23,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 50.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "dustin may",
+    "jackson chourio",
+    "jake cronenworth",
+    "joey ortiz",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5215858342",
+   "username": "jazzyj0619",
+   "points": 61.23,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "david hamilton",
+    "dustin may",
+    "jackson chourio",
+    "joey ortiz",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5216477270",
+   "username": "zonaque",
+   "points": 61.23,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "david hamilton",
+    "dustin may",
+    "jackson chourio",
+    "joey ortiz",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5216490395",
+   "username": "Cmoney13x",
+   "points": 61.23,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "dustin may",
+    "jackson chourio",
+    "ty france",
+    "william contreras",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5216011917",
+   "username": "Stree",
+   "points": 60.23,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "dustin may",
+    "jackson chourio",
+    "jake cronenworth",
+    "joey ortiz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5216382170",
+   "username": "wittwerjoe",
+   "points": 59.23,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "austin hays",
+    "dustin may",
+    "jackson merrill",
+    "jake cronenworth",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5216051293",
+   "username": "whoisjohngalt420",
+   "points": 59.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin hays",
+    "dustin may",
+    "jake cronenworth",
+    "luis rengifo",
+    "robbie ray",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "robbie ray"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5216419438",
+   "username": "Harmiles",
+   "points": 55.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 31.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "gary sanchez",
+    "jake cronenworth",
+    "luis rengifo",
+    "manny machado",
+    "robbie ray",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "manny machado"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5215624504",
+   "username": "Footballchamp1967",
+   "points": 53.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 23.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "fernando tatis",
+    "gary sanchez",
+    "jackson merrill",
+    "manny machado",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jackson merrill"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5216392851",
+   "username": "bleeski",
+   "points": 51.23,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon lockridge",
+    "brice turang",
+    "dustin may",
+    "jackson chourio",
+    "jake cronenworth"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5216430164",
+   "username": "corruption79",
+   "points": 51.23,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "dustin may",
+    "jackson chourio",
+    "jackson merrill",
+    "joey ortiz",
+    "manny machado"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5216124869",
+   "username": "clags22",
+   "points": 51.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "dustin may",
+    "freddy fermin",
+    "gavin sheets",
+    "jackson merrill",
+    "luis rengifo",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "robbie ray"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5216376514",
+   "username": "crf_333",
+   "points": 50.15,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "austin hays",
+    "dustin may",
+    "jake cronenworth",
+    "robbie ray",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "robbie ray"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5216481176",
+   "username": "MadDoggs75",
+   "points": 50.15,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 48.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lockridge",
+    "dustin may",
+    "gavin sheets",
+    "jackson chourio",
+    "jake cronenworth",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "robbie ray"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5216464357",
+   "username": "Harvesters0812",
+   "points": 49.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 26.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin hays",
+    "jackson merrill",
+    "jake bauers",
+    "robbie ray",
+    "ty france",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "robbie ray"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5216196080",
+   "username": "mrclean913",
+   "points": 48.23,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "austin hays",
+    "brandon lockridge",
+    "dustin may",
+    "jake bauers",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5216480827",
+   "username": "TG282930",
+   "points": 45.23,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "austin hays",
+    "dustin may",
+    "freddy fermin",
+    "jackson chourio",
+    "robbie ray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "dustin may"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5216473453",
+   "username": "jarradkern",
+   "points": 38.5,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "jackson chourio",
+    "joey ortiz",
+    "luis rengifo",
+    "ty france",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brice turang"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5216413929",
+   "username": "SkyFlyDFS",
+   "points": 37.15,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "dustin may",
+    "jackson chourio",
+    "jake cronenworth",
+    "manny machado",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andrew vaughn"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Dustin May",
+   "player_norm": "dustin may",
+   "roster_position": "UTIL",
+   "pct_drafted": 78.26,
+   "fpts": 22.15
+  },
+  {
+   "player": "Robbie Ray",
+   "player_norm": "robbie ray",
+   "roster_position": "UTIL",
+   "pct_drafted": 56.52,
+   "fpts": 10.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "UTIL",
+   "pct_drafted": 56.52,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jake Cronenworth",
+   "player_norm": "jake cronenworth",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 9.0
+  },
+  {
+   "player": "Brandon Lockridge",
+   "player_norm": "brandon lockridge",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jackson Merrill",
+   "player_norm": "jackson merrill",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 7.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 9.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 4.0
+  },
+  {
+   "player": "Gary Sanchez",
+   "player_norm": "gary sanchez",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 23.0
+  },
+  {
+   "player": "Austin Hays",
+   "player_norm": "austin hays",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 7.0
+  },
+  {
+   "player": "Manny Machado",
+   "player_norm": "manny machado",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ty France",
+   "player_norm": "ty france",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 8.0
+  },
+  {
+   "player": "Luis Rengifo",
+   "player_norm": "luis rengifo",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 5.0
+  },
+  {
+   "player": "Gavin Sheets",
+   "player_norm": "gavin sheets",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 5.0
+  },
+  {
+   "player": "Xander Bogaerts",
+   "player_norm": "xander bogaerts",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 14.0
+  },
+  {
+   "player": "David Hamilton",
+   "player_norm": "david hamilton",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Freddy Fermin",
+   "player_norm": "freddy fermin",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Fernando Tatis Jr.",
+   "player_norm": "fernando tatis",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 16.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 14,
+  "worst_rank": 14,
+  "best_finish_percentile": 43.48,
+  "median_finish_percentile": 43.48,
+  "best_points": 51.23,
+  "winning_points": 82.23,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

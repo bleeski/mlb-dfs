@@ -1,0 +1,840 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193619919",
+ "slate_date": "2026-08-12",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 102.08,
+  "winning_entry_id": "5216011622",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 21,
+  "entries_in_duplicated_lineups": 4,
+  "share_duplicated_pct": 17.4,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 19,
+   "2": 2
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3800,
+  "at_cap_entries": 8,
+  "at_cap_share_pct": 34.8,
+  "salary_left_histogram": {
+   "701-1500": 8,
+   "1-100": 4,
+   "301-700": 6,
+   "101-300": 1,
+   "<= 0": 4
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 8,
+   "5": 10
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Shohei Ohtani",
+    "pct_drafted": 82.61
+   },
+   {
+    "player": "Mookie Betts",
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Eric Lauer",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Andy Pages",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Bobby Witt Jr.",
+    "pct_drafted": 43.48
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Eric Lauer",
+    "captain_count": 7,
+    "captain_share_pct": 30.4,
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Andy Pages",
+    "captain_count": 4,
+    "captain_share_pct": 17.4,
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Mookie Betts",
+    "captain_count": 3,
+    "captain_share_pct": 13.0,
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Shohei Ohtani",
+    "captain_count": 3,
+    "captain_share_pct": 13.0,
+    "pct_drafted": 82.61
+   },
+   {
+    "player": "Bobby Witt Jr.",
+    "captain_count": 3,
+    "captain_share_pct": 13.0,
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Jac Caglianone",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 17.39
+   },
+   {
+    "player": "Max Muncy",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 8.7
+   },
+   {
+    "player": "Salvador Perez",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 30.43
+   }
+  ],
+  "winner_captain": {
+   "player": "Eric Lauer",
+   "pct_drafted": 47.83,
+   "captain_share_pct": 30.4,
+   "was_top_owned_captain": true
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5216011622",
+   "username": "Stree",
+   "points": 102.08,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "eric lauer",
+    "hunter feduccia",
+    "jac caglianone",
+    "miguel rojas",
+    "mookie betts",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5216289632",
+   "username": "bkukor",
+   "points": 94.08,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 50.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "eric lauer",
+    "hunter feduccia",
+    "mookie betts",
+    "shohei ohtani",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5216682432",
+   "username": "L053R666",
+   "points": 94.08,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 50.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "eric lauer",
+    "hunter feduccia",
+    "mookie betts",
+    "shohei ohtani",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5216809282",
+   "username": "SportsJoker12",
+   "points": 80.55,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "eric lauer",
+    "isaac collins",
+    "mookie betts",
+    "salvador perez",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5216749656",
+   "username": "Extraqtt",
+   "points": 80.08,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "eric lauer",
+    "hunter feduccia",
+    "kyle tucker",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5216524074",
+   "username": "KristianFTM",
+   "points": 73.08,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "eric lauer",
+    "hunter feduccia",
+    "isaac collins",
+    "kyle tucker",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5216752198",
+   "username": "SmokingSquash",
+   "points": 72.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 47.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "eric lauer",
+    "jac caglianone",
+    "mookie betts",
+    "nick loftin",
+    "shohei ohtani",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jac caglianone"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5216036552",
+   "username": "jep4576",
+   "points": 72.08,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "eric lauer",
+    "freddie freeman",
+    "mookie betts",
+    "starling marte",
+    "teoscar hernandez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5216692183",
+   "username": "friedbaconbits",
+   "points": 71.5,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 48.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "mookie betts",
+    "salvador perez",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5216139841",
+   "username": "KILLANADZ24",
+   "points": 68.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 50.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bobby witt",
+    "miguel rojas",
+    "mookie betts",
+    "shohei ohtani",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5216258014",
+   "username": "Tburke34",
+   "points": 68.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 50.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bobby witt",
+    "miguel rojas",
+    "mookie betts",
+    "shohei ohtani",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5216756947",
+   "username": "Jpage86",
+   "points": 63.55,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "eric lauer",
+    "miguel rojas",
+    "nick loftin",
+    "salvador perez",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5216712220",
+   "username": "Bears133",
+   "points": 61.5,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 50.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bobby witt",
+    "mookie betts",
+    "nick loftin",
+    "shohei ohtani",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5216779953",
+   "username": "Cmoney13x",
+   "points": 59.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "freddie freeman",
+    "miguel rojas",
+    "nick loftin",
+    "shohei ohtani",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5216423473",
+   "username": "corruption79",
+   "points": 59.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 45.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "isaac collins",
+    "mookie betts",
+    "salvador perez",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bobby witt"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5216779281",
+   "username": "jhawthorne111470",
+   "points": 58.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "max muncy",
+    "miguel rojas",
+    "mookie betts",
+    "shohei ohtani",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "max muncy"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5216768787",
+   "username": "dtapper29",
+   "points": 57.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "jac caglianone",
+    "nick loftin",
+    "salvador perez",
+    "shohei ohtani",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5215896195",
+   "username": "Celticsnc",
+   "points": 56.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.99,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "eric lauer",
+    "freddie freeman",
+    "hunter feduccia",
+    "max muncy",
+    "salvador perez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "salvador perez"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5216789529",
+   "username": "bleeski",
+   "points": 55.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kyle tucker",
+    "mookie betts",
+    "shohei ohtani",
+    "starling marte",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5216664708",
+   "username": "DUI-Guy",
+   "points": 55.28,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 26.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "daniel lynch",
+    "eric lauer",
+    "mason black",
+    "miguel rojas",
+    "nick loftin",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eric lauer"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5216829266",
+   "username": "neversummer",
+   "points": 52.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.3,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "freddie freeman",
+    "josh rojas",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5216805983",
+   "username": "TDs_n_Beer",
+   "points": 48.0,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bobby witt",
+    "isaac collins",
+    "jac caglianone",
+    "mookie betts",
+    "salvador perez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bobby witt"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5216059004",
+   "username": "whoisjohngalt420",
+   "points": 46.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "mason black",
+    "nick loftin",
+    "shohei ohtani",
+    "starling marte",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bobby witt"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "UTIL",
+   "pct_drafted": 82.61,
+   "fpts": 19.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "UTIL",
+   "pct_drafted": 65.22,
+   "fpts": 19.0
+  },
+  {
+   "player": "Eric Lauer",
+   "player_norm": "eric lauer",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 24.05
+  },
+  {
+   "player": "Bobby Witt Jr.",
+   "player_norm": "bobby witt",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 8.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 3.0
+  },
+  {
+   "player": "Starling Marte",
+   "player_norm": "starling marte",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Tolbert",
+   "player_norm": "tyler tolbert",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 9.0
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 7.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Rojas",
+   "player_norm": "miguel rojas",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 9.0
+  },
+  {
+   "player": "Hunter Feduccia",
+   "player_norm": "hunter feduccia",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 14.0
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jac Caglianone",
+   "player_norm": "jac caglianone",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Isaac Collins",
+   "player_norm": "isaac collins",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mason Black",
+   "player_norm": "mason black",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 3.75
+  },
+  {
+   "player": "Daniel Lynch IV",
+   "player_norm": "daniel lynch",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 3.45
+  },
+  {
+   "player": "Josh Rojas",
+   "player_norm": "josh rojas",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 5.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 19,
+  "worst_rank": 19,
+  "best_finish_percentile": 21.74,
+  "median_finish_percentile": 21.74,
+  "best_points": 55.5,
+  "winning_points": 102.08,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

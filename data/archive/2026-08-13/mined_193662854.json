@@ -1,0 +1,5490 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193662854",
+ "slate_date": "2026-08-13",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 161,
+  "entries_complete_lineups": 161,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 161.8,
+  "winning_entry_id": "5217413581",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 158,
+  "entries_in_duplicated_lineups": 6,
+  "share_duplicated_pct": 3.7,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 155,
+   "2": 3
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2200,
+  "at_cap_entries": 50,
+  "at_cap_share_pct": 31.1,
+  "salary_left_histogram": {
+   "101-300": 39,
+   "301-700": 27,
+   "> 1500": 17,
+   "1-100": 22,
+   "<= 0": 28,
+   "701-1500": 28
+  },
+  "max_stack_histogram": {
+   "2": 2,
+   "3": 31,
+   "4": 56,
+   "5": 72
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Kevin Gausman",
+     "Payton Tolle"
+    ],
+    "count": 74,
+    "field_share_pct": 46.0
+   },
+   {
+    "pair": [
+     "Cade Cavalli",
+     "Payton Tolle"
+    ],
+    "count": 41,
+    "field_share_pct": 25.5
+   },
+   {
+    "pair": [
+     "Kevin Gausman",
+     "Max Scherzer"
+    ],
+    "count": 17,
+    "field_share_pct": 10.6
+   },
+   {
+    "pair": [
+     "Cade Cavalli",
+     "Kevin Gausman"
+    ],
+    "count": 9,
+    "field_share_pct": 5.6
+   },
+   {
+    "pair": [
+     "Cade Cavalli",
+     "Max Scherzer"
+    ],
+    "count": 8,
+    "field_share_pct": 5.0
+   },
+   {
+    "pair": [
+     "Max Scherzer",
+     "Payton Tolle"
+    ],
+    "count": 7,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Davis Martin",
+     "Payton Tolle"
+    ],
+    "count": 2,
+    "field_share_pct": 1.2
+   },
+   {
+    "pair": [
+     "Cade Cavalli",
+     "Davis Martin"
+    ],
+    "count": 1,
+    "field_share_pct": 0.6
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Payton Tolle",
+    "pct_drafted": 77.64
+   },
+   {
+    "player": "Kevin Gausman",
+    "pct_drafted": 62.73
+   },
+   {
+    "player": "Pete Crow-Armstrong",
+    "pct_drafted": 55.28
+   },
+   {
+    "player": "Wilyer Abreu",
+    "pct_drafted": 45.96
+   },
+   {
+    "player": "Nick Sogard",
+    "pct_drafted": 43.48
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1610,
+  "roster_slots_expected": 1610,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5217413581",
+   "username": "Sabali00",
+   "points": 161.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 30.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "cade cavalli",
+    "caleb durbin",
+    "cj abrams",
+    "connor wong",
+    "daylen lile",
+    "dylan crews",
+    "nico hoerner",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5217400789",
+   "username": "claytankgunner",
+   "points": 156.8,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.44,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "cade cavalli",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "jose tena",
+    "keibert ruiz",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5217368184",
+   "username": "nomjlikeme",
+   "points": 141.8,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew pinckney",
+    "cade cavalli",
+    "caleb durbin",
+    "cj abrams",
+    "connor wong",
+    "jorbit vivas",
+    "masataka yoshida",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5217418215",
+   "username": "kouhit11",
+   "points": 139.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "keibert ruiz",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5217324474",
+   "username": "auweglman",
+   "points": 135.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 28.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cade cavalli",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "george springer",
+    "jorbit vivas",
+    "payton tolle",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5217368185",
+   "username": "nomjlikeme",
+   "points": 134.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 33.11,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew pinckney",
+    "cade cavalli",
+    "caleb durbin",
+    "cj abrams",
+    "daylen lile",
+    "keibert ruiz",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5217398265",
+   "username": "wittwerjoe",
+   "points": 124.799995,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 35.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "cj abrams",
+    "jarren duran",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5217400671",
+   "username": "BigDumbAnimal19",
+   "points": 123.799995,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "caleb durbin",
+    "cj abrams",
+    "connor wong",
+    "jacob young",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5217420897",
+   "username": "swenburhooden",
+   "points": 123.799995,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "brady house",
+    "cade cavalli",
+    "carson kelly",
+    "ceddanne rafaela",
+    "cj abrams",
+    "jarren duran",
+    "nasim nunez",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5217242731",
+   "username": "adonis112",
+   "points": 121.799995,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "cade cavalli",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "keibert ruiz",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5217391906",
+   "username": "boys4",
+   "points": 120.799995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "ceddanne rafaela",
+    "charles mcadoo",
+    "cj abrams",
+    "keibert ruiz",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5217431726",
+   "username": "ChrisA626",
+   "points": 120.799995,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres chaparro",
+    "cade cavalli",
+    "caleb durbin",
+    "cj abrams",
+    "keibert ruiz",
+    "masataka yoshida",
+    "nathan lukes",
+    "payton tolle",
+    "pedro ramirez",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5217328184",
+   "username": "auweglman",
+   "points": 119.799995,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cade cavalli",
+    "caleb durbin",
+    "dansby swanson",
+    "ian happ",
+    "jorbit vivas",
+    "kazuma okamoto",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5217439788",
+   "username": "BAlmeida402",
+   "points": 119.799995,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "cade cavalli",
+    "cj abrams",
+    "connor wong",
+    "daylen lile",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5217381515",
+   "username": "Greenbay26",
+   "points": 117.299995,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5217427196",
+   "username": "peterjpacheco",
+   "points": 116.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 30.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "cade cavalli",
+    "caleb durbin",
+    "chase meidroth",
+    "cj abrams",
+    "jarren duran",
+    "kevin gausman",
+    "pete crow armstrong",
+    "tyler stephenson",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5217381149",
+   "username": "kylehaeussler",
+   "points": 116.799995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "cj abrams",
+    "connor wong",
+    "daylen lile",
+    "kazuma okamoto",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5217428296",
+   "username": "tdbaker13",
+   "points": 115.799995,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "ceddanne rafaela",
+    "cj abrams",
+    "connor wong",
+    "jacob young",
+    "jorbit vivas",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5217423732",
+   "username": "bleeski",
+   "points": 114.799995,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 31.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "cade cavalli",
+    "cj abrams",
+    "connor wong",
+    "daylen lile",
+    "jarren duran",
+    "jorbit vivas",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5217084538",
+   "username": "davidlobo4",
+   "points": 111.799995,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew pinckney",
+    "brady house",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "cj abrams",
+    "keibert ruiz",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5217427199",
+   "username": "peterjpacheco",
+   "points": 111.799995,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.09,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "cj abrams",
+    "connor wong",
+    "ernie clement",
+    "jarren duran",
+    "kazuma okamoto",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5217439783",
+   "username": "BAlmeida402",
+   "points": 111.799995,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.35,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew pinckney",
+    "brady house",
+    "cade cavalli",
+    "cj abrams",
+    "connor wong",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5217042967",
+   "username": "minrobertson210",
+   "points": 110.799995,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 36.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "cj abrams",
+    "ernie clement",
+    "jarren duran",
+    "masataka yoshida",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5217392336",
+   "username": "auweglman",
+   "points": 110.799995,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "brandon valenzuela",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "dylan crews",
+    "kazuma okamoto",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "25",
+   "entry_id": "5217438247",
+   "username": "angerisagift",
+   "points": 109.799995,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cade cavalli",
+    "cj abrams",
+    "daylen lile",
+    "kazuma okamoto",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5217427195",
+   "username": "peterjpacheco",
+   "points": 109.299995,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.94,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "connor wong",
+    "jarren duran",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5217033931",
+   "username": "SuperDavisms",
+   "points": 105.799995,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "cade cavalli",
+    "dansby swanson",
+    "ernie clement",
+    "jarren duran",
+    "keibert ruiz",
+    "masataka yoshida",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "28",
+   "entry_id": "5217042970",
+   "username": "minrobertson210",
+   "points": 104.799995,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 36.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "ceddanne rafaela",
+    "cj abrams",
+    "connor wong",
+    "jarren duran",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "28",
+   "entry_id": "5217398269",
+   "username": "wittwerjoe",
+   "points": 104.799995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "cade cavalli",
+    "cj abrams",
+    "connor wong",
+    "jarren duran",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5217283328",
+   "username": "bellsopa",
+   "points": 103.799995,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 31.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "daylen lile",
+    "kazuma okamoto",
+    "miguel amaya",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5217403720",
+   "username": "lornaz",
+   "points": 103.799995,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 26.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew pinckney",
+    "cade cavalli",
+    "charles mcadoo",
+    "cj abrams",
+    "harry ford",
+    "jorbit vivas",
+    "payton tolle",
+    "seiya suzuki",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5217418958",
+   "username": "frysd85",
+   "points": 103.799995,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "ceddanne rafaela",
+    "cj abrams",
+    "connor wong",
+    "ian happ",
+    "kazuma okamoto",
+    "masataka yoshida",
+    "nasim nunez",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5217389740",
+   "username": "BigDumbAnimal19",
+   "points": 101.299995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 35.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "cj abrams",
+    "connor wong",
+    "kevin gausman",
+    "masataka yoshida",
+    "nathan lukes",
+    "nico hoerner",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5217420586",
+   "username": "137666",
+   "points": 101.299995,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "keibert ruiz",
+    "kevin gausman",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "35",
+   "entry_id": "5217033950",
+   "username": "SuperDavisms",
+   "points": 99.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 32.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "cade cavalli",
+    "caleb durbin",
+    "daylen lile",
+    "kevin gausman",
+    "miguel amaya",
+    "nick sogard",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "36",
+   "entry_id": "5217427197",
+   "username": "peterjpacheco",
+   "points": 99.299995,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 31.3,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "chase meidroth",
+    "colson montgomery",
+    "jarren duran",
+    "kevin gausman",
+    "payton tolle",
+    "pete crow armstrong",
+    "tyler stephenson",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5217398264",
+   "username": "wittwerjoe",
+   "points": 98.799995,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "connor wong",
+    "jarren duran",
+    "payton tolle",
+    "pedro ramirez",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "38",
+   "entry_id": "5217097486",
+   "username": "stevmortc",
+   "points": 98.299995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "caleb durbin",
+    "daylen lile",
+    "harry ford",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5217118920",
+   "username": "jdub.14",
+   "points": 97.299995,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5217184696",
+   "username": "starplay",
+   "points": 97.299995,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "nico hoerner",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5217398268",
+   "username": "wittwerjoe",
+   "points": 96.799995,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "cade cavalli",
+    "charles mcadoo",
+    "jarren duran",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5217427198",
+   "username": "peterjpacheco",
+   "points": 96.799995,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.89,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "cade cavalli",
+    "chase meidroth",
+    "dansby swanson",
+    "jarren duran",
+    "keibert ruiz",
+    "miguel vargas",
+    "payton tolle",
+    "pete crow armstrong",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5217330979",
+   "username": "auweglman",
+   "points": 96.299995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 30.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "kevin gausman",
+    "michael busch",
+    "nathan lukes",
+    "payton tolle",
+    "pedro ramirez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5217368180",
+   "username": "nomjlikeme",
+   "points": 96.299995,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "45",
+   "entry_id": "5217398266",
+   "username": "wittwerjoe",
+   "points": 95.799995,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brandon valenzuela",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "jarren duran",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "45",
+   "entry_id": "5217398270",
+   "username": "wittwerjoe",
+   "points": 95.799995,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cade cavalli",
+    "ernie clement",
+    "ian happ",
+    "jarren duran",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "47",
+   "entry_id": "5217099464",
+   "username": "Stree",
+   "points": 94.299995,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "47",
+   "entry_id": "5217368182",
+   "username": "nomjlikeme",
+   "points": 94.299995,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5217101431",
+   "username": "Dave2zone",
+   "points": 93.799995,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "cj abrams",
+    "jarren duran",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "masataka yoshida",
+    "myles straw",
+    "nico hoerner",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5217101432",
+   "username": "Dave2zone",
+   "points": 93.799995,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "cj abrams",
+    "jarren duran",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "masataka yoshida",
+    "myles straw",
+    "nico hoerner",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5217171476",
+   "username": "sportsfan14",
+   "points": 93.45,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 20.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "charles mcadoo",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "ernie clement",
+    "ian happ",
+    "keibert ruiz",
+    "max scherzer",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5217099466",
+   "username": "Stree",
+   "points": 93.299995,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "53",
+   "entry_id": "5217073019",
+   "username": "Mrboozer",
+   "points": 92.299995,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.04,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew pinckney",
+    "caleb durbin",
+    "cj abrams",
+    "ernie clement",
+    "jarren duran",
+    "kevin gausman",
+    "miguel amaya",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "54",
+   "entry_id": "5217411894",
+   "username": "mgarmon72",
+   "points": 91.799995,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 34.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cade cavalli",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "myles straw",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5217413373",
+   "username": "bleeski",
+   "points": 91.45,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "cade cavalli",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "ernie clement",
+    "george springer",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "max scherzer"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5217427045",
+   "username": "WildSixtyNine",
+   "points": 90.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cade cavalli",
+    "dansby swanson",
+    "dylan crews",
+    "kazuma okamoto",
+    "kevin gausman",
+    "nick sogard",
+    "seiya suzuki",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5217146954",
+   "username": "jokerdpo",
+   "points": 90.3,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 37.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "carson kelly",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5217439787",
+   "username": "BAlmeida402",
+   "points": 90.3,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5217398267",
+   "username": "wittwerjoe",
+   "points": 89.8,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andres gimenez",
+    "cade cavalli",
+    "connor wong",
+    "jarren duran",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5217390302",
+   "username": "BigDumbAnimal19",
+   "points": 88.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "cade cavalli",
+    "connor wong",
+    "ernie clement",
+    "jarren duran",
+    "kazuma okamoto",
+    "michael busch",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "61",
+   "entry_id": "5217212578",
+   "username": "SadatGnosis",
+   "points": 88.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.07,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "ernie clement",
+    "keibert ruiz",
+    "kevin gausman",
+    "masataka yoshida",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "62",
+   "entry_id": "5217106412",
+   "username": "brock196",
+   "points": 87.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 26.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "cade cavalli",
+    "cj abrams",
+    "daylen lile",
+    "keibert ruiz",
+    "max scherzer",
+    "michael conforto",
+    "pedro ramirez",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "63",
+   "entry_id": "5217431716",
+   "username": "alexisawesomer7",
+   "points": 87.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 42.3,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "daylen lile",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5217368179",
+   "username": "nomjlikeme",
+   "points": 86.3,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5217428298",
+   "username": "tdbaker13",
+   "points": 86.3,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "carson kelly",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5217428300",
+   "username": "tdbaker13",
+   "points": 86.3,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "67",
+   "entry_id": "5217400790",
+   "username": "claytankgunner",
+   "points": 85.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "ceddanne rafaela",
+    "connor wong",
+    "dansby swanson",
+    "kazuma okamoto",
+    "kevin gausman",
+    "nick sogard",
+    "pete crow armstrong",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "68",
+   "entry_id": "5217368181",
+   "username": "nomjlikeme",
+   "points": 85.3,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "caleb durbin",
+    "connor wong",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "68",
+   "entry_id": "5217439785",
+   "username": "BAlmeida402",
+   "points": 85.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5217166799",
+   "username": "ktm4214",
+   "points": 81.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon valenzuela",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "kazuma okamoto",
+    "max scherzer",
+    "nico hoerner",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5217112530",
+   "username": "tampayardie",
+   "points": 81.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "george springer",
+    "harry ford",
+    "jarren duran",
+    "kazuma okamoto",
+    "kevin gausman",
+    "nico hoerner",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "72",
+   "entry_id": "5217137061",
+   "username": "whoisjohngalt420",
+   "points": 80.85,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.33,
+   "n_cheap": 2,
+   "players_norm": [
+    "abimelec ortiz",
+    "andrew pinckney",
+    "cj abrams",
+    "jorbit vivas",
+    "keibert ruiz",
+    "max scherzer",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "73",
+   "entry_id": "5217438561",
+   "username": "Vabeagles",
+   "points": 80.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "dansby swanson",
+    "george springer",
+    "ian happ",
+    "jarren duran",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "payton tolle",
+    "pedro ramirez",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5217171479",
+   "username": "sportsfan14",
+   "points": 80.45,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cade cavalli",
+    "charles mcadoo",
+    "dylan crews",
+    "ernie clement",
+    "george springer",
+    "keibert ruiz",
+    "max scherzer",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "75",
+   "entry_id": "5217438665",
+   "username": "earnhard3",
+   "points": 79.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andres gimenez",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "ian happ",
+    "keibert ruiz",
+    "kevin gausman",
+    "pedro ramirez",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5217171474",
+   "username": "sportsfan14",
+   "points": 79.45,
+   "salary_used": 45200,
+   "salary_left": 4800,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 18.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres chaparro",
+    "brady house",
+    "cade cavalli",
+    "cj abrams",
+    "daylen lile",
+    "ernie clement",
+    "ian happ",
+    "keibert ruiz",
+    "max scherzer",
+    "myles straw"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "77",
+   "entry_id": "5217042968",
+   "username": "minrobertson210",
+   "points": 79.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.3,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "dansby swanson",
+    "jarren duran",
+    "kevin gausman",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5217368183",
+   "username": "nomjlikeme",
+   "points": 76.3,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5217420663",
+   "username": "rstash24",
+   "points": 75.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 26.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cade cavalli",
+    "cj abrams",
+    "jarren duran",
+    "kazuma okamoto",
+    "max scherzer",
+    "nasim nunez",
+    "pete crow armstrong",
+    "vladimir guerrero",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "80",
+   "entry_id": "5217056177",
+   "username": "pickuphockey",
+   "points": 75.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 25.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "braden montgomery",
+    "ceddanne rafaela",
+    "cj abrams",
+    "george springer",
+    "harry ford",
+    "kevin gausman",
+    "payton tolle",
+    "romy gonzalez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5217159633",
+   "username": "jsolda1990",
+   "points": 75.2,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Davis Martin"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 20.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "carson kelly",
+    "dansby swanson",
+    "davis martin",
+    "dylan crews",
+    "kazuma okamoto",
+    "michael busch",
+    "nasim nunez",
+    "seiya suzuki",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5217413371",
+   "username": "bleeski",
+   "points": 74.9,
+   "salary_used": 46600,
+   "salary_left": 3400,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brandon valenzuela",
+    "cade cavalli",
+    "george springer",
+    "jarren duran",
+    "kazuma okamoto",
+    "kevin gausman",
+    "nick sogard",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5217436868",
+   "username": "darwinhobb",
+   "points": 74.8,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "cade cavalli",
+    "ernie clement",
+    "kazuma okamoto",
+    "michael conforto",
+    "payton tolle",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217042971",
+   "username": "minrobertson210",
+   "points": 74.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.64,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "andruw monasterio",
+    "jarren duran",
+    "kevin gausman",
+    "miguel amaya",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217099467",
+   "username": "Stree",
+   "points": 74.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.19,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217428299",
+   "username": "tdbaker13",
+   "points": 74.3,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 41.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor wong",
+    "dansby swanson",
+    "daylen lile",
+    "ernie clement",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217436996",
+   "username": "LarryW",
+   "points": 74.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brandon valenzuela",
+    "ceddanne rafaela",
+    "charles mcadoo",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5217439789",
+   "username": "BAlmeida402",
+   "points": 73.3,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5217281299",
+   "username": "dcw331",
+   "points": 72.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 32.48,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "adley rutschman",
+    "alex bregman",
+    "andres gimenez",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "nico hoerner",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5217428301",
+   "username": "tdbaker13",
+   "points": 72.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "connor wong",
+    "dansby swanson",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "nico hoerner",
+    "payton tolle",
+    "pete crow armstrong",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5217042966",
+   "username": "minrobertson210",
+   "points": 71.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 30.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "charles mcadoo",
+    "cj abrams",
+    "ian happ",
+    "max scherzer",
+    "miguel amaya",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5217430364",
+   "username": "blizzybeatz",
+   "points": 71.85,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.63,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "brady house",
+    "dansby swanson",
+    "keibert ruiz",
+    "max scherzer",
+    "michael conforto",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "93",
+   "entry_id": "5217142780",
+   "username": "Deftones5678",
+   "points": 71.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 26.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "cade cavalli",
+    "dansby swanson",
+    "daylen lile",
+    "george springer",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "max scherzer",
+    "michael busch",
+    "nico hoerner",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "94",
+   "entry_id": "5217426499",
+   "username": "howardwi",
+   "points": 71.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ceddanne rafaela",
+    "ernie clement",
+    "jarren duran",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "kevin gausman",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "94",
+   "entry_id": "5217427194",
+   "username": "peterjpacheco",
+   "points": 71.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 32.92,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "chase meidroth",
+    "connor wong",
+    "elly de la cruz",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "96",
+   "entry_id": "5217171478",
+   "username": "sportsfan14",
+   "points": 70.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "dansby swanson",
+    "ernie clement",
+    "ian happ",
+    "keibert ruiz",
+    "max scherzer",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "96",
+   "entry_id": "5217413372",
+   "username": "bleeski",
+   "points": 70.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 29.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "dansby swanson",
+    "daylen lile",
+    "ian happ",
+    "jorbit vivas",
+    "keibert ruiz",
+    "max scherzer",
+    "michael busch",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5216684918",
+   "username": "snakes1407",
+   "points": 70.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "andres gimenez",
+    "connor wong",
+    "daylen lile",
+    "kevin gausman",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5217099470",
+   "username": "Stree",
+   "points": 70.3,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5217405783",
+   "username": "RunWired",
+   "points": 69.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 33.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "cade cavalli",
+    "ceddanne rafaela",
+    "connor wong",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "101",
+   "entry_id": "5217042969",
+   "username": "minrobertson210",
+   "points": 69.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.33,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "alex bregman",
+    "cj abrams",
+    "george springer",
+    "ian happ",
+    "max scherzer",
+    "miguel amaya",
+    "payton tolle",
+    "pedro ramirez",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5217439784",
+   "username": "BAlmeida402",
+   "points": 69.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "payton tolle",
+    "pedro ramirez",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "103",
+   "entry_id": "5217099465",
+   "username": "Stree",
+   "points": 68.3,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor wong",
+    "dansby swanson",
+    "daylen lile",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "103",
+   "entry_id": "5217360462",
+   "username": "psereda",
+   "points": 68.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "charles mcadoo",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "nick sogard",
+    "nico hoerner",
+    "payton tolle",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "105",
+   "entry_id": "5217342430",
+   "username": "jdrujon",
+   "points": 67.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "daylen lile",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "105",
+   "entry_id": "5217392827",
+   "username": "auweglman",
+   "points": 67.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 31.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "cj abrams",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael conforto",
+    "payton tolle",
+    "pedro ramirez",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5217025028",
+   "username": "jpeyton1219",
+   "points": 66.3,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "nasim nunez",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5217099468",
+   "username": "Stree",
+   "points": 66.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5217159849",
+   "username": "Texanastro",
+   "points": 66.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "cj abrams",
+    "dylan crews",
+    "ernie clement",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "myles straw",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5217327012",
+   "username": "minnows8up",
+   "points": 66.3,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "ceddanne rafaela",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5217427193",
+   "username": "peterjpacheco",
+   "points": 65.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "cade cavalli",
+    "colson montgomery",
+    "ian happ",
+    "kevin gausman",
+    "michael busch",
+    "miguel amaya",
+    "nick sogard",
+    "seiya suzuki",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "112",
+   "entry_id": "5217400788",
+   "username": "claytankgunner",
+   "points": 65.3,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nico hoerner",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "112",
+   "entry_id": "5217431666",
+   "username": "qbjjj",
+   "points": 65.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "charles mcadoo",
+    "connor wong",
+    "dansby swanson",
+    "jarren duran",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5217329590",
+   "username": "auweglman",
+   "points": 64.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 32.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "caleb durbin",
+    "dansby swanson",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "115",
+   "entry_id": "5217334279",
+   "username": "calnuss",
+   "points": 64.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "charles mcadoo",
+    "dylan crews",
+    "george springer",
+    "keibert ruiz",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "115",
+   "entry_id": "5217441421",
+   "username": "hitch0403",
+   "points": 64.3,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "jarren duran",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "kevin gausman",
+    "masataka yoshida",
+    "nathan lukes",
+    "payton tolle",
+    "pedro ramirez",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "117",
+   "entry_id": "5217231139",
+   "username": "daprof507",
+   "points": 63.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Dylan Cease",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 16.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "andres chaparro",
+    "dylan cease",
+    "dylan crews",
+    "ernie clement",
+    "eugenio suarez",
+    "george springer",
+    "masataka yoshida",
+    "nasim nunez",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5217304317",
+   "username": "BadMOFO55",
+   "points": 63.300003,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "daylen lile",
+    "ian happ",
+    "kevin gausman",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5217413376",
+   "username": "bleeski",
+   "points": 63.300003,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "120",
+   "entry_id": "5217171477",
+   "username": "sportsfan14",
+   "points": 61.9,
+   "salary_used": 45200,
+   "salary_left": 4800,
+   "sp_pair": [
+    "Cade Cavalli",
+    "Kevin Gausman"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 26.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "cade cavalli",
+    "charles mcadoo",
+    "ernie clement",
+    "jarren duran",
+    "keibert ruiz",
+    "kevin gausman",
+    "nathan lukes",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "121",
+   "entry_id": "5217042972",
+   "username": "minrobertson210",
+   "points": 61.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Max Scherzer",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "charles mcadoo",
+    "cj abrams",
+    "daylen lile",
+    "ian happ",
+    "max scherzer",
+    "michael busch",
+    "miguel amaya",
+    "payton tolle",
+    "pedro ramirez",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "122",
+   "entry_id": "5217153954",
+   "username": "nelson335",
+   "points": 61.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Davis Martin",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 26.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "alex bregman",
+    "andres gimenez",
+    "ceddanne rafaela",
+    "davis martin",
+    "jarren duran",
+    "nasim nunez",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "123",
+   "entry_id": "5217428297",
+   "username": "tdbaker13",
+   "points": 61.300003,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "connor wong",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "123",
+   "entry_id": "5217439786",
+   "username": "BAlmeida402",
+   "points": 61.300003,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "connor wong",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5217394103",
+   "username": "Jadacattt",
+   "points": 60.300003,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andres gimenez",
+    "ceddanne rafaela",
+    "connor wong",
+    "kevin gausman",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5217424500",
+   "username": "darwinhobb",
+   "points": 60.300003,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5217014079",
+   "username": "Dicskstone32",
+   "points": 59.300003,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5217400792",
+   "username": "claytankgunner",
+   "points": 59.300003,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "ceddanne rafaela",
+    "connor wong",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5217413375",
+   "username": "bleeski",
+   "points": 59.300003,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5217420587",
+   "username": "137666",
+   "points": 59.300003,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "ceddanne rafaela",
+    "connor wong",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "131",
+   "entry_id": "5217099469",
+   "username": "Stree",
+   "points": 58.300003,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "131",
+   "entry_id": "5217424786",
+   "username": "murphy2228",
+   "points": 58.300003,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 33.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "carson kelly",
+    "ceddanne rafaela",
+    "dansby swanson",
+    "ernie clement",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "payton tolle",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "131",
+   "entry_id": "5217438402",
+   "username": "Habersham1275H",
+   "points": 58.300003,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "charles mcadoo",
+    "dansby swanson",
+    "ernie clement",
+    "george springer",
+    "kevin gausman",
+    "michael busch",
+    "miguel amaya",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "131",
+   "entry_id": "5217440028",
+   "username": "choproom",
+   "points": 58.300003,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 40.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "connor wong",
+    "dansby swanson",
+    "ernie clement",
+    "jarren duran",
+    "kevin gausman",
+    "masataka yoshida",
+    "michael busch",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "135",
+   "entry_id": "5217330281",
+   "username": "auweglman",
+   "points": 56.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 29.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "charles mcadoo",
+    "cj abrams",
+    "dylan crews",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "136",
+   "entry_id": "5217392498",
+   "username": "mallemang",
+   "points": 56.300003,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 32.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "daylen lile",
+    "ernie clement",
+    "kevin gausman",
+    "miguel amaya",
+    "myles straw",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "137",
+   "entry_id": "5217187876",
+   "username": "mamamoons",
+   "points": 55.300003,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 27.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "adley rutschman",
+    "brett bateman",
+    "charles mcadoo",
+    "cj abrams",
+    "daylen lile",
+    "juan brito",
+    "kevin gausman",
+    "payton tolle",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "138",
+   "entry_id": "5217441706",
+   "username": "grassy7132",
+   "points": 54.300003,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "daylen lile",
+    "ernie clement",
+    "george springer",
+    "kevin gausman",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "139",
+   "entry_id": "5217281300",
+   "username": "schnib",
+   "points": 53.300003,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "kevin gausman",
+    "michael conforto",
+    "miguel amaya",
+    "nick sogard",
+    "payton tolle",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "139",
+   "entry_id": "5217428302",
+   "username": "tdbaker13",
+   "points": 53.300003,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "charles mcadoo",
+    "connor wong",
+    "dansby swanson",
+    "ian happ",
+    "kevin gausman",
+    "masataka yoshida",
+    "nico hoerner",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "141",
+   "entry_id": "5217329110",
+   "username": "slophound",
+   "points": 50.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 32.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "keibert ruiz",
+    "kevin gausman",
+    "masataka yoshida",
+    "max scherzer",
+    "michael busch",
+    "nico hoerner",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "142",
+   "entry_id": "5217381670",
+   "username": "PlayactionJames",
+   "points": 50.300003,
+   "salary_used": 43900,
+   "salary_left": 6100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "charles mcadoo",
+    "connor wong",
+    "ernie clement",
+    "george springer",
+    "jarren duran",
+    "kevin gausman",
+    "nathan lukes",
+    "payton tolle",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "143",
+   "entry_id": "5217400793",
+   "username": "claytankgunner",
+   "points": 47.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "charles mcadoo",
+    "dansby swanson",
+    "dylan crews",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "nico hoerner",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "144",
+   "entry_id": "5217426182",
+   "username": "darwinhobb",
+   "points": 47.300003,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "charles mcadoo",
+    "keibert ruiz",
+    "kevin gausman",
+    "michael busch",
+    "myles straw",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "144",
+   "entry_id": "5217440830",
+   "username": "gcferraro",
+   "points": 47.300003,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.64,
+   "n_cheap": 1,
+   "players_norm": [
+    "alex bregman",
+    "andrew pinckney",
+    "andruw monasterio",
+    "connor wong",
+    "kevin gausman",
+    "michael busch",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "146",
+   "entry_id": "5217353999",
+   "username": "jefftheho",
+   "points": 45.300003,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "connor wong",
+    "ian happ",
+    "kevin gausman",
+    "michael busch",
+    "michael conforto",
+    "nick sogard",
+    "payton tolle",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "147",
+   "entry_id": "5217400787",
+   "username": "claytankgunner",
+   "points": 42.95,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "charles mcadoo",
+    "dansby swanson",
+    "kevin gausman",
+    "masataka yoshida",
+    "max scherzer",
+    "michael busch",
+    "nico hoerner",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "148",
+   "entry_id": "5217184425",
+   "username": "titanhawks",
+   "points": 38.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andruw monasterio",
+    "brandon valenzuela",
+    "ian happ",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "nasim nunez",
+    "pete crow armstrong",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "148",
+   "entry_id": "5217441697",
+   "username": "Suava79",
+   "points": 38.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andres gimenez",
+    "daylen lile",
+    "ernie clement",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "miguel amaya",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "150",
+   "entry_id": "5216718362",
+   "username": "cookp25fred",
+   "points": 36.6,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Davis Martin",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 19.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "carson kelly",
+    "dansby swanson",
+    "davis martin",
+    "jarren duran",
+    "michael busch",
+    "miguel vargas",
+    "nico hoerner",
+    "payton tolle",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "151",
+   "entry_id": "5217171475",
+   "username": "sportsfan14",
+   "points": 32.95,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "charles mcadoo",
+    "connor wong",
+    "dansby swanson",
+    "ernie clement",
+    "ian happ",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "152",
+   "entry_id": "5217400791",
+   "username": "claytankgunner",
+   "points": 31.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "charles mcadoo",
+    "cj abrams",
+    "ian happ",
+    "keibert ruiz",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "michael conforto",
+    "nico hoerner",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5217137057",
+   "username": "whoisjohngalt420",
+   "points": 30.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon valenzuela",
+    "dansby swanson",
+    "ernie clement",
+    "ian happ",
+    "kevin gausman",
+    "max scherzer",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5217137058",
+   "username": "whoisjohngalt420",
+   "points": 30.95,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 27.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "ernie clement",
+    "george springer",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "miguel amaya",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5217137062",
+   "username": "whoisjohngalt420",
+   "points": 30.95,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.69,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "dansby swanson",
+    "ernie clement",
+    "george springer",
+    "ian happ",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5217137063",
+   "username": "whoisjohngalt420",
+   "points": 30.95,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 28.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "ernie clement",
+    "george springer",
+    "ian happ",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "miguel amaya",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5217171473",
+   "username": "sportsfan14",
+   "points": 30.95,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "dansby swanson",
+    "ernie clement",
+    "george springer",
+    "ian happ",
+    "kazuma okamoto",
+    "keibert ruiz",
+    "kevin gausman",
+    "max scherzer",
+    "pete crow armstrong",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5217413374",
+   "username": "bleeski",
+   "points": 30.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon valenzuela",
+    "dansby swanson",
+    "ernie clement",
+    "ian happ",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "159",
+   "entry_id": "5217137059",
+   "username": "whoisjohngalt420",
+   "points": 28.95,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "ernie clement",
+    "ian happ",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "michael busch",
+    "miguel amaya",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "159",
+   "entry_id": "5217137060",
+   "username": "whoisjohngalt420",
+   "points": 28.95,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Kevin Gausman",
+    "Max Scherzer"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 26.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres gimenez",
+    "brandon valenzuela",
+    "ernie clement",
+    "ian happ",
+    "kazuma okamoto",
+    "kevin gausman",
+    "max scherzer",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "vladimir guerrero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "161",
+   "entry_id": "5217166797",
+   "username": "hacker33",
+   "points": 15.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Davis Martin",
+    "Kevin Gausman"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 26.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "adley rutschman",
+    "alex bregman",
+    "andruw monasterio",
+    "chase meidroth",
+    "davis martin",
+    "ian happ",
+    "jarren duran",
+    "kevin gausman",
+    "michael busch",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Payton Tolle",
+   "player_norm": "payton tolle",
+   "roster_position": "P",
+   "pct_drafted": 77.64,
+   "fpts": 27.6
+  },
+  {
+   "player": "Kevin Gausman",
+   "player_norm": "kevin gausman",
+   "roster_position": "P",
+   "pct_drafted": 62.73,
+   "fpts": 7.7
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "OF",
+   "pct_drafted": 55.28,
+   "fpts": 0.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 45.96,
+   "fpts": 11.0
+  },
+  {
+   "player": "Dansby Swanson",
+   "player_norm": "dansby swanson",
+   "roster_position": "SS",
+   "pct_drafted": 38.51,
+   "fpts": 4.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 37.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "2B",
+   "pct_drafted": 37.27,
+   "fpts": 4.0
+  },
+  {
+   "player": "Cade Cavalli",
+   "player_norm": "cade cavalli",
+   "roster_position": "P",
+   "pct_drafted": 36.65,
+   "fpts": 40.2
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "1B",
+   "pct_drafted": 31.68,
+   "fpts": 7.0
+  },
+  {
+   "player": "Masataka Yoshida",
+   "player_norm": "masataka yoshida",
+   "roster_position": "OF",
+   "pct_drafted": 31.06,
+   "fpts": 12.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "3B",
+   "pct_drafted": 29.81,
+   "fpts": 0.0
+  },
+  {
+   "player": "CJ Abrams",
+   "player_norm": "cj abrams",
+   "roster_position": "SS",
+   "pct_drafted": 29.19,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 28.57,
+   "fpts": 2.0
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "OF",
+   "pct_drafted": 28.57,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 27.95,
+   "fpts": 12.0
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "1B",
+   "pct_drafted": 27.33,
+   "fpts": 3.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 22.36,
+   "fpts": 28.0
+  },
+  {
+   "player": "Keibert Ruiz",
+   "player_norm": "keibert ruiz",
+   "roster_position": "C",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "2B",
+   "pct_drafted": 19.88,
+   "fpts": 0.0
+  },
+  {
+   "player": "Max Scherzer",
+   "player_norm": "max scherzer",
+   "roster_position": "P",
+   "pct_drafted": 19.88,
+   "fpts": 14.25
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "SS",
+   "pct_drafted": 19.25,
+   "fpts": 3.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "OF",
+   "pct_drafted": 18.63,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "2B",
+   "pct_drafted": 18.63,
+   "fpts": 2.0
+  },
+  {
+   "player": "Daylen Lile",
+   "player_norm": "daylen lile",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 10.0
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "3B",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Amaya",
+   "player_norm": "miguel amaya",
+   "roster_position": "C",
+   "pct_drafted": 16.15,
+   "fpts": 0.0
+  },
+  {
+   "player": "Abimelec Ortiz",
+   "player_norm": "abimelec ortiz",
+   "roster_position": "1B",
+   "pct_drafted": 14.91,
+   "fpts": 23.0
+  },
+  {
+   "player": "Brandon Valenzuela",
+   "player_norm": "brandon valenzuela",
+   "roster_position": "C",
+   "pct_drafted": 13.66,
+   "fpts": 0.0
+  },
+  {
+   "player": "Charles McAdoo",
+   "player_norm": "charles mcadoo",
+   "roster_position": "3B",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "George Springer",
+   "player_norm": "george springer",
+   "roster_position": "OF",
+   "pct_drafted": 12.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Vladimir Guerrero Jr.",
+   "player_norm": "vladimir guerrero",
+   "roster_position": "1B",
+   "pct_drafted": 12.42,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "2B",
+   "pct_drafted": 11.18,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andres Gimenez",
+   "player_norm": "andres gimenez",
+   "roster_position": "SS",
+   "pct_drafted": 10.56,
+   "fpts": 2.0
+  },
+  {
+   "player": "Michael Conforto",
+   "player_norm": "michael conforto",
+   "roster_position": "OF",
+   "pct_drafted": 8.07,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dylan Crews",
+   "player_norm": "dylan crews",
+   "roster_position": "OF",
+   "pct_drafted": 7.45,
+   "fpts": 17.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "1B",
+   "pct_drafted": 6.21,
+   "fpts": 4.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "3B",
+   "pct_drafted": 6.21,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brady House",
+   "player_norm": "brady house",
+   "roster_position": "3B",
+   "pct_drafted": 5.59,
+   "fpts": 3.0
+  },
+  {
+   "player": "Andrew Pinckney",
+   "player_norm": "andrew pinckney",
+   "roster_position": "OF",
+   "pct_drafted": 4.97,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kazuma Okamoto",
+   "player_norm": "kazuma okamoto",
+   "roster_position": "1B",
+   "pct_drafted": 4.97,
+   "fpts": 0.0
+  },
+  {
+   "player": "Carson Kelly",
+   "player_norm": "carson kelly",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "2B",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Myles Straw",
+   "player_norm": "myles straw",
+   "roster_position": "OF",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nathan Lukes",
+   "player_norm": "nathan lukes",
+   "roster_position": "OF",
+   "pct_drafted": 3.73,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jorbit Vivas",
+   "player_norm": "jorbit vivas",
+   "roster_position": "2B",
+   "pct_drafted": 3.73,
+   "fpts": 9.0
+  },
+  {
+   "player": "Adley Rutschman",
+   "player_norm": "adley rutschman",
+   "roster_position": "C",
+   "pct_drafted": 3.11,
+   "fpts": 0.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 3.11,
+   "fpts": 0.0
+  },
+  {
+   "player": "Davis Martin",
+   "player_norm": "davis martin",
+   "roster_position": "P",
+   "pct_drafted": 2.48,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ernie Clement",
+   "player_norm": "ernie clement",
+   "roster_position": "3B",
+   "pct_drafted": 2.48,
+   "fpts": 2.0
+  },
+  {
+   "player": "Harry Ford",
+   "player_norm": "harry ford",
+   "roster_position": "C",
+   "pct_drafted": 2.48,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andres Chaparro",
+   "player_norm": "andres chaparro",
+   "roster_position": "1B",
+   "pct_drafted": 1.86,
+   "fpts": 5.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "3B",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Braden Montgomery",
+   "player_norm": "braden montgomery",
+   "roster_position": "OF",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jorbit Vivas",
+   "player_norm": "jorbit vivas",
+   "roster_position": "3B",
+   "pct_drafted": 1.24,
+   "fpts": 9.0
+  },
+  {
+   "player": "Jacob Young",
+   "player_norm": "jacob young",
+   "roster_position": "OF",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Stephenson",
+   "player_norm": "tyler stephenson",
+   "roster_position": "C",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyrone Taylor",
+   "player_norm": "tyrone taylor",
+   "roster_position": "OF",
+   "pct_drafted": 1.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Romy Gonzalez",
+   "player_norm": "romy gonzalez",
+   "roster_position": "2B",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Juan Brito",
+   "player_norm": "juan brito",
+   "roster_position": "2B",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brett Bateman",
+   "player_norm": "brett bateman",
+   "roster_position": "OF",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Eugenio Suarez",
+   "player_norm": "eugenio suarez",
+   "roster_position": "3B",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dylan Cease",
+   "player_norm": "dylan cease",
+   "roster_position": "P",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "SS",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Tena",
+   "player_norm": "jose tena",
+   "roster_position": "2B",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Elly De La Cruz",
+   "player_norm": "elly de la cruz",
+   "roster_position": "SS",
+   "pct_drafted": 0.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Charles McAdoo",
+   "player_norm": "charles mcadoo",
+   "roster_position": "1B",
+   "pct_drafted": 0.62,
+   "fpts": 2.0
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 161,
+  "best_rank": 19,
+  "worst_rank": 153,
+  "best_finish_percentile": 88.82,
+  "median_finish_percentile": 40.99,
+  "best_points": 114.799995,
+  "winning_points": 161.8,
+  "own_lineups_duplicated_by_field": 1,
+  "max_copies_of_an_own_lineup": 2,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

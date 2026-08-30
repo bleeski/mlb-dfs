@@ -1,0 +1,846 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193514633",
+ "slate_date": "2026-08-09",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 69.5,
+  "winning_entry_id": "5213791687",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 10,
+  "at_cap_share_pct": 43.5,
+  "salary_left_histogram": {
+   "1-100": 4,
+   "101-300": 5,
+   "<= 0": 6,
+   "301-700": 6,
+   "701-1500": 2
+  },
+  "max_stack_histogram": {
+   "3": 8,
+   "4": 8,
+   "5": 7
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Yordan Alvarez",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Jake Cronenworth",
+    "pct_drafted": 65.22
+   },
+   {
+    "player": "Fernando Tatis Jr.",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Jackson Merrill",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Ty France",
+    "pct_drafted": 43.48
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Yordan Alvarez",
+    "captain_count": 6,
+    "captain_share_pct": 26.1,
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Cristian Javier",
+    "captain_count": 5,
+    "captain_share_pct": 21.7,
+    "pct_drafted": 30.43
+   },
+   {
+    "player": "Jackson Merrill",
+    "captain_count": 4,
+    "captain_share_pct": 17.4,
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Fernando Tatis Jr.",
+    "captain_count": 2,
+    "captain_share_pct": 8.7,
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Ty France",
+    "captain_count": 2,
+    "captain_share_pct": 8.7,
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Manny Machado",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 26.09
+   },
+   {
+    "player": "Freddy Fermin",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 26.09
+   },
+   {
+    "player": "Daulton Varsho",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 21.74
+   }
+  ],
+  "winner_captain": {
+   "player": "Jackson Merrill",
+   "pct_drafted": 47.83,
+   "captain_share_pct": 17.4,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5213791687",
+   "username": "Razzle11",
+   "points": 69.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 47.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jackson merrill"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5213784287",
+   "username": "Flipper9",
+   "points": 61.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "luis rengifo",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jackson merrill"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5213733342",
+   "username": "bleeski",
+   "points": 57.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "isaac paredes",
+    "jackson merrill",
+    "jake cronenworth",
+    "manny machado",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "fernando tatis"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5213759998",
+   "username": "sasmallen",
+   "points": 51.78,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristian javier",
+    "daulton varsho",
+    "gavin sheets",
+    "jackson merrill",
+    "jake cronenworth",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cristian javier"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5213812483",
+   "username": "jeffs4162",
+   "points": 51.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 31.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "fernando tatis",
+    "isaac paredes",
+    "jackson merrill",
+    "lamonte wade",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jackson merrill"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5213750492",
+   "username": "cw1tt",
+   "points": 47.55,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jake cronenworth",
+    "jose altuve",
+    "luis rengifo",
+    "randy vasquez",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ty france"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5213726474",
+   "username": "peterjpacheco",
+   "points": 46.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "gavin sheets",
+    "manny machado",
+    "ty france",
+    "xander bogaerts",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "manny machado"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5213724434",
+   "username": "qbjjj",
+   "points": 45.83,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristian javier",
+    "fernando tatis",
+    "freddy fermin",
+    "jake cronenworth",
+    "randy vasquez",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cristian javier"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5213730890",
+   "username": "SportsJoker12",
+   "points": 45.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "fernando tatis",
+    "freddy fermin",
+    "ty france",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "fernando tatis"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5213742076",
+   "username": "SDOD1",
+   "points": 44.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 49.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "isaac paredes",
+    "jackson merrill",
+    "jake cronenworth",
+    "ty france",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ty france"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5213766052",
+   "username": "jc000000",
+   "points": 44.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 45.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "gavin sheets",
+    "jake cronenworth",
+    "jeremy pena",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5213807662",
+   "username": "nlh46",
+   "points": 43.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "freddy fermin",
+    "jeremy pena",
+    "manny machado",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "freddy fermin"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5213782723",
+   "username": "longlivefantasy",
+   "points": 37.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "freddy fermin",
+    "jackson merrill",
+    "jake cronenworth",
+    "jose altuve",
+    "randy vasquez",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5213781076",
+   "username": "rgamm29",
+   "points": 36.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "gavin sheets",
+    "jackson merrill",
+    "jeremy pena",
+    "ty france",
+    "xander bogaerts",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5213726456",
+   "username": "Alex20001",
+   "points": 35.35,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristian javier",
+    "jackson merrill",
+    "jake cronenworth",
+    "jose altuve",
+    "taylor trammell",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jackson merrill"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5213805663",
+   "username": "meyers2305",
+   "points": 33.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 24.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristian javier",
+    "daulton varsho",
+    "jeremy pena",
+    "manny machado",
+    "mason miller",
+    "taylor trammell"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "daulton varsho"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5213762867",
+   "username": "KILLANADZ24",
+   "points": 32.05,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson merrill",
+    "jake cronenworth",
+    "manny machado",
+    "randy vasquez",
+    "xander bogaerts",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jake cronenworth"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5213714338",
+   "username": "BigJRuck25",
+   "points": 27.0,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "gavin sheets",
+    "jake cronenworth",
+    "jeremy pena",
+    "luis rengifo",
+    "manny machado",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5213728498",
+   "username": "Draconfire",
+   "points": 26.78,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "cristian javier",
+    "freddy fermin",
+    "gavin sheets",
+    "isaac paredes",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cristian javier"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5213737287",
+   "username": "DanDePo",
+   "points": 26.78,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristian javier",
+    "daulton varsho",
+    "jake cronenworth",
+    "jeremy pena",
+    "taylor trammell",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cristian javier"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5213736584",
+   "username": "whoisjohngalt420",
+   "points": 23.78,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "cristian javier",
+    "daulton varsho",
+    "jake cronenworth",
+    "lamonte wade",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cristian javier"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5213798061",
+   "username": "arbo1",
+   "points": 20.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "jackson merrill",
+    "jake cronenworth",
+    "ty france",
+    "yainer diaz",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5213739027",
+   "username": "WiLDM4Ch1NE",
+   "points": 8.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "freddy fermin",
+    "isaac paredes",
+    "jeremy pena",
+    "jose altuve",
+    "lamonte wade",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Yordan Alvarez",
+   "player_norm": "yordan alvarez",
+   "roster_position": "UTIL",
+   "pct_drafted": 69.57,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Cronenworth",
+   "player_norm": "jake cronenworth",
+   "roster_position": "UTIL",
+   "pct_drafted": 65.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Fernando Tatis Jr.",
+   "player_norm": "fernando tatis",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 23.0
+  },
+  {
+   "player": "Jackson Merrill",
+   "player_norm": "jackson merrill",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 17.0
+  },
+  {
+   "player": "Ty France",
+   "player_norm": "ty france",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 3.0
+  },
+  {
+   "player": "Taylor Trammell",
+   "player_norm": "taylor trammell",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 5.0
+  },
+  {
+   "player": "Cristian Javier",
+   "player_norm": "cristian javier",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 1.85
+  },
+  {
+   "player": "Jeremy Pena",
+   "player_norm": "jeremy pena",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 0.0
+  },
+  {
+   "player": "Manny Machado",
+   "player_norm": "manny machado",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gavin Sheets",
+   "player_norm": "gavin sheets",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 16.0
+  },
+  {
+   "player": "Freddy Fermin",
+   "player_norm": "freddy fermin",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 8.0
+  },
+  {
+   "player": "Isaac Paredes",
+   "player_norm": "isaac paredes",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 16.0
+  },
+  {
+   "player": "Randy Vasquez",
+   "player_norm": "randy vasquez",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 12.05
+  },
+  {
+   "player": "Jose Altuve",
+   "player_norm": "jose altuve",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Walker",
+   "player_norm": "christian walker",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Xander Bogaerts",
+   "player_norm": "xander bogaerts",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Rengifo",
+   "player_norm": "luis rengifo",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 8.0
+  },
+  {
+   "player": "LaMonte Wade Jr.",
+   "player_norm": "lamonte wade",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Yainer Diaz",
+   "player_norm": "yainer diaz",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mason Miller",
+   "player_norm": "mason miller",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 3,
+  "worst_rank": 3,
+  "best_finish_percentile": 91.3,
+  "median_finish_percentile": 91.3,
+  "best_points": 57.5,
+  "winning_points": 69.5,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

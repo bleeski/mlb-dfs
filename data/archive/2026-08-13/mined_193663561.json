@@ -1,0 +1,3966 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193663561",
+ "slate_date": "2026-08-13",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 118,
+  "entries_complete_lineups": 114,
+  "roster_size": 10,
+  "entries_unparsed": 4,
+  "winning_points": 120.5,
+  "winning_entry_id": "5217531956",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 111,
+  "entries_in_duplicated_lineups": 5,
+  "share_duplicated_pct": 4.4,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 109,
+   "2": 1,
+   "3": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2100,
+  "at_cap_entries": 28,
+  "at_cap_share_pct": 24.6,
+  "salary_left_histogram": {
+   "> 1500": 25,
+   "301-700": 27,
+   "701-1500": 19,
+   "101-300": 15,
+   "1-100": 11,
+   "<= 0": 17
+  },
+  "max_stack_histogram": {
+   "3": 15,
+   "4": 46,
+   "5": 53
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Jacob deGrom",
+     "Roki Sasaki"
+    ],
+    "count": 50,
+    "field_share_pct": 43.9
+   },
+   {
+    "pair": [
+     "Roki Sasaki",
+     "Walbert Urena"
+    ],
+    "count": 20,
+    "field_share_pct": 17.5
+   },
+   {
+    "pair": [
+     "Jacob deGrom",
+     "Walbert Urena"
+    ],
+    "count": 19,
+    "field_share_pct": 16.7
+   },
+   {
+    "pair": [
+     "Jacob deGrom",
+     "Shane Drohan"
+    ],
+    "count": 16,
+    "field_share_pct": 14.0
+   },
+   {
+    "pair": [
+     "Shane Drohan",
+     "Walbert Urena"
+    ],
+    "count": 8,
+    "field_share_pct": 7.0
+   },
+   {
+    "pair": [
+     "Roki Sasaki",
+     "Shane Drohan"
+    ],
+    "count": 1,
+    "field_share_pct": 0.9
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Jacob deGrom",
+    "pct_drafted": 72.03
+   },
+   {
+    "player": "Shohei Ohtani",
+    "pct_drafted": 63.56
+   },
+   {
+    "player": "Roki Sasaki",
+    "pct_drafted": 60.17
+   },
+   {
+    "player": "Tommy Edman",
+    "pct_drafted": 59.32
+   },
+   {
+    "player": "Corey Seager",
+    "pct_drafted": 55.93
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 11.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0339,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1140,
+  "roster_slots_expected": 1140,
+  "recomputed_total_pct": 966.1,
+  "dk_table_total_pct": 955.1,
+  "dk_table_deficit_pts": 11.0,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 11.0 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5217531956",
+   "username": "Spizzwolf",
+   "points": 120.5,
+   "salary_used": 44300,
+   "salary_left": 5700,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "gary sanchez",
+    "jackson chourio",
+    "jake bauers",
+    "joey ortiz",
+    "josh lowe",
+    "nolan schanuel",
+    "shane drohan",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5217586096",
+   "username": "Wolverines1016",
+   "points": 117.5,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "denzer guzman",
+    "gary sanchez",
+    "jackson chourio",
+    "joey ortiz",
+    "mike trout",
+    "nolan schanuel",
+    "shane drohan",
+    "vaughn grissom",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5217653894",
+   "username": "whoisjohngalt420",
+   "points": 116.5,
+   "salary_used": 44300,
+   "salary_left": 5700,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 16.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "andrew vaughn",
+    "david hamilton",
+    "denzer guzman",
+    "jackson chourio",
+    "jake bauers",
+    "jose siri",
+    "shane drohan",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5217648977",
+   "username": "DueceEmUp",
+   "points": 110.5,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "denzer guzman",
+    "jackson chourio",
+    "joey ortiz",
+    "mike trout",
+    "nolan schanuel",
+    "shane drohan",
+    "vaughn grissom",
+    "wade meckler",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5217748800",
+   "username": "bleeski",
+   "points": 110.5,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "denzer guzman",
+    "garrett mitchell",
+    "jackson chourio",
+    "jake bauers",
+    "mike trout",
+    "shane drohan",
+    "vaughn grissom",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5217151733",
+   "username": "jrevelle3",
+   "points": 107.5,
+   "salary_used": 45700,
+   "salary_left": 4300,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "christian yelich",
+    "david hamilton",
+    "jackson chourio",
+    "joey ortiz",
+    "mike trout",
+    "nolan schanuel",
+    "shane drohan",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5217586581",
+   "username": "blueblood_UNC",
+   "points": 100.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "ben rortvedt",
+    "david hamilton",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "joey ortiz",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5217377541",
+   "username": "Oxyfide",
+   "points": 98.5,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 28.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "andrew vaughn",
+    "corey seager",
+    "jackson chourio",
+    "mike trout",
+    "shane drohan",
+    "shohei ohtani",
+    "wade meckler",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "9",
+   "entry_id": "5217768913",
+   "username": "hokesfight24",
+   "points": 95.5,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "Shane Drohan",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "shane drohan",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5217653895",
+   "username": "whoisjohngalt420",
+   "points": 92.2,
+   "salary_used": 44000,
+   "salary_left": 6000,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "david hamilton",
+    "jose siri",
+    "kike hernandez",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5217424713",
+   "username": "Wood334",
+   "points": 91.7,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "mike trout",
+    "shane drohan",
+    "vaughn grissom",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5217355390",
+   "username": "118JLK",
+   "points": 90.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "joey ortiz",
+    "josh lowe",
+    "miguel rojas",
+    "shohei ohtani",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5217506120",
+   "username": "BSteelz34",
+   "points": 90.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.66,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "christian yelich",
+    "jacob degrom",
+    "jake bauers",
+    "joey ortiz",
+    "miguel rojas",
+    "mike trout",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5217787228",
+   "username": "coopjs23",
+   "points": 90.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "garrett mitchell",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "joey ortiz",
+    "miguel rojas",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5217513822",
+   "username": "TheDCarman",
+   "points": 90.2,
+   "salary_used": 41100,
+   "salary_left": 8900,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "josh lowe",
+    "kike hernandez",
+    "miguel rojas",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "roki sasaki",
+    "tommy edman",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5217610606",
+   "username": "sparks127",
+   "points": 89.2,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 31.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "corey seager",
+    "jake bauers",
+    "mike trout",
+    "roki sasaki",
+    "tommy edman",
+    "wade meckler",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5217531957",
+   "username": "Spizzwolf",
+   "points": 88.4,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "garrett mitchell",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "miguel rojas",
+    "teoscar hernandez",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5217769746",
+   "username": "tigolebitties91",
+   "points": 88.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "joey ortiz",
+    "miguel rojas",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5217612644",
+   "username": "12PackAbs",
+   "points": 88.2,
+   "salary_used": 47500,
+   "salary_left": 2500,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corey seager",
+    "denzer guzman",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5217769748",
+   "username": "tigolebitties91",
+   "points": 88.2,
+   "salary_used": 47200,
+   "salary_left": 2800,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "miguel rojas",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "21",
+   "entry_id": "5217151732",
+   "username": "jrevelle3",
+   "points": 86.2,
+   "salary_used": 43500,
+   "salary_left": 6500,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "kyle tucker",
+    "miguel rojas",
+    "mike trout",
+    "nolan schanuel",
+    "roki sasaki",
+    "teoscar hernandez",
+    "tommy edman",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "21",
+   "entry_id": "5217794168",
+   "username": "CLTGoBlue",
+   "points": 86.2,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "freddie freeman",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5217769747",
+   "username": "tigolebitties91",
+   "points": 85.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "david hamilton",
+    "gary sanchez",
+    "jacob degrom",
+    "jake bauers",
+    "joey ortiz",
+    "miguel rojas",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "24",
+   "entry_id": "5217151731",
+   "username": "jrevelle3",
+   "points": 85.2,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "denzer guzman",
+    "gary sanchez",
+    "miguel rojas",
+    "nolan schanuel",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "25",
+   "entry_id": "5217657824",
+   "username": "deckeron",
+   "points": 83.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "miguel rojas",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5217758581",
+   "username": "bleeski",
+   "points": 83.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "freddie freeman",
+    "miguel rojas",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5217456727",
+   "username": "replacements64",
+   "points": 82.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 29.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "freddie freeman",
+    "gary sanchez",
+    "jacob degrom",
+    "jake bauers",
+    "miguel rojas",
+    "nicky lopez",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "28",
+   "entry_id": "5217694168",
+   "username": "Ozarkian",
+   "points": 81.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 32.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "christian yelich",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "miguel rojas",
+    "moises ballesteros",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "29",
+   "entry_id": "5217309628",
+   "username": "ecaras0381",
+   "points": 80.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel duran",
+    "gary sanchez",
+    "joey ortiz",
+    "kyle tucker",
+    "mike trout",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "29",
+   "entry_id": "5217803130",
+   "username": "Harvesters0812",
+   "points": 80.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 28.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "ezequiel duran",
+    "freddie freeman",
+    "jake bauers",
+    "jose siri",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5217548358",
+   "username": "jpeyton1219",
+   "points": 79.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "david hamilton",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "moises ballesteros",
+    "teoscar hernandez",
+    "tommy edman",
+    "walbert urena",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "32",
+   "entry_id": "5217586097",
+   "username": "Wolverines1016",
+   "points": 79.2,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kike hernandez",
+    "miguel rojas",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5217450537",
+   "username": "tdbaker13",
+   "points": 78.2,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "mike trout",
+    "moises ballesteros",
+    "mookie betts",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "34",
+   "entry_id": "5217648979",
+   "username": "DueceEmUp",
+   "points": 76.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "garrett mitchell",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "kike hernandez",
+    "miguel rojas",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "35",
+   "entry_id": "5217745739",
+   "username": "Donso",
+   "points": 75.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 34.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "gary sanchez",
+    "jacob degrom",
+    "joey ortiz",
+    "kike hernandez",
+    "kyle tucker",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "36",
+   "entry_id": "5217263476",
+   "username": "jaakko",
+   "points": 74.2,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel duran",
+    "freddie freeman",
+    "miguel rojas",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5217263477",
+   "username": "jaakko",
+   "points": 72.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 30.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "david hamilton",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "jake bauers",
+    "kyle tucker",
+    "miguel rojas",
+    "mike trout",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5217747977",
+   "username": "Donso",
+   "points": 72.4,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "garrett mitchell",
+    "gary sanchez",
+    "jacob degrom",
+    "kike hernandez",
+    "miguel rojas",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5217694169",
+   "username": "Ozarkian",
+   "points": 72.2,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corey seager",
+    "kike hernandez",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wade meckler",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "40",
+   "entry_id": "5217506122",
+   "username": "BSteelz34",
+   "points": 70.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "ezequiel duran",
+    "jake bauers",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "walbert urena",
+    "william contreras",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5217765581",
+   "username": "DodgerLou",
+   "points": 69.2,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 37.46,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "corey seager",
+    "garrett mitchell",
+    "joc pederson",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "42",
+   "entry_id": "5217801623",
+   "username": "Harvesters0812",
+   "points": 68.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 36.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "corey seager",
+    "ezequiel duran",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "joc pederson",
+    "mike trout",
+    "roki sasaki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "42",
+   "entry_id": "5217821051",
+   "username": "Glaze",
+   "points": 68.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 33.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "andy pages",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "joey ortiz",
+    "kike hernandez",
+    "shohei ohtani",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "44",
+   "entry_id": "5217637337",
+   "username": "bartletto",
+   "points": 63.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.32,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "corey seager",
+    "denzer guzman",
+    "freddie freeman",
+    "jacob degrom",
+    "kike hernandez",
+    "mike trout",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "44",
+   "entry_id": "5217657825",
+   "username": "deckeron",
+   "points": 63.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 31.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "evan carter",
+    "jackson chourio",
+    "jacob degrom",
+    "joey ortiz",
+    "kike hernandez",
+    "miguel rojas",
+    "shohei ohtani",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5217637289",
+   "username": "Flipper9",
+   "points": 63.2,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 41.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corey seager",
+    "jackson chourio",
+    "joc pederson",
+    "kike hernandez",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "47",
+   "entry_id": "5217586098",
+   "username": "Wolverines1016",
+   "points": 62.5,
+   "salary_used": 44000,
+   "salary_left": 6000,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "justin foscue",
+    "mike trout",
+    "nolan schanuel",
+    "roki sasaki",
+    "shane drohan",
+    "vaughn grissom",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "48",
+   "entry_id": "5217800188",
+   "username": "mikecapp12",
+   "points": 60.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon nimmo",
+    "corey seager",
+    "garrett mitchell",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "miguel rojas",
+    "shane drohan",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5217821052",
+   "username": "Glaze",
+   "points": 59.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 39.66,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "ben rortvedt",
+    "corey seager",
+    "freddie freeman",
+    "jackson chourio",
+    "jacob degrom",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5217538149",
+   "username": "nlang003",
+   "points": 58.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "freddie freeman",
+    "jacob degrom",
+    "joey ortiz",
+    "kike hernandez",
+    "kyle tucker",
+    "teoscar hernandez",
+    "tommy edman",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5217424714",
+   "username": "Wood334",
+   "points": 57.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "corey seager",
+    "garrett mitchell",
+    "jacob degrom",
+    "jake bauers",
+    "joc pederson",
+    "shane drohan",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5217546724",
+   "username": "soloboxeo",
+   "points": 56.7,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 28.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "elias diaz",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "joc pederson",
+    "mookie betts",
+    "shane drohan",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "53",
+   "entry_id": "5217516423",
+   "username": "Boltmantom",
+   "points": 56.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "ben rortvedt",
+    "corey seager",
+    "jacob degrom",
+    "joc pederson",
+    "mike trout",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "54",
+   "entry_id": "5217711668",
+   "username": "hallfreddy",
+   "points": 55.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 41.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon nimmo",
+    "corey seager",
+    "garrett mitchell",
+    "gary sanchez",
+    "jacob degrom",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5217435850",
+   "username": "jordanh415",
+   "points": 55.2,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "wade meckler",
+    "walbert urena",
+    "william contreras",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5217798301",
+   "username": "bigjerk18",
+   "points": 53.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 37.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "mike trout",
+    "shane drohan",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5217557322",
+   "username": "Boltmantom",
+   "points": 52.7,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "jake bauers",
+    "josh lowe",
+    "justin foscue",
+    "shane drohan",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "58",
+   "entry_id": "5217263475",
+   "username": "jaakko",
+   "points": 52.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "ben rortvedt",
+    "brandon nimmo",
+    "corey seager",
+    "freddie freeman",
+    "jacob degrom",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5217699751",
+   "username": "Baca369",
+   "points": 51.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 39.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "corey seager",
+    "evan carter",
+    "freddie freeman",
+    "jacob degrom",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5217746957",
+   "username": "bytordws",
+   "points": 51.4,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 39.83,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "miguel rojas",
+    "mike trout",
+    "nolan schanuel",
+    "roki sasaki",
+    "shohei ohtani",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5217807750",
+   "username": "Harvesters0812",
+   "points": 51.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "mike trout",
+    "moises ballesteros",
+    "roki sasaki",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "62",
+   "entry_id": "5217590843",
+   "username": "FantanaXJ",
+   "points": 50.7,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "corey seager",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "mike trout",
+    "shane drohan",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "63",
+   "entry_id": "5217506121",
+   "username": "BSteelz34",
+   "points": 49.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "brandon nimmo",
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "jake bauers",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5217185515",
+   "username": "jep4576",
+   "points": 49.2,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Roki Sasaki",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "hunter feduccia",
+    "joc pederson",
+    "kyle tucker",
+    "mookie betts",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "walbert urena"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "65",
+   "entry_id": "5217030368",
+   "username": "TheBabz",
+   "points": 48.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "corey seager",
+    "ezequiel duran",
+    "freddie freeman",
+    "jacob degrom",
+    "josh lowe",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "65",
+   "entry_id": "5217766540",
+   "username": "johnbrock636",
+   "points": 48.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 45.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "vaughn grissom",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "67",
+   "entry_id": "5217590842",
+   "username": "FantanaXJ",
+   "points": 47.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "justin foscue",
+    "mike trout",
+    "shane drohan"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "68",
+   "entry_id": "5217538151",
+   "username": "nlang003",
+   "points": 47.4,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Walbert Urena"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 27.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "christian yelich",
+    "david hamilton",
+    "freddie freeman",
+    "jacob degrom",
+    "kike hernandez",
+    "kyle tucker",
+    "miguel rojas",
+    "walbert urena",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "69",
+   "entry_id": "5217043432",
+   "username": "mbrewer81",
+   "points": 46.7,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "gary sanchez",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "shane drohan",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5217766541",
+   "username": "johnbrock636",
+   "points": 46.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 44.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "corey seager",
+    "jacob degrom",
+    "joc pederson",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5217450535",
+   "username": "tdbaker13",
+   "points": 45.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 29.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brandon nimmo",
+    "brice turang",
+    "corey seager",
+    "jacob degrom",
+    "jake bauers",
+    "joc pederson",
+    "shane drohan",
+    "william contreras",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "72",
+   "entry_id": "5217450536",
+   "username": "tdbaker13",
+   "points": 43.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 25.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "corey seager",
+    "evan carter",
+    "jackson chourio",
+    "jacob degrom",
+    "jake burger",
+    "joey ortiz",
+    "shane drohan",
+    "william contreras",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "73",
+   "entry_id": "5217804392",
+   "username": "A1HoosierSales",
+   "points": 43.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "garrett mitchell",
+    "gary sanchez",
+    "jacob degrom",
+    "kike hernandez",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5217612645",
+   "username": "12PackAbs",
+   "points": 42.7,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "joey ortiz",
+    "justin foscue",
+    "shane drohan",
+    "william contreras",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "75",
+   "entry_id": "5217229581",
+   "username": "cptnspaulding",
+   "points": 41.4,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "evan carter",
+    "gary sanchez",
+    "jacob degrom",
+    "kike hernandez",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5217653893",
+   "username": "whoisjohngalt420",
+   "points": 40.4,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "miguel rojas",
+    "nicky lopez",
+    "roki sasaki",
+    "teoscar hernandez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5217657823",
+   "username": "deckeron",
+   "points": 40.4,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 39.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "garrett mitchell",
+    "jacob degrom",
+    "jake bauers",
+    "joc pederson",
+    "roki sasaki",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5217757713",
+   "username": "hypegotti",
+   "points": 39.7,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "shane drohan",
+    "tommy edman",
+    "william contreras",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5217610607",
+   "username": "sparks127",
+   "points": 39.4,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 35.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "jacob degrom",
+    "jake bauers",
+    "justin foscue",
+    "kike hernandez",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5217790755",
+   "username": "ATKM2007",
+   "points": 39.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 43.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5217610605",
+   "username": "sparks127",
+   "points": 38.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5217724402",
+   "username": "stewie14",
+   "points": 38.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5217741255",
+   "username": "scrappycrab",
+   "points": 38.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "freddie freeman",
+    "jacob degrom",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217229582",
+   "username": "cptnspaulding",
+   "points": 37.4,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "jacob degrom",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217229583",
+   "username": "cptnspaulding",
+   "points": 37.4,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 44.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "corey seager",
+    "ezequiel duran",
+    "garrett mitchell",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217666255",
+   "username": "sirleged7777",
+   "points": 37.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "brandon nimmo",
+    "ezequiel duran",
+    "freddie freeman",
+    "jacob degrom",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5217766539",
+   "username": "johnbrock636",
+   "points": 37.4,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "moises ballesteros",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5217317292",
+   "username": "ecaras0381",
+   "points": 36.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5217637360",
+   "username": "cashyobe",
+   "points": 36.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5217787473",
+   "username": "bigjerk18",
+   "points": 36.4,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.07,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "brandon nimmo",
+    "corey seager",
+    "jacob degrom",
+    "joc pederson",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5217538150",
+   "username": "nlang003",
+   "points": 34.7,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "garrett mitchell",
+    "jacob degrom",
+    "justin foscue",
+    "shane drohan",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5217538948",
+   "username": "sh-13",
+   "points": 34.4,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5217637359",
+   "username": "cashyobe",
+   "points": 34.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5217736060",
+   "username": "Donso",
+   "points": 34.4,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "jacob degrom",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5217777433",
+   "username": "jc000000",
+   "points": 34.4,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5217785682",
+   "username": "ideagirl13",
+   "points": 34.4,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 45.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5217785683",
+   "username": "ideagirl13",
+   "points": 34.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 39.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "corey seager",
+    "ezequiel duran",
+    "freddie freeman",
+    "jacob degrom",
+    "roki sasaki",
+    "teoscar hernandez",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5217021082",
+   "username": "befeld",
+   "points": 33.4,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "freddie freeman",
+    "jacob degrom",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5217424712",
+   "username": "Wood334",
+   "points": 33.4,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5217528866",
+   "username": "ecaras0381",
+   "points": 33.4,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "vaughn grissom",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5217637358",
+   "username": "cashyobe",
+   "points": 33.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.41,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5217531958",
+   "username": "Spizzwolf",
+   "points": 32.4,
+   "salary_used": 44500,
+   "salary_left": 5500,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "jacob degrom",
+    "joc pederson",
+    "kike hernandez",
+    "kyle tucker",
+    "miguel rojas",
+    "roki sasaki",
+    "teoscar hernandez",
+    "tommy edman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "103",
+   "entry_id": "5217392146",
+   "username": "ecsdroop",
+   "points": 31.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 38.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "shane drohan",
+    "tommy edman",
+    "william contreras",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5217544197",
+   "username": "Boltmantom",
+   "points": 31.400002,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5217648978",
+   "username": "DueceEmUp",
+   "points": 31.400002,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5217758582",
+   "username": "bleeski",
+   "points": 31.400002,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5217807753",
+   "username": "Swampdonkey018",
+   "points": 31.400002,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5217418024",
+   "username": "JRaab",
+   "points": 30.7,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Shane Drohan"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "christian yelich",
+    "corey seager",
+    "ezequiel duran",
+    "jackson chourio",
+    "jacob degrom",
+    "joc pederson",
+    "justin foscue",
+    "shane drohan",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "109",
+   "entry_id": "5217552949",
+   "username": "hoosierpack",
+   "points": 29.400002,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "gary sanchez",
+    "jacob degrom",
+    "justin foscue",
+    "kike hernandez",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "110",
+   "entry_id": "5217329474",
+   "username": "emelim03",
+   "points": 26.400002,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 40.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brandon nimmo",
+    "elias diaz",
+    "ezequiel duran",
+    "jacob degrom",
+    "joc pederson",
+    "mookie betts",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "110",
+   "entry_id": "5217502827",
+   "username": "falstaff64",
+   "points": 26.400002,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "corey seager",
+    "ezequiel duran",
+    "hunter feduccia",
+    "jacob degrom",
+    "jake burger",
+    "kyle tucker",
+    "roki sasaki",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "110",
+   "entry_id": "5217616930",
+   "username": "BSMITTYFIREMAN",
+   "points": 26.400002,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "gary sanchez",
+    "jacob degrom",
+    "joc pederson",
+    "justin foscue",
+    "roki sasaki",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "113",
+   "entry_id": "5217612646",
+   "username": "12PackAbs",
+   "points": 23.400002,
+   "salary_used": 43900,
+   "salary_left": 6100,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 30.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "jacob degrom",
+    "joc pederson",
+    "justin foscue",
+    "kike hernandez",
+    "kyle tucker",
+    "miguel rojas",
+    "roki sasaki",
+    "teoscar hernandez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5217487612",
+   "username": "clintavious",
+   "points": 22.400002,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jacob deGrom",
+    "Roki Sasaki"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "brice turang",
+    "corey seager",
+    "elias diaz",
+    "jacob degrom",
+    "joc pederson",
+    "kike hernandez",
+    "roki sasaki",
+    "shohei ohtani",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Jacob deGrom",
+   "player_norm": "jacob degrom",
+   "roster_position": "P",
+   "pct_drafted": 72.03,
+   "fpts": 2.3
+  },
+  {
+   "player": "Roki Sasaki",
+   "player_norm": "roki sasaki",
+   "roster_position": "P",
+   "pct_drafted": 60.17,
+   "fpts": 8.1
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "2B",
+   "pct_drafted": 56.78,
+   "fpts": 9.0
+  },
+  {
+   "player": "Corey Seager",
+   "player_norm": "corey seager",
+   "roster_position": "SS",
+   "pct_drafted": 55.93,
+   "fpts": 2.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "OF",
+   "pct_drafted": 40.68,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "3B",
+   "pct_drafted": 39.83,
+   "fpts": 0.0
+  },
+  {
+   "player": "Walbert Urena",
+   "player_norm": "walbert urena",
+   "roster_position": "P",
+   "pct_drafted": 39.83,
+   "fpts": 25.1
+  },
+  {
+   "player": "Joc Pederson",
+   "player_norm": "joc pederson",
+   "roster_position": "1B",
+   "pct_drafted": 34.75,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "OF",
+   "pct_drafted": 34.75,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brandon Nimmo",
+   "player_norm": "brandon nimmo",
+   "roster_position": "OF",
+   "pct_drafted": 30.51,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "OF",
+   "pct_drafted": 29.66,
+   "fpts": 9.0
+  },
+  {
+   "player": "Wyatt Langford",
+   "player_norm": "wyatt langford",
+   "roster_position": "OF",
+   "pct_drafted": 27.97,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gary Sanchez",
+   "player_norm": "gary sanchez",
+   "roster_position": "C",
+   "pct_drafted": 26.27,
+   "fpts": 7.0
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "OF",
+   "pct_drafted": 26.27,
+   "fpts": 13.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "1B",
+   "pct_drafted": 22.88,
+   "fpts": 5.0
+  },
+  {
+   "player": "Shane Drohan",
+   "player_norm": "shane drohan",
+   "roster_position": "P",
+   "pct_drafted": 21.19,
+   "fpts": 12.4
+  },
+  {
+   "player": "Miguel Rojas",
+   "player_norm": "miguel rojas",
+   "roster_position": "SS",
+   "pct_drafted": 20.34,
+   "fpts": 4.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "C",
+   "pct_drafted": 19.49,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "3B",
+   "pct_drafted": 18.64,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Yelich",
+   "player_norm": "christian yelich",
+   "roster_position": "OF",
+   "pct_drafted": 17.8,
+   "fpts": 3.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 17.8,
+   "fpts": 3.0
+  },
+  {
+   "player": "Austin Wynns",
+   "player_norm": "austin wynns",
+   "roster_position": "C",
+   "pct_drafted": 16.95,
+   "fpts": 3.0
+  },
+  {
+   "player": "Moises Ballesteros",
+   "player_norm": "moises ballesteros",
+   "roster_position": "C",
+   "pct_drafted": 15.25,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ben Rortvedt",
+   "player_norm": "ben rortvedt",
+   "roster_position": "C",
+   "pct_drafted": 14.41,
+   "fpts": 5.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "3B",
+   "pct_drafted": 14.41,
+   "fpts": 12.0
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "1B",
+   "pct_drafted": 13.56,
+   "fpts": 4.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "OF",
+   "pct_drafted": 13.56,
+   "fpts": 0.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "2B",
+   "pct_drafted": 13.56,
+   "fpts": 10.0
+  },
+  {
+   "player": "Garrett Mitchell",
+   "player_norm": "garrett mitchell",
+   "roster_position": "OF",
+   "pct_drafted": 11.02,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "1B",
+   "pct_drafted": 11.02,
+   "fpts": 12.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "1B",
+   "pct_drafted": 10.17,
+   "fpts": 9.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "SS",
+   "pct_drafted": 10.17,
+   "fpts": 12.0
+  },
+  {
+   "player": "Wade Meckler",
+   "player_norm": "wade meckler",
+   "roster_position": "OF",
+   "pct_drafted": 10.17,
+   "fpts": 5.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "3B",
+   "pct_drafted": 8.47,
+   "fpts": 10.0
+  },
+  {
+   "player": "Justin Foscue",
+   "player_norm": "justin foscue",
+   "roster_position": "2B",
+   "pct_drafted": 8.47,
+   "fpts": 0.0
+  },
+  {
+   "player": "Miguel Rojas",
+   "player_norm": "miguel rojas",
+   "roster_position": "2B",
+   "pct_drafted": 7.63,
+   "fpts": 4.0
+  },
+  {
+   "player": "Denzer Guzman",
+   "player_norm": "denzer guzman",
+   "roster_position": "3B",
+   "pct_drafted": 5.93,
+   "fpts": 15.0
+  },
+  {
+   "player": "Adam Frazier",
+   "player_norm": "adam frazier",
+   "roster_position": "2B",
+   "pct_drafted": 5.93,
+   "fpts": 15.0
+  },
+  {
+   "player": "Evan Carter",
+   "player_norm": "evan carter",
+   "roster_position": "OF",
+   "pct_drafted": 5.93,
+   "fpts": 3.0
+  },
+  {
+   "player": "David Hamilton",
+   "player_norm": "david hamilton",
+   "roster_position": "SS",
+   "pct_drafted": 5.93,
+   "fpts": 9.0
+  },
+  {
+   "player": "David Hamilton",
+   "player_norm": "david hamilton",
+   "roster_position": "3B",
+   "pct_drafted": 5.08,
+   "fpts": 9.0
+  },
+  {
+   "player": "Josh Lowe",
+   "player_norm": "josh lowe",
+   "roster_position": "OF",
+   "pct_drafted": 4.24,
+   "fpts": 12.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "3B",
+   "pct_drafted": 4.24,
+   "fpts": 12.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "SS",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Elias Diaz",
+   "player_norm": "elias diaz",
+   "roster_position": "C",
+   "pct_drafted": 2.54,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "2B",
+   "pct_drafted": 2.54,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "1B",
+   "pct_drafted": 2.54,
+   "fpts": 12.0
+  },
+  {
+   "player": "Jose Siri",
+   "player_norm": "jose siri",
+   "roster_position": "OF",
+   "pct_drafted": 2.54,
+   "fpts": 7.0
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "OF",
+   "pct_drafted": 2.54,
+   "fpts": 9.0
+  },
+  {
+   "player": "Hunter Feduccia",
+   "player_norm": "hunter feduccia",
+   "roster_position": "C",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Burger",
+   "player_norm": "jake burger",
+   "roster_position": "1B",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nicky Lopez",
+   "player_norm": "nicky lopez",
+   "roster_position": "2B",
+   "pct_drafted": 1.69,
+   "fpts": 8.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "SS",
+   "pct_drafted": 0.85,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 3,
+  "requested": 3,
+  "field_size": 118,
+  "best_rank": 4,
+  "worst_rank": 104,
+  "best_finish_percentile": 97.46,
+  "median_finish_percentile": 78.81,
+  "best_points": 110.5,
+  "winning_points": 120.5,
+  "own_lineups_duplicated_by_field": 1,
+  "max_copies_of_an_own_lineup": 3,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}
