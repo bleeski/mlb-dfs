@@ -3235,6 +3235,38 @@ class CorruptManifestIsItsOwnStateTests(unittest.TestCase):
                          "nothing wrong' on the file preflight cross-checks against")
         self.assertIn("unreadable", check["problems"][0])
 
+    def test_a_row_with_no_sha256_is_not_counted_among_the_files_checked(self):
+        """R228's class, second site. ``checked += 1`` ran before the hash guard, so
+        a row recording no sha256 was counted as verified by the one function whose
+        subject is whether the files still hash the same."""
+        path = self._new_delivery("DKEntries_d.csv")
+        (self.outputs / self.um.MANIFEST_NAME).write_text(json.dumps(
+            {"version": "1.1", "date": self.date, "deliveries": [
+                {"delivered_file": self.um.repo_relative(path),
+                 "contest_type": "classic", "slate_tag": "t",
+                 "status": "upload_ready"}]}), encoding="utf-8")
+        check = self.um.verify_manifest(self.date)
+        self.assertEqual(check["checked"], 0,
+                         "nothing about this row was verified, so the count of "
+                         "verified files must not include it")
+        self.assertEqual(len(check["unverifiable"]), 1)
+        self.assertIn("records no sha256", check["unverifiable"][0])
+        self.assertTrue(check["passed"],
+                        "a thin record is not a drifted file; calling it one would "
+                        "trade a false pass for a false failure")
+
+    def test_a_row_with_a_sha256_is_still_counted_and_still_compared(self):
+        path = self._new_delivery("DKEntries_e.csv")
+        (self.outputs / self.um.MANIFEST_NAME).write_text(json.dumps(
+            {"version": "1.1", "date": self.date, "deliveries": [
+                {"delivered_file": self.um.repo_relative(path),
+                 "sha256": "cc" * 32, "contest_type": "classic", "slate_tag": "t",
+                 "status": "upload_ready"}]}), encoding="utf-8")
+        check = self.um.verify_manifest(self.date)
+        self.assertEqual(check["checked"], 1)
+        self.assertEqual(check["unverifiable"], [])
+        self.assertFalse(check["passed"], "these bytes do not hash to 'cc'*32")
+
 
 class RePromoteRunTests(unittest.TestCase):
     """R129. Supersession was a one-way door; ``tools/promote_run.py`` is the way back.
@@ -3272,7 +3304,7 @@ class RePromoteRunTests(unittest.TestCase):
         return "\n".join(",".join(c for c in row) for row in rows) + "\n"
 
     def _make_run(self, run_id, entry_ids=("111", "222"), workflow_valid=True,
-                  tamper=False):
+                  tamper=False, bind="recorded"):
         run_dir = self.root / "runs" / run_id
         (run_dir / "final").mkdir(parents=True)
         (run_dir / "inputs").mkdir(parents=True)
@@ -3283,13 +3315,23 @@ class RePromoteRunTests(unittest.TestCase):
         if tamper:
             export.write_text(self._entries_csv(tuple(entry_ids) + ("333",)),
                               encoding="utf-8")
+        # R228. `bind` picks which of the three evidence states the run manifest is
+        # in: the hash recorded, the artifacts row absent entirely (an older writer,
+        # or one killed mid-write), or the row present carrying no sha256.
+        if bind == "recorded":
+            artifacts = {"final/DKEntries.csv": {"sha256": digest, "role": "dk_export"}}
+        elif bind == "no_row":
+            artifacts = {}
+        elif bind == "no_sha":
+            artifacts = {"final/DKEntries.csv": {"role": "dk_export"}}
+        else:  # pragma: no cover - a typo in a test is not a supported state
+            raise ValueError(f"unknown bind {bind!r}")
         (run_dir / "manifest.json").write_text(json.dumps({
             "run_id": run_id, "status": "promoted",
             "certification": {"workflow_valid": workflow_valid,
                               "selection_certified": workflow_valid,
                               "allocation_certified": workflow_valid},
-            "artifacts": {"final/DKEntries.csv": {"sha256": digest,
-                                                 "role": "dk_export"}},
+            "artifacts": artifacts,
         }), encoding="utf-8")
         return run_dir
 
@@ -3397,6 +3439,64 @@ class RePromoteRunTests(unittest.TestCase):
                          "refusing here would put this tool back in the business "
                          "of process preventing a lineup")
         self.assertEqual(self._rows()[-1]["certification"], "not_certified")
+
+    # ---- R228: absent evidence is a refusal, not a passing check ----------
+
+    def test_a_run_manifest_with_no_artifacts_row_is_refused_not_promoted(self):
+        """The fail-open this item closes. `if recorded_sha and ...` read an absent
+        row as a check that passed, so a manifest written by an older code path or
+        truncated by a killed writer promoted in silence at the one boundary
+        CLAUDE.md calls immutable."""
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id, bind="no_row")
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        before = len(self._rows())
+        self.assertEqual(self._promote("--run-id", run_id), 2)
+        self.assertEqual(len(self._rows()), before,
+                         "a refused promotion appends no row")
+
+    def test_an_artifacts_row_carrying_no_sha256_is_refused_the_same_way(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id, bind="no_sha")
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        self.assertEqual(self._promote("--run-id", run_id), 2,
+                         "a row present but silent about the hash binds nothing; "
+                         "'has a row' is not the check")
+
+    def test_force_unbound_promotes_but_never_returns_zero_and_says_so_on_the_row(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id, bind="no_row")
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        self.assertEqual(
+            self._promote("--run-id", run_id, "--force-unbound"), 4,
+            "the acknowledgment delivers the bytes; it does not turn missing "
+            "evidence into a pass, so the exit code is 4 and not 0")
+        row = self._rows()[-1]
+        self.assertEqual(row["re_promoted_from"], run_id)
+        self.assertIn("NOT verified", row.get("notes") or "",
+                      "the permanent record has to carry the unverified bind; the "
+                      "console line disappears and the manifest is what preflight "
+                      "and the next session read")
+
+    def test_a_verified_bind_leaves_the_row_saying_nothing_about_R228(self):
+        """The other half of the pair: the marker means something only if a normal
+        promotion does not carry it."""
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        self.assertNotIn("NOT verified", self._rows()[-1].get("notes") or "")
+
+    def test_a_dry_run_reports_the_exit_code_the_real_run_would_return(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id, bind="no_row")
+        self._seed_row(run_id, "DKEntries_2138_2g.csv", status="superseded")
+        before = len(self._rows())
+        self.assertEqual(
+            self._promote("--run-id", run_id, "--force-unbound", "--dry-run"), 4,
+            "handing back 0 from the dry run while the promotion returns 4 is the "
+            "same misreport one command earlier")
+        self.assertEqual(len(self._rows()), before)
 
 
 class ManifestRecordMatchingTests(unittest.TestCase):

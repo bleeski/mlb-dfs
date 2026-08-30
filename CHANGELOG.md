@@ -25,6 +25,84 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R228: absent evidence stops promoting a run in silence
+
+**What moved.** `tools/promote_run.py` reads three states where it read two. A
+recorded sha256 that MATCHES promotes, a recorded sha256 that DIFFERS refuses
+(unchanged), and an ABSENT one — no `artifacts` block, no `final/DKEntries.csv`
+row, or a row carrying no `sha256` — now refuses on its own, naming the bytes it
+cannot bind. `--force-unbound` is the acknowledgment: it promotes, writes the
+unverified bind onto the manifest row's `notes`, prints a WARN, and returns exit
+**4**, never 0. `--dry-run` returns the code the real run would return, so the
+rehearsal cannot read cleaner than the thing it rehearses. The docstring's exit
+table carries 4. Second site, same class, fixed with it:
+`upload_manifest.verify_manifest` ran `checked += 1` BEFORE its hash guard, so a
+row recording no sha256 was counted among the files it had verified; absence now
+lands in a new `unverifiable` list and is left out of `checked`.
+
+**Why.** The comment three lines above the guard states the guarantee — a final
+export whose hash no longer matches the run record "is not immutable any more, and
+promoting it would launder that." Absent evidence launders it exactly as
+thoroughly and said nothing, at the one boundary CLAUDE.md calls immutable. The
+re-promotion path is where it bites: a run manifest written by an older code path,
+or truncated by a killed writer, promoted clean. `if recorded_sha and
+recorded_sha != actual_sha` reads missing evidence as a check that passed, which
+is the R177/F16 fail-open shape one step from Ben's upload.
+
+**Which of the two options R228 offered.** The entry left fail-closed vs WARN to
+be stated rather than assumed. **Fail-closed**, because the comment above the
+guard already promises the stronger of the two and a WARN would leave the
+promise false. The escape hatch keeps the tool out of the business of process
+preventing a lineup, and exit 4 keeps it out of the business of calling that a
+pass — the preflight's convention, reused rather than reinvented.
+
+**R233 enumeration — the fail-open-on-absent-evidence class.** Two greps, 14
+sites, and the item named one.
+
+    grep -rnE "if [a-z_]+ and [a-z_]+ ?!=" mlb_engine tools tests --include=*.py   -> 10
+    grep -rn "sha256" mlb_engine/entries/ mlb_engine/swap/ tools/preflight_upload.py \
+         tools/verify_export.py tools/promote_run.py | grep -E "!=|=="              -> 4
+
+FIXED (2): `promote_run.py:188` (the item), `upload_manifest.py:514` (now 526,
+and it no longer matches grep 1's shape because the guard is split out).
+
+LEFT AND FILED as **R275**, both the same class at the same boundary, both needing
+their own coverage and their own commit rather than riding this one:
+`preflight_upload.py:1012`, where a manifest row carrying an EMPTY `contest_ids`
+skips the contest-assignment cross-check entirely; and `preflight_upload.py:2014`,
+where a row recording no `certification` leaves the verdict at `upload_ready` —
+the one label CLAUDE.md reserves, handed out on missing evidence.
+
+DELIBERATELY KEPT (10), each with the reason it survives:
+`late_swap.py:406` and `preflight_upload.py:1267` are the CORRECT form of this
+shape and are the models — the first names the absence in an `elif not feed_date`
+warning, the second fails closed with `if not recorded or recorded != ...`.
+`verify_export.py:396` and `paste_lineups.py:804` compare roster cells and lineup
+lines where empty is a real state (a blank slot, a line with no team), not missing
+evidence. `showdown_theses.py:802` and `:811` are list-comprehension filters, not
+guards. `autobuild.py:450` compares applied controls away from any money
+boundary. `preflight_upload.py:470` reads a geometry the caller declares, and an
+undeclared one is checked elsewhere in the same resolver.
+`upload_manifest.py:301` is an equality dedupe, and `preflight_upload.py:934`
+selects rows BY digest rather than checking one.
+
+**Premises.** R228's own citation (`tools/promote_run.py:169-171`) was accurate at
+this head, the only one of this batch's four that was. Its quoted code block
+matched the tree verbatim.
+
+**Mutations.** Nine, all killed, but the first pass lied once and the lie is the
+part worth keeping: mutant M4 was written as `    return 4 if unbound else 0` and
+`str.replace(old, new, 1)` matched the DRY-RUN return first, because the
+eight-space line contains the four-space pattern as a substring. It reported
+KILLED against a test for the other site while the real exit path was never
+mutated. Re-run as M4b with the preceding line as an anchor; killed for real. The
+harness now reports NO-OP explicitly, but a pattern that matches the WRONG site is
+not a no-op and no harness can catch it — only reading which test failed can.
+
+**Gate.** 1461 -> 1468. `PASS  v2.26.0  27 modules  1468 tests`.
+
+---
+
 ## 2026-08-30 — R250: captain budget is reserved before UTIL can spend it
 
 **What moved.** `solve_ladder` walks the theses once before solving, counts how

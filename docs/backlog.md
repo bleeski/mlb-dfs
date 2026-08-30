@@ -4820,32 +4820,41 @@ per attempt. Nothing about these checks requires them to be serial.
 
 The `--salary` auto-resolve is scoped to the file being checked and refuses rather than reaching past it; the showdown exposure line counts the PERSON and prints the captain distribution on its own line. Landed with `verify_export.py`'s copy of the same unguarded resolve, which R191 had not named, and with `person_key` unifying four hand-written copies of one identity rule. Gate 1276 -> 1292.
 
-### R228. Promotion's immutability bind is skipped when the run manifest lacks the artifact row: fail-open on missing evidence at the money boundary (P1, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-S7) and independently from the outside spec (D13); VERIFIED-read at `tools/promote_run.py:169-171`, coordinator-re-read, re-read here
+### R228. CLOSED 2026-08-30 -- absent evidence refuses at the promotion boundary; entry migrated to CHANGELOG.md
 
-**What.**
+Fail-closed was the option taken, because the comment above the guard already
+promised it. `--force-unbound` promotes, writes the unverified bind onto the
+manifest row, and exits 4. Landed with the second site of the same class,
+`verify_manifest`, which counted a row it had not checked. R233 found 14 sites in
+the class against the one the entry named; two more are filed as R275 below. Gate
+1461 -> 1468.
 
-    recorded = ((run_manifest.get("artifacts") or {}).get("final/DKEntries.csv") or {})
-    recorded_sha = str(recorded.get("sha256") or "")
-    actual_sha = sha256_file(source)
-    if recorded_sha and recorded_sha != actual_sha:
-        return _refuse(...)
+### R275. The preflight's own fail-open pair: an empty `contest_ids` skips the contest cross-check, and a row with no `certification` still earns `upload_ready` (P1, S) | new 2026-08-30, found by R228's R233 enumeration at this head; VERIFIED-read
 
-A hash MISMATCH refuses, correctly and loudly. An ABSENT artifact row, or a row
-with no `sha256`, promotes with no check and no message.
+**What.** Two sites, same shape as R228, one boundary later.
 
-**Why.** The comment three lines above states the guarantee: "A final/ export whose
-hash no longer matches the run record is not immutable any more, and promoting it
-would launder that." Absent evidence launders it just as thoroughly and says
-nothing, which is the R177/F16 class at the one boundary CLAUDE.md calls immutable.
-The re-promotion path is where it bites: a run whose manifest was written by an
-older code path, or truncated by a killed writer, promotes clean.
+    tools/preflight_upload.py:1012   if recorded and recorded != actual:
+    tools/preflight_upload.py:2014   if certification and certification != "certified":
 
-**Fix.** Refuse when the row or the hash is absent, naming the unverifiable bind,
-with a `--force`-class acknowledgment that prints the failure and exits non-zero
-(the preflight's exit-4 convention, never 0). A WARN is the weaker option and is
-acceptable only if Ben wants promotion to stay non-blocking; state which, because
-"fail-open with a warning" and "fail-closed" are different guarantees and the
-comment currently promises the second.
+(a) `recorded` is the manifest row's `contest_ids`. An EMPTY set skips the
+contest-assignment cross-check entirely rather than failing it, so a row that
+never recorded which contests it was for reads exactly like a row that agrees.
+(b) `certification` is the row's recorded certification. Absent, the verdict stays
+`upload_ready` — the one label CLAUDE.md reserves for a run where `workflow_valid`,
+`selection_certified` and `allocation_certified` all passed — awarded on missing
+evidence. The reachable case is a row written by an older writer or by a path that
+omits the field; a delivered file with NO row already hard-fails separately, so
+this is thin records rather than absent ones.
+
+**Why.** Same argument R228 closed, at the checker Ben runs immediately before
+uploading, and (b) hands out the reserved label rather than merely skipping a
+check.
+
+**Fix.** Both fail closed on absence and say which evidence was missing.
+(b) needs care and its own coverage: turning currently-passing preflights into
+`review_ready` changes what Ben sees at T-5, so land it with the count of existing
+rows in `outputs/` that carry no `certification` and state whether any is live.
+Deliberately NOT folded into R228's commit for that reason.
 
 ### R242. The preflight's salary auto-resolve reaches across dates and draftgroups before refusing; it should find the slate's own file (P2, S) | new 2026-08-27, merged from BUILD fragments `2026-08-24_BUILD_showdown_contest_assignment.md` §2 and `2026-08-26_BUILD_contest_aware_allocation_at_onset.md` §6; corroborated by the outside spec ed8 (F-11's surviving sliver)
 

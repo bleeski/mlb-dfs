@@ -492,13 +492,14 @@ def verify_manifest(date: str) -> Dict[str, Any]:
     thing preflight cross-checks against.
     """
     problems: List[str] = []
+    unverifiable: List[str] = []
     checked = 0
     manifest = read_manifest(date)
     if manifest.get("corrupt"):
         # R36 F6m. This used to return passed=True with checked=0, which reads as
         # "nothing recorded, nothing wrong" on the one file preflight cross-checks
         # against. An unreadable record is the worst state, not the empty one.
-        return {"passed": False, "checked": 0, "date": str(date),
+        return {"passed": False, "checked": 0, "date": str(date), "unverifiable": [],
                 "problems": [f"{manifest['corrupt']['path']}: manifest is unreadable "
                              f"({manifest['corrupt']['error']}); no delivery on this "
                              f"date has verifiable provenance until it is quarantined "
@@ -510,10 +511,21 @@ def verify_manifest(date: str) -> Dict[str, Any]:
         if not target.exists():
             problems.append(f"{record.get('delivered_file')}: recorded but missing")
             continue
+        # R228's class, second site. `checked += 1` ran before the guard, so a row
+        # carrying no sha256 was counted as verified by a function whose whole
+        # subject is "do they still hash the same". Absence gets its own list; it
+        # does not join `problems`, because a row that never recorded a hash is a
+        # thin record and not a drifted file, and conflating the two would trade
+        # one false label for another.
+        if not record.get("sha256"):
+            unverifiable.append(
+                f"{record.get('delivered_file')}: row records no sha256, so nothing "
+                f"here can say whether the file changed after it was delivered")
+            continue
         checked += 1
-        if record.get("sha256") and sha256_file(target) != record["sha256"]:
+        if sha256_file(target) != record["sha256"]:
             problems.append(
                 f"{record.get('delivered_file')}: on-disk sha256 differs from the "
                 f"recorded one; the file changed after it was delivered")
     return {"passed": not problems, "checked": checked, "problems": problems,
-            "date": str(date)}
+            "unverifiable": unverifiable, "date": str(date)}

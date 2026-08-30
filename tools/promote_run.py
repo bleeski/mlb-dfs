@@ -34,7 +34,10 @@ Default destination is RUN-SCOPED (``DKEntries_<tag>_<run8>.csv``) so the canoni
 path is not the only place a certified file can live; ``--canonical`` overwrites
 the canonical name when that is what you want.
 
-Exit codes: 0 promoted, 2 refused, 3 IO error.
+Exit codes: 0 promoted, 2 refused, 3 IO error, 4 promoted with an UNVERIFIED
+immutability bind (``--force-unbound``; R228). Four is never success: it means the
+bytes were delivered and the run manifest could not say they are the bytes it
+recorded.
 """
 from __future__ import annotations
 
@@ -134,6 +137,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="deliver onto the canonical DKEntries_<tag>.csv instead of a "
                         "run-scoped name")
     p.add_argument("--notes", default="")
+    p.add_argument("--force-unbound", action="store_true",
+                   help="promote even though the run manifest records no sha256 for "
+                        "final/DKEntries.csv; the unverified bind is written onto the "
+                        "manifest row and the exit code is 4, never 0 (R228)")
     p.add_argument("--dry-run", action="store_true",
                    help="print what would be written and touch nothing")
     p.add_argument("--json", action="store_true")
@@ -165,6 +172,16 @@ def run(args: argparse.Namespace) -> int:
     # The run's own manifest binds its bytes. A final/ export whose hash no longer
     # matches the run record is not immutable any more, and promoting it would
     # launder that.
+    #
+    # R228, 2026-08-30. THREE states, not two. A hash mismatch refused loudly; an
+    # ABSENT artifacts row, or a row carrying no sha256, promoted with no check and
+    # no message, because `if recorded_sha and ...` reads missing evidence as a
+    # passing check. That is the same laundering the comment above forbids, with the
+    # evidence missing instead of contradicted -- the R177/F16 fail-open class at the
+    # one boundary CLAUDE.md calls immutable. The re-promotion path is where it bites:
+    # a run manifest written by an older code path, or truncated by a killed writer,
+    # promoted clean. Absence is now its own refusal, and the acknowledgment that
+    # overrides it never returns 0.
     recorded = ((run_manifest.get("artifacts") or {}).get("final/DKEntries.csv") or {})
     recorded_sha = str(recorded.get("sha256") or "")
     actual_sha = sha256_file(source)
@@ -173,6 +190,16 @@ def run(args: argparse.Namespace) -> int:
                        f"records {recorded_sha[:12]}; the run's final export changed "
                        f"after it was written and is no longer the artifact it claims "
                        f"to be")
+    unbound = not recorded_sha
+    if unbound and not args.force_unbound:
+        return _refuse(
+            f"the run manifest at {run_dir / 'manifest.json'} records no sha256 for "
+            f"final/DKEntries.csv, so nothing in the run binds the bytes being "
+            f"promoted (they hash {actual_sha[:12]}). This is missing evidence, not "
+            f"a check that passed: the immutability of runs/<id>/final/ is the whole "
+            f"basis of this operation and here it is unverifiable. Rebuild the run, "
+            f"or acknowledge with --force-unbound, which promotes, records the "
+            f"unverified bind on the row, and exits 4 rather than 0")
 
     prior_date, prior_row = find_prior_row(run_id, outputs_root)
     date = str(args.date or prior_date or "").strip()
@@ -201,7 +228,22 @@ def run(args: argparse.Namespace) -> int:
         "sha256": actual_sha, "entries": facts["entries"],
         "contest_ids": facts["contest_ids"],
         "prior_row_status": (prior_row or {}).get("status"),
+        "immutability_bind": "unverified" if unbound else "verified",
     }
+
+    # The row has to carry the fact, not just the console. A promotion whose bind
+    # nothing verified is a different artifact from one whose bind held, and the
+    # manifest is what preflight and the next session read.
+    notes = str(args.notes or "")
+    if unbound:
+        unbound_note = (
+            "R228: promoted with --force-unbound; the run manifest recorded no "
+            "sha256 for final/DKEntries.csv, so the immutability bind on these "
+            "bytes was NOT verified")
+        notes = f"{notes}; {unbound_note}" if notes else unbound_note
+        print(f"WARN  the run manifest records no sha256 for final/DKEntries.csv; "
+              f"the immutability bind is UNVERIFIED and --force-unbound was given. "
+              f"The manifest row will say so and the exit code is 4, not 0")
 
     if not workflow_valid:
         print(f"WARN  run {run_id} is NOT certified (workflow_valid false); it will "
@@ -210,7 +252,10 @@ def run(args: argparse.Namespace) -> int:
         print(json.dumps(plan, indent=1) if args.json else
               "\n".join(f"  {k}: {v}" for k, v in plan.items()))
         print("DRY RUN  nothing written")
-        return 0
+        # A dry run reports what the real run would do, exit code included. Handing
+        # back 0 here while the promotion itself would hand back 4 is the same
+        # misreport this item exists to close, one command earlier.
+        return 4 if unbound else 0
 
     def _write(provisional: Path) -> None:
         provisional.write_bytes(source.read_bytes())
@@ -230,7 +275,7 @@ def run(args: argparse.Namespace) -> int:
             strategy_state=((prior_row or {}).get("strategy_state") or
                             {"state": "unknown", "counts": {}}),
             re_promoted_from=run_id,
-            notes=str(args.notes or ""),
+            notes=notes,
         )
     except CorruptManifestError as exc:
         return _refuse(str(exc))
@@ -254,7 +299,7 @@ def run(args: argparse.Namespace) -> int:
                   f"row is appended and whatever was current is now superseded")
         print(f"  NEXT: python tools/preflight_upload.py --entries {result['path']} "
               f"--salary <salary.csv>")
-    return 0
+    return 4 if unbound else 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:

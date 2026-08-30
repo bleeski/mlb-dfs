@@ -601,7 +601,15 @@ EXPECTED_SUITE_COUNTS = {
     # once the bar changed, and a guarded copy nothing calls reads as protection
     # and is not). Two tests replace three: the bar's own arithmetic, and the
     # checker pinned equal to the builder at every size.
-    "tests.test_upload_integrity": 269,
+    # R228, 2026-08-30: 269 -> 276, the seven that pin absent evidence as a
+    # refusal rather than a passing check at the promotion boundary -- five on
+    # promote_run (an absent artifacts row and a row with no sha256 both refused,
+    # the --force-unbound acknowledgment promoting at exit 4 with the unverified
+    # bind on the manifest row, a verified promotion leaving that marker off, and
+    # the dry run reporting the exit code the real run would return) and two on
+    # verify_manifest's copy of the same shape, where `checked` counted a row it
+    # had not checked.
+    "tests.test_upload_integrity": 276,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from
