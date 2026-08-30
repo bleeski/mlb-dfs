@@ -82,6 +82,25 @@ code, no test, and no contract; the change is two documents. `--gate-run` was no
 spent on it. Anything that edits the DEV write set beyond docs still owes the
 full assembly at its own session start.
 
+**R277's Fix line CORRECTED the same session, before anyone built on it.** As
+first written it said to derive the K-rate side from
+`expected_stats_pitching.csv`. That file carries no K rate: its columns are
+`ba/est_ba/slg/est_slg/woba/est_woba/era/xera`, and
+`FG_PITCHING_RATE_COLUMNS = ("K%", "K/9")` names the only two the engine reads.
+Savant is the xwOBA and F4 source, not a K-rate source, and the correction as
+first filed would have reproduced the defect it was filed to fix. The real fix is
+to widen the FanGraphs pull, **and the precedent is ten lines above the defect in
+the same file**: `refresh_reference_data.py:72-79` already made this exact call on
+the Savant side (`DEFAULT_MIN_PA = "1"`) with its safety argument written out, and
+`FANGRAPHS_PITCHING_URL` four lines below still says `qual=y`. R167/R233 shape:
+the fix, the argument and the safety proof all existed and were never applied to
+the second site. Two facts added to the entry while verifying: the neutral is
+`XISO_CEILING_NEUTRAL = 1.42` inside a clip band of `(1.25, 1.60)` and is the
+50th percentile BY CONSTRUCTION, so an unseen arm is priced as a median qualified
+starter with no random component to average out; and R127(b)'s own comment in that
+file records the same mechanism on 2026-08-15 costing an arm 9 of 19 lineups,
+mis-read as staleness then too.
+
 ## 2026-08-30 — Board: slot 1 closed and refilled, not vacated
 
 **What moved.** `docs/backlog.md` only. The four entries above closed the whole

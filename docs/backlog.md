@@ -3885,6 +3885,28 @@ in 4 of 7 entries, tied for most-used. Kikuchi: **0** grep hits in
 this session after a same-day Savant refresh. He has faced 165 batters against
 Wheeler's 499 and Springs' 527. He is not qualified.
 
+**The neutral is not neutral: it is the MEDIAN, and that is why the bias has a
+direction.** `build_k_rate_ceiling_multipliers` computes `neutral + (percentile -
+0.5) * span` with `XISO_CEILING_NEUTRAL = 1.42`, `span = 0.30`, clip
+`(1.25, 1.60)`. Neutral is the 50th percentile of the qualified starter
+population by construction, inside a band only 0.35 wide. **An arm the file
+cannot see is therefore priced as a median qualified starter, every time**, which
+over-prices every below-median arm and under-prices every above-median one, with
+no random component to average out. Kikuchi at 1.420 against Springs' 1.381 and
+Bassitt's 1.294 is that arithmetic, not a coincidence. Two things that follow.
+This is the file `CSV_FEEDS` calls "the K-rate pitcher ceiling multipliers, **the
+only factor that separates arms in a ceiling-scored build**," so the bias lands
+on the one term that ranks pitchers against each other. And at 165 TBF Kikuchi is
+ABOVE `XWOBA_PA_FULL` (100), so once the file can see him he takes his real rate
+at FULL weight with no shrink: the coverage gap is the entire defect, and the
+sample-size objection does not apply to him.
+
+**Not the first time, and the prior sighting was mis-attributed the same way.**
+`refresh_reference_data.py`'s own R127(b) comment records that on 2026-08-15 this
+file "feeds the pitcher K-rate ceiling and is exactly what would have caught the
+arm that kept the neutral multiplier and **took 9 of 19 lineups**." Same
+mechanism, larger portfolio, and it was read as an aging file then too.
+
 **Why P1, and why this is not the staleness item it was filed as.** The
 2026-08-16 DEV merge pass recorded, on this board, that "Dobnak is absent from
 all 212 rows of `fangraphs_season_pitching.csv` (file dated 2026-07-16, which is
@@ -3897,13 +3919,39 @@ slate for the whole season, and the surface an operator reads under a clock tell
 him to fix it by re-downloading. Silently degrading lineup quality while naming
 an impossible remedy is the P1 definition twice over.
 
-**Fix.** (a) Decide the source question rather than the URL question first: the
-Savant file already carries 831 arms including this one, so the cheapest correct
-answer may be to derive the K-rate side from `expected_stats_pitching.csv` and
-retire the qualified-only dependency, not to widen the FanGraphs pull. If the
-pull is widened instead (`qual=0`), check what downstream assumes qualified rates
-before shipping it, because a 30-batter sample and a 500-batter sample are not
-the same input. (b) Whatever (a) decides, the warning stops claiming staleness
+**Fix, CORRECTED 2026-08-30 the same session that filed it, because the version
+above was wrong.** It read "derive the K-rate side from
+`expected_stats_pitching.csv` and retire the qualified-only dependency." **That
+file carries no K rate.** Its columns, read at this head, are
+`ba/est_ba/slg/est_slg/woba/est_woba/era/xera` and nothing else;
+`FG_PITCHING_RATE_COLUMNS = ("K%", "K/9")` and only the FanGraphs export has
+either. Savant's 831 rows are the xwOBA and F4 source, not a K-rate source, and
+conflating the two is how the corrected item would have reproduced the defect it
+was filed to fix.
+
+(a) **Widen the FanGraphs pull, and the precedent is TEN LINES ABOVE the defect
+in the same file.** `refresh_reference_data.py:72-79` already carries this exact
+fix on the Savant side, with its safety argument written out: Savant's `min=q`
+default "was silently costing more than half the enrichment coverage, because a
+DK slate is full of part-time and recently called-up hitters who never qualify.
+Pulling the long tail is safe here: the engine PA-shrinks every rate toward 1.0
+and returns exactly 1.0 below `XWOBA_PA_MIN` ... **What it cannot do is shrink a
+row it never saw.**" `DEFAULT_MIN_PA = "1"` is that decision, and `--min-pa`
+exposes it. Four lines later `FANGRAPHS_PITCHING_URL` still says `qual=y`. The
+shrink the argument depends on is already implemented for K rate too
+(`build_k_rate_ceiling_multipliers`: neutral below `pa_min`, linear toward the
+full value between `pa_min` and `pa_full`), so the same reasoning transfers
+unchanged and no projection math has to move. **This is the R167/R233 shape: the
+fix, the argument, and the safety proof all already existed and were never
+applied to the second site.**
+
+(b) **The one real consequence to MEASURE before shipping, and it is not the
+sample-size worry.** The multiplier is `neutral + (percentile - 0.5) * span`,
+where the percentile ranks within the qualified-starter rows OF THE SUPPLIED
+TABLE. Widening the pull changes the ranking POPULATION, so every existing arm's
+multiplier moves even though its K rate did not. Report the before/after
+multiplier distribution for the arms already in the file, not just the arms
+added. (c) The warning stops claiming staleness
 for an arm that is absent by QUALIFICATION and names the real condition; this
 half is R237's typed-state discipline applied to a reason string, and it can ship
 alone. (c) Cross-ref R237: a `not_computed` state whose reason reads "not
