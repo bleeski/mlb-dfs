@@ -165,7 +165,52 @@ def section_applied(brief: dict) -> List[str]:
         lines.append(f"CONTROLS RELAXED: {brief['controls_override_applied']}")
     else:
         lines.append("controls relaxed: none")
+    lines.extend(per_contest_lines(brief))
     return lines
+
+
+def per_contest_lines(brief: dict) -> List[str]:
+    """R239(c). No clean verdict on a Showdown brief with no per-contest slice.
+
+    A missing block is a REFUSAL and not a silent pass. The whole finding is that
+    every portfolio counter can read clean on a file that duplicated captains
+    inside two contests, so a qa run that cannot see the slice cannot say the
+    portfolio is clean -- it can only say it does not know, which is what these
+    lines make it say.
+
+    Classic is exempt: `contest_allocator` already enforces
+    `no_duplicates_within_contest` by default, and the per-contest captain slice
+    is a Showdown-path concept (there is no multiplier slot to duplicate).
+    """
+    if (brief.get("contest_type") or "").lower() != "showdown":
+        return []
+    pc = brief.get("per_contest")
+    if not pc:
+        return ["PER-CONTEST SLICE ABSENT: this brief predates R239(c) or was "
+                "built without a contest partition. No clean verdict is "
+                "available -- the portfolio counters cannot see duplication "
+                "inside a contest, which is the finding they missed on "
+                "2026-08-28."]
+    if not pc.get("available"):
+        return [f"PER-CONTEST SLICE UNAVAILABLE: {pc.get('reason') or 'unstated'}. "
+                f"No clean verdict is available."]
+    out = [f"per contest: {pc.get('multi_entry_contests', 0)} multi-entry of "
+           f"{pc.get('contests', 0)}, cap {pc.get('max_cpt_per_contest')} "
+           f"captain(s) per contest"]
+    for cid, b in sorted((pc.get("by_contest") or {}).items()):
+        if b["n"] < 2:
+            continue
+        repeats = ", ".join(f"{p} x{c}" for p, c in b["captain_counts"].items() if c > 1)
+        out.append(
+            f"  {cid}: {b['distinct_captains']} distinct CPT / {b['n']} entries"
+            f", max overlap {b['max_pairwise_overlap']}"
+            f", {b['team_shape_spread']} team shape(s)"
+            + (f"; {repeats}" if repeats else "; no captain repeats")
+            + ("  <-- OVER CAP" if b["over_cap"] else ""))
+    if pc.get("over_cap"):
+        out.append(f"PER-CONTEST CAP BREACHED in {len(pc['over_cap'])} slot(s): "
+                   f"NOT clean, whatever the portfolio counters say")
+    return out
 
 
 # ---------------------------------------------------------------- section 2

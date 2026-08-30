@@ -35,6 +35,7 @@ import pandas as pd
 
 from mlb_engine.optimize.showdown import (
     DEFAULT_MAX_CPT_EXPOSURE_PCT,
+    DEFAULT_MAX_CPT_PER_CONTEST,
     DEFAULT_MAX_PLAYER_EXPOSURE_PCT,
     DEFAULT_MAX_SHARED_PLAYERS,
     build_showdown_lineup,
@@ -497,6 +498,145 @@ def contest_partition(contest_of_entry: Optional[Sequence[str]],
         "sizes": dict(sorted(sizes.items())),
         "size_of_entry": [sizes[c] for c in vec],
         "n_contests": len(sizes),
+    }
+
+
+def per_contest_report(df: pd.DataFrame,
+                       lineups: Sequence[Optional[Mapping[str, Any]]],
+                       contest_of_entry: Optional[Sequence[str]],
+                       max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+                       ) -> Dict[str, Any]:
+    """R239(c). What was entered, sliced by the contest that pays it.
+
+    The portfolio counters answer "what share of the ENTERED SET does this
+    captain own". In a one-ticket satellite that is the wrong denominator: the
+    prize resolves per contest, so two entries sharing a captain inside one
+    2-entry contest is one outcome bought twice, and the portfolio reading of the
+    same file can sit at 23.8% under a 0.25 cap and call it clean. That is
+    verbatim the 2026-08-28 `2215_1g_sd` delivery.
+
+    Per contest: ``n``, ``distinct_captains``, ``captain_counts``, top player
+    exposure, ``max_pairwise_overlap``, and the team-shape spread (how many
+    distinct team splits the contest's entries span, which is the crude read on
+    whether one contest's entries are all the same construction).
+
+    ``clean`` here means every contest held the per-contest captain bar. It is
+    deliberately NOT the same question as the portfolio's `counted_relaxations`,
+    and the caller ANDs the two rather than replacing one with the other.
+    """
+    if contest_of_entry is None:
+        return {"available": False,
+                "reason": "no contest partition; per-contest slices unavailable",
+                "by_contest": {}, "over_cap": [], "clean": None}
+
+    names = dict(zip(df["Player_Key"], df["Name"]))
+    teams = dict(zip(df["Player_Key"], df["Team"]))
+    buckets: Dict[str, List[Mapping[str, Any]]] = {}
+    for cid, lu in zip(contest_of_entry, lineups):
+        if lu is not None:
+            buckets.setdefault(str(cid), []).append(lu)
+
+    by_contest: Dict[str, Any] = {}
+    over_cap: List[Dict[str, Any]] = []
+    for cid in sorted(buckets):
+        lus = buckets[cid]
+        n = len(lus)
+        sets = [set(lu["player_keys"]) for lu in lus]
+        cpts: Dict[str, int] = {}
+        for lu in lus:
+            key = lu["captain"]["player_key"]
+            label = names.get(key, key)
+            cpts[label] = cpts.get(label, 0) + 1
+        players: Dict[str, int] = {}
+        for s in sets:
+            for k in s:
+                label = names.get(k, k)
+                players[label] = players.get(label, 0) + 1
+        splits = {"-".join(str(v) for _, v in sorted(
+            {t: sum(1 for k in s if teams.get(k) == t)
+             for t in sorted({teams.get(k, "") for k in s})}.items()))
+            for s in sets}
+        cap = max(1, min(int(max_cpt_per_contest), n))
+        breaches = [{"contest_id": cid, "player": p, "n": c, "cap": cap,
+                     "pct": round(100.0 * c / n, 1)}
+                    for p, c in sorted(cpts.items(), key=lambda kv: (-kv[1], kv[0]))
+                    if c > cap]
+        over_cap.extend(breaches)
+        by_contest[cid] = {
+            "n": n,
+            "cap": cap,
+            "distinct_captains": len(cpts),
+            "captain_counts": dict(sorted(cpts.items(), key=lambda kv: (-kv[1], kv[0]))),
+            "max_captain_pct": round(100.0 * max(cpts.values()) / n, 1) if cpts else 0.0,
+            "top_player_exposure": dict(sorted(players.items(),
+                                               key=lambda kv: (-kv[1], kv[0]))[:5]),
+            "max_player_pct": round(100.0 * max(players.values()) / n, 1) if players else 0.0,
+            "max_pairwise_overlap": max((len(a & b) for i, a in enumerate(sets)
+                                         for b in sets[i + 1:]), default=0),
+            "team_shape_spread": len(splits),
+            "team_shapes": sorted(splits),
+            "over_cap": breaches,
+        }
+    return {"available": True, "reason": "",
+            "by_contest": by_contest,
+            "over_cap": over_cap,
+            "max_cpt_per_contest": int(max_cpt_per_contest),
+            "contests": len(by_contest),
+            "multi_entry_contests": sum(1 for b in by_contest.values() if b["n"] > 1),
+            "clean": not over_cap}
+
+
+def captain_assignment_feasible(captain_counts: Mapping[str, int],
+                                contest_sizes: Sequence[int],
+                                max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+                                ) -> Dict[str, Any]:
+    """Can this captain multiset be dealt so no contest exceeds the per-contest cap?
+
+    R239(b)(ii), the precondition R239 did not originally have. Gale-Ryser on
+    captain counts against contest sizes: an assignment exists if and only if,
+    for every k, the sum of the k largest captain counts is at most
+    ``sum over contests of min(n_j, k * m)``, where m is the per-contest cap.
+
+    The bound is what one contest can absorb from the k most-used captains: at
+    most ``m`` entries each, and never more than the contest's own size.
+
+    At ``m = 1`` this is R239's stated form. The 2026-08-28 bank fails it there
+    at k=3 -- counts (5,5,4,4,1,1,1) against sizes (7,7,2,2,1,1,1) give
+    ``14 > 13`` -- which is the finding worth keeping: **that bank admitted no
+    valid assignment at all, so no permutation of the delivered file could have
+    produced a clean one.** Dealing cannot create diversity the bank does not
+    contain, which is why R239(a) waits on (b).
+
+    Run this on the apportionment BEFORE solving. A failure is not a refusal: a
+    blank reserved row blocks certification, so the remedy is to widen the
+    captain pool, never to refuse and never to relax in silence.
+    """
+    counts = sorted((int(c) for c in captain_counts.values()), reverse=True)
+    sizes = [int(s) for s in contest_sizes]
+    m = max(1, int(max_cpt_per_contest))
+    total, capacity = sum(counts), sum(min(s, len(counts) * m) for s in sizes)
+    failures: List[Dict[str, int]] = []
+    for k in range(1, len(counts) + 1):
+        lhs = sum(counts[:k])
+        rhs = sum(min(s, k * m) for s in sizes)
+        if lhs > rhs:
+            failures.append({"k": k, "needed": lhs, "capacity": rhs,
+                             "short_by": lhs - rhs})
+    return {
+        "feasible": not failures and total <= capacity,
+        "max_cpt_per_contest": m,
+        "captain_counts_desc": counts,
+        "contest_sizes": sorted(sizes, reverse=True),
+        "entries": total,
+        "failures": failures,
+        # The binding k is the FIRST one to break: it names how many captains are
+        # over-concentrated, which is how many more the pool has to produce.
+        # `short_by` is that same k's shortfall and not the worst one, because a
+        # pair of adjacent fields describing two different failures is a report
+        # that reads as one fact and is two.
+        "binding_k": failures[0]["k"] if failures else None,
+        "short_by": failures[0]["short_by"] if failures else 0,
+        "worst_short_by": max((f["short_by"] for f in failures), default=0),
     }
 
 

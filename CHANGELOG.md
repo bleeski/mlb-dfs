@@ -25,6 +25,76 @@ performance claim.
 
 ---
 
+## 2026-08-29 — R239(c): the per-contest slice, and a clean verdict that answers to it
+
+### R239(c). What was entered, sliced by the contest that pays it
+
+**What moved.** `showdown_theses.per_contest_report` produces, per contest: `n`,
+`cap`, `distinct_captains`, `captain_counts`, top player exposure,
+`max_pairwise_overlap`, and the team-shape spread. It lands in the brief as
+`per_contest`, on BOTH build paths (the points-max bank path builds no thesis
+report, but it does build lineups, and the contest each is entered into is known
+either way — a slice that vanished on the weaker path would be absent exactly
+when the operator has least other information).
+
+**`counted_relaxations.clean` now answers to it.** On 2026-08-28 that field read
+`true` on a file that duplicated a captain across an entire 2-entry contest. It
+now also requires zero per-contest cap breaches. The breach count is carried
+separately as `per_contest_cap_breaches` and ANDed, not folded into the
+relaxation counters, because a breach is not a relaxation: nothing gave way.
+That is R153's own distinction, kept.
+
+**`qa_portfolio` refuses rather than passes.** A Showdown brief with no
+per-contest block prints `PER-CONTEST SLICE ABSENT ... No clean verdict is
+available`, and one whose block is UNAVAILABLE prints the reason. A qa run that
+cannot see the slice cannot say the portfolio is clean; it can only say it does
+not know. Classic is exempt and the exemption is the asymmetry worth stating:
+`contest_allocator` already carries the partition as a first-class object and
+already enforces `no_duplicates_within_contest` (default True, at 101/493/1190),
+while the same grep returns 0 on both Showdown modules.
+
+### The feasibility precondition R239 did not have
+
+`showdown_theses.captain_assignment_feasible` implements Gale-Ryser on captain
+counts against contest sizes: an assignment exists iff for every k, the sum of
+the k largest captain counts is at most `sum over contests of min(n_j, k * m)`,
+where m is the per-contest cap. At m=1 that is R239's stated form; the `k * m`
+generalization is this entry's, and it reduces to R239's exactly.
+
+Run against the 2026-08-28 bank it reproduces the measured finding to the
+number: counts (5,5,4,4,1,1,1) against sizes (7,7,2,2,1,1,1) fail at k=3 with
+needed 14 against capacity 13. **That bank admitted no valid distinct-captain
+assignment at all, so no permutation of the delivered file could have produced a
+clean one** — which is why R239(a)'s round-robin deal stays last and depends on
+(b). Dealing cannot create diversity the bank does not contain.
+
+### The one design decision, made rather than deferred
+
+`DEFAULT_MAX_CPT_PER_CONTEST = 2`, an explicit named control, **not derived from
+`max_cpt_exposure_pct`**.
+
+Deriving it gives `max(1, floor(0.25 * 7)) = 1` — fully distinct captains in any
+contest up to seven entries. That is a strong constraint arriving as an accident
+of arithmetic rather than as a choice, and R247 has already measured what
+tightening a cap costs: twelve roster slots moved off the four BUY-graded players
+onto the four FADE-graded ones, every counter reading clean. R240 records that
+the ladder constructs no captain below $5,800, so the deep captains full
+distinctness would force are partly unreachable.
+
+2 kills the cases that actually cost tickets (the 2-entry contest at 100%, the
+3-of-7 at 42.9%) and leaves the ladder its good captains. The measurement that
+decided it: the 08-28 bank is **infeasible at 1 and feasible at 2**, so this
+value is the difference between a bank that can be dealt cleanly and one that
+cannot. Whether it becomes 1 is Ben's and is already filed in Tier 4; because it
+is a named control that answer is a one-value change, and the realized
+per-contest counts are reported either way so the call gets priced against
+R247's frontier instead of guessed.
+
+**Gate.** `1409 -> 1425 tests`. `EXPECTED_SUITE_COUNTS["tests.test_showdown"]`
+98 -> 114.
+
+---
+
 ## 2026-08-29 — R239 seam: the contest partition reaches the ladder
 
 ### R239 (seam only). Entry-to-contest threaded into `build_thesis_ladder` and `solve_ladder`

@@ -53,6 +53,34 @@ VERSION = "0.3-review"
 # falls back to all_healthy and the thesis ladder does not run.
 DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25
 
+# R239(b), 2026-08-29. The FOURTH portfolio control, and the first one that binds
+# per contest rather than against the entered total. No captain fills more than
+# this many entries inside any ONE contest.
+#
+# **It is a named control and NOT derived from the pct above, and that is the
+# decision.** Deriving it gives max(1, floor(0.25 * 7)) = 1, i.e. fully distinct
+# captains in any contest up to seven entries -- a strong constraint arriving as
+# an accident of arithmetic rather than as a choice. R247 has already MEASURED
+# what tightening a cap costs: twelve roster slots moved off the four BUY-graded
+# players onto the four FADE-graded ones, with every counter reading clean.
+# Forcing seven distinct captains in a 7-entry contest means captaining the
+# bank's worst options, and R240 records that the ladder constructs no captain
+# below $5,800 at all, so the deep captains it would be forced onto may not
+# exist to reach.
+#
+# 2 kills the cases that actually cost tickets -- the 2-entry contest at 100% and
+# the 3-of-7 at 42.9%, both measured on 2026-08-28 -- while leaving the ladder its
+# good captains. Checked against that slate: its delivered bank (captain counts
+# 5,5,4,4,1,1,1 against contest sizes 7,7,2,2,1,1,1) is INFEASIBLE at 1 and
+# FEASIBLE at 2, so this value is the difference between a bank that can be dealt
+# cleanly and one that cannot be.
+#
+# Whether it becomes 1 is Ben's, and the question is already filed in Tier 4.
+# Because it is a named control his answer is a one-value change; the realized
+# per-contest captain counts are reported either way, so the decision gets priced
+# against R247's frontier instead of guessed.
+DEFAULT_MAX_CPT_PER_CONTEST = 2
+
 # Ben, 2026-08-19 (R153). No single PLAYER, in any role, fills more than half the
 # entered set. This is the portfolio-level washout control CLAUDE.md's dual
 # objective names and the module did not have: the overlap bound stops two

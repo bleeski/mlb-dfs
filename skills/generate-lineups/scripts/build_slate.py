@@ -2535,6 +2535,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         cap_reassignments = []
         player_locks_dropped = []
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
+    # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
+    # report, but it does build lineups, and the contest each one is entered into
+    # is known either way. A slice that exists only on the ladder path would be
+    # absent exactly when the operator has least other information.
+    per_contest = st.per_contest_report(
+        priced if use_ladder else df, bank, contest_of_entry,
+        max_cpt_per_contest=overrides.get("max_cpt_per_contest",
+                                          sd.DEFAULT_MAX_CPT_PER_CONTEST))
+
     captain_exposure = {
         key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
         for key, count in sorted(captain_counts.items(), key=lambda kv: -kv[1])
@@ -2635,6 +2644,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # is not clean because the gates passed; it is clean when these are zero.
         # ``both_relaxed_slots`` is a subset of the other two, which each count
         # every lineup built without that control, whichever rung produced it.
+        # R239(c). What was ENTERED, sliced by the contest that pays it. The
+        # counters above answer "what share of the entered set", which in a
+        # one-ticket satellite is the wrong denominator: the prize resolves per
+        # contest. On 2026-08-28 this build printed realized_max_pct 23.8 under a
+        # 0.25 cap while one 2-entry contest carried a single captain across both
+        # entries.
+        "per_contest": per_contest,
         "counted_relaxations": {
             "captain_relaxed_slots": relaxed_slots,
             "overlap_relaxed_slots": overlap_relaxed,
@@ -2646,8 +2662,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # the key is absent from the melted pool. Non-empty means the bank
             # was built without a player the operator asked for.
             "ignored_locks": ignored_locks,
-            "clean": not (relaxed_slots or overlap_relaxed or both_relaxed
-                          or player_relaxed or ignored_locks),
+            # R239(c). The fourth control joins the clean verdict on R153's own
+            # reasoning, one level down: "clean" meaning "the portfolio controls
+            # held" reads as "the portfolio is clean", and on 2026-08-28 it read
+            # true on a file that violated the captain cap's own value inside two
+            # contests. A breach here is NOT a relaxation (nothing gave way), so
+            # it is counted separately and ANDed rather than folded into the
+            # relaxation counts.
+            "per_contest_cap_breaches": len(per_contest.get("over_cap") or []),
+            "clean": (not (relaxed_slots or overlap_relaxed or both_relaxed
+                           or player_relaxed or ignored_locks)
+                      and not (per_contest.get("over_cap") or [])),
         },
         "construction": ({
             "mode": "thesis_ladder",

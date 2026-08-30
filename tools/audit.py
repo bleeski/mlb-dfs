@@ -478,7 +478,18 @@ EXPECTED_SUITE_COUNTS = {
     # diagnostic except the partition, and the captain list specifically, which
     # is the one R239(b) is about to move and therefore the one whose "unchanged
     # by the seam" reading the next stage depends on.
-    "tests.test_showdown": 98,
+    # R239(c), 2026-08-29: 98 -> 114, the sixteen that pin the per-contest
+    # slice and the clean verdict answering to it. Six on the slice (counts and
+    # distinct captains per contest, a captain over the bar being the finding,
+    # AT the cap not being over it, the cap never exceeding the contest's own
+    # size, no partition reading clean=None rather than True or False, and an
+    # unsolved slot not counting as an entry). Six on the Gale-Ryser
+    # precondition, two of them reproducing the measured 08-28 numbers exactly
+    # (infeasible at m=1 with 14 > 13 at k=3, feasible at the shipped m=2, which
+    # is the evidence for the default being named rather than derived). Four on
+    # qa_portfolio refusing a clean verdict without the block, and leaving
+    # Classic alone.
+    "tests.test_showdown": 114,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

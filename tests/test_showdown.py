@@ -1627,5 +1627,168 @@ class R239ContestPartitionSeamTests(unittest.TestCase):
                          [t["cpt"] for t in with_["theses"]])
 
 
+class R239PerContestReportTests(unittest.TestCase):
+    """R239(c). The slice, and the clean verdict that has to answer to it."""
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+        self.ml = {"MIN": -150, "CHC": 130}
+
+    def _fake(self, cpt_key, others):
+        return {"captain": {"player_key": cpt_key},
+                "player_keys": [cpt_key] + list(others)}
+
+    def _keys(self, n):
+        return list(self.df["Player_Key"])[:n]
+
+    def test_the_slice_reports_n_distinct_captains_and_counts_per_contest(self):
+        k = self._keys(9)
+        lineups = [self._fake(k[0], k[1:6]), self._fake(k[0], k[2:7]),
+                   self._fake(k[1], k[1:6]), self._fake(k[2], k[3:8])]
+        out = st.per_contest_report(self.df, lineups, ["A", "A", "B", "B"],
+                                    max_cpt_per_contest=2)
+        self.assertTrue(out["available"])
+        self.assertEqual(out["by_contest"]["A"]["n"], 2)
+        self.assertEqual(out["by_contest"]["A"]["distinct_captains"], 1)
+        self.assertEqual(out["by_contest"]["B"]["distinct_captains"], 2)
+        self.assertIn("max_pairwise_overlap", out["by_contest"]["A"])
+        self.assertIn("team_shape_spread", out["by_contest"]["A"])
+        self.assertIn("top_player_exposure", out["by_contest"]["A"])
+
+    def test_a_captain_over_the_per_contest_cap_is_the_finding(self):
+        k = self._keys(9)
+        lineups = [self._fake(k[0], k[1:6]) for _ in range(3)] + [
+            self._fake(k[1], k[2:7])]
+        out = st.per_contest_report(self.df, lineups, ["A"] * 4,
+                                    max_cpt_per_contest=2)
+        self.assertFalse(out["clean"])
+        self.assertEqual(len(out["over_cap"]), 1)
+        self.assertEqual(out["over_cap"][0]["n"], 3)
+        self.assertEqual(out["over_cap"][0]["cap"], 2)
+
+    def test_at_the_cap_is_not_over_the_cap(self):
+        k = self._keys(9)
+        lineups = [self._fake(k[0], k[1:6]), self._fake(k[0], k[2:7]),
+                   self._fake(k[1], k[3:8]), self._fake(k[2], k[1:6])]
+        out = st.per_contest_report(self.df, lineups, ["A"] * 4,
+                                    max_cpt_per_contest=2)
+        self.assertTrue(out["clean"])
+        self.assertEqual(out["over_cap"], [])
+
+    def test_the_cap_never_exceeds_the_contests_own_size(self):
+        """A 1-entry contest cannot breach a cap of 2, and must not report as
+        though it had room for two."""
+        k = self._keys(9)
+        out = st.per_contest_report(self.df, [self._fake(k[0], k[1:6])], ["A"],
+                                    max_cpt_per_contest=2)
+        self.assertEqual(out["by_contest"]["A"]["cap"], 1)
+        self.assertTrue(out["clean"])
+
+    def test_no_partition_is_UNAVAILABLE_and_clean_is_None_not_True(self):
+        """`clean: False` would be a false alarm and `clean: True` a false
+        reassurance. Neither is the answer when nothing was measured."""
+        k = self._keys(9)
+        out = st.per_contest_report(self.df, [self._fake(k[0], k[1:6])], None)
+        self.assertFalse(out["available"])
+        self.assertIsNone(out["clean"])
+        self.assertEqual(out["by_contest"], {})
+
+    def test_unsolved_slots_are_skipped_not_counted_as_entries(self):
+        k = self._keys(9)
+        out = st.per_contest_report(self.df, [self._fake(k[0], k[1:6]), None],
+                                    ["A", "A"], max_cpt_per_contest=2)
+        self.assertEqual(out["by_contest"]["A"]["n"], 1)
+
+    # -- Gale-Ryser --------------------------------------------------------
+    def test_the_2026_08_28_bank_fails_the_precondition_at_k_equals_3(self):
+        """The measured finding, reproduced: counts (5,5,4,4,1,1,1) against
+        sizes (7,7,2,2,1,1,1) give 14 > 13 at k=3, so that bank admitted NO
+        distinct-captain assignment and no permutation could have fixed it."""
+        counts = {"Drake": 5, "Carroll": 5, "Tidwell": 4, "Devers": 4,
+                  "e": 1, "f": 1, "g": 1}
+        sizes = [7, 7, 2, 2, 1, 1, 1]
+        r = st.captain_assignment_feasible(counts, sizes, max_cpt_per_contest=1)
+        self.assertFalse(r["feasible"])
+        self.assertEqual(r["binding_k"], 3)
+        first = [f for f in r["failures"] if f["k"] == 3][0]
+        self.assertEqual((first["needed"], first["capacity"]), (14, 13))
+
+    def test_the_same_bank_is_feasible_at_the_shipped_default_of_two(self):
+        """Which is the evidence for the default being 2 rather than derived:
+        at 1 that delivered bank could not be dealt cleanly at all."""
+        counts = {"Drake": 5, "Carroll": 5, "Tidwell": 4, "Devers": 4,
+                  "e": 1, "f": 1, "g": 1}
+        sizes = [7, 7, 2, 2, 1, 1, 1]
+        r = st.captain_assignment_feasible(counts, sizes,
+                                           max_cpt_per_contest=sd.DEFAULT_MAX_CPT_PER_CONTEST)
+        self.assertTrue(r["feasible"])
+        self.assertIsNone(r["binding_k"])
+
+    def test_binding_k_and_short_by_describe_the_same_failure(self):
+        counts = {"a": 9, "b": 1}
+        r = st.captain_assignment_feasible(counts, [5, 5], max_cpt_per_contest=1)
+        self.assertFalse(r["feasible"])
+        binding = [f for f in r["failures"] if f["k"] == r["binding_k"]][0]
+        self.assertEqual(r["short_by"], binding["short_by"])
+
+    def test_a_dealable_bank_is_feasible_at_every_k(self):
+        r = st.captain_assignment_feasible({"a": 2, "b": 2, "c": 2}, [3, 3],
+                                           max_cpt_per_contest=1)
+        self.assertTrue(r["feasible"])
+        self.assertEqual(r["failures"], [])
+
+    def test_more_entries_than_capacity_is_infeasible(self):
+        r = st.captain_assignment_feasible({"a": 1, "b": 1, "c": 1}, [2],
+                                           max_cpt_per_contest=1)
+        self.assertFalse(r["feasible"])
+
+    # -- qa_portfolio refuses a clean verdict without the block --------------
+    def _qa(self):
+        import sys
+        sys.path.insert(0, str(REPO / "tools"))
+        import qa_portfolio
+        return qa_portfolio
+
+    def test_qa_refuses_a_clean_verdict_when_the_block_is_absent(self):
+        lines = self._qa().per_contest_lines({"contest_type": "showdown"})
+        self.assertTrue(any("SLICE ABSENT" in l for l in lines))
+        self.assertTrue(any("No clean verdict" in l for l in lines))
+
+    def test_qa_refuses_when_the_block_is_present_but_unavailable(self):
+        lines = self._qa().per_contest_lines(
+            {"contest_type": "showdown",
+             "per_contest": {"available": False, "reason": "no contest partition"}})
+        self.assertTrue(any("UNAVAILABLE" in l for l in lines))
+
+    def test_qa_leaves_classic_alone(self):
+        """contest_allocator already enforces no_duplicates_within_contest by
+        default, and Classic has no multiplier slot to duplicate."""
+        self.assertEqual(self._qa().per_contest_lines({"contest_type": "classic"}), [])
+
+    def test_qa_names_the_breach_over_the_portfolio_counters(self):
+        lines = self._qa().per_contest_lines({
+            "contest_type": "showdown",
+            "per_contest": {
+                "available": True, "contests": 1, "multi_entry_contests": 1,
+                "max_cpt_per_contest": 2,
+                "by_contest": {"A": {"n": 2, "distinct_captains": 1,
+                                     "captain_counts": {"Tidwell": 2},
+                                     "max_pairwise_overlap": 4,
+                                     "team_shape_spread": 1,
+                                     "over_cap": [{"player": "Tidwell"}]}},
+                "over_cap": [{"player": "Tidwell"}]}})
+        self.assertTrue(any("OVER CAP" in l for l in lines))
+        self.assertTrue(any("whatever the portfolio counters say" in l for l in lines))
+
+    def test_the_default_control_is_named_not_derived_from_the_pct(self):
+        """Deriving it from 0.25 gives 1 at every contest size up to 7, which is
+        full distinctness arriving as an accident of arithmetic. R247 measured
+        what tightening a cap costs, so this value is a decision with a number."""
+        self.assertEqual(sd.DEFAULT_MAX_CPT_PER_CONTEST, 2)
+        self.assertNotEqual(sd.DEFAULT_MAX_CPT_PER_CONTEST,
+                            sd.exposure_cap_count(sd.DEFAULT_MAX_CPT_EXPOSURE_PCT, 7))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
