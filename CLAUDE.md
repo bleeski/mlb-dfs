@@ -34,9 +34,16 @@ This file carries the contracts and the gotchas. Each procedure lives once:
 - Keeping disk, container and GitHub in sync: docs/cowork_sync_protocol.md,
   which wraps `python tools/sync_check.py`. Read it before moving files
   between the mount and a container, before believing `git status` on the
-  mount, and when a git operation dies on a stale `.git/index.lock` — this
+  mount, and when a git operation dies on a stale lock — this
   mount grants create and truncate but not unlink, so `rm` cannot clear one
   and the remedy is a timestamped `mv` (R109).
+  **The lock is a CLASS, not `index.lock` (R109 third sighting, 2026-08-29).**
+  `HEAD.lock` and `next-index-*.lock` block every git write with the same
+  message `index.lock` produces, so a session sweeping only the one name reads
+  a still-blocked repo as clean. Diagnose with `find .git -name '*.lock'` and
+  `mv` each hit aside. Sweep at session start AND before every git write: on
+  this mount a plain `git status` leaves a fresh `index.lock` behind, so the
+  read that tells you the tree is clean is itself what blocks the next `add`.
 - What's missing from the standings inbox: skills/mlb-standings-pull-checklist/SKILL.md,
   which wraps `python tools/awaiting_standings.py scan`. Regenerated, never
   hand-maintained.
@@ -294,7 +301,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1386 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1402 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -307,10 +314,23 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    leave the gate for good. All four are WARNINGS: proceed, fix after the
    slate. A failing suite blocks. The audit gates test_core, test_showdown,
    test_upload_integrity, test_golden_replay, and test_paste_lineups.
-   **That one command does not fit a Cowork `device_bash` call, which dies at
-   45 seconds, so the gate has a supported split (R152).** Measured 2026-08-18
-   on the device mount: `tests.test_core` alone needs ~89s and one of its tests
-   needs 35.8s by itself. Backgrounding it is the trap and not the workaround —
+   **That one command does not fit one Cowork bash call, so the gate has a
+   supported split (R152).** Measured 2026-08-18 on the device mount:
+   `tests.test_core` alone needs ~89s and one of its tests needs 35.8s by itself.
+   **The 45-second figure this paragraph carried until 2026-08-29 was WRONG, and
+   so are the flag defaults derived from it (R271(b)).** The real Cowork bash
+   ceiling is ~180s when the call passes an explicit timeout. Pass the budget:
+   `python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165`.
+   Measured 2026-08-29 on this mount: **one** `--gate-run` assembled all five
+   suites warm, and **five** did it from a cold `__pycache__` (one suite per
+   call, `test_core` being the expensive one), against the twenty-odd calls the
+   28/39 defaults force either way. Budget for five, not one — a session that
+   has just cleared caches for a mutation check pays the cold price, and quoting
+   the warm number as the expectation is how a measurement becomes a promise.
+   Do not ask Ben to run it instead: his Windows Python has no scipy and
+   `.pylibs/` is a Linux build, so `--run-tests` cannot pass on his host
+   (R271(c)). The gate is the session's job.
+   Backgrounding it is the trap and not the workaround —
    `nohup` and `setsid` both die with the call, the log comes back EMPTY, which
    reads exactly like a silent pass, and a killed `audit.py` strands the
    session's next commit on a zero-byte `.git/index.lock` (R109). Instead:

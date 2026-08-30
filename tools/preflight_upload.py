@@ -88,6 +88,7 @@ import collections
 import csv
 import hashlib
 import json
+import math
 import re
 import sys
 import unicodedata
@@ -119,6 +120,13 @@ WARN_STATUSES = frozenset({"DTD", "GTD", "Q"})
 # Showdown contest names carry the literal token, Classic names never do.
 ARCHETYPES_CSV = REPO_ROOT / "data" / "reference" / "dk_contest_archetypes.csv"
 SHOWDOWN_NAME_TOKENS = ("showdown", "captain mode")
+
+# R266. A verbatim copy of showdown.DEFAULT_MAX_CPT_EXPOSURE_PCT, pinned equal by
+# test, on the same reasoning as ARCHETYPE_TYPE_PRECEDENCE below: preflight cannot
+# import the engine, and a preflight applying a different captain cap than the
+# engine built to would be R79(d)'s no-op failure class on the money boundary.
+# Override per run with --max-cpt-exposure-pct when a build used a different value.
+DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25
 
 # A verbatim copy of dk_entries_manager.ARCHETYPE_TYPE_PRECEDENCE, pinned equal
 # by test. Preflight cannot import the engine, and resolving the same contest
@@ -1600,8 +1608,152 @@ def partition_duplicate_lineups(rows: Iterable[Tuple[str, Any]]) -> Dict[str, in
     }
 
 
+def assert_fraction_cap_local(pct: Any) -> float:
+    """R167/R215(b)'s units rule, mirrored for a tool that cannot import the engine.
+
+    A local copy of ``contest_allocator.assert_fraction_cap``'s contract, pinned
+    equal by test. Copying a rule is this project's named no-op failure class, so
+    the copy is guarded rather than left to hold by luck -- but the alternative
+    here is worse than a guarded copy: without the rule, ``25`` typed for ``0.25``
+    yields a per-contest cap of 25n, which forbids nobody, and the R266 check
+    reports every contest CLEAN. That is R167's exact harm (a control switched off
+    by a keystroke while its counter reads clean) arriving at the money boundary.
+
+    Raises ValueError above 1.0, on NaN, on infinity, and on bool. Zero and below
+    are returned unchanged and read by the caller as "not set".
+    """
+    if isinstance(pct, bool):
+        raise ValueError(f"exposure cap must be a number, got bool {pct!r}")
+    value = float(pct)
+    if math.isnan(value) or math.isinf(value):
+        raise ValueError(f"exposure cap must be finite, got {pct!r}")
+    if value > 1.0:
+        raise ValueError(
+            f"exposure cap {pct!r} is above 1.0; these are FRACTIONS, so 0.25 "
+            f"means 25%. A units slip here disables the check silently: a cap "
+            f"of 25 forbids nobody and every contest then reads clean")
+    return value
+
+
+def per_contest_captain_cap(n: int, cap_pct: float) -> int:
+    """How many times one captain may appear inside a contest of ``n`` entries.
+
+    The engine's own clamp, applied to the contest's own n instead of the entered
+    total: ``max(1, floor(pct * n))``. The ``max(1, ...)`` matches
+    ``showdown.exposure_cap_count``'s rule that ``pct * n < 1`` clamps to 1 rather
+    than forbidding everyone -- without it a 2-entry contest at 0.25 would admit
+    no captain at all rather than admitting one. ``math.floor``, never round or
+    ceil, for the same reason the engine gives: a cap is an UPPER bound.
+    """
+    return max(1, math.floor(assert_fraction_cap_local(cap_pct) * max(1, int(n))))
+
+
+def per_contest_captain_exposure(filled: Sequence[EntryRow],
+                                 persons: Mapping[str, str],
+                                 display: Mapping[str, Tuple[str, str]],
+                                 cap_pct: float) -> List[Dict[str, Any]]:
+    """Count captains per CONTEST rather than per file (R266).
+
+    This crosses the two checks ``advisory`` already held six lines apart and
+    never crossed: ``top_captain_exposure`` counted captains across the WHOLE
+    FILE, and R128's partition split entries by contest for lineup duplication
+    only. Neither could see the 2026-08-29 finding on ``2215_1g_sd``, where a
+    2-entry contest carried ONE captain across both entries (two entries bought,
+    one outcome) and a 7-entry satellite carried 4 distinct captains across 7,
+    while the portfolio counters read ``realized_max_pct 23.8`` under a 0.25 cap
+    with ``cap_relaxed_slots 0`` -- every number true, none of them describing
+    what was entered.
+
+    R128's own words are the precedent unchanged: entries duplicated inside one
+    contest "pay twice into one prize pool for one outcome". A shared captain is
+    that same waste one slot down, and on a six-man roster carrying 1.5x it is
+    the most expensive slot to duplicate.
+
+    Contests holding one entry are omitted: a single entry cannot duplicate
+    anything, and listing it would bury the finding in noise on a slate where
+    most contests are single-entry.
+
+    Returns one block per multi-entry contest, worst first, each carrying its own
+    ``n``, ``cap``, ``distinct_captains``, full ``captain_counts``, and the
+    ``over_cap`` rows that are the finding.
+    """
+    by_contest: Dict[str, List[EntryRow]] = collections.defaultdict(list)
+    for e in filled:
+        # Same key as R128, in the same order and for the same reason: the ID is
+        # the key and the name is the fallback, because a hand-assembled file can
+        # leave the ID blank while the name still separates the contests.
+        by_contest[e.contest_id or e.contest_name or ""].append(e)
+
+    blocks: List[Dict[str, Any]] = []
+    for key, rows in by_contest.items():
+        n = len(rows)
+        if n < 2:
+            continue
+        counts: collections.Counter = collections.Counter()
+        for e in rows:
+            if e.cells and e.cells[0]:
+                counts[persons.get(e.cells[0], e.cells[0])] += 1
+        if not counts:
+            continue
+        cap = per_contest_captain_cap(n, cap_pct)
+        over = [
+            {"player": display.get(k, (k, "?"))[0],
+             "team": display.get(k, (k, "?"))[1],
+             "n": c, "cap": cap, "pct": round(100.0 * c / n, 1)}
+            for k, c in counts.most_common() if c > cap
+        ]
+        name = next((e.contest_name for e in rows if e.contest_name), "")
+        blocks.append({
+            "contest_id": rows[0].contest_id or "",
+            "contest_name": name,
+            "contest_key": key,
+            "n": n,
+            "cap": cap,
+            "distinct_captains": len(counts),
+            "captain_counts": [
+                {"player": display.get(k, (k, "?"))[0], "n": c}
+                for k, c in counts.most_common()
+            ],
+            "over_cap": over,
+            "worst_pct": round(100.0 * counts.most_common(1)[0][1] / n, 1),
+        })
+    # Worst first: the contest whose most-repeated captain owns the largest share
+    # is the one the operator has seconds to look at. Ties break on the contest
+    # key so the ordering is deterministic, which the golden replay needs.
+    blocks.sort(key=lambda b: (-b["worst_pct"], -b["n"], b["contest_key"]))
+    return blocks
+
+
+def check_contest_captain_diversity(adv: Mapping[str, Any], rep: Report,
+                                    strict: bool = False) -> None:
+    """Register the R266 finding as a WARNING, or as a failure under --strict.
+
+    **WARN by default and this is deliberate.** A deliberate double-up is a
+    legitimate play and CLAUDE.md reserves concentration to Ben, so this check
+    must not block an upload on its own judgment. The hard failure lives behind
+    ``--strict-contest-diversity`` and is not wired on anywhere.
+
+    Why this belongs on the preflight rather than only in the brief: the preflight
+    is the one surface that runs on every deliverable, with no engine import, no
+    bank and no network, and it is already trusted at the money boundary. It also
+    catches a HAND-PERMUTED file, which the brief cannot -- and R239 records two
+    live deliveries that shipped by hand permutation of the delivered file.
+    """
+    for b in adv.get("per_contest_captains") or []:
+        for row in b["over_cap"]:
+            where = b["contest_id"] or b["contest_name"] or "unkeyed contest"
+            msg = (f"contest {where}: captain {row['player']} in {row['n']} of "
+                   f"{b['n']} entries ({row['pct']}%), above the per-contest cap "
+                   f"of {row['cap']}. Entries sharing a captain inside one "
+                   f"contest pay twice into one prize pool for one outcome; the "
+                   f"portfolio captain cap cannot see this, because it counts "
+                   f"against the entered total")
+            rep.fail(msg) if strict else rep.warn(msg)
+
+
 def advisory(contest: str, entries: Sequence[EntryRow],
-             salary: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
+             salary: Dict[str, Dict[str, str]],
+             cap_pct: float = DEFAULT_MAX_CPT_EXPOSURE_PCT) -> Dict[str, Any]:
     filled = [e for e in entries if not e.is_blank]
     n = len(filled)
     out: Dict[str, Any] = {"entries": len(entries), "filled": n}
@@ -1641,6 +1793,12 @@ def advisory(contest: str, entries: Sequence[EntryRow],
         out["top_captain_exposure"] = _top(collections.Counter(
             persons.get(e.cells[0], e.cells[0])
             for e in filled if e.cells and e.cells[0]))
+        # R266. The same captains, counted against the contest that pays them
+        # instead of against the file. The line above and R128's partition below
+        # sat six lines apart and never crossed; this is the crossing.
+        out["per_contest_captains"] = per_contest_captain_exposure(
+            filled, persons, display, cap_pct)
+        out["per_contest_captain_cap_pct"] = cap_pct
     # R128. The contest each entry belongs to is already in the row; the DK
     # template writes it beside the Entry ID, so the partition needs no new
     # input. Contest ID is the key and the name is the fallback, because a
@@ -1774,12 +1932,22 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
         rep.warn("no lineups feed resolved; the posted-lineup cross-check did "
                  "not run and a benched starter would not be caught here")
 
+    # R266. The advisory is computed BEFORE the report dict, not inside it,
+    # because the diversity check registers into `rep` and `passed` is evaluated
+    # at dict-construction time. Built inline, a --strict failure would land in
+    # `rep.failures` after `passed` had already read it as True.
+    adv = advisory(contest, entries, salary,
+                   cap_pct=getattr(args, "max_cpt_exposure_pct",
+                                   DEFAULT_MAX_CPT_EXPOSURE_PCT))
+    check_contest_captain_diversity(
+        adv, rep, strict=bool(getattr(args, "strict_contest_diversity", False)))
+
     report = {
         "tool": "preflight_upload", "version": VERSION,
         "passed": not rep.failures,
         "failures": rep.failures, "warnings": rep.warnings,
         "info": rep.info, "lineups": details,
-        "advisory": advisory(contest, entries, salary),
+        "advisory": adv,
     }
     return rep, report
 
@@ -1819,6 +1987,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                          "sha256 (full hex, or a prefix of 12+ chars); pairs "
                          "the upload with the brief's delivered_sha256 (R20a)")
     ap.add_argument("--min-pool-overlap", type=float, default=0.95)
+    # R266. Default WARN. A deliberate double-up is a legitimate play and
+    # CLAUDE.md reserves concentration to Ben, so this must not block on its own
+    # judgment; the strict flag exists so the decision is a flag flip rather than
+    # a rebuild, and it is not wired on anywhere.
+    ap.add_argument("--strict-contest-diversity", action="store_true",
+                    help="turn the R266 per-contest captain finding into a hard "
+                         "failure instead of a warning")
+    ap.add_argument("--max-cpt-exposure-pct", type=float,
+                    default=DEFAULT_MAX_CPT_EXPOSURE_PCT,
+                    help="captain exposure cap the build used; the per-contest "
+                         "bar is max(1, floor(pct * contest entries)) "
+                         f"(default {DEFAULT_MAX_CPT_EXPOSURE_PCT})")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="print failures and exit 4 (acknowledged, not clean); "
@@ -1884,6 +2064,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             top = ", ".join(f"{x['player']} {x['pct']}%"
                             for x in adv["top_captain_exposure"][:5])
             print(f"  top CPT exposure: {top}")
+        if adv.get("per_contest_captains"):
+            # R266. Prints even when every contest is clean, on R128's own
+            # reasoning: "zero repeats inside a contest" is the reassurance the
+            # T-5 reader needs, and inferring it from silence is what nearly cost
+            # a good portfolio on 2026-08-15.
+            blocks = adv["per_contest_captains"]
+            flagged = sum(1 for b in blocks if b["over_cap"])
+            print(f"  CPT per contest ({len(blocks)} multi-entry contest"
+                  f"{'s' if len(blocks) != 1 else ''}, "
+                  f"{flagged} over cap):")
+            for b in blocks[:6]:
+                mark = "  <-- OVER CAP" if b["over_cap"] else ""
+                repeats = ", ".join(f"{c['player']} x{c['n']}"
+                                    for c in b["captain_counts"] if c["n"] > 1)
+                print(f"    {b['contest_id'] or b['contest_name'] or '?'}: "
+                      f"{b['distinct_captains']} distinct CPT across {b['n']} "
+                      f"entries (cap {b['cap']}/CPT)"
+                      + (f"; {repeats}" if repeats else "; no repeats") + mark)
         if adv.get("duplicate_lineup_groups"):
             # R128. Same trigger as before, so no file that prints nothing
             # today starts printing; what changed is that the operator is told

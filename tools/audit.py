@@ -533,7 +533,20 @@ EXPECTED_SUITE_COUNTS = {
     # pin person_key itself, which is what a surviving mutation asked for: one
     # name on two teams is two people, one person priced twice is one key, and
     # a lineup holding both Will Smiths is not a duplicate person.
-    "tests.test_upload_integrity": 254,
+    # R266, 2026-08-29: 254 -> 270, the sixteen that pin captains counted
+    # against the contest that pays them rather than against the file. Four on
+    # the arithmetic (the engine's own max(1, floor(pct * n)) on the contest's
+    # own n, a units slip raising instead of disabling the check silently, the
+    # local units rule agreeing with contest_allocator's, and the mirrored
+    # default equalling showdown's). Seven on the finding, the load-bearing pair
+    # being one captain across a 2-entry contest reading 100% while the
+    # PORTFOLIO line on the same file reads clean -- which is what shipped on
+    # 2026-08-28. Three on severity: WARN by default, --strict-contest-diversity
+    # turning the same finding into a failure, and a clean file registering
+    # neither. Two end to end, one of them pinning that the advisory is computed
+    # BEFORE the report dict, because built inline a strict failure lands in
+    # rep.failures after `passed` has already read it as True.
+    "tests.test_upload_integrity": 270,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

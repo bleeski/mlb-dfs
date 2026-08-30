@@ -4384,6 +4384,245 @@ class R234SalaryAutoResolveIsScopedTests(unittest.TestCase):
             self.assertIn("rostered=", call, name)
 
 
+class R266PerContestCaptainDiversityTests(unittest.TestCase):
+    """Captains counted against the contest that pays them, not against the file.
+
+    The fixture is the measured 2026-08-28 delivery on ``2215_1g_sd`` (ARI@SF,
+    21 entries, 7 contests, sha256 68528791e00d), reduced to the shape that
+    matters: a 2-entry contest whose two entries carried the SAME captain, and a
+    multi-entry contest carrying repeats under the per-contest bar. Portfolio-wide
+    that build read ``realized_max_pct 23.8`` under a 0.25 cap with
+    ``cap_relaxed_slots 0`` and ``counted_relaxations.clean true`` -- every number
+    true, none of them describing what was entered.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.salary_path = self.root / "DKSalaries.csv"
+        self.people = write_showdown_salary(self.salary_path)
+        import preflight_upload
+        self.pf = preflight_upload
+        self.salary = self.pf.load_salary(self.salary_path)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _entry(self, line_no, contest_id, captain, utils):
+        raw = ["90" + str(line_no), f"Contest {contest_id}", str(contest_id),
+               "$1", captain] + list(utils)
+        return self.pf.EntryRow(line_no, raw + ["", "1. instructions"], 6)
+
+    def _cpt(self, surname, team="AAA"):
+        return self.people[f"{team} {surname}"]["CPT"]
+
+    def _utils(self, n=5, team="BBB"):
+        return [self.people[f"{team} {s}"]["UTIL"] for s in SURNAMES[:n]]
+
+    def _duplicated_captain_portfolio(self):
+        """Contest 111 holds two entries under ONE captain: the 100% case.
+
+        Contest 222 holds four entries with a captain repeated three times, which
+        is over its own bar of max(1, floor(0.25 * 4)) = 1.
+        """
+        return [
+            self._entry(1, 111, self._cpt("Aster"), self._utils()),
+            self._entry(2, 111, self._cpt("Aster"), self._utils(4) + [
+                self.people["AAA Boone"]["UTIL"]]),
+            self._entry(3, 222, self._cpt("Boone"), self._utils()),
+            self._entry(4, 222, self._cpt("Boone"), self._utils(4) + [
+                self.people["AAA Aster"]["UTIL"]]),
+            self._entry(5, 222, self._cpt("Boone"), self._utils(3) + [
+                self.people["AAA Aster"]["UTIL"],
+                self.people["AAA Ellis"]["UTIL"]]),
+            self._entry(6, 222, self._cpt("Ellis"), self._utils()),
+        ]
+
+    def _clean_portfolio(self):
+        """Same six entries, distinct captains inside every contest."""
+        return [
+            self._entry(1, 111, self._cpt("Aster"), self._utils()),
+            self._entry(2, 111, self._cpt("Boone"), self._utils()),
+            self._entry(3, 222, self._cpt("Ellis"), self._utils()),
+            self._entry(4, 222, self._cpt("Aster"), self._utils()),
+            self._entry(5, 222, self._cpt("Boone"), self._utils()),
+            self._entry(6, 222, self._cpt("Aster", "BBB"), self._utils()),
+        ]
+
+    # -- the arithmetic ----------------------------------------------------
+    def test_the_per_contest_bar_is_the_engines_own_clamp_on_the_contests_own_n(self):
+        """max(1, floor(pct * n)), never round or ceil: a cap is an UPPER bound."""
+        self.assertEqual(self.pf.per_contest_captain_cap(2, 0.25), 1)
+        self.assertEqual(self.pf.per_contest_captain_cap(7, 0.25), 1)
+        self.assertEqual(self.pf.per_contest_captain_cap(8, 0.25), 2)
+        self.assertEqual(self.pf.per_contest_captain_cap(20, 0.25), 5)
+        # pct * n < 1 clamps to 1 rather than forbidding everyone, matching
+        # showdown.exposure_cap_count. Without it a 2-entry contest at 0.25
+        # would admit no captain at all.
+        self.assertEqual(self.pf.per_contest_captain_cap(1, 0.25), 1)
+        self.assertEqual(self.pf.per_contest_captain_cap(3, 0.10), 1)
+
+    def test_a_units_slip_raises_instead_of_disabling_the_check_silently(self):
+        """R167's harm at the money boundary: 25 typed for 0.25 forbids nobody.
+
+        The check would then report every contest clean, which is the failure
+        mode the units rule exists to stop, one surface further out.
+        """
+        for slip in (25, 25.0, 100, float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                self.pf.per_contest_captain_cap(7, slip)
+        with self.assertRaises(ValueError):
+            self.pf.per_contest_captain_cap(7, True)
+
+    def test_the_local_units_rule_agrees_with_the_engines(self):
+        """The copy is guarded rather than left to hold by luck (R79(d))."""
+        from mlb_engine.allocate.contest_allocator import assert_fraction_cap
+        for good in (0.0, 0.08, 0.25, 0.5, 1.0):
+            self.assertEqual(self.pf.assert_fraction_cap_local(good),
+                             assert_fraction_cap(good))
+        for bad in (1.01, 25, float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                assert_fraction_cap(bad)
+            with self.assertRaises(ValueError):
+                self.pf.assert_fraction_cap_local(bad)
+
+    def test_the_mirrored_default_equals_the_engines(self):
+        from mlb_engine.optimize import showdown as sd
+        self.assertEqual(self.pf.DEFAULT_MAX_CPT_EXPOSURE_PCT,
+                         sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
+
+    # -- the finding -------------------------------------------------------
+    def test_one_captain_across_a_two_entry_contest_is_reported_at_100_pct(self):
+        adv = self.pf.advisory("showdown", self._duplicated_captain_portfolio(),
+                               self.salary)
+        blocks = {b["contest_id"]: b for b in adv["per_contest_captains"]}
+        self.assertEqual(blocks["111"]["n"], 2)
+        self.assertEqual(blocks["111"]["distinct_captains"], 1)
+        self.assertEqual(blocks["111"]["cap"], 1)
+        self.assertEqual(blocks["111"]["over_cap"][0]["player"], "AAA Aster")
+        self.assertEqual(blocks["111"]["over_cap"][0]["n"], 2)
+        self.assertEqual(blocks["111"]["over_cap"][0]["pct"], 100.0)
+
+    def test_the_portfolio_captain_line_reads_clean_on_the_same_file(self):
+        """The whole point: the flat count cannot see this.
+
+        Aster captains 2 of 6 entries file-wide (33%) and Boone 3 of 6 (50%),
+        while inside contest 111 Aster owns 100% of a contest. The per-file line
+        is what shipped on 2026-08-28 reading 23.8% under a 0.25 cap.
+        """
+        adv = self.pf.advisory("showdown", self._duplicated_captain_portfolio(),
+                               self.salary)
+        flat = {r["player"]: r for r in adv["top_captain_exposure"]}
+        self.assertEqual(flat["AAA Aster"]["n"], 2)
+        self.assertNotEqual(flat["AAA Aster"]["pct"], 100.0)
+        # and the per-contest reading of the SAME captain is 100%.
+        blocks = {b["contest_id"]: b for b in adv["per_contest_captains"]}
+        self.assertEqual(blocks["111"]["over_cap"][0]["pct"], 100.0)
+
+    def test_a_clean_portfolio_reports_blocks_with_nothing_over_cap(self):
+        adv = self.pf.advisory("showdown", self._clean_portfolio(), self.salary)
+        self.assertEqual(len(adv["per_contest_captains"]), 2)
+        for b in adv["per_contest_captains"]:
+            self.assertEqual(b["over_cap"], [])
+        # The block still prints: "zero repeats inside a contest" is the
+        # reassurance the T-5 reader needs, per R128's own reasoning.
+        self.assertTrue(adv["per_contest_captains"])
+
+    def test_single_entry_contests_are_omitted_not_reported_clean(self):
+        """One entry cannot duplicate anything; listing it buries the finding."""
+        entries = self._clean_portfolio() + [
+            self._entry(7, 333, self._cpt("Aster"), self._utils())]
+        adv = self.pf.advisory("showdown", entries, self.salary)
+        self.assertNotIn("333", {b["contest_id"]
+                                 for b in adv["per_contest_captains"]})
+
+    def test_worst_contest_sorts_first_and_the_order_is_deterministic(self):
+        adv = self.pf.advisory("showdown", self._duplicated_captain_portfolio(),
+                               self.salary)
+        ids = [b["contest_id"] for b in adv["per_contest_captains"]]
+        self.assertEqual(ids[0], "111")   # 100% beats 75%
+        again = self.pf.advisory("showdown",
+                                 self._duplicated_captain_portfolio(),
+                                 self.salary)
+        self.assertEqual(ids, [b["contest_id"] for b in again["per_contest_captains"]])
+
+    def test_classic_gets_no_per_contest_captain_block(self):
+        salary_path = self.root / "classic.csv"
+        lineup = write_classic_salary(salary_path)
+        salary = self.pf.load_salary(salary_path)
+        row = ["900", "MLB Test Contest", "5", "$1"] + lineup + ["", "1. inst"]
+        adv = self.pf.advisory("classic", [self.pf.EntryRow(1, row, 10)], salary)
+        self.assertNotIn("per_contest_captains", adv)
+
+    # -- the severity ------------------------------------------------------
+    def test_the_finding_warns_and_does_not_block_by_default(self):
+        """A deliberate double-up is a legitimate play and CLAUDE.md reserves
+        concentration to Ben, so this must not block on its own judgment."""
+        adv = self.pf.advisory("showdown", self._duplicated_captain_portfolio(),
+                               self.salary)
+        rep = self.pf.Report()
+        self.pf.check_contest_captain_diversity(adv, rep)
+        self.assertEqual(rep.failures, [])
+        self.assertTrue(any("above the per-contest cap" in w for w in rep.warnings))
+        self.assertTrue(any("AAA Aster" in w and "111" in w for w in rep.warnings))
+
+    def test_strict_turns_the_same_finding_into_a_failure(self):
+        adv = self.pf.advisory("showdown", self._duplicated_captain_portfolio(),
+                               self.salary)
+        rep = self.pf.Report()
+        self.pf.check_contest_captain_diversity(adv, rep, strict=True)
+        self.assertTrue(rep.failures)
+        self.assertEqual(rep.warnings, [])
+
+    def test_a_clean_file_registers_neither_warning_nor_failure(self):
+        adv = self.pf.advisory("showdown", self._clean_portfolio(), self.salary)
+        for strict in (False, True):
+            rep = self.pf.Report()
+            self.pf.check_contest_captain_diversity(adv, rep, strict=strict)
+            self.assertEqual(rep.failures, [])
+            self.assertEqual(rep.warnings, [])
+
+    # -- end to end --------------------------------------------------------
+    def test_the_cli_warns_and_still_exits_zero(self):
+        entries = self.root / "DKEntries.csv"
+        rows = [showdown_entry("90" + str(i), cid, e.cells) for i, (e, cid) in
+                enumerate(zip(self._duplicated_captain_portfolio(),
+                              ["111", "111", "222", "222", "222", "222"]), start=1)]
+        write_entries(entries, SHOWDOWN_HEADER, rows)
+        result = run_preflight("--entries", str(entries),
+                               "--salary", str(self.salary_path), "--no-manifest")
+        self.assertIn("CPT per contest", result.stdout)
+        self.assertIn("OVER CAP", result.stdout)
+        self.assertEqual(result.returncode, 0,
+                         "R266 is a warning; it must not block an upload")
+
+    def test_strict_flag_makes_the_cli_hard_fail(self):
+        entries = self.root / "DKEntries.csv"
+        rows = [showdown_entry("90" + str(i), cid, e.cells) for i, (e, cid) in
+                enumerate(zip(self._duplicated_captain_portfolio(),
+                              ["111", "111", "222", "222", "222", "222"]), start=1)]
+        write_entries(entries, SHOWDOWN_HEADER, rows)
+        result = run_preflight("--entries", str(entries),
+                               "--salary", str(self.salary_path), "--no-manifest",
+                               "--strict-contest-diversity")
+        self.assertEqual(result.returncode, 2)
+
+    def test_the_strict_failure_is_counted_before_passed_is_evaluated(self):
+        """Built inline in the report dict, a --strict failure would land in
+        rep.failures after `passed` had already read it as True."""
+        entries = self.root / "DKEntries.csv"
+        rows = [showdown_entry("90" + str(i), cid, e.cells) for i, (e, cid) in
+                enumerate(zip(self._duplicated_captain_portfolio(),
+                              ["111", "111", "222", "222", "222", "222"]), start=1)]
+        write_entries(entries, SHOWDOWN_HEADER, rows)
+        result = run_preflight("--entries", str(entries),
+                               "--salary", str(self.salary_path), "--no-manifest",
+                               "--strict-contest-diversity", "--json")
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["passed"])
+        self.assertTrue(payload["failures"])
+
+
 class R192ShowdownExposureCountsThePersonTests(unittest.TestCase):
     """A draftable id is a role. Counting ids splits one human into two."""
 

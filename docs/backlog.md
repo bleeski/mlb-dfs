@@ -4936,43 +4936,16 @@ wrong verdict — but noise on the one surface whose job is to be believed at
 T-5, and SKILL.md already names this crosswalk as a known fact. Filed as
 recurrence, not new scope: the item is unchanged and stays in slot 2.
 
-### R266. The preflight can catch per-contest captain duplication today, from two checks it already holds six lines apart and never crosses (P1, S; no dependencies, lands alone) | new 2026-08-29, from BUILD fragment `2026-08-29_BUILD_per_contest_captain_duplication_fix.md` "Layer 0"; the guard for R239's fourth sighting
+### R266. CLOSED 2026-08-29 — shipped; see CHANGELOG.md
 
-**What.** `tools/preflight_upload.py` holds both halves of this check inside
-one function, six lines apart, and never crosses them. Line 1641,
-`top_captain_exposure`: captains extracted from `e.cells[0]`,
-person-normalised, counted across the WHOLE FILE — its own comment says it
-exists because "an operator checking either against the brief had neither."
-Lines 1644-1655, R128: entries partitioned by `e.contest_id or e.contest_name`,
-with the comment "the partition needs no new input." Cross them and the
-2026-08-29 finding is caught at T-5 instead of in post-mortem.
-
-**Why here and not the brief.** The preflight is the one surface that runs on
-every deliverable, Classic and Showdown, with no engine import, no bank and no
-network, under two seconds, and is already trusted at the money boundary. It
-also catches a HAND-PERMUTED file, which the brief cannot, and R239 records
-that two live deliveries have already shipped by hand permutation. R128's own
-words are the precedent unchanged: entries duplicated inside one contest "pay
-twice into one prize pool for one outcome." A shared captain is that same waste
-one slot down, and on a six-man roster carrying 1.5x it is the most expensive
-slot to duplicate.
-
-**Fix.** Count captains per contest key instead of per file. Report, for every
-contest holding more than one entry: `n`, distinct captains, and any captain
-appearing more than `max(1, floor(max_cpt_exposure_pct * n))` times.
-**Severity WARN by default** — a deliberate double-up is a legitimate play and
-CLAUDE.md reserves concentration to Ben, so this must not block on its own
-judgment. Whether it ever becomes a hard failure, and above what per-contest
-share, is a flag (`--strict-contest-diversity`) and a Tier 4 decision, listed
-there.
-
-**Sequencing.** Independent of R239 in both directions: it needs nothing R239
-builds, and R239 landing does not retire it, because the engine cannot see a
-file an operator permuted after export. It rides slot 2 for the shared
-`preflight_upload.py` test pass ONLY — not a dependency, and per this board's
-own 2026-08-28 batching lesson (batches justified by an ordering dependency
-hold; batches justified by a shared surface have not), it lands alone within
-that slot and its landing is not contingent on R174/R175/R248/R242.
+The preflight now counts captains per contest and warns above
+`max(1, floor(pct * n))`, with the hard failure behind
+`--strict-contest-diversity` and wired to nothing. Severity WARN was kept as
+specified. What did NOT come with it, and is not open scope: the strict flag's
+threshold and whether it ever blocks stay the Tier 4 decision this entry
+always named. Reasoning, the R233 enumeration, and the two things found while
+building it (the units rule, and the report-dict ordering that made `passed`
+read stale) are in the changelog entry.
 
 ### R269. Re-promoting a superseded run mints a SECOND filename for identical bytes, and the old path stays blocked (P2, S) | new 2026-08-29, from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §C(3); mechanism verified at `tools/promote_run.py:191,194`
 

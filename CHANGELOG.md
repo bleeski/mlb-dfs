@@ -25,6 +25,111 @@ performance claim.
 
 ---
 
+## 2026-08-29 — R266: the preflight counts captains against the contest that pays them
+
+### R266. Per-contest captain duplication, caught at T-5 instead of in post-mortem
+
+**What moved.** `tools/preflight_upload.py` held both halves of this check inside
+one function, six lines apart, and never crossed them: `top_captain_exposure`
+counted captains across the WHOLE FILE, and R128's partition split entries by
+`contest_id or contest_name` for lineup duplication only. They are now crossed.
+For every contest holding more than one entry the advisory carries `n`, `cap`,
+`distinct_captains`, the full `captain_counts`, and the `over_cap` rows, worst
+contest first; the CLI prints the block; and any captain appearing more than
+`max(1, floor(pct * n))` times inside its own contest registers a WARNING.
+
+**Why it moved.** On the `2215_1g_sd` delivery (ARI@SF, 21 entries, 7 contests,
+2026-08-28, sha256 `68528791e00d`) a 2-entry contest carried the SAME captain in
+both entries — two entries bought, one outcome — and a 7-entry satellite carried
+4 distinct captains across 7. Every portfolio counter in that artifact read
+clean: `captain_exposure.realized_max_pct 23.8` under a 0.25 cap,
+`cap_relaxed_slots 0`, `counted_relaxations.clean true`. All true, none of it
+describing what was entered. R128's own words are the precedent unchanged —
+entries duplicated inside one contest "pay twice into one prize pool for one
+outcome" — and a shared captain is that waste one slot down, on the roster's
+only 1.5x slot. The preflight is where this belongs rather than the brief: it is
+the one surface that runs on every deliverable with no engine import, no bank and
+no network, it is already trusted at the money boundary, and it is the only one
+that can see a HAND-PERMUTED file. R239 records two live deliveries that shipped
+by hand permutation, which no engine surface can inspect.
+
+**Severity is WARN and that is a decision, not a default.** A deliberate
+double-up is a legitimate play and CLAUDE.md reserves concentration to Ben, so
+this check must not block an upload on its own judgment. The hard failure lives
+behind `--strict-contest-diversity`, which is wired to nothing. Whether it ever
+becomes a block, and above what per-contest share, stays a Tier 4 decision.
+
+**Two things found while building it, neither in the backlog entry.**
+
+1. *The units rule had to come along.* The bar is a fraction, so `25` typed for
+   `0.25` yields a per-contest cap of 25n, which forbids nobody and reports every
+   contest CLEAN. That is R167's exact harm — a control switched off by a
+   keystroke while its counter reads clean — arriving one surface further out, at
+   the money boundary. Preflight cannot import the engine, so
+   `assert_fraction_cap_local` mirrors `contest_allocator.assert_fraction_cap`
+   (above 1.0, NaN, inf, bool all raise) and a test pins the two equal, the same
+   treatment `ARCHETYPE_TYPE_PRECEDENCE` already gets. `DEFAULT_MAX_CPT_EXPOSURE_PCT`
+   is mirrored and pinned the same way.
+2. *Ordering was load-bearing.* `advisory()` was called inline inside the report
+   dict, one line below `"passed": not rep.failures`. A `--strict` failure
+   registered from there lands in `rep.failures` after `passed` has already read
+   it as True, so the file would report `passed: true` with failures listed. The
+   advisory is now computed before the dict. A test pins it, and the mutation that
+   restores the old ordering is killed.
+
+**R233 enumeration.** The class is "a cap computed against the entered TOTAL when
+the prize resolves per contest." Re-run at this head, 2026-08-29:
+
+    $ grep -rn 'exposure_cap_count' mlb_engine/ tools/ skills/ tests/   ->  19 hits
+
+Six are the call sites R239 enumerated and all six still pass a portfolio total —
+`showdown.py:477,478`, `showdown_theses.py:496,636,637,943` — plus the definition
+at `showdown.py:401`, one import at `showdown_theses.py:42`, one comment at
+`tools/audit.py:444`, and ten in `tests/test_showdown.py`. **No seventh call
+site; R239's list is complete as of this head.** **All six copies are
+deliberately left in place by this entry**, and the reason is that R266 does not
+touch them: the preflight is a post-export reader that derives its own bar from
+the contest's own n and never calls `exposure_cap_count` at all. Closing the six
+is R239(b)'s correction, not this one. The preflight's bar is a SEVENTH
+derivation of the same arithmetic, living in a tool that may not import the
+engine — which is why it is pinned equal by test rather than left to agree by
+luck. `no_duplicates_within_contest` still returns 3 hits in
+`contest_allocator.py` (101 default True, 493, 1190) and 0 on both Showdown
+modules: the principle is shipped and defaulted ON for Classic, and this is the
+first piece of it to reach the Showdown path.
+
+**Gate.** `PASS v2.26.0 27 modules 1386 tests` -> `PASS v2.26.0 27 modules 1402
+tests`. `EXPECTED_SUITE_COUNTS["tests.test_upload_integrity"]` 254 -> 270.
+Six mutations run against the new guards (cap counting the file instead of the
+contest, units rule removed, strict downgraded to a warning, single-entry
+contests no longer omitted, `>` weakened to `>=`, advisory rebuilt inline after
+`passed`): six killed, zero survivors.
+
+### CLAUDE.md: two instructions this session proved wrong
+
+**The gate's call budget (R271(b)).** Step 2 said a Cowork bash call "dies at 45
+seconds" and the `--gate-run` defaults (28/39) are derived from that figure. It is
+wrong; the real ceiling is ~180s when the call passes an explicit timeout. With
+`--gate-budget 130 --gate-ceiling 165` the whole gate assembled in ONE
+`--gate-run` warm and five from a cold `__pycache__`, against the twenty-odd calls
+the defaults force. The paragraph now carries the flags and tells the reader to
+budget for five rather than one, because quoting the warm number as the
+expectation is how a measurement becomes a promise. It also now says not to hand
+the gate to Ben: his Windows Python has no scipy and `.pylibs/` is a Linux build,
+so `--run-tests` cannot pass on his host (R271(c)).
+
+**The git lock is a class, not a filename (R109, third sighting).** The
+sync-protocol note named `index.lock` only. `HEAD.lock` and `next-index-*.lock`
+block every git write with the same message, so a session sweeping the one name
+reads a still-blocked repo as clean. The remedy is unchanged (`mv`, never `rm` —
+this mount grants create and truncate but not unlink); what changed is that the
+diagnosis is now `find .git -name '*.lock'` and the sweep runs before every git
+write, not only at session start. Observed twice this session: a plain
+`git status` left a fresh `index.lock` behind each time, so the read that reports
+a clean tree is itself what blocks the next `add`.
+
+---
+
 ## 2026-08-29 — Decided, not yet shipped
 
 ### Decided: repair is not strategy — Ben's autonomy instruction extends to replacing a player who will not play
