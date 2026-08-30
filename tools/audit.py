@@ -360,7 +360,37 @@ EXPECTED_SUITE_COUNTS = {
     # surface), book order not moving the answer, and the price/probability
     # round trip -- plus the one member of the class that survives on purpose,
     # the total's cross-book median, which is linear and says so.
-    "tests.test_core": 911,
+    # R37(2)(a)+(b) + R263, 2026-08-28: 911 -> 934, the twenty-three that pin
+    # Ben's two live shape bands and the quota ladder that replaced R34's hard
+    # fail. Twelve on the routing (the ledger's own slate buckets, breadth <= 0.02
+    # selecting EXACTLY the postures the item names by list, floor 5 binding only
+    # under R34's unanimity rule so a mixed portfolio falls back to 4, the 1-2g
+    # exemption that is the tranche's own counter-case, the quota reading the field
+    # share monotonically and clamping to Ben's band, the share naming WHICH source
+    # answered and surviving a torn rollup, the band adding the quota to postures
+    # that never declared it -- load-bearing, since the mid band's whole population
+    # is served by large_gpp and small_gpp -- the band never lowering a control an
+    # operator set, and the R167 units gate still catching a slipped quota).
+    # One is the defect a check found rather than reasoning: an UNMEASURABLE slate
+    # size is a third state and is not "3g or more", and `late_swap` running
+    # without a projection frame reached exactly it and printed floor 5.
+    # Ten on the ladder (the rungs, an empty qualifying set relaxing OFF in ONE
+    # counted step rather than refusing the delivery, a carryable quota clean, a
+    # REUSE-DEPENDENT quota named and NOT relaxed -- the case R34 had no diagnostic
+    # for at all, where the row is satisfiable only through candidate reuse and a
+    # bare infeasibility used to arrive with no control attached to it -- absent
+    # not being the same fact as relaxed, a share that floors to zero entries
+    # reporting off rather than adding a vacuous row, and the quota stepping BEFORE
+    # the primary-stack floor because the floor has three tranches behind it and
+    # the quota is one dated decision old).
+    # The last one is R116's rule generalized to a third ladder and it is where
+    # this batch's own R233 moment landed: every re-entry must carry every sibling
+    # ladder state. Its first cut counted the substring over the rest of the file,
+    # found four calls, and flagged the fourth -- which is `allocate_entries`'
+    # top-level entry into the allocator, where a private ladder kwarg would be a
+    # defect and not a fix. Scoped by AST now. The class had one more member than
+    # the enumeration and the test is what said so.
+    "tests.test_core": 934,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -415,7 +445,32 @@ EXPECTED_SUITE_COUNTS = {
     # nothing, so `25` typed for `0.25` returned a cap of 25n, capped nobody,
     # and left every relaxation counter reading clean -- R153's washout axis
     # switched off by a keystroke, invisible in the brief.
-    "tests.test_showdown": 79,
+    # R263, 2026-08-28: 79 -> 91, the twelve on the shadow report and the coarse
+    # weight lever that was MEASURED AND DECLINED. Eight pin the shadow: the split
+    # pattern canonicalized the way `field_miner`'s `stack_pattern` already does so
+    # a delivered split and a mined field share are one vocabulary, the pitcher-CPT
+    # share counted off SOLVED lineups, `steers: False` present in the artifact and
+    # not only in a comment, the per-player captain-cap CEILING beside the share, a
+    # band the caps FORBID reported unreachable rather than missed, the three
+    # verdict directions, the bands carrying their 3.21 evidence with no outcome
+    # claim, and an empty report returning unmeasured rather than zeros that would
+    # print as a finding.
+    # Four pin the declined lever. Ben asked for a weight bump to move the
+    # delivered pitcher-CPT share from ~40% toward ~50%; it was built and measured
+    # over 96 apportion-and-solve checks (six moneylines x n=9..24, R156's own
+    # standard on this fixture) and declined. Mean realized share 43.66% -> 44.91%,
+    # mean STRUCTURAL CEILING 45.01% unchanged, builds at their ceiling 75/96 ->
+    # 94/96, captain-cap relaxations 37 -> 56. The share is CAP-bound, not
+    # weight-bound: with two declared arms and a per-PLAYER captain cap, the
+    # reachable share is 2*floor(cap*n)/n, which never exceeds 50% and averages
+    # 45.0%. So ~50% is not reachable by any weight, the old weights were already
+    # at 97% of what is, and the bump buys 1.25pp by manufacturing relaxations at
+    # n=16, 17 and 18 -- entry counts that had zero. The pinned
+    # `test_ladder_spans_game_states_and_holds_the_captain_cap` caught it at n=18.
+    # The tests pin the ceiling arithmetic, R156's 0.45 standing untouched, the
+    # directional block summing to 1.00 whatever a future re-sizing does, and the
+    # apportioned captain count staying under the cap the same call computed.
+    "tests.test_showdown": 91,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

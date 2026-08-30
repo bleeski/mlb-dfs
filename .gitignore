@@ -62,6 +62,24 @@ data/standings/PENDING_MINE_*.md
 # Moved here rather than deleted because the sandbox cannot delete (2026-08-03).
 data/standings/processed_zips/
 
+# the same rule one directory over (2026-08-29). Zips also land in
+# data/archive/<date>/ beside the CSV they were mined from, and there they read as
+# untracked dirt on every `git status` while being the same bytes the tracked CSV
+# already holds. Verified before adding: all 17 present on this date had their
+# mined CSV alongside, so nothing unmined is being hidden. If a zip ever arrives
+# WITHOUT its CSV it is an unmined pull, and the awaiting-standings checklist is
+# what reports that, not git.
+data/archive/**/*.zip
+
+# root-level tarball residue from the disk-to-container bridge, same class as
+# _stage_repo*.tar.gz below but named per session (_changes, _final_0827, ...).
+# Environment, never history.
+/_*.tar.gz
+
+# a timestamped .bak beside a reference file is a session's own safety copy; the
+# tracked file is the record.
+data/reference/*.bak.json
+
 # files a session finished with and could not delete: the sandbox denies rm on the
 # mount. Ben empties this folder; nothing here is history and nothing reads it.
 _to_delete/

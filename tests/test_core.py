@@ -25,6 +25,7 @@ REPO = Path(__file__).resolve().parents[1]
 from mlb_engine.optimize import optimizer_v3 as opt
 
 from mlb_engine.pipeline import execution_pipeline as epi
+from mlb_engine.allocate import contest_allocator as ca
 
 from mlb_engine.pipeline.build_state_manager import (
     create_run, promote_run, register_artifact, sha256_file,
@@ -11246,7 +11247,23 @@ class PrimaryStackSizeFloorTests(unittest.TestCase):
             self.assertEqual(on["assignments"][0]["candidate_id"], "five")
             self.assertEqual(on["assignments"][0]["primary_stack_size"], 5)
 
-    def test_floor_names_the_constraint_when_no_candidate_qualifies(self):
+    def test_quota_relaxes_and_counts_instead_of_refusing_the_delivery(self):
+        """R37(2)(b), Ben's dated decision of 2026-08-28. This test previously
+        asserted the OPPOSITE and the change is deliberate, so the old contract is
+        recorded here rather than deleted.
+
+        R34 shipped the quota as a MILP row that HARD FAILED when no candidate
+        qualified: `passed: False`, an error naming the control, no assignments. R37
+        stage 1 shipped the primary-stack floor one screen up as a ladder that
+        relaxes and counts. The backlog item named that state unshippable -- two
+        lower bounds on the same quantity with opposite failure modes -- and named
+        which one wins: the counted relaxation. A control that refuses here leaves
+        every reserved row blank, and a blank reserved row blocks certification, so
+        refusing costs the whole delivery to enforce a quota nobody can meet.
+
+        What must survive from the old test is the DIAGNOSTIC: the reason still
+        names the control, still says zero candidates qualified, and still refuses
+        to suggest trimming the pool."""
         with tempfile.TemporaryDirectory() as tmp:
             ids = write_salary(Path(tmp) / "salary.csv")
             r1, r2 = legal_rosters(ids)
@@ -11257,12 +11274,23 @@ class PrimaryStackSizeFloorTests(unittest.TestCase):
                 [{"entry_id": "1", "contest_id": "x", "contest_shape": "large_wta"}],
                 {"max_shared_players": 9, "min_five_stack_share_pct": 1.0},
             )
-            self.assertFalse(res["passed"])
-            self.assertFalse(res["selection_certified"])
-            joined = " ".join(res["errors"])
-            self.assertIn("min_five_stack_share_pct", joined)
-            self.assertIn("0 such candidates", joined)
-            self.assertIn("never trim the pool", joined)
+            self.assertTrue(res["passed"])
+            self.assertTrue(res["selection_certified"])
+            self.assertEqual(len(res["assignments"]), 1)
+            q = res["five_stack_quota"]
+            self.assertEqual(q["status"], "relaxed_off")
+            self.assertEqual(q["relaxations"], 1)
+            self.assertEqual(q["applied_need"], 0)
+            self.assertEqual(q["qualifying_candidates"], 0)
+            reason = q["relaxation_steps"][0]["reason"]
+            self.assertIn("min_five_stack_share_pct", reason)
+            self.assertIn("0 such candidates", reason)
+            self.assertIn("never trim the pool", reason.lower()
+                          .replace("never trim the\npool", "never trim the pool"))
+            # The relaxation is COUNTED where the operator reads cleanliness.
+            joined = " ".join(res.get("warnings") or [])
+            self.assertIn("min_five_stack_share_pct relaxed 1 time(s)", joined)
+            self.assertIn("clean when the relaxation counts are zero", joined)
 
     def test_posture_default_is_off_so_behaviour_is_unchanged(self):
         for posture, spec in epi.STRATEGY_DEFAULTS.items():
@@ -17800,6 +17828,309 @@ class SupervisorHardeningTests(unittest.TestCase):
                          f"main() returns at lines {unflushed} without flushing "
                          f"the decision log first; that exit files no "
                          f"post-mortem (R212, and R169(a) before it)")
+
+
+class ShapeBandRoutingTests(unittest.TestCase):
+    """R37(2)(a)+(b), Ben's dated decision of 2026-08-28. The two live bands and
+    the merge rules they have to survive."""
+
+    @staticmethod
+    def _pbc(*specs):
+        return {str(i): {"posture": p, "contest_shape": s, "contest_name": s,
+                         "inferred": {"payout_shape_default": s}}
+                for i, (p, s) in enumerate(specs)}
+
+    def _merged(self, pbc, games, override=None):
+        bands = epi.resolve_shape_bands(pbc, game_count=games)
+        return bands, epi._merged_controls_for_build(
+            pbc, override, shape_bands=bands)
+
+    def test_slate_size_buckets_match_the_ledger_conditioning(self):
+        """3.21 conditions every shape finding on these buckets, so returning
+        different boundaries would force a reader to reconcile two bucketings."""
+        self.assertEqual(
+            [epi.slate_size_bucket(n) for n in (1, 2, 3, 4, 5, 6, 7, 15)],
+            ["1-2g", "1-2g", "3-4g", "3-4g", "5-6g", "5-6g", "7g+", "7g+"])
+        for bad in (None, 0, -3, "x"):
+            self.assertIsNone(epi.slate_size_bucket(bad))
+
+    def test_narrow_breadth_threshold_selects_exactly_the_named_postures(self):
+        """The item names a SET (WTA, one-seat satellites, solo shots,
+        mme_gpp/mini-MAX, single_entry_gpp) and the code routes on breadth <=
+        0.02. If those ever stop picking out the same contests, the threshold has
+        become a second list that can drift from the first."""
+        table = epi.PAYOUT_BREADTH_BY_SHAPE
+        named = {"winner_take_all", "large_wta", "small_wta", "mid_wta",
+                 "wta_ticket_satellite", "single_entry_gpp", "mme_top_heavy",
+                 "mme_gpp"}
+        at_or_under = {s for s, b in table.items()
+                       if b <= epi.NARROW_BREADTH_MAX}
+        self.assertEqual(named, at_or_under)
+
+    def test_floor_5_binds_only_when_every_contest_is_narrow(self):
+        """R34's floor merge takes the LEAST demanding declared value, because one
+        portfolio serves every contest. A mixed set must fall back to the stage-1
+        floor of 4 rather than force a narrow contest's floor onto a broad one."""
+        allnarrow = self._pbc(("wta_satellite", "winner_take_all"),
+                              ("mme", "mme_gpp"))
+        _, m = self._merged(allnarrow, 6)
+        self.assertEqual(m["primary_stack_min_size"], 5)
+        mixed = self._pbc(("wta_satellite", "winner_take_all"),
+                          ("large_gpp", "large_field_gpp"))
+        bands, m2 = self._merged(mixed, 6)
+        self.assertEqual(m2["primary_stack_min_size"], 4)
+        self.assertFalse(bands["floor_5_binds_portfolio"])
+
+    def test_one_and_two_game_slates_are_exempt_from_the_narrow_floor(self):
+        """The tranche's own counter-case: at 1-2g the cohort favors 5-3 (+16.5pp)
+        and 4-4 (+12.0) with 5-2-1 FLAT (+1.4). The floor is slate-size
+        conditioned by Ben's decision, never global."""
+        pbc = self._pbc(("wta_satellite", "winner_take_all"))
+        for games, expected in ((1, 4), (2, 4), (3, 5), (6, 5)):
+            bands, m = self._merged(pbc, games)
+            self.assertEqual(m["primary_stack_min_size"], expected,
+                             f"{games} game slate")
+        bands, _ = self._merged(pbc, 2)
+        self.assertTrue(bands["contests"][0]["slate_size_exempt"])
+
+    def test_unmeasurable_slate_size_leaves_the_narrow_floor_unavailable(self):
+        """Caught by check, not by reasoning. `slate_exempt` was first written
+        `bool(bucket) and bucket == '1-2g'`, which is False for an UNKNOWN bucket,
+        so a narrow portfolio whose game count nothing had measured silently bound
+        floor 5. `late_swap` reaches exactly that state whenever it runs without a
+        projection frame. An unknown slate size is a third state and it is not
+        '3g or more'."""
+        pbc = self._pbc(("wta_satellite", "winner_take_all"))
+        bands, m = self._merged(pbc, None)
+        self.assertEqual(m["primary_stack_min_size"], 4)
+        self.assertFalse(bands["narrow_floor_available"])
+        self.assertIn("unmeasurable",
+                      bands["contests"][0]["floor_unavailable_reason"])
+
+    def test_slate_game_count_reads_the_frame_or_says_it_cannot(self):
+        import pandas as pd
+        self.assertEqual(epi.slate_game_count(pd.DataFrame(
+            {"Game_ID": ["a", "a", "b", "c"]})), 3)
+        # A frame with no game column returns None rather than 0 or 1, either of
+        # which would silently land in a bucket and bind or exempt the floor.
+        self.assertIsNone(epi.slate_game_count(pd.DataFrame({"Team": ["X"]})))
+        self.assertIsNone(epi.slate_game_count(None))
+
+    def test_quota_reads_the_field_share_and_never_a_lift_constant(self):
+        """R37(2)(b)'s build requirement. The LIFT moved opposite to 5-2-1's field
+        share in all three prior tranches, which is why the quota reads the SHARE.
+        Monotone in the share and clamped to the band Ben sized."""
+        lo, hi = epi.MID_BREADTH_QUOTA_BAND
+        prev = None
+        for share in (0.05, 0.15, 0.21, 0.26, 0.34, 0.60):
+            q = epi.five_stack_quota_from_field_share(share)
+            self.assertGreaterEqual(q, lo)
+            self.assertLessEqual(q, hi)
+            if prev is not None:
+                self.assertGreaterEqual(q, prev)
+            prev = q
+        self.assertEqual(epi.five_stack_quota_from_field_share(0.60), hi)
+        # An unmeasurable share leaves the quota unavailable rather than pinned to
+        # a band edge, which would be the forbidden constant in a measurement's
+        # clothes.
+        for bad in (None, 0.0, -1.0, "x"):
+            self.assertIsNone(epi.five_stack_quota_from_field_share(bad))
+
+    def test_field_share_names_which_source_answered(self):
+        """R145-R148 cost this project real time by presenting a cached reading as
+        a live one. The share carries its source and its as_of date."""
+        got = epi.read_five_stack_field_share(6)
+        self.assertEqual(got["source"], "ledger_measured")
+        self.assertEqual(got["as_of"], epi.FIVE_STACK_FIELD_SHARE_MEASURED_AS_OF)
+        self.assertEqual(got["bucket"], "5-6g")
+        blind = epi.read_five_stack_field_share(None)
+        self.assertEqual(blind["source"], "unavailable")
+        self.assertIsNone(blind["share"])
+
+    def test_field_share_prefers_a_rollup_and_survives_a_torn_one(self):
+        import json as _json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            good = Path(tmp) / "rollup.json"
+            good.write_text(_json.dumps({
+                "computed_at": "2026-09-01",
+                "five_stack_share_by_slate_bucket": {"5-6g": 0.31}}),
+                encoding="utf-8")
+            live = epi.read_five_stack_field_share(6, rollup_path=str(good))
+            self.assertEqual(live["source"], "archive_rollup")
+            self.assertEqual(live["share"], 0.31)
+            self.assertEqual(live["as_of"], "2026-09-01")
+            torn = Path(tmp) / "torn.json"
+            torn.write_text("{not json", encoding="utf-8")
+            fell = epi.read_five_stack_field_share(6, rollup_path=str(torn))
+            self.assertEqual(fell["source"], "ledger_measured")
+            self.assertIn("unreadable", fell["source_detail"])
+
+    def test_quota_binds_mid_breadth_postures_that_never_declared_the_key(self):
+        """Load-bearing. Only `wta_satellite` ships `min_five_stack_share_pct`,
+        while the mid band's actual population -- large_field_gpp 0.12,
+        portfolio_gpp 0.15, small_field_gpp 0.18 -- is served by `large_gpp` and
+        `small_gpp`, which never declared it. Gating the band on the posture
+        having spoken first would make (b) live in name and inert on every contest
+        it was sized for."""
+        pbc = self._pbc(("large_gpp", "large_field_gpp"),
+                        ("small_gpp", "portfolio_gpp"))
+        bands, m = self._merged(pbc, 6)
+        self.assertTrue(bands["quota_binds_portfolio"])
+        lo, hi = epi.MID_BREADTH_QUOTA_BAND
+        self.assertGreaterEqual(m["min_five_stack_share_pct"], lo)
+        self.assertLessEqual(m["min_five_stack_share_pct"], hi)
+        self.assertEqual(m["five_stack_min_size"], 5)
+
+    def test_quota_retires_when_any_contest_is_outside_the_mid_band(self):
+        """Same unanimity rule as the floor, same reason: a contest that never
+        asked for a quota must not inherit one."""
+        pbc = self._pbc(("large_gpp", "large_field_gpp"),
+                        ("wta_satellite", "winner_take_all"))
+        bands, m = self._merged(pbc, 6)
+        self.assertFalse(bands["quota_binds_portfolio"])
+        self.assertEqual(m.get("min_five_stack_share_pct", 0.0), 0.0)
+
+    def test_bands_never_lower_a_control_a_posture_or_operator_set(self):
+        """A band may only RAISE a floor. An explicit override still wins over
+        everything, which is the rule the merge has held since v1.8."""
+        pbc = self._pbc(("wta_satellite", "winner_take_all"))
+        _, m = self._merged(pbc, 6, override={"primary_stack_min_size": 3})
+        self.assertEqual(m["primary_stack_min_size"], 3)
+        _, m2 = self._merged(pbc, 6, override={"min_five_stack_share_pct": 0.40})
+        self.assertEqual(m2["min_five_stack_share_pct"], 0.40)
+
+    def test_band_derived_quota_still_passes_the_units_gate(self):
+        """R167/R215. The bands produce a fraction-valued control, so it goes
+        through the same validation an operator override does."""
+        pbc = self._pbc(("large_gpp", "large_field_gpp"))
+        with self.assertRaises(ValueError):
+            self._merged(pbc, 6, override={"min_five_stack_share_pct": 20})
+
+    def test_shape_bands_block_carries_its_own_truthful_label(self):
+        pbc = self._pbc(("large_gpp", "large_field_gpp"))
+        bands, _ = self._merged(pbc, 6)
+        for banned in ("roi", "win rate", "win_rate", "profit", "probability"):
+            self.assertNotIn(banned, bands["label"].lower().replace(
+                "never a win rate, cash rate, or probability claim", ""))
+        self.assertIn("3.21", bands["evidence"])
+
+
+class FiveStackQuotaLadderTests(unittest.TestCase):
+    """R37(2)(b). R34's quota HARD FAILED and R37 stage 1's floor relaxes and
+    counts. Two lower bounds on the same quantity with opposite failure modes is
+    not a state to ship; the item named the counted relaxation as the winner."""
+
+    def test_rungs_are_the_band_then_off(self):
+        self.assertEqual(ca.five_stack_quota_rungs(0.20), [0.20, 0.15, None])
+        self.assertEqual(ca.five_stack_quota_rungs(0.15), [0.15, None])
+        for bad in (0.0, None, "x", -1):
+            self.assertEqual(ca.five_stack_quota_rungs(bad), [None])
+
+    def test_an_empty_qualifying_set_relaxes_off_instead_of_refusing(self):
+        r = ca._resolve_five_stack_quota(
+            [4, 4, 3], 10,
+            {"min_five_stack_share_pct": 0.20, "five_stack_min_size": 5})
+        self.assertEqual(r["status"], "relaxed_off")
+        self.assertEqual(r["applied_need"], 0)
+        self.assertIsNone(r["applied_share"])
+        # ONE counted step, not two. Lowering 0.20 to 0.15 cannot make a
+        # candidate qualify, so counting that as a relaxation would inflate the
+        # number the brief teaches Ben to read as "how much gave way".
+        self.assertEqual(r["relaxations"], 1)
+        self.assertEqual(r["relaxation_steps"][0]["trigger"],
+                         "no_qualifying_candidate_in_bank")
+        self.assertIn("Lowering the share cannot help",
+                      r["relaxation_steps"][0]["reason"])
+
+    def test_a_carryable_quota_applies_clean(self):
+        r = ca._resolve_five_stack_quota(
+            [5, 5, 5, 4], 10,
+            {"min_five_stack_share_pct": 0.20, "five_stack_min_size": 5})
+        self.assertEqual(r["status"], "applied")
+        self.assertEqual(r["applied_need"], 2)
+        self.assertEqual(r["relaxations"], 0)
+        self.assertFalse(r["reuse_dependent"])
+
+    def test_a_reuse_dependent_quota_is_named_and_not_relaxed(self):
+        """The case R34 had NO diagnostic for. Fewer distinct qualifying
+        candidates than the need is satisfiable through candidate reuse, so
+        whether it fits is the joint MILP's answer and not arithmetic. Naming it
+        means a later proven infeasibility arrives with the quota already
+        identified instead of as a bare infeasibility with no control attached."""
+        r = ca._resolve_five_stack_quota(
+            [5, 4, 4, 4], 20,
+            {"min_five_stack_share_pct": 0.20, "five_stack_min_size": 5})
+        self.assertEqual(r["status"], "applied")
+        self.assertEqual(r["applied_need"], 4)
+        self.assertEqual(r["qualifying_candidates"], 1)
+        self.assertTrue(r["reuse_dependent"])
+        self.assertEqual(r["relaxations"], 0)
+
+    def test_an_absent_quota_is_not_the_same_fact_as_a_relaxed_one(self):
+        r = ca._resolve_five_stack_quota([5, 5], 10, {})
+        self.assertEqual(r["status"], "not_requested")
+        self.assertEqual(r["relaxations"], 0)
+        z = ca._resolve_five_stack_quota([5, 5], 10,
+                                         {"min_five_stack_share_pct": 0.0})
+        self.assertEqual(z["status"], "not_requested")
+
+    def test_a_share_that_floors_to_zero_entries_reports_off_not_applied(self):
+        """0.15 over 4 entries floors to 0, so the row would bind nothing. A
+        vacuous constraint reported as applied is the shape R215 closed one
+        control over."""
+        r = ca._resolve_five_stack_quota(
+            [5, 5], 4, {"min_five_stack_share_pct": 0.15})
+        self.assertEqual(r["status"], "off")
+        self.assertEqual(r["applied_need"], 0)
+
+    def test_a_units_slip_in_the_quota_is_rejected_at_the_resolver(self):
+        """R167. 20 typed for 0.20 is one quota nobody can meet."""
+        with self.assertRaises(ValueError):
+            ca._resolve_five_stack_quota([5, 5], 10,
+                                         {"min_five_stack_share_pct": 20})
+
+    def test_the_quota_relaxes_before_the_primary_stack_floor(self):
+        """Ordering is a judgment and it is pinned rather than left to source
+        order. The floor of 4 has three independent tranches behind it; the quota
+        is one dated decision old and is sized off a share whose LIFT has moved in
+        three directions. Relax the newer, thinner-evidenced control first."""
+        src = Path(ca.__file__).read_text(encoding="utf-8")
+        q = src.index("proven_infeasible_with_five_stack_quota")
+        f = src.index("proven_infeasible_with_floor")
+        self.assertLess(q, f, "the five-stack quota's re-entry must precede the "
+                              "primary-stack floor's")
+
+    def test_every_ladder_re_entry_carries_every_sibling_ladder_state(self):
+        """R116's rule, now applied to three ladders instead of two: sibling state
+        rides every re-entry, or a step silently re-adds a control this solve
+        already proved infeasible and buys an extra round trip per rung.
+
+        Scoped by AST to RECURSIVE calls inside ``select_and_assign_entries``. A
+        substring count over the rest of the file was the first cut and it was
+        wrong in the informative direction: it found four calls and flagged the
+        fourth as a missing ``_quota_state``, when that one is
+        ``allocate_entries``' own top-level call into the allocator -- an entry
+        point, where a private ladder-state kwarg would be a defect rather than a
+        fix. The lesson is R233's, arriving inside a session that had just written
+        R233 into an entry: the class had one more member than the enumeration,
+        and the test is what said so."""
+        import ast as _ast
+        src = Path(ca.__file__).read_text(encoding="utf-8")
+        fn = next(n for n in _ast.walk(_ast.parse(src))
+                  if isinstance(n, _ast.FunctionDef)
+                  and n.name == "select_and_assign_entries")
+        recursive = [n for n in _ast.walk(fn)
+                     if isinstance(n, _ast.Call)
+                     and getattr(n.func, "id", "") == "select_and_assign_entries"]
+        self.assertEqual(len(recursive), 3,
+                         "three ladders, three re-entries: engine-default reuse "
+                         "cap, five-stack quota, primary-stack floor")
+        for call in recursive:
+            passed = {kw.arg for kw in call.keywords}
+            for state in ("_floor_state", "_reuse_state", "_quota_state"):
+                self.assertIn(state, passed,
+                              f"re-entry at line {call.lineno} drops {state}")
 
 
 if __name__ == "__main__":

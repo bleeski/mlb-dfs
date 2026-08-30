@@ -1348,5 +1348,170 @@ class GateCallCeilingTests(unittest.TestCase):
         self.assertGreaterEqual(got, 90.0 + self.audit.GATE_UNKNOWN_RESERVE_S)
 
 
+class ConstructionShadowTests(unittest.TestCase):
+    """R263 build half, Ben's dated decision of 2026-08-28. SHADOW ONLY: the
+    block reports and steers nothing. The hard bands wait on R238/R239."""
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+
+    def _shadow(self, n, cap=0.25):
+        ladder = st.build_thesis_ladder(self.df, n,
+                                        moneyline={"MIN": -150, "CHC": 130})
+        solved = st.solve_ladder(self.df, ladder["theses"], time_limit=6)
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        return st.construction_shadow(self.df, report, max_cpt_exposure_pct=cap)
+
+    def test_split_pattern_canonicalizes_the_way_the_miner_does(self):
+        """Descending, joined by '-'. `field_miner`'s `stack_pattern` uses the
+        same rule, so a delivered split and a mined field share are comparable
+        strings rather than two vocabularies for one fact."""
+        self.assertEqual(st._split_pattern({"BOS": 1, "ARI": 5}), "5-1")
+        self.assertEqual(st._split_pattern({"BOS": 3, "ARI": 3}), "3-3")
+        self.assertEqual(st._split_pattern({"BOS": 2, "ARI": 4}), "4-2")
+        self.assertEqual(st._split_pattern({}), "")
+
+    def test_the_shadow_counts_the_pitcher_captain_share_off_solved_lineups(self):
+        sh = self._shadow(19)
+        self.assertEqual(sh["entries_solved"], 19)
+        self.assertEqual(sh["declared_arms"], 2)
+        self.assertIsNotNone(sh["pitcher_cpt_share_pct"])
+        self.assertEqual(
+            sh["pitcher_cpt_entries"],
+            round(sh["pitcher_cpt_share_pct"] * 19 / 100.0))
+        # The mix is a share of the solved set, so it sums to 100.
+        self.assertAlmostEqual(sum(sh["team_split_mix_pct"].values()), 100.0,
+                               places=1)
+
+    def test_the_shadow_steers_nothing_and_says_so_in_the_artifact(self):
+        """`steers: False` is in the block, not only in a comment, because the
+        artifact is what a post-slate reader has."""
+        sh = self._shadow(12)
+        self.assertFalse(sh["steers"])
+        self.assertIn("steers nothing", sh["label"])
+        self.assertIn("2026-08-28", sh["decision"])
+
+    def test_the_pitcher_captain_ceiling_is_the_per_player_cap_arithmetic(self):
+        """The number that keeps the band check honest. A two-arm slate cannot
+        captain a pitcher in more than 2 * floor(cap * n) entries, because the
+        captain cap is per PLAYER and only two players are eligible. At n=19 and
+        cap 0.25 that is 8 of 19 = 42.1%, so a 48-52% band is UNREACHABLE there no
+        matter what any thesis weight does."""
+        sh = self._shadow(19)
+        self.assertEqual(sh["pitcher_cpt_ceiling_pct"], 42.1)
+        self.assertEqual(self._shadow(20)["pitcher_cpt_ceiling_pct"], 50.0)
+
+    def test_a_band_the_caps_forbid_is_reported_unreachable_not_missed(self):
+        """A portfolio at its structural ceiling is not 6 points short of a
+        target; it is at the maximum the caps allow. Reading it as a miss is what
+        would send the next session to raise a weight that cannot move."""
+        chk = self._shadow(19)["band_check"]["pitcher_cpt_share_pct"]
+        self.assertFalse(chk["band_reachable"])
+        self.assertEqual(chk["structural_ceiling_pct"], 42.1)
+        self.assertIn("structural ceiling", chk["note"])
+        reachable = self._shadow(20)["band_check"]["pitcher_cpt_share_pct"]
+        self.assertTrue(reachable["band_reachable"])
+
+    def test_the_band_check_verdicts_cover_all_three_directions(self):
+        sh = self._shadow(19)
+        verdicts = {k: v["verdict"] for k, v in sh["band_check"].items()}
+        self.assertEqual(set(verdicts) , {"pitcher_cpt_share_pct",
+                                          "team_split_5_1_pct",
+                                          "team_split_4_2_pct"})
+        for v in verdicts.values():
+            self.assertIn(v, {"in_band", "below_band", "above_band",
+                              "unmeasurable"})
+        # Our 5-1 concentration is the axis 3.21 calls OVER-concentrated, so on
+        # this fixture it must read above_band rather than clean.
+        self.assertEqual(verdicts["team_split_5_1_pct"], "above_band")
+
+    def test_the_shadow_bands_carry_their_evidence_and_no_outcome_claim(self):
+        for key, band in st.R263_SHADOW_BANDS.items():
+            self.assertTrue(band["evidence"])
+            self.assertIn("3.21", band["evidence"])
+            for banned in ("roi", "win rate", "profit", "probability", "ev "):
+                self.assertNotIn(banned, band["evidence"].lower())
+
+    def test_an_empty_report_returns_unmeasured_rather_than_zeros(self):
+        sh = st.construction_shadow(self.df, {"lineups": []},
+                                    max_cpt_exposure_pct=0.25)
+        self.assertEqual(sh["entries_solved"], 0)
+        self.assertIsNone(sh["pitcher_cpt_share_pct"])
+        self.assertEqual(sh["team_split_mix_pct"], {})
+
+
+class ThesisWeightTests(unittest.TestCase):
+    """R263's coarse weight lever, MEASURED AND DECLINED 2026-08-28. Ben asked for
+    a pitcher-captain weight bump to move the delivered share from ~40% toward
+    ~50%. It was built, measured over 96 apportion-and-solve checks, and declined:
+    the share is CAP-bound, not weight-bound. These tests pin the arithmetic that
+    made the call, so the next session reads the reason instead of re-running the
+    search."""
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+
+    def test_the_directional_block_sums_to_one_whatever_the_weights_are(self):
+        """The invariant any future re-sizing has to preserve: the five directional
+        weights sum to 1.00, so a change is a REALLOCATION and never an inflation
+        of the directional slice against the 0.18 neutral one."""
+        shape = st.describe_slate(self.df, moneyline={"MIN": -150, "CHC": 130})
+        for side in (shape["favorite"], shape["underdog"]):
+            directional = [s for s in st._template_specs(shape)
+                           if s["side"] == side]
+            self.assertEqual(len(directional), 5)
+            self.assertAlmostEqual(sum(s["weight"] for s in directional), 1.00,
+                                   places=6)
+
+    def test_r156_pitchers_duel_weight_is_untouched(self):
+        """R156 set `pitchers_duel` to 0.45 to schedule a second duel slot more
+        often under a 25% captain cap. Today's declined bump would have moved it to
+        0.55; it stands exactly as R156 set it."""
+        shape = st.describe_slate(self.df, moneyline={"MIN": -150, "CHC": 130})
+        specs = {s["id"]: s["weight"] for s in st._template_specs(shape)}
+        self.assertEqual(specs["pitchers_duel"], 0.45)
+        self.assertEqual(specs["both_explode"], 0.30)
+        self.assertEqual(specs["ace_loses"], 0.22)
+
+    def test_pitcher_captain_share_is_bounded_by_the_per_player_captain_cap(self):
+        """The arithmetic that decided it, independent of any fixture. Only the two
+        declared arms can fill the captain slot, and the cap is per PLAYER, so the
+        reachable share is 2 * floor(cap * n) / n. It never exceeds 50% and it
+        averages 45.0% over the entry counts this engine actually builds -- so a
+        48-52% band and a '~50%' target are both above what weights can reach."""
+        cap = sd.DEFAULT_MAX_CPT_EXPOSURE_PCT
+        ceil = {}
+        for n in range(9, 25):
+            per_player = sd.exposure_cap_count(cap, n)
+            ceil[n] = min(n, 2 * per_player) / n
+        self.assertLessEqual(max(ceil.values()), 0.50)
+        self.assertAlmostEqual(sum(ceil.values()) / len(ceil), 0.4501, places=3)
+        # 50% is reached only where floor(0.25n) == 0.25n, so a target stated as
+        # "~50%" is met at one n in four and is BELOW reach at the other three.
+        self.assertAlmostEqual(ceil[20], 0.50, places=6)
+        self.assertAlmostEqual(ceil[19], 8 / 19, places=6)      # 42.1%
+        self.assertAlmostEqual(min(ceil.values()), 4 / 11, places=6)   # 36.4%
+
+    def test_the_shipped_weights_hold_the_captain_cap_they_apportion_under(self):
+        """The test that caught the declined bump. `build_thesis_ladder` computes
+        its own cap count and slides past a captain already at it; the bump pushed
+        a fifth slot onto one arm at n=16, 17 and 18 -- entry counts that had ZERO
+        captain-cap relaxations -- and this assertion went red at n=18."""
+        import collections as _c
+        for n in (12, 16, 17, 18, 24):
+            ladder = st.build_thesis_ladder(
+                self.df, n, moneyline={"MIN": -150, "CHC": 130})
+            counts = _c.Counter(t["cpt"] for t in ladder["theses"])
+            self.assertLessEqual(max(counts.values()),
+                                 ladder["captain_cap_count"],
+                                 f"n={n}: apportioned captain count exceeds the "
+                                 f"cap the same call computed")
+            self.assertEqual(ladder["captain_cap_relaxed"], 0,
+                             f"n={n}: a relaxation this entry count did not have "
+                             f"before")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

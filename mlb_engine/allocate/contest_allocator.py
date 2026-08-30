@@ -1936,6 +1936,148 @@ def primary_stack_floor_rungs(requested: int) -> List[Optional[int]]:
     return [n for n in range(top, PRIMARY_STACK_FLOOR_MIN_RUNG - 1, -1)] + [None]
 
 
+# The bottom rung of the quota ladder above zero. R37(2)(b) sizes the live band
+# at 0.15-0.25, so 0.15 is the loosest share the decision actually asked for;
+# below it the honest step is off, not an unsized fraction nobody chose.
+FIVE_STACK_QUOTA_MIN_RUNG = 0.15
+
+
+def five_stack_quota_rungs(requested_share: float) -> List[Optional[float]]:
+    """The relaxation ladder for the five-stack SHARE quota, tightest first.
+
+    R37(2)(b), Ben's dated decision of 2026-08-28. ``0.20 -> [0.20, 0.15, None]``:
+    the requested share, then the bottom of the sized band, then the quota
+    switched off. The final ``None`` is the truncation-avoiding rung, for the
+    reason ``primary_stack_floor_rungs`` states in full -- a control that
+    REFUSES leaves a blank reserved row, and a blank row blocks certification.
+
+    This ladder is the reconciliation the backlog item asked for. R34 shipped
+    the quota as a MILP row that HARD FAILS, while R37 stage 1 shipped the
+    primary-stack floor as a ladder that relaxes and counts. Two lower bounds on
+    the same quantity with opposite failure modes is not a state to ship, and
+    the item names which one wins: the counted relaxation.
+    """
+    try:
+        top = float(requested_share)
+    except (TypeError, ValueError):
+        return [None]
+    if not (top > 0.0):
+        return [None]
+    rungs: List[Optional[float]] = [top]
+    if top > FIVE_STACK_QUOTA_MIN_RUNG:
+        rungs.append(FIVE_STACK_QUOTA_MIN_RUNG)
+    rungs.append(None)
+    return rungs
+
+
+def _resolve_five_stack_quota(
+    stack_sizes: Sequence[int],
+    n_entries: int,
+    controls: Mapping[str, Any],
+    quota_state: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Resolve the five-stack share quota to a need count this bank can carry.
+
+    R37(2)(b). Returns the report block AND the ``need`` the MILP row should
+    enforce. Three statuses matter and they are deliberately distinct:
+
+    ``not_requested`` -- the share is 0.0 or absent. Every posture shipped 0.0
+    until this date, so this is still the common case, and it is NOT the same
+    fact as a quota that was asked for and could not be carried.
+
+    ``relaxed_off`` -- asked for, and NO candidate in the bank reports a primary
+    stack at or above ``five_stack_min_size``. That is arithmetically binding
+    without consulting the solver: a lower bound of ``need`` over an empty
+    column set cannot be met. R34 returned ``passed: False`` here. It now steps
+    the ladder and counts, because the alternative is a refusal that delivers
+    nothing.
+
+    ``applied`` / ``applied_relaxed`` -- enforced at the rung named.
+
+    One case R34 did not have a diagnostic for at all, and this does: when SOME
+    candidates qualify but fewer than ``need`` distinct ones exist, the row is
+    satisfiable only through candidate REUSE, so whether it fits is the joint
+    MILP's answer and not arithmetic. That is not relaxed here. It is NAMED in
+    ``reuse_dependent``, so a proven infeasibility downstream arrives with the
+    quota already identified as a probable binder instead of as a bare
+    infeasibility with no control attached to it.
+    """
+    state = dict(quota_state or {})
+    requested = controls.get("min_five_stack_share_pct")
+    E = max(0, int(n_entries))
+    report: Dict[str, Any] = {
+        "requested_share": None,
+        "applied_share": None,
+        "status": "not_requested",
+        "min_size": int(controls.get("five_stack_min_size") or 5),
+        "requested_need": 0,
+        "applied_need": 0,
+        "qualifying_candidates": 0,
+        "reuse_dependent": False,
+        "relaxations": int(state.get("relaxations") or 0),
+        "relaxation_steps": list(state.get("relaxation_steps") or []),
+        "rung_index": int(state.get("rung_index") or 0),
+        "note": "deterministic construction control sized off a MEASURED field "
+                "share; observed-outcome rationale, never a win rate, cash "
+                "rate, or ROI claim",
+    }
+    if not requested:
+        return report
+    ladder = five_stack_quota_rungs(requested)
+    rung_idx = min(report["rung_index"], len(ladder) - 1)
+    report["rung_index"] = rung_idx
+    report["requested_share"] = assert_fraction_cap(
+        requested, key="min_five_stack_share_pct")
+    applied = ladder[rung_idx]
+    if applied is None:
+        report["status"] = "relaxed_off" if report["relaxations"] else "off"
+        return report
+    min_size = report["min_size"]
+    qualifying = [k for k, size in enumerate(stack_sizes) if int(size) >= min_size]
+    report["qualifying_candidates"] = len(qualifying)
+    report["requested_need"] = int(math.floor(E * report["requested_share"] + 1e-9))
+    need = int(math.floor(E * float(applied) + 1e-9))
+    if need <= 0:
+        report["applied_share"] = float(applied)
+        report["status"] = "off"
+        report["note"] = (
+            f"quota share {applied} over {E} entries floors to a need of 0 "
+            f"entries, so the row would bind nothing. Reported off rather than "
+            f"added as a vacuous constraint. " + report["note"])
+        return report
+    if not qualifying:
+        # Arithmetically binding: a lower bound over an empty column set. Step
+        # STRAIGHT to off rather than walking the ladder, because the bind is the
+        # candidate set and not the share -- lowering 0.20 to 0.15 does not make
+        # a candidate qualify, and counting that as a relaxation would inflate
+        # the number the brief teaches Ben to read as "how much gave way". One
+        # bind, one counted step.
+        stepped = list(report["relaxation_steps"])
+        stepped.append({
+            "from": float(applied),
+            "to": None,
+            "reason": (
+                f"min_five_stack_share_pct {applied} requires {need} of {E} "
+                f"entries at primary stack size >= {min_size}, and the bank "
+                f"contains 0 such candidates. Lowering the share cannot help; "
+                f"raise bank_stack_min_size on the bank build. Never trim the "
+                f"pool to fit"),
+            "trigger": "no_qualifying_candidate_in_bank",
+        })
+        report["relaxations"] = int(report["relaxations"]) + 1
+        report["relaxation_steps"] = stepped
+        report["rung_index"] = len(ladder) - 1
+        report["status"] = "relaxed_off"
+        report["applied_share"] = None
+        report["applied_need"] = 0
+        return report
+    report["applied_share"] = float(applied)
+    report["applied_need"] = need
+    report["reuse_dependent"] = len(qualifying) < need
+    report["status"] = "applied_relaxed" if report["relaxations"] else "applied"
+    return report
+
+
 def _resolve_primary_stack_floor(
     candidates: Sequence[Dict[str, Any]],
     full_compatible: Sequence[Sequence[bool]],
@@ -2083,6 +2225,7 @@ def select_and_assign_entries(
     feasibility_inputs: Optional[Mapping[str, Any]] = None,
     _floor_state: Optional[Mapping[str, Any]] = None,
     _reuse_state: Optional[Mapping[str, Any]] = None,
+    _quota_state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
@@ -2529,25 +2672,21 @@ def select_and_assign_entries(
     # cannot be met by selecting at all if the bank has too few qualifying
     # candidates. _slate_feasibility floors the share before it reaches here,
     # and the relaxation ladder owns what happens when it still does not fit.
-    five_share = controls.get("min_five_stack_share_pct")
-    if five_share:
-        min_size = int(controls.get("five_stack_min_size") or 5)
-        need = int(math.floor(E * min(1.0, max(0.0, float(five_share))) + 1e-9))
-        qualifying = [k for k in range(K) if stack_sizes[k] >= min_size]
-        if need > 0:
-            if not qualifying:
-                return {
-                    "passed": False, "assignments": [], "selection_certified": False,
-                    "allocation_certified": False,
-                    "allocation_method": "scipy_milp_entry_level",
-                    "errors": [
-                        f"min_five_stack_share_pct {five_share} requires {need} of {E} "
-                        f"entries at primary stack size >= {min_size}, and the bank "
-                        f"contains 0 such candidates. Raise bank_stack_min_size on the "
-                        f"bank build or lower the share; never trim the pool to fit."
-                    ],
-                }
-            add({x_idx(e, k): 1.0 for e in range(E) for k in qualifying}, float(need), np.inf)
+    #
+    # R37(2)(b), 2026-08-28. This used to HARD FAIL when no candidate qualified,
+    # which is the failure mode the backlog item told us to retire: R37 stage 1's
+    # floor one screen up relaxes and counts, and two lower bounds on the same
+    # quantity with opposite failure modes is not a state to ship. The resolution
+    # now runs through `_resolve_five_stack_quota`, which steps the ladder, counts
+    # the step, and reports the rung it landed on. A quota that cannot be carried
+    # costs a named relaxation; it no longer costs the delivery.
+    quota_report = _resolve_five_stack_quota(stack_sizes, E, controls,
+                                             quota_state=_quota_state)
+    if quota_report.get("applied_need"):
+        qualifying = [k for k in range(K)
+                      if stack_sizes[k] >= int(quota_report["min_size"])]
+        add({x_idx(e, k): 1.0 for e in range(E) for k in qualifying},
+            float(quota_report["applied_need"]), np.inf)
 
     game_caps = dict(controls.get("max_game_exposure_pct_by_game") or {})
     if game_caps:
@@ -2723,7 +2862,53 @@ def select_and_assign_entries(
                         "trigger": "proven_infeasible_with_engine_default_reuse_cap",
                     }],
                 },
+                # R37(2)(b), R116's rule applied to the third ladder: sibling
+                # state rides every re-entry, or a step silently re-adds a
+                # control this solve already proved infeasible and buys an extra
+                # round trip per rung.
+                _quota_state=_quota_state,
             )
+
+        # R37(2)(b), 2026-08-28. The five-stack quota steps BEFORE the
+        # primary-stack floor, and the ordering is a judgment worth stating
+        # rather than leaving to source order. Both are lower bounds sized off
+        # the archive, so neither is the engine's own guess the way the reuse cap
+        # above is; what separates them is the weight of evidence. The floor of 4
+        # has three independent tranches behind it and put `<=3-primary` negative
+        # every time. The quota is one dated decision old, sized off a field
+        # share whose LIFT has moved in three directions across three tranches,
+        # which is the reason the item made it read the share instead. Relax the
+        # newer, thinner-evidenced control first. Never on a timeout, for the
+        # reason the floor's own comment gives.
+        if (not timed_out) and quota_report.get("applied_need"):
+            q_ladder = five_stack_quota_rungs(quota_report["requested_share"])
+            q_idx = int(quota_report.get("rung_index") or 0)
+            if q_idx + 1 < len(q_ladder):
+                q_stepped = list(quota_report.get("relaxation_steps") or [])
+                q_stepped.append({
+                    "from": quota_report["applied_share"],
+                    "to": q_ladder[q_idx + 1],
+                    "reason": (
+                        "entry-level joint MILP proven infeasible with the "
+                        "five-stack share quota active; the quota is one of the "
+                        "controls whose interaction the solver could not satisfy"
+                        + (", and it was already flagged reuse_dependent -- "
+                           "fewer distinct qualifying candidates than the need"
+                           if quota_report.get("reuse_dependent") else "")),
+                    "trigger": "proven_infeasible_with_five_stack_quota",
+                })
+                return select_and_assign_entries(
+                    _all_candidates, entry_requirements, portfolio_controls,
+                    bank_report=bank_report, fixed_exposure=fixed_exposure,
+                    feasibility_inputs=feasibility_inputs,
+                    _floor_state=_floor_state,
+                    _reuse_state=_reuse_state,
+                    _quota_state={
+                        "rung_index": q_idx + 1,
+                        "relaxations": int(quota_report.get("relaxations") or 0) + 1,
+                        "relaxation_steps": q_stepped,
+                    },
+                )
 
         # R37. The one re-entry. A PROVEN infeasibility with the floor active is
         # the case the ladder exists for, and relaxing beats refusing because a
@@ -2755,6 +2940,8 @@ def select_and_assign_entries(
                     # already proved infeasible and buy an extra round trip per
                     # rung.
                     _reuse_state=_reuse_state,
+                    # R37(2)(b): and the quota's state, for the same reason.
+                    _quota_state=_quota_state,
                     _floor_state={
                         "rung_index": rung_idx + 1,
                         "relaxations": int(floor_report.get("relaxations") or 0) + 1,
@@ -2776,6 +2963,8 @@ def select_and_assign_entries(
             "candidate_reuse": dict(reuse_state_report),
             **({"primary_stack_floor": floor_report}
                if floor_report.get("status") != "not_requested" else {}),
+            **({"five_stack_quota": quota_report}
+               if quota_report.get("status") != "not_requested" else {}),
         }
 
     # A time-limited incumbent satisfies every constraint in the matrix; it is
@@ -2891,7 +3080,45 @@ def select_and_assign_entries(
             ),
         }}
 
+    # R37(2)(b). The same discipline for the quota: it is a claim about the
+    # delivered set, so it is counted off the assignments. `assigned_qualifying`
+    # is what the file actually carries at or above `five_stack_min_size`, and it
+    # is the number to read against `applied_need` -- the constraint is a lower
+    # bound, so the solver may exceed it, and reading the request instead of the
+    # realization is the mistake R153 named one module over.
+    quota_block: Dict[str, Any] = {}
+    if quota_report.get("status") != "not_requested":
+        _min_size = int(quota_report.get("min_size") or 5)
+        assigned_q = sum(1 for a in assignments
+                         if int(a.get("primary_stack_size") or 0) >= _min_size)
+        quota_block = {"five_stack_quota": {
+            **dict(quota_report),
+            "assigned_qualifying": assigned_q,
+            "assigned_qualifying_share": (
+                round(assigned_q / len(assignments), 4) if assignments else 0.0),
+            "need_met": (assigned_q >= int(quota_report.get("applied_need") or 0)),
+        }}
+
     floor_warnings: List[str] = []
+    _qr = quota_block.get("five_stack_quota") if quota_block else None
+    if _qr:
+        if _qr.get("relaxations"):
+            floor_warnings.append(
+                f"min_five_stack_share_pct relaxed {_qr['relaxations']} time(s): "
+                f"requested {_qr['requested_share']}, applied "
+                f"{_qr['applied_share'] if _qr['applied_share'] is not None else 'none'}. "
+                f"A portfolio is not clean because the gates passed; it is clean "
+                f"when the relaxation counts are zero"
+            )
+        if _qr.get("reuse_dependent"):
+            floor_warnings.append(
+                f"min_five_stack_share_pct is satisfiable only through candidate "
+                f"REUSE on this bank: {_qr['qualifying_candidates']} distinct "
+                f"candidate(s) at primary stack size >= {_qr['min_size']} against a "
+                f"need of {_qr['applied_need']}. The quota held here, and it is the "
+                f"first control to suspect if a later solve on this bank proves "
+                f"infeasible"
+            )
     _fr = floor_block.get("primary_stack_floor") if floor_block else None
     if _fr:
         if _fr.get("relaxations"):
@@ -2912,6 +3139,7 @@ def select_and_assign_entries(
     return {
         **fixed_report,
         **floor_block,
+        **quota_block,
         **reuse_block,
         "passed": True,
         "assignments": assignments,

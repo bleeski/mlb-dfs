@@ -1,3 +1,14 @@
+> **RETAINED — DO NOT DELETE ON AN INBOX SWEEP.** This fragment is not
+> unconsumed; it is KEPT by design, and has been through three inbox passes
+> (2026-08-16, 2026-08-27, 2026-08-29). `docs/backlog.md` names it as the SOLE
+> CARRIER of the nine-family table below and of the four cautions in "Four
+> things to get right on the way in," which exist nowhere else in the project.
+> The inbox contract says the owning role merges and deletes consumed
+> fragments; this one is exempt until ARCHIVE writes the rows into
+> `data/reference/dk_contest_archetypes.csv` (Tier 4, R1c-tail) and the
+> cautions land with them. Referenced from `docs/backlog.md` at R1c-tail,
+> R10's step 1, R40, and R196(a).
+
 # Ben's dated decision, 2026-08-09: add the nine ledger-3.14 satellite families to the curated archetypes table
 
 **For ARCHIVE to execute.** Filed by DEV because the decision came in a DEV

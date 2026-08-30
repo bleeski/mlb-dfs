@@ -25,6 +25,543 @@ performance claim.
 
 ---
 
+## 2026-08-29 — Decided, not yet shipped
+
+### Decided: repair is not strategy — Ben's autonomy instruction extends to replacing a player who will not play
+
+**Who and when.** Ben, 2026-08-29, in post-mortem on the `1305_12g` repair
+slate, in his own words: *"you made me intervene by answering questions and I
+want you to make those changes autonomously."*
+
+**What was decided.** CLAUDE.md's Autonomy section classifies by what the engine
+named and by strategy-vs-feasibility. It has no REPAIR category, so a scratched
+player falls through to "ask" — and on 08-29 it did, twice, inside a 45-minute
+lock window, both answered "recommended option." Four things become autonomous:
+replacing a player who will not play (the entered set already contains a zero,
+and leaving it there is the damaging choice, not the conservative one); choosing
+among the mechanically legal replacements (slot eligibility, salary, game not
+locked, confirmed starter, not already rostered, not opposing a rostered SP —
+ranked by the build's own projection); the minimum-loss collateral downgrade
+needed to afford a repair; and shipping a hand-corrected file when the engine
+cannot produce one and both `verify_export.py` and `preflight_upload.py` exit 0,
+labeled review-grade, never certified, diff and sha256 stated.
+
+**What is NOT decided, stated so the edit cannot overreach.** Any exposure or
+stack change with no dead player behind it, anything needing `--force` or
+leaving a gate failing, any reduction of the legal player pool, and the
+money-and-entry wall. All unchanged.
+
+**Where the work lives.** `docs/backlog.md` R272, which carries the proposed
+section text, paired with R267 (the one-slot repair filter that makes the policy
+mechanical). The CLAUDE.md edit itself needs the quiet window the multi-session
+contract requires and CLAUDE.md currently carries uncommitted foreign edits, so
+this entry is the durable record until then. R271 lands in the same window.
+
+---
+
+## 2026-08-29 — R267–R272 filed, queue gains a slot 3, three riders, three ignore rules (docs only)
+
+**Three `.gitignore` rules, so `git status` stops reporting the same bytes
+twice.** `data/archive/**/*.zip` — the rule that already covers
+`data/standings/processed_zips/`, one directory over: a raw DK zip lands beside
+the CSV it was mined from and read as untracked dirt at every session start.
+Verified before adding, not assumed: all 17 present on this date had their mined
+CSV alongside, so nothing unmined is being hidden, and an unmined pull is
+reported by the awaiting-standings checklist rather than by git. `/_*.tar.gz` —
+root-level bridge residue, the `_stage_repo*.tar.gz` class under per-session
+names (`_changes`, `_final_0827`). `data/reference/*.bak.json` — a session's own
+safety copy beside a tracked reference file. Net effect: the untracked list at
+session start drops from 20 lines of residue to the archive records and inbox
+fragments that genuinely await a decision.
+
+**Scope.** `docs/backlog.md`, `.gitignore`. No code moved; the test gate was not run. Merged
+from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md`,
+the post-mortem of a live repair on slate `1305_12g` (COL's probable moved from
+Feltner to Agnos after delivery, a dead arm in 10 of 31 entries, 45 minutes on
+the clock).
+
+**The resequencing, which is the first this month.** A new slot 3 — R267 + R272,
+then R268, with R204's ceiling half riding — inserted on field evidence rather
+than review, the same argument that moved the Showdown cluster on 08-27.
+Everything below moved down one; nothing jumped; the queue is fourteen slots.
+
+**R267.** `late_swap` matches WHOLE-LINEUP candidates against an entry's pins,
+so it structurally cannot repair a heavily-pinned entry, and this is not search
+effort: the bank was grown 566 → 1425 across six invocations and the refusal
+never changed, because more whole lineups do not make a 9-pin prefix more
+likely. One entry had 9 of 10 slots locked and $5,300 of cap for the open P2 —
+a one-slot search over ~1100 salary rows that the engine spent ~13 minutes
+failing to find. The fix is a single-slot repair filter that touches no
+portfolio control, which is what makes it safe to run unattended. (d) carries
+BUILD's observation, filed as an observation: when Feltner went, the entire set
+of confirmed starters in still-open games fitting the $5,200-$5,400 headroom was
+two arms, one of them an opener the engine bars from P slots — a sub-$5.5k arm
+carries a replacement risk nothing in the build measures.
+
+**R268, and the check it implies.** Two shipped fixes whose symptom never
+closed, filed as one number because the class is the finding. R29(3) unified
+control resolution and the swap still derived `max_player_exposure_pct` 0.50
+against a parent that shipped 0.55, which with most rows frozen is
+unsatisfiable by construction. R29(2) deferred promotion specifically to end the
+`--allow-parent-mismatch` habit, and the flag was still needed on every
+invocation. Both fixes were correct about their mechanism. **A fix that
+eliminates a documented workaround is not done until the workaround stops being
+typed**, and neither was verified that way.
+
+**R269.** Re-promoting a superseded run mints `DKEntries_<tag>_<run8>.csv`
+(`promote_run.py:194`) while identical bytes at the earlier path stay marked
+superseded: same sha256, two paths, one blocked, during a repair sequence.
+Cross-ref R245 and R120, the same manifest object from three sides.
+
+**R270.** Two halves of one intake boundary. (a) `hydrate=lineups` returns both
+legs of a split doubleheader and the lineups path has no leg filter, so BOS,
+NYY, ARI and SF read as "zero starters" — indistinguishable downstream from
+"not posted," R237's conflation arriving through a different door. The odds path
+already solves this on the same slate by matching the salary file's start time
+to within 10 minutes; one rule, one implementation. (b) is new to the pool
+contract: once a game is in progress the hydrate stops carrying its lineup, so a
+"confirmed" check silently degrades to "not posted" for exactly the games whose
+answer is certain. `liveData.boxscore` is the authority after first pitch, and
+it is what found the last genuinely dead player in the delivered file while the
+preflight still read that side as unposted. Accent normalisation must be SHARED
+from `preflight_upload.py:181-182`, not reimplemented — reimplementing it is how
+R248's crosswalk got two copies.
+
+**R271, measured three ways.** CLAUDE.md:311 and SKILL.md:443 state a 45-second
+Cowork bash ceiling and build a 25-to-33-second inner-timeout rule on it. The
+real ceiling is ~180 s: BUILD measured `Command timed out after 177999ms` with
+150-165 s calls completing, this session re-measured `sleep 100` completing
+under an explicit budget (19:29:12 → 19:30:52), and the project's operating
+memory has carried ~178 s independently. P1 despite being a text edit, because a
+feasible joint MILP on this slate needed 53-156 s and could never have fit in
+45, so a session following the documented rule concludes its own slate is
+unsolvable when it is not. R152's other two claims are independent of the number
+and still hold.
+
+**R271 gained two halves the same day, both found by running the thing.** (b):
+the number is compiled into `audit.py`'s own `--gate-budget` (28) and
+`--gate-ceiling` (39) defaults, help strings citing 45 by name. Measured: at
+the defaults the split gate spends a full call on 30 of `test_core`'s 126
+units; at `--gate-budget 130 --gate-ceiling 165` it does all 126 in one call
+and the whole five-suite gate in five. The gate that exists to work around the
+ceiling is throttled by the wrong ceiling. (c): Ben ran CLAUDE.md's
+session-start step 2 on his own machine and it cannot pass there —
+`FAIL dependencies: missing ['scipy']`, three suites failed, 1378 ran. The
+vendored `.pylibs/scipy` that makes `env_probe`'s zero-install path work is a
+LINUX build living in the Windows folder because that folder is what the
+sandbox mounts, so the fast path can never warm his host and the printed
+remedy means a real pip install. Step 2 is written as if the host is always
+the sandbox, and it is the one start step that cannot be handed to him.
+
+**R109 third sighting, filed the same day, and it re-prices the item.** Ben's
+commit died on a stale `.git/HEAD.lock` left by the BUILD session's own commit
+at 14:26, beside an 86KB `next-index-5.lock` from the same minute. R109's own
+08-25 rider already says the class is `.git/*.lock` and already records a
+`HEAD.lock` costing four git calls — and the session writing Ben's commands read
+CLAUDE.md's session-start note, which names `index.lock` alone, and handed him
+the remedy for the wrong file. **A hygiene fix recorded only in a backlog rider
+does not reach the session that needs it, because the moment it is needed is the
+moment nobody is reading the backlog.** The fix belongs in CLAUDE.md's
+session-start note as one sentence naming the class and carrying the sweep. No
+longer P2 hygiene: three blocked commits across three sessions, twice after
+being documented, and the third time it blocked Ben rather than a session.
+
+**Gate run for this landing, in the sandbox where scipy resolves:**
+`PASS  v2.26.0  27 modules  1386 tests`, exit 0, all five suites at their
+per-suite pins (test_core 934, test_upload_integrity 254, test_paste_lineups
+98, test_showdown 91, test_golden_replay 9). This is the gate for the 08-28
+code landing that shipped uncommitted, not for the docs above.
+
+**Three riders, no new numbers.** R204 gains its sharper half — the
+grow-the-bank hint fires after `max_candidates = max(n_entries * 12, 60)` has
+capped growth (372 → 372 on re-run), which is the one remedy CLAUDE.md makes
+always-permitted being recommended at the moment it cannot work; per R233 the
+grep returns three real print sites (`contest_allocator.py`, `build_slate.py`,
+`SKILL.md`) plus one closed-slate scratch file named so it is not counted as a
+fourth. R193 gains the stale-apex column, its own class one column over: qa's
+`APEX` reads the Ceiling computed for the original rosters and reported 4404.1
+across two genuinely different portfolios, while the washout and stack proxies
+beside it are live. And "Kept as-is" gains three components that each caught a
+real failure on this slate — `preflight_upload.py` caught both live ones
+unaided, `verify_export.py` caught the session's own repair bug (a hitter
+opposing its own rostered SP), qa's frontier correctly rejected two attempted
+improvements — recorded so a refactor does not weaken a working check while
+addressing the item filed against it.
+
+---
+
+## 2026-08-29 — R266 filed, R239's fix order corrected, backlog inbox consumed (docs only)
+
+**Scope.** `docs/backlog.md` and the retained header on
+`docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`.
+No code moved, so the test gate was not run; the next code landing runs it
+regardless.
+
+**What changed.** Three BUILD fragments merged and moved to
+`_to_delete/backlog_inbox_consumed_20260829/` (the mount refuses unlink, R109).
+One new number, **R266** — `preflight_upload.py` holds a whole-file captain
+count at line 1641 and R128's per-contest partition at 1644-1655, inside one
+function, six lines apart, and never crosses them; crossing them catches
+per-contest captain duplication at T-5 on any deliverable, including a
+hand-permuted one the engine never sees. WARN by default, because concentration
+is Ben's call. Filed into queue slot 2, landing alone inside it.
+
+**The correction, which is the reason this entry exists at all.** R239 has
+carried a sequencing note since 08-27 — its round-robin dealing half "can land
+first and alone" — and queue slot 5 repeated it. It is wrong, and the 08-29
+fragment disproves it arithmetically rather than by argument: on `2215_1g_sd`
+the bank's captain multiset (5,5,4,4,1,1,1) against contest sizes (7,7,2,2,1,1,1)
+fails Gale-Ryser at k=3, 14 > 13, so no permutation of that bank admits a
+per-contest-distinct assignment. Dealing cannot create diversity the bank does
+not contain. R239's (b) therefore stops being "evaluate the caps per contest"
+(evaluation after `solve_ladder` can only report a bind too late to satisfy) and
+becomes a binding value at construction, `min(portfolio_cap, per_contest_cap)`,
+plus a feasibility precondition on the apportionment. The order is now (c), (b),
+(a). **This is R153 one level up:** R153 said a cap enforced anywhere other than
+where the roster spots are spent is not a cap; this is the same sentence with
+population substituted for enforcement point. The enabling seam already exists
+and is a signature change with no behavior change — `run_showdown` parses the
+contest partition at `showdown.py:728` before any bank is built, then drops it.
+
+**R233 enumeration.** The class is "a cap computed against the entered TOTAL
+when the prize resolves per contest." `grep -rn 'exposure_cap_count'
+mlb_engine/ tools/ skills/` returns six call sites (`showdown.py:477,478`,
+`showdown_theses.py:496,636,637,943`), the definition at `showdown.py:401`, and
+one comment at `tools/audit.py:444`. All six pass a portfolio total; there is no
+seventh and no copy is deliberately kept. The class does NOT extend to Classic:
+`contest_allocator.py` already holds the partition as a first-class object and
+already enforces `no_duplicates_within_contest` by default, while the same grep
+returns 0 on both Showdown modules. An existing invariant to extend, not a new
+idea to design.
+
+**Three second sightings, no new numbers.** R210(c) upgrades from "may be a
+silent no-op" to verified — `grep -n 'postures|contest_shape'
+mlb_engine/optimize/showdown.py` returns nothing, and the slate that exposed it
+carried "Pocket Cup," the exact family-name trap the Quick Card tells every
+session to defeat by passing explicit postures. R237's Showdown face recurred
+(`F1 NEUTRAL` printed against a module with no F1, on a build where odds did
+apply as `win_share_basis: moneyline_no_vig`). R248 hit a second slate
+unchanged. Two Tier 4 decisions filed, both Ben's: whether
+distinct-captains-per-contest is the right target at all given R247's measured
+cap cost, and whether R266 ever blocks rather than warns.
+
+**Not consumed, and now says so.** The 08-09 curated-archetypes fragment is
+KEPT for the third consecutive inbox pass and carries a RETAINED header naming
+the four backlog sites that cite it. The board calls it the sole carrier of the
+nine-family `ticket_count` table; the inbox contract says consumed fragments get
+deleted; it has survived on a reader noticing. The header is the cheap fix.
+
+---
+
+## 2026-08-28 — Decided, not yet fully shipped
+
+### Decided: the first tranche of the greenfield standings findings goes live — R37(2)(a), R37(2)(b), and R263's shadow half
+Ben, dated 2026-08-28. Evidence: ledger 3.21. Backlog R37(2), R263.
+
+Ben's instruction, recorded here because the strategy change is HIS and must not
+read as a session's inference. Phase 0+1 of his go-live decision:
+
+1. **R37(2)(a) live.** Primary-stack floor 5 on the narrow-breadth posture set
+   exactly as the item names it (breadth <= 0.02: WTA, one-seat satellites, solo
+   shots, mme_gpp/mini-MAX, single_entry_gpp). 1-2g slates stay EXEMPT, because
+   3.21 shows those slates favor 5-3 and 4-4 and the floor must stay
+   slate-size-conditioned, never global.
+2. **R37(2)(b) live.** `min_five_stack_share_pct` in the 15-25% band on the
+   middle breadth band (0.10-0.22). The quota reads the shape's CURRENT field
+   share, never a pinned lift constant. The two enforcement paths are reconciled
+   first, and the COUNTED relaxation wins over the hard fail.
+3. **R263, build half only, shadow-report.** Pitcher-CPT share, team-split mix,
+   and the band check printed beside the caps on every Showdown delivery,
+   steering nothing.
+4. **The coarse pitcher-CPT lever.** Raise the thesis-ladder weights favoring
+   pitcher captains, on R156's precedent, to move the portfolio share from ~40%
+   toward ~50%. Weights only.
+
+Explicitly OUT of scope by the same instruction, so a later session does not
+read their absence as an oversight: R37(2)(c)'s 4-2-x secondary cap (Ben sized
+nothing there yet); R263's three HARD bands (pitcher-CPT 48-52%, 5-1 45-55%, 4-2
+>= 30%), which wait on the R238/R239 contest-awareness cluster; and the satellite
+chalk floor, which waits on the R10 fit.
+
+The terms Ben attached to the whole tranche: every relaxation counted, every
+changed default named in the brief, Showdown stays review-grade, and nothing in
+it becomes a probability claim. The bands are his dated strategy decision and
+are graded as FINISH COHORTS over ~12 conditioned slates before any of them
+tightens further.
+
+Item 4 is the one that did not ship. It was built, measured, and declined on the
+evidence; the entry below carries the numbers and the reasoning, and the decision
+to decline is a DEV call under CLAUDE.md's Autonomy section, reversible in a
+five-number edit.
+
+---
+
+## 2026-08-28 — R37(2)(a) + R37(2)(b) + R263: two shape bands go live, the five-stack quota stops refusing deliveries, and the coarse Showdown weight lever is measured and declined
+
+DEV, claim `engine` (`engine_2026-08-28`, re-taken), scope
+`R37(2)ab + R263 shadow + thesis weights`. Ben's dated decision of 2026-08-28 is
+the `Decided` entry directly above; this is what shipped against it.
+
+**Gate state, stated exactly rather than rounded up.** Session-start gate was
+clean: `PASS  v2.26.0  27 modules  1351 tests`. Every suite measured green
+suite-by-suite after the change -- `tests.test_core` 934 OK in 58.0s,
+`tests.test_showdown` 91 OK in 7.8s, and the other three untouched at their pins
+(254 / 9 / 98, summing to 1386) -- but the ASSEMBLED
+`--gate-report --terse` line was NOT obtained before the session's shell died,
+so the exit gate is unverified as an assembly and this entry does not claim it.
+The last assembly attempt printed
+`FAIL  test suite FAILED in tests.test_core (ran 1386)` while `test_core` passed
+in full on the same tree, which is a contradiction with two candidate
+explanations and no measurement to separate them. Whoever picks this up runs
+`python tools/audit.py --gate-reset` FIRST, then the normal `--gate-run` /
+`--gate-report` cycle, and treats a still-red assembly as real.
+
+The reason `--gate-reset` and not `rm -rf .audit_gate`: this mount refuses
+unlink (R109), so the `rm` in this session's gate loop silently did nothing --
+observed directly, an `ls -d .audit_gate` immediately after it still printed the
+directory. That makes a stale per-unit record the first hypothesis, since the
+final `--gate-run` reported GATE COMPLETE with all five units in ONE call where
+the same work had taken five calls twenty minutes earlier, and the failure it
+carries is consistent with the test_core record taken BEFORE the pin arithmetic
+below was corrected. The competing hypothesis is a class that genuinely fails in
+the gate's isolated subprocess and passes in the full-module run, which would be
+a real defect. Do not assume the first one.
+
+**One arithmetic error worth recording because a pinned test caught it.** The
+new total was written 1385 in five places -- CLAUDE.md, this file twice, the
+skill, and the ledger Quick Card -- against a per-suite dict summing to 1386
+(934 + 91 + 254 + 9 + 98). `test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes`
+and `test_a_complete_clean_gate_prints_the_line_claude_md_quotes` both went red
+on it, which is exactly the drift those two exist to catch, and is why the pin
+line's own rule is that the dict wins and the prose is what goes stale.
+
+**R37(2)(a): the floor of 5, and the gate it waited two and a half weeks for.**
+Ben's 2026-08-09 decision held floor 5 until one tranche had been archived with
+the floor-4 portfolio in it, so the two effects stayed separable. Ledger 3.21 is
+that tranche: 610 contests, 2026-06-03 -> 08-27, with stage 1's floor-4 deliveries
+inside it. The top-1%+win cohort's 5-2-1 lift held in BOTH halves on 3g+ slates
+(+13.1/+16.6pp on 5-6g, +12.9/+13.1 on 7g+), mean primary-stack size ran
+4.36-4.63 in top cohorts against a field at 4.00-4.23 on every slate size, and
+our own 5g+ mix ran 5-2-1 at 0.4% against a field at 25.7% -- the largest observed
+portfolio-vs-cohort gap in either format. Label STABLE DIRECTIONAL, not
+replicated: the root doc's slate-clustered estimate of the same effect is +3.84pp
+and fails its permutation gate, and that stricter read is the one that governs.
+
+The routing is BREADTH, per contest, and the threshold is now the definition
+rather than a second list beside the item's own. `NARROW_BREADTH_MAX = 0.02`
+picks out exactly `winner_take_all`, `large_wta`, `small_wta`, `mid_wta`,
+`wta_ticket_satellite`, `single_entry_gpp`, `mme_top_heavy` and `mme_gpp`, and
+the next shape up is `limited_entry_gpp` at 0.10. A test asserts that set
+equality, so the two cannot drift apart silently.
+
+Three things about where this lives, because the placement is the safety
+property and not an implementation detail. It is NOT a posture default, which is
+where every other construction number in `execution_pipeline` sits: a posture is
+blind to both axes 3.21 conditions on, and `wta_satellite` alone covers a
+0.002-breadth one-seat ticket and a 0.22-breadth cut-line satellite. It enters as
+a per-contest DECLARED value layered over the posture default, so R34's existing
+floor merge does the rest unchanged -- least demanding wins, one silent posture
+retires the floor for the whole portfolio. So floor 5 binds only when EVERY
+contest in the entered set is narrow-breadth, and a mixed set lands back on 4
+automatically. And it rides `late_swap` too, on R29(3)'s rule that one
+implementation is the point: omitting it there would have the swap re-derive a
+LOOSER floor than the build shipped, which is safe for legality and wrong for
+truth.
+
+**The defect a check found and reasoning did not.** `slate_exempt` was first
+written `bool(bucket) and bucket == "1-2g"`, which is False for an UNKNOWN
+bucket, so `narrow and not slate_exempt` bound floor 5 on a narrow portfolio
+whose game count nothing had measured -- and `late_swap` reaches exactly that
+state whenever it runs without a projection frame, where it printed
+`primary_stack_min_size: 5` while this function's own docstring said the bands
+were inert. An unmeasurable slate size is a THIRD state and it is not "3g or
+more". The floor is now unavailable there, with the reason named per contest in
+`floor_unavailable_reason`, which is the same distinction
+`f4_handedness_unavailable` draws one layer down. Read any pre-2026-08-28 nothing
+here: the bug never shipped. It is recorded because it is the R145 class arriving
+in a boolean instead of a document, and because the fix is a state the next
+reader has to know exists.
+
+**R37(2)(b): the quota reads the share, never the lift.** The item's build
+requirement, carried by Ben's decision, and the reason is arithmetic rather than
+caution: 5-2-1's LIFT has moved OPPOSITE to its field share in all three prior
+tranches (+3.1pp on a 25.1% share, +0.2pp on 29.7%, +13.6pp on 21.6%) and 3.21
+adds a fourth point with a strong val-half lift on a ~26% share. Four points in
+three directions is a record-only pattern, not a law. So
+`MID_BREADTH_QUOTA_SHARE_RATIO = 0.75` asks for three quarters of the shape's
+current field share, clamped into Ben's 15-25% band: at 3.21's measured 25.7% on
+5g+ that is 19.3%, which moves us off 0.4% without asking the portfolio to
+out-concentrate the field on shape. Below 1.0 deliberately -- R37(2)'s standing
+"no contrarian push" constraint has a mirror, and nothing in the tranche licenses
+going PAST the field.
+
+The share has three sources and the report names which one answered:
+`archive_rollup` when a refreshed rollup is on disk at
+`data/reference/stack_shape_field_shares.json` (ARCHIVE's write set; the engine
+only reads it), `ledger_measured` from 3.21's dated values with `as_of`
+attached, and `unavailable`, which leaves the quota OFF rather than defaulted to
+a band edge. That naming is not decoration: R145-R148 cost this project real time
+by presenting a cached reading as a live one, and a share nothing on this disk
+can re-read goes stale silently and confidently.
+
+One consequence worth stating because it is load-bearing rather than incidental.
+Only `wta_satellite` carries `min_five_stack_share_pct` today, while the mid
+band's actual population -- `large_field_gpp` 0.12, `portfolio_gpp` and
+`mid_field_gpp` 0.15, `small_field_gpp` 0.18 -- is served by `large_gpp` and
+`small_gpp`, which never declared it. So the band ADDS the key where no posture
+had it. Gating the band on the posture having spoken first would have made (b)
+live in name and inert on every contest it was sized for. Under R34's rule
+silence is no opinion, and the band IS an opinion: Ben's, dated, keyed on the
+axis the ledger conditions on.
+
+**The reconciliation, which the item required before any of the above.** R34
+shipped the quota as a MILP row that HARD FAILED when no candidate qualified:
+`passed: False`, an error naming the control, no assignments. R37 stage 1 shipped
+the primary-stack floor one screen up as a ladder that relaxes and counts. Two
+lower bounds on the same quantity with opposite failure modes is not a state to
+ship, and the item named the winner. The quota now runs through
+`_resolve_five_stack_quota` on rungs `[requested, 0.15, None]`, and a control
+that cannot be carried costs a named relaxation instead of the delivery -- which
+matters concretely, because a refusal there leaves every reserved row blank and a
+blank reserved row blocks certification.
+
+Two details in it are decisions rather than mechanics. An empty qualifying set
+steps STRAIGHT to off in ONE counted step, not down the ladder, because the bind
+is the candidate set and not the share -- lowering 0.20 to 0.15 cannot make a
+candidate qualify, and counting that as a relaxation would inflate the number the
+brief teaches Ben to read as how much gave way. And the quota's re-entry is
+ordered BEFORE the primary-stack floor's: both are archive-sized lower bounds, so
+neither is the engine's own guess the way the reuse cap is, and what separates
+them is evidence weight. The floor of 4 has three independent tranches behind it;
+the quota is one dated decision old and is sized off a share whose lift has moved
+three ways. Relax the newer, thinner-evidenced control first.
+
+**A case R34 had no diagnostic for at all, now named.** When SOME candidates
+qualify but fewer DISTINCT ones exist than the need, the row is satisfiable only
+through candidate reuse, so whether it fits is the joint MILP's answer and not
+arithmetic. R34 added the row anyway and the solve died as a bare infeasibility
+with no control attached to it. That case is not relaxed -- nothing has been
+proven -- it is flagged `reuse_dependent` with a warning naming the quota as the
+first control to suspect if a later solve on this bank proves infeasible.
+
+**R263, the shadow half: what a Showdown delivery now says about its own
+construction.** `construction_shadow` prints pitcher-CPT share, the team-split
+mix as canonical pattern strings, and the three-band check beside the caps in
+every Showdown brief. Counted off the SOLVED lineups, never the ladder's
+apportionment, which is the distinction R153 paid for. `steers: False` is in the
+artifact and not only in a comment, because the artifact is what a post-slate
+reader has. The split pattern is canonicalized the way `field_miner`'s
+`stack_pattern` already does it -- counts descending, joined by "-" -- so a
+delivered split and a mined field share are one vocabulary rather than two.
+
+The band check carries a column the item did not ask for and needs:
+`pitcher_cpt_ceiling_pct`. On a slate with two declared arms the pitcher-CPT
+share cannot exceed `2 * floor(cpt_cap * n) / n`, because the captain cap is per
+PLAYER and only two players are eligible for that slot. At the shipped 0.25 cap
+that is 42.1% at n=19, 36.4% at n=11, 50.0% at n=20, and it averages 45.0% across
+n=9..24. So a 48-52% band is UNREACHABLE at most entry counts no matter what any
+thesis weight does, and the check reports `band_reachable: False` with the
+arithmetic rather than a verdict that reads as a miss. A portfolio at its
+structural ceiling is not short of a target.
+
+**Item 4 of Ben's instruction: measured and DECLINED.** The bump was built --
+directional `win_big` 0.26 -> 0.31, `win_close` 0.24 -> 0.29 funded by
+`win_big_no_sp` 0.22 -> 0.19, `shootout` 0.16 -> 0.13, `bottom_order` 0.12 ->
+0.08; neutral `pitchers_duel` 0.45 -> 0.55 and `ace_loses` 0.22 -> 0.28 funded by
+`both_explode` 0.30 -> 0.14, with the directional block still summing to 1.00 so
+it was a reallocation and not an inflation -- and then measured over 96
+apportion-and-solve checks on the tracked MIN@CHC fixture, six moneyline
+scenarios x n=9..24, which is R156's own standard for this fixture:
+
+    mean realized pitcher-CPT share   43.66% -> 44.91%   (+1.25pp)
+    mean structural ceiling            45.01% -> 45.01%   (unchanged)
+    builds already at their ceiling    75/96  -> 94/96
+    captain-cap relaxations            37     -> 56       (+19)
+
+The ceiling is why it was declined. The ~50% target is not reachable by any
+weight, the pre-existing weights were already at 97% of what IS reachable, and
+the bump collects the last 1.25pp by manufacturing captain-cap relaxations at
+n=16, 17 and 18 -- three entry counts that had ZERO. CLAUDE.md prices that trade
+directly: a portfolio is not clean because the gates passed, it is clean when the
+relaxation counts are zero. Buying 1.25pp on a metric whose ceiling is 45% by
+making three common entry counts unclean is the wrong side of that rule.
+
+The pinned `test_ladder_spans_game_states_and_holds_the_captain_cap` is what
+caught it, going red at n=18 on 27.8% against a 25% cap. Four alternative weight
+sets were searched and every one of them was worse: same 45.0% mean share, more
+relaxations (11, 14, 18, 19 against the baseline's 8 on the single-moneyline
+sweep). The lever is spent. What can actually move this share is the captain cap
+itself, or the order in which the ladder spends captain slots across the two arms
+-- `win_big`, `win_close` and `ace_loses` all reach for the SAME arm, so weight
+added to them piles onto one capped player rather than spreading. Both are
+outside R263's scope and wait on R238/R239. R156's 0.45 on `pitchers_duel` stands
+exactly as R156 set it.
+
+What ships instead is the shadow report, which is the better instrument for this
+question anyway: it measures the real population over Ben's >= 12 conditioned
+slates rather than one fixture, and it prints the ceiling so the next session
+reads a bound instead of a shortfall. The archive's 40% sits ~5pp under the ~45%
+ceiling, so real slates DO fall short of it; that gap is now measured on every
+delivery instead of estimated from a fixture.
+
+**R233 enumeration.** Two rules in this entry claim to live in one place.
+
+*The shape bands, one routing.* Every consumer of a per-contest primary-stack
+floor or five-stack quota resolves it through `resolve_shape_bands` and then
+`_merged_controls_for_build`. The grep and its full hit list:
+
+    $ grep -rn "resolve_shape_bands" --include=*.py mlb_engine/ tools/ skills/ tests/
+    mlb_engine/pipeline/execution_pipeline.py   (definition; run_slate call site)
+    tools/late_swap.py                          (resolve_swap_controls)
+    tests/test_core.py                          (ShapeBandRoutingTests)
+
+    $ grep -rn "_merged_controls_for_build" --include=*.py mlb_engine/ tools/ skills/
+    mlb_engine/pipeline/execution_pipeline.py:  definition + 2 call sites
+                                               (merged_default, controls)
+    tools/late_swap.py:                         1 call site
+    skills/generate-lineups/scripts/build_slate.py:  comment reference only
+
+Two production callers, both pass the bands, and both `execution_pipeline` call
+sites pass the SAME resolved object -- deliberately, since passing them to one
+and not the other would have reported every band floor as a feasibility floor in
+the `floors_applied` diff. `build_slate.py` names the function in a comment and
+does not call it. Count: 2 callers, 2 wired, 0 deliberately left.
+
+*Sibling ladder state on every re-entry.* R116 established that a ladder
+re-entry must carry the other ladders' state or it silently re-adds a control the
+solve already proved infeasible. There are now THREE ladders in
+`select_and_assign_entries` (engine-default reuse cap, five-stack quota,
+primary-stack floor), so the enumeration is:
+
+    $ grep -n "return select_and_assign_entries(" mlb_engine/allocate/contest_allocator.py
+    2846:  reuse-cap re-entry        -> carries _floor_state, _reuse_state, _quota_state
+    2900:  five-stack quota re-entry -> carries _floor_state, _reuse_state, _quota_state
+    2934:  primary-stack floor       -> carries _floor_state, _reuse_state, _quota_state
+    3216:  allocate_entries          -> ENTRY POINT, carries none, correctly
+
+Three re-entries, three complete, plus one top-level call that must NOT carry a
+private ladder kwarg. And this is the batch's own R233 moment, which is worth the
+line: the test that pins this was first written as a substring count over the
+file after the function, it found four calls, and it flagged 3216 as a missing
+`_quota_state`. The class had one more member than the enumeration and the
+member was not a defect. It is scoped by AST now, asserting all three states on
+each of the three recursive calls.
+
+**Also in this batch.** `slate_game_count` reads the distinct game count off the
+projection frame and returns `None` rather than guessing, because it is an input
+to a strategy control and not a cosmetic. `slate_size_bucket` returns the same
+bucket names ledger 3.21 prints, so a reader never reconciles two bucketings.
+`five_stack_quota_rungs` and `FIVE_STACK_QUOTA_MIN_RUNG` are module-level and
+exported for the same reason `primary_stack_floor_rungs` is: the ladder is a
+contract, not an internal.
+
+Everything in this entry is deterministic construction control, observed cohort
+shares, and counted relaxations. Nothing in it is a win rate, a cash rate, an
+ROI, or a probability claim. Test counts: `test_core` 911 -> 934,
+`test_showdown` 79 -> 91, total 1351 -> 1386.
+
+---
+
 ## 2026-08-28 — R205 + R236: the cross-book consensus stops being computed in a scale that has a hole in it, and the odds get a paste path
 
 DEV, claim `engine` (`engine_2026-08-28`, re-taken), queue slot 1. Session-start

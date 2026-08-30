@@ -72,6 +72,7 @@ from mlb_engine.entries.upload_manifest import (  # noqa: E402
 )
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
+    resolve_shape_bands, slate_game_count,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
     promote_deferred_run, run_late_swap, unresolved_contest_blockers,
 )
@@ -170,8 +171,24 @@ def resolve_swap_controls(postures, override, solver_budget,
     if requirements is not None and projections is not None:
         floors = feasibility_floors_from(_slate_feasibility(
             postures, requirements, projections, excluded_player_ids))
+    # R37(2)(a)+(b), 2026-08-28. The shape bands ride the swap for the reason
+    # R29(3) already established for the feasibility floors: one implementation,
+    # because two would diverge and the weaker one would report success. Omitting
+    # them here would have the swap re-derive a LOOSER floor than the build
+    # shipped (4 where the build applied 5), which is the safe direction for
+    # legality and the wrong one for truth -- the swapped file would carry a
+    # portfolio the build's own stated construction rule does not describe, and
+    # nothing would say so.
+    #
+    # Without a projection frame there is no game count, so the bands resolve
+    # unavailable and this is the pre-band merge exactly. That is the same
+    # condition under which the floors are skipped two lines up.
+    shape_bands = resolve_shape_bands(
+        postures,
+        game_count=slate_game_count(projections) if projections is not None else None,
+    )
     controls = dict(_merged_controls_for_build(
-        postures, None, feasibility_floors=floors))
+        postures, None, feasibility_floors=floors, shape_bands=shape_bands))
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})

@@ -1418,6 +1418,346 @@ _DEFAULT_PAYOUT_BREADTH = 0.12
 _PRIMARY_CEILING_RATIO = 0.75   # scripts within this ratio of the top are "primary"
 _MAX_PRIMARY_SCRIPTS = 2
 
+# ---------------------------------------------------------------------------
+# R37(2)(a) and (b): the two live bands, Ben's dated decision of 2026-08-28.
+# ---------------------------------------------------------------------------
+#
+# Evidence: ledger 3.21, the 610-contest greenfield standings mine, which is the
+# ONE measured tranche R37(2)(a)'s gate waited on. Stage 1's floor-4 portfolio is
+# archived and graded across 2026-08-09 -> 08-27, so the two effects are
+# separable exactly as Ben's 2026-08-09 decision required.
+#
+# What the tranche says, and every number here is an observed cohort share or a
+# deterministic review proxy over one, never a win rate or a probability:
+#   - The top-1%+win cohort's 5-2-1 lift held in BOTH halves on 3g+ slates
+#     (+13.1/+16.6pp on 5-6g, +12.9/+13.1 on 7g+, pooled estimator). The root
+#     doc's slate-clustered estimate of the same effect is +3.84pp and fails its
+#     permutation gate, so the joint label is STABLE DIRECTIONAL, not replicated.
+#   - Mean primary-stack size runs 4.36-4.63 in top cohorts against a field at
+#     4.00-4.23, on every slate size.
+#   - 1-2g slates are the counter-case and they are why the floor is
+#     slate-size-conditioned rather than global: there the cohort favors 5-3
+#     (+16.5pp) and 4-4 (+12.0) with 5-2-1 FLAT (+1.4).
+#   - Our own delivered mix on 5g+ slates ran 5-2-1 at 0.4% against a field at
+#     25.7% and a top cohort near 40%. That is the largest observed
+#     portfolio-vs-cohort gap in either format.
+#
+# BREADTH <= 0.02 is the routing, and it is exactly the set the item names. Read
+# PAYOUT_BREADTH_BY_SHAPE above: winner_take_all 0.002, wta_ticket_satellite /
+# small_wta / mid_wta 0.002, single_entry_gpp 0.01, mme_top_heavy / mme_gpp /
+# large_wta 0.02 sit at or under the threshold, and the next shape up is
+# limited_entry_gpp at 0.10. So "WTA, one-seat satellites, solo shots,
+# mme_gpp/mini-MAX, single_entry_gpp" and "breadth <= 0.02" pick out the same
+# contests, and the threshold is the definition rather than a second list that
+# can drift from the first.
+NARROW_BREADTH_MAX = 0.02
+NARROW_BREADTH_PRIMARY_STACK_FLOOR = 5
+
+# 1-2 game slates are EXEMPT and stay at the stage-1 floor of 4. This is not
+# caution about a thin slate's feasibility; it is the tranche's own counter-case.
+MIN_SLATE_GAMES_FOR_NARROW_FLOOR = 3
+
+# R37(2)(b): the middle breadth band, inclusive at both ends. large_field_gpp
+# (0.12), limited_entry_gpp (0.10), broad_micro_gpp / portfolio_gpp /
+# mid_field_gpp (0.15), small_field_gpp (0.18), ticket_line / satellite /
+# ticket_satellite (0.22). Part of the payout there sits at a cut line where
+# shape does not separate, so the quota buys top-end exposure on a SHARE of
+# entries rather than on all of them.
+MID_BREADTH_RANGE = (0.10, 0.22)
+
+# The band Ben sized. The quota lands inside it; it is never set outside it.
+MID_BREADTH_QUOTA_BAND = (0.15, 0.25)
+
+# How the quota reads the field. `MID_BREADTH_QUOTA_SHARE_RATIO` is the fraction
+# of the shape's CURRENT field share we ask for, clamped into the band above.
+#
+# This is the item's build requirement, carried by Ben's decision and worth
+# restating because it is the whole reason the quota is not a constant: the LIFT
+# has moved OPPOSITE to 5-2-1's field share in all three prior tranches (+3.1pp
+# on a 25.1% share, +0.2pp on 29.7%, +13.6pp on 21.6%), and 3.21 adds a fourth
+# point with a strong val-half lift on a ~26% share. Four points in three
+# directions is a record-only pattern, not a law. So the quota reads the SHARE,
+# which is measurable and stable, and never the lift, which is neither.
+#
+# Below 1.0 on purpose: at a 25.7% field share the quota asks for 19%, which
+# moves us off 0.4% without asking the portfolio to out-concentrate the field on
+# shape. R37(2)'s standing constraint is "no contrarian push", and its mirror
+# holds too -- nothing in the tranche licenses going PAST the field.
+MID_BREADTH_QUOTA_SHARE_RATIO = 0.75
+
+# The field share of the five-or-larger primary stack, by slate-size bucket, as
+# MEASURED in ledger 3.21 over the 610-contest corpus (2026-06-03 -> 08-27).
+#
+# This is a dated FALLBACK, not the intended source. `read_five_stack_field_share`
+# prefers a rollup emitted from the archive, so the share can be refreshed
+# without an engine edit; these values answer only when no rollup is on disk, and
+# whichever source answered is NAMED in the report. That naming is the point:
+# R145-R148 cost this project real time by presenting a cached reading as a live
+# one, and a share that nothing on this disk can re-read goes stale silently and
+# confidently.
+FIVE_STACK_FIELD_SHARE_MEASURED = {
+    "1-2g": 0.155,
+    "3-4g": 0.212,
+    "5-6g": 0.257,
+    "7g+": 0.257,
+}
+FIVE_STACK_FIELD_SHARE_MEASURED_AS_OF = "2026-08-28"
+FIVE_STACK_FIELD_SHARE_MEASURED_SOURCE = (
+    "ledger 3.21, 610-contest greenfield standings mine, 2026-06-03..2026-08-27")
+
+# Where a refreshed rollup is read from when one exists. ARCHIVE owns this path
+# (`data/reference/` is ARCHIVE's write set); the engine only READS it.
+#
+# NOTHING PRODUCES THIS FILE YET, and that is stated here rather than implied by
+# a forward reference to a tool that does not exist. `field_miner.mine_contest`
+# writes the per-entry `stack_pattern` string but aggregates only
+# `max_stack_histogram` -- the scalar primary size, not the partition -- so the
+# shares have only ever been computed by a throwaway under `tools/_scratch_*`.
+# The producer is filed as R37(2)(c)'s open remainder and it is ARCHIVE's work.
+# Until it exists every build reads `ledger_measured` and SAYS so, which is the
+# whole point of `read_five_stack_field_share` naming its source.
+#
+# Resolved against the REPO ROOT, not the process CWD. A bare relative path here
+# would resolve against wherever the caller happened to start, so the rollup
+# would be invisible to any build not launched from the repo root -- and it would
+# be invisible SILENTLY, falling back to the dated values with `ledger_measured`
+# in the report, which is the one failure mode this three-source design exists to
+# prevent. `upload_manifest` and `repo_env` both anchor the same way.
+FIVE_STACK_FIELD_SHARE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "data" / "reference" / "stack_shape_field_shares.json")
+
+
+def slate_game_count(projections: Any) -> Optional[int]:
+    """Distinct games in the pool, or ``None`` when the frame cannot say.
+
+    R37(2)(a). The floor is slate-size-conditioned, so the count is an INPUT to a
+    strategy control and not a cosmetic. It is read off the projection frame's
+    game column, which descends from the DKSalaries `Game Info` field, and that
+    file is this project's authority on what is on the slate.
+
+    ``None`` rather than a guess when no game column exists: an unmeasurable
+    slate size leaves both bands unavailable, which the callers treat as "do not
+    apply", never as "apply the default bucket". A frame with a team column but
+    no game column would otherwise take whichever bucket 0 or 1 falls in and
+    silently exempt or bind the whole portfolio.
+    """
+    try:
+        if not hasattr(projections, "columns"):
+            return None
+        cols = set(projections.columns)
+        col = next((c for c in ("Game_ID", "GameId", "Game") if c in cols), None)
+        if col is None:
+            return None
+        vals = {str(v).strip() for v in projections[col].tolist() if str(v).strip()}
+        return len(vals) or None
+    except Exception:
+        return None
+
+
+def slate_size_bucket(game_count: Optional[int]) -> Optional[str]:
+    """Slate-size bucket, matching ledger 3.21's own conditioning exactly.
+
+    3.21 reports every shape finding by this bucketing, and the buckets are the
+    reason R37(2)(a) is conditioned at all -- 1-2g is where the 5-2-1 lift goes
+    flat and 5-3/4-4 take over. Returning the same names the ledger prints keeps
+    a reader from having to reconcile two bucketings.
+    """
+    if game_count is None:
+        return None
+    try:
+        n = int(game_count)
+    except (TypeError, ValueError):
+        return None
+    if n <= 0:
+        return None
+    if n <= 2:
+        return "1-2g"
+    if n <= 4:
+        return "3-4g"
+    if n <= 6:
+        return "5-6g"
+    return "7g+"
+
+
+def read_five_stack_field_share(
+    game_count: Optional[int],
+    rollup_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """The five-stack field share for this slate size, and WHICH source answered.
+
+    R37(2)(b). Three outcomes, and the third is the one that matters most:
+
+    ``archive_rollup`` -- a rollup exists on disk and carries this bucket. This
+    is the live read and the intended path.
+
+    ``ledger_measured`` -- no rollup, so the dated 3.21 measurement answers. The
+    report carries ``as_of`` so nobody reads it as current.
+
+    ``unavailable`` -- no share for this bucket from either source, which happens
+    when the slate size cannot be determined. The quota is then OFF. It is not
+    guessed and it is not silently zero-with-an-opinion: an unmeasurable input
+    makes a control unavailable, the same distinction `f4_handedness_unavailable`
+    draws one layer down.
+    """
+    bucket = slate_size_bucket(game_count)
+    out: Dict[str, Any] = {
+        "bucket": bucket,
+        "share": None,
+        "source": "unavailable",
+        "as_of": None,
+        "source_detail": None,
+    }
+    if bucket is None:
+        out["source_detail"] = (
+            "slate game count unavailable, so no slate-size bucket could be "
+            "resolved and the quota is unavailable rather than defaulted")
+        return out
+    path = Path(rollup_path or FIVE_STACK_FIELD_SHARE_PATH)
+    try:
+        if path.exists():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            shares = (payload or {}).get("five_stack_share_by_slate_bucket") or {}
+            raw = shares.get(bucket)
+            if raw is not None:
+                share = float(raw)
+                if 0.0 <= share <= 1.0:
+                    out.update({
+                        "share": share,
+                        "source": "archive_rollup",
+                        "as_of": (payload or {}).get("computed_at"),
+                        "source_detail": str(path),
+                    })
+                    return out
+    except Exception as exc:      # a torn or unreadable rollup falls through
+        out["source_detail"] = f"rollup at {path} unreadable ({exc}); fell back"
+    measured = FIVE_STACK_FIELD_SHARE_MEASURED.get(bucket)
+    if measured is None:
+        return out
+    out.update({
+        "share": float(measured),
+        "source": "ledger_measured",
+        "as_of": FIVE_STACK_FIELD_SHARE_MEASURED_AS_OF,
+        "source_detail": (out["source_detail"] + "; " if out["source_detail"]
+                          else "") + FIVE_STACK_FIELD_SHARE_MEASURED_SOURCE,
+    })
+    return out
+
+
+def five_stack_quota_from_field_share(field_share: Optional[float]) -> Optional[float]:
+    """The quota share to request, read off the field share and clamped to the band.
+
+    R37(2)(b). ``None`` in, ``None`` out: an unmeasurable field share leaves the
+    quota unavailable rather than defaulted to a band edge, which would be the
+    pinned constant the item forbids wearing a measurement's clothes.
+    """
+    if field_share is None:
+        return None
+    try:
+        share = float(field_share)
+    except (TypeError, ValueError):
+        return None
+    if not (share > 0.0):
+        return None
+    lo, hi = MID_BREADTH_QUOTA_BAND
+    return round(min(hi, max(lo, MID_BREADTH_QUOTA_SHARE_RATIO * share)), 4)
+
+
+def resolve_shape_bands(
+    posture_by_contest: Mapping[str, Mapping[str, Any]],
+    game_count: Optional[int] = None,
+    archetypes_path: Optional[str] = None,
+    rollup_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Per-contest R37(2) band routing, and the portfolio-wide floors it implies.
+
+    R37(2)(a)+(b), Ben's dated decision of 2026-08-28. Returns the per-contest
+    rows AND the two floor values the control merge should treat as DECLARED for
+    each contest, so the merge's existing rules do the rest unchanged.
+
+    That last part is deliberate and it is the safety property worth naming.
+    R34's floor merge takes the LEAST demanding declared value and retires the
+    floor entirely if any posture is silent, because ONE portfolio serves every
+    contest and forcing a narrow-breadth contest's floor onto a broad-payout one
+    is a strategy change for that contest made invisibly. Routing per contest and
+    then merging by that rule means a mixed entered set lands back on the stage-1
+    floor of 4 automatically. Floor 5 binds only when EVERY contest in the set is
+    narrow-breadth; the quota binds only when every contest is mid-breadth. That
+    is the conservative direction and it is not a coincidence -- it is the reason
+    the routing goes here rather than into a posture default.
+    """
+    breadth_by_shape = _payout_breadth_by_shape_from_csv(archetypes_path)
+    bucket = slate_size_bucket(game_count)
+    slate_exempt = bucket == "1-2g"
+    # An UNKNOWN slate size is a third state and it is not "3g or more". The
+    # floor is slate-size-conditioned by Ben's decision, so a bucket that could
+    # not be resolved leaves it unavailable rather than applied -- the same
+    # direction the quota already takes when the field share cannot be read.
+    #
+    # Caught by check rather than by reasoning, and worth recording as the
+    # R145-class failure it is: `slate_exempt` was first written
+    # `bool(bucket) and bucket == "1-2g"`, which is False for an unknown bucket,
+    # so `narrow and not slate_exempt` bound floor 5 on a narrow portfolio whose
+    # game count nothing had measured. `late_swap` reaches exactly that state
+    # whenever it runs without a projection frame, and it printed
+    # `primary_stack_min_size: 5` there while this function's own docstring said
+    # the bands were inert.
+    floor_available = bucket is not None and not slate_exempt
+    field = read_five_stack_field_share(game_count, rollup_path=rollup_path)
+    quota_share = five_stack_quota_from_field_share(field.get("share"))
+    lo, hi = MID_BREADTH_RANGE
+    rows: List[Dict[str, Any]] = []
+    for cid, info in posture_by_contest.items():
+        breadth = _resolve_payout_breadth(info, breadth_by_shape)
+        narrow = breadth <= NARROW_BREADTH_MAX
+        mid = lo <= breadth <= hi
+        floor = NARROW_BREADTH_PRIMARY_STACK_FLOOR if (narrow and floor_available) else None
+        rows.append({
+            "contest_id": cid,
+            "contest_name": info.get("contest_name", ""),
+            "posture": info.get("posture", ""),
+            "payout_breadth": round(float(breadth), 4),
+            "band": "narrow" if narrow else ("mid" if mid else "broad"),
+            "primary_stack_min_size_declared": floor,
+            "min_five_stack_share_pct_declared": quota_share if mid else None,
+            "slate_size_exempt": bool(narrow and slate_exempt),
+            "floor_unavailable_reason": (
+                None if (floor is not None or not narrow)
+                else ("1-2g slate: the tranche's own counter-case, where the "
+                      "cohort favors 5-3 and 4-4 and the 5-2-1 lift is flat"
+                      if slate_exempt else
+                      "slate game count unmeasurable, so the size condition "
+                      "cannot be evaluated and the floor is unavailable")),
+        })
+    narrow_rows = [r for r in rows if r["band"] == "narrow"]
+    mid_rows = [r for r in rows if r["band"] == "mid"]
+    return {
+        "label": "R37(2) SHAPE BANDS — Ben's dated decision of 2026-08-28; "
+                 "observed cohort shares and deterministic review proxies, never "
+                 "a win rate, cash rate, or probability claim",
+        "evidence": "ledger 3.21 (610 contests, 2026-06-03..2026-08-27)",
+        "slate_games": game_count,
+        "slate_size_bucket": bucket,
+        "narrow_breadth_max": NARROW_BREADTH_MAX,
+        "mid_breadth_range": list(MID_BREADTH_RANGE),
+        "quota_band": list(MID_BREADTH_QUOTA_BAND),
+        "quota_share_ratio": MID_BREADTH_QUOTA_SHARE_RATIO,
+        "five_stack_field_share": field,
+        "quota_share_resolved": quota_share,
+        "slate_size_exempts_narrow_floor": slate_exempt,
+        "narrow_floor_available": floor_available,
+        "contests": rows,
+        "narrow_breadth_contests": len(narrow_rows),
+        "mid_breadth_contests": len(mid_rows),
+        # What the merge will actually do, stated here so the checkpoint does not
+        # require re-deriving R34's unanimity rule by hand.
+        "floor_5_binds_portfolio": bool(rows) and all(
+            r["primary_stack_min_size_declared"] == NARROW_BREADTH_PRIMARY_STACK_FLOOR
+            for r in rows),
+        "quota_binds_portfolio": bool(rows) and quota_share is not None and all(
+            r["min_five_stack_share_pct_declared"] is not None for r in rows),
+    }
+
 
 def _payout_breadth_by_shape_from_csv(archetypes_path: Optional[str]) -> Dict[str, float]:
     """Read the optional payout_breadth column from the archetype CSV, aggregated
@@ -2191,6 +2531,7 @@ def _merged_controls_for_build(
     posture_by_contest: Mapping[str, Mapping[str, Any]],
     override: Optional[Mapping[str, Any]],
     feasibility_floors: Optional[Mapping[str, Any]] = None,
+    shape_bands: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Merge strategy-default controls across contests (tightest cap wins), floor to
     feasibility, then apply overrides.
@@ -2262,9 +2603,59 @@ def _merged_controls_for_build(
     # and the merge is a no-op; the rule still has to hold, because a posture
     # that stops declaring it must retire the floor for the whole portfolio
     # rather than inherit one it never asked for.
+    #
+    # R37(2)(a)+(b), Ben's dated decision of 2026-08-28. The two live bands enter
+    # HERE, as a per-contest DECLARED value layered over the posture default, so
+    # every rule below runs on them unchanged. Nothing about the merge changes;
+    # what changes is what a contest declares.
+    #
+    # Why not a posture default, which is where every other construction number
+    # in this module lives: the bands are conditioned on PAYOUT BREADTH and SLATE
+    # SIZE, and a posture is neither. `wta_satellite` covers a 0.002-breadth
+    # one-seat ticket and a 0.22-breadth cut-line satellite alike -- the ledger's
+    # own conditioning rule is family x field size x slate size, never pooled,
+    # and a posture-keyed default would pool exactly the axis 3.21 says decides
+    # the answer. `_resolve_payout_breadth` already resolves breadth per contest,
+    # which is what R37(2)(a) meant by "the routing exists".
+    _band_floors: Dict[str, Dict[str, Any]] = {}
+    for _row in ((shape_bands or {}).get("contests") or []):
+        _band_floors[str(_row.get("contest_id"))] = _row
     floor_keys = ("min_five_stack_share_pct", "primary_stack_min_size")
-    for info in posture_by_contest.values():
-        controls = STRATEGY_DEFAULTS.get(info["posture"], STRATEGY_DEFAULTS["large_gpp"])["controls"]
+
+    def _declared_controls(info: Mapping[str, Any], cid: str) -> Dict[str, Any]:
+        """A contest's declared controls: its posture default, then its band."""
+        base = dict(STRATEGY_DEFAULTS.get(
+            info["posture"], STRATEGY_DEFAULTS["large_gpp"])["controls"])
+        row = _band_floors.get(str(cid))
+        if not row:
+            return base
+        band_floor = row.get("primary_stack_min_size_declared")
+        if band_floor is not None and "primary_stack_min_size" in base:
+            # A band may only RAISE the floor, never lower one a posture set.
+            base["primary_stack_min_size"] = max(
+                int(base["primary_stack_min_size"]), int(band_floor))
+        band_quota = row.get("min_five_stack_share_pct_declared")
+        if band_quota is not None:
+            # Same direction for the quota: a band raises a floor the posture
+            # ships at 0.0, and never lowers one already asked for.
+            #
+            # It also ADDS the key where the posture never had it, and that is
+            # load-bearing rather than incidental. Only `wta_satellite` carries
+            # `min_five_stack_share_pct` today, while the mid-breadth band's
+            # actual population -- large_field_gpp at 0.12, portfolio_gpp and
+            # mid_field_gpp at 0.15, small_field_gpp at 0.18 -- is served by
+            # `large_gpp` and `small_gpp`, which never declared it. Gating the
+            # band on the posture having spoken first would have made (b) live in
+            # name and inert on every contest it was sized for. Under R34's rule
+            # silence is no opinion, and the band IS an opinion: Ben's, dated,
+            # keyed on the axis the ledger conditions on.
+            base["min_five_stack_share_pct"] = max(
+                float(base.get("min_five_stack_share_pct") or 0.0), float(band_quota))
+            base.setdefault("five_stack_min_size", 5)
+        return base
+
+    for cid, info in posture_by_contest.items():
+        controls = _declared_controls(info, cid)
         for key in pct_keys:
             if key in controls:
                 merged[key] = min(merged.get(key, 1.0), float(controls[key]))
@@ -2280,11 +2671,8 @@ def _merged_controls_for_build(
     # a quota that contest never asked for. So one silent posture retires the
     # floor for the whole merge; among postures that do declare it, the least
     # demanding wins for the same reason.
+    declared = [_declared_controls(i, cid) for cid, i in posture_by_contest.items()]
     for key in floor_keys:
-        declared = [
-            STRATEGY_DEFAULTS.get(i["posture"], STRATEGY_DEFAULTS["large_gpp"])["controls"]
-            for i in posture_by_contest.values()
-        ]
         vals = [float(c[key] or 0.0) for c in declared if key in c]
         if not vals:
             continue          # nobody asked: the key stays absent entirely
@@ -3785,10 +4173,23 @@ def run_slate(
     feasibility_inputs = _slate_feasibility(
         posture_by_contest, entry_requirements, projections, excluded_player_ids
     )
-    merged_default = _merged_controls_for_build(posture_by_contest, None)
+    # R37(2)(a)+(b), Ben's dated decision of 2026-08-28. Resolved once and passed
+    # to BOTH merges, so `merged_default` and `controls` are the same portfolio's
+    # defaults and the floors-applied diff below compares like with like. Passing
+    # the bands to one and not the other would have reported every band floor as
+    # a feasibility floor.
+    shape_bands = resolve_shape_bands(
+        posture_by_contest,
+        game_count=slate_game_count(projections),
+        archetypes_path=archetypes_path,
+    )
+    checkpoint["shape_bands"] = shape_bands
+    merged_default = _merged_controls_for_build(
+        posture_by_contest, None, shape_bands=shape_bands)
     floors = feasibility_floors_from(feasibility_inputs)
     controls = _merged_controls_for_build(
-        posture_by_contest, portfolio_controls_override, feasibility_floors=floors
+        posture_by_contest, portfolio_controls_override, feasibility_floors=floors,
+        shape_bands=shape_bands,
     )
 
     override_keys = set(dict(portfolio_controls_override or {}).keys())

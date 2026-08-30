@@ -2472,6 +2472,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         both_relaxed = solve_diag.get("both_relaxed") or 0
         ignored_locks = list(solve_diag.get("ignored_locks") or [])
         max_overlap = report.get("max_pairwise_overlap")
+        # R263 shadow, Ben's dated decision of 2026-08-28. Counted off the solved
+        # lineups, printed beside the caps below, steers nothing.
+        construction_shadow = st.construction_shadow(
+            priced, report, max_cpt_exposure_pct=cpt_cap)
         # R153.
         player_counts = report.get("player_exposure") or {}
         player_cap_count = solve_diag.get("player_cap_count")
@@ -2487,6 +2491,19 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
         relaxed_slots = cpt_diagnostics.get("relaxed_slots") or 0
+        # R263: the bank path builds no per-lineup report, so the shadow has no
+        # team_split to read. UNAVAILABLE with the reason, never an empty mix that
+        # would print as "0% 5-1" and read as a finding.
+        construction_shadow = {
+            "label": "R263 CONSTRUCTION SHADOW — unavailable on this path",
+            "entries_solved": len(bank),
+            "steers": False,
+            "unavailable_reason": (
+                "the points-max bank path builds no thesis report, so no "
+                "per-lineup captain or team split is recorded. The shadow "
+                "requires the thesis ladder, which requires both posted batting "
+                "orders"),
+        }
         # R113 does not apply to this path: build_showdown_bank has one cap
         # mechanism (a rotating cpt_exclude list), no separate per-thesis lock,
         # so there is nothing to split.
@@ -2592,6 +2609,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                       or not player_cap_pct
                                       or player_cap_pct >= player_structural_floor),
         },
+        # R263 shadow, Ben's dated decision of 2026-08-28. Sits HERE, between the
+        # two exposure caps and the diversity block, because "beside the caps" is
+        # where the item put it and because that is where the reader already is.
+        # It steers nothing: no thesis, posture, or constraint reads this key, and
+        # `steers: False` says so in the artifact rather than only in a comment.
+        "construction_shadow": construction_shadow,
         "diversity": {
             "max_shared_players": share_cap,
             "max_pairwise_overlap": max_overlap,

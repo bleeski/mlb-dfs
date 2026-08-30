@@ -27,6 +27,7 @@ VERSION history
 from __future__ import annotations
 
 import math
+from collections import Counter
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
@@ -270,6 +271,47 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
                 "mult": _suppress(_hitters(shape, o), SUPPRESS_CLOSE),
             }
 
+        # R263 weight lever, MEASURED AND DECLINED, 2026-08-28. These five weights
+        # are UNCHANGED and that is the finding, not an omission.
+        #
+        # Ben asked for a bump on the pitcher-captain theses (`win_big` and
+        # `win_close`, the two whose `cpt_ladder` leads with that side's declared
+        # arm) to move the portfolio's pitcher-CPT share off ~40% toward ~50%,
+        # citing R156's 0.30 -> 0.45 on `pitchers_duel` as precedent. The bump was
+        # built (0.26/0.22/0.24/0.16/0.12 -> 0.31/0.19/0.29/0.13/0.08, with
+        # `pitchers_duel` 0.45 -> 0.55, `ace_loses` 0.22 -> 0.28, `both_explode`
+        # 0.30 -> 0.14) and then measured over 96 apportion-and-solve checks on the
+        # tracked MIN@CHC fixture: six moneyline scenarios x n = 9..24, which is
+        # R156's own standard for this fixture.
+        #
+        #   mean realized pitcher-CPT share   43.66% -> 44.91%   (+1.25pp)
+        #   mean STRUCTURAL CEILING            45.01% -> 45.01%   (unchanged)
+        #   builds already at their ceiling    75/96  -> 94/96
+        #   captain-cap relaxations            37     -> 56       (+19)
+        #
+        # The ceiling is why this was declined. Pitcher-CPT share on a slate with
+        # two declared arms is bounded by 2 * floor(cpt_cap * n) / n, because the
+        # captain cap is per PLAYER and only two players are eligible to fill that
+        # slot. At the shipped 0.25 cap that bound averages 45.0% over n=9..24 and
+        # never exceeds 50%; it is 42.1% at n=19. So the ~50% target is not
+        # reachable by any weight, the pre-existing weights were already at 97% of
+        # what IS reachable, and the bump spends 19 additional counted captain-cap
+        # relaxations to collect the last 1.25pp. CLAUDE.md's own rule prices that
+        # trade: a portfolio is not clean because the gates passed, it is clean
+        # when the relaxation counts are zero. Buying 1.25pp on a metric whose
+        # ceiling is 45% by manufacturing relaxations at n=16, 17 and 18 -- entry
+        # counts that had none -- is the wrong side of that rule, and the pinned
+        # test `test_ladder_spans_game_states_and_holds_the_captain_cap` is what
+        # caught it.
+        #
+        # What DID ship is `construction_shadow`, which prints the ceiling beside
+        # the share on every delivery, so the real population gets measured over
+        # Ben's >= 12 conditioned slates instead of this one fixture. The lever
+        # that can actually move this is the captain cap itself, or the order in
+        # which the ladder spends captain slots across the two arms -- both out of
+        # R263's scope, both waiting on the R238/R239 contest-awareness cluster.
+        # Reversing this decision is a five-number edit; the search that produced
+        # it is recorded in the CHANGELOG so it is not re-run from scratch.
         add(f"{tag}_win_big", side, 0.26, win_big)
         add(f"{tag}_win_big_no_sp", side, 0.22, win_big_no_sp)
         add(f"{tag}_win_close", side, 0.24, win_close)
@@ -386,6 +428,11 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
     # guarantee: whether this template clears a second slot at a given n still
     # depends on how its share lands against the other ten under that n's
     # moneyline split.
+    # R263, 2026-08-28: the neutral half of the same declined bump. `pitchers_duel`
+    # 0.45 -> 0.55, `ace_loses` 0.22 -> 0.28 and `both_explode` 0.30 -> 0.14 were
+    # built and measured with the directional five above, and are unchanged for the
+    # same reason -- the full measurement is in the comment on that block. R156's
+    # 0.45 on `pitchers_duel` stands exactly as R156 set it.
     add("pitchers_duel", None, 0.45, duel)
     add("both_explode", None, 0.30, both_explode)
     add("ace_loses", None, 0.22, ace_loses)
@@ -780,6 +827,168 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "cpt_cap_reassigned": list(cpt_cap_reassigned),
             "captain_exposure_realized": dict(cpt_counts),
         })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# R263 shadow report, Ben's dated decision of 2026-08-28. SHADOW ONLY.
+# ---------------------------------------------------------------------------
+#
+# These three bands come from ledger 3.21 and the root greenfield doc. They are
+# PRINTED beside the caps and they steer NOTHING: no thesis, no posture, no
+# constraint reads them. The hard-band half of R263 waits on the R238/R239
+# contest-awareness cluster, and R153's lesson is exactly why it waits -- a cap
+# enforced anywhere other than where the roster spots are actually spent is not a
+# cap, and the place SD roster spots are spent is `solve_ladder`, not a report.
+#
+# What 3.21 measured, all observed cohort shares over 249 Showdown contests:
+#   - Pitcher CPT: 46.0% of field rows, 56.8% of top-decile, 65.5% of winners,
+#     with disc/val winner shares .692/.631 -- REPLICATED direction, the
+#     strongest construction signal in either format. We deliver 40%.
+#   - Team split of the 6 rostered: 5-1 is 50.2% of the top-1% cohort against a
+#     field at 35.3%, and 3-3 is -10.3pp. Direction stable, magnitude unstable
+#     across halves: STABLE DIRECTIONAL. We deliver 73.4% 5-1, which is the one
+#     axis where we are OVER-concentrated -- above even the top cohort.
+#
+# None of this is a win rate, a cash rate, or a probability claim.
+R263_SHADOW_BANDS: Dict[str, Any] = {
+    "pitcher_cpt_share_pct": {
+        "low": 48.0, "high": 52.0,
+        "condition": "both starters declared",
+        "evidence": "3.21: field 46.0, top-decile 56.8, winners 65.5 (REPLICATED direction)",
+    },
+    "team_split_5_1_pct": {
+        "low": 45.0, "high": 55.0,
+        "condition": None,
+        "evidence": "3.21: top-1% 50.2 vs field 35.3 (STABLE DIRECTIONAL); ours 73.4",
+    },
+    "team_split_4_2_pct": {
+        "low": 30.0, "high": None,
+        "condition": None,
+        "evidence": "3.21: restore 4-2 to >= 30% as the counterweight to 5-1 over-concentration",
+    },
+}
+
+
+def _split_pattern(team_split: Mapping[str, int]) -> str:
+    """A team split dict -> the canonical pattern string, e.g. ``{'BOS':5,'ARI':1}``
+    -> ``'5-1'``. Counts sorted DESCENDING and joined by '-', which is the same
+    canonicalization `field_miner`'s `stack_pattern` uses, so a delivered split
+    and a mined field share are directly comparable strings rather than two
+    vocabularies for one fact."""
+    counts = sorted((int(v) for v in team_split.values()), reverse=True)
+    return "-".join(str(c) for c in counts) if counts else ""
+
+
+def construction_shadow(
+    df: pd.DataFrame,
+    report: Mapping[str, Any],
+    max_cpt_exposure_pct: Optional[float] = None,
+) -> Dict[str, Any]:
+    """R263's shadow report: pitcher-CPT share, team-split mix, and the band check.
+
+    Steers nothing. Every number is counted off the SOLVED lineups, so it
+    describes the file that is about to be delivered rather than the ladder's
+    apportionment -- the distinction R153 paid for, where a captain apportionment
+    read clean while the realized set breached the cap.
+
+    ``pitcher_cpt_ceiling_pct`` is the part of this block worth reading FIRST,
+    and it is why the band check prints a ceiling column at all. A Showdown slate
+    with two declared arms cannot put a pitcher in the captain slot of more than
+    ``2 * floor(cap_pct * n)`` entries, because the captain cap is per PLAYER and
+    there are only two players eligible to be that captain. At the shipped 0.25
+    cap that ceiling is at most 50% and is usually less: at n=19 it is
+    2*floor(4.75)/19 = 42.1%. So a 48-52% band is UNREACHABLE on a two-arm slate
+    at 19 entries no matter what any thesis weight does, and a delivered 40%
+    there is 95% of the structural maximum rather than 8 points short of a
+    target. A bullpen game raises the ceiling by adding eligible arms; nothing
+    else does except the cap itself, which is out of R263's scope.
+    """
+    rows = [r for r in (report.get("lineups") or []) if r.get("solved")]
+    n = len(rows)
+    out: Dict[str, Any] = {
+        "label": "R263 CONSTRUCTION SHADOW — observed cohort comparison; steers "
+                 "nothing, gates nothing, and is never a win rate, cash rate, or "
+                 "probability claim",
+        "decision": "Ben, dated 2026-08-28; bands graded as finish cohorts over "
+                    ">= 12 conditioned slates before any tightening",
+        "entries_solved": n,
+        "pitcher_cpt_entries": None,
+        "pitcher_cpt_share_pct": None,
+        "pitcher_cpt_ceiling_pct": None,
+        "pitcher_cpt_share_of_ceiling_pct": None,
+        "declared_arms": None,
+        "team_split_mix": {},
+        "team_split_mix_pct": {},
+        "band_check": {},
+        "steers": False,
+    }
+    if not n:
+        return out
+    # A Showdown pitcher is a row with no batting order, which is the same
+    # definition `describe_slate` uses to find the starters. Read from the melt
+    # rather than from a position string: DK prices every player twice in this
+    # format and `Roster_Position` carries CPT/UTIL, not P.
+    try:
+        pitcher_names = {
+            str(nm) for nm, bo in zip(df["Name"], df["Batting_Order"])
+            if pd.isna(bo)}
+    except Exception:
+        pitcher_names = set()
+    out["declared_arms"] = len(pitcher_names)
+    cpt_is_p = [1 if str(r.get("captain")) in pitcher_names else 0 for r in rows]
+    out["pitcher_cpt_entries"] = sum(cpt_is_p)
+    out["pitcher_cpt_share_pct"] = round(100.0 * sum(cpt_is_p) / n, 1)
+    if pitcher_names and max_cpt_exposure_pct:
+        per_player = exposure_cap_count(max_cpt_exposure_pct, n)
+        if per_player is not None:
+            ceiling = min(n, len(pitcher_names) * int(per_player))
+            out["pitcher_cpt_ceiling_pct"] = round(100.0 * ceiling / n, 1)
+            if ceiling:
+                out["pitcher_cpt_share_of_ceiling_pct"] = round(
+                    100.0 * sum(cpt_is_p) / ceiling, 1)
+    patterns = [_split_pattern(r.get("team_split") or {}) for r in rows]
+    mix = Counter(p for p in patterns if p)
+    out["team_split_mix"] = dict(sorted(mix.items(), key=lambda kv: -kv[1]))
+    out["team_split_mix_pct"] = {
+        k: round(100.0 * v / n, 1) for k, v in out["team_split_mix"].items()}
+
+    def _check(key: str, observed: Optional[float], ceiling: Optional[float] = None):
+        band = R263_SHADOW_BANDS[key]
+        lo, hi = band["low"], band["high"]
+        if observed is None:
+            verdict = "unmeasurable"
+        elif lo is not None and observed < lo:
+            verdict = "below_band"
+        elif hi is not None and observed > hi:
+            verdict = "above_band"
+        else:
+            verdict = "in_band"
+        entry: Dict[str, Any] = {
+            "observed_pct": observed, "band_low": lo, "band_high": hi,
+            "verdict": verdict, "evidence": band["evidence"],
+            "condition": band.get("condition"),
+        }
+        if ceiling is not None:
+            entry["structural_ceiling_pct"] = ceiling
+            # A band the caps forbid is not a miss and must not read as one.
+            if lo is not None and ceiling < lo:
+                entry["band_reachable"] = False
+                entry["note"] = (
+                    f"the band's floor of {lo}% is ABOVE this portfolio's "
+                    f"structural ceiling of {ceiling}%, which the per-player "
+                    f"captain cap fixes at 2 x floor(cap x n) on a two-arm "
+                    f"slate. Thesis weights cannot reach it; only the cap or "
+                    f"another declared arm can. Read the share against the "
+                    f"ceiling, not against the band")
+            else:
+                entry["band_reachable"] = True
+        out["band_check"][key] = entry
+
+    _check("pitcher_cpt_share_pct", out["pitcher_cpt_share_pct"],
+           ceiling=out["pitcher_cpt_ceiling_pct"])
+    _check("team_split_5_1_pct", out["team_split_mix_pct"].get("5-1", 0.0))
+    _check("team_split_4_2_pct", out["team_split_mix_pct"].get("4-2", 0.0))
     return out
 
 
