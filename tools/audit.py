@@ -470,7 +470,15 @@ EXPECTED_SUITE_COUNTS = {
     # The tests pin the ceiling arithmetic, R156's 0.45 standing untouched, the
     # directional block summing to 1.00 whatever a future re-sizing does, and the
     # apportioned captain count staying under the cap the same call computed.
-    "tests.test_showdown": 91,
+    # R239 seam, 2026-08-29: 91 -> 98, the seven that pin the contest partition
+    # reaching the ladder and changing nothing. Three on the vector (sizes and
+    # each slot's OWN contest size, a missing vector reading UNAVAILABLE rather
+    # than as one contest, a short vector reported short rather than silently
+    # zipped) and four on identity -- the ladder, the solved bank, every
+    # diagnostic except the partition, and the captain list specifically, which
+    # is the one R239(b) is about to move and therefore the one whose "unchanged
+    # by the seam" reading the next stage depends on.
+    "tests.test_showdown": 98,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

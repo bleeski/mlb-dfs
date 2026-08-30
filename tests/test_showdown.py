@@ -8,6 +8,7 @@ from the Classic solver, so test_golden_replay is unaffected.
 from __future__ import annotations
 
 import collections
+import json
 import math
 import tempfile
 import unittest
@@ -1511,6 +1512,119 @@ class ThesisWeightTests(unittest.TestCase):
             self.assertEqual(ladder["captain_cap_relaxed"], 0,
                              f"n={n}: a relaxation this entry count did not have "
                              f"before")
+
+
+class R239ContestPartitionSeamTests(unittest.TestCase):
+    """The seam: the partition reaches the ladder, and changes nothing yet.
+
+    R239's own note says thread this first and alone. Two things need pinning
+    for that claim to mean anything: the vector arrives intact, and every
+    existing output is byte-identical with and without it. The second is the
+    load-bearing one -- a "no behavior change" commit that changed behavior is
+    worse than no commit, because the next stage would build on a moved floor.
+    """
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+        self.ml = {"MIN": -150, "CHC": 130}
+        # The 2026-08-28 `2215_1g_sd` shape: 21 entries across 7 contests,
+        # sized 7, 7, 2, 2, 1, 1, 1.
+        self.vec = (["A"] * 7) + (["B"] * 7) + ["C", "C"] + ["D", "D"] + ["E", "F", "G"]
+
+    # -- the vector arrives ------------------------------------------------
+    def test_the_partition_derives_sizes_and_each_slots_own_contest_size(self):
+        part = st.contest_partition(self.vec, 21)
+        self.assertTrue(part["available"])
+        self.assertEqual(part["sizes"],
+                         {"A": 7, "B": 7, "C": 2, "D": 2, "E": 1, "F": 1, "G": 1})
+        self.assertEqual(part["n_contests"], 7)
+        self.assertEqual(part["contest_of_entry"], self.vec)
+        # Each slot carries its OWN contest's size, which is what a per-contest
+        # cap has to read at the moment that slot is filled.
+        self.assertEqual(part["size_of_entry"][0], 7)
+        self.assertEqual(part["size_of_entry"][14], 2)
+        self.assertEqual(part["size_of_entry"][-1], 1)
+
+    def test_no_vector_is_UNAVAILABLE_and_never_reads_as_one_contest(self):
+        """A build with no partition and a build whose entries all sit in one
+        contest are different facts; collapsing them presents a portfolio number
+        as a per-contest one."""
+        part = st.contest_partition(None, 21)
+        self.assertFalse(part["available"])
+        self.assertIsNone(part["contest_of_entry"])
+        self.assertEqual(part["sizes"], {})
+        self.assertEqual(part["n_contests"] if "n_contests" in part else 0, 0)
+        one = st.contest_partition(["A"] * 21, 21)
+        self.assertTrue(one["available"])
+        self.assertEqual(one["n_contests"], 1)
+
+    def test_a_short_vector_is_reported_short_rather_than_silently_zipped(self):
+        part = st.contest_partition(["A", "B"], 21)
+        self.assertFalse(part["available"])
+        self.assertIn("2 of 21", part["reason"])
+
+    def test_the_vector_reaches_both_ladder_functions_intact(self):
+        ladder = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
+                                        contest_of_entry=self.vec)
+        self.assertEqual(ladder["contest_partition"]["contest_of_entry"], self.vec)
+        self.assertEqual(ladder["contest_partition"]["sizes"]["A"], 7)
+        diag = {}
+        st.solve_ladder(self.df, ladder["theses"], time_limit=5,
+                        diagnostics=diag, contest_of_entry=self.vec)
+        self.assertEqual(diag["contest_partition"]["contest_of_entry"], self.vec)
+        self.assertEqual(diag["contest_partition"]["n_contests"], 7)
+
+    # -- and changes nothing ----------------------------------------------
+    def test_the_ladder_is_identical_with_and_without_the_partition(self):
+        without = st.build_thesis_ladder(self.df, 21, moneyline=self.ml)
+        with_ = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
+                                       contest_of_entry=self.vec)
+        self.assertEqual(json.dumps(without["theses"], sort_keys=True, default=str),
+                         json.dumps(with_["theses"], sort_keys=True, default=str))
+        for key in ("allocation", "captain_cap_count", "captain_cap_relaxed",
+                    "shape", "win_share_basis"):
+            self.assertEqual(json.dumps(without[key], sort_keys=True, default=str),
+                             json.dumps(with_[key], sort_keys=True, default=str), key)
+        # The key set does not move either: `contest_partition` is present on
+        # BOTH, carrying the UNAVAILABLE block when no vector was supplied. A
+        # key that appears only when an argument is passed makes every consumer
+        # write a `.get`, and the missing-key and no-partition cases then read
+        # the same, which is the distinction the block exists to keep.
+        self.assertEqual(set(without), set(with_))
+        self.assertFalse(without["contest_partition"]["available"])
+        self.assertTrue(with_["contest_partition"]["available"])
+
+    def test_the_solved_bank_is_identical_with_and_without_the_partition(self):
+        ladder = st.build_thesis_ladder(self.df, 12, moneyline=self.ml)
+        vec = (["A"] * 7) + ["C", "C"] + ["E", "F", "G"]
+        d1, d2 = {}, {}
+        a = st.solve_ladder(self.df, ladder["theses"], time_limit=5, diagnostics=d1)
+        b = st.solve_ladder(self.df, ladder["theses"], time_limit=5, diagnostics=d2,
+                            contest_of_entry=vec)
+        self.assertEqual(json.dumps(a, sort_keys=True, default=str),
+                         json.dumps(b, sort_keys=True, default=str))
+        self.assertEqual(set(d1), set(d2))
+        # Every diagnostic except the partition itself is unchanged -- including
+        # every relaxation counter, which is what "no behavior change" has to
+        # mean on this path.
+        for key in d1:
+            if key == "contest_partition":
+                continue
+            self.assertEqual(json.dumps(d1[key], sort_keys=True, default=str),
+                             json.dumps(d2[key], sort_keys=True, default=str), key)
+        self.assertFalse(d1["contest_partition"]["available"])
+        self.assertTrue(d2["contest_partition"]["available"])
+
+    def test_no_captain_moves_yet_which_is_the_point_of_landing_this_alone(self):
+        """The 08-28 bank is the fixture R239(b) has to fix. It must still be
+        exactly as broken after the seam lands as it was before -- otherwise the
+        next stage cannot tell its own change from this one's."""
+        without = st.build_thesis_ladder(self.df, 21, moneyline=self.ml)
+        with_ = st.build_thesis_ladder(self.df, 21, moneyline=self.ml,
+                                       contest_of_entry=self.vec)
+        self.assertEqual([t["cpt"] for t in without["theses"]],
+                         [t["cpt"] for t in with_["theses"]])
 
 
 if __name__ == "__main__":

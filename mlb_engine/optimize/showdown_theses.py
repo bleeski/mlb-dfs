@@ -459,15 +459,64 @@ def _team_of(shape, key) -> str:
 NEUTRAL_SHARE = 0.18   # slice of the portfolio reserved for no-winner theses
 
 
+def contest_partition(contest_of_entry: Optional[Sequence[str]],
+                      n_entries: int) -> Dict[str, Any]:
+    """Turn a per-entry contest vector into the partition the ladder can use.
+
+    R239 seam. ``contest_of_entry[i]`` is the contest the i-th ladder slot will
+    be entered into, in the SAME order the caller will later zip theses against
+    reserved rows. The alignment is the whole contract: `run_showdown` assigns
+    with ``zip(rows, bank)``, ``bank[j]`` solves ``theses[j]``, and ``theses`` is
+    built in ``_round_robin`` order, so slot j lands in ``rows[j]``'s contest.
+
+    Returns ``sizes`` (entries per contest), ``size_of_entry`` (each slot's own
+    contest size), and the vector itself, truncated or reported short against
+    ``n_entries`` rather than silently zipped. ``None`` in gives an UNAVAILABLE
+    partition, which every consumer must treat as "no per-contest information",
+    never as "one contest".
+
+    The distinction matters because those two readings differ: a build with no
+    partition and a build whose entries genuinely all sit in one contest want
+    different reports, and collapsing them is how a portfolio-level number gets
+    presented as a per-contest one.
+    """
+    if contest_of_entry is None:
+        return {"available": False, "reason": "no contest vector supplied",
+                "contest_of_entry": None, "sizes": {}, "size_of_entry": None}
+    vec = [str(c) for c in contest_of_entry]
+    short = len(vec) < int(n_entries)
+    vec = vec[:int(n_entries)]
+    sizes: Dict[str, int] = {}
+    for cid in vec:
+        sizes[cid] = sizes.get(cid, 0) + 1
+    return {
+        "available": not short,
+        "reason": (f"contest vector covers {len(vec)} of {int(n_entries)} entries"
+                   if short else ""),
+        "contest_of_entry": vec,
+        "sizes": dict(sorted(sizes.items())),
+        "size_of_entry": [sizes[c] for c in vec],
+        "n_contests": len(sizes),
+    }
+
+
 def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                         moneyline: Optional[Mapping[str, float]] = None,
                         implied_totals: Optional[Mapping[str, float]] = None,
                         max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
+                        contest_of_entry: Optional[Sequence[str]] = None,
                         ) -> Dict[str, Any]:
     """Generate ``n_entries`` thesis specs, allocated across game states and with
     captains rotated so no captain exceeds the cap.
 
     Returns ``{"theses": [...], "shape": {...}, "allocation": {...}}``.
+
+    R239 seam, 2026-08-29. ``contest_of_entry`` is accepted, validated and
+    echoed back as ``contest_partition``; NOTHING reads it for a decision yet, so
+    every output of this function is byte-identical with and without it. It is
+    threaded first and alone deliberately: R239's own note says do that, and the
+    partition has to exist here before the per-contest captain cap can bind at
+    the moment a captain slot is filled rather than be evaluated after the fact.
     """
     shape = dict(describe_slate(df, moneyline, implied_totals))
     shape["_base"] = dict(zip(df["Player_Key"], df["Base"]))
@@ -551,6 +600,8 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             "allocation": allocation,
             "captain_cap_count": cap,
             "captain_cap_relaxed": cap_relaxed,
+            # R239 seam. Carried, not consumed: no branch above reads it.
+            "contest_partition": contest_partition(contest_of_entry, int(n_entries)),
             "win_share_basis": shape["win_share_basis"]}
 
 
@@ -587,6 +638,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                  max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
                  time_limit: int = 8,
                  diagnostics: Optional[Dict[str, Any]] = None,
+                 contest_of_entry: Optional[Sequence[str]] = None,
                  ) -> List[Optional[Dict[str, Any]]]:
     """Solve each thesis under its own constraints, enforcing the overlap bound
     and the player-exposure cap against every lineup already built.
@@ -826,6 +878,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "cpt_cap_count": cpt_cap,
             "cpt_cap_reassigned": list(cpt_cap_reassigned),
             "captain_exposure_realized": dict(cpt_counts),
+            # R239 seam. Carried, not consumed: no rung above reads it, and the
+            # solved bank is byte-identical with and without it. The per-contest
+            # cap that WILL read it has to bind inside the loop above, at the
+            # moment cpt_excludes is assembled -- R153's finding with population
+            # substituted for enforcement point.
+            "contest_partition": contest_partition(contest_of_entry, len(theses)),
         })
     return out
 

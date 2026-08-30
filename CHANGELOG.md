@@ -25,6 +25,53 @@ performance claim.
 
 ---
 
+## 2026-08-29 — R239 seam: the contest partition reaches the ladder
+
+### R239 (seam only). Entry-to-contest threaded into `build_thesis_ladder` and `solve_ladder`
+
+**What moved.** A signature change and nothing else. `run_showdown`
+(`skills/generate-lineups/scripts/build_slate.py:2309`) already parsed the
+contest each reserved row belongs to and then dropped it; it now derives
+`contest_of_entry` from `rows` and passes it to both ladder functions. A new
+`showdown_theses.contest_partition` turns that vector into `sizes`,
+`size_of_entry` and `n_contests`, and both functions echo the result —
+`ladder_meta["contest_partition"]` and `diagnostics["contest_partition"]`.
+Nothing reads it for a decision. No captain moves, no lineup changes, no
+relaxation counter moves.
+
+**Why alone.** R239's own fix note says thread it first and alone if the rest has
+to wait, and the reason is the next stage: a per-contest captain cap has to bind
+at the moment a captain slot is filled, which means the partition must already be
+inside the loop that assembles `cpt_excludes`. Landing the plumbing separately
+means the stage that changes captain selection can be read against a floor that
+provably did not move.
+
+**The alignment is the contract, so it is written down.** `run_showdown` assigns
+with `zip(rows, bank)`; `bank[j]` solves `theses[j]`; `theses` is built in
+`_round_robin` order. So ladder slot j lands in `rows[j]`'s contest, and the
+vector is built in that same order. Verified at this head, not assumed.
+
+**Two small decisions worth naming.** A missing vector yields an UNAVAILABLE
+block rather than an empty partition, because "no per-contest information" and
+"every entry sits in one contest" are different facts and a consumer that cannot
+tell them apart will present a portfolio number as a per-contest one. And the
+`contest_partition` key is present whether or not a vector was passed, so no
+consumer has to write a `.get` whose default re-merges the two cases.
+
+**A correction to the backlog's own wording.** R239 and R266 both describe the
+driver as `run_showdown` without saying where it lives, and a grep of
+`mlb_engine/` and `tools/` returns nothing — the function is in `skills/`, at
+`build_slate.py:2309`. The premises R239 states all hold exactly as written:
+reserved rows are parsed into `{"row_index", "entry_id", "contest_id",
+"contest_name", ...}` at `showdown.py:728`, `contest_id` is read exactly once
+more at `showdown.py:782` (the post-hoc assignment log), and both
+`build_thesis_ladder` and `solve_ladder` took scalars.
+
+**Gate.** `1402 -> 1409 tests`. `EXPECTED_SUITE_COUNTS["tests.test_showdown"]`
+91 -> 98.
+
+---
+
 ## 2026-08-29 — R266: the preflight counts captains against the contest that pays them
 
 ### R266. Per-contest captain duplication, caught at T-5 instead of in post-mortem

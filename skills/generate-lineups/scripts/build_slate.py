@@ -2351,15 +2351,25 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     cpt_diagnostics: dict = {}
     report: dict = {}
 
+    # R239 seam. `rows` already carries the contest each reserved row belongs to,
+    # parsed at read_showdown_reserved_rows and then dropped -- the entry-to-
+    # contest fact existed here before any bank was built and nothing downstream
+    # ever saw it. This vector is aligned to the SAME order used by
+    # `zip(rows, bank)` below, which is what makes ladder slot j and rows[j] the
+    # same entry. Passed through; nothing reads it for a decision yet.
+    contest_of_entry = [r["contest_id"] for r in rows[:n_entries]]
+
     if use_ladder:
         priced = st.apply_base_prior(df, bat_side=bat_side, pitcher_hand=pitcher_hand)
         ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
-                                             max_cpt_exposure_pct=cpt_cap)
+                                             max_cpt_exposure_pct=cpt_cap,
+                                             contest_of_entry=contest_of_entry)
         theses = ladder_meta["theses"]
         solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
                                  max_player_exposure_pct=player_cap_pct,
                                  max_cpt_exposure_pct=cpt_cap,
-                                 diagnostics=solve_diag)
+                                 diagnostics=solve_diag,
+                                 contest_of_entry=contest_of_entry)
         if any(lu is None for lu in solved):
             print(json.dumps({"status": "ladder_infeasible",
                               "unsolved": [t["name"] for t, lu in zip(theses, solved)
