@@ -4720,18 +4720,14 @@ per attempt. Nothing about these checks requires them to be serial.
   flags. The four walls above stand verbatim; the browser tier stays
   time-permitting and unchanged.
 
-### R172. `manifest_projection_tier` counts the value guard as enrichment, so every default assembled build records `projection_tier: "enriched"` (P1, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro AT THIS HEAD (`execution_pipeline.py:4202`)
+### R172. CLOSED 2026-08-30 -- the value guard no longer counts as enrichment; entry migrated to CHANGELOG.md
 
-- **What:** the tier's key list includes `"value_guard"`, and `_applied`
-  returns True for the guard block (`applied: True`, no `matched` key). The
-  guard is an internal Base cap, not an enrichment reaching rows — so a build
-  with ZERO external data writes `"enriched"` into the permanent manifest
-  row, destroying the field's stated purpose on a money-adjacent record.
-  Repro re-run against ec832cf 2026-08-22: guard-only → `enriched`; empty
-  enrichment → `proxy`.
-- **Fix:** drop `"value_guard"` from the tier key list (or require
-  `matched`/`applied_count` evidence for tier purposes). One test: default
-  assembled build with no external inputs is `"proxy"`.
+Key dropped from the tier list rather than made to produce richer evidence: an
+internal Base cap cannot become enrichment on any evidence. The comment that
+caused it (value_guard listed among "the Savant-fed blocks") is corrected in the
+same commit. R172's citation was stale by ~460 lines (`4202`; the function is at
+4661); its substantive claims all re-verified. What it missed: a test PINNED the
+defect, so the wrong behaviour had a green guard. Gate 1468 -> 1469.
 
 ### R173. The lineup gate certifies True on a truthy pool_report that carries no checkable keys — the R53 class, on the branch R53 did not touch (P1, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro at ac8ac05, branch re-confirmed at ec832cf (`execution_pipeline.py:1168`)
 

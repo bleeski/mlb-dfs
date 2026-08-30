@@ -25,6 +25,68 @@ performance claim.
 
 ---
 
+## 2026-08-30 — R172: the value guard stops counting as enrichment
+
+**What moved.** `"value_guard"` is out of `manifest_projection_tier`'s key list.
+`_applied` still reads the guard's shape, because the weather and odds gates share
+that helper; only the tier stopped asking. The comment above `_applied` that
+CAUSED this is corrected in the same commit: it read "the SAVANT-FED blocks" and
+then listed value_guard among them, which is how an internal Base cap got into a
+list of external-enrichment keys.
+
+**Why.** The guard is a Base cap, not enrichment. Hitter Base is clipped at the
+slate's own 90th-percentile hitter pts/$1k times 1.08, computed from the salary
+file and the build's own projections, reaching no external source at all
+(`MLB_Classic.md:195` describes it as exactly that and never calls it
+enrichment). It is on by default and its block writes `applied: True` whether it
+clipped anyone or not, so every default assembled build stamped
+`projection_tier: "enriched"` onto a permanent manifest row, including a build
+with zero external data. That is precisely the case the field exists to
+distinguish, so the field said nothing on every build that had it.
+
+Dropping the key rather than demanding richer evidence from it: no evidence the
+guard could produce would turn an internal cap into enrichment.
+
+**A test pinned the defect, and R172 did not know that.** `test_savant_enriched_
+blocks_read_as_enriched` asserted `manifest_projection_tier(guard) == "enriched"`.
+R64(b) swept value_guard in with the Savant-fed blocks because they share an
+`applied` flag and pinned the result, so the wrong behaviour had a green test
+guarding it. The assertion is inverted, with a comment saying it used to read the
+other way and why. This is the reason the suite count moves by one and not two:
+one test added, one changed.
+
+**R233 enumeration — a label derived from evidence that does not support it.**
+
+    grep -rn "_applied(" mlb_engine tools --include=*.py                  -> 3 engine sites
+    grep -rn "projection_tier" mlb_engine tools skills --include=*.py     -> 4 writers
+    grep -rn '"enriched"' mlb_engine tools skills --include=*.py          -> 1 other flag
+
+FIXED (1): the tier's key list.
+
+DELIBERATELY KEPT (7), each checked rather than assumed:
+`_applied` at `execution_pipeline.py:1256` and `:1258` back the weather and odds
+gates, and each asks about the one external map it names (f5 park/weather, f1
+implied total), so the evidence matches the label. Of the four writers of
+`projection_tier`, `late_swap.py:880` hardcodes `"proxy"` and is honest (the swap
+assembles emergency-proxy projections, and the hardcode errs toward the weaker
+claim); `promote_run.py:274` copies the prior row and falls back to `"unknown"`;
+`run_evals.py:119` is a fixture. `stack_shape_probe.py:136` keeps its own
+`enriched` flag derived from `bool(savant_batting or savant_pitching)`, which is
+what this tier should have looked like all along and is left as the model.
+`build_slate.py:1469` surfaces `value_guard` in the brief under its own name,
+claiming nothing about enrichment.
+
+**Premises.** R172's citation was STALE by ~460 lines: it cites
+`execution_pipeline.py:4202`; `manifest_projection_tier` is at 4661 and the key
+list at 4683 after this change. Its substantive claims all held on re-verification
+at this head: the guard block does carry `applied: True` with no `matched` key,
+`_applied` does return True for it, and a guard-only enrichment did record
+`enriched`. What the entry missed is the pinning test above.
+
+**Gate.** 1468 -> 1469. `PASS  v2.26.0  27 modules  1469 tests`.
+
+---
+
 ## 2026-08-30 — R228: absent evidence stops promoting a run in silence
 
 **What moved.** `tools/promote_run.py` reads three states where it read two. A

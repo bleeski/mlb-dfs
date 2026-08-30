@@ -1097,11 +1097,18 @@ def _applied(block: Any) -> Optional[bool]:
             return None
         return int(block.get("applied_count") or 0) > 0
     # R64(b): only f1/f4/f5 and projected_order carry requested/applied_count.
-    # The Savant-fed blocks report their own shapes -- xwoba an explicit `applied`
+    # The other blocks report their own shapes -- xwoba an explicit `applied`
     # flag over considered/matched, ceiling and pitcher_ceiling matched/unmatched,
     # value_guard an `applied` flag with clipped_count -- so requiring `requested`
     # returned None for every one of them, and `manifest_projection_tier`
     # recorded a fully Savant-enriched build as projection_tier="proxy".
+    #
+    # R172, 2026-08-30: this comment said "the SAVANT-FED blocks" and then listed
+    # value_guard among them, which is how an internal Base cap ended up in the
+    # tier's key list and made every default build read "enriched". The guard is
+    # not Savant-fed and reaches no external source; `_applied` still reads its
+    # shape, because the weather and odds gates use this helper too, but
+    # `manifest_projection_tier` no longer asks it.
     if "applied" in block:
         applied = bool(block.get("applied"))
         if not applied:
@@ -4659,9 +4666,20 @@ def manifest_projection_tier(result: Mapping[str, Any]) -> str:
     ``requested`` and ``applied_count``, and ``_applied`` is already the helper
     that reads them, so the tier is derived from those instead. A build whose
     projections were handed in prebuilt has no enrichment at all and is 'proxy'.
+
+    R172, 2026-08-30. ``value_guard`` was in this list and is not enrichment. It is
+    an internal Base cap: hitter Base clipped at the slate's own 90th-percentile
+    pts/$1k times 1.08, computed from the salary file and the build's own
+    projections, reaching no external source at all. It is applied by default, and
+    its block reads ``applied: True`` whether it clipped anything or not, so EVERY
+    default assembled build wrote ``projection_tier: "enriched"`` onto a permanent,
+    money-adjacent record, including a build with zero external data, which is the
+    exact case this field exists to distinguish. Dropping the key is the fix rather
+    than demanding richer evidence from it: no evidence the guard could produce
+    would make an internal cap into enrichment.
     """
     enrichment = result.get("projection_enrichment") or {}
-    for key in ("xwoba", "ceiling", "value_guard", "f4", "f1", "f5", "pitcher_ceiling"):
+    for key in ("xwoba", "ceiling", "f4", "f1", "f5", "pitcher_ceiling"):
         if _applied(enrichment.get(key)):
             return "enriched"
     return "proxy"

@@ -609,7 +609,11 @@ EXPECTED_SUITE_COUNTS = {
     # the dry run reporting the exit code the real run would return) and two on
     # verify_manifest's copy of the same shape, where `checked` counted a row it
     # had not checked.
-    "tests.test_upload_integrity": 276,
+    # R172, 2026-08-30: 276 -> 277, the one that pins the value guard as NOT
+    # enrichment. A second test in the same class changed its assertion rather
+    # than being added: it pinned the defect ("enriched" for a guard-only build),
+    # which is why the count moves by one and not two.
+    "tests.test_upload_integrity": 277,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

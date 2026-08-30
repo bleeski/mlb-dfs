@@ -784,9 +784,16 @@ class PreflightManifestBindingTests(unittest.TestCase):
         ceiling = {"projection_enrichment": {"ceiling": {
             "matched": 120, "unmatched": 60, "match_rate": 0.67}}}
         self.assertEqual(epi.manifest_projection_tier(ceiling), "enriched")
+        # R172, 2026-08-30: this assertion USED to read "enriched" and was wrong.
+        # R64(b) swept value_guard in with the Savant-fed blocks because they share
+        # an `applied` flag, and pinned the result. The guard reaches no external
+        # source; see test_the_value_guard_alone_is_not_enrichment below.
         guard = {"projection_enrichment": {"value_guard": {
             "applied": True, "clipped_count": 3}}}
-        self.assertEqual(epi.manifest_projection_tier(guard), "enriched")
+        self.assertEqual(epi.manifest_projection_tier(guard), "proxy")
+        self.assertTrue(epi._applied(guard["projection_enrichment"]["value_guard"]),
+                        "the helper still reads the guard's shape; the weather and "
+                        "odds gates share it. Only the tier stopped asking")
         # A block that ran and reached nothing is not enrichment, and an
         # opted-out guard is not a failure either -- both stay proxy.
         self.assertEqual(epi.manifest_projection_tier(
@@ -795,6 +802,30 @@ class PreflightManifestBindingTests(unittest.TestCase):
         self.assertEqual(epi.manifest_projection_tier(
             {"projection_enrichment": {"value_guard": {"applied": False}}}), "proxy")
         self.assertIsNone(epi._applied({"matched": 0, "unmatched": 0}))
+
+    def test_the_value_guard_alone_is_not_enrichment(self):
+        """R172. The guard is an internal Base cap: hitter Base clipped at the
+        slate's own 90th-percentile pts/$1k x 1.08, off the salary file and the
+        build's own projections. It is on by default and its block reads
+        `applied: True` whether or not it clipped anyone, so with it in the tier's
+        key list EVERY default assembled build recorded projection_tier='enriched'
+        on a permanent money-adjacent record, including one with zero external
+        data. That is the case the field exists to distinguish."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+
+        default_build = {"projection_enrichment": {
+            "value_guard": {"applied": True, "percentile": 90, "clipped_count": 3},
+            "f1": {"requested": 0, "applied_count": 0},
+            "f5": {"requested": 0, "applied_count": 0},
+            "xwoba": None, "ceiling": None, "pitcher_ceiling": None, "f4": None,
+        }}
+        self.assertEqual(epi.manifest_projection_tier(default_build), "proxy",
+                         "zero external data reached these rows")
+        # And the guard does not mask a real enrichment sitting beside it.
+        with_odds = {"projection_enrichment": {
+            "value_guard": {"applied": True, "clipped_count": 3},
+            "f1": {"requested": 18, "applied_count": 18}}}
+        self.assertEqual(epi.manifest_projection_tier(with_odds), "enriched")
 
 
 class LineupGateEvidenceTests(unittest.TestCase):
