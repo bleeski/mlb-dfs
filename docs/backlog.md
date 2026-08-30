@@ -39,6 +39,61 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-30 (third note this date), DEV, claim `engine` (`engine_2026-08-30`,
+re-taken): **backlog inbox merged. Three 08-30 BUILD fragments consumed, TWO new
+numbers (R276, R277), FOUR riders on existing entries, and ONE item half-closed.
+The queue gains a slot at 13; only the old 13 and 14 renumber.**
+
+**Why only two numbers for four fragments.** Three of the fragments' findings
+already had a class on this board and the R167/R159 lesson says a second number
+for one class is how the two copies start disagreeing. The measured cost of
+Showdown's APPG ranking (three confirmed starters at 0 of 10 entries, all three
+with POSITIVE xwOBA-minus-wOBA gaps) is R249's first MEASUREMENT, not a new item;
+the missing Showdown `enrichment` block is R237's NOT_APPLICABLE clause seen from
+the brief side rather than the qa side, and it goes there as a third sighting
+plus a Fix addendum; the $10,300 salary-left Classic lineup is R247's first
+non-Showdown sighting. Only the standing QA step and the `qual=y` condition had
+no home.
+
+**R277 is the finding worth reading twice.** `refresh_reference_data.py:83` builds
+the FanGraphs pitching export with `&qual=y`, so the file holds 211 arms against
+Savant's 831. Verified on disk at this head: Kikuchi 0 hits in
+`fangraphs_season_pitching.csv`, 1 hit in `expected_stats_pitching.csv`. He took
+the neutral K-rate default, which ranked him SECOND of four arms on
+`Ceiling_Multiplier` (1.420) above two measured arms, while Savant puts him
+between the two of them on contact suppression. He was in 4 of 7 entries. **This
+corrects a verified claim already on this board:** the 2026-08-16 merge pass
+recorded Dobnak's absence from the same file and attributed it to the 30.2-day
+staleness the warning reports. The absence was real, the attribution was never
+checked, and it is wrong for this class. Every non-qualified starter takes the
+neutral default all season and no refresh changes it, so the warning's printed
+remedy provably cannot fix the case it fires on.
+
+**R196 is half closed and its Fix line was wrong.** The Solo Shot and Micro
+Booster rows were written to `dk_contest_archetypes.csv` on 08-30 (both verified
+in the file at this head), which closes the "no row" half after six sightings.
+But R196's Fix specified shape `single_entry_gpp`, and `single_entry_gpp` is
+inside `WTA_CONSTRUCTION_SHAPES` (`contest_shapes.py:96-99`), which
+`execution_pipeline.py:4562` reads to pick max-concentration construction. The
+entered contest paid 350 of 1486, breadth 0.235, against that shape's curated
+0.01. Writing the row exactly as R196 specified would have PINNED WTA
+construction onto a broad-curve contest on every future slate, where the refusal
+at least forces a human to name a posture. The remainder is renamed: the table
+cannot express "single entry, broad curve," because posture inference reads
+`inferred_type` and nothing reads `payout_shape_default`.
+
+**Board corrections.** `ledger/inbox/` is ARCHIVE's and this session wrote nothing
+there. Its `_CONSUMED_2026-08-22_DO_NOT_REMERGE.md` says all 108 miner fragments
+and four of the five dated fragments were merged on 08-22 and only the DELETION is
+outstanding, blocked then because the mount refused `rm`. **That blocker is gone:
+`_to_delete/` now exists and is gitignored (`.gitignore:85`), so an ARCHIVE session
+can finish the close-out with `mv`.** The one genuinely unconsumed file there,
+`2026-08-28_DEV_3-21-five-stack-line-now-stale.md`, is a Quick Card reconciliation
+and its backlog half is already R37(2)(c); no board change was owed.
+`docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`
+is RETAINED, unchanged, for the fourth inbox pass: three entries cite it as the
+sole carrier of the nine-family table and the four cautions.*
+
 *2026-08-30 (second note this date), DEV, claim `engine` (`engine_2026-08-30`,
 re-taken): **slot 1 is CLOSED and REFILLED, not vacated. All four of R228, R172,
 R173 and R176 shipped, in that order, as four separate commits with the gate run
@@ -558,14 +613,29 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
     atomic-writer copy, so ed8 adds no scope.
-13. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221 **+ R270(a)** (the
+13. **R276 + R277** — **INSERTED 2026-08-30 (third note), the only resequencing
+    this date; the old 13 and 14 move down one and nothing else changed.** Ben's
+    dated standing-QA instruction and the first finding it produced, and they
+    land together because neither is worth much alone: R276's panel (a) is
+    exactly the check that surfaces R277 with no cleverness, and R277 without a
+    panel is one arm on one slate. Positioned HERE and not higher for a stated
+    reason: R276 changes no delivered byte (it is report-only, on the surface
+    CLAUDE.md already calls a report and never a gate), and it reads brief fields
+    that slots 5 and 6 are about to rewrite, so building the panels first would
+    aim them at a moving target. Positioned here and not lower because Ben dated
+    the instruction and R277 degrades pitcher ranking on every slate until it
+    lands. **R276's panel (b) has a hard dependency on R196's remainder:** the
+    breadth-vs-construction comparison needs the archetype table to carry a
+    truthful breadth for the shape it resolves, which is the thing R196 cannot
+    currently express.
+14. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221 **+ R270(a)** (the
     two sides of one doubleheader-leg boundary — the write side stamps the
     wrong leg's order, the read side has no leg filter at all, and the odds
     path already holds the matcher both should use), R222, R229 (+F-24's severity
     note on the (b) half), R230 (+(d), the game-cap test that passes with the
     constraint deleted, F-28), R231, R232, R241, R243. R269 lands here or with
     R245, whichever moves first; they are the same manifest object.
-14. **The pre-existing Tier 1 remainder from R121**, standing order,
+15. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged.
 
 **Tier 2 keeps its order and gains one rider:** R118 → R48 + R83 → R10 (still
@@ -2409,6 +2479,26 @@ skill-aware-cap DIRECTION (scale the cap by the build's own Base rank, or cap
 correlated blocks instead of persons) is a strategy change and Ben's decision;
 it goes to Tier 4 with (a)–(c)'s numbers as its evidence.
 
+**First CLASSIC sighting, 2026-08-30** (from BUILD fragment
+`2026-08-30_BUILD_standing-data-driven-qa.md` §C, slate `1605_2g`, 7 entries on
+2 games). Both filed sightings were Showdown, which left open whether this is a
+Showdown-ladder artifact. It is not. A certified Classic build carried a lineup
+with **$10,300 salary left**, against the $6,100 the 1905_1g_sd sighting
+reported, with the same signature exactly: `counted_relaxations` zero,
+`relaxations: 0`, all three gates green, every counter clean because nothing
+relaxed. This strengthens R247(a): the flag belongs on the delivered brief for
+both formats, and the salary-left bar is the cheaper of the two triggers.
+
+**And one consequence that changes what R247(c) has to measure: the degraded
+entry INFLATED the washout proxy.** Comparing two builds of that slate, the
+weaker one showed "2 of 7 entries untouched" against the stronger one's 1 of 7,
+and its second untouched entry WAS the $10,300 lineup. It survived a zeroed
+BAL@ATH because it was cheap and weak, not because it was a designed hedge. A
+washout count that cannot tell a hedge from a dead entry will keep scoring the
+defect as protection, so R247(c)'s correlated-block line needs a second axis:
+survival attributed to design (low overlap with the failed block) versus
+survival attributed to a lineup that had nothing at stake anywhere.
+
 ### R249. Showdown has no projection input, so the operator's only lever is rewriting the salary file, invisibly (P1, S) | new 2026-08-27, merged from BUILD fragment `2026-08-27_BUILD_showdown-has-no-projection-input.md`; corroborated by the outside spec ed8 (F-40)
 
 **What.** `run_showdown` builds from `melt_showdown_salary_csv` and `Base` is
@@ -2429,6 +2519,43 @@ count of players whose Base differs from APPG, min/median/max ratio. The
 long-term answer (Showdown through the Classic enrichment stack) is R41's and
 unchanged; this is the cheap intermediate that also serves operator priors
 after R41 lands.
+
+**Second sighting, 2026-08-30, and the first MEASUREMENT of what the gap costs**
+(from BUILD fragment `2026-08-30_BUILD_showdown-ranks-on-raw-appg.md`, slate
+`1920_1g_sd`, CIN@CHC, 10 entries). The build certified review-grade with
+`counted_relaxations.clean: true` and zero adversarial findings, so nothing that
+ran could have caught this. Savant expected stats for the 18 confirmed bats
+against delivered exposure: **three confirmed starters drew ZERO of 10 entries
+and all three carry POSITIVE xwOBA-minus-wOBA gaps**, results trailing contact
+quality, which is the exact correction the xwOBA Base step exists to make.
+Bleday (CIN, .350 xwOBA, +.017), Hoerner (CHC, .324, +.025), McLain (CIN, .311,
++.028). Bleday ties the second-best CIN bat by xwOBA; Hoerner outranks three
+CHC bats that each drew 3 or 4 entries. The mirror holds: the two bats pinned at
+the 50% player cap carry the largest NEGATIVE gaps on the board (Crow-Armstrong
+-.037, Suzuki -.035).
+
+**State the mechanism so the fix can be aimed, because it is not a batting-order
+artifact.** Amaya bats 9th with the worst xwOBA of the 18 and still drew 3 of 10
+because he is cheap. The starved band is the 6-7 hole at mid salary: too
+expensive to be a punt, short of the top bats on APPG alone. APPG plus salary is
+the entire ranking, so a bat whose season results lag its contact quality has
+nothing that can lift it. Verified at this head: `showdown.py:223` reads
+`AvgPointsPerGame` for Base, and `grep -icE 'enrich|est_woba|xwoba|expected_stats'`
+over that module returns **0** against 23 `def` in the same file, so the absence
+is real and not a silent-grep failure. `build_slate.py:3441-3442` routes
+`contest == "showdown"` into `run_showdown` before the enrichment block at
+`:733`, and `run_showdown` touches none of it. Both Savant reference files were
+FRESH on the day (fetched 19:52Z; **636 and 831 data rows**, not the 637/832 the
+fragment reports, which are `wc -l` counts carrying the header). The inputs were
+on disk and current; nothing consumed them. `showdown.py:238` (`if base and not
+rec.get("Base"): rec["Base"] = base`, quoted exactly at this head) suggests a
+pre-seeded Base already survives the pool build, so
+the `--projections` seam may be narrower than R249's Fix assumes; check that
+before scoping. The truthful-label half of that fragment is filed on R237, not
+here. **R233 note for whoever takes this:** enumerate every `contest ==
+"showdown"` branch and every consumer of `reference_manifest.json` before
+claiming the class is closed. The fragment named two sites and did not count
+them.
 
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 
@@ -3729,6 +3856,61 @@ timestamped, beside the build-time packet; both retained under
 `data/slates/<date>/`. (c) The backtest note: date-bounded Statcast pulls
 for anything retrospective; forward-going, the snapshots are the record.
 
+### R277. The FanGraphs pitching export is `qual=y`, so every non-qualified starter takes the neutral K-rate default all season, and the staleness warning names a remedy that provably cannot reach him (P1, S) | new 2026-08-30, merged from BUILD fragment `2026-08-30_BUILD_standing-data-driven-qa.md` §B; VERIFIED on disk at this head; **corrects a verified claim already on this board**
+
+**What.** `tools/refresh_reference_data.py:83` builds the FanGraphs pitching URL
+as `?pos=all&stats=pit&lg=all&qual=y&type=8`, qualified pitchers only. Counted at
+this head: `fangraphs_season_pitching.csv` holds **211** rows;
+`expected_stats_pitching.csv` holds **831**. Roughly three quarters of the arms a
+slate can hand the engine are structurally absent from the file that supplies the
+K-rate side of `Ceiling_Multiplier`, and they take the neutral default instead.
+
+**Measured on `1605_2g`, 2026-08-30.** `Ceiling_Multiplier` off the run's own
+`final/projections.csv`, against Savant for the same four arms:
+
+| Arm | Ceiling_Multiplier | Source | Savant xwOBA / xwOBAcon |
+|---|---|---|---|
+| Zack Wheeler | 1.497 | measured | 0.213 / 0.209 |
+| **Yusei Kikuchi** | **1.420** | **neutral default** | 0.294 / 0.267 |
+| Jeffrey Springs | 1.381 | measured | 0.273 / 0.255 |
+| Chris Bassitt | 1.294 | measured | 0.301 / 0.281 |
+
+The neutral default ranked the one unmeasured arm SECOND of four, above both
+measured arms, while Savant places him BETWEEN Springs and Bassitt on contact
+suppression, below the arm the multiplier puts him above. His Base is 8.95
+against Bassitt's 9.50, so the unmeasured multiplier is the whole of what lifts
+his Ceiling to 12.70, the highest of the three non-Wheeler arms. He was rostered
+in 4 of 7 entries, tied for most-used. Kikuchi: **0** grep hits in
+`fangraphs_season_pitching.csv`, **1** in `expected_stats_pitching.csv`, verified
+this session after a same-day Savant refresh. He has faced 165 batters against
+Wheeler's 499 and Springs' 527. He is not qualified.
+
+**Why P1, and why this is not the staleness item it was filed as.** The
+2026-08-16 DEV merge pass recorded, on this board, that "Dobnak is absent from
+all 212 rows of `fangraphs_season_pitching.csv` (file dated 2026-07-16, which is
+the 30.2 days the warning reports)." **The absence was verified correctly; the
+attribution to staleness was never checked and is wrong for this class.** The
+warning prints an export URL ending `&qual=y&type=8` as its remedy, so a fresh
+export re-fetches the same qualified subset and adds nobody. This is a STANDING
+condition, not an aging file: every non-qualified starter is unmeasured on every
+slate for the whole season, and the surface an operator reads under a clock tells
+him to fix it by re-downloading. Silently degrading lineup quality while naming
+an impossible remedy is the P1 definition twice over.
+
+**Fix.** (a) Decide the source question rather than the URL question first: the
+Savant file already carries 831 arms including this one, so the cheapest correct
+answer may be to derive the K-rate side from `expected_stats_pitching.csv` and
+retire the qualified-only dependency, not to widen the FanGraphs pull. If the
+pull is widened instead (`qual=0`), check what downstream assumes qualified rates
+before shipping it, because a 30-batter sample and a 500-batter sample are not
+the same input. (b) Whatever (a) decides, the warning stops claiming staleness
+for an arm that is absent by QUALIFICATION and names the real condition; this
+half is R237's typed-state discipline applied to a reason string, and it can ship
+alone. (c) Cross-ref R237: a `not_computed` state whose reason reads "not
+qualified, structural" is a different fact from one reading "provider failed,"
+and this is the first named instance where the difference changes what the
+operator should do.
+
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
 The R51/R92 family lives here: reports that are honest line by line while
@@ -4604,6 +4786,32 @@ Showdown rendering should print the win-share basis in its place. Recurrence
 is the point — the class was filed 08-27 and shipped a misleading line again
 the next build, on the surface a session reads under time pressure.
 
+**Third field sighting, 2026-08-30, and it adds the BRIEF half this entry did
+not have** (from BUILD fragment `2026-08-30_BUILD_showdown-ranks-on-raw-appg.md`,
+slate `1920_1g_sd`). Same line, third build: `F1 NEUTRAL: no implied totals
+reached the projections` printed against a brief carrying
+`construction.win_share_basis: moneyline_no_vig`. The moneyline reached the
+entry ALLOCATION across game states and never reached a projection, so the qa
+line is wrong in both directions again.
+
+**What is new: the Showdown brief carries no `enrichment` key at all.** Not a
+false value, an absent one. `signal_applied`, `counts` and `factors_inert` are
+the three fields SKILL.md instructs the operator to read before presenting
+anything, and on this path they do not exist. There is nothing to read and no
+statement that there is nothing to read, so the operator's only signal is a
+MISSING field, which is the weakest possible one and the failure R172 fixed
+pointed the other way (there, a value guard wrote `projection_tier: "enriched"`
+onto a permanent record for a build with zero external data).
+
+**Fix addendum, and it is a precondition of the Fix above, not a parallel item.**
+qa cannot render a typed state the brief does not carry, so the Showdown brief
+writes `enrichment: {applied: false, reason: "showdown path ranks on
+AvgPointsPerGame", ...}` and qa's NOT_APPLICABLE reads it rather than
+special-casing the format. Ship this half FIRST if the rest of R237 waits: it is
+close to one dict key, and a truthful label that says "unenriched" is worth more
+than a missing one. The measured cost of the ranking itself is R249's second
+sighting, filed there and deliberately not duplicated here.
+
 ### R244. R157's rescue opens three caps when the 1.0 sanity check already names the one that binds, and the first value that certifies is not the value to ship (P1, S; the CLAUDE.md half needs a quiet window) | new 2026-08-27, merged from BUILD fragment `2026-08-27_BUILD_container-bank-and-r157-single-cap.md` §§2-3; feeds R203's design
 
 **What.** On 1905_5g the R157 trigger fired and the delegated remedy says move
@@ -5024,6 +5232,71 @@ superseded. Cross-ref R245 (one manifest file per date across concurrent
 builds) and R120 (a delivered file naming a run directory that is not there):
 the three are the same object seen from three sides, and whichever lands first
 should say which of the other two it makes cheaper.
+
+### R276. Ben's standing data-driven QA step, built as three `qa_portfolio` panels and a `--compare` flag rather than a prose checklist (P1, S-M; report-only, changes no delivered byte) | new 2026-08-30, merged from BUILD fragment `2026-08-30_BUILD_standing-data-driven-qa.md`; **Ben's dated instruction, 2026-08-30**
+
+**The instruction, and its second half is the load-bearing one.** Ben, after the
+`1605_2g` build had already certified and delivered: run the QA pass that ran on
+that slate on **any** lineup build, time permitting. His own bound, stated twice
+on the same slate: *"we don't want to force a change for change's sake, but if
+there is something notable that we find that would change it let's do a bit of
+research to uncover it."* Run the checks. Change the build on a FINDING, never on
+the fact that a check ran.
+
+**What "this level" concretely was.** Five checks on `1605_2g`. Four produced
+findings, one produced a correction to the session's own work, and exactly ONE
+changed the delivered file. That ratio is the argument: the value is in the
+clean checks being CHEAP, not in every check moving something. The four findings
+are already filed (R196's corrected Fix line, R277's neutral default, R247's
+first Classic sighting, and the archetype-row validation below), so this entry is
+the surface, not the findings.
+
+**Why a tool and not a checklist.** A checklist that depends on a session being
+curious will decay, and `qa_portfolio.py` is already the adversarial surface: it
+already reads the brief and the delivered bytes, already prints section 1 from
+the artifact, and CLAUDE.md already calls it a report and never a gate, so
+nothing here can block a delivery.
+
+**Fix, three panels and one flag.** (a) **Neutral-default RANK check.** The brief
+already carries `enrichment.neutral_default` with `in_pool` and `at_neutral`
+counts and the named players (`execution_pipeline.py:3864-3883`). It does not say
+where the neutral value RANKS among the MEASURED members of the same pool. Print
+the multiplier distribution and flag when a neutral default lands above the
+median measured peer. This is the panel that surfaces R277 with no cleverness
+required, and it is the one to build first. (b) **Payout-breadth vs
+construction-mode consistency.** The archetype table already carries
+`payout_breadth`; `WTA_CONSTRUCTION_SHAPES` already decides the MILP mode;
+nothing compares them. Flag any contest whose resolved shape takes WTA
+construction while its own `payout_breadth` exceeds a bar. On `1605_2g`
+`single_entry_gpp` carries 0.01 and the entered contest ran 0.235, a 23x gap, and
+no surface said so. **This panel depends on R196's remainder:** it can only be
+truthful once the table can express a single-entry contest with a broad curve.
+(c) **Remedy-validity check**, lowest value of the three and listed last for that
+reason: at minimum the FanGraphs warning stops claiming staleness for an arm
+absent by qualification (this is R277(b) seen from the review side; whichever
+ships first makes the other cheaper). (d) **`--compare <other_brief.json>`.**
+`qa_portfolio` already prints the frontier and both proxies; what is missing is
+comparing TWO briefs in one invocation. On `1605_2g` that comparison was a
+hand-written grep across two `_qa.out` files, which is exactly the kind of cost
+that stops a check from being run under a clock. Verified at this head:
+`tools/qa_portfolio.py` takes seven arguments and none of them is `--compare`.
+
+**Time-boxing, which decides whether this survives contact with a slate.** The
+T-schedule in CLAUDE.md governs and this does not amend it; what it needs is an
+explicit precedence rule, because on `1605_2g` the checks ran AFTER delivery and
+that was the right order. A certified, preflight-clean file is delivered FIRST;
+the QA pass never sits between a passing preflight and Ben's hands. Inside T-20,
+panels (a) and (b) only, both reads, no rebuild. Inside T-10, no checks at all,
+per the existing instruction to approve on posture defaults. **A finding
+discovered after delivery is REPORTED as a finding, not acted on, unless the
+clock genuinely allows a rebuild AND a re-preflight.** On that slate the R277
+finding arrived near T-10 and was deliberately not acted on, and the call was
+stated in the delivery report rather than buried, which is the behaviour to keep.
+
+**One thing this entry does not do:** check 5 of the five (re-run the inference a
+reference-table edit is supposed to drive, with no `--postures`) needs no code. It
+is one re-run and it belongs in whatever procedure owns archetype-row additions,
+which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
@@ -5513,6 +5786,25 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   copy loses nothing; it is left in place only because deletion is Ben's
   grant on this mount. Done when: `git status` at session start reports only
   genuinely foreign dirt.
+- **Rider on (a), 2026-08-30, and it changes what "adopt" would even mean**
+  (from `ledger/inbox/2026-08-22_BUILD_wsh-platoon-refresh-build-scoped-only.md`,
+  merged to the ledger Quick Card 4a on 08-22; this half is DEV's and had no
+  board entry). The tool's bare-URL default assumes the **'Projected'** stat set,
+  matching the reference file's global `stat_set`. As of 2026-08-22 FanGraphs
+  RosterResource gates 'Projected' behind membership, so a logged-out browser
+  save returns the free **'Current Year'** table instead. Same vs_RHP/vs_LHP
+  shape, different meaning. The 08-22 BUILD session refreshed WSH from 'Current
+  Year' and labeled that team's own `stat_set` and `collected_via` rather than
+  overwriting the file's global 'Projected' label, which is the right move and
+  also means the canonical file can now hold two stat sets under one global
+  label. So: adopting the tool requires deciding whether refreshes are
+  member-authenticated (and where that session lives), or whether the file's
+  schema carries `stat_set` per team as the 08-22 write already does in
+  practice. Deleting it makes the question the manual step's instead of the
+  tool's; it does not answer it. **Also still true and separately owed to
+  ARCHIVE:** that refresh was BUILD-scoped to
+  `data/slates/2026-08-22/reference/`, so `data/reference/fangraphs_platoon_lineups.json`
+  is untouched and remains 17.7+ days old for all 30 teams, WSH included.
 
 ### R109. `.git/index.lock` goes stale on this mount and `rm` cannot clear it (P2, XS-S) | new 2026-08-10, filed from three incidents that never had a number
 
@@ -6231,7 +6523,7 @@ item's effective priority without changing its label.
 - **Fix:** `extract_inbox_zips.py` skips a zip whose contest ID already has a `data/archive/*/mined_<id>.json`, and a successful mine relocates the zip the same way it already relocates the CSV (`--no-archive-move` should opt both out together, not just the CSV). Done when a mine leaves neither a stale CSV nor a stale zip behind in the inbox.
 - **Rider added 2026-08-23, from ARCHIVE fragment `2026-08-22_ARCHIVE_extract-zips-never-moves-r44-evidence.md`.** The missing call is now named rather than inferred: `grep -n "processed_zips\|shutil.move\|os.replace\|rename" tools/extract_inbox_zips.py` returns NOTHING. The tool extracts and returns; it has never relocated a zip. `data/standings/processed_zips/` holds 127 files and every one was moved there **by hand**, which means the hand-move IS this item's mechanism — the loop is not "the mine forgets the zip", it is "nothing in the tooling has ever moved one." The 08-22 pass added 60 more hand-moves, the 128th through 187th in the archive's history. Two constraints on the fix, both already recorded elsewhere: on this mount `rm` is refused and `mv` works (R109), so the fix must MOVE to `processed_zips/` and can never delete; and the cheap independent second guard is to skip a zip whose contest id already has a `data/archive/*/mined_<id>.json`, which is the same exclusion `awaiting_standings.py` already computes.
 
-### R196. `dk_contest_archetypes.csv` has no Solo Shot row (P2, XS — ARCHIVE's write set, not DEV's) | new 2026-08-23, merged from THREE BUILD fragments (`2026-08-19_BUILD_solo-shot-archetype.md`, `..._-recurred.md`, `2026-08-22_BUILD_solo-shot-archetype-3rd-occurrence.md`); THREE occurrences in four days. **FOURTH occurrence 2026-08-27, from `2026-08-25_BUILD_posture-vocab-and-solo-shot.md` §2:** "MLB $100 Solo Shot (Turbo)" matched no row and name-inferred to `large_gpp` — wrong for a single-entry contest — until `--postures <id>=single_entry` was passed by hand; and a FIFTH sighting the same week, "MLB Showdown $1K Solo Shot" absent on 1905_1g_sd (the R238 fragment). The family recurs on both formats; the Tier 4 decision this waits on is unchanged.
+### R196, remainder. The archetype table cannot express "single entry, broad curve": the Solo Shot row is WRITTEN and posture inference still needs a hand override (P2, XS-S) | **RETITLED 2026-08-30** when the row half closed after six sightings; the rows exist, the tax does not go away, and this entry's own Fix line was wrong. Original title: "`dk_contest_archetypes.csv` has no Solo Shot row" | new 2026-08-23, merged from THREE BUILD fragments (`2026-08-19_BUILD_solo-shot-archetype.md`, `..._-recurred.md`, `2026-08-22_BUILD_solo-shot-archetype-3rd-occurrence.md`); THREE occurrences in four days. **FOURTH occurrence 2026-08-27, from `2026-08-25_BUILD_posture-vocab-and-solo-shot.md` §2:** "MLB $100 Solo Shot (Turbo)" matched no row and name-inferred to `large_gpp` — wrong for a single-entry contest — until `--postures <id>=single_entry` was passed by hand; and a FIFTH sighting the same week, "MLB Showdown $1K Solo Shot" absent on 1905_1g_sd (the R238 fragment). The family recurs on both formats; the Tier 4 decision this waits on is unchanged.
 
 - **What:** `MLB $2.5K Solo Shot (Night)` (08-19, `2005_3g`) matched no archetype
   row, so `preflight_upload.py` warned that no archetype could be inferred.
@@ -6261,6 +6553,71 @@ item's effective priority without changing its label.
   write it. Worth Ben granting a standing DEV exception for
   `dk_contest_archetypes.csv` ADDITIONS, or an ARCHIVE session picking it up in
   the next tranche — either closes it, and nothing else will.
+
+**ROW HALF CLOSED 2026-08-30, and the Fix line above is CORRECTED** (from BUILD
+fragments `2026-08-30_BUILD_contest-archetype-gaps.md` and
+`2026-08-30_BUILD_standing-data-driven-qa.md` §A and §D, slate `1605_2g`).
+`build_slate.py` refused at exit 3 on contest identity for two names; Ben
+supplied both real payout tables and instructed the rows be written, which is
+the standing exception the third-occurrence bullet asked for, granted per
+contest rather than standing. Both rows verified present in the file at this
+head, each carrying its observed field size and full prize curve in `notes` so a
+later session can re-derive `payout_breadth` instead of trusting it:
+
+- **`Micro Booster`** | `wta` | `winner_take_all` | breadth **0.021** | objective
+  `wta`. Observed on contest 194681833: 237 entrants, top 5 win $10 flat on a
+  $0.25 entry, 6th pays what 237th pays. The `40x` in the title is the payout
+  multiple, not the field size.
+- **`Solo Shot`** | `se_gpp` | `broad_micro_gpp` | breadth **0.235** | objective
+  `gpp`. Observed on contest 194686507: 1486 entrants, paid to 350th, top 10
+  hold 43% of the pool and ranks 51-350 hold another 43%.
+
+**The correction, which is the part worth reading.** This entry's Fix specified
+posture `single_entry`, shape `single_entry_gpp`. `single_entry_gpp` is inside
+`WTA_CONSTRUCTION_SHAPES` (`contest_shapes.py:96-99`), and
+`execution_pipeline.py:4562` reads that set to choose `mode = "wta"`,
+max-concentration construction. Its curated `payout_breadth` is 0.01; the
+entered contest ran 0.235, a 23x gap, and no surface said so. **Writing the row
+exactly as this entry specified would have made the build WORSE than the manual
+override it replaces**, silently pinning WTA construction to a broad curve on
+every future slate, where today the refusal at least forces a human to name a
+posture. The row as actually written sets `payout_shape_default:
+broad_micro_gpp` deliberately for that reason.
+
+**The remainder, verified by re-running the inference the row is supposed to
+drive.** Re-ran `build_slate.py` with NO `--postures`: `Micro Booster` resolved
+`wta_satellite (name_inference)`, which LANDS; `Solo Shot` resolved
+`single_entry (name_inference)`, which does NOT. Posture inference reads
+`inferred_type`, and `se_gpp` is the truthful value there because the entry cap
+really is 1, so it routes back to `single_entry_gpp` and back into WTA
+construction. Nothing reads `payout_shape_default` for posture. **Until the
+table can carry both facts, every Solo Shot still needs `--postures
+<contest_id>=small_gpp` by hand, which is this entry's original tax unchanged
+after six sightings.** Fix: make posture inference consult
+`payout_shape_default` (or add an explicit construction-mode column) so a
+single-entry contest with a broad curve is expressible. That half is DEV's, not
+ARCHIVE's, which is why this entry stops being blocked on a write-set boundary.
+
+**Three riders.** (a) Measured cost on this slate was near zero and that is worth
+recording rather than generalizing: rebuilt under `small_gpp` and the frontier
+did not move (apex 796.47 to 796.56, washout equal on both). **One number in the
+source fragment does not reconcile and is left unresolved rather than picked:**
+its §A reports the washout proxy for these two builds at 71% and its own §C table
+reports the same two builds at 63.1%. Whichever reading is right, both builds
+carry the SAME value, which is the claim this rider rests on; anyone acting on
+the level rather than the equality should re-derive it from the run. A 2-game slate
+gave the allocator `distinct_lineups_available: 13` for 7 entries and
+construction mode had almost no room. **Do not read the null result forward:**
+13 candidates is a 2-game artifact and the same defect on a 12-game slate has
+far more room to express itself. (b) FIFTH data point for this entry's second,
+smaller question: the Micro Booster printed `large_wta -> wta_satellite
+[COLLAPSED]` on a 237-entrant field. The posture vocabulary exposes only
+`wta_satellite`, mapping to `large_wta`, while `contest_shapes.py` also defines
+`small_wta` and `mid_wta` that no posture can reach, so a 237-person field and a
+six-figure field get identical construction. **(c) Not done, and owed:** the
+`dk_contest_paid_places.json` companion was not touched. Both contests now have
+an observed paid-place count (5 of 237, 350 of 1486) that belongs there if that
+file is still what `--paid-places-from` reads. ARCHIVE's.
 
 ### R201. `MIN_AUTO_TEAM_COVERAGE` is a false negative on a small slate, and it overrides the tier the code's own docstring calls authoritative (P1, S) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_team-coverage-floor-false-negative.md`; head of this workstream's remainder
 

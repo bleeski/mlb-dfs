@@ -25,6 +25,63 @@ performance claim.
 
 ---
 
+## 2026-08-30 — Board: the backlog inbox is merged, and one item's own Fix line was wrong
+
+**What moved.** `docs/backlog.md` only, plus three consumed fragments moved out
+of `docs/backlog_inbox/` to `_to_delete/` (this mount cannot unlink; `mv` is the
+close-out). Three 08-30 BUILD fragments in, TWO new numbers, FOUR riders, one
+item half-closed and retitled, and one new queue slot at 13 which renumbers only
+the old 13 and 14.
+
+**New: R276** (Ben's dated standing-QA instruction, built as three
+`qa_portfolio` panels and a `--compare` flag; report-only, changes no delivered
+byte) and **R277** (`refresh_reference_data.py:83` builds the FanGraphs pitching
+export with `&qual=y`, so 211 arms are measured against Savant's 831 and every
+non-qualified starter takes the neutral K-rate default all season).
+
+**Riders, no new number: R249** gains the first MEASUREMENT of what Showdown's
+APPG ranking costs; **R237** gains a third field sighting and the brief half it
+lacked; **R247** gains its first CLASSIC sighting and a second axis its washout
+line has to measure; **R107(a)** gains the FanGraphs membership gate that changes
+what "adopt" would mean.
+
+**Why only two numbers for four fragments.** Three findings already had a class
+on this board, and R167/R159 is the entry that spent itself undoing two copies of
+one rule that had started disagreeing. A second number for an existing class is
+how that begins.
+
+**R277 corrects a verified claim already on the board.** The 2026-08-16 merge
+pass recorded Dobnak's absence from `fangraphs_season_pitching.csv` and
+attributed it to the 30.2-day staleness the warning reports. The absence was
+verified correctly; the attribution was never checked and is wrong for this
+class. Counted on disk at this head: 211 rows and 0 Kikuchi hits in that file,
+831 rows and 1 hit in `expected_stats_pitching.csv`. The warning's printed remedy
+ends `&qual=y&type=8`, so a fresh export adds nobody. Standing condition, not an
+aging file.
+
+**R196's own Fix line specified the defect.** It called for shape
+`single_entry_gpp`; that value is inside `WTA_CONSTRUCTION_SHAPES`
+(`contest_shapes.py:96-99`), which `execution_pipeline.py:4562` reads to pick
+max-concentration construction, and the entered Solo Shot paid 350 of 1486
+(breadth 0.235 against the shape's curated 0.01). Writing the row as specified
+would have pinned WTA construction to a broad curve on every future slate. The
+row half is CLOSED (both rows verified in `dk_contest_archetypes.csv`); the entry
+is retitled to its real remainder, which is that the table cannot express "single
+entry, broad curve" because posture inference reads `inferred_type` and nothing
+reads `payout_shape_default`.
+
+**One thing found while merging, for ARCHIVE and not acted on here.**
+`ledger/inbox/_CONSUMED_2026-08-22_DO_NOT_REMERGE.md` says 108 miner fragments
+and four dated fragments were merged on 08-22 and only the DELETION is
+outstanding, blocked at the time because the mount refused `rm`. That blocker is
+gone: `_to_delete/` exists and is gitignored (`.gitignore:85`). `ledger/inbox/` is
+ARCHIVE's write surface and this session wrote nothing there.
+
+**Gate not run, stated rather than skipped quietly.** This commit touches no
+code, no test, and no contract; the change is two documents. `--gate-run` was not
+spent on it. Anything that edits the DEV write set beyond docs still owes the
+full assembly at its own session start.
+
 ## 2026-08-30 — Board: slot 1 closed and refilled, not vacated
 
 **What moved.** `docs/backlog.md` only. The four entries above closed the whole
