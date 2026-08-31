@@ -39,6 +39,36 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-31, DEV, claim `engine` (`engine_2026-08-31`): **R277(d) SHIPPED; R277
+stays on the board holding (a), (b) and the (c) follow-on. Slot 13 is now R276 +
+R277-remainder. No resequencing; nothing else moved.**
+
+What closed: the warning that reported absence-by-QUALIFICATION as staleness and
+printed an export URL as its remedy, plus `REQUIRED_COLUMNS` finally enforced on
+the manual FanGraphs export — the one file `_validate` never sees, and the one
+about to be re-pulled by hand through a different URL. Membership by filter is now
+its own age-independent condition, declared once in `SOURCE_MEMBERSHIP_FILTER`;
+deleting that entry is part of widening the pull, so the table cannot go quietly
+stale. Five tests, seven mutations all killed, gate 1489 -> 1494. Full reasoning
+in CHANGELOG 2026-08-31, including the 19-site R233 enumeration and the one member
+it FILED: `fangraphs_season_pitching.csv` can never carry a `fetched_at` stamp,
+because only `refresh()` stamps and `refresh()` fetches Savant, so the one file
+placed by hand is the one file aged by mtime.
+
+**Why (a) did not ship, and it is not a blocker to work around.** FanGraphs is
+manual by decision, so a session cannot download it, and shipping `qual=0`
+unverified would put an untested export parameter on the one pull nothing here can
+test. `data/reference/fangraphs_season_pitching.csv` is still 211 rows, mtime
+2026-07-16, 45.2 days old against a 14-day limit — stale AND filtered, both
+now reported separately. **The download is the single input the remainder needs.**
+
+**The go/no-go is already set, so the next session measures rather than debates.**
+Bar stated before any after-data: |Δmultiplier| > 0.05 for an arm whose K rate did
+not change. The sensitivity analysis in the CHANGELOG entry reduces the whole
+question to one number — the mean K/9 gap between the added and the existing
+population. Inside ±1.0 almost nothing crosses the bar and this is a coverage fix;
+past about ±1.5 it is a strategy change and stops for Ben.*
+
 *2026-08-30 (third note this date), DEV, claim `engine` (`engine_2026-08-30`,
 re-taken): **backlog inbox merged. Three 08-30 BUILD fragments consumed, TWO new
 numbers (R276, R277), FOUR riders on existing entries, and ONE item half-closed.
@@ -613,8 +643,11 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
     atomic-writer copy, so ed8 adds no scope.
-13. **R276 + R277** — **INSERTED 2026-08-30 (third note), the only resequencing
-    this date; the old 13 and 14 move down one and nothing else changed.** Ben's
+13. **R276 + R277-remainder** — **R277(d) SHIPPED 2026-08-31 (CHANGELOG that
+    date); the slot now holds R277's (a)/(b)/(c-follow-on) remainder, which is
+    BLOCKED on one manual FanGraphs download and on nothing in code.** Position
+    unchanged: no resequencing this date. Inserted 2026-08-30 (third note), the
+    only resequencing that date; the old 13 and 14 moved down one. Ben's
     dated standing-QA instruction and the first finding it produced, and they
     land together because neither is worth much alone: R276's panel (a) is
     exactly the check that surfaces R277 with no cleverness, and R277 without a
@@ -3856,7 +3889,7 @@ timestamped, beside the build-time packet; both retained under
 `data/slates/<date>/`. (c) The backtest note: date-bounded Statcast pulls
 for anything retrospective; forward-going, the snapshots are the record.
 
-### R277. The FanGraphs pitching export is `qual=y`, so every non-qualified starter takes the neutral K-rate default all season, and the staleness warning names a remedy that provably cannot reach him (P1, S) | new 2026-08-30, merged from BUILD fragment `2026-08-30_BUILD_standing-data-driven-qa.md` §B; VERIFIED on disk at this head; **corrects a verified claim already on this board**
+### R277. The FanGraphs pitching export is `qual=y`, so every non-qualified starter takes the neutral K-rate default all season (P1, S) | new 2026-08-30, merged from BUILD fragment `2026-08-30_BUILD_standing-data-driven-qa.md` §B; VERIFIED on disk at this head; **corrects a verified claim already on this board** | **(d) SHIPPED 2026-08-31, see CHANGELOG that date; this entry now holds (a), (b) and the (c) follow-on only, and is BLOCKED on one manual download**
 
 **What.** `tools/refresh_reference_data.py:83` builds the FanGraphs pitching URL
 as `?pos=all&stats=pit&lg=all&qual=y&type=8`, qualified pitchers only. Counted at
@@ -3945,19 +3978,74 @@ unchanged and no projection math has to move. **This is the R167/R233 shape: the
 fix, the argument, and the safety proof all already existed and were never
 applied to the second site.**
 
-(b) **The one real consequence to MEASURE before shipping, and it is not the
-sample-size worry.** The multiplier is `neutral + (percentile - 0.5) * span`,
-where the percentile ranks within the qualified-starter rows OF THE SUPPLIED
-TABLE. Widening the pull changes the ranking POPULATION, so every existing arm's
-multiplier moves even though its K rate did not. Report the before/after
-multiplier distribution for the arms already in the file, not just the arms
-added. (c) The warning stops claiming staleness
-for an arm that is absent by QUALIFICATION and names the real condition; this
-half is R237's typed-state discipline applied to a reason string, and it can ship
-alone. (c) Cross-ref R237: a `not_computed` state whose reason reads "not
-qualified, structural" is a different fact from one reading "provider failed,"
-and this is the first named instance where the difference changes what the
-operator should do.
+**BLOCKED, and on exactly one thing: a manual FanGraphs download.** FanGraphs is
+manual by decision, so no session can fetch it, and a URL nobody has downloaded is
+an untested export parameter on the one pull nothing here can test. Ben opens
+`https://www.fangraphs.com/leaders/major-league?pos=all&stats=pit&lg=all&qual=0&type=8`,
+uses **Export Data**, and saves over
+`data/reference/fangraphs_season_pitching.csv` (back the old file up first). The
+expected row count is **well above 211**. Still 211 means `qual=0` is the wrong
+parameter and the next session reads the export link off the page rather than
+guessing again; **under** 211 means stop and keep the old file. As of 2026-08-31
+the file on disk is still the 211-row 2026-07-16 export, 45.2 days old against a
+14-day limit — stale AND filtered, which (d) now reports as two separate
+conditions with two separate remedies.
+
+(b) **The consequence to MEASURE, and it is not the sample-size worry.** The
+percentile ranks within the qualified-starter rows OF THE SUPPLIED TABLE, so
+widening changes the ranking POPULATION and every existing arm's multiplier moves
+even though its K rate did not. **The BEFORE half is measured and recorded here so
+the next session only has to run the after:** 211 rows, **189 rank** (22 are
+`GS==0` and take the neutral), K/9 min 4.39 / median 8.38 / max 13.65, multipliers
+min **1.2716** / median **1.4200** / max **1.5700**. The clip never binds — the
+full-weight range `neutral ± span/2` = [1.270, 1.570] sits strictly inside
+`(1.25, 1.60)` and 0 of 211 reach either bound.
+
+**Bar, stated before any after-data: |Δmultiplier| > 0.05** for an arm whose K
+rate did not change stops being a coverage fix. One sixth of the 0.30 span, i.e. a
+16.7 percentile-point move. Report min, median, max and the largest absolute move
+WITH THE NAME ATTACHED, over the arms already in the file.
+
+**The go/no-go reduces to one number.** Exact analytic worst case (all added arms
+on one side): |Δ| = 0.104 at M=100, 0.154 at M=200, 0.204 at M=400, up to 68% of
+the span. A sensitivity analysis (labelled prior, not a measurement — added arms
+drawn from the qualified K/9 distribution shifted by δ) says the realistic answer
+is governed entirely by δ, the mean K/9 gap between the added and existing
+populations: within ±0.5, max |Δ| ≤ 0.029 and **nothing** crosses the bar; at
+δ=−1.0, 7 of 189 cross; at δ=−2.0, max |Δ| = 0.088 and 131 of 189 cross.
+**Inside ±1.0 this is a coverage fix. Past about ±1.5 it is a strategy change and
+it stops for Ben.** Measure δ first; it decides the item.
+
+(c) **The floor is DECIDED, not open: keep `XWOBA_PA_MIN=50` / `XWOBA_PA_FULL=100`
+unchanged.** Four reasons in the CHANGELOG 2026-08-31 entry; the binding one is
+sequencing — changing the floor and the population together confounds (b), because
+an existing arm's move could be either and nothing would say which.
+
+**What (c) found that the next session MUST measure, and it is the real risk.**
+Ranking membership is gated at `_tbf >= pa_min`, but the shrink weight applies only
+to an arm's OWN multiplier. An arm at 51 TBF enters the ranking at **full
+standing**, displacing everyone's percentile, while taking 2% of its own deviation.
+The shrink protects the thin arm from a wrong multiplier; it does not protect the
+population from that arm's rank contribution. At `qual=y` this is invisible: the
+[50, 100) TBF band holds **0 of 211** rows and the file's minimum is 40.0 IP, so
+the shrink has never once fired on this feature. At `qual=0` the band fills, and
+with `GS>=1` a reliever with one spot start and 12 IP votes at full weight carrying
+a reliever's structurally-high K rate — the exact contamination the module comment
+says the GS filter exists to prevent, and the mechanism that would push δ positive.
+So: count the added ranked arms landing in [50, 100) TBF and look at their GS/G.
+**If that band is thick with 1-GS relievers the remedy is the STARTER TEST, not the
+floor.**
+
+(d) **SHIPPED 2026-08-31.** The warning no longer reports absence-by-QUALIFICATION
+as staleness, and the export URL now rides only the age condition it can actually
+remedy. Membership by filter is its own age-independent condition declared once in
+`SOURCE_MEMBERSHIP_FILTER`; **deleting that entry is part of (a)**, which is what
+keeps the table from going quietly stale when the pull widens. `REQUIRED_COLUMNS`
+is now enforced on this file too — it was checked on the FETCH path only, so the
+one file placed by hand was the one file whose columns nothing verified, which is
+the guard (a) needs to be safe. Cross-ref R237 stands: a reason reading "not
+qualified, structural" is a different fact from "provider failed," and this was the
+first named instance where the difference changes what the operator does.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 

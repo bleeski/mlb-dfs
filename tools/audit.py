@@ -390,7 +390,15 @@ EXPECTED_SUITE_COUNTS = {
     # top-level entry into the allocator, where a private ladder kwarg would be a
     # defect and not a fix. Scoped by AST now. The class had one more member than
     # the enumeration and the test is what said so.
-    "tests.test_core": 934,
+    # R277, 2026-08-31: 934 -> 939, the five that pin membership by FILTER as a
+    # condition separate from age -- the filter warning firing on a file pulled
+    # this morning (where the old code said nothing at all), the export URL
+    # riding only the age condition it can actually remedy, deleting the
+    # SOURCE_MEMBERSHIP_FILTER entry being what silences the warning, and
+    # REQUIRED_COLUMNS finally enforced on the one file nothing fetches
+    # (a good header, a missing K/9, and a non-empty file whose header cannot be
+    # read at all, which is the branch a bad hand-placed download arrives on).
+    "tests.test_core": 939,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

@@ -4778,10 +4778,17 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
                  "fangraphs_season_pitching.csv"]
         files = {}
         now = dt.datetime.now(dt.timezone.utc)
+        # R277. These were a one-word "placeholder" line, which is a file with
+        # ONE column and none of the ones its factor reads. It passed only
+        # because nothing checked; the fixture is now well-formed so the column
+        # guard has something honest to pass on.
+        from tools.refresh_reference_data import REQUIRED_COLUMNS
         for name in names:
             if name in missing:
                 continue
-            (root / name).write_text("placeholder\n", encoding="utf-8")
+            (root / name).write_text(
+                ",".join(REQUIRED_COLUMNS[name]) + "\nplaceholder\n",
+                encoding="utf-8")
             age = (ages or {}).get(name, 0.0)
             files[name] = {"fetched_at": (now - dt.timedelta(days=age)).isoformat()}
         (root / "reference_manifest.json").write_text(
@@ -4810,7 +4817,19 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
             self.assertTrue(ref["fangraphs_pitching"])
             self.assertTrue(ref["status"]["enabled"])
             self.assertFalse(ref["status"]["any_stale"])
-            self.assertEqual(ref["status"]["warnings"], [])
+            # R277. "No warnings" stopped being the right assertion when
+            # membership by FILTER became a standing, age-independent condition:
+            # a fresh well-formed file pulled through qual=y is still missing
+            # most of the league. What a clean dir now means is that nothing is
+            # STALE and nothing is the wrong SHAPE; assert that, and let the
+            # membership warning come and go with SOURCE_MEMBERSHIP_FILTER so
+            # widening the pull does not have to edit this test.
+            warnings = ref["status"]["warnings"]
+            self.assertEqual([w for w in warnings if "days old" in w], [])
+            self.assertEqual(
+                [w for w in warnings if "missing required column" in w], [])
+            self.assertEqual(
+                [w for w in warnings if "INCOMPLETE BY FILTER" not in w], [])
 
     def test_stale_and_missing_reference_data_warn_without_blocking(self):
         """Degraded signal beats no lineups at T-10, but it is never silent."""
@@ -5019,10 +5038,121 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
                 encoding="utf-8")
             warnings = rrd.reference_status(reference_dir=root)["warnings"]
             fg = [w for w in warnings if w.startswith("fangraphs_season_pitching.csv")]
-            self.assertEqual(len(fg), 1)
-            self.assertIn("it feeds the K-rate pitcher ceiling multipliers", fg[0])
-            self.assertIn("enrichment['neutral_default']", fg[0])
-            self.assertNotIn("season rates are drifting", fg[0])
+            # R277 split this file's report into three independently-caused
+            # conditions, so select the AGE one rather than counting; every
+            # R127(b) assertion still lands on it.
+            stale = [w for w in fg if "days old" in w]
+            self.assertEqual(len(stale), 1)
+            self.assertIn("it feeds the K-rate pitcher ceiling multipliers", stale[0])
+            self.assertIn("enrichment['neutral_default']", stale[0])
+            self.assertNotIn("season rates are drifting", stale[0])
+
+    # --- R277: absence by FILTER is not absence by AGE ----------------------
+    def _fangraphs_only_status(self, root, header, age_days=0.0):
+        """reference_status over a temp dir holding one FanGraphs CSV."""
+        import tools.refresh_reference_data as rrd
+        root = Path(root)
+        for name in rrd.REQUIRED_COLUMNS:
+            cols = header if name == "fangraphs_season_pitching.csv" else \
+                ",".join(rrd.REQUIRED_COLUMNS[name])
+            (root / name).write_text(cols + "\nrow\n", encoding="utf-8")
+        when = (datetime.now(timezone.utc) - timedelta(days=age_days)).isoformat()
+        (root / "reference_manifest.json").write_text(json.dumps(
+            {"files": {n: {"fetched_at": when} for n in rrd.REQUIRED_COLUMNS}}),
+            encoding="utf-8")
+        status = rrd.reference_status(reference_dir=root)
+        fg = [w for w in status["warnings"]
+              if w.startswith("fangraphs_season_pitching.csv")]
+        return status, fg
+
+    def test_filter_absence_is_reported_on_a_perfectly_fresh_file(self):
+        """R277. The incompleteness sentence used to live on the STALENESS
+        branch, so a file pulled this morning through qual=y reported NOTHING
+        while omitting most of the league's arms. Membership is set by the
+        export's filter, not by the clock."""
+        with tempfile.TemporaryDirectory() as tmp:
+            status, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9", age_days=0.0)
+            entry = status["files"]["fangraphs_season_pitching.csv"]
+            self.assertFalse(entry["stale"])
+            self.assertTrue(entry["membership_filtered"])
+            filt = [w for w in fg if "INCOMPLETE BY FILTER" in w]
+            self.assertEqual(len(filt), 1)
+            self.assertIn("qual=y", filt[0])
+            self.assertIn("neutral_default", filt[0])
+
+    def test_the_remedy_url_rides_only_the_condition_it_can_reach(self):
+        """R277, the defect in one assertion. The stale warning printed the
+        export URL as the remedy for 'any player it never listed', and
+        re-exporting that URL returns the same roster -- the remedy reproduced
+        the condition. The URL now rides the AGE warning alone, and the filter
+        warning says in terms that a refresh is not the fix."""
+        import tools.refresh_reference_data as rrd
+        url = rrd.MANUAL_TARGETS["fangraphs_season_pitching.csv"]
+        with tempfile.TemporaryDirectory() as tmp:
+            _, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9", age_days=30.0)
+            carrying_url = [w for w in fg if url in w]
+            self.assertEqual(len(carrying_url), 1)
+            self.assertIn("days old", carrying_url[0])
+            # Age causes only the absence a fresh pull can undo.
+            self.assertIn("called up after the pull", carrying_url[0])
+            self.assertNotIn("never listed", carrying_url[0])
+            filt = [w for w in fg if "INCOMPLETE BY FILTER" in w]
+            self.assertEqual(len(filt), 1)
+            self.assertNotIn(url, filt[0])
+            self.assertIn("a refresh is not the remedy", filt[0])
+
+    def test_widening_the_pull_is_what_silences_the_filter_warning(self):
+        """R277. SOURCE_MEMBERSHIP_FILTER is the single owner of this claim, so
+        deleting the entry -- which is part of widening the pull it describes --
+        silences that warning and leaves the other two conditions alone."""
+        import tools.refresh_reference_data as rrd
+        with tempfile.TemporaryDirectory() as tmp:
+            with unittest.mock.patch.dict(rrd.SOURCE_MEMBERSHIP_FILTER, {},
+                                          clear=True):
+                status, fg = self._fangraphs_only_status(
+                    tmp, "Name,IP,K/9", age_days=30.0)
+            self.assertEqual(
+                [w for w in fg if "INCOMPLETE BY FILTER" in w], [])
+            self.assertFalse(
+                status["files"]["fangraphs_season_pitching.csv"]["membership_filtered"])
+            self.assertEqual(len([w for w in fg if "days old" in w]), 1)
+
+    def test_required_columns_are_checked_on_the_file_nothing_fetches(self):
+        """R277. _validate enforces REQUIRED_COLUMNS on the FETCH path, so the
+        manual FanGraphs export -- the only file placed by hand, and the one
+        about to be re-pulled through a different URL -- was the one file whose
+        column list nothing ever checked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            status, fg = self._fangraphs_only_status(tmp, "Name,IP,ERA")
+            entry = status["files"]["fangraphs_season_pitching.csv"]
+            self.assertEqual(entry["missing_columns"], ["K/9"])
+            missing = [w for w in fg if "missing required column" in w]
+            self.assertEqual(len(missing), 1)
+            self.assertIn("K/9", missing[0])
+        with tempfile.TemporaryDirectory() as tmp:
+            status, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9,K%,WAR")
+            self.assertEqual(
+                status["files"]["fangraphs_season_pitching.csv"]["missing_columns"], [])
+            self.assertEqual([w for w in fg if "missing required column" in w], [])
+
+    def test_an_unreadable_header_confirms_nothing_and_says_so(self):
+        """R277. A non-empty file that is not this CSV -- an HTML error page or
+        a truncated binary landing on the path -- must not read as a file whose
+        columns were checked and found fine. `exists` is size-based, so this is
+        the branch a bad hand-placed download actually arrives on."""
+        import tools.refresh_reference_data as rrd
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._fangraphs_only_status(tmp, "Name,IP,K/9")
+            (root / "fangraphs_season_pitching.csv").write_bytes(b"\xff\xfe\x00bad")
+            status = rrd.reference_status(reference_dir=root)
+            entry = status["files"]["fangraphs_season_pitching.csv"]
+            self.assertTrue(entry["exists"])
+            self.assertEqual(entry["missing_columns"], list(
+                rrd.REQUIRED_COLUMNS["fangraphs_season_pitching.csv"]))
+            unreadable = [w for w in status["warnings"] if "header unreadable" in w]
+            self.assertEqual(len(unreadable), 1)
+            self.assertIn("K/9", unreadable[0])
 
     def test_a_missing_reference_warning_names_the_factor_that_is_off(self):
         import tools.refresh_reference_data as rrd

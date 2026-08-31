@@ -25,6 +25,186 @@ performance claim.
 
 ---
 
+## 2026-08-31 — R277(d): absence by FILTER stops being reported as absence by AGE, and the one file nothing fetches gets its column check
+
+**What moved.** `tools/refresh_reference_data.py`, `tests/test_core.py`,
+`tools/audit.py` (suite pin), `CLAUDE.md` (quoted gate line). No engine path, no
+delivered byte, no projection math. **R277's (a) half — widening the export URL
+itself — did NOT ship, and the reason is in "What did not ship" below.**
+
+**What was wrong.** `reference_status` carried the sentence "A stale file is also
+an INCOMPLETE one: any player it never listed takes the neutral default" on the
+STALENESS branch, and appended the export URL as the remedy. For
+`fangraphs_season_pitching.csv` that URL ends `&qual=y`, so re-exporting it
+returns the same 211 arms: the remedy reproduced the condition it was offered
+for. Two consequences, and both have already been paid. A file pulled this
+morning through the same filter emitted **nothing at all**, because the only
+place the incompleteness was ever stated was gated on age. And an operator who
+did follow the remedy got the same roster back and no signal that anything was
+still missing — which is how the same arm's absence was read as staleness on
+2026-08-15 and again on 2026-08-16, the second time in a pass that verified the
+staleness and never checked the attribution.
+
+**What it is now.** Three INDEPENDENT conditions per CSV, because they have three
+causes and three remedies, and collapsing them is the whole defect:
+
+- `stale` — age. The warning now claims only the incompleteness age actually
+  causes ("a player who debuted or was called up after the pull"), which a fresh
+  pull does reach. It keeps the export URL.
+- `membership_filtered` — the export's own filter drops players by rule, declared
+  once in the new `SOURCE_MEMBERSHIP_FILTER`. Reported whether the file is fresh
+  or stale, carries **no** URL, and says in terms that a refresh is not the
+  remedy. Deleting the entry is part of widening the pull it describes, which is
+  what makes the table go stale loudly instead of silently.
+- `missing_columns` — `REQUIRED_COLUMNS` enforced on a file this tool never
+  fetched. `_validate` runs on the FETCH path only, so the manual FanGraphs
+  export was the one file whose column list nothing ever checked; that entry read
+  as a guard and was decoration. It matters most exactly now, when the next step
+  is Ben hand-placing a differently-parameterised export.
+
+**R233 enumeration.** Class: *reference-data pulls carrying a qualification or
+minimum filter*, plus every consumer of `fangraphs_season_pitching.csv`
+separately. **19 sites, 1 fixed, 1 blocked, 1 filed, 16 kept with the reason
+each survives.** The item named 4.
+
+Pull sites, 8: `refresh_reference_data.py:69` Savant `min={min_pa}` — KEPT, it is
+the model this fix follows (`DEFAULT_MIN_PA="1"`); `:83` FanGraphs `qual=y` — the
+defect, BLOCKED on the download, see below; `:379` the `--min-pa` CLI flag, Savant
+only — KEPT, a flag parameterises a fetch and FanGraphs has no fetch to
+parameterise, so a FanGraphs equivalent would control nothing; `:122`
+FanGraphs roster-resource depth charts — KEPT, no filter parameter;
+`fetch_fangraphs_platoon.py:62` per-team slug — KEPT, enumerates a roster, no
+qualification filter; `fetch_rotowire_lineups.py:58` + its `--min-teams` — KEPT
+and named as the CORRECT form: a floor that REFUSES a short response is not a
+filter that silently drops rows; `fetch_slate_bundle.py:59-62` (schedule/people,
+odds, weather) — KEPT, `hydrate`/`regions`/`markets` select markets and payload
+shape, not players; `wheel_fetch.py` PyPI — out of class.
+
+Consumers, 11: `build_k_rate_ceiling_multipliers` — KEPT, and it holds the second
+in-code filter (`GS>=1 & TBF>=50`) that (c) below is about;
+`build_dk_keyed_pitcher_ceiling_multipliers` — KEPT, but NAMED: it resolves
+normalized-name collisions by higher-TBF-wins, and widening the file from 211 to
+~800 rows makes that rule far more load-bearing than it has ever been;
+`execution_pipeline.py:3757-3813` (the zero-match wiring guard, the
+`absent_from_fangraphs_season_pitching` reason, the `pitcher_ceiling` block) —
+KEPT, widening raises the match rate and cannot trip the guard;
+`REQUIRED_COLUMNS`, `MANUAL_TARGETS`, `CSV_FEEDS` entries — the first FIXED, the
+other two KEPT; `stage_slate.py:475` and `skills/.../build_slate.py:786` — KEPT,
+path resolution and a presence check, neither reads a row;
+`tests/test_golden_replay.py:413,438` — KEPT DELIBERATELY and verified rather
+than assumed: it reads its own frozen `fangraphs_season_pitching_frozen_2026-07-16.csv`
+(22,406 bytes, 212 lines, byte-identical to today's production file), on a
+separate path, so widening production cannot move the replay;
+`MANIFEST.md:60` and `docs/DFS_SYSTEM_GREENFIELD_SPEC_CODEX.md:285` — KEPT, prose.
+
+**Filed, not fixed (the class had one more member than the item named).**
+`reference_manifest.json` has no entry for `fangraphs_season_pitching.csv` and
+structurally cannot get one: only `refresh()` stamps, and `refresh()` fetches
+Savant. So the one file that is placed by hand is the one file whose age can
+never come from `fetched_at`, and it falls back to mtime — which this module's
+own `_age_days` docstring calls "only a floor on true age", reset by any copy or
+checkout. Verified at this head: the manifest holds two entries, both Savant.
+Filed for a number; not fixed here because a manual-stamp path is its own
+decision about who asserts a fetch time.
+
+**(b) The population shift: measured on the BEFORE side, BLOCKED on the after.**
+The percentile ranks within the qualified rows OF THE SUPPLIED TABLE, so widening
+moves every existing arm. At this head: 211 rows, of which **189 rank** (22 are
+`GS==0` and take the neutral); K/9 min 4.39, median 8.38, max 13.65; multipliers
+min 1.2716, median 1.4200, max 1.5700. **The clip never binds** — full-weight
+range is `neutral ± span/2` = [1.270, 1.570] strictly inside `(1.25, 1.60)`, and
+0 of 211 sit at either bound.
+
+Bar stated up front, before any after-data: **|Δmultiplier| > 0.05** for an arm
+whose K rate did not change stops being a coverage fix. That is one sixth of the
+0.30 span, i.e. a 16.7 percentile-point move.
+
+Two things measurable without the download, and both are in the entry because
+they set the go/no-go before the file arrives. The EXACT analytic worst case
+(every added arm landing on one side) is |Δ| = 0.104 at M=100, 0.154 at M=200,
+0.204 at M=400 — up to 68% of the whole span. A SENSITIVITY ANALYSIS (labelled
+prior, not a measurement: added arms drawn from the qualified K/9 distribution
+shifted by δ, 20 draws each) says the realistic answer turns entirely on δ:
+
+| added M | δ K/9 | max abs Δ | over the 0.05 bar |
+|---|---|---|---|
+| 400 | −2.0 | 0.088 | 131 of 189 |
+| 400 | −1.0 | 0.050 | 7 of 189 |
+| 400 | ±0.5 | ≤0.029 | 0 of 189 |
+| 400 | +1.0 | 0.049 | 10 of 189 |
+
+**So the whole decision is one number: the mean K/9 gap between the added and
+existing populations. Inside ±1.0 this is a coverage fix and almost nothing
+crosses the bar; past about ±1.5 it is a strategy change and stops here.** That
+number needs the file.
+
+**(c) The small-sample floor: DECIDED, keep 50/100 unchanged, four reasons.**
+`XWOBA_PA_MIN=50` / `XWOBA_PA_FULL=100` are 11.76 IP and 23.53 IP at
+`K_RATE_TBF_PER_IP=4.25`. (1) They have **never once fired on this feature**: 0 of
+211 rows sit below the full-weight bar and the file's minimum is 40.0 IP, so the
+shrink is untested here and widening is what exercises it for the first time.
+(2) Pitcher K% stabilises far faster than xwOBA-against, so constants chosen for
+the slower stat are conservative when reused on the faster one — they err toward
+demanding more sample, not less. (3) A separate constant would mint a second
+sample-size vocabulary for one shrink mechanism shared by three call sites, which
+is the R167/R159 shape this file has already spent two entries undoing. (4)
+Sequencing, and this is the binding one: changing the floor and the population in
+the same commit confounds (b) — an existing arm's move could be either and
+nothing would say which. Not brought to Ben, per the Autonomy section; the
+evidence settled it. The arm that motivated the item has 165 TBF, above `pa_full`,
+so the floor never excluded him and changing it would fix nothing he needs.
+
+**The asymmetry that (c) found and the next session must measure.** Membership in
+the RANKING population is gated at `_tbf >= pa_min`, but the shrink weight applies
+only to the arm's OWN multiplier. An arm at 51 TBF therefore enters the ranking at
+**full standing**, displacing every other arm's percentile, while receiving 2% of
+its own deviation. The shrink protects the thin arm from a wrong multiplier; it
+does not protect the population from that arm's rank contribution. At `qual=y`
+this was invisible — the [50, 100) band is empty. At `qual=0` it fills, and
+combined with `GS>=1` a reliever with one spot start and 12 IP votes at full
+weight with a reliever's structurally-high K rate: the exact contamination the
+module comment says the GS filter exists to prevent. If the widened band is thick
+with 1-GS relievers the remedy is the STARTER TEST, not the floor.
+
+**What did not ship, and why.** (a). `data/reference/fangraphs_season_pitching.csv`
+is still the 211-row file, mtime 2026-07-16, 45.2 days old against a 14-day limit.
+FanGraphs is manual by decision, so the session does not fetch it, and shipping a
+URL nobody has downloaded would put an unverified export parameter on the one pull
+that cannot be tested from here. (b)'s after-half and the (c) follow-on measurement
+go with it. R277 stays on the board holding exactly that remainder.
+
+**Tests.** Five new, all in `BuildSlateEnrichmentWiringTests`. Two existing tests
+moved and neither was loosened. `test_a_stale_reference_warning_names_what_it_feeds`
+counted `len(fg) == 1`; it now SELECTS the age warning and keeps every R127(b)
+assertion on it, which is stronger, since the count was only ever a proxy for
+"the warning that names the factor". `test_resolve_reference_data_reports_ages_and_returns_paths`
+asserted `warnings == []` over a fixture whose reference files each contained the
+single word `placeholder` — a one-column file carrying none of the columns its
+factor reads, which passed only because nothing checked. **The fixture was fixed,
+not the guard**, and the assertion became "nothing stale and nothing the wrong
+shape", which survives (a) landing without another edit.
+
+**Mutations.** Seven, all seven KILLED, no survivors, target restored
+byte-identical and asserted so. M1 re-gated the filter warning on staleness; M2
+put the export URL back into it; M3 restored "never listed" to the age warning;
+M4 neutered the column check to always-clean; M5 dropped the `exists` guard; M6
+made an unreadable header read as an empty one; M7 pinned `membership_filtered`
+False. `__pycache__` cleared before the run and between mutants, each anchor
+asserted to appear exactly once and the patch asserted non-identical, because a
+no-op patch and stale bytecode both read as SURVIVED. Recorded because it cost
+something: the first driver ran all seven in one call, hit the ~180s Cowork bash
+ceiling mid-M2, and **left that mutation on disk**; caught by grepping the
+anchors rather than trusting the driver's own restore. Split into batches of
+three and four, with the revert in a `finally`.
+
+**Gate 1489 -> 1494.** `PASS  v2.26.0  27 modules  1494 tests`. Two tests failed
+first and both were right to: `AuditSkipHonestyTests` and `SplitGateTests` pin
+that CLAUDE.md's quoted line equals the computed one, so the count move dragged
+`CLAUDE.md:304` with it. That is the staleness class this file keeps writing
+entries about, enforced instead of trusted.
+
+---
+
 ## 2026-08-30 — Board: the backlog inbox is merged, and one item's own Fix line was wrong
 
 **What moved.** `docs/backlog.md` only, plus three consumed fragments moved out

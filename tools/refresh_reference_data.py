@@ -118,6 +118,28 @@ CSV_FEEDS: Dict[str, str] = {
         "in a ceiling-scored build",
 }
 
+# R277. MEMBERSHIP, not age. Which players a reference file lists is set by the
+# filter its export carries, and a pull made this morning is exactly as
+# incomplete as a month-old one when both were pulled through the same filter.
+# That fact used to ride the STALENESS branch below, where it printed the export
+# URL as the remedy -- and re-exporting the same URL returns the same roster, so
+# the remedy reproduced the condition it was offered for. On 2026-08-15 and again
+# on 2026-08-16 an arm's absence was read as staleness on exactly that warning.
+# An entry here says: this file's source drops players by rule, and here is the
+# rule. No entry means the pull is unfiltered. DELETING an entry is part of
+# widening the pull it describes, which is what makes this table go stale loudly.
+SOURCE_MEMBERSHIP_FILTER: Dict[str, str] = {
+    "fangraphs_season_pitching.csv":
+        "its export URL carries qual=y, so it lists only QUALIFIED pitchers -- "
+        "211 arms at this head, against 831 pitcher rows in Savant's min=1 "
+        "export of the same season. Age is not the cause and a refresh is not "
+        "the remedy: the same URL returns the same roster. Every starter it "
+        "never listed takes the neutral K-rate multiplier, which is the 50th "
+        "percentile by construction, so an unlisted arm is priced as a MEDIAN "
+        "qualified starter rather than as unknown. Widening the pull is the "
+        "only remedy",
+}
+
 FANGRAPHS_ROSTER_RESOURCE_URL = (
     "https://www.fangraphs.com/roster-resource/depth-charts"
 )
@@ -226,6 +248,25 @@ def _json_payload_age_days(path: Path, date_key: str) -> Optional[float]:
     return (_now() - stamped).total_seconds() / 86400.0
 
 
+def _header_columns(path: Path) -> Optional[List[str]]:
+    """First CSV row as a stripped column list, or None if it cannot be read.
+
+    R277. ``REQUIRED_COLUMNS`` is enforced by ``_validate`` on the FETCH path
+    only, so the one file nobody fetches -- the manual FanGraphs export -- was
+    the one file whose column list nothing ever checked. That entry read as a
+    guard and was decoration, and it matters most exactly when the manual export
+    changes shape under a hand re-pull.
+    """
+    try:
+        with path.open(encoding="utf-8-sig", newline="") as fh:
+            row = next(csv.reader(fh), None)
+    except (OSError, UnicodeDecodeError, csv.Error, StopIteration):
+        return None
+    if row is None:
+        return None
+    return [c.strip().strip('"') for c in row]
+
+
 def reference_status(reference_dir: Path = REFERENCE_DIR,
                      max_age_days: float = DEFAULT_MAX_AGE_DAYS) -> Dict[str, Any]:
     """Report presence, age, and staleness for every enrichment input.
@@ -234,6 +275,17 @@ def reference_status(reference_dir: Path = REFERENCE_DIR,
     ``usable`` means every file exists; stale files are still usable and still
     passed to the build, because degraded signal beats no signal — but the
     warnings ride into the brief so the operator sees it.
+
+    R277. A CSV entry carries three INDEPENDENT conditions, because they have
+    three different causes and three different remedies, and collapsing them is
+    what let an arm absent by qualification be reported as staleness twice:
+
+      * ``stale`` — age. Remedy: a fresh pull.
+      * ``membership_filtered`` — the export's own filter drops players by rule
+        (``SOURCE_MEMBERSHIP_FILTER``). Age-independent; a fresh pull through
+        the same filter returns the same roster. Remedy: widen the pull.
+      * ``missing_columns`` — the file is the wrong shape for what it feeds.
+        Remedy: re-export, and check the export type.
     """
     reference_dir = Path(reference_dir)
     manifest_files = (load_manifest(reference_dir).get("files") or {})
@@ -264,14 +316,52 @@ def reference_status(reference_dir: Path = REFERENCE_DIR,
             how = (f"export it manually from {MANUAL_TARGETS[name]}"
                    if name in MANUAL_TARGETS
                    else "run tools/refresh_reference_data.py")
+            # R277. This branch keeps only the incompleteness AGE causes -- a
+            # player who arrived after the pull -- because that is the half a
+            # fresh pull actually reaches. Absence by the export's own filter is
+            # a different cause with a different remedy and is reported below,
+            # whatever this file's age.
             out["warnings"].append(
                 f"{name}: {out['files'][name]['age_days']} days old "
                 f"(limit {max_age_days}); it feeds "
-                f"{CSV_FEEDS.get(name, 'projection enrichment')}. A stale file "
-                f"is also an INCOMPLETE one: any player it never listed takes "
-                f"the neutral default and is named in "
-                f"enrichment['neutral_default']. {how[0].upper()}{how[1:]}"
+                f"{CSV_FEEDS.get(name, 'projection enrichment')}. Age costs "
+                f"MEMBERSHIP as well as accuracy: a player who debuted or was "
+                f"called up after the pull is absent, takes the neutral default, "
+                f"and is named in enrichment['neutral_default']. "
+                f"{how[0].upper()}{how[1:]}"
             )
+        # Membership by FILTER, reported whether the file is fresh or stale,
+        # because its cause is the export URL and not the clock.
+        membership = SOURCE_MEMBERSHIP_FILTER.get(name)
+        out["files"][name]["membership_filtered"] = bool(exists and membership)
+        if exists and membership:
+            out["warnings"].append(
+                f"{name}: INCOMPLETE BY FILTER, independent of age -- "
+                f"{membership}. It feeds "
+                f"{CSV_FEEDS.get(name, 'projection enrichment')}; every player "
+                f"it omits is named in enrichment['neutral_default']."
+            )
+        # REQUIRED_COLUMNS enforced on a file this tool did not fetch.
+        if exists:
+            header = _header_columns(path)
+            if header is None:
+                missing_cols = list(REQUIRED_COLUMNS[name])
+                out["warnings"].append(
+                    f"{name}: header unreadable, so none of "
+                    f"{', '.join(REQUIRED_COLUMNS[name])} could be confirmed; it "
+                    f"feeds {CSV_FEEDS.get(name, 'projection enrichment')}"
+                )
+            else:
+                missing_cols = [c for c in REQUIRED_COLUMNS[name] if c not in header]
+                if missing_cols:
+                    out["warnings"].append(
+                        f"{name}: missing required column(s) "
+                        f"{', '.join(missing_cols)} (header carries "
+                        f"{len(header)}); it feeds "
+                        f"{CSV_FEEDS.get(name, 'projection enrichment')}, which "
+                        f"will fail or silently neutralize on this file"
+                    )
+            out["files"][name]["missing_columns"] = missing_cols
     for name, spec in TRACKED_JSON.items():
         path = reference_dir / name
         limit = float(spec.get("max_age_days") or max_age_days)
