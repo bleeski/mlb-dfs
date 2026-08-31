@@ -39,6 +39,22 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-31 (third note this date), DEV: **R277 CLOSED COMPLETELY and off the
+board. Slot 13 is R276 alone; the queue stays at fourteen and nothing
+resequenced.** Ben's first real run of the new fetcher returned 834 rows with a
+real `fetched_at` stamp, which also closes the mtime-only-aging hole R277(d)
+filed. The (b) measurement: **max population-only |Δmultiplier| 0.0123, 0 of 191
+arms over the 0.05 bar, 95 up / 96 down** — the stop condition does not fire and
+this was a coverage fix. Two earlier cuts of that measurement said 0.13 and
+tripped the bar; both were junk, because comparing the old file to the new one
+compares two dates as well as two populations. **That file's date has now
+confounded FOUR measurements**, and the generalisable lesson is in the CHANGELOG:
+a two-file comparison cannot separate population from time, so construct a
+one-file comparison that holds time fixed. (c): the [50,100) TBF band went 0 → 32
+arms whose median K/9 is 7.56 against the ranked population's 8.22 — LOWER, not
+the high-K reliever contamination the entry predicted. Floor constants stay, now
+on evidence rather than on sequencing.*
+
 *2026-08-31 (second note this date), DEV, claim `engine` (`engine_2026-08-31`,
 re-taken): **R278 SHIPPED and it RETIRES R277(a) unbuilt. Ben's call this date:
 swap the K-rate source rather than widen the FanGraphs export.** Slot 13 is now
@@ -673,10 +689,14 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
     atomic-writer copy, so ed8 adds no scope.
-13. **R276 + R277-remainder** — **R277(d) SHIPPED 2026-08-31 (CHANGELOG that
-    date); the slot now holds R277's (a)/(b)/(c-follow-on) remainder, which is
-    BLOCKED on one manual FanGraphs download and on nothing in code.** Position
-    unchanged: no resequencing this date. Inserted 2026-08-30 (third note), the
+13. **R276 alone** — **R277 CLOSED COMPLETELY 2026-08-31 and has left the board**
+    ((a) retired unbuilt and superseded by R278, (d) shipped, (b) and (c)
+    measured; all three CHANGELOG entries that date). The slot keeps its position
+    and the queue stays at fourteen: R276 is still worth its place on Ben's dated
+    instruction, and vacating would renumber for no gain. What changed for R276 is
+    that its panel (a) lost its motivating open defect — R277 is fixed, so panel
+    (a) now earns its keep as the check that catches the NEXT neutral-default
+    instance rather than this one. Inserted 2026-08-30 (third note), the
     only resequencing that date; the old 13 and 14 moved down one. Ben's
     dated standing-QA instruction and the first finding it produced, and they
     land together because neither is worth much alone: R276's panel (a) is
@@ -3918,170 +3938,6 @@ discipline, land together. (b) A morning odds capture near salary post,
 timestamped, beside the build-time packet; both retained under
 `data/slates/<date>/`. (c) The backtest note: date-bounded Statcast pulls
 for anything retrospective; forward-going, the snapshots are the record.
-
-### R277. The FanGraphs pitching export is `qual=y`, so every non-qualified starter takes the neutral K-rate default all season (P1, S) | new 2026-08-30, merged from BUILD fragment `2026-08-30_BUILD_standing-data-driven-qa.md` §B; VERIFIED on disk at this head; **corrects a verified claim already on this board** | **(d) SHIPPED 2026-08-31, see CHANGELOG that date; this entry now holds (a), (b) and the (c) follow-on only, and is BLOCKED on one manual download**
-
-**What.** `tools/refresh_reference_data.py:83` builds the FanGraphs pitching URL
-as `?pos=all&stats=pit&lg=all&qual=y&type=8`, qualified pitchers only. Counted at
-this head: `fangraphs_season_pitching.csv` holds **211** rows;
-`expected_stats_pitching.csv` holds **831**. Roughly three quarters of the arms a
-slate can hand the engine are structurally absent from the file that supplies the
-K-rate side of `Ceiling_Multiplier`, and they take the neutral default instead.
-
-**Measured on `1605_2g`, 2026-08-30.** `Ceiling_Multiplier` off the run's own
-`final/projections.csv`, against Savant for the same four arms:
-
-| Arm | Ceiling_Multiplier | Source | Savant xwOBA / xwOBAcon |
-|---|---|---|---|
-| Zack Wheeler | 1.497 | measured | 0.213 / 0.209 |
-| **Yusei Kikuchi** | **1.420** | **neutral default** | 0.294 / 0.267 |
-| Jeffrey Springs | 1.381 | measured | 0.273 / 0.255 |
-| Chris Bassitt | 1.294 | measured | 0.301 / 0.281 |
-
-The neutral default ranked the one unmeasured arm SECOND of four, above both
-measured arms, while Savant places him BETWEEN Springs and Bassitt on contact
-suppression, below the arm the multiplier puts him above. His Base is 8.95
-against Bassitt's 9.50, so the unmeasured multiplier is the whole of what lifts
-his Ceiling to 12.70, the highest of the three non-Wheeler arms. He was rostered
-in 4 of 7 entries, tied for most-used. Kikuchi: **0** grep hits in
-`fangraphs_season_pitching.csv`, **1** in `expected_stats_pitching.csv`, verified
-this session after a same-day Savant refresh. He has faced 165 batters against
-Wheeler's 499 and Springs' 527. He is not qualified.
-
-**The neutral is not neutral: it is the MEDIAN, and that is why the bias has a
-direction.** `build_k_rate_ceiling_multipliers` computes `neutral + (percentile -
-0.5) * span` with `XISO_CEILING_NEUTRAL = 1.42`, `span = 0.30`, clip
-`(1.25, 1.60)`. Neutral is the 50th percentile of the qualified starter
-population by construction, inside a band only 0.35 wide. **An arm the file
-cannot see is therefore priced as a median qualified starter, every time**, which
-over-prices every below-median arm and under-prices every above-median one, with
-no random component to average out. Kikuchi at 1.420 against Springs' 1.381 and
-Bassitt's 1.294 is that arithmetic, not a coincidence. Two things that follow.
-This is the file `CSV_FEEDS` calls "the K-rate pitcher ceiling multipliers, **the
-only factor that separates arms in a ceiling-scored build**," so the bias lands
-on the one term that ranks pitchers against each other. And at 165 TBF Kikuchi is
-ABOVE `XWOBA_PA_FULL` (100), so once the file can see him he takes his real rate
-at FULL weight with no shrink: the coverage gap is the entire defect, and the
-sample-size objection does not apply to him.
-
-**Not the first time, and the prior sighting was mis-attributed the same way.**
-`refresh_reference_data.py`'s own R127(b) comment records that on 2026-08-15 this
-file "feeds the pitcher K-rate ceiling and is exactly what would have caught the
-arm that kept the neutral multiplier and **took 9 of 19 lineups**." Same
-mechanism, larger portfolio, and it was read as an aging file then too.
-
-**Why P1, and why this is not the staleness item it was filed as.** The
-2026-08-16 DEV merge pass recorded, on this board, that "Dobnak is absent from
-all 212 rows of `fangraphs_season_pitching.csv` (file dated 2026-07-16, which is
-the 30.2 days the warning reports)." **The absence was verified correctly; the
-attribution to staleness was never checked and is wrong for this class.** The
-warning prints an export URL ending `&qual=y&type=8` as its remedy, so a fresh
-export re-fetches the same qualified subset and adds nobody. This is a STANDING
-condition, not an aging file: every non-qualified starter is unmeasured on every
-slate for the whole season, and the surface an operator reads under a clock tells
-him to fix it by re-downloading. Silently degrading lineup quality while naming
-an impossible remedy is the P1 definition twice over.
-
-**Fix, CORRECTED 2026-08-30 the same session that filed it, because the version
-above was wrong.** It read "derive the K-rate side from
-`expected_stats_pitching.csv` and retire the qualified-only dependency." **That
-file carries no K rate.** Its columns, read at this head, are
-`ba/est_ba/slg/est_slg/woba/est_woba/era/xera` and nothing else;
-`FG_PITCHING_RATE_COLUMNS = ("K%", "K/9")` and only the FanGraphs export has
-either. Savant's 831 rows are the xwOBA and F4 source, not a K-rate source, and
-conflating the two is how the corrected item would have reproduced the defect it
-was filed to fix.
-
-(a) **Widen the FanGraphs pull, and the precedent is TEN LINES ABOVE the defect
-in the same file.** `refresh_reference_data.py:72-79` already carries this exact
-fix on the Savant side, with its safety argument written out: Savant's `min=q`
-default "was silently costing more than half the enrichment coverage, because a
-DK slate is full of part-time and recently called-up hitters who never qualify.
-Pulling the long tail is safe here: the engine PA-shrinks every rate toward 1.0
-and returns exactly 1.0 below `XWOBA_PA_MIN` ... **What it cannot do is shrink a
-row it never saw.**" `DEFAULT_MIN_PA = "1"` is that decision, and `--min-pa`
-exposes it. Four lines later `FANGRAPHS_PITCHING_URL` still says `qual=y`. The
-shrink the argument depends on is already implemented for K rate too
-(`build_k_rate_ceiling_multipliers`: neutral below `pa_min`, linear toward the
-full value between `pa_min` and `pa_full`), so the same reasoning transfers
-unchanged and no projection math has to move. **This is the R167/R233 shape: the
-fix, the argument, and the safety proof all already existed and were never
-applied to the second site.**
-
-**(a) RETIRED UNBUILT 2026-08-31, superseded by R278.** The `qual=0` parameter
-was verified right (832 rows against 211, identical columns, both read off the
-live page) and the fix was still not taken: the export behind that URL is a
-FanGraphs membership feature, and automating it is circumventing the gate rather
-than using it. The K-rate source moved to MLB StatsAPI instead —
-`playerPool=All`, no qualification filter, no membership, no manual step, plus a
-real `TBF` and the MLBAM id. See CLAUDE.md's DK rule for the same shape.
-
-**What remains is (b) and the (c) follow-on, and both are MEASUREMENTS blocked on
-one command.** `python tools/refresh_reference_data.py` on a machine with network
-(the container gets proxy 403 to `statsapi.mlb.com`) writes
-`data/reference/statsapi_season_pitching.csv`. Expect **~834 rows**. The fetcher
-is fixture-tested and has never made a real HTTP call, so the first run is also
-its network test: check that `_validate` passed, that the row count is in the
-800s, and that `reference_manifest.json` gained a `statsapi_season_pitching.csv`
-entry — which it can now HAVE, because the file is fetched rather than
-hand-placed, closing the "the one hand-placed file is the one aged by mtime" hole
-this entry filed.
-
-(b) **The consequence to MEASURE, and it is not the sample-size worry.** The
-percentile ranks within the qualified-starter rows OF THE SUPPLIED TABLE, so
-widening changes the ranking POPULATION and every existing arm's multiplier moves
-even though its K rate did not. **The BEFORE half is measured and recorded here so
-the next session only has to run the after:** 211 rows, **189 rank** (22 are
-`GS==0` and take the neutral), K/9 min 4.39 / median 8.38 / max 13.65, multipliers
-min **1.2716** / median **1.4200** / max **1.5700**. The clip never binds — the
-full-weight range `neutral ± span/2` = [1.270, 1.570] sits strictly inside
-`(1.25, 1.60)` and 0 of 211 reach either bound.
-
-**Bar, stated before any after-data: |Δmultiplier| > 0.05** for an arm whose K
-rate did not change stops being a coverage fix. One sixth of the 0.30 span, i.e. a
-16.7 percentile-point move. Report min, median, max and the largest absolute move
-WITH THE NAME ATTACHED, over the arms already in the file.
-
-**The go/no-go reduces to one number.** Exact analytic worst case (all added arms
-on one side): |Δ| = 0.104 at M=100, 0.154 at M=200, 0.204 at M=400, up to 68% of
-the span. A sensitivity analysis (labelled prior, not a measurement — added arms
-drawn from the qualified K/9 distribution shifted by δ) says the realistic answer
-is governed entirely by δ, the mean K/9 gap between the added and existing
-populations: within ±0.5, max |Δ| ≤ 0.029 and **nothing** crosses the bar; at
-δ=−1.0, 7 of 189 cross; at δ=−2.0, max |Δ| = 0.088 and 131 of 189 cross.
-**Inside ±1.0 this is a coverage fix. Past about ±1.5 it is a strategy change and
-it stops for Ben.** Measure δ first; it decides the item.
-
-(c) **The floor is DECIDED, not open: keep `XWOBA_PA_MIN=50` / `XWOBA_PA_FULL=100`
-unchanged.** Four reasons in the CHANGELOG 2026-08-31 entry; the binding one is
-sequencing — changing the floor and the population together confounds (b), because
-an existing arm's move could be either and nothing would say which.
-
-**What (c) found that the next session MUST measure, and it is the real risk.**
-Ranking membership is gated at `_tbf >= pa_min`, but the shrink weight applies only
-to an arm's OWN multiplier. An arm at 51 TBF enters the ranking at **full
-standing**, displacing everyone's percentile, while taking 2% of its own deviation.
-The shrink protects the thin arm from a wrong multiplier; it does not protect the
-population from that arm's rank contribution. At `qual=y` this is invisible: the
-[50, 100) TBF band holds **0 of 211** rows and the file's minimum is 40.0 IP, so
-the shrink has never once fired on this feature. At `qual=0` the band fills, and
-with `GS>=1` a reliever with one spot start and 12 IP votes at full weight carrying
-a reliever's structurally-high K rate — the exact contamination the module comment
-says the GS filter exists to prevent, and the mechanism that would push δ positive.
-So: count the added ranked arms landing in [50, 100) TBF and look at their GS/G.
-**If that band is thick with 1-GS relievers the remedy is the STARTER TEST, not the
-floor.**
-
-(d) **SHIPPED 2026-08-31.** The warning no longer reports absence-by-QUALIFICATION
-as staleness, and the export URL now rides only the age condition it can actually
-remedy. Membership by filter is its own age-independent condition declared once in
-`SOURCE_MEMBERSHIP_FILTER`; **deleting that entry is part of (a)**, which is what
-keeps the table from going quietly stale when the pull widens. `REQUIRED_COLUMNS`
-is now enforced on this file too — it was checked on the FETCH path only, so the
-one file placed by hand was the one file whose columns nothing verified, which is
-the guard (a) needs to be safe. Cross-ref R237 stands: a reason reading "not
-qualified, structural" is a different fact from "provider failed," and this was the
-first named instance where the difference changes what the operator does.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 

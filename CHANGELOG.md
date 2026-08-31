@@ -25,6 +25,73 @@ performance claim.
 
 ---
 
+## 2026-08-31 — R277(b)/(c) MEASURED and R277 CLOSED: widening the population moved no arm past the bar, and the confound was the file's date every time
+
+**What moved.** `docs/backlog.md` and this file only. **Gate not run, and stated
+rather than skipped quietly: this commit touches no code, no test, and no
+contract.** The measurement scripts were scratch (`tools/_scratch_r277/`,
+gitignored); their numbers are here, which is the durable form.
+
+**The fetcher's first real HTTP call succeeded.** Ben ran
+`python tools/refresh_reference_data.py`: **834 rows**, `_validate` passed, and
+`reference_manifest.json` gained a `statsapi_season_pitching.csv` entry with a
+real `fetched_at`. That last detail closes the hole R277(d) filed and could not
+fix — the one hand-placed file was the one file aged by mtime, and it is not
+hand-placed any more.
+
+**(b), and the first two answers were both wrong.** Comparing the old 211-row
+file to the new 834-row file gives max |Δmultiplier| **0.1306**, with **26 of 211
+over the 0.05 bar** — which trips the stated stop condition. Splitting arms that
+were at the neutral (unmeasured, so their move is the fix working) from arms
+genuinely ranked before still leaves **23 of 189 over the bar, max 0.1229**.
+Both numbers are junk. The two files are **seven weeks apart**, so those arms'
+K rates genuinely changed; "moved on population alone" was false by construction.
+
+**The confound-free measurement uses ONE file and varies only the population.**
+Multipliers computed twice off `statsapi_season_pitching.csv` — once ranking
+within only the 211 arms the old `qual=y` file admitted, once within all 834 —
+same data, same date, one variable:
+
+| population-only |Δmultiplier| | value |
+|---|---|
+| median | 0.0043 |
+| mean | 0.0050 |
+| **max** | **0.0123** |
+| over the 0.05 bar | **0 of 191** |
+| over 0.03 | 0 |
+| direction | 95 up, 96 down |
+
+**The stop condition does not fire. This was a coverage fix.** And the
+sensitivity analysis filed on 2026-08-31 was accurate after all: it predicted max
+≈0.011 at δ≈0, the measured δ between added and existing ranked arms is **+0.103
+K/9**, and the observed max is 0.0123. The apparent order-of-magnitude miss was
+entirely the date gap.
+
+**That file's date has now confounded FOUR measurements**, and the pattern is
+worth the sentence: the 2026-08-16 Dobnak misattribution, both source-agreement
+passes during the R278 swap, and the first two cuts of this one. Every time, a
+real difference was attributed to the wrong cause because the control's as-of date
+was assumed from its mtime. The lesson is not "check dates" — it is that a
+two-file comparison cannot separate population from time, and the fix each time
+was to construct a ONE-file comparison that holds time fixed.
+
+**(c) follow-on, and it contradicted the prior this entry filed.** The
+[50, 100) TBF shrink band went from **0 arms to 32**, and 22 more sit below the
+50-TBF floor and take the neutral. The worry recorded on 2026-08-31 was that this
+band would fill with 1-GS relievers carrying structurally HIGH K rates, pushing
+every real starter's percentile down. Measured: their GS/G ratio is 0.45, so they
+are genuinely swingmen — but their median K/9 is **7.56 against the ranked
+population's 8.22**, i.e. LOWER, not higher. The contamination mechanism the
+entry predicted is not what arrived. **`XWOBA_PA_MIN=50` / `XWOBA_PA_FULL=100`
+stay unchanged**, now on evidence rather than on the sequencing argument that
+justified holding them: the band that fills is small (32 of 325 ranked), it shrinks
+toward neutral as designed, and it moves nobody past the bar.
+
+**R277 closes completely** and leaves the board. (a) retired unbuilt, superseded
+by R278; (d) shipped 2026-08-31; (b) and (c) measured here.
+
+---
+
 ## 2026-08-31 — R278: the K-rate side moves off FanGraphs to MLB StatsAPI, and the last manual reference input stops being manual
 
 **What moved.** `tools/refresh_reference_data.py` (new fetcher, new file, both
