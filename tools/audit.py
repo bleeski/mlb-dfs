@@ -398,7 +398,15 @@ EXPECTED_SUITE_COUNTS = {
     # REQUIRED_COLUMNS finally enforced on the one file nothing fetches
     # (a good header, a missing K/9, and a non-empty file whose header cannot be
     # read at all, which is the branch a bad hand-placed download arrives on).
-    "tests.test_core": 939,
+    # R278, 2026-08-31: 939 -> 945, the six that pin the K-rate source swap --
+    # both membership tables EMPTY at this head (a claim, not an absence: the
+    # qual=y entry left with the file it described), baseball innings notation
+    # resolved to thirds at the emit boundary rather than carried as a float
+    # that is wrong in one direction, playerPool=All carrying no filter to get
+    # wrong, a truncated pagination REFUSING rather than writing a narrower
+    # league, the offset loop deduping a player repeated across a page boundary,
+    # and a 0 IP row leaving rather than dividing by zero.
+    "tests.test_core": 945,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

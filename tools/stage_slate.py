@@ -472,7 +472,12 @@ def stage_slate(
     reference = Path(reference_dir)
     savant_batting = reference / "expected_stats_batting.csv"
     savant_pitching = reference / "expected_stats_pitching.csv"
-    fangraphs_pitching = reference / "fangraphs_season_pitching.csv"
+    # R278. The K-rate input moved from a manual FanGraphs export to MLB
+    # StatsAPI. The engine kwarg it feeds is still `fangraphs_pitching_csv`,
+    # deliberately: that parameter is SHAPE-based (any CSV with Name and a K-rate
+    # column) and the golden replay still feeds it a frozen FanGraphs file, so
+    # the identifier rename is filed separately rather than ridden in here.
+    fangraphs_pitching = reference / "statsapi_season_pitching.csv"
 
     # F4 deterministic matchup prior: opposing-SP contact quality (Savant
     # pitching frame) times the platoon hand factor. Neutral (1.0) where an

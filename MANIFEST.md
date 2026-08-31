@@ -57,7 +57,7 @@ per ledger 3.7 and is included in the archive.
 | mlb_engine/field/ | field_miner v0.3-review, ownership_prior v0.1-prior |
 | tools/ | fetch_slate_bundle.py (--venues default updated), audit.py v3.0; stage_slate.py lands here in Phase 1 |
 | tests/ | test_core.py (119 tests), fixtures/, golden/ |
-| data/reference/ | 5 structural CSVs + both Savant CSVs + fangraphs_season_pitching.csv |
+| data/reference/ | 5 structural CSVs + both Savant CSVs + statsapi_season_pitching.csv (R278: was fangraphs_season_pitching.csv, a manual export; all three rate files are fetched now) |
 | data/archive/2026-06-29/ | 3 mined JSONs + canonical ownership CSV (A-001) |
 | data/slates/, data/standings/inbox/, data/odds_history/, data/order_history/ | scaffold for the per-slate loop and Tasks A/B |
 | ledger/ | calibration ledger + field_opponent_registry.json |

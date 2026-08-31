@@ -8,8 +8,8 @@ The engine's three season-rate enrichment inputs live in ``data/reference/``:
   * ``expected_stats_pitching.csv`` — Baseball Savant expected statistics
     (pitcher). Feeds the same correction on the pitcher side AND the opposing-SP
     quality component of the deterministic F4 matchup factor.
-  * ``fangraphs_season_pitching.csv`` — FanGraphs season pitching leaderboard.
-    Feeds the K-rate pitcher ceiling.
+  * ``statsapi_season_pitching.csv`` — MLB StatsAPI season pitching, every
+    pitcher (``playerPool=All``). Feeds the K-rate pitcher ceiling.
 
 These are season-long rates, so a weekly refresh is plenty. What they are NOT is
 optional: a build whose reference files are missing or months old silently
@@ -18,14 +18,13 @@ cleanly as a build on real signal. That is the whole reason this script and the
 staleness stamp exist — the freshness of these files is not observable anywhere
 else in the pipeline.
 
-Two sources, two policies, deliberately:
-
-  * **Savant is fetched over HTTP.** The leaderboard exports a CSV on a public
-    URL; this script pulls it, validates the shape before overwriting anything,
-    and stamps the fetch time.
-  * **FanGraphs is manual by decision** (project rule, not a technical limit).
-    This script never fetches it. It reports the file's age and prints the export
-    URL so Ben can pull it by hand when it goes stale.
+All three are fetched over HTTP, validated before anything is overwritten, and
+stamped with the fetch time. **Nothing here is manual any more (R278).** The
+K-rate input used to be a hand-run FanGraphs export, which is why it was the one
+file that reliably went stale — 45.2 days old against a 14-day limit on the day
+it was replaced — and why its ``qual=y`` URL silently held the file to 211 arms
+against Savant's 831. MLB StatsAPI answers the same question with no
+qualification filter, no membership gate, and no human in the loop.
 
 Nothing here is a projection, an edge, or a probability claim. These are
 published observed season rates; every factor derived from them downstream is a
@@ -78,10 +77,39 @@ SAVANT_EXPECTED = (
 # thin one contributes nothing. What it cannot do is shrink a row it never saw.
 DEFAULT_MIN_PA = "1"
 
-FANGRAPHS_PITCHING_URL = (
-    "https://www.fangraphs.com/leaders/major-league"
-    "?pos=all&stats=pit&lg=all&qual=y&type=8"
+# R278. The K-rate side moved off FanGraphs entirely. The old source was a
+# MANUAL export whose URL carried `qual=y`, which is why the file held 211 arms
+# against Savant's 831 and why every non-qualified starter took the neutral
+# multiplier all season (R277). Widening that export was the filed fix and it was
+# NOT taken: the one-click CSV is a FanGraphs membership feature, the data behind
+# it is free to read but the export is the gated thing, and rebuilding it by
+# automation is doing the gated thing by another route.
+#
+# MLB StatsAPI answers the same question with no gate and no membership. It is
+# already a dependency of this repo (tools/fetch_slate_bundle.py reads the
+# schedule and people endpoints from the same host), `playerPool=All` has no
+# qualification filter to get wrong, and it carries two fields the FanGraphs
+# export never did: a REAL batters-faced count, replacing the IP x 4.25 proxy at
+# exactly the sample sizes where the proxy was worst, and the MLBAM id, which is
+# the key `expected_stats_pitching.csv` is already joined on.
+#
+# Three sources agree on the population: StatsAPI 834, FanGraphs at qual=0 832,
+# Savant at min=1 831. Rank agreement between StatsAPI and the FanGraphs file was
+# measured at Spearman 0.980 over the 40 highest-IP arms, implying a maximum
+# multiplier move of 0.045 -- under the 0.05 bar, and that residual still
+# contains an unknown date gap, so the true source disagreement is smaller.
+STATSAPI_PITCHING = (
+    "https://statsapi.mlb.com/api/v1/stats"
+    "?stats=season&group=pitching&season={year}&playerPool=All&sportId=1"
+    "&limit={limit}&offset={offset}"
 )
+STATSAPI_PAGE_SIZE = 250
+STATSAPI_MAX_ROWS = 5000
+
+# Emitted column order. `Name` keeps the existing DK name crosswalk working
+# unchanged; `MLBAM_ID` is carried so the join can move off names later without
+# another fetch change.
+STATSAPI_COLUMNS = ["Name", "MLBAM_ID", "Team", "G", "GS", "IP", "TBF", "SO", "K/9"]
 
 # Columns each file must actually contain for the enrichment it feeds to work.
 # Checked before anything is written, so a redirect to an HTML error page or a
@@ -89,7 +117,7 @@ FANGRAPHS_PITCHING_URL = (
 REQUIRED_COLUMNS: Dict[str, List[str]] = {
     "expected_stats_batting.csv": ["player_id", "pa", "woba", "est_woba"],
     "expected_stats_pitching.csv": ["player_id", "pa", "woba", "est_woba"],
-    "fangraphs_season_pitching.csv": ["Name", "IP", "K/9"],
+    "statsapi_season_pitching.csv": ["Name", "IP", "K/9", "GS", "TBF"],
 }
 
 SAVANT_TARGETS = {
@@ -97,9 +125,16 @@ SAVANT_TARGETS = {
     "expected_stats_pitching.csv": "pitcher",
 }
 
-MANUAL_TARGETS = {
-    "fangraphs_season_pitching.csv": FANGRAPHS_PITCHING_URL,
+STATSAPI_TARGETS = {
+    "statsapi_season_pitching.csv": STATSAPI_PITCHING,
 }
+
+# R278. Empty, and that is the change. This held the FanGraphs pitching export,
+# the last reference input a human had to fetch by hand -- which is why it was
+# 45.2 days old against a 14-day limit on the day it was replaced. Nothing is
+# manual now. Kept as a table rather than deleted because `reference_status`
+# still branches on it and a future manual source would go here.
+MANUAL_TARGETS: Dict[str, str] = {}
 
 # R127(b). What each CSV actually FEEDS, in the words of the thing it moves.
 # The stale warning used to read "season rates are drifting", which names a
@@ -113,7 +148,7 @@ CSV_FEEDS: Dict[str, str] = {
         "the xwOBA Base correction and the xISO hitter ceiling multipliers",
     "expected_stats_pitching.csv":
         "the xwOBA Base correction on pitcher rows and the F4 opposing-SP quality term",
-    "fangraphs_season_pitching.csv":
+    "statsapi_season_pitching.csv":
         "the K-rate pitcher ceiling multipliers, the only factor that separates arms "
         "in a ceiling-scored build",
 }
@@ -128,17 +163,14 @@ CSV_FEEDS: Dict[str, str] = {
 # An entry here says: this file's source drops players by rule, and here is the
 # rule. No entry means the pull is unfiltered. DELETING an entry is part of
 # widening the pull it describes, which is what makes this table go stale loudly.
-SOURCE_MEMBERSHIP_FILTER: Dict[str, str] = {
-    "fangraphs_season_pitching.csv":
-        "its export URL carries qual=y, so it lists only QUALIFIED pitchers -- "
-        "211 arms at this head, against 831 pitcher rows in Savant's min=1 "
-        "export of the same season. Age is not the cause and a refresh is not "
-        "the remedy: the same URL returns the same roster. Every starter it "
-        "never listed takes the neutral K-rate multiplier, which is the 50th "
-        "percentile by construction, so an unlisted arm is priced as a MEDIAN "
-        "qualified starter rather than as unknown. Widening the pull is the "
-        "only remedy",
-}
+#
+# R278: EMPTY, one day later, and by that mechanism working as designed. The
+# single entry described `fangraphs_season_pitching.csv`'s `qual=y`; the source
+# moved to MLB StatsAPI with `playerPool=All`, there is no qualification filter
+# left to declare, and the entry left with the file it described rather than
+# surviving to describe a filter nothing carries. An empty table here is a claim:
+# no reference pull currently drops players by rule.
+SOURCE_MEMBERSHIP_FILTER: Dict[str, str] = {}
 
 FANGRAPHS_ROSTER_RESOURCE_URL = (
     "https://www.fangraphs.com/roster-resource/depth-charts"
@@ -426,6 +458,124 @@ def fetch_savant(kind: str, year: int, min_pa: str = DEFAULT_MIN_PA) -> str:
         return response.read().decode("utf-8-sig")
 
 
+def innings_to_float(value: Any) -> Optional[float]:
+    """Baseball innings notation to a true decimal: ``.1`` is a THIRD, not a tenth.
+
+    R278. Both FanGraphs and MLB StatsAPI write 148 and one third as ``148.1``,
+    so ``float("148.1")`` is wrong by up to 0.23 innings and always in the same
+    direction. The old path never noticed because the only consumer of IP was the
+    ``IP * K_RATE_TBF_PER_IP`` batters-faced PROXY, where a 0.2% error hid inside
+    a 4.25 fudge factor. This emitter resolves the thirds once, at the boundary,
+    so no downstream reader has to know the convention -- and the file also
+    carries a REAL ``TBF``, so nothing has to use the proxy at all.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if "." not in text:
+        try:
+            return float(text)
+        except ValueError:
+            return None
+    whole, frac = text.split(".", 1)
+    try:
+        base = float(whole)
+    except ValueError:
+        return None
+    return base + {"0": 0.0, "1": 1.0 / 3.0, "2": 2.0 / 3.0}.get(frac[:1], 0.0)
+
+
+def statsapi_rows_to_csv(splits: List[Dict[str, Any]]) -> str:
+    """Render StatsAPI pitching splits as the season pitching CSV the engine reads.
+
+    One row per pitcher with a positive IP. ``K/9`` is computed here as
+    ``9 * SO / IP`` off the official counting stats rather than taken from the
+    API's own pre-rounded ``strikeoutsPer9Inn``, so the rank the multiplier
+    consumes is not decided by a two-decimal string. ``IP`` is a true decimal
+    (see ``innings_to_float``), NOT the ``.1``-is-a-third notation the FanGraphs
+    export used, and that is a deliberate semantic change carried by the rename.
+    """
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    writer.writerow(STATSAPI_COLUMNS)
+    seen: set = set()
+    for split in splits:
+        stat = split.get("stat") or {}
+        player = split.get("player") or {}
+        innings = innings_to_float(stat.get("inningsPitched"))
+        strikeouts = stat.get("strikeOuts")
+        if not innings or innings <= 0 or strikeouts is None:
+            continue
+        pid = str(player.get("id") or "").strip()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        team = ((split.get("team") or {}).get("abbreviation")
+                or (split.get("team") or {}).get("name") or "")
+        writer.writerow([
+            player.get("fullName") or "",
+            pid,
+            team,
+            stat.get("gamesPlayed") or 0,
+            stat.get("gamesStarted") or 0,
+            f"{innings:.4f}",
+            stat.get("battersFaced") if stat.get("battersFaced") is not None else "",
+            strikeouts,
+            f"{9.0 * float(strikeouts) / innings:.4f}",
+        ])
+    return out.getvalue()
+
+
+def fetch_statsapi_pitching(year: int, page_size: int = STATSAPI_PAGE_SIZE,
+                            opener=None) -> str:
+    """Fetch every pitcher's season line from MLB StatsAPI and render it as CSV.
+
+    R278. This replaces a MANUAL FanGraphs export whose URL carried ``qual=y``.
+    ``playerPool=All`` is the whole point: there is no qualification filter to
+    get wrong, so the coverage defect cannot come back through a parameter.
+    Paginated because the response is capped server-side; the loop stops when a
+    page returns nothing or ``totalSplits`` is covered, and it REFUSES a short
+    read rather than writing a partial league, since a partial league is exactly
+    the condition this change exists to remove.
+    """
+    fetch = opener or _read_url
+    collected: List[Dict[str, Any]] = []
+    total: Optional[int] = None
+    offset = 0
+    while True:
+        url = STATSAPI_PITCHING.format(year=year, limit=page_size, offset=offset)
+        payload = json.loads(fetch(url))
+        blocks = payload.get("stats") or []
+        splits = (blocks[0].get("splits") or []) if blocks else []
+        if total is None and blocks:
+            total = blocks[0].get("totalSplits")
+        if not splits:
+            break
+        collected.extend(splits)
+        offset += len(splits)
+        if total is not None and offset >= int(total):
+            break
+        if offset > STATSAPI_MAX_ROWS:
+            raise ValueError(
+                f"StatsAPI pagination exceeded {STATSAPI_MAX_ROWS} rows; refusing "
+                "to loop"
+            )
+    if total is not None and len(collected) < int(total):
+        raise ValueError(
+            f"StatsAPI returned {len(collected)} of {total} pitcher rows; refusing "
+            "to overwrite with a partial league"
+        )
+    return statsapi_rows_to_csv(collected)
+
+
+def _read_url(url: str) -> str:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        return response.read().decode("utf-8")
+
+
 def refresh(reference_dir: Path = REFERENCE_DIR, year: Optional[int] = None,
             targets: Optional[List[str]] = None,
             min_pa: str = DEFAULT_MIN_PA) -> Dict[str, Any]:
@@ -450,6 +600,26 @@ def refresh(reference_dir: Path = REFERENCE_DIR, year: Optional[int] = None,
         (reference_dir / name).write_text(text, encoding="utf-8")
         _stamp(manifest, name,
                f"baseballsavant expected_statistics {kind} {year} min={min_pa}",
+               rows, reference_dir)
+        result["fetched"].append({"file": name, "rows": rows, "year": year})
+
+    # R278. The K-rate input, fetched rather than hand-exported. Same
+    # fail-independently discipline as Savant: validate before overwriting, and a
+    # failure leaves the existing file alone and is reported.
+    for name in STATSAPI_TARGETS:
+        if targets and name not in targets:
+            result["skipped"].append(name)
+            continue
+        try:
+            text = fetch_statsapi_pitching(year)
+            rows = _validate(text, name)
+        except (urllib.error.URLError, ValueError, TimeoutError, OSError,
+                json.JSONDecodeError, KeyError) as exc:
+            result["failed"].append({"file": name, "error": str(exc)})
+            continue
+        (reference_dir / name).write_text(text, encoding="utf-8")
+        _stamp(manifest, name,
+               f"mlb statsapi season pitching {year} playerPool=All",
                rows, reference_dir)
         result["fetched"].append({"file": name, "rows": rows, "year": year})
 

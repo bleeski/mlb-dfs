@@ -783,7 +783,10 @@ def resolve_reference_data(args) -> dict:
     return {
         "savant_batting": usable("expected_stats_batting.csv"),
         "savant_pitching": usable("expected_stats_pitching.csv"),
-        "fangraphs_pitching": usable("fangraphs_season_pitching.csv"),
+        # R278: file renamed with the source swap (FanGraphs manual export ->
+        # MLB StatsAPI). The KEY keeps its name because it feeds run_slate's
+        # shape-based `fangraphs_pitching_csv` kwarg; that rename is filed.
+        "fangraphs_pitching": usable("statsapi_season_pitching.csv"),
         "status": status,
     }
 

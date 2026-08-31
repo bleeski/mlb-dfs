@@ -39,6 +39,36 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-31 (second note this date), DEV, claim `engine` (`engine_2026-08-31`,
+re-taken): **R278 SHIPPED and it RETIRES R277(a) unbuilt. Ben's call this date:
+swap the K-rate source rather than widen the FanGraphs export.** Slot 13 is now
+R276 + R277's measurement remainder only. No resequencing.
+
+R277(a) was verified correct and still not taken. The `qual=0` parameter is
+right (832 rows against 211, columns identical, both read off the live site), but
+the one-click CSV behind that URL is a FanGraphs MEMBERSHIP feature: the rows are
+free to read, the export is the gated thing, and rebuilding it by automating 28
+page-turns is doing the gated thing another way. Ben can relax his own
+"FanGraphs is manual by decision" rule; he cannot consent for FanGraphs, and
+CLAUDE.md already says the same for DK.
+
+MLB StatsAPI replaces it: `playerPool=All`, no qualification filter to get wrong,
+already a repo dependency, and it carries a REAL batters-faced count (the engine
+was approximating it as `IP x 4.25`, measured a median -3.7% and up to -12.4% off)
+plus the MLBAM id. `MANUAL_TARGETS` is now EMPTY — nothing in `data/reference/`
+is hand-fetched any more, which is why that one file was reliably the stale one.
+Rank agreement Spearman 0.980, implied |d multiplier| max 0.045, under the 0.05
+bar, and that residual still contains an unknown date gap so the true
+disagreement is smaller. Full reasoning, the 9-site rename, the two deliberate
+non-renames, and the innings-notation bug found in passing: CHANGELOG 2026-08-31.
+
+**What is left of R277 is a MEASUREMENT, not a code change,** and it is blocked
+on one command rather than on a download: the container cannot reach
+`statsapi.mlb.com` (proxy 403), so `python tools/refresh_reference_data.py` on
+Ben's machine is the first real fetch. The fetcher is fixture-tested, not
+network-tested. Until it runs the file is MISSING and the build correctly reports
+the K-rate ceiling OFF rather than degraded.*
+
 *2026-08-31, DEV, claim `engine` (`engine_2026-08-31`): **R277(d) SHIPPED; R277
 stays on the board holding (a), (b) and the (c) follow-on. Slot 13 is now R276 +
 R277-remainder. No resequencing; nothing else moved.**
@@ -3978,18 +4008,24 @@ unchanged and no projection math has to move. **This is the R167/R233 shape: the
 fix, the argument, and the safety proof all already existed and were never
 applied to the second site.**
 
-**BLOCKED, and on exactly one thing: a manual FanGraphs download.** FanGraphs is
-manual by decision, so no session can fetch it, and a URL nobody has downloaded is
-an untested export parameter on the one pull nothing here can test. Ben opens
-`https://www.fangraphs.com/leaders/major-league?pos=all&stats=pit&lg=all&qual=0&type=8`,
-uses **Export Data**, and saves over
-`data/reference/fangraphs_season_pitching.csv` (back the old file up first). The
-expected row count is **well above 211**. Still 211 means `qual=0` is the wrong
-parameter and the next session reads the export link off the page rather than
-guessing again; **under** 211 means stop and keep the old file. As of 2026-08-31
-the file on disk is still the 211-row 2026-07-16 export, 45.2 days old against a
-14-day limit — stale AND filtered, which (d) now reports as two separate
-conditions with two separate remedies.
+**(a) RETIRED UNBUILT 2026-08-31, superseded by R278.** The `qual=0` parameter
+was verified right (832 rows against 211, identical columns, both read off the
+live page) and the fix was still not taken: the export behind that URL is a
+FanGraphs membership feature, and automating it is circumventing the gate rather
+than using it. The K-rate source moved to MLB StatsAPI instead —
+`playerPool=All`, no qualification filter, no membership, no manual step, plus a
+real `TBF` and the MLBAM id. See CLAUDE.md's DK rule for the same shape.
+
+**What remains is (b) and the (c) follow-on, and both are MEASUREMENTS blocked on
+one command.** `python tools/refresh_reference_data.py` on a machine with network
+(the container gets proxy 403 to `statsapi.mlb.com`) writes
+`data/reference/statsapi_season_pitching.csv`. Expect **~834 rows**. The fetcher
+is fixture-tested and has never made a real HTTP call, so the first run is also
+its network test: check that `_validate` passed, that the row count is in the
+800s, and that `reference_manifest.json` gained a `statsapi_season_pitching.csv`
+entry — which it can now HAVE, because the file is fetched rather than
+hand-placed, closing the "the one hand-placed file is the one aged by mtime" hole
+this entry filed.
 
 (b) **The consequence to MEASURE, and it is not the sample-size worry.** The
 percentile ranks within the qualified-starter rows OF THE SUPPLIED TABLE, so

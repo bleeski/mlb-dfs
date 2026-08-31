@@ -3797,7 +3797,11 @@ def _assemble_projection_frame(
             else:
                 pitcher_ceiling_neutral_ids.add(pid)
                 pitcher_ceiling_reasons[pid] = (
-                    "absent_from_fangraphs_season_pitching" if pid in _unmatched_ids
+                    # R278. Named for the CONDITION, not the vendor: the K-rate
+                    # source moved from a FanGraphs export to MLB StatsAPI and
+                    # this reason string outlived the provider it named once
+                    # already.
+                    "absent_from_season_pitching" if pid in _unmatched_ids
                     else "not_in_salary_file_pitcher_crosswalk")
         enrichment["pitcher_ceiling"] = {
             "matched": pitcher_report.get("matched", 0),

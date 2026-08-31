@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import inspect
+import io
 import datetime as dtmod
 import json
 import math
@@ -3351,7 +3352,7 @@ class NeutralDefaultVisibilityTests(unittest.TestCase):
             self.assertEqual(block["at_neutral"], 1)
             self.assertEqual(
                 [(p["name"], p["player_id"], p["reason"]) for p in block["players"]],
-                [("Pitcher C", "10002", "absent_from_fangraphs_season_pitching")])
+                [("Pitcher C", "10002", "absent_from_season_pitching")])
             self.assertEqual(block["neutral"], 1.42)
 
     def test_the_named_miss_reaches_the_warnings_with_the_player_in_it(self):
@@ -3364,7 +3365,7 @@ class NeutralDefaultVisibilityTests(unittest.TestCase):
             nd_warnings = enrich["neutral_default"]["warnings"]
             self.assertEqual(len(nd_warnings), 1)
             self.assertIn("Pitcher C", nd_warnings[0])
-            self.assertIn("absent_from_fangraphs_season_pitching", nd_warnings[0])
+            self.assertIn("absent_from_season_pitching", nd_warnings[0])
             self.assertIn("1 of 2 declared starter(s)", nd_warnings[0])
             self.assertIn("can change selection", nd_warnings[0])
             self.assertIn(nd_warnings[0], enrich["warnings"])
@@ -4775,7 +4776,7 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         root = Path(tmp) / "reference"
         root.mkdir(parents=True, exist_ok=True)
         names = ["expected_stats_batting.csv", "expected_stats_pitching.csv",
-                 "fangraphs_season_pitching.csv"]
+                 "statsapi_season_pitching.csv"]
         files = {}
         now = dt.datetime.now(dt.timezone.utc)
         # R277. These were a one-word "placeholder" line, which is a file with
@@ -4837,14 +4838,14 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self._reference_dir(
                 tmp, ages={"expected_stats_batting.csv": 40.0},
-                missing=("fangraphs_season_pitching.csv",))
+                missing=("statsapi_season_pitching.csv",))
             ref = mod.resolve_reference_data(self._args(reference_dir=str(root)))
             self.assertTrue(ref["savant_batting"])          # stale is still used
             self.assertIsNone(ref["fangraphs_pitching"])    # missing is not
             self.assertTrue(ref["status"]["any_stale"])
             joined = " ".join(ref["status"]["warnings"])
             self.assertIn("expected_stats_batting.csv", joined)
-            self.assertIn("fangraphs_season_pitching.csv", joined)
+            self.assertIn("statsapi_season_pitching.csv", joined)
 
     def test_no_enrichment_flag_returns_no_paths(self):
         mod = self._module()
@@ -4995,13 +4996,13 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
                                      "players": [{"player_id": "30065",
                                                   "name": "Randy Dobnak",
                                                   "team": "MIN", "position": "P",
-                                                  "reason": "absent_from_fangraphs_season_pitching"}]}}
+                                                  "reason": "absent_from_season_pitching"}]}}
         summary = mod.summarize_enrichment(
             {"enabled": True, "warnings": []},
             {"neutral_default": block, "warnings": []}, {}, None)
         named = summary["neutral_default"]["pitcher_ceiling"]["players"]
         self.assertEqual([p["name"] for p in named], ["Randy Dobnak"])
-        self.assertEqual(named[0]["reason"], "absent_from_fangraphs_season_pitching")
+        self.assertEqual(named[0]["reason"], "absent_from_season_pitching")
 
     def test_the_brief_states_the_projection_mode_distribution(self):
         """`Projection_Mode = emergency_proxy` on every row is a fact about what
@@ -5030,14 +5031,14 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for name in ("expected_stats_batting.csv", "expected_stats_pitching.csv",
-                         "fangraphs_season_pitching.csv"):
+                         "statsapi_season_pitching.csv"):
                 (root / name).write_text("x\n", encoding="utf-8")
             old = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
             (root / "reference_manifest.json").write_text(json.dumps(
                 {"files": {n: {"fetched_at": old} for n in rrd.REQUIRED_COLUMNS}}),
                 encoding="utf-8")
             warnings = rrd.reference_status(reference_dir=root)["warnings"]
-            fg = [w for w in warnings if w.startswith("fangraphs_season_pitching.csv")]
+            fg = [w for w in warnings if w.startswith("statsapi_season_pitching.csv")]
             # R277 split this file's report into three independently-caused
             # conditions, so select the AGE one rather than counting; every
             # R127(b) assertion still lands on it.
@@ -5048,31 +5049,58 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
             self.assertNotIn("season rates are drifting", stale[0])
 
     # --- R277: absence by FILTER is not absence by AGE ----------------------
-    def _fangraphs_only_status(self, root, header, age_days=0.0):
-        """reference_status over a temp dir holding one FanGraphs CSV."""
+    # R278 re-pointed these at the MECHANISM. They were written against the one
+    # real entry (FanGraphs `qual=y`) and that entry left with its file when the
+    # source moved to StatsAPI a day later, so a test coupled to the data fact
+    # would have gone green by deletion. The mechanism is what has to keep
+    # working, so the tables are patched with synthetic entries here and the
+    # "both are empty at this head" claim gets its own test below.
+    SYNTH_FILE = "statsapi_season_pitching.csv"
+
+    def _fangraphs_only_status(self, root, header, age_days=0.0,
+                               membership=None, manual_url=None):
+        """reference_status over a temp dir holding one season-pitching CSV."""
         import tools.refresh_reference_data as rrd
         root = Path(root)
         for name in rrd.REQUIRED_COLUMNS:
-            cols = header if name == "fangraphs_season_pitching.csv" else \
+            cols = header if name == self.SYNTH_FILE else \
                 ",".join(rrd.REQUIRED_COLUMNS[name])
             (root / name).write_text(cols + "\nrow\n", encoding="utf-8")
         when = (datetime.now(timezone.utc) - timedelta(days=age_days)).isoformat()
         (root / "reference_manifest.json").write_text(json.dumps(
             {"files": {n: {"fetched_at": when} for n in rrd.REQUIRED_COLUMNS}}),
             encoding="utf-8")
-        status = rrd.reference_status(reference_dir=root)
-        fg = [w for w in status["warnings"]
-              if w.startswith("fangraphs_season_pitching.csv")]
+        mem = {} if membership is None else {self.SYNTH_FILE: membership}
+        man = {} if manual_url is None else {self.SYNTH_FILE: manual_url}
+        with unittest.mock.patch.dict(rrd.SOURCE_MEMBERSHIP_FILTER, mem, clear=True), \
+                unittest.mock.patch.dict(rrd.MANUAL_TARGETS, man, clear=True):
+            status = rrd.reference_status(reference_dir=root)
+        fg = [w for w in status["warnings"] if w.startswith(self.SYNTH_FILE)]
         return status, fg
+
+    def test_no_reference_pull_currently_drops_players_by_rule(self):
+        """R278. Both tables are EMPTY at this head, and that emptiness is a
+        claim rather than an absence of code: the FanGraphs `qual=y` entry and
+        the manual export it described left together when the K-rate source
+        moved to StatsAPI `playerPool=All`. A future entry here means a pull
+        started filtering again."""
+        import tools.refresh_reference_data as rrd
+        self.assertEqual(rrd.SOURCE_MEMBERSHIP_FILTER, {})
+        self.assertEqual(rrd.MANUAL_TARGETS, {})
+        self.assertIn("playerPool=All", rrd.STATSAPI_PITCHING)
+        self.assertNotIn("qual=", rrd.STATSAPI_PITCHING)
 
     def test_filter_absence_is_reported_on_a_perfectly_fresh_file(self):
         """R277. The incompleteness sentence used to live on the STALENESS
-        branch, so a file pulled this morning through qual=y reported NOTHING
-        while omitting most of the league's arms. Membership is set by the
-        export's filter, not by the clock."""
+        branch, so a file pulled this morning through a filtered export reported
+        NOTHING while omitting most of the league's arms. Membership is set by
+        the export's filter, not by the clock."""
         with tempfile.TemporaryDirectory() as tmp:
-            status, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9", age_days=0.0)
-            entry = status["files"]["fangraphs_season_pitching.csv"]
+            status, fg = self._fangraphs_only_status(
+                tmp, "Name,IP,K/9,GS,TBF", age_days=0.0,
+                membership="its export URL carries qual=y, so it lists only "
+                           "QUALIFIED pitchers; a refresh is not the remedy")
+            entry = status["files"][self.SYNTH_FILE]
             self.assertFalse(entry["stale"])
             self.assertTrue(entry["membership_filtered"])
             filt = [w for w in fg if "INCOMPLETE BY FILTER" in w]
@@ -5086,10 +5114,12 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         re-exporting that URL returns the same roster -- the remedy reproduced
         the condition. The URL now rides the AGE warning alone, and the filter
         warning says in terms that a refresh is not the fix."""
-        import tools.refresh_reference_data as rrd
-        url = rrd.MANUAL_TARGETS["fangraphs_season_pitching.csv"]
+        url = "https://example.invalid/export?qual=y"
         with tempfile.TemporaryDirectory() as tmp:
-            _, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9", age_days=30.0)
+            _, fg = self._fangraphs_only_status(
+                tmp, "Name,IP,K/9,GS,TBF", age_days=30.0, manual_url=url,
+                membership="its export URL carries qual=y; a refresh is not "
+                           "the remedy")
             carrying_url = [w for w in fg if url in w]
             self.assertEqual(len(carrying_url), 1)
             self.assertIn("days old", carrying_url[0])
@@ -5103,18 +5133,15 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
 
     def test_widening_the_pull_is_what_silences_the_filter_warning(self):
         """R277. SOURCE_MEMBERSHIP_FILTER is the single owner of this claim, so
-        deleting the entry -- which is part of widening the pull it describes --
-        silences that warning and leaves the other two conditions alone."""
-        import tools.refresh_reference_data as rrd
+        deleting the entry -- which is what widening the pull does, and what
+        R278 actually did -- silences that warning and leaves the other two
+        conditions alone."""
         with tempfile.TemporaryDirectory() as tmp:
-            with unittest.mock.patch.dict(rrd.SOURCE_MEMBERSHIP_FILTER, {},
-                                          clear=True):
-                status, fg = self._fangraphs_only_status(
-                    tmp, "Name,IP,K/9", age_days=30.0)
+            status, fg = self._fangraphs_only_status(
+                tmp, "Name,IP,K/9,GS,TBF", age_days=30.0, membership=None)
             self.assertEqual(
                 [w for w in fg if "INCOMPLETE BY FILTER" in w], [])
-            self.assertFalse(
-                status["files"]["fangraphs_season_pitching.csv"]["membership_filtered"])
+            self.assertFalse(status["files"][self.SYNTH_FILE]["membership_filtered"])
             self.assertEqual(len([w for w in fg if "days old" in w]), 1)
 
     def test_required_columns_are_checked_on_the_file_nothing_fetches(self):
@@ -5123,17 +5150,106 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         about to be re-pulled through a different URL -- was the one file whose
         column list nothing ever checked."""
         with tempfile.TemporaryDirectory() as tmp:
-            status, fg = self._fangraphs_only_status(tmp, "Name,IP,ERA")
-            entry = status["files"]["fangraphs_season_pitching.csv"]
+            status, fg = self._fangraphs_only_status(tmp, "Name,IP,GS,TBF,ERA")
+            entry = status["files"]["statsapi_season_pitching.csv"]
             self.assertEqual(entry["missing_columns"], ["K/9"])
             missing = [w for w in fg if "missing required column" in w]
             self.assertEqual(len(missing), 1)
             self.assertIn("K/9", missing[0])
         with tempfile.TemporaryDirectory() as tmp:
-            status, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9,K%,WAR")
+            status, fg = self._fangraphs_only_status(tmp, "Name,IP,K/9,GS,TBF,K%")
             self.assertEqual(
-                status["files"]["fangraphs_season_pitching.csv"]["missing_columns"], [])
+                status["files"]["statsapi_season_pitching.csv"]["missing_columns"], [])
             self.assertEqual([w for w in fg if "missing required column" in w], [])
+
+    # --- R278: the K-rate source, fetched instead of hand-exported ----------
+    @staticmethod
+    def _statsapi_page(n, offset=0, total=None, gs=1, ip="6.1", so=9):
+        """One StatsAPI stats-endpoint page, shaped like the real payload."""
+        return json.dumps({"stats": [{
+            "totalSplits": total if total is not None else n,
+            "splits": [{
+                "team": {"abbreviation": "MIL"},
+                "player": {"id": 100000 + offset + i, "fullName": f"Arm {offset + i}"},
+                "stat": {"gamesPlayed": 20, "gamesStarted": gs,
+                         "inningsPitched": ip, "strikeOuts": so, "battersFaced": 400},
+            } for i in range(n)],
+        }]})
+
+    def test_innings_notation_is_thirds_not_tenths(self):
+        """R278. FanGraphs and StatsAPI both write 148 and a third as '148.1'.
+        float('148.1') is wrong by up to 0.23 IP and ALWAYS in one direction; it
+        went unnoticed because IP's only consumer was the IP x 4.25 batters-faced
+        proxy, where the error hid inside the fudge factor."""
+        import tools.refresh_reference_data as rrd
+        self.assertAlmostEqual(rrd.innings_to_float("148.0"), 148.0)
+        self.assertAlmostEqual(rrd.innings_to_float("148.1"), 148 + 1 / 3)
+        self.assertAlmostEqual(rrd.innings_to_float("148.2"), 148 + 2 / 3)
+        self.assertAlmostEqual(rrd.innings_to_float("7"), 7.0)
+        self.assertIsNone(rrd.innings_to_float(None))
+        self.assertIsNone(rrd.innings_to_float(""))
+        # The emitted CSV carries the RESOLVED decimal, not the notation, so no
+        # downstream reader has to know the convention.
+        csv_text = rrd.statsapi_rows_to_csv(json.loads(
+            self._statsapi_page(1, ip="148.1", so=150))["stats"][0]["splits"])
+        row = list(csv.DictReader(io.StringIO(csv_text)))[0]
+        self.assertAlmostEqual(float(row["IP"]), 148 + 1 / 3, places=3)
+        self.assertAlmostEqual(float(row["K/9"]), 9 * 150 / (148 + 1 / 3), places=3)
+
+    def test_the_statsapi_pull_carries_no_qualification_filter(self):
+        """R278. The whole defect R277 filed was a `qual=y` in a URL. The
+        replacement asks for playerPool=All, so there is no filter parameter to
+        get wrong, and the emitted file carries a REAL batters-faced count rather
+        than the IP x 4.25 proxy."""
+        import tools.refresh_reference_data as rrd
+        pages = [self._statsapi_page(2, offset=0, total=2)]
+        text = rrd.fetch_statsapi_pitching(2026, page_size=2,
+                                           opener=lambda url: pages.pop(0))
+        rows = list(csv.DictReader(io.StringIO(text)))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(list(rows[0]), rrd.STATSAPI_COLUMNS)
+        self.assertEqual(rows[0]["TBF"], "400")
+        self.assertTrue(rows[0]["MLBAM_ID"].isdigit())
+
+    def test_a_short_statsapi_read_refuses_rather_than_writing_a_partial_league(self):
+        """R278. A partial league is EXACTLY the condition this change exists to
+        remove, so a truncated pagination must not land as a narrower file that
+        certifies clean -- which is how the qual=y file behaved for a season."""
+        import tools.refresh_reference_data as rrd
+        pages = [self._statsapi_page(2, offset=0, total=900),
+                 self._statsapi_page(0, offset=2, total=900)]
+        with self.assertRaises(ValueError) as ctx:
+            rrd.fetch_statsapi_pitching(2026, page_size=2,
+                                        opener=lambda url: pages.pop(0))
+        self.assertIn("partial league", str(ctx.exception))
+
+    def test_statsapi_pagination_walks_offsets_and_dedupes(self):
+        """R278. The response is capped server-side, so a full league needs the
+        offset loop; a player repeated across a page boundary must not be ranked
+        twice."""
+        import tools.refresh_reference_data as rrd
+        seen_urls = []
+
+        def opener(url):
+            seen_urls.append(url)
+            return self._statsapi_page(2, offset=0 if len(seen_urls) == 1 else 1,
+                                       total=4)
+        text = rrd.fetch_statsapi_pitching(2026, page_size=2, opener=opener)
+        rows = list(csv.DictReader(io.StringIO(text)))
+        self.assertEqual(len(seen_urls), 2)
+        self.assertIn("offset=0", seen_urls[0])
+        self.assertIn("offset=2", seen_urls[1])
+        # Pages 1 and 2 overlap on one player; he appears once.
+        self.assertEqual(len({r["MLBAM_ID"] for r in rows}), len(rows))
+        self.assertEqual(len(rows), 3)
+
+    def test_a_scoreless_or_zero_inning_arm_is_left_out_rather_than_dividing_by_zero(self):
+        """R278. playerPool=All includes position players who threw an inning
+        and pitchers with none at all; a 0 IP row has no K rate to compute."""
+        import tools.refresh_reference_data as rrd
+        payload = json.loads(self._statsapi_page(1, ip="0.0", so=0))
+        self.assertEqual(rrd.statsapi_rows_to_csv(
+            payload["stats"][0]["splits"]).strip().splitlines()[1:], [])
 
     def test_an_unreadable_header_confirms_nothing_and_says_so(self):
         """R277. A non-empty file that is not this CSV -- an HTML error page or
@@ -5144,12 +5260,12 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._fangraphs_only_status(tmp, "Name,IP,K/9")
-            (root / "fangraphs_season_pitching.csv").write_bytes(b"\xff\xfe\x00bad")
+            (root / "statsapi_season_pitching.csv").write_bytes(b"\xff\xfe\x00bad")
             status = rrd.reference_status(reference_dir=root)
-            entry = status["files"]["fangraphs_season_pitching.csv"]
+            entry = status["files"]["statsapi_season_pitching.csv"]
             self.assertTrue(entry["exists"])
             self.assertEqual(entry["missing_columns"], list(
-                rrd.REQUIRED_COLUMNS["fangraphs_season_pitching.csv"]))
+                rrd.REQUIRED_COLUMNS["statsapi_season_pitching.csv"]))
             unreadable = [w for w in status["warnings"] if "header unreadable" in w]
             self.assertEqual(len(unreadable), 1)
             self.assertIn("K/9", unreadable[0])
@@ -5158,7 +5274,7 @@ class BuildSlateEnrichmentWiringTests(unittest.TestCase):
         import tools.refresh_reference_data as rrd
         with tempfile.TemporaryDirectory() as tmp:
             warnings = rrd.reference_status(reference_dir=Path(tmp))["warnings"]
-            fg = [w for w in warnings if w.startswith("fangraphs_season_pitching.csv")]
+            fg = [w for w in warnings if w.startswith("statsapi_season_pitching.csv")]
             self.assertEqual(len(fg), 1)
             self.assertIn("it feeds the K-rate pitcher ceiling multipliers", fg[0])
             self.assertIn("which is OFF for this build", fg[0])

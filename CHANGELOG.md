@@ -25,6 +25,127 @@ performance claim.
 
 ---
 
+## 2026-08-31 — R278: the K-rate side moves off FanGraphs to MLB StatsAPI, and the last manual reference input stops being manual
+
+**What moved.** `tools/refresh_reference_data.py` (new fetcher, new file, both
+membership tables emptied), `tools/stage_slate.py`,
+`skills/generate-lineups/scripts/build_slate.py`,
+`mlb_engine/pipeline/execution_pipeline.py` (one reason string),
+`tests/test_core.py`, `tools/audit.py`, `MANIFEST.md`. **Supersedes R277(a),
+which is retired unbuilt** — see "Why not the filed fix".
+
+**Ben's call, this date.** R277(a) was "widen the FanGraphs export URL from
+`qual=y` to `qual=0`." Verified on the live site that the parameter was right:
+the pager at that exact query string reads 832 rows against 211, and the rendered
+column set is byte-for-byte the current header, so the `REQUIRED_COLUMNS` stop
+condition was clear. **The fix was still not taken.**
+
+**Why not the filed fix.** The one-click CSV behind that URL is a FanGraphs
+*membership* feature. The rows are free to read; the export is the gated thing.
+Rebuilding it by automating 28 page-turns is doing the gated thing by another
+route, and Ben — who wrote the "FanGraphs is manual by decision" rule — can relax
+his own project rule but cannot consent on FanGraphs' behalf. This file's own
+sibling rule already says the same for a different vendor: "scripted DK access
+violates DK terms; never attempt to bypass either, by curl, requests, or any
+alternate fetch."
+
+**What replaced it.** MLB StatsAPI, `stats=season&group=pitching&playerPool=All`.
+Already a dependency of this repo (`tools/fetch_slate_bundle.py` reads the
+schedule and people endpoints from the same host). Four things it gives that the
+export did not:
+
+1. **No qualification filter exists to get wrong.** `playerPool=All` is the whole
+   population; the R277 defect cannot return through a parameter. Three sources
+   agree on that population: StatsAPI 834, FanGraphs at `qual=0` 832, Savant at
+   `min=1` 831.
+2. **Nothing is manual.** `MANUAL_TARGETS` is now empty. That table held exactly
+   one file, and it is the file that was 45.2 days old against a 14-day limit on
+   the day it was replaced — because a human had to fetch it.
+3. **A real `TBF`.** The engine approximates batters faced as
+   `IP * K_RATE_TBF_PER_IP` (4.25). Measured against the real count on 40 arms,
+   the proxy runs a median −3.7% and as far as −12.4% off. It is worst exactly at
+   the [50, 100) TBF shrink band, which is empty today and fills the moment the
+   population widens — so the guess is removed at the point it would first have
+   bitten.
+4. **The MLBAM id**, carried in the file so the crosswalk can move off name
+   matching later without another fetch change.
+
+**Rank agreement, and the honest caveat.** What the multiplier consumes is a
+percentile RANK, not a K/9 level, so that is what was tested: **Spearman 0.980**
+over the 40 highest-IP arms, median rank move 2 places, max 6. Implied
+|Δmultiplier| max **0.0450**, median 0.0150, **0 of 40 over the 0.05 bar** set in
+yesterday's entry. The caveat is that this is an UPPER bound, not a clean
+measurement: the FanGraphs control file's true as-of date is unknown and earlier
+than its 2026-07-16 mtime — a date-matched `byDateRange` query still put StatsAPI
+5 to 15 innings ahead of it, median 7.0, about one start. **That file's date has
+now confounded three separate measurements**: the 2026-08-16 Dobnak
+misattribution, and both source-agreement passes in this session, the first of
+which was nearly reported as a source disagreement before the IP columns were
+read. Since the residual contains the date gap, true source disagreement is
+smaller than 0.045.
+
+**A latent bug found and fixed in passing.** Both FanGraphs and StatsAPI write
+"148 and one third" as `148.1`. `float("148.1")` is wrong by up to 0.23 innings
+and always in the same direction, and `build_k_rate_ceiling_multipliers` has been
+doing exactly that via `pd.to_numeric(table["IP"])`. It never mattered because
+IP's only consumer was the 4.25 proxy, where a 0.2% error hid inside the fudge
+factor. `innings_to_float` resolves the thirds once at the emit boundary, so the
+new file carries a true decimal and no downstream reader has to know the
+convention. **This is a deliberate semantic change to the `IP` column, and it is
+carried by the rename** rather than applied silently to a file of the same name.
+
+**The rename, and what it forced.** `fangraphs_season_pitching.csv` →
+`statsapi_season_pitching.csv`. A file named for a vendor that no longer supplies
+it is the exact name-that-lies class this changelog keeps writing entries about,
+and renaming is what forced every consumer to be visited. **9 consumer sites,
+all updated:** the three tables in `refresh_reference_data.py`, `stage_slate.py`,
+the skill's `build_slate.py`, `execution_pipeline.py`'s reason string
+(`absent_from_fangraphs_season_pitching` → `absent_from_season_pitching`, named
+for the CONDITION since it has now outlived its vendor once), `MANIFEST.md`, and
+16 test sites.
+
+**Two things deliberately NOT renamed, with reasons.** The engine kwarg
+`fangraphs_pitching_csv` and `load_fangraphs_pitching` stay: 54 sites across 7
+files, the parameter is SHAPE-based (any CSV with `Name` and a K-rate column),
+and `test_golden_replay` legitimately still feeds it a frozen FanGraphs file.
+Riding that rename in here would be mechanical churn that could confound this
+change; filed separately. And
+`tests/fixtures/enrichment/fangraphs_season_pitching_frozen_2026-07-16.csv` keeps
+its name and its bytes — it IS a FanGraphs export, it is on a separate path, and
+the golden replay must not move when the live source does. Verified: all 258
+golden-replay/showdown/paste tests pass untouched.
+
+**`SOURCE_MEMBERSHIP_FILTER` is empty, one day after it was built.** That is the
+mechanism working, not a regression: yesterday's entry said "deleting an entry is
+part of widening the pull it describes, which is what makes this table go stale
+loudly," and the entry left with the file it described rather than surviving to
+describe a filter nothing carries. An empty table is now a claim — no reference
+pull drops players by rule — and it has a test.
+
+**Tests re-pointed rather than deleted.** The three R277 membership tests were
+written against the one real entry, so when that entry left they would have gone
+green by deletion. They now patch synthetic entries and pin the MECHANISM, and
+the "both tables are empty at this head" claim gets its own separate test. That
+distinction is the point: a test coupled to a data fact goes quiet when the fact
+changes; a test coupled to the mechanism does not.
+
+**Six new tests, seven mutations, all seven KILLED**, target restored
+byte-identical: innings notation back to a plain float, partial-league refusal
+removed, cross-page dedupe removed, zero-IP rows allowed through, a `qual=y` put
+back into the pull URL, a membership entry re-added, and pagination stopping after
+the first page.
+
+**Not yet measured, and stated rather than skipped quietly.** R277(b)'s
+before/after multiplier distribution needs the new file on disk, and the container
+cannot reach `statsapi.mlb.com` (proxy 403), so the first real fetch is Ben
+running `python tools/refresh_reference_data.py`. The fetcher is fixture-tested,
+not network-tested. Until that runs, `statsapi_season_pitching.csv` is MISSING and
+the build correctly reports the K-rate ceiling as OFF rather than degraded.
+
+**Gate 1494 -> 1500.** `PASS  v2.26.0  27 modules  1500 tests`.
+
+---
+
 ## 2026-08-31 — R277(d): absence by FILTER stops being reported as absence by AGE, and the one file nothing fetches gets its column check
 
 **What moved.** `tools/refresh_reference_data.py`, `tests/test_core.py`,
