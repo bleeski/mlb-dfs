@@ -586,25 +586,36 @@ written for it; R274's cleanup half is ARCHIVE's.*
 SOURCE-TEXT grep for a literal. R223 moved that literal to a different rung and
 the test kept passing while its docstring went false. Rewritten behavioural.*
 
-1. **R273 + R275** — the false-evidence slot, REFILLED 2026-08-30 rather than
-   vacated. **R172, R176 (with ed8's F-34 rider), R173 and R228 all SHIPPED
-   2026-08-30** (see CHANGELOG.md), in that order and as four separate commits.
-   What replaces them is the same class found by their own R233 enumerations,
-   both P1 and both S: **R273**, the Classic joint allocator discarding a
-   time-limited incumbent and recording `direct_constraint_failure: True` for a
-   clock event (found by R158's enumeration at `00f0995`, and R158's fix for the
-   Showdown face of it is the template); and **R275**, the preflight's own
-   fail-open pair, where an empty `contest_ids` skips the contest cross-check and
-   a row with no `certification` still earns `upload_ready`.
-   **The slot keeps its position and the queue stays at fourteen.** Both
-   replacements meet this tier's stated criterion (verified P1 silent-wrong-output
-   at S lift) and both sit one file from the money boundary, so promoting slot 2
-   over them would put a weaker claim first; and refilling costs no renumbering
-   where vacating would move thirteen entries for no gain. R273 is the heavier of
-   the two: it is on the Classic certified path, it needs its own Classic coverage,
-   and the 08-30 batch deliberately did not fold it in on the grounds that four
-   items was already the commit's limit.
-2. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by
+*DEV, 2026-08-31. **Slot 1 is VACATED and the queue drops to thirteen.** R275
+SHIPPED this date (see CHANGELOG.md) with its census: 829 manifest files, 2495
+rows, zero carrying an empty `contest_ids` or a missing `certification`, so the
+migration stop condition never fired and no historical delivery changes verdict.
+R273 did NOT ship and is not deferred — its fifth premise was checked against the
+tree and is false. `assign_lineups_to_contests`, which contains the `:1276`
+defect, has no caller, no importer and no string reference anywhere in
+`mlb_engine/`, `tools/` or `tests/`; `direct_constraint_failure` is written at
+that one dead site and nowhere else; and the live Classic path
+(`select_and_assign_entries`, `execution_pipeline.py:378` and `:3302`) is the one
+whose MILP at `:2745` R273 wanted to copy FROM. Two prior reviews had already run
+that census (ed6's "live-looking dead surface", ed7's GF7-S6 "no production
+caller; quarantine rationale, not a live defect"), and an R233 grep enumeration
+re-filed it as P1 because a grep cannot see that a site is unreachable. R273 is
+rewritten in place to what it actually is, an L quarantine decision in the R77 /
+GF7-S6 thread, and demoted to P3.*
+
+*This time the slot is VACATED rather than refilled, reversing the 08-30 call,
+and the reason is that the 08-30 argument no longer holds. That note refused to
+promote slot 2 because two verified P1 silent-wrong-output defects outranked it.
+One of those two has shipped and the other was not a live defect at all, so
+nothing is left at the head that outranks the money boundary — and the money
+boundary now has R248's two field hits and a session's worth of context in
+`preflight_upload.py` freshly banked. Renumbering thirteen entries is the cost
+the 08-30 note declined to pay for no gain; here the gain is that the strongest
+remaining claim is actually first, which is what the ordering is for. Slots
+2-15 each move up one. No content below changed.*
+
+
+1. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by
    two field hits from this week: the preflight's feed matcher has no AZ→ARI
    crosswalk and silently demotes ten hard checks to warnings (R248, F-33,
    and it hit a SECOND slate 08-28), and the salary auto-resolve still reaches
@@ -613,7 +624,7 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
    without running it. **R266 SHIPPED 2026-08-29 and is out of this slot**; it
    landed alone as its own note said it would, and its landing changed nothing
    about the other four.
-3. **The repair path: R267 + R272, then R268, R204's ceiling half rides** —
+2. **The repair path: R267 + R272, then R268, R204's ceiling half rides** —
    **INSERTED 2026-08-29, the one resequencing this date; everything below
    moved down one and nothing else changed.** The argument is the same one that
    moved the Showdown cluster on 08-27, field evidence rather than review:
@@ -634,9 +645,9 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
    the smalls: both edit CLAUDE.md, contract edits are allowed only with no
    other session live, and two edits to one contract file in one window is an
    ordering argument rather than a shared-surface convenience.
-4. **R165 + R163** — unchanged content, down one: its evidence is unchanged
+3. **R165 + R163** — unchanged content, down one: its evidence is unchanged
    while the Showdown slot gained two live hits.
-5. **Showdown ladder truth: R247 + R237 + R224** — **R158, R223 and R250 all
+4. **Showdown ladder truth: R247 + R237 + R224** — **R158, R223 and R250 all
    SHIPPED 2026-08-30** (see CHANGELOG.md), in that order and separately; what
    is left in this slot is the visibility half. The solver-status precondition
    (F-08) is met, so anything here may now trust a solve result and read a
@@ -651,7 +662,7 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
    it was filed against — re-verify its premise before building it, per the
    standing rule that a backlog entry's premises are checked against the tree
    rather than taken from the entry.
-6. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
+5. **Showdown contest awareness: R238 first, then R239 + R249, R245 rides** —
    shapes before assignment (R239's shape-aware half consumes R238).
    **R239(b) and (c) SHIPPED 2026-08-29** (see CHANGELOG.md); what is left in
    this slot is **R239(a) alone**, the round-robin deal, and it still consumes
@@ -667,29 +678,29 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
    decision-first — and becomes LOAD-BEARING if Ben answers the new
    distinct-captains decision "distinct," since a 7-entry contest would then
    need 7 captains and the ladder constructs none below $5,800.
-7. **R216** — unchanged reason: lands alone at a session boundary because it
+6. **R216** — unchanged reason: lands alone at a session boundary because it
    resets in-flight gate state. Gains F-01's widening as a rider: the
    behavior manifest should also cover the lock files and
    `reference_manifest.json`, and record runtime identity (R217(d)'s half).
-8. **R195 + R181 + R179** — unchanged; R195 before R181.
-9. **R180 + R217 + R218** — audit hardening, unchanged (F-02, F-22).
-10. **R207 + R244** — the R203 feeder pair, now explicit: R207 makes the
+7. **R195 + R181 + R179** — unchanged; R195 before R181.
+8. **R180 + R217 + R218** — audit hardening, unchanged (F-02, F-22).
+9. **R207 + R244** — the R203 feeder pair, now explicit: R207 makes the
     refusal name the binding cap, R244 makes the rescue open ONLY that cap
     and bisect downward (the 08-27 container fragment measured 0.43
     dominating 0.50 outright — the first value that certifies is not the
     value to ship). R203's R214 precondition is MET (landed 2026-08-28), so
     this pair is all that stands between the board and R203; its entry gains
     R244's design.
-11. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
+10. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
     the bank job grid (F-29) and the `--leverage` passthrough that makes
     R154's two constraints reachable from the slate's own prediction file
     (F-15's narrow accept; Ben has now asked for leverage twice in-slate and
     the answer was "built but not connected").
-12. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
+11. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
     atomic-writer copy, so ed8 adds no scope.
-13. **R276 alone** — **R277 CLOSED COMPLETELY 2026-08-31 and has left the board**
+12. **R276 alone** — **R277 CLOSED COMPLETELY 2026-08-31 and has left the board**
     ((a) retired unbuilt and superseded by R278, (d) shipped, (b) and (c)
     measured; all three CHANGELOG entries that date). The slot keeps its position
     and the queue stays at fourteen: R276 is still worth its place on Ben's dated
@@ -711,14 +722,14 @@ the test kept passing while its docstring went false. Rewritten behavioural.*
     breadth-vs-construction comparison needs the archetype table to carry a
     truthful breadth for the shape it resolves, which is the thing R196 cannot
     currently express.
-14. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221 **+ R270(a)** (the
+13. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221 **+ R270(a)** (the
     two sides of one doubleheader-leg boundary — the write side stamps the
     wrong leg's order, the read side has no leg filter at all, and the odds
     path already holds the matcher both should use), R222, R229 (+F-24's severity
     note on the (b) half), R230 (+(d), the game-cap test that passes with the
     constraint deleted, F-28), R231, R232, R241, R243. R269 lands here or with
     R245, whichever moves first; they are the same manifest object.
-15. **The pre-existing Tier 1 remainder from R121**, standing order,
+14. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged.
 
 **Tier 2 keeps its order and gains one rider:** R118 → R48 + R83 → R10 (still
@@ -2385,34 +2396,62 @@ the batch's named rider and did not get pulled.
   declared_starters` unable to coexist with `posted_hitters: 0`: that pair is
   the misleading half and it is a one-line assertion.
 
-### R273. The Classic joint allocator files a clock expiry as a constraint failure (P1, S) | new 2026-08-30, found by R158's R233 enumeration at `00f0995`; VERIFIED-read | **POSITIONED 2026-08-30 into slot 1**, with R275, when the false-evidence batch closed: same class, Classic certified path, and R158's Showdown fix is the template to follow rather than re-derive
+### R273. The clock-expiry mislabel is real and it is in DEAD CODE; the item is now a quarantine decision, not a label fix (P3, was P1) | new 2026-08-30 from R158's R233 enumeration | **DEMOTED OUT OF SLOT 1 on 2026-08-31**: the premise that put it there was checked against the tree and is false
 
-- **What:** `contest_allocator.py:1276-1290`. The joint MILP reads
-  `if not result.success or result.x is None:` and, on any non-success, falls
-  back to `_assign_lineups_greedy_fallback` while setting
-  `direct_constraint_failure: True` and `selection_certified: False`. A status-1
-  time limit holding a feasible incumbent is therefore discarded AND recorded as
-  a CONSTRAINT failure. That is R158's inversion with a worse label: the fallback
-  is correct behaviour for an infeasible model and wrong for a slow one, and the
-  operator reading `direct_constraint_failure` is told the controls are
-  impossible when the clock simply ran out.
-- **Why it was left on 2026-08-30:** R158 fixed the Showdown twin the same day
-  and named this site rather than touching it. It sits on the CLASSIC certified
-  path behind the golden replay, and changing what `selection_certified` reports
-  is not a change that belongs in a Showdown stage with no Classic coverage
-  written for it.
-- **Fix:** the pattern is already in this same file at `:2745`, which verifies
-  its incumbent and emits a `solver_report` — port that, not `optimizer_v3`'s,
-  since it is the nearer neighbour. Then the fallback fires on a proven
-  infeasibility and a verified time-limited incumbent is accepted and tagged,
-  with the timeout counted separately from `direct_constraint_failure`.
-  Note `:2745` carries its own inline `{0: "optimal", 1: "time_limit", ...}`
-  dict, a second copy of `optimizer_v3.SCIPY_MILP_STATUS`; unify to the import
-  while here, which makes the vocabulary one definition across all four `milp`
-  call sites.
-- **Cost of leaving it:** a Classic build whose joint MILP times out ships
-  through the greedy fallback uncertified, with a diagnostic naming the wrong
-  cause. Nobody currently reads it as a timeout, so the misdiagnosis is silent.
+- **The defect, re-verified at this head and unchanged:**
+  `contest_allocator.py:1276-1290` reads `if not result.success or result.x is
+  None:` and on any non-success discards the result, falls back to
+  `_assign_lineups_greedy_fallback`, and sets `direct_constraint_failure: True`
+  with `selection_certified: False`. A status-1 time limit holding a feasible
+  incumbent is thrown away AND filed as a CONSTRAINT failure. Every word of that
+  is still true.
+- **What is FALSE, and it was the reason for the priority.** This entry and the
+  08-30 DEV note both said the site "sits on the CLASSIC certified path behind
+  the golden replay". It does not. `:1276` is inside
+  `assign_lineups_to_contests` (def at `:1096`), which has **no calls, no
+  imports and no string references anywhere** in `mlb_engine/`, `tools/` or
+  `tests/` — counted by AST walk, not grep, on 2026-08-31. The only mention in
+  code is a comment at `:2553` pointing at it. `direct_constraint_failure` is
+  written at exactly ONE site in the repo, `:1289`, inside that dead function.
+  The production Classic path is `select_and_assign_entries` (`:2218`), called
+  from `execution_pipeline.py:378` and `:3302` — and its MILP is the one at
+  `:2745` that R273 proposed porting FROM. The fix as written would have moved
+  the correct pattern out of the live function and into the dead one.
+- **The repo already knew, twice, and this board did not pick it up.**
+  `docs/2026-08-22_critique_greenfield_spec_ed6.md:28` calls
+  `assign_lineups_to_contests` plus the attractiveness scoring and the greedy
+  fallback "~1,000 lines of live-looking dead surface (R77 class)".
+  `docs/2026-08-24_critique_greenfield_spec_ed7.md:116` files the sibling defect
+  (the same path mints `selection_certified: True` for a solve that never ran)
+  and closes it with "**No production caller (census below); quarantine
+  rationale, not a live defect**" — a census run six days before R273 was filed.
+  R273 came out of an R233 grep enumeration on 08-30, which counted the site and
+  could not see that it was dead. That is the enumeration's blind spot stated in
+  the 08-30 board note, one turn further: it counts sites, a test pinning a site
+  reads as coverage, and **a dead site reads as a live one**. An enumeration that
+  reports a hit list should say which hits have callers.
+- **What is left, and it is one decision.** Do not port the pattern into dead
+  code; that makes an unreachable record look maintained and is the wrong
+  direction for a surface two reviews have recommended quarantining. The real
+  item merges with the R77 / GF7-S6 thread: **delete or quarantine
+  `assign_lineups_to_contests`, `_assign_lineups_greedy_fallback` (called only
+  at `:1145` and `:1285`, both inside it) and the attractiveness scoring**, and
+  R273 closes by removing its own subject. Sizing that is L, not S: ~1,000 lines
+  out of the certified module, its own commit, its own gate, and it must not run
+  during a live slate.
+- **The one thing worth keeping from the original Fix line,** because it is true
+  and cheap and independent of the quarantine: `:2745` carries its own inline
+  `{0: "optimal", 1: "time_limit", ...}` dict, a verified second copy of
+  `optimizer_v3.SCIPY_MILP_STATUS`. Confirmed 2026-08-31 — there are exactly
+  four `milp(` call sites (`contest_allocator.py:1276` and `:2745`,
+  `optimizer_v3.py:1027`, `showdown.py:498`); `:1027` and `:498` share the
+  import, `:2745` holds the copy, `:1276` has no status vocabulary at all.
+  Unifying `:2745` to the import is XS, touches the LIVE path, and does not
+  depend on what happens to the dead half.
+- **Cost of leaving it:** nothing operational. Nobody reads
+  `direct_constraint_failure` because nothing writes it. The cost is that the
+  surface keeps being re-found: three reviews in ten days have now filed against
+  this same dead code, and the next enumeration will file a fourth.
 
 ### R224. Two Showdown cap-resolver smalls, both on surfaces R157 sends operators to read (P2, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-E4, GF7-E5); VERIFIED-read, re-read here
 
@@ -5123,33 +5162,6 @@ manifest row, and exits 4. Landed with the second site of the same class,
 `verify_manifest`, which counted a row it had not checked. R233 found 14 sites in
 the class against the one the entry named; two more are filed as R275 below. Gate
 1461 -> 1468.
-
-### R275. The preflight's own fail-open pair: an empty `contest_ids` skips the contest cross-check, and a row with no `certification` still earns `upload_ready` (P1, S) | new 2026-08-30, found by R228's R233 enumeration at this head; VERIFIED-read
-
-**What.** Two sites, same shape as R228, one boundary later.
-
-    tools/preflight_upload.py:1012   if recorded and recorded != actual:
-    tools/preflight_upload.py:2014   if certification and certification != "certified":
-
-(a) `recorded` is the manifest row's `contest_ids`. An EMPTY set skips the
-contest-assignment cross-check entirely rather than failing it, so a row that
-never recorded which contests it was for reads exactly like a row that agrees.
-(b) `certification` is the row's recorded certification. Absent, the verdict stays
-`upload_ready` — the one label CLAUDE.md reserves for a run where `workflow_valid`,
-`selection_certified` and `allocation_certified` all passed — awarded on missing
-evidence. The reachable case is a row written by an older writer or by a path that
-omits the field; a delivered file with NO row already hard-fails separately, so
-this is thin records rather than absent ones.
-
-**Why.** Same argument R228 closed, at the checker Ben runs immediately before
-uploading, and (b) hands out the reserved label rather than merely skipping a
-check.
-
-**Fix.** Both fail closed on absence and say which evidence was missing.
-(b) needs care and its own coverage: turning currently-passing preflights into
-`review_ready` changes what Ben sees at T-5, so land it with the count of existing
-rows in `outputs/` that carry no `certification` and state whether any is live.
-Deliberately NOT folded into R228's commit for that reason.
 
 ### R242. The preflight's salary auto-resolve reaches across dates and draftgroups before refusing; it should find the slate's own file (P2, S) | new 2026-08-27, merged from BUILD fragments `2026-08-24_BUILD_showdown_contest_assignment.md` §2 and `2026-08-26_BUILD_contest_aware_allocation_at_onset.md` §6; corroborated by the outside spec ed8 (F-11's surviving sliver)
 

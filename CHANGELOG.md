@@ -25,6 +25,169 @@ performance claim.
 
 ---
 
+## 2026-08-31 — R275: three manifest cross-checks stop reading an absent field as agreement, and the reserved label stops being awarded on no evidence
+
+**What moved.** `tools/preflight_upload.py` (three guards),
+`tests/test_upload_integrity.py` (nine new, one inverted), `tools/audit.py`
+(the pin), `CLAUDE.md` (the quoted gate line). Gate **1500 -> 1509**.
+
+**The defect.** Both sites the item named were written
+`if <field> and <field> != <expected>`, so a manifest row that OMITTED the field
+skipped the check instead of failing it, and a row that never recorded a fact
+read exactly like a row that agrees. (a) `:1012`, an empty `contest_ids` skipped
+the contest-assignment cross-check. (b) `:2045` (the item cited `:2014`, which is
+an argparse comment — the citation was stale by 31 lines, the defect was exactly
+as described), an absent `certification` fell through to `upload_ready`, the one
+label CLAUDE.md reserves for a run where `workflow_valid`,
+`selection_certified` and `allocation_certified` all passed, awarded on missing
+evidence.
+
+**This is the writer's own default, not a legacy shape, and that is the part the
+item understated.** R275 read the reachable case as "a row written by an older
+writer". It is nearer than that: `record_delivery` makes both fields optional and
+its defaults produce precisely the fail-open values — `contest_ids or []` writes
+an EMPTY LIST and `entries` writes `None` (`upload_manifest.py:273,275`) — so any
+`deliver(**record_kwargs)` caller that omits either writes a row this checker
+reads as corroboration. Zero callers omit them today; one would suffice.
+
+**Census, which the item required before (b) could land.** 829 manifest files,
+2495 rows: `certification`, `status`, `entries`, `contest_ids` present on
+**2495 of 2495**, and **0** rows carry an empty `contest_ids` list. Certification
+values are `certified` 2438, `review_grade` 56, `certified_with_manual_patch` 1.
+**Blast radius on existing rows is zero** — no historical delivery changes
+verdict — so the stop condition ("live rows with no certification would make this
+a migration") does not fire. What DOES change is the no-manifest case: a loose
+file, or `--no-manifest`, now reads `review_ready` rather than `upload_ready`,
+because neither carries evidence the three gates passed. Ben's documented
+invocation is against a DELIVERED file, where an absent manifest already
+hard-fails, so the T-5 path is untouched.
+
+**A third guard shipped with them, and one was deliberately kept.** The
+truncation check at `:992` is the same shape with the same writer reachability
+(`entries=None`), and it also fail-opened on TYPE: a hand-edited `"1"` skipped
+silently, and a bare `isinstance(x, int)` would have compared `True == 1` and
+passed, since `bool` is an `int` in Python. Both now fail with the value quoted.
+`:987` (`recorded_status` outside `STATUS_VALUES`) is the same shape and is
+**KEPT**: `_valid_status` raises at the writer, so absence cannot arrive from the
+one writer that exists, and a second absence rule in the reader would mint a
+second enforcement point for a vocabulary rule that function already owns —
+R167/R159's class, which is the one this batch is trying not to start.
+
+**R233 enumeration.** Class is every fail-open conditional of the form
+`if <evidence> and <evidence> != <expected>` in `preflight_upload.py`, taken by
+AST (an `If` whose test is a two-value `And` of a bare truthiness guard and a
+comparison sharing a name), not by grep — the grep finds three of the eight.
+**Eight sites; the item named two. Three fixed, five kept:**
+
+| site | verdict | reason |
+|---|---|---|
+| `:470` `if contest and snap_contest != contest:` | KEEP | `contest` is an optional caller-supplied FILTER, not evidence about the file; absence means "do not filter", which is the correct form. |
+| `:622` `if entry.contest_name and ... not in unmatched:` | KEEP | list dedup-append, not a check; no verdict rides on it. |
+| `:987` `if recorded_status and ... not in STATUS_VALUES:` | KEEP | see above: `_valid_status` owns this rule at the writer. |
+| `:992` `if isinstance(recorded_entries, int) and ...` | **FIXED** | writer default is `None`; also fail-open on type and on `bool`. |
+| `:1012` `if recorded and recorded != actual:` | **FIXED** | R275(a); writer default is `[]`. |
+| `:1213` `if p and p.contest_id != e.contest_id:` | KEEP | absence means "new entry", a different and correct meaning, and the complementary direction is already hard-failed at `:1209`. |
+| `:1877` `if args.expect_contest_type and ...` | KEEP | an optional operator assertion; absence means the operator made no claim. Same family as `--expect-sha256` at `:1862`. |
+| `:2045` `if certification and certification != "certified":` | **FIXED** | R275(b). |
+
+**A test pinned the defect, for the third time this month.**
+`test_a_clean_run_never_returns_a_nonzero_code_and_zero_means_clean` asserted
+`verdict == "upload_ready"` on a loose fixture carrying NO manifest — the
+reserved label on zero evidence, green for as long as it has existed. The
+assertion was **inverted, not loosened**, and the exit-code claim the test exists
+for is untouched. That follows R64(b) over R172 and
+`test_unevidenced_gates_block_and_are_named` over R176, both on 2026-08-30. The
+enumeration cannot find this class: it counts sites, and a test pinning a site
+reads as coverage.
+
+**Mutations: seven, all KILLED, target restored byte-identical
+(sha256 `67632f3882fa`) after both batches.** Run three-then-four with the revert
+in a `finally` and the anchors grepped afterwards rather than trusting the
+driver, per the 08-31 ceiling lesson. M1 (contest_ids fail-open restored), M2
+(entries guard neutered), M3 (certification fail-open restored), M4 (bool guard
+dropped, so `True` compares as 1), M5 (disagreement branch neutered), M6 (the two
+certification notes swapped), M7 (`certified` no longer earns the label). M4 and
+M6 were written because the first five would have passed a guard that quietly
+lost the `bool` edge and one that gave both cases the same note; each was killed
+by exactly the test written for it. Driver in `tools/_scratch_r275/`, gitignored.
+
+**Not shipped, and stated rather than skipped quietly: R273.** Its fifth premise
+is false and the finding is its own entry below. R275 shipped alone.
+
+---
+
+## 2026-08-31 — R273 NOT BUILT: the defect is real, the site is dead code, and the priority that put it in slot 1 rested on a premise nothing had checked
+
+**What moved.** `docs/backlog.md` and this file. **Gate not run for this half,
+and stated rather than skipped quietly: it touches no code, no test and no
+contract.** It ships in the same commit as R275 because both edit the board.
+
+**The premise, and how it failed.** R273 was positioned into slot 1 on 2026-08-30
+as a P1 on the certified path; the entry and the DEV note both said it "sits on
+the CLASSIC certified path behind the golden replay". The pre-build premise check
+found no golden-replay coverage of the function, then found the reason:
+`assign_lineups_to_contests` (`contest_allocator.py:1096`, containing the
+`:1276` defect) has **no calls, no imports and no string references anywhere** in
+`mlb_engine/`, `tools/` or `tests/`. Counted by AST walk over every module, not
+by grep, because grep is what filed the item. `direct_constraint_failure` is
+written at exactly one site in the repo — `:1289`, inside that function. The
+production Classic path is `select_and_assign_entries` (`:2218`), reached from
+`execution_pipeline.py:378` and `:3302`, and its MILP at `:2745` is the one R273
+proposed porting the correct pattern FROM. Building the item as written would
+have moved that pattern out of the live function and into the dead one.
+
+**The stated impact does not survive it.** "The operator's remedy is to relax
+exposure caps, a real strategy change made for a fake reason" cannot happen:
+nothing produces the diagnostic. CLAUDE.md's R157 cap-loosening delegation keys
+off the error string from `select_and_assign_entries` (`:2815`, "no single
+control is arithmetically binding"), not off `direct_constraint_failure`. The
+entry's own "Cost of leaving it" line half-knew — "nobody currently reads it as a
+timeout" — and the truer statement is that nobody reads it at all.
+
+**The repo had already run this census, twice, six and four days before the item
+was filed.** `docs/2026-08-22_critique_greenfield_spec_ed6.md:28` calls the
+function, the attractiveness scoring and the greedy fallback "~1,000 lines of
+live-looking dead surface (R77 class)".
+`docs/2026-08-24_critique_greenfield_spec_ed7.md:116` files the sibling defect on
+the same path and closes it "No production caller (census below); quarantine
+rationale, not a live defect". R273 came from an R233 grep enumeration that
+counted the site and could not see it was unreachable.
+
+**What that says about R233, which is the generalisable part.** The 08-30 board
+note recorded that the enumeration cannot find a defect with a test over it,
+because it counts sites and a test pinning a site reads as coverage. This is the
+same blind spot one turn further: **a dead site also reads as a live one.** Seven
+prior editions found the class was N+1 when the item named N; this one found the
+class was N-1, and the missing check is cheaper than the one already required.
+An enumeration that reports a hit list should say which hits have callers, and a
+P1 that turns on a site being live should carry the caller count as evidence
+rather than as an assumption. Not filed as a rule change to R233 tonight: one
+sighting, and the right place for it is the next R233 edition rather than a
+same-session amendment to the rule that caught it.
+
+**What R273 becomes.** Rewritten in place, demoted P1 -> P3, and out of slot 1.
+It is no longer a label fix; it is the quarantine decision in the R77 / GF7-S6
+thread — delete or quarantine `assign_lineups_to_contests`,
+`_assign_lineups_greedy_fallback` (called only at `:1145` and `:1285`, both
+inside it) and the attractiveness scoring, so R273 closes by removing its own
+subject. That is L, not S, and it must not run during a live slate. One true and
+independent fragment of the original Fix line survives at XS on the LIVE path:
+`:2745` carries an inline `{0: "optimal", 1: "time_limit", ...}` dict, a verified
+second copy of `optimizer_v3.SCIPY_MILP_STATUS`. Confirmed here — exactly four
+`milp(` call sites (`contest_allocator.py:1276`, `:2745`, `optimizer_v3.py:1027`,
+`showdown.py:498`); the latter two share the import, `:2745` holds the copy, and
+`:1276` has no status vocabulary at all.
+
+**Slot 1 is VACATED and the queue drops to thirteen**, reversing the 08-30 call
+to refill rather than renumber. That call rested on two verified P1
+silent-wrong-output defects outranking the money boundary; one has shipped and
+the other was never a live defect, so the argument is gone and the money-boundary
+batch is now the strongest remaining claim. Slots 2-15 each move up one; no
+content below changed, and the three numbered headers in the older dated notes
+further down were checked and left alone.
+
+---
+
 ## 2026-08-31 — R277(b)/(c) MEASURED and R277 CLOSED: widening the population moved no arm past the bar, and the confound was the file's date every time
 
 **What moved.** `docs/backlog.md` and this file only. **Gate not run, and stated

@@ -644,7 +644,17 @@ EXPECTED_SUITE_COUNTS = {
     # longer exits zero (and is acknowledgeable at 4), a stamp that CLAIMS success
     # is still read back, the read-back's own contract, the stamp's new return, and
     # a superseded row reporting the status it holds rather than the verdict.
-    "tests.test_upload_integrity": 297,
+    # R275, 2026-08-31: 297 -> 306, the nine that pin the preflight's thin-row
+    # trio -- an empty contest_ids and an absent, string or boolean entries count
+    # FAILING rather than skipping the cross-check each feeds, both happy paths
+    # (agreeing ids, a real disagreement) held so the guards did not eat them,
+    # and a row with no certification landing at review_ready with a note that
+    # says the evidence was never recorded rather than quoting an empty string.
+    # A tenth test moved rather than grew: the R2 clean-exit test asserted
+    # `upload_ready` on a loose file carrying NO manifest, which is the reserved
+    # label on zero evidence -- the assertion was inverted, not loosened, and the
+    # exit-code claim it exists for is untouched.
+    "tests.test_upload_integrity": 306,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

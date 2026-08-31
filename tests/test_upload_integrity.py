@@ -565,11 +565,23 @@ class PreflightToolTests(unittest.TestCase):
 
     def test_a_clean_run_never_returns_a_nonzero_code_and_zero_means_clean(self):
         """The other half of R2's done-when: no code path with a non-empty
-        failure list returns 0."""
+        failure list returns 0.
+
+        R275(b), 2026-08-31. The verdict assertion is INVERTED here, not
+        loosened. This fixture is a loose file with no manifest at all, so
+        nothing on disk records that workflow_valid, selection_certified and
+        allocation_certified passed -- and `upload_ready` is the label CLAUDE.md
+        reserves for exactly that. The assertion pinned the defect: it required
+        the reserved label on a file carrying no evidence for it, which is the
+        third instance this month of a green test standing over the thing an
+        item was filed to fix (R64(b) over R172,
+        test_unevidenced_gates_block_and_are_named over R176). What this test
+        exists to prove is unchanged and still holds: a clean run exits 0.
+        """
         clean = self._run("--json")
         self.assertEqual(clean.returncode, 0)
         self.assertEqual(json.loads(clean.stdout)["failures"], [])
-        self.assertEqual(json.loads(clean.stdout)["verdict"], "upload_ready")
+        self.assertEqual(json.loads(clean.stdout)["verdict"], "review_ready")
 
     def test_json_output_is_parseable(self):
         payload = json.loads(self._run("--json").stdout)
@@ -674,6 +686,84 @@ class PreflightManifestBindingTests(unittest.TestCase):
         self.assertEqual(record["status"], "upload_ready")
         self.assertEqual(record["preflight"]["verdict"], "upload_ready")
         self.assertEqual(record["preflight"]["failures"], [])
+
+    # ---- R275, 2026-08-31: a thin manifest row is not a row that agrees ----
+    #
+    # Every check below reads a field `record_delivery` makes OPTIONAL, whose
+    # own default is the fail-open value: `contest_ids or []` writes an empty
+    # list and `entries` writes None. These are the writer's defaults, not a
+    # legacy shape, so each case is one `deliver(**record_kwargs)` caller away.
+
+    def test_a_row_with_no_contest_ids_fails_rather_than_skipping_the_check(self):
+        self._write_manifest(contest_ids=[])
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("records no contest_ids", result.stdout)
+        self.assertIn("is not evidence that it agrees", result.stdout)
+
+    def test_a_row_whose_contest_ids_agree_still_passes(self):
+        """The happy path the guard must not have eaten."""
+        self._write_manifest(contest_ids=["5"])
+        self.assertEqual(self._run().returncode, 0)
+
+    def test_a_row_whose_contest_ids_disagree_still_fails_the_old_way(self):
+        self._write_manifest(contest_ids=["999"])
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("contest assignment differs from the manifest", result.stdout)
+
+    def test_a_row_with_no_entries_count_fails_rather_than_skipping_truncation(self):
+        self._write_manifest(entries=None)
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("entries=None", result.stdout)
+        self.assertIn("not an integer count", result.stdout)
+
+    def test_a_row_whose_entries_count_is_a_string_cannot_be_compared(self):
+        """`"1"` is the shape a hand-edited or foreign row arrives in. The old
+        isinstance guard skipped it silently, which is the same fail-open."""
+        self._write_manifest(entries="1")
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("not an integer count", result.stdout)
+
+    def test_a_row_whose_entries_count_is_true_is_not_compared_as_one(self):
+        """`True` IS an int in Python and the file holds exactly 1 entry, so a
+        bare isinstance(x, int) check would compare True == 1 and pass. The
+        count is a count; a boolean is missing evidence wearing an int."""
+        self._write_manifest(entries=True)
+        result = self._run()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("not an integer count", result.stdout)
+
+    def test_a_row_with_no_certification_is_not_upload_ready(self):
+        """R275(b). `upload_ready` is the one label CLAUDE.md reserves. A row
+        that records nothing is not evidence the three gates passed."""
+        self._write_manifest(certification=None)
+        result = self._run("--json")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["failures"], [])
+        self.assertEqual(payload["verdict"], "review_ready")
+        self.assertIn("no manifest certification was recorded",
+                      payload["verdict_note"])
+
+    def test_the_absent_and_the_wrong_certification_get_different_notes(self):
+        """A note quoting certification='' reads like a checker bug. The
+        operator needs to know whether the evidence disagreed or was never
+        recorded, so the two cases say different things."""
+        self._write_manifest(certification="review_grade")
+        wrong = json.loads(self._run("--json").stdout)
+        self.assertEqual(wrong["verdict"], "review_ready")
+        self.assertIn("certification='review_grade'", wrong["verdict_note"])
+        self.assertNotIn("no manifest certification was recorded",
+                         wrong["verdict_note"])
+
+    def test_a_row_recording_certified_still_earns_upload_ready(self):
+        """The label is not withdrawn from the case that earns it."""
+        self._write_manifest(certification="certified")
+        payload = json.loads(self._run("--json").stdout)
+        self.assertEqual(payload["verdict"], "upload_ready")
 
     # ---- R176 rider (ed8 F-34): a zero exit has to be durably recorded ----
 

@@ -988,8 +988,25 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
         rep.fail(f"manifest records status {recorded_status!r}, which is not one "
                  f"of {list(STATUS_VALUES)}; an unknown status reads as current "
                  f"everywhere that only filters out 'superseded'")
+    # R275, 2026-08-31. Absence is not agreement. This guard and the contest_ids
+    # guard below were each written `if <field> and <field> != <expected>`, so a
+    # row that OMITS the field skipped the check instead of failing it, and a row
+    # that never recorded the fact read exactly like a row that agrees. That is
+    # not a hypothetical thin record: `record_delivery` makes both fields
+    # optional and its own defaults produce exactly these values --
+    # `entries` writes None and `contest_ids or []` writes an EMPTY LIST
+    # (upload_manifest.py:275,273) -- so any `deliver(**record_kwargs)` caller
+    # that omits either writes a row this checker reads as corroboration.
+    # The type test is part of the same fact: a non-integer count cannot be
+    # compared either, and `bool` is excluded because True is an int in Python
+    # and would otherwise compare as 1.
     recorded_entries = match.get("entries")
-    if isinstance(recorded_entries, int) and recorded_entries != len(entries):
+    if isinstance(recorded_entries, bool) or not isinstance(recorded_entries, int):
+        rep.fail(f"manifest records entries={recorded_entries!r}, which is not an "
+                 f"integer count, so the truncation cross-check could not run; "
+                 f"the file holds {len(entries)}. Re-record the delivery rather "
+                 f"than uploading against a row too thin to corroborate it")
+    elif recorded_entries != len(entries):
         rep.fail(f"manifest records {recorded_entries} entries, file holds "
                  f"{len(entries)}; a short file is a truncated write")
     if str(match.get("status") or "") == "superseded":
@@ -1007,9 +1024,17 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
                   "from; rebuild rather than waiving the manifest")
         rep.fail(f"manifest marks this file superseded by "
                  f"{match.get('superseded_by')}; do not upload it.{remedy}")
+    # R275(a). See the note on the entries guard above: the empty case is the
+    # writer's own default, not a legacy shape.
     recorded = {str(c) for c in (match.get("contest_ids") or [])}
     actual = {e.contest_id for e in entries}
-    if recorded and recorded != actual:
+    if not recorded:
+        rep.fail(f"the manifest row for {name} records no contest_ids, so the "
+                 f"contest-assignment cross-check could not run; the file "
+                 f"assigns {sorted(actual)}. A row that never recorded which "
+                 f"contests it was for is not evidence that it agrees. "
+                 f"Re-record the delivery rather than uploading against it")
+    elif recorded != actual:
         rep.fail(f"contest assignment differs from the manifest: recorded "
                  f"{sorted(recorded)}, file carries {sorted(actual)}")
 
@@ -2042,9 +2067,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # R52: the exit code comes from the shared contract; only the LABEL is local.
     code = verdict_exit_code(report["failures"], args.force)
     if not report["failures"]:
-        if certification and certification != "certified":
+        # R275(b), 2026-08-31. The guard was `if certification and certification
+        # != "certified"`, so an ABSENT certification fell through to
+        # `upload_ready` -- the one label CLAUDE.md reserves, awarded on missing
+        # evidence rather than on evidence of certification. Absence now lands in
+        # the same branch as a wrong value, because "no row said it was certified"
+        # and "the row said it was review_grade" are the same fact for this label.
+        # The two cases get DIFFERENT notes: a verdict note that quotes
+        # `certification=''` reads like a checker bug, and the operator needs to
+        # know whether the evidence disagreed or was never recorded.
+        if certification != "certified":
             verdict = "review_ready"
             report["verdict_note"] = (
+                f"every file-level check passed, but no manifest certification "
+                f"was recorded for these bytes, so this is NOT upload_ready: "
+                f"that label is reserved for a run where workflow_valid, "
+                f"selection_certified and allocation_certified all passed, and a "
+                f"row that records nothing is not evidence that they did. Check "
+                f"the delivery was recorded by the build path (a --no-manifest "
+                f"run reaches here by design)."
+                if not certification else
                 f"every file-level check passed, but the manifest records "
                 f"certification={certification!r}, so this is NOT upload_ready: "
                 f"that label is reserved for a run where workflow_valid, "
