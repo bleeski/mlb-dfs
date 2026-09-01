@@ -25,6 +25,128 @@ performance claim.
 
 ---
 
+## 2026-09-01 — R165: the id-string rule gets one owner, and two of the five "live" members turn out to be sites the fix itself would have broken
+
+**What moved.** `mlb_engine/determinism.py` (`normalize_id`, `normalize_ids`,
+`normalize_id_series`, `normalize_id_frame` — the rule, stated once, beside
+`stable_union` whose contract it is), `mlb_engine/optimize/optimizer_v3.py` (six
+sites routed through it, one of them R55's own), `tests/test_core.py` (ten new),
+`tools/audit.py` and `CLAUDE.md` (the pin and the quoted line). Gate
+**1562 -> 1572**. Golden replay unmoved; no delivered byte changes.
+
+**The defect, measured rather than read.** `_eligible_sp_ids_for_anchor_caps`
+and `resolve_viable_sp_pool` filtered with `df['Player_ID'].isin(excludes)` and
+no normalization. On the `runs/20260830T215239Z_157fec42` replay salary file
+reloaded the way R55 names — a plain `read_csv`, `Player_ID` dtype `int64` —
+excluding 83 of 103 arms returned **103 arms where 20 is correct: all 83
+excluded arms survived into the auto SP-cap denominator**, while the solves
+themselves honored the excludes. `du_penalty_dict_for_target` returned **0 of 2
+drivers** where 2 of 2 is correct, so every DU penalty retry re-solved the
+identical MILP with no penalty applied. All three fail silently: `isin` and `==`
+against a mismatched dtype return an all-False mask rather than raising.
+
+**Two of the five filed members were NOT live, and the reason matters more than
+the correction.** `:1643` (`resolve_sp_pair_coverage_plan`) and `:3991`
+(`_teams_of_pair`) were SELF-JOINS: the pid came off the same frame the lookup
+searched, because `enumerate_sp_pairs` passes its input ids through untouched
+rather than stringifying them as the entry assumed. Measured at the pre-fix
+head, both were correct on either dtype — `:1643` gave 347 distinct pair
+priority scores on int64 and on str alike, `:3991` gave 0 of 40 empty team sets
+on both. **Normalizing the producer is what breaks them**, and that is measured
+too: with the producer returning strings and the consumers left alone, `:1643`
+collapses to 1 distinct score (the pair ranking goes flat, deciding what a
+budget-truncated bank covers) and `:3991` returns an empty team set for 40 of 40
+pairs (R164(b)'s provably-infeasible skip stops skipping). So they are fixed in
+this commit, in the opposite direction from the one filed: not because they were
+broken, but because the fix is incomplete without them. A producer-side dtype
+change that stops at the producer is a defect shipped, not a defect closed.
+
+**The caller check that made that finding.** The entry named three known callers
+of the two helpers. The AST walk found **four call sites plus one import**, and
+the one it had missed — `optimizer_v3.py:3923` at the pre-fix head, inside
+`build_diverse_candidate_bank` — is exactly the one whose downstream consumer
+`:3991` the return-dtype change breaks. The three named callers are all
+dtype-tolerant as claimed (`execution_pipeline.py:3172` does
+`{str(s) for s in sps}`; two test callers take `len()`).
+`resolve_viable_sp_pool` has exactly one production caller, its own
+`resolve_sp_pair_coverage_plan`.
+
+**R233 enumeration, class A: every `isin(...)` or `== pid` against an ID column
+in `optimizer_v3.py` and its callers.** AST, not grep, over `mlb_engine/`,
+`tools/`, `tests/`, `skills/`. **Nine sites in `optimizer_v3.py`, not the seven
+the entry names** — six after the fix, because three no longer match the pattern.
+The two the 09-01 read missed are both benign, and one of them is the site the
+fix converts. Full hit list with liveness:
+
+| site | function | verdict |
+|---|---|---|
+| `:542` | `_check_stack_feasibility` | KEPT — the early return at `:512` leaves `locked_player_ids` empty, so the comparison cannot bind |
+| `:709` | `_prepare_single_lineup_df` | **NOT IN THE ENTRY.** R55's own site, already correct; now a CALLER of the shared rule rather than the only statement of it |
+| `:738` | `_build_lineup_output_from_selected` | **NOT IN THE ENTRY.** KEPT — self-join, `pid` comes from the solver's selection over this same prepared frame |
+| `:974` | `_build_single_lineup_scipy` | KEPT — self-join, `sp_pid` from the frame's own `.tolist()` |
+| `:1432` | `_eligible_sp_ids_for_anchor_caps` | LIVE, FIXED (103 arms -> 20) |
+| `:1461` | `resolve_viable_sp_pool` | LIVE, FIXED |
+| `:1643` | `resolve_sp_pair_coverage_plan` | correct as a self-join; FIXED because the producer change breaks it (347 distinct -> 1) |
+| `:2052` | `du_penalty_dict_for_target` | LIVE, FIXED — the one genuinely CROSS-frame site (2 of 2 drivers -> 0 of 2) |
+| `:3991` | `_teams_of_pair` | correct as a self-join; FIXED because the producer change breaks it (0 of 40 empty -> 40 of 40) |
+
+Three of the nine have production callers and were live; two have production
+callers and were latent; three are kept with the reason above; one is a
+refactor. Outside `optimizer_v3.py` the walk found eight hits, all in tests
+against str fixtures, none live.
+
+**Class B, filed rather than fixed: the SECOND FORM of the same rule.** The AST
+walk keys on `isin` and `==` and is blind to the rule restated as a string
+expression. Sweeping for that found **55 restatements across 18 files** — seven
+`Player_ID.astype(str)` with no `.strip()` (a weaker normalization than this
+one: `bank_cache.py:428`, `late_swap.py:369`, four in `execution_pipeline.py`,
+one in `projection_builder.py`, against `projection_builder.py:339` which does
+strip), and 48 inline `str(x).strip()` comprehensions over player ids in
+`contest_allocator`, `dk_entries_manager`, `field_miner`, `live_data_adapters`,
+`execution_pipeline` and others. Not touched here: R165 is scoped to
+`optimizer_v3.py` and its callers, and rewriting id handling across six
+certified modules is not a normalization commit. Filed as **R282**. One site of
+the second form WAS converted, because it is inside a function this commit
+already rewrites: `_prepare_single_lineup_df`'s `penalized_players` key
+normalization.
+
+**Mutation check: 14 mutations, 2 survivors, both killed, and both were my
+tests' fault rather than the code's.** `__pycache__` cleared first; every apply
+paired with a revert in a `finally`, restored sha256 and a byte-identical check
+printed per mutation, anchors grepped afterwards rather than trusting the
+driver.
+
+- **M10 (`:3991` reverted) SURVIVED.** The test asserted that no candidate
+  stacks a team opposing its own arms — right behaviour, wrong observable. The
+  opposing-team skip is a WASTE optimization and not a legality gate, so the
+  MILP refuses those jobs anyway and no illegal candidate ever appears. Worse,
+  the fixture never reached the guard at all: at the default sizes the base bank
+  already covers every viable pair, Phase 1 `continue`s past all of them, and
+  `_teams_of_pair` is never called (`attempts=0` on both dtypes). Killed by
+  replacing it with the property R165 is actually about — the bank's
+  augmentation record must be IDENTICAL on both dtypes — at
+  `requested_n=1, coverage_target=12`, which is the smallest fixture that
+  reaches the loop. That parameter pair is load-bearing and the test says so.
+- **M11 (`_prepare_single_lineup_df`'s exclude filter reverted) SURVIVED.**
+  Every test in the file hands the helpers excludes that are already strings, so
+  the EXCLUDES side of the rule was untested everywhere. Killed by a test that
+  passes int-typed excludes to all three sites.
+- One mutation was withdrawn as an equivalent mutant rather than counted:
+  normalizing the penalty dict's KEY was in the first cut and is unreachable —
+  `drivers` come off a frame `_prepare_single_lineup_df` already normalized, and
+  the one consumer normalizes its own keys. It was removed rather than left in
+  as a line no test can distinguish, which is the shape of guard this item
+  exists to stop shipping. The replacement mutation (delete the Ceiling multiply
+  from the penalty VALUE) also survived `assertGreater(v, 0)` and is killed by
+  asserting the exact value.
+
+**The one dtype consequence to state plainly.** Both helpers now return stripped
+STRINGS on every frame, which is `stable_union`'s contract and what makes
+`:1643` and `:3991` correct. Every caller was checked by AST first, not last.
+`normalize_ids` returns a `frozenset` on purpose: it is for membership only, and
+`stable_ids`/`stable_union` stay the only way to turn ids into an ordered
+collection, because set iteration order is what F19 pinned the hash seed over.
+
 ## 2026-09-01 — R247(a) + R247(c): the degraded tail gets a name, and the washout count stops scoring a dead entry as a hedge
 
 **What moved.** `mlb_engine/field/field_miner.py` (two archive-derived bars,

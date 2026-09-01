@@ -90,6 +90,64 @@ def ensure_pinned_hash_seed(argv: Optional[Sequence[str]] = None) -> bool:
     return False  # pragma: no cover - execve does not return on success
 
 
+def normalize_id(value: Any) -> str:
+    """A player ID as this engine compares them: a stripped string.
+
+    R165. This is the ONE statement of the rule. It used to be written inline at
+    every site that needed it, and the sites that forgot it did not fail -- they
+    silently matched nothing, because ``isin`` and ``==`` against a mismatched
+    dtype return an all-False mask rather than raising. An exclude list no-ops,
+    a cap denominator counts arms the build cannot roster, a penalty dict comes
+    back empty and the retry re-solves with no penalty. Nothing in the certified
+    output says any of it happened.
+
+    The condition is not exotic: a plain ``read_csv`` of
+    ``runs/<id>/inputs/projections.csv`` gives an int64 ``Player_ID`` column,
+    and every id-keyed control in the engine is a string by contract.
+
+    Note this strips and ``stable_ids`` does not. The two agree on every real DK
+    id; the strip is kept because R55's original site stripped and the exclude
+    sets built against it are stripped.
+    """
+    return str(value).strip()
+
+
+def normalize_ids(values: Optional[Sequence[Any]]) -> frozenset:
+    """``normalize_id`` over a collection, as a MEMBERSHIP set.
+
+    Deliberately unordered and deliberately a ``frozenset``: this is for
+    ``isin`` and ``in``, never for anything that reaches the solver. Set
+    iteration order is exactly what F19 pinned the hash seed over, so
+    ``stable_ids`` / ``stable_union`` remain the only way to turn ids into an
+    ordered collection.
+    """
+    return frozenset(normalize_id(v) for v in (values or ()))
+
+
+def normalize_id_series(series: Any) -> Any:
+    """``normalize_id`` over a pandas Series, vectorized.
+
+    Duck-typed so this module stays import-cheap -- ``ensure_pinned_hash_seed``
+    is meant to run before anything expensive is imported. The vectorized form
+    and the scalar form are two spellings of one rule, so a test pins them
+    elementwise equal rather than leaving the agreement to inspection.
+    """
+    return series.astype(str).str.strip()
+
+
+def normalize_id_frame(df: Any, column: str = "Player_ID") -> Any:
+    """A copy of ``df`` with its ID column normalized. No-op if absent.
+
+    Copies rather than mutating: every caller here already worked on a copy, and
+    a normalizer that edited the caller's frame in place would be a far worse
+    surprise than the dtype bug it exists to fix.
+    """
+    out = df.copy()
+    if column in getattr(out, "columns", []):
+        out[column] = normalize_id_series(out[column])
+    return out
+
+
 def stable_ids(values: Optional[Sequence[Any]]) -> List[str]:
     """A deterministic, deduplicated, string-sorted list of player IDs.
 

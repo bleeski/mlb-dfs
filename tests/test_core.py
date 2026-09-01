@@ -14,7 +14,7 @@ import time
 import types
 import unittest
 import unittest.mock
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -24,6 +24,8 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[1]
 
 from mlb_engine.optimize import optimizer_v3 as opt
+from mlb_engine import determinism
+from mlb_engine.determinism import stable_union
 
 from mlb_engine.pipeline import execution_pipeline as epi
 from mlb_engine.allocate import contest_allocator as ca
@@ -19049,6 +19051,189 @@ class ObservedStarterTierTests(unittest.TestCase):
         feed = {"games": [{"away": {"team_abbrev": "STL"},
                            "home": {"team_abbrev": "COL"}}]}
         self.assertEqual(lda.boxscore_urls_for_feed(feed), {})
+
+
+class IdNormalizationTests(unittest.TestCase):
+    """R165. Every one of these has to be able to tell the two answers apart.
+
+    An ``astype(str)`` fix passes trivially on a frame that is already str, so a
+    test built on the default fixture proves nothing at all: the fixture must be
+    the int64 one, and the only honest way to build it is the round trip R55
+    names -- write the frame out and ``read_csv`` it back, which is what
+    ``runs/<id>/inputs/projections.csv`` is. Building it with ``astype(int)``
+    would pin my own idea of the condition instead of the reader's.
+    """
+
+    @staticmethod
+    def _int64_reload(frame):
+        """The `runs/<id>/inputs/projections.csv` round trip, verbatim."""
+        tmp = Path(tempfile.mkdtemp()) / "projections.csv"
+        frame.to_csv(tmp, index=False)
+        out = pd.read_csv(tmp)
+        assert str(out["Player_ID"].dtype) == "int64", (
+            "fixture is not the condition under test: %s" % out["Player_ID"].dtype
+        )
+        return out
+
+    # --- the rule itself, stated once and spelled twice -------------------
+
+    def test_the_vectorized_spelling_equals_the_scalar_one(self):
+        """`normalize_id_series` and `normalize_id` are one rule in two forms.
+        Nothing but a test keeps them from drifting apart."""
+        raw = [1, "2", " 3 ", 40000000, "  x  ", "0055", -1, 0]
+        series = pd.Series(raw, dtype=object)
+        self.assertEqual(
+            list(determinism.normalize_id_series(series)),
+            [determinism.normalize_id(v) for v in raw],
+        )
+
+    def test_normalize_ids_is_a_membership_set_of_stripped_strings(self):
+        out = determinism.normalize_ids([1, " 2", "2 ", 3])
+        self.assertIsInstance(out, frozenset)
+        self.assertEqual(out, {"1", "2", "3"})
+        self.assertEqual(determinism.normalize_ids(None), frozenset())
+
+    def test_normalize_id_frame_copies_and_no_ops_on_a_missing_column(self):
+        frame = pd.DataFrame({"Player_ID": [1, 2], "Name": ["a", "b"]})
+        out = determinism.normalize_id_frame(frame)
+        self.assertEqual(list(out["Player_ID"]), ["1", "2"])
+        self.assertEqual(str(frame["Player_ID"].dtype), "int64",
+                         "the caller's frame was mutated")
+        bare = pd.DataFrame({"Name": ["a"]})
+        self.assertEqual(list(determinism.normalize_id_frame(bare).columns), ["Name"])
+
+    # --- the five live members --------------------------------------------
+
+    def test_excludes_bind_in_the_cap_denominator_on_an_int64_frame(self):
+        """`:1432`. The headline. On the 2026-08-30 replay file this returned
+        103 arms where 20 was correct."""
+        frame = self._int64_reload(diverse_projection_frame())
+        every = opt._eligible_sp_ids_for_anchor_caps(frame)
+        self.assertEqual(len(every), 4)
+        excludes = stable_union(every[:2])          # strings, as every control is
+        kept = opt._eligible_sp_ids_for_anchor_caps(frame, excludes=excludes)
+        self.assertEqual(len(kept), 2, "string excludes no-opped on an int64 frame")
+        self.assertTrue(all(isinstance(p, str) for p in kept))
+        self.assertFalse(set(kept) & set(excludes))
+
+    def test_excludes_bind_in_the_viable_sp_pool_on_an_int64_frame(self):
+        """`:1461`, and every id list the pool returns is a string."""
+        frame = self._int64_reload(diverse_projection_frame())
+        every = opt.resolve_viable_sp_pool(frame)["viable_sp_ids"]
+        self.assertEqual(len(every), 4)
+        excludes = stable_union(every[:2])
+        pool = opt.resolve_viable_sp_pool(frame, excludes=excludes)
+        self.assertEqual(len(pool["viable_sp_ids"]), 2)
+        for key in ("required_sp_ids", "optional_sp_ids", "excluded_sp_ids",
+                    "unknown_sp_ids", "viable_sp_ids"):
+            self.assertTrue(all(isinstance(p, str) for p in pool[key]), key)
+
+    def test_the_du_penalty_dict_is_not_empty_on_an_int64_frame(self):
+        """`:2052`, the one genuinely CROSS-frame site: the drivers come off a
+        solved lineup frame the solver already normalized, the projections frame
+        is the caller's raw one. Empty meant every DU retry re-solved with no
+        penalty at all."""
+        frame = self._int64_reload(diverse_projection_frame())
+        prepared, _ = opt._prepare_single_lineup_df(frame, target="ceiling")
+        arms = prepared[prepared["Position"].apply(
+            lambda p: "P" in opt._parse_positions(p))].head(2).copy()
+        arms["Assigned_Slot"] = ["P", "P"]
+        arms["Assigned_Position"] = ["P", "P"]
+        penalty = opt.du_penalty_dict_for_target(
+            "sp_pair", [{"matched_units": ["sp_pair"]}], arms, frame, None)
+        self.assertEqual(len(penalty), 2, "the penalty dict came back empty")
+        self.assertTrue(all(isinstance(k, str) for k in penalty))
+        # The VALUE, not just its sign: a lookup that missed and a lookup that
+        # matched the wrong row both produce a positive number, and the
+        # mutation check found that `assertGreater(v, 0)` alone let the Ceiling
+        # multiply be deleted outright.
+        ceiling_by_id = dict(zip(
+            determinism.normalize_id_series(frame["Player_ID"]),
+            frame["Ceiling"].astype(float)))
+        for pid, value in penalty.items():
+            self.assertAlmostEqual(
+                value, opt.DU_PENALTY_MAGNITUDE * ceiling_by_id[pid], places=6)
+
+    def test_int_typed_excludes_bind_wherever_they_arrive(self):
+        """The other half of the contract, and the mutation check is why it is
+        here: every test above hands the helpers excludes that are already
+        strings, so dropping the normalization on the EXCLUDES side survived
+        untouched. An operator control can arrive as ints from a JSON reload
+        just as easily as a frame can arrive int64."""
+        frame = self._int64_reload(diverse_projection_frame())
+        every = opt._eligible_sp_ids_for_anchor_caps(frame)
+        int_excludes = [int(p) for p in every[:2]]
+        self.assertEqual(
+            len(opt._eligible_sp_ids_for_anchor_caps(frame, excludes=int_excludes)), 2)
+        self.assertEqual(
+            len(opt.resolve_viable_sp_pool(
+                frame, excludes=int_excludes)["viable_sp_ids"]), 2)
+        prepared, _ = opt._prepare_single_lineup_df(
+            frame, target="ceiling", excludes=int_excludes,
+            skip_feasibility_check=True)
+        self.assertFalse(
+            set(prepared["Player_ID"]) & {str(p) for p in int_excludes},
+            "int-typed excludes no-opped in _prepare_single_lineup_df")
+
+    def test_the_sp_pair_priority_ranking_does_not_go_flat_on_an_int64_frame(self):
+        """`:1643`. This site was CORRECT before R165 and only as a self-join --
+        the pids came off the same frame. Normalizing the producer is what
+        breaks it, so it is fixed in the same commit as the producer or not at
+        all. Flat means every Ceiling lookup missed, and that order decides
+        which pairs a budget-truncated bank covers."""
+        frame = self._int64_reload(diverse_projection_frame())
+        plan = opt.resolve_sp_pair_coverage_plan(
+            n_lineups=6, projections_df=frame, slate_game_count=2)
+        scores = plan["sp_pair_priority_scores"]
+        self.assertTrue(scores)
+        self.assertGreater(len(set(round(v, 6) for v in scores.values())), 1,
+                           "the pair priority ranking went flat")
+
+    def test_an_operator_supplied_viable_list_arrives_on_the_same_contract(self):
+        """The `viable_sp_ids` branch of the same function: int ids in, the same
+        plan out. The two branches disagreeing is how one slate produced two
+        differently-typed plans."""
+        frame = self._int64_reload(diverse_projection_frame())
+        ints = [int(p) for p in opt._eligible_sp_ids_for_anchor_caps(frame)]
+        plan = opt.resolve_sp_pair_coverage_plan(
+            n_lineups=6, projections_df=frame, slate_game_count=2,
+            viable_sp_ids=ints)
+        self.assertTrue(all(isinstance(p, str) for p in plan["viable_sp_ids"]))
+        self.assertGreater(
+            len(set(round(v, 6) for v in plan["sp_pair_priority_scores"].values())), 1)
+
+    def test_the_diverse_bank_does_the_same_work_on_either_dtype(self):
+        """`:3991`, R164(b)'s own fix, and the second site that was correct only
+        as a self-join. `_teams_of_pair` is a closure, so this asserts the
+        property R165 is actually about: the frame's DTYPE must not change what
+        the engine does.
+
+        The first cut of this test asserted the wrong observable -- that no
+        candidate stacks a team opposing its own arms -- and the mutation check
+        caught it: reverting `:3991` SURVIVED. The opposing-team skip is a WASTE
+        optimization, not a legality gate, so the MILP refuses those jobs anyway
+        and no illegal candidate ever appears. What the broken skip changes is
+        the number of solves SPENT, which is R164(b)'s whole point.
+
+        `requested_n=1, coverage_target=12` is load-bearing: at the default
+        sizes the base bank already covers every viable pair, Phase 1 `continue`s
+        past all of them, and `_teams_of_pair` is never called at all. A fixture
+        that does not reach the guard cannot test it.
+        """
+        args = dict(requested_n=1, mode="gpp", target="ceiling",
+                    contest_shapes=["large_field_gpp"], coverage_target=12)
+        as_str = opt.build_diverse_candidate_bank(
+            diverse_projection_frame(), **args)["diversity_augmentation"]
+        as_int = opt.build_diverse_candidate_bank(
+            self._int64_reload(diverse_projection_frame()),
+            **args)["diversity_augmentation"]
+        self.assertGreater(as_str["attempts"], 0,
+                           "the fixture never reached the augmentation loop")
+        for key in ("attempts", "appended", "base_candidate_count",
+                    "final_candidate_count", "distinct_sp_pairs",
+                    "viable_sp_pair_count"):
+            self.assertEqual(as_str[key], as_int[key],
+                             f"{key} differs on an int64 frame")
 
 
 if __name__ == "__main__":

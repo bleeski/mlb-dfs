@@ -131,7 +131,15 @@ from math import ceil
 from mlb_engine.contest_shapes import (
     CONTEST_SHAPES, OBJECTIVE_CLASS_BY_SHAPE, is_ticket_line, objective_class,
 )
-from mlb_engine.determinism import hash_seed_report, stable_ids, stable_union
+from mlb_engine.determinism import (
+    hash_seed_report,
+    normalize_id,
+    normalize_id_frame,
+    normalize_id_series,
+    normalize_ids,
+    stable_ids,
+    stable_union,
+)
 
 try:
     import scipy  # noqa: F401
@@ -685,8 +693,12 @@ def _prepare_single_lineup_df(
 ):
     """Shared preprocessing for all single-lineup solver backends.
 
-    R55: ``Player_ID`` is normalized to a stripped string HERE, once, before any
-    control is matched against it. Every control that arrives as a set of ids --
+    R55: ``Player_ID`` is normalized to a stripped string HERE, before any
+    control is matched against it. R165 moved the RULE itself to
+    ``determinism.normalize_id`` and made this a caller: this site was the only
+    statement of it, four other sites in this file needed the same rule, and
+    five copies of an ``astype`` is what R167 and R159 each spent an entry
+    undoing. Every control that arrives as a set of ids --
     locks, locked slot assignments, excludes, penalized players, forbidden
     combos, overlap references -- is a set of STRINGS by contract
     (``determinism.stable_union`` returns sorted strings). A frame whose
@@ -698,23 +710,21 @@ def _prepare_single_lineup_df(
     infeasibility label. Both failures were silent and neither reduced the pool
     visibly in the certified output.
     """
-    df = projections_df.copy()
-    if 'Player_ID' in getattr(df, 'columns', []):
-        df['Player_ID'] = df['Player_ID'].astype(str).str.strip()
+    df = normalize_id_frame(projections_df)
 
     if not skip_feasibility_check:
         _check_stack_feasibility(df, stack_constraints, locks)
 
     if excludes:
-        df = df[~df['Player_ID'].isin({str(x).strip() for x in excludes})]
+        df = df[~df['Player_ID'].isin(normalize_ids(excludes))]
     df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
 
     df['_pos_set'] = df['Position'].apply(_parse_positions)
 
     value_col = 'Ceiling' if target == 'ceiling' else 'Floor'
     if penalized_players:
-        # Same string contract as every other id-keyed control (R55).
-        penalties = {str(k).strip(): v for k, v in penalized_players.items()}
+        # Same string contract as every other id-keyed control (R55/R165).
+        penalties = {normalize_id(k): v for k, v in penalized_players.items()}
         df['_obj'] = df.apply(
             lambda r: r[value_col] - penalties.get(r['Player_ID'], 0),
             axis=1
@@ -1426,10 +1436,16 @@ def _get_ordered_sp_ids(lineup_df):
 
 
 def _eligible_sp_ids_for_anchor_caps(projections_df, excludes=None):
-    """Returns rosterable SP IDs after Excluded/excludes gates for auto caps."""
-    df = projections_df.copy()
+    """Returns rosterable SP IDs after Excluded/excludes gates for auto caps.
+
+    R165: the returned ids are stripped STRINGS whatever the frame's dtype, per
+    ``determinism``'s contract. Measured on the 2026-08-30 replay salary file:
+    on an int64 frame the unnormalized filter returned 103 arms where 20 is
+    correct, 83 excluded arms surviving into the cap denominator.
+    """
+    df = normalize_id_frame(projections_df)
     if excludes:
-        df = df[~df['Player_ID'].isin(excludes)]
+        df = df[~df['Player_ID'].isin(normalize_ids(excludes))]
     df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
     sp_df = df[df['Position'].apply(lambda p: 'P' in _parse_positions(p))]
     return sp_df['Player_ID'].tolist()
@@ -1455,10 +1471,14 @@ def resolve_viable_sp_pool(
     can be included only when the caller opts in. If no audit column is present,
     the helper treats rosterable salary-row pitchers as viable but flags the
     plan as unaudited so the executor can block upload-ready export elsewhere.
+
+    R165: every id list returned here is stripped STRINGS whatever the frame's
+    dtype, matching ``_eligible_sp_ids_for_anchor_caps`` and
+    ``determinism.stable_union``.
     """
-    df = projections_df.copy()
+    df = normalize_id_frame(projections_df)
     if excludes:
-        df = df[~df['Player_ID'].isin(excludes)]
+        df = df[~df['Player_ID'].isin(normalize_ids(excludes))]
     df = _drop_excluded_rows(df)  # F21: one reading of the column, counted
     sp_df = df[df['Position'].apply(lambda p: 'P' in _parse_positions(p))].copy()
 
@@ -1619,7 +1639,11 @@ def resolve_sp_pair_coverage_plan(
             )
             viable_ids = pool['viable_sp_ids']
     else:
-        viable_ids = sorted(set(viable_sp_ids or []), key=str)
+        # R165: the pool branch above returns strings, so an operator-supplied
+        # list has to arrive on the same contract or the two branches produce
+        # differently-typed plans from the same slate. Sorted, because this list
+        # orders the pair grid and F19 pinned exactly that.
+        viable_ids = sorted(normalize_ids(viable_sp_ids))
 
     pairs = enumerate_sp_pairs(viable_ids)
     pair_count = len(pairs)
@@ -1639,8 +1663,17 @@ def resolve_sp_pair_coverage_plan(
         )
         if score_col:
             raw = {}
+            # R165. `viable_ids` are strings by contract; `projections_df` is
+            # the caller's raw frame and may be int64. Normalize the column ONCE
+            # rather than per pid -- this loop runs over every viable arm and
+            # the grid can be thousands of pairs wide. Left unnormalized, every
+            # lookup misses, every score stays 1.0, and `pair_priority_scores`
+            # goes flat: measured 347 distinct scores -> 1 on the 2026-08-30
+            # replay file, which is the order deciding which pairs a
+            # budget-truncated bank covers at all.
+            pid_col = normalize_id_series(projections_df['Player_ID'])
             for pid in viable_ids:
-                vals = projections_df.loc[projections_df['Player_ID'] == pid, score_col]
+                vals = projections_df.loc[pid_col == normalize_id(pid), score_col]
                 if len(vals):
                     raw[pid] = max(0.0, _safe_float(vals.iloc[0], 0.0))
             if raw:
@@ -2047,12 +2080,28 @@ def du_penalty_dict_for_target(
         return {}
     drivers = _bucket_drivers(target_unit, lineup_df, slate_metadata)
     penalty = {}
+    # R165, and this is the one site in the class that is genuinely CROSS-frame:
+    # `drivers` come off a SOLVED lineup frame, whose ids
+    # `_prepare_single_lineup_df` already normalized to strings, while
+    # `projections_df` is the caller's raw frame. On an int64 frame every lookup
+    # missed, the `continue` fired on all of them, and this returned an EMPTY
+    # penalty dict -- so every DU penalty retry re-solved the identical MILP
+    # with no penalty applied, a strategy control silently absent with nothing
+    # in the run record saying so. Measured 2 of 2 drivers -> 0 of 2.
+    pid_col = normalize_id_series(projections_df['Player_ID'])
     for pid in drivers:
         ceiling_series = projections_df.loc[
-            projections_df['Player_ID'] == pid, 'Ceiling'
+            pid_col == normalize_id(pid), 'Ceiling'
         ]
         if len(ceiling_series) == 0:
             continue
+        # The KEY is left as it arrives. Normalizing it here was in the first
+        # cut and the mutation check found it untestable: `drivers` come off a
+        # frame `_prepare_single_lineup_df` already normalized, so the call was
+        # a no-op in every reachable state, and the one consumer
+        # (`penalized_players`) normalizes its own keys anyway. A line no test
+        # can distinguish is the shape of guard this item exists to stop
+        # shipping.
         penalty[pid] = DU_PENALTY_MAGNITUDE * float(ceiling_series.values[0])
     return penalty
 
@@ -3981,16 +4030,29 @@ def build_diverse_candidate_bank(
 
     next_candidate_id = 1 + max([int(r.get('candidate_id') or 0) for r in scored] + [0])
     team_of_cache = {}
+    # R165. This lookup was correct only as a SELF-JOIN: `pair` came from
+    # `enumerate_sp_pairs(eligible_sps, ...)`, which passes its input ids
+    # through untouched, so the pids carried the frame's own dtype and matched.
+    # Normalizing the producer is what breaks it -- measured 0 of 40 pairs
+    # returning an empty team set before, 40 of 40 after, with the R164(b)
+    # provably-infeasible skip silently ceasing to skip. Normalized once here
+    # rather than per call: `_teams_of_pair` runs over every viable pair in both
+    # bank phases.
+    _bank_pid_col = (
+        normalize_id_series(projections_df['Player_ID'])
+        if 'Player_ID' in getattr(projections_df, 'columns', []) else None
+    )
 
     def _teams_of_pair(pair):
         key = tuple(pair)
         if key in team_of_cache:
             return team_of_cache[key]
         teams = set()
-        for pid in pair:
-            row = projections_df[projections_df['Player_ID'] == pid]
-            if len(row):
-                teams.add(str(row.iloc[0].get('Team')))
+        if _bank_pid_col is not None:
+            for pid in pair:
+                row = projections_df[_bank_pid_col == normalize_id(pid)]
+                if len(row):
+                    teams.add(str(row.iloc[0].get('Team')))
         team_of_cache[key] = teams
         return teams
 

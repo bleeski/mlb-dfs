@@ -437,7 +437,16 @@ EXPECTED_SUITE_COUNTS = {
     # build_slate lines, qa_portfolio no longer publishing the bare untouched
     # count and naming a pre-R247 brief, and the Showdown brief's own cap,
     # never-a-literal fallback, and entry_id-to-lineup pairing).
-    "tests.test_core": 983,
+    # R165, 2026-09-01: 983 -> 993, the ten that pin the id-normalization
+    # contract. Three on the normalizer itself (the vectorized and scalar
+    # spellings held elementwise equal, the membership set, the copy), and
+    # seven on the sites, every one of them built on an int64 frame produced by
+    # a real `read_csv` reload -- an `astype(str)` fix passes trivially on a
+    # frame that is already str, so the fixture IS the test. Two of the seven
+    # exist because the mutation check killed the first cut of them: the
+    # diverse-bank one asserted legality where the guard only changes solves
+    # SPENT, and nothing anywhere handed a helper int-typed EXCLUDES.
+    "tests.test_core": 993,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
