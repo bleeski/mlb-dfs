@@ -159,6 +159,22 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    Hitters are the confirmed nine per posted lineup plus the platoon-projected
    nine per TBD team; pitchers are feed probables plus explicit declarations.
    Every other salary row is absent, not excluded.
+   **Once a game is UNDERWAY the boxscore outranks all three sources below
+   (R270(b), 2026-08-31).** `liveData.boxscore.teams.<side>.battingOrder` and
+   `.pitchers[0]` from `statsapi.mlb.com/api/v1.1/game/<gamePk>/feed/live` are a
+   RECORD of who played; DK, a paste and the API are PREDICTIONS of who will.
+   A prediction cannot improve after first pitch and a record cannot be wrong,
+   so the record wins for that game and only for that game. The reason this tier
+   has to exist rather than being implied: the schedule hydrate stops carrying a
+   game's lineup once it starts, so a "confirmed" test against the feed silently
+   becomes "not posted" for exactly the games whose answer is certain, and a
+   dead bat then reads identically to an unposted side. `observed_starter_state`
+   returns THREE values (`started` / `did_not_start` / `unobserved`) and never a
+   bool: `unobserved` means this game has not begun and the caller must fall
+   through to the ranking below, and collapsing it into `did_not_start` is the
+   same conflation R237 is filed on arriving through a new door. A side whose
+   boxscore block came back empty on a game that IS underway is an unread block,
+   named in `sides_unread`, never nine scratches.
    **Lineup sources rank, and the ranking is PER SIDE (R143, Ben 2026-08-17):
    the DKSalaries CSV first, a paste second, an API pull third.** DK publishes
    the batting order in the `Starting` column, 1-9 next to the Player_ID this
@@ -301,7 +317,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1509 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1520 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

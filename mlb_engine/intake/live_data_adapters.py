@@ -1049,6 +1049,288 @@ def build_status_map_from_lineups_feed(
     }
 
 
+# ---------------------------------------------------------------------------
+# R270(b): the OBSERVED-FACT tier, which outranks all three sources above
+# ---------------------------------------------------------------------------
+# The schedule hydrate stops carrying a game's lineup once that game is in
+# progress, so every "confirmed" test against the feed SILENTLY DEGRADES to
+# "not posted" for exactly the games whose answer is now certain. On
+# `1305_12g` that is how a dead bat (Nootbaar) survived a preflight that was
+# reading his side as unposted.
+#
+# The ranking this adds to R143's line, and the reason it sits at the top:
+# DK's `Starting` column, an operator paste and the schedule API are all
+# PREDICTIONS of who will play. A boxscore is a RECORD of who did. Once a game
+# is underway the prediction cannot improve and the record cannot be wrong, so
+# the record wins for that game and only for that game -- a Preview game has no
+# boxscore and this tier says nothing about it, which is the whole point of
+# `observed_starter_state` returning a third value rather than a bool.
+#
+# Name normalisation is SHARED, not reimplemented: `normalize_name` is the
+# same function `build_player_lineup_status` uses for this identical DK-salary
+# join (see `match_dk_id` above), so the observed tier and the feed tier cannot
+# disagree about who "Acuna" is. R270(b) named `preflight_upload._norm_name`
+# as the thing to share; that copy is equivalent on the accented cases but it
+# lives in a TOOL, and an engine module importing a tool inverts the dependency
+# -- so the share is the engine's own, which the join it has to agree with
+# already uses. Reimplementing either is how the R248 crosswalk got two copies.
+BOXSCORE_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+
+# `abstractGameState` values that mean first pitch has happened. Preview is the
+# only state that means it has not; anything unrecognised is treated as NOT
+# started, because a boxscore read out of an unknown state is a guess wearing
+# an observation's label.
+BOXSCORE_STARTED_STATES = ("Live", "Final")
+
+
+def boxscore_url(game_pk: Any) -> str:
+    """The `/feed/live` URL for one game. One place, so a caller that fetches
+    and a test that fixtures cannot drift on the path."""
+    return BOXSCORE_FEED_URL.format(game_pk=str(game_pk).strip())
+
+
+def boxscore_urls_for_feed(
+    feed: Mapping[str, Any],
+    salary_game_times: Optional[Mapping[str, datetime]] = None,
+) -> Dict[str, str]:
+    """DK ``game_id -> boxscore URL`` for the games on this slate.
+
+    Goes through ``_legs_for_extraction``, so a doubleheader contributes the
+    SLATE's leg and not the other one -- the same leg filter every other reader
+    of the hydrated schedule uses (R58/R270(a)). A game with no ``game_pk`` is
+    omitted rather than given a guessed one.
+    """
+    out: Dict[str, str] = {}
+    for game_entry in _legs_for_extraction(feed, salary_game_times):
+        away = to_dk_abbrev((game_entry.get("away") or {}).get("team_abbrev"))
+        home = to_dk_abbrev((game_entry.get("home") or {}).get("team_abbrev"))
+        game_pk = game_entry.get("game_pk")
+        if not (away and home) or game_pk in (None, ""):
+            continue
+        out[f"{away}@{home}"] = boxscore_url(game_pk)
+    return out
+
+
+def _boxscore_person_names(side: Mapping[str, Any],
+                           game_data: Mapping[str, Any]) -> Dict[str, str]:
+    """MLBAM id (as str) -> full name, from the boxscore's own player block,
+    falling back to ``gameData.players``. Both are keyed ``ID<mlbam>``."""
+    names: Dict[str, str] = {}
+    for block in ((game_data.get("players") or {}), (side.get("players") or {})):
+        if not isinstance(block, Mapping):
+            continue
+        for key, entry in block.items():
+            if not isinstance(entry, Mapping):
+                continue
+            person = entry.get("person") or entry
+            mlbam = str(person.get("id") or str(key).replace("ID", "")).strip()
+            full = str(person.get("fullName") or "").strip()
+            if mlbam and full:
+                names[mlbam] = full
+    return names
+
+
+def parse_boxscore_feed(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """One game's ``/feed/live`` -> who ACTUALLY batted and who ACTUALLY started.
+
+    ``liveData.boxscore.teams.<side>.battingOrder`` is the observed 1-9 and
+    ``.pitchers[0]`` is the arm that threw the first pitch. Returns::
+
+        {"game_pk", "game_id", "abstract_state", "detailed_state", "started",
+         "sides": {"away"|"home": {"team": DK abbrev,
+                                   "batting_order": [{"mlbam", "name", "order"}],
+                                   "starting_pitcher": {"mlbam", "name"} | None}}}
+
+    ``started`` is False for a Preview game and for any payload whose state is
+    unreadable, and a not-started game returns EMPTY sides even when the
+    boxscore block is present -- a pre-game boxscore carries an empty or
+    provisional order, and reading it would put a prediction into the tier
+    whose entire claim is that it holds observations.
+    """
+    game_data = payload.get("gameData") or {}
+    live_data = payload.get("liveData") or {}
+    status = game_data.get("status") or {}
+    abstract = str(status.get("abstractGameState") or "").strip()
+    detailed = str(status.get("detailedState") or "").strip()
+    game_pk = (game_data.get("game") or {}).get("pk", payload.get("gamePk"))
+
+    teams_meta = game_data.get("teams") or {}
+    box_teams = (live_data.get("boxscore") or {}).get("teams") or {}
+    started = abstract in BOXSCORE_STARTED_STATES
+
+    sides: Dict[str, Dict[str, Any]] = {}
+    abbrevs: Dict[str, str] = {}
+    for side_key in ("away", "home"):
+        meta = teams_meta.get(side_key) or {}
+        dk_team = to_dk_abbrev(meta.get("abbreviation") or "") or team_name_to_dk_abbrev(
+            str(meta.get("name") or ""))
+        abbrevs[side_key] = dk_team
+        side = box_teams.get(side_key) or {}
+        entry: Dict[str, Any] = {"team": dk_team, "batting_order": [],
+                                 "starting_pitcher": None}
+        if started:
+            names = _boxscore_person_names(side, game_data)
+            order_ids = [str(x).replace("ID", "").strip()
+                         for x in (side.get("battingOrder") or [])]
+            for slot, mlbam in enumerate(order_ids[:9], start=1):
+                if not mlbam:
+                    continue
+                entry["batting_order"].append(
+                    {"mlbam": mlbam, "name": names.get(mlbam, ""), "order": slot})
+            pitchers = [str(x).replace("ID", "").strip()
+                        for x in (side.get("pitchers") or []) if str(x).strip()]
+            if pitchers:
+                entry["starting_pitcher"] = {
+                    "mlbam": pitchers[0], "name": names.get(pitchers[0], "")}
+        sides[side_key] = entry
+
+    game_id = (f"{abbrevs['away']}@{abbrevs['home']}"
+               if abbrevs["away"] and abbrevs["home"] else "")
+    return {
+        "game_pk": game_pk,
+        "game_id": game_id,
+        "abstract_state": abstract,
+        "detailed_state": detailed,
+        "started": started,
+        "sides": sides,
+    }
+
+
+def fetch_boxscore(game_pk: Any, timeout: float = 20.0) -> Dict[str, Any]:  # pragma: no cover - network path
+    """Fetch and parse one game's boxscore. Network; the parse is what is tested."""
+    payload, _headers = _http_get_json(boxscore_url(game_pk), timeout=timeout)
+    return parse_boxscore_feed(payload)
+
+
+def build_observed_starters(boxscores: Iterable[Mapping[str, Any]],
+                            salary_players: Any) -> Dict[str, Any]:
+    """Parsed boxscores + the DK salary file -> the observed-fact tier.
+
+    Takes the output of ``parse_boxscore_feed`` (one per game) and joins it to
+    DK Player_IDs on ``normalize_name`` + team, the same crosswalk the status
+    map uses. Returns::
+
+        {"observed_teams": [DK teams whose game is underway and was read],
+         "observed_game_ids", "not_started_game_ids",
+         "observed_hitter_ids", "observed_order_by_player_id",
+         "observed_pitcher_ids", "observed_pitcher_by_team",
+         "unmatched", "unrostered_observed"}
+
+    ``unrostered_observed`` is an observed starter with no DK salary row. That
+    is NOT an error -- DK owns eligibility and a player it never listed is
+    unrosterable anyway -- so it is named and carried, the same reading R32
+    settled for a pasted starter absent from the pool.
+
+    A side enters ``observed_teams`` ONLY when it carries an actual observation
+    (a non-empty batting order, or a starting pitcher). A game that is underway
+    whose side block came back empty is an INCOMPLETE READ, not evidence that
+    nobody started, and admitting it would make every player on that side read
+    ``did_not_start`` -- one empty block condemning nine bats, which is the
+    false-positive class this tier was built to remove rather than relocate.
+    Those sides are named in ``sides_unread``.
+    """
+    players = _load_salary_players(salary_players)
+    by_name_team: Dict[Tuple[str, str], List[str]] = {}
+    for pid, record in players.items():
+        key = (normalize_name(_record_get(record, "name")),
+               str(_record_get(record, "team")).strip().upper())
+        by_name_team.setdefault(key, []).append(str(pid))
+
+    observed_teams: List[str] = []
+    observed_game_ids: List[str] = []
+    not_started: List[str] = []
+    hitter_ids: List[str] = []
+    order_by_pid: Dict[str, int] = {}
+    pitcher_ids: List[str] = []
+    pitcher_by_team: Dict[str, str] = {}
+    unmatched: List[Dict[str, str]] = []
+    unrostered: List[Dict[str, str]] = []
+    sides_unread: List[Dict[str, str]] = []
+
+    def resolve(name: str, dk_team: str, role: str) -> Optional[str]:
+        hits = by_name_team.get((normalize_name(name), dk_team), [])
+        if len(hits) == 1:
+            return hits[0]
+        if not hits:
+            unrostered.append({"name": str(name), "team": dk_team, "role": role,
+                               "reason": "observed starter absent from the DK pool"})
+        else:
+            unmatched.append({"name": str(name), "team": dk_team, "role": role,
+                              "reason": "ambiguous salary match"})
+        return None
+
+    for box in boxscores:
+        game_id = str(box.get("game_id") or "")
+        if not box.get("started"):
+            if game_id:
+                not_started.append(game_id)
+            continue
+        if game_id:
+            observed_game_ids.append(game_id)
+        for side in (box.get("sides") or {}).values():
+            dk_team = str(side.get("team") or "").strip().upper()
+            if not dk_team:
+                continue
+            if not (side.get("batting_order") or side.get("starting_pitcher")):
+                sides_unread.append({
+                    "team": dk_team, "game_id": game_id,
+                    "reason": "game is underway but the boxscore carried no "
+                              "batting order and no starting pitcher for this "
+                              "side; absence here is an unread block, not an "
+                              "observation"})
+                continue
+            observed_teams.append(dk_team)
+            for row in side.get("batting_order") or []:
+                dk_id = resolve(row.get("name") or "", dk_team, "hitter")
+                if dk_id is None:
+                    continue
+                hitter_ids.append(dk_id)
+                order_by_pid[dk_id] = int(row.get("order") or 0)
+            starter = side.get("starting_pitcher") or None
+            if starter:
+                dk_id = resolve(starter.get("name") or "", dk_team, "pitcher")
+                if dk_id is not None:
+                    pitcher_ids.append(dk_id)
+                    pitcher_by_team[dk_team] = dk_id
+
+    return {
+        "observed_teams": sorted(set(observed_teams)),
+        "observed_game_ids": sorted(set(observed_game_ids)),
+        "not_started_game_ids": sorted(set(not_started)),
+        "observed_hitter_ids": sorted(set(hitter_ids)),
+        "observed_order_by_player_id": order_by_pid,
+        "observed_pitcher_ids": sorted(set(pitcher_ids)),
+        "observed_pitcher_by_team": dict(sorted(pitcher_by_team.items())),
+        "unmatched": unmatched,
+        "unrostered_observed": unrostered,
+        "sides_unread": sorted(sides_unread, key=lambda r: (r["team"], r["game_id"])),
+    }
+
+
+def observed_starter_state(observed: Mapping[str, Any],
+                           player_id: Any,
+                           team: Any) -> str:
+    """``"started"`` | ``"did_not_start"`` | ``"unobserved"`` for one DK player.
+
+    THREE values, not a bool, and that is the whole contract. ``unobserved``
+    means this player's game has not begun, so the observed tier has nothing to
+    say and the caller must fall through to the feed; collapsing it into
+    ``did_not_start`` is the same conflation R237 is filed on and the exact
+    failure this tier exists to end. A player on a team whose game IS underway
+    and who is in neither observed set did not start -- that is an observation,
+    and it is the one that finds a dead bat.
+    """
+    pid = str(player_id).strip()
+    dk_team = str(team or "").strip().upper()
+    if dk_team not in set(observed.get("observed_teams") or []):
+        return "unobserved"
+    if pid in set(observed.get("observed_hitter_ids") or []):
+        return "started"
+    if pid in set(observed.get("observed_pitcher_ids") or []):
+        return "started"
+    return "did_not_start"
+
+
 def extract_opposing_probables(
     feed: Mapping[str, Any],
     salary_game_times: Optional[Mapping[str, datetime]] = None,

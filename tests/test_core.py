@@ -18388,5 +18388,177 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
                               f"re-entry at line {call.lineno} drops {state}")
 
 
+class ObservedStarterTierTests(unittest.TestCase):
+    """R270(b). The boxscore is the OBSERVED-FACT tier, and its whole value is
+    that it says three things, not two.
+
+    The defect it closes: once a game is in progress the schedule hydrate stops
+    carrying its lineup, so every "confirmed" test against the feed silently
+    degrades to "not posted" for exactly the games whose answer is certain. On
+    `1305_12g` that is how a dead bat survived a preflight reading his side as
+    unposted.
+    """
+
+    def _lda(self):
+        from mlb_engine.intake import live_data_adapters as lda
+        return lda
+
+    def _live(self, abstract="Live", away_order=(2,), away_pitchers=(3, 6),
+              home_order=(4,), home_pitchers=(5,)):
+        return {
+            "gameData": {
+                "game": {"pk": 777001},
+                "status": {"abstractGameState": abstract,
+                           "detailedState": "In Progress"},
+                "teams": {"away": {"abbreviation": "STL"},
+                          "home": {"abbreviation": "COL"}},
+                "players": {
+                    "ID2": {"person": {"id": 2, "fullName": "Ronald Acuña Jr."}},
+                    "ID3": {"person": {"id": 3, "fullName": "Austin Gomber"}},
+                    "ID4": {"person": {"id": 4, "fullName": "Ryan McMahon"}},
+                    "ID5": {"person": {"id": 5, "fullName": "Kyle Freeland"}},
+                    "ID6": {"person": {"id": 6, "fullName": "Ryan Helsley"}},
+                    "ID7": {"person": {"id": 7, "fullName": "Pedro Pagés"}},
+                },
+            },
+            "liveData": {"boxscore": {"teams": {
+                "away": {"battingOrder": list(away_order),
+                         "pitchers": list(away_pitchers)},
+                "home": {"battingOrder": list(home_order),
+                         "pitchers": list(home_pitchers)},
+            }}},
+        }
+
+    SALARY = {
+        "100": {"name": "Ronald Acuna Jr", "team": "STL"},
+        "101": {"name": "Austin Gomber", "team": "STL"},
+        "102": {"name": "Lars Nootbaar", "team": "STL"},
+        "300": {"name": "Ryan McMahon", "team": "COL"},
+        "301": {"name": "Kyle Freeland", "team": "COL"},
+    }
+
+    def _observed(self, *payloads, salary=None):
+        lda = self._lda()
+        boxes = [lda.parse_boxscore_feed(p) for p in payloads]
+        return lda.build_observed_starters(boxes, salary or self.SALARY)
+
+    def test_a_started_game_yields_the_order_that_actually_batted(self):
+        box = self._lda().parse_boxscore_feed(self._live())
+        self.assertTrue(box["started"])
+        self.assertEqual(box["game_id"], "STL@COL")
+        away = box["sides"]["away"]
+        self.assertEqual([r["order"] for r in away["batting_order"]], [1])
+        self.assertEqual(away["starting_pitcher"]["name"], "Austin Gomber",
+                         "`pitchers` is who threw, in order; [0] is the STARTER "
+                         "and the tail is the bullpen")
+
+    def test_a_substitution_appended_to_the_order_is_not_a_tenth_starter(self):
+        """`battingOrder` is nine slots. A payload carrying more (a sub read
+        into the list) must not mint slot 10, because a caller reading this as
+        the observed starting nine would count a bench bat as one."""
+        payload = self._live(away_order=(2, 4, 5, 3, 6, 7, 2, 4, 5, 7))
+        box = self._lda().parse_boxscore_feed(payload)
+        orders = [r["order"] for r in box["sides"]["away"]["batting_order"]]
+        self.assertEqual(orders, list(range(1, 10)))
+        self.assertNotIn(10, orders)
+
+    def test_a_preview_game_reads_no_order_even_when_a_block_is_present(self):
+        """A pre-game boxscore carries a provisional order. Reading it would put
+        a PREDICTION into the tier whose entire claim is that it holds
+        observations, which is the defect wearing new clothes."""
+        payload = self._live(abstract="Preview")
+        box = self._lda().parse_boxscore_feed(payload)
+        self.assertFalse(box["started"])
+        self.assertEqual(box["sides"]["away"]["batting_order"], [])
+        self.assertIsNone(box["sides"]["away"]["starting_pitcher"])
+
+    def test_an_unrecognised_state_is_not_started(self):
+        box = self._lda().parse_boxscore_feed(self._live(abstract="Bananas"))
+        self.assertFalse(box["started"])
+
+    def test_the_join_shares_the_engine_normalizer_so_accents_resolve(self):
+        """R270(b)'s named implementation note: a first pass without accent
+        folding produced eight false positives. `normalize_name` is the SAME
+        function `build_player_lineup_status` uses for this identical join, so
+        the observed tier cannot disagree with the feed tier about who
+        'Acuna' is."""
+        obs = self._observed(self._live())
+        self.assertIn("100", obs["observed_hitter_ids"])
+        self.assertEqual(obs["observed_order_by_player_id"]["100"], 1)
+        self.assertEqual(obs["unmatched"], [])
+
+    def test_the_three_states_are_distinct_and_did_not_start_finds_the_dead_bat(self):
+        """The Nootbaar case verbatim: rostered, his game is underway, he is in
+        neither observed set. That is an OBSERVATION, and it is the one the
+        preflight's feed check could not make."""
+        lda = self._lda()
+        obs = self._observed(self._live())
+        self.assertEqual(lda.observed_starter_state(obs, "100", "STL"), "started")
+        self.assertEqual(lda.observed_starter_state(obs, "102", "STL"),
+                         "did_not_start")
+        self.assertEqual(lda.observed_starter_state(obs, "999", "NYY"),
+                         "unobserved")
+
+    def test_unobserved_never_collapses_into_did_not_start(self):
+        """The conflation R237 is filed on, arriving through this door. A team
+        whose game has not started must be UNOBSERVED, so the caller falls
+        through to the feed instead of reading silence as a scratch."""
+        lda = self._lda()
+        obs = self._observed(self._live(abstract="Preview"))
+        self.assertEqual(obs["observed_teams"], [])
+        self.assertEqual(obs["not_started_game_ids"], ["STL@COL"])
+        for pid, team in (("100", "STL"), ("102", "STL"), ("300", "COL")):
+            self.assertEqual(lda.observed_starter_state(obs, pid, team),
+                             "unobserved")
+
+    def test_an_empty_side_block_is_an_unread_block_not_nine_scratches(self):
+        """One empty block must not condemn nine bats. A side with no order and
+        no pitcher on a game that IS underway is an incomplete read; admitting
+        it would relocate the false-positive class rather than remove it."""
+        lda = self._lda()
+        payload = self._live(home_order=(), home_pitchers=())
+        obs = self._observed(payload)
+        self.assertEqual(obs["observed_teams"], ["STL"])
+        self.assertEqual([r["team"] for r in obs["sides_unread"]], ["COL"])
+        self.assertEqual(lda.observed_starter_state(obs, "300", "COL"),
+                         "unobserved")
+        self.assertEqual(lda.observed_starter_state(obs, "102", "STL"),
+                         "did_not_start")
+
+    def test_an_observed_starter_absent_from_the_DK_pool_is_named_not_dropped(self):
+        """R32's reading: DK owns eligibility, so a starter it never listed is
+        unrosterable anyway. It is a fact to carry, not an error to raise."""
+        obs = self._observed(self._live(), salary={
+            "100": {"name": "Ronald Acuna Jr", "team": "STL"}})
+        names = [r["name"] for r in obs["unrostered_observed"]]
+        self.assertIn("Austin Gomber", names)
+        self.assertIn("Ryan McMahon", names)
+        self.assertEqual(obs["unmatched"], [])
+
+    def test_the_boxscore_url_goes_through_the_leg_filter(self):
+        """A doubleheader must contribute the SLATE's leg. The URL builder goes
+        through `_legs_for_extraction`, the same filter every other reader of
+        the hydrated schedule uses, so this cannot become a second matcher."""
+        lda = self._lda()
+        feed = {"games": [
+            {"game_pk": 1, "game_date_utc": "2026-08-29T17:05:00Z",
+             "away": {"team_abbrev": "STL"}, "home": {"team_abbrev": "COL"}},
+            {"game_pk": 2, "game_date_utc": "2026-08-29T23:10:00Z",
+             "away": {"team_abbrev": "STL"}, "home": {"team_abbrev": "COL"}},
+        ]}
+        times = {"STL@COL": datetime(2026, 8, 29, 17, 5, tzinfo=timezone.utc)}
+        urls = lda.boxscore_urls_for_feed(feed, times)
+        self.assertEqual(list(urls), ["STL@COL"])
+        self.assertTrue(urls["STL@COL"].endswith("/game/1/feed/live"))
+        self.assertIn("_legs_for_extraction",
+                      inspect.getsource(lda.boxscore_urls_for_feed))
+
+    def test_a_game_with_no_game_pk_is_omitted_rather_than_guessed(self):
+        lda = self._lda()
+        feed = {"games": [{"away": {"team_abbrev": "STL"},
+                           "home": {"team_abbrev": "COL"}}]}
+        self.assertEqual(lda.boxscore_urls_for_feed(feed), {})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

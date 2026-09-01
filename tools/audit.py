@@ -406,7 +406,20 @@ EXPECTED_SUITE_COUNTS = {
     # wrong, a truncated pagination REFUSING rather than writing a narrower
     # league, the offset loop deduping a player repeated across a page boundary,
     # and a 0 IP row leaving rather than dividing by zero.
-    "tests.test_core": 945,
+    # R270(b), 2026-08-31: 945 -> 956, the eleven that pin the OBSERVED-FACT
+    # tier -- a started game yielding the order that actually batted, a Preview
+    # game reading NO order even with a block present (a pre-game boxscore is a
+    # prediction and this tier holds observations), an unrecognised state
+    # treated as not-started, the shared `normalize_name` join so the accented
+    # spellings that cost a pass resolve, the three states being distinct with
+    # `did_not_start` finding the dead bat, `unobserved` never collapsing into
+    # `did_not_start` (R237's conflation through a new door), an empty side
+    # block on an underway game being an UNREAD BLOCK rather than nine
+    # scratches, an observed starter absent from the DK pool named rather than
+    # dropped (R32's reading), a substitution appended to the order not minting
+    # a tenth starter, and the boxscore URL builder going through the one leg
+    # filter rather than becoming a second matcher.
+    "tests.test_core": 956,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

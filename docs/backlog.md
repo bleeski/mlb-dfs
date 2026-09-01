@@ -623,7 +623,12 @@ remaining claim is actually first, which is what the ordering is for. Slots
    rides R174: `late_swap.py` prints the preflight command and returns success
    without running it. **R266 SHIPPED 2026-08-29 and is out of this slot**; it
    landed alone as its own note said it would, and its landing changed nothing
-   about the other four.
+   about the other four. **R279 JOINS this slot 2026-08-31**, from R270(b)'s
+   class-B enumeration: the observed-fact tier is built and `check_feed` still
+   derives "confirmed" from a feed that stops carrying it after first pitch, so
+   the preflight can read a dead slot as an unposted side. It is here rather
+   than with the reader because wiring it changes a HARD-GATE verdict, which is
+   this slot's whole subject.
 2. **The repair path: R267 + R272, then R268, R204's ceiling half rides** —
    **INSERTED 2026-08-29, the one resequencing this date; everything below
    moved down one and nothing else changed.** The argument is the same one that
@@ -638,10 +643,11 @@ remaining claim is actually first, which is what the ordering is for. Slots
    sequence typed reflexively. R204's ceiling half rides here rather than in
    the smalls: it prints the one remedy CLAUDE.md makes always-permitted, at a
    moment when it cannot work, which is a live hazard for an unattended
-   supervisor and not a wording fix. **R270(b) is a hard dependency of
-   R267(a)** — the filter's "confirmed starter" test has no source after first
-   pitch, which is exactly when a repair runs, so the boxscore reader lands
-   with it or the filter is guessing. **R271 rides R272's quiet window**, not
+   supervisor and not a wording fix. **R270(b) SHIPPED 2026-08-31 and its
+   dependency on R267(a) is DISCHARGED** — the filter's "confirmed starter"
+   test had no source after first pitch, which is exactly when a repair runs;
+   `observed_starter_state` is now that source and the filter is its first
+   consumer. **R271 rides R272's quiet window**, not
    the smalls: both edit CLAUDE.md, contract edits are allowed only with no
    other session live, and two edits to one contract file in one window is an
    ordering argument rather than a shared-surface convenience.
@@ -722,10 +728,16 @@ remaining claim is actually first, which is what the ordering is for. Slots
     breadth-vs-construction comparison needs the archetype table to carry a
     truthful breadth for the shape it resolves, which is the thing R196 cannot
     currently express.
-13. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221 **+ R270(a)** (the
+13. **Smalls, batched opportunistically:** R264 + R265 (one move, see both), R236(b) (one Action Network capture, then the fixture), R221 **+ R280** (the
     two sides of one doubleheader-leg boundary — the write side stamps the
-    wrong leg's order, the read side has no leg filter at all, and the odds
-    path already holds the matcher both should use), R222, R229 (+F-24's severity
+    wrong leg's order, and the read side that still has no leg filter is the
+    tail scanner, not the lineups path). **R270(a) was CLOSED 2026-08-31 and is
+    gone from this slot: its premise was false at that head.** There is ONE leg
+    matcher, `select_one_leg_per_matchup`; both paths reach it; it landed
+    2026-08-05 in `8a1b32b` (R58(a)(b)), twenty-four days before R270 was filed,
+    and `tests/test_core.py:8553-8555` already pinned both callers by AST. R280
+    is what survived the enumeration that closed it: a third reader, with a
+    production caller, that R58(b)'s own enumeration missed. R222, R229 (+F-24's severity
     note on the (b) half), R230 (+(d), the game-cap test that passes with the
     constraint deleted, F-28), R231, R232, R241, R243. R269 lands here or with
     R245, whichever moves first; they are the same manifest object.
@@ -3672,50 +3684,67 @@ Route every inbound abbrev through `to_dk_abbrev` at parse time (merge_feeds, Ro
 - **What remains, (d):** `fetch_slate_bundle.py:278` — the second same-venue game reuses the first leg's weather window, unmarked. Independent surface, no interaction with (a) or (b). Carries a small decision: give the second leg its own window, or widen the first leg's window to the latest same-venue start (the filed fix says the latter). Either way, mark it rather than leaving the reuse silent.
 - **Scope of the remainder:** both affect a doubleheader slate only, and neither is in the wrong-lineup-reaches-the-pool class (a) and (b) were, which is why the priority drops from P1 to P2. (c) degrades a TBD team's projected order on a DH; (d) degrades one game's weather input.
 
-### R270. The doubleheader leg matcher exists on the odds path and not on the lineups path, and after first pitch the feed's "confirmed" silently becomes "not posted" (P1, S-M; two independent halves) | new 2026-08-29, merged from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §D; field-forced on slate `1305_12g`, both halves observed
+### R279. Three sites derive "confirmed" from a feed that stops carrying it after first pitch, and the observed tier that answers them is built but unwired (P1, M; money boundary) | new 2026-08-31, from R270(b)'s class-B R233 enumeration; the tier shipped the same day
 
-**(a) One rule, two implementations, and only one of them exists.**
-`schedule?...&hydrate=lineups,probablePitcher` returns BOTH legs of a split
-doubleheader. Iterating without filtering leaves the LATER leg in the dict. On
-`1305_12g` BOS@NYY and ARI@SF were both splits (`gameNumber == 1`,
-`doubleHeader == 'S'` for the DK slate in both cases) and the first sweep
-reported BOS, NYY, ARI and SF as having ZERO starters. **That reads exactly like
-"these teams have not posted" and is indistinguishable from it downstream** —
-the same conflation R237 is filed on, arriving through the leg filter instead of
-the factor report. The odds path already solves this, benignly, on the same
-slate: F1 reported "2 doubleheader odds leg(s) dropped" for these same two
-games, matching the salary file's start time to within 10 minutes. **The
-lineups path should use that matcher.** Per R233, the landing entry carries the
-grep enumerating every reader that iterates the hydrated schedule without a leg
-filter. Cross-ref R221 (the DK merge stamps the slate leg's order onto every
-feed leg — the same seam, the write side) and R58(c) (per-leg orders, blocked
-on R90's fixture); R221 and this are the two sides of one boundary and should
-be read together even if they land apart.
+- **What:** R270(b) shipped the observed-fact tier
+  (`live_data_adapters.parse_boxscore_feed` / `build_observed_starters` /
+  `observed_starter_state`) and gave it one consumer, the repair filter. Three
+  sites still derive "confirmed" from the schedule hydrate and each degrades
+  silently once a game is underway: `live_data_adapters.py:969`
+  (`is_confirmed = posted == "confirmed"`, the primary derivation);
+  `fetch_slate_bundle.py:177` (`"confirmed" if len(lineup) >= 9`, where the
+  degradation ORIGINATES — an in-progress game carries no lineup in the hydrate,
+  so the side is stamped `tbd`); and `preflight_upload.py:1446` inside
+  `check_feed`, which is the site that read Nootbaar's side as unposted while he
+  was already a dead slot in a delivered file.
+- **Why it was not folded into R270(b):** it needs a fetched boxscore artifact
+  on disk, which no session container can produce (proxy 403 to
+  `statsapi.mlb.com`, re-measured 2026-08-31), and the preflight site changes a
+  HARD-GATE verdict at the money boundary. A verdict change on a gate, driven by
+  a source nothing here has ever successfully fetched, is its own item on its
+  own evidence.
+- **Fix:** an on-disk boxscore artifact per slate (shape and writer to be
+  decided with the fetch), then `check_feed` consulting
+  `observed_starter_state` BEFORE its feed read and treating `did_not_start` as
+  the hard failure it already treats an absent confirmed player as. `unobserved`
+  must fall through to today's behaviour unchanged — the three-state contract is
+  the whole safety argument, and a two-state read here would convert every
+  not-yet-started game into a scratch. `check_feed` also iterates
+  `feed["games"]` with no leg filter (R270(b) class A); on this path the effect
+  is a UNION across legs rather than a wrong leg, so it is permissive rather
+  than wrong, and it rides this item rather than R280.
 
-**(b) The pool contract has no post-first-pitch source, and this one is new.**
-Once a game is in progress the schedule hydrate stops carrying its lineup, so a
-"confirmed" check against the feed **silently degrades to "not posted" for
-exactly the games whose answer is now certain.** The authoritative source after
-first pitch is the boxscore:
+### R280. `tail_candidate_scanner._pitchers_by_game` has no doubleheader leg filter, and it is the third reader R58(b)'s own enumeration missed (P2, S) | new 2026-08-31, from R270(b)'s class-A R233 enumeration; verified in tree with a production caller
 
-    https://statsapi.mlb.com/api/v1.1/game/<gamePk>/feed/live
-      -> liveData.boxscore.teams.<side>.battingOrder   (who actually hit)
-      -> liveData.boxscore.teams.<side>.pitchers[0]    (who actually started)
+- **What:** `mlb_engine/optimize/tail_candidate_scanner.py:222` iterates
+  `lineups_json.get("games", [])` and writes an `AWAY@HOME`-keyed dict, so both
+  legs of a split doubleheader produce the same key and the LATER leg wins. That
+  is R58(b)'s shape exactly — "this function writes into a TEAM-keyed dict while
+  iterating the feed's games, so two legs of one matchup are last-write-wins and
+  a matinee build silently took the night starter" — in a third reader R58(b)
+  fixed two of. It has a production caller: `_pitchers_by_game` is called at
+  `:571` inside `scan_tail_candidates` (AST walk, so this is not R273's dead-site
+  trap).
+- **Why P2 and not P1:** the tail scanner is a report surface, and the wrong
+  probable degrades a scan rather than a delivered lineup. It is still a wrong
+  fact presented as a right one on a doubleheader slate.
+- **Fix:** thread `salary_game_times` into `scan_tail_candidates` and route the
+  read through `_legs_for_extraction`, the one filter the other four readers
+  use. It is a caller-facing signature change and needs its own test, which is
+  why it did not ride R270(b). Do NOT add a fourth leg-selection implementation;
+  R270(a) is closed precisely because there is one.
 
-This is what found the one genuinely dead player left in the delivered file
-(Nootbaar, 1 entry) while `preflight_upload.py` was still reporting that side as
-unposted from the feed. It is the observed-fact source for late swap and for the
-preflight's feed check, and it belongs in the intake contract's source ranking
-beside R143's DK-then-paste-then-API line, as the tier that outranks all three
-once the game is underway.
+### R270. CLOSED 2026-08-31 — (b) SHIPPED, (a) was ALREADY CLOSED on 2026-08-05; entry migrated to CHANGELOG.md
 
-**One implementation note that already cost a pass.** Names need
-accent-normalising to join to the DK salary file (`Acuña/Acuna`, `Díaz/Diaz`,
-`Peña/Pena`, `Rodríguez/Rodriguez`, `Pérez/Perez`, `Dubón/Dubon`); a first pass
-without it produced eight false positives. `preflight_upload.py` already
-normalises correctly — `unicodedata.normalize("NFKD")` plus combining-mark strip
-at lines 181-182 — so the logic exists and is to be SHARED, not reimplemented.
-Reimplementing it is how the R248 crosswalk got two copies.
+(b), the post-first-pitch boxscore source, shipped as the observed-fact tier in
+`live_data_adapters.py` with CLAUDE.md's build contract item 1 gaining the tier
+above R143's ranking. (a)'s premise was FALSE at the head that built (b): there
+is one leg matcher, `select_one_leg_per_matchup`, both paths reach it, and it
+landed in `8a1b32b` twenty-four days before R270 was filed. The consequences
+that outlived the entry are on the board as **R279** (the three unwired
+derivation sites, money boundary) and **R280** (the third unfiltered reader).
+Full reasoning, both R233 enumerations with their caller analysis, and the two
+dead sites named-but-not-filed: CHANGELOG 2026-08-31.
 
 ### R75. The DK↔Savant crosswalk joins on normalized name only; same-name players collapse to one row (P2, S) | audit 2026-08-04, verified in tree
 

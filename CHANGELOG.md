@@ -25,6 +25,157 @@ performance claim.
 
 ---
 
+## 2026-08-31 — R270(b) SHIPPED and R270(a) was ALREADY CLOSED: the observed-fact tier arrives, and the half filed beside it had been fixed 24 days before it was filed
+
+**What moved.** `mlb_engine/intake/live_data_adapters.py` (the new tier, five
+public names), `tests/test_core.py` (eleven new), `tools/audit.py` (the pin),
+`CLAUDE.md` (build contract item 1 gains a tier, and the quoted gate line).
+Module count unchanged at 27, deliberately: see "where it lives" below. Gate
+**1509 -> 1520**.
+
+**The defect (b) closes.** The schedule hydrate stops carrying a game's lineup
+once that game is in progress. Every "confirmed" test against the feed
+therefore silently degrades to "not posted" for exactly the games whose answer
+is now certain, and a player who did not play becomes indistinguishable from a
+side that has not posted. On `1305_12g` that is how a dead bat (Nootbaar, 1
+entry) survived a preflight that was reading his side as unposted. A boxscore
+is the record: `liveData.boxscore.teams.<side>.battingOrder` is who batted and
+`.pitchers[0]` is who threw the first pitch.
+
+**The contract this adds, and why it is a tier rather than a fourth source.**
+DK's `Starting` column, an operator paste and the schedule API are all
+PREDICTIONS of who will play; a boxscore is a RECORD of who did. After first
+pitch a prediction cannot improve and a record cannot be wrong, so the record
+wins — for that game, and only for that game. CLAUDE.md's build contract item 1
+gains the tier above R143's DK-then-paste-then-API line.
+
+**`observed_starter_state` returns THREE values, and that is the whole
+contract.** `started` / `did_not_start` / `unobserved`, never a bool.
+`unobserved` means this player's game has not begun, so the tier has nothing to
+say and the caller falls through to the ranking below; collapsing it into
+`did_not_start` would be R237's conflation arriving through a new door, which
+is the failure this tier exists to end rather than relocate. `did_not_start` —
+rostered, game underway, in neither observed set — is the Nootbaar reading, and
+it is an observation rather than an absence.
+
+**A false-positive class caught in the first cut and closed before it shipped.**
+A side entering `observed_teams` on the strength of the game being underway made
+an EMPTY boxscore block condemn nine bats: one unread side, nine false
+scratches. A side now enters only when it carries an actual observation (a
+non-empty order, or a starting pitcher), and an underway game whose block came
+back empty is named in `sides_unread`. This is the same shape as the eight false
+positives the item records from its own first pass, arriving from the other
+direction — absence of evidence read as evidence.
+
+**Where the shared normalizer came from, and why not the one the item named.**
+R270(b) said to share `preflight_upload._norm_name` (cited at `:181-182`; it is
+at `:194` at this head, moved 13 lines by R275 the same day — citation stale,
+logic exactly as described). That copy is equivalent on the accented cases, but
+it lives in a TOOL and an engine module importing a tool inverts the dependency.
+The share taken is `slate_intake_manager.normalize_name`, which is the SAME
+function `build_player_lineup_status.match_dk_id` already uses for this
+identical DK-salary join — so the observed tier and the feed tier cannot
+disagree about who "Acuña" is, which is the property the sharing was for.
+Reimplementing either is how the R248 crosswalk got two copies.
+
+**Where it lives, and why no new module.** In `live_data_adapters.py` beside
+`build_player_lineup_status`, `_select_slate_legs` and R143's merge, rather than
+in a new `boxscore.py`. The source ranking is one rule and it now reads in one
+place; a second module would have needed the private `_http_get_json` across a
+module boundary and split the ranking across two files, which is R167/R159's
+class. Module count stays 27 as a consequence, not as a goal.
+
+**Whether it has ever made a real HTTP call: NO, and stated rather than implied.**
+`fetch_boxscore` is the only network path, is marked `pragma: no cover`, and has
+never been executed. Measured at this head from the container, using the repo's
+own urllib path: `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=...`
+returns `URLError <urlopen error Tunnel connection failed: 403 Forbidden>`. The
+2026-08-31 handoff asserted "the container reaches statsapi.mlb.com fine"; it
+does not, and the R278 entry of the same date had it right. Everything shipped
+here is the PARSE and the JOIN, fixture-tested; the first real fetch is still
+Ben's machine.
+
+**R233 enumeration, two classes, run separately, with the caller half.**
+
+*Class A — every reader that iterates the hydrated schedule without a leg
+filter: 20 sites (13 production, 7 test), the item named one.* Four already go
+through `_legs_for_extraction` (`boxscore_urls_for_feed` — the new one, built
+that way so it could not become a second matcher; `extract_opposing_probables`;
+`extract_batter_hands`; `platoon_order_adapter.extract_opp_throws_from_lineups`).
+Two are WRITERS that must emit both legs and are kept for that reason
+(`fetch_slate_bundle.fetch_lineups_feed`, which builds the feed downstream picks
+from, and `fetch_weather`, which appends both legs' `game_pk`s to one venue
+record on purpose). Two read a different object and are not members
+(`tail_candidate_scanner._odds_by_game` reads the odds packet;
+`build_state_manager.slate_context_refresh_plan` reads a context packet).
+`lineups_from_paste.merge_feeds` is kept: it normalises keys so the leg selector
+downstream sees one matchup once, which is the fix R59(a) made there.
+**Two genuine members, neither fixed here, both FILED:**
+`tail_candidate_scanner._pitchers_by_game` (**has a production caller**, `:571`
+inside `scan_tail_candidates`) writes an `AWAY@HOME`-keyed dict from
+`lineups_json["games"]` with no filter, so a doubleheader is last-write-wins —
+R58(b)'s exact shape in a third reader its own enumeration missed, filed as
+**R280**; and `preflight_upload.check_feed` (`:1431`), filed with the class-B
+member below as **R279**.
+**One dead site, NAMED and deliberately NOT filed as a defect:**
+`slate_intake_manager.emit_slate_context_packet_template` (`:1084`) iterates
+`requirements["games"]` unfiltered and has **no calls, no imports and no string
+references anywhere** — AST walk, not grep. R273 was filed P1 five days ago by a
+grep that counted exactly this kind of site, so it is recorded as a quarantine
+candidate beside R273 rather than as a P-anything.
+
+*Class B — every site that tests "confirmed" against the feed.* The broad needle
+returns 34 functions, but most merely RECEIVE a `confirmed_*` argument. The
+class that DERIVES confirmation is 12 sites. Nine are kept with reasons: three
+read DK's `Starting` column and one is its completeness helper (a different
+source, and one this tier outranks only after first pitch, which is not when
+they run); one is a writer stamping `lineup_status` from a merge; two are
+paste-derived, where an operator-supplied fact has no post-first-pitch problem;
+one consumes a supplied set (`projection_builder:188`); one is RotoWire. **Three
+are real members and none is wired here:** `live_data_adapters:969`
+(`is_confirmed = posted == "confirmed"`, the primary derivation),
+`fetch_slate_bundle:177` (`"confirmed" if len(lineup) >= 9`, which is where the
+degradation ORIGINATES — an in-progress game has no lineup in the hydrate, so
+the side is stamped `tbd`), and `preflight_upload:1446`. Wiring them needs a
+fetched boxscore artifact on disk, which this container cannot produce, and the
+preflight one changes a HARD-GATE verdict at the money boundary. That is its own
+item on its own evidence, not a rider on the reader: **R279**.
+**A second dead site found while enumerating:**
+`late_swap_manager.cohort_refresh_plan` (`:397`) has zero references of any
+kind. Named, not filed, same reason as the first.
+
+**Mutations: eight, all KILLED**, three batches, revert in a `finally`, target
+`live_data_adapters.py` restored byte-identical (sha256 `e3fb72023f83`) after
+every batch, and the anchors greppped afterwards rather than the driver's own
+restore being trusted — six original anchors present, zero mutant tokens.
+M1 widened the started-state to "anything not Preview"; M2 removed the
+not-started guard so a Preview order is read; M3 `pitchers[0]` -> `pitchers[-1]`
+(the fixture was given a second arm first, because with one pitcher `[0]` and
+`[-1]` are the same element and the mutation would have survived on a fixture
+weakness rather than a guard); M4 removed the nine-slot cap so a substitution
+becomes slot 10; M5 removed the unread-side guard; M6 collapsed `unobserved`
+into `did_not_start`; M7 replaced the shared normalizer with a bare `lower()`;
+M8 dropped the leg filter from the URL builder. No test blocked a fix and none
+was loosened.
+
+**(a) DID NOT SHIP because it was already closed, and this is a corrected
+premise rather than a footnote.** R270(a) says "the doubleheader leg matcher
+exists on the odds path and not on the lineups path." At this head there is ONE
+matcher, `select_one_leg_per_matchup` (`live_data_adapters.py:191`), and both
+paths reach it: the lineups path through `_select_slate_legs` (`:318`, called at
+`:296` and `:885`) and the odds path directly (`:2466`). It landed **2026-08-05
+in `8a1b32b` (R58(a)(b))**, twenty-four days before R270 was filed, and
+`tests/test_core.py:8553-8555` already pins by AST that both callers reach it.
+The field symptom the item records (BOS, NYY, ARI and SF reading as zero
+starters on `1305_12g`) is real and its cause is not a missing matcher: an
+unfiltered read is what `_legs_for_extraction` returns when a caller supplies no
+`salary_game_times`, which is the documented R58(b) opt-out, and the sweep that
+produced the observation was the BUILD session's own. **(a) is closed on the
+board rather than built.** This is the second time in two days that a filed
+premise has not survived contact with the tree (R273 on 2026-08-31 was the
+first), and the two failures are the same failure: an entry's citation is a
+photograph, and the tree moves.
+
 ## 2026-08-31 — R275: three manifest cross-checks stop reading an absent field as agreement, and the reserved label stops being awarded on no evidence
 
 **What moved.** `tools/preflight_upload.py` (three guards),
