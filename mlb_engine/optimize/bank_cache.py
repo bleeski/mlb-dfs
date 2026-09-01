@@ -613,6 +613,32 @@ def _lock_signature(locked_slot_assignments: Optional[Mapping[str, str]]) -> str
     return ",".join(f"{k}={v}" for k, v in sorted(locked_slot_assignments.items()))
 
 
+#: R246. The three R154 solver controls, named once so every caller that
+#: forwards them forwards the same set. A key absent from the mapping stays
+#: absent from the call, so the solver sees `None` and builds no constraint --
+#: opt-in, and a build that passes nothing solves exactly the MILP it always did.
+LEVERAGE_KEYS = ("max_cumulative_ownership_pct", "min_low_owned_hitters",
+                 "low_owned_threshold_pct")
+
+
+def _leverage_kwargs(leverage: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Only the keys actually supplied, so nothing is passed as an explicit None.
+
+    A caller who sets a cumulative cap and no floor gets the cap constraint and
+    no floor constraint; the two are independently settable because
+    `min_low_owned_hitters` has a real infeasibility edge (measured on 1605_2g:
+    a floor of 6 under a 6.0% threshold is infeasible on a pool whose best
+    lineup carries zero hitters that cheap) and an operator has to be able to
+    back one off without losing the other.
+    """
+    out: Dict[str, Any] = {}
+    for key in LEVERAGE_KEYS:
+        value = (leverage or {}).get(key)
+        if value is not None:
+            out[key] = value
+    return out
+
+
 def extend_bank(
     cache: BankCache,
     projections_df,
@@ -625,6 +651,7 @@ def extend_bank(
     stack_max: int = 5,
     max_candidates: Optional[int] = None,
     solver_time_limit_s: Optional[float] = None,
+    leverage: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
 
@@ -811,6 +838,12 @@ def extend_bank(
                 # the per-solve limit reduces search effort and nothing else.
                 time_limit_s=resolve_solver_time_limit(solver_time_limit_s, remaining),
                 status_out=status,
+                # R246. This is the bank `build_slate.py` actually delivers from
+                # -- it hands the result to `run_slate` as `candidates_override`,
+                # which skips `build_diverse_candidate_bank` entirely. A
+                # `--leverage` that reached only the auto-bank path would be a
+                # silent no-op on every sliced build, which is most of them.
+                **_leverage_kwargs(leverage),
             )
         except Exception as exc:  # noqa: BLE001
             worst = max(worst, time.monotonic() - attempt_started)

@@ -19322,5 +19322,402 @@ class IdNormalizationTests(unittest.TestCase):
                              f"{key} differs on an int64 frame")
 
 
+class LeveragePassthroughTests(unittest.TestCase):
+    """R246. R154 built the two constraints and shipped them OFF pending
+    calibration; what was not intended is that no path could turn them ON --
+    grepped at the pre-fix head they appeared only in `optimizer_v3.py` and this
+    file. On 1905_5g qa priced all 14 delivered entries chalk-positive (+11.1 to
+    +46.0 pp) while the ask was for more leverage.
+
+    Every test below asserts the constraint BINDS, by first showing that an
+    unconstrained solve VIOLATES the bound. A leverage test on a pool where the
+    bound is slack passes without the constraint existing at all, which is the
+    same class as the R249 mutation that survived a whole suite.
+    """
+
+    HITTER_POSITIONS = ["C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+
+    @classmethod
+    def _pool(cls):
+        """Reuses R154's own fixture shape: one chalk bat and one low-owned bat
+        per position, so a refusal means the CONSTRAINT bound rather than the
+        fixture running out of eligible slots.
+
+        ``Ownership_Tier`` is added because the BANK path reads it and the
+        single-lineup path does not -- `_classify_chalk_one_off` needs it for
+        the unit signature. It is not what the leverage constraints read; those
+        read `Projected_Ownership_Pct`, and nothing here writes the tier from
+        the prior, which is `attach_predicted_ownership`'s deliberate
+        non-behaviour."""
+        df = LeverageControlsTests._pool()
+        df["Ownership_Tier"] = [
+            "High" if float(v) >= 20.0 else "Low"
+            for v in df["Projected_Ownership_Pct"]]
+        df["Notes"] = ""
+        return df
+
+    @staticmethod
+    def _binding_cap(cums):
+        """The second-highest cumulative the UNCONSTRAINED bank produced.
+
+        Derived rather than hardcoded, for two reasons that matter equally. It
+        is strictly below the worst candidate, so the precondition -- an
+        unconstrained bank violates the bound -- holds by construction and a
+        fixture change cannot quietly turn this into a test of a slack
+        constraint. And a real lineup sits exactly at it, so the constrained
+        solve is provably feasible and a refusal is a genuine failure rather
+        than an over-tight fixture."""
+        distinct = sorted(set(cums))
+        return distinct[-2] if len(distinct) > 1 else round(distinct[0] - 0.01, 2)
+
+    @staticmethod
+    def _ids(record):
+        """The two banks return different record shapes, and reading only one of
+        them is how a bank test silently measures nothing: `build_diverse_
+        candidate_bank` writes `player_ids`, `bank_cache` writes `roster`. An
+        unrecognised shape RAISES rather than returning an empty list, because
+        an empty list scores 0.0 and 0.0 passes every cap."""
+        ids = record.get("player_ids") or record.get("roster")
+        if not ids:
+            raise AssertionError(f"unrecognised bank record: {sorted(record)}")
+        return ids
+
+    @classmethod
+    def _cum(cls, frame, record):
+        own = {str(r["Player_ID"]): float(r["Projected_Ownership_Pct"])
+               for _i, r in frame.iterrows()}
+        return round(sum(own.get(str(p), 12.0) for p in cls._ids(record)), 2)
+
+    # -- the shared key list and its opt-in shape ---------------------------- #
+
+    def test_leverage_kwargs_is_opt_in_and_omits_what_was_not_supplied(self):
+        from mlb_engine.optimize.bank_cache import LEVERAGE_KEYS, _leverage_kwargs
+        self.assertEqual(_leverage_kwargs(None), {})
+        self.assertEqual(_leverage_kwargs({}), {})
+        # a key present-but-None must be OMITTED, not forwarded as None: the two
+        # are the same to the solver today, and a forwarded None is how a
+        # "defaults unchanged" promise quietly stops being checkable.
+        self.assertEqual(_leverage_kwargs({"max_cumulative_ownership_pct": None}), {})
+        self.assertEqual(
+            _leverage_kwargs({"max_cumulative_ownership_pct": 90,
+                              "own_pct_by_player_id": {"1": 5.0}, "source": "x"}),
+            {"max_cumulative_ownership_pct": 90},
+            "only the solver keys travel; the prior map and the source do not")
+        self.assertEqual(
+            set(LEVERAGE_KEYS),
+            {"max_cumulative_ownership_pct", "min_low_owned_hitters",
+             "low_owned_threshold_pct"})
+
+    def test_the_two_constraints_are_independently_settable(self):
+        """`min_low_owned_hitters` has a real infeasibility edge -- measured on
+        1605_2g, a floor of 6 under a 6.0% threshold is infeasible on a pool
+        whose best lineup carries zero hitters that cheap -- so an operator has
+        to be able to back one off without losing the other."""
+        from mlb_engine.optimize.bank_cache import _leverage_kwargs
+        cap_only = _leverage_kwargs({"max_cumulative_ownership_pct": 200.0,
+                                     "min_low_owned_hitters": None})
+        floor_only = _leverage_kwargs({"max_cumulative_ownership_pct": None,
+                                       "min_low_owned_hitters": 4})
+        self.assertEqual(list(cap_only), ["max_cumulative_ownership_pct"])
+        self.assertEqual(list(floor_only), ["min_low_owned_hitters"])
+
+    # -- the ownership column, read from an emitted prediction --------------- #
+
+    def test_predicted_ownership_is_written_from_the_file_and_counts_the_gaps(self):
+        from mlb_engine.field.ownership_prior import attach_predicted_ownership
+        frame = self._pool().drop(columns=["Projected_Ownership_Pct"])
+        ids = [str(p) for p in frame["Player_ID"]]
+        supplied = {p: 7.5 for p in ids[:5]}
+        out, report = attach_predicted_ownership(frame, supplied, source="f.json")
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["players_scored"], 5)
+        self.assertEqual(report["players_unscored"], len(ids) - 5)
+        self.assertEqual(report["source"], "f.json")
+        self.assertEqual(
+            [7.5] * 5,
+            [float(v) for v in out["Projected_Ownership_Pct"].head(5)])
+        # a player the file never predicted is left to the reader's own fallback
+        # rather than written a number, and is NAMED
+        self.assertTrue(pd.isna(out["Projected_Ownership_Pct"].iloc[5]))
+        self.assertIn(ids[5], report["unscored_player_ids"])
+
+    def test_it_will_not_overwrite_an_existing_column_unasked(self):
+        from mlb_engine.field.ownership_prior import attach_predicted_ownership
+        frame = self._pool()                       # already carries the column
+        before = list(frame["Projected_Ownership_Pct"])
+        out, report = attach_predicted_ownership(
+            frame, {str(p): 1.0 for p in frame["Player_ID"]})
+        self.assertFalse(report["applied"])
+        self.assertEqual(report["reason"], "column_present_and_overwrite_false")
+        self.assertEqual(before, list(out["Projected_Ownership_Pct"]))
+        forced, forced_report = attach_predicted_ownership(
+            frame, {str(p): 1.0 for p in frame["Player_ID"]}, overwrite=True)
+        self.assertTrue(forced_report["applied"])
+        self.assertEqual([1.0] * len(frame),
+                         [float(v) for v in forced["Projected_Ownership_Pct"]])
+
+    def test_the_prediction_is_labelled_ungraded_and_claims_no_performance(self):
+        from mlb_engine.field.ownership_prior import attach_predicted_ownership
+        frame = self._pool().drop(columns=["Projected_Ownership_Pct"])
+        _out, report = attach_predicted_ownership(
+            frame, {str(p): 5.0 for p in frame["Player_ID"]})
+        label = report["label"].lower()
+        # the label DISCLAIMS these words, so search only the part before the
+        # disclaimer -- otherwise "never an ROI ... claim" would fail its own test
+        claimed = label.split("never")[0]
+        for banned in ("roi", "win rate", "win-rate", "cash rate", "cash-rate",
+                       "probability", "expected value"):
+            self.assertNotIn(banned, claimed,
+                             f"the label makes a {banned} claim")
+        self.assertIn("ungraded", label)
+        self.assertIn("ordering", label)
+        self.assertIn("never an roi", label)
+
+    # -- both production bank routes carry it -------------------------------- #
+
+    def test_the_augmentation_pass_carries_the_constraints_too(self):
+        """`build_diverse_candidate_bank` reaches the solver by TWO routes: the
+        base bank through `build_candidate_lineup_bank`, and its own
+        forced-augmentation `build_single_lineup` call, which reads only the
+        `passthrough_keys` whitelist. Left off that list, the base bank would
+        honour a cap and every augmented candidate would ignore it with nothing
+        saying so -- R153's 'on every rung' shape."""
+        import mlb_engine.optimize.optimizer_v3 as _opt
+        src = inspect.getsource(_opt.build_diverse_candidate_bank)
+        for key in ("max_cumulative_ownership_pct", "min_low_owned_hitters",
+                    "low_owned_threshold_pct"):
+            self.assertIn(f"'{key}'", src,
+                          f"{key} is not on the augmentation whitelist")
+
+    def test_the_auto_bank_route_binds_and_an_unconstrained_bank_violates(self):
+        """The cap is DERIVED from the unconstrained bank's own worst candidate
+        rather than hardcoded, so the precondition this test rests on -- that an
+        unconstrained bank violates the bound -- is guaranteed by construction
+        instead of hoped for. A fixture change cannot quietly turn this into a
+        test of a slack constraint."""
+        df = self._pool()
+        loose = opt.build_diverse_candidate_bank(
+            df, requested_n=3, mode="wta", target="ceiling", time_budget_s=20.0)
+        loose_cums = [self._cum(df, r)
+                      for r in (loose.get("candidate_lineups") or [])]
+        self.assertTrue(loose_cums, "the unconstrained bank built something")
+        cap = self._binding_cap(loose_cums)
+        self.assertGreater(max(loose_cums), cap)
+        tight = opt.build_diverse_candidate_bank(
+            df, requested_n=3, mode="wta", target="ceiling", time_budget_s=20.0,
+            max_cumulative_ownership_pct=cap)
+        tight_cums = [self._cum(df, r)
+                      for r in (tight.get("candidate_lineups") or [])]
+        self.assertTrue(tight_cums, "the constrained bank built something")
+        self.assertLessEqual(max(tight_cums), cap + 1e-6)
+
+    def test_the_sliced_bank_route_binds_and_an_unconstrained_bank_violates(self):
+        """The bank `build_slate.py` actually delivers from: its candidates go
+        to `run_slate` as `candidates_override`, so `run_slate` builds no bank
+        and the auto-bank passthrough never runs."""
+        from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+        df = self._pool()
+
+        def bank(lev):
+            with tempfile.TemporaryDirectory() as tmp:
+                cache = BankCache(Path(tmp) / "bank.json")
+                extend_bank(cache, df, time_budget_s=20.0, max_candidates=8,
+                            leverage=lev)
+                return [self._cum(df, r)
+                        for r in cache.candidates]
+
+        loose = bank(None)
+        self.assertTrue(loose, "the unconstrained sliced bank built something")
+        cap = self._binding_cap(loose)             # derived, never hardcoded
+        self.assertGreater(max(loose), cap)
+        tight = bank({"max_cumulative_ownership_pct": cap})
+        self.assertTrue(tight, "the constrained sliced bank built something")
+        self.assertLessEqual(max(tight), cap + 1e-6)
+
+    def test_a_sliced_bank_with_no_leverage_is_unchanged(self):
+        """Opt-in. Passing nothing must produce the bank that was produced
+        before this commit existed, which is what keeps the golden replay still."""
+        from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+        df = self._pool()
+        rosters = []
+        for lev in (None, {}):
+            with tempfile.TemporaryDirectory() as tmp:
+                cache = BankCache(Path(tmp) / "bank.json")
+                extend_bank(cache, df, time_budget_s=20.0, max_candidates=6,
+                            leverage=lev)
+                rosters.append([tuple(r.get("roster") or []) for r in cache.candidates])
+        self.assertEqual(rosters[0], rosters[1])
+
+    # -- run_slate's own seam ------------------------------------------------ #
+
+    def test_run_slates_attach_is_a_function_the_tests_can_execute(self):
+        """Written inline as an `if` inside `run_slate`, a mutation that
+        disabled this branch SURVIVED the whole suite -- the only test covering
+        it read the source for the call and its position, and a disabled `if`
+        keeps both. Same shape as R249's M1 one commit earlier, same remedy."""
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._pool().drop(columns=["Projected_Ownership_Pct"])
+        ids = [str(p) for p in frame["Player_ID"]]
+
+        same, off = apply_leverage_ownership(frame, None)
+        self.assertFalse(off["applied"])
+        self.assertNotIn("Projected_Ownership_Pct", same.columns)
+        same, off = apply_leverage_ownership(frame, {"max_cumulative_ownership_pct": 90})
+        self.assertFalse(off["applied"], "solver keys alone attach nothing")
+        self.assertNotIn("Projected_Ownership_Pct", same.columns)
+
+        out, report = apply_leverage_ownership(
+            frame, {"own_pct_by_player_id": {p: 4.25 for p in ids},
+                    "source": "pred.json"})
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["source"], "pred.json")
+        self.assertEqual([4.25] * len(ids),
+                         [float(v) for v in out["Projected_Ownership_Pct"]])
+
+    def test_run_slate_takes_leverage_and_attaches_before_anything_reads_it(self):
+        """`run_slate` REASSEMBLES the projections frame rather than taking the
+        caller's, so attaching the column upstream reaches the sliced bank and
+        not the auto one. Position is a property of the layout and not of any
+        return value, so this half stays a source read."""
+        from mlb_engine.pipeline import execution_pipeline as ep
+        self.assertIn("leverage", inspect.signature(ep.run_slate).parameters)
+        src = inspect.getsource(ep.run_slate)
+        attach = src.index("apply_leverage_ownership(projections, leverage)")
+        schema = src.index("schema = validate_projection_schema(projections)")
+        self.assertLess(attach, schema,
+                        "the ownership column must land before anything reads "
+                        "the reassembled frame")
+        self.assertIn('"leverage": {', src, "the result carries a leverage block")
+
+    # -- the operator surface ------------------------------------------------ #
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_leverage_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    class _Args:
+        leverage = None
+        ownership_pred = None
+        date = "2026-01-01"
+
+    def _args(self, **kw):
+        a = self._Args()
+        for k, v in kw.items():
+            setattr(a, k, v)
+        return a
+
+    def _prior_file(self, tmp, archetypes):
+        outdir = Path(tmp) / "outputs" / "2026-01-01"
+        outdir.mkdir(parents=True)
+        path = outdir / "ownership_pred_test_2g.json"
+        path.write_text(json.dumps({"archetypes": archetypes}), encoding="utf-8")
+        return path
+
+    def test_it_refuses_with_the_path_named_when_the_prediction_is_absent(self):
+        """R242's shape on the surface where it costs most: building without the
+        input the operator asked for, while the delivered file looks like every
+        other delivered file."""
+        mod = self._build_slate()
+        args = self._args(leverage={"max_cumulative_ownership_pct": 90})
+        with tempfile.TemporaryDirectory() as tmp:
+            with unittest.mock.patch.object(mod, "REPO", Path(tmp)):
+                with self.assertRaises(FileNotFoundError) as ctx:
+                    mod.resolve_leverage(args, None, "test_2g")
+        self.assertIn("ownership_pred_test_2g.json", str(ctx.exception))
+        self.assertIn("drop --leverage", str(ctx.exception))
+
+    def test_it_records_the_source_sha_and_the_ungraded_label(self):
+        mod = self._build_slate()
+        args = self._args(leverage={"max_cumulative_ownership_pct": 90,
+                                    "min_low_owned_hitters": 2})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._prior_file(tmp, {"large_field_gpp": {
+                "own_pct_by_player_id": {"1": 30.0, "2": 2.0}}})
+            with unittest.mock.patch.object(mod, "REPO", Path(tmp)):
+                leverage, brief = mod.resolve_leverage(args, None, "test_2g")
+            self.assertEqual(brief["source"], str(path))
+            self.assertEqual(
+                brief["sha256"],
+                __import__("hashlib").sha256(path.read_bytes()).hexdigest())
+        self.assertEqual(brief["archetype"], "large_field_gpp")
+        self.assertEqual(brief["players_in_prediction"], 2)
+        self.assertEqual(brief["constraints"]["max_cumulative_ownership_pct"], 90)
+        self.assertEqual(brief["constraints"]["low_owned_threshold_pct"], None)
+        self.assertIn("ungraded", brief["label"].lower())
+        self.assertEqual(leverage["own_pct_by_player_id"], {"1": 30.0, "2": 2.0})
+
+    def test_more_than_one_archetype_is_a_question_not_a_race(self):
+        """R70's rule, and `find_prior_file`'s own: ambiguity is named, never
+        picked from by sort order."""
+        mod = self._build_slate()
+        args = self._args(leverage={"max_cumulative_ownership_pct": 90})
+        with tempfile.TemporaryDirectory() as tmp:
+            self._prior_file(tmp, {
+                "cash": {"own_pct_by_player_id": {"1": 50.0}},
+                "large_field_gpp": {"own_pct_by_player_id": {"1": 20.0}}})
+            with unittest.mock.patch.object(mod, "REPO", Path(tmp)):
+                with self.assertRaises(ValueError) as ctx:
+                    mod.resolve_leverage(args, None, "test_2g")
+                self.assertIn("2 archetypes", str(ctx.exception))
+                # naming one resolves it
+                args.leverage = dict(args.leverage, archetype="cash")
+                leverage, brief = mod.resolve_leverage(args, None, "test_2g")
+        self.assertEqual(brief["archetype"], "cash")
+
+    def test_an_unknown_leverage_key_refuses_rather_than_being_dropped(self):
+        mod = self._build_slate()
+        args = self._args(leverage={"max_ownership": 90})
+        with tempfile.TemporaryDirectory() as tmp:
+            self._prior_file(tmp, {"cash": {"own_pct_by_player_id": {"1": 5.0}}})
+            with unittest.mock.patch.object(mod, "REPO", Path(tmp)):
+                with self.assertRaises(ValueError) as ctx:
+                    mod.resolve_leverage(args, None, "test_2g")
+        self.assertIn("max_ownership", str(ctx.exception))
+
+    def test_no_leverage_asked_for_resolves_to_nothing(self):
+        mod = self._build_slate()
+        leverage, brief = mod.resolve_leverage(self._args(), None, "test_2g")
+        self.assertEqual(leverage, {})
+        self.assertFalse(brief["applied"])
+
+    def test_the_sliced_path_attaches_through_the_SAME_function_before_the_bank(self):
+        """The failure this pins is the sharpest one in the item. `build_slate`
+        inlined its own attach in the first cut, and a mutation disabling it
+        SURVIVED: with no `Projected_Ownership_Pct` column the solver's reader
+        falls back to a flat 12.0 for every player, so a cumulative cap of 90
+        would have bound against 10 x 12.0 = 120 and looked like it was working
+        while measuring nothing. One function, called by both paths, and the
+        call sites are position-checked."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertNotIn("attach_predicted_ownership(", src,
+                         "build_slate must call the engine's shared attach, not "
+                         "mint a second copy of it")
+        attach = src.index("apply_leverage_ownership(projections, leverage)")
+        bank = src.index("bank_report = extend_bank(")
+        self.assertLess(attach, bank,
+                        "the column must land before the sliced bank solves")
+        resolve = src.index("leverage, leverage_brief = resolve_leverage(")
+        self.assertLess(resolve, attach)
+
+    def test_build_slate_refuses_leverage_on_a_showdown_build(self):
+        """Showdown never enters `run_slate` and `build_showdown_bank` builds no
+        ownership row, so accepting the flag there would be the same silent
+        no-op R242 is filed on. Read off the source: keyed on the contest and
+        landing before anything is staged."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"status": "leverage_not_supported_on_showdown"', src)
+        refusal = src.index("leverage_not_supported_on_showdown")
+        staging = src.index('suffix = "_showdown" if contest == "showdown" else ""')
+        self.assertLess(refusal, staging)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

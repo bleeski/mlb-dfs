@@ -320,6 +320,81 @@ def predict_ownership(
 PROJECTED_OWNERSHIP_COLUMN = "Projected_Ownership_Pct"
 
 
+def attach_predicted_ownership(
+    projections_df: Any,
+    own_pct_by_player_id: Mapping[str, float],
+    source: Optional[str] = None,
+    overwrite: bool = False,
+) -> Tuple[Any, Dict[str, Any]]:
+    """Write ``Projected_Ownership_Pct`` onto a COPY of a frame from an EMITTED
+    prediction file, rather than recomputing the prior here.
+
+    R246. ``attach_projected_ownership`` above derives the column from the
+    frame's own features; this writes the numbers a slate's
+    ``ownership_pred_<tag>.json`` already carries, which is the artifact R209
+    actually graded (Spearman +0.581 over 112 graded players) and the artifact
+    whose sha256 a brief can name. Two functions rather than one because they
+    answer different questions -- "what would this prior say" and "what did that
+    file say" -- and collapsing them would make the recorded sha describe an
+    input that was then recomputed.
+
+    Same three limits as its sibling, restated because they are the reason this
+    is safe: it writes ONE column, that column has exactly one reader in the
+    engine (``optimizer_v3._ownership_pct_for_row``), and it does NOT touch
+    ``Ownership_Tier``, which is behaviour-bearing in one-off selection. So
+    attaching changes no lineup by itself; the two R154 controls are off unless
+    a caller passes a number.
+
+    **This is an UNCALIBRATED, UNGRADED PRIOR.** Its ORDERING is what R209
+    measured as usable and its LEVEL is explicitly not; one slate cannot size a
+    coefficient. Nothing here is an ROI, win-rate, cash-rate or probability
+    claim, and a caller that reports it must say so.
+
+    Players absent from the map are left to ``_ownership_pct_for_row``'s own
+    fallback rather than being written a number this file never predicted, and
+    they are COUNTED, because a prediction file that covers half the pool makes
+    a cumulative cap mean half of what the operator asked for.
+    """
+    frame = projections_df.copy()
+    report: Dict[str, Any] = {
+        "applied": False, "reason": None, "source": source,
+        "prior_version": VERSION, "players_scored": 0, "players_unscored": 0,
+        "unscored_player_ids": [], "column": PROJECTED_OWNERSHIP_COLUMN,
+        "label": ("UNCALIBRATED, UNGRADED PRIOR read from an emitted prediction "
+                  "file; its ORDERING is what has been measured and its LEVEL "
+                  "has not. A predicted share, never a measured one, and never "
+                  "an ROI, win-rate, cash-rate or probability claim."),
+    }
+    if PROJECTED_OWNERSHIP_COLUMN in getattr(frame, "columns", []) and not overwrite:
+        report["reason"] = "column_present_and_overwrite_false"
+        return frame, report
+    supplied = {str(k).strip(): v for k, v in dict(own_pct_by_player_id or {}).items()}
+    if not supplied:
+        report["reason"] = "no_predicted_ownership_supplied"
+        return frame, report
+    if not len(getattr(frame, "index", [])):
+        report["reason"] = "empty_frame"
+        return frame, report
+
+    values, unscored = [], []
+    for pid in frame["Player_ID"]:
+        key = str(pid).strip()
+        raw = supplied.get(key)
+        try:
+            values.append(float(raw))
+        except (TypeError, ValueError):
+            values.append(float("nan"))
+            unscored.append(key)
+    frame[PROJECTED_OWNERSHIP_COLUMN] = values
+    report.update({
+        "applied": True,
+        "players_scored": len(values) - len(unscored),
+        "players_unscored": len(unscored),
+        "unscored_player_ids": sorted(unscored),
+    })
+    return frame, report
+
+
 def attach_projected_ownership(
     projections_df: Any,
     contest_shape: object = None,

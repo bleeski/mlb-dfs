@@ -39,6 +39,57 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-01 (third note this date), DEV, claim `engine` (`engine_2026-09-01`,
+re-taken a second time): **R246 SHIPPED. Gate 1592 -> 1610, golden replay
+unmoved. Slot 10's R246 half closes; the slot KEEPS its position with R164
+alone and the queue stays at fourteen.** The reason is in slot 10: renumbering
+four slots to reclaim half of one buys nothing, and R164 was always the larger
+half of that batch.*
+
+***The work was already built and the session's job was to finish verifying
+it.*** The 09-01 sandbox died mid-verification with three edits un-run, and
+`NEXT_SESSION_PROMPT.md` named them. All three held: 18 `LeveragePassthroughTests`
+pass, `tests.test_core` 1016, the full gate assembles clean. Worth recording
+because the handoff made it cheap -- naming the exact three unverified edits and
+which was most likely wrong turned an hour of re-derivation into three greps.
+
+***The mutation driver's own anchors had gone stale, and it failed HONESTLY.***
+Two of the seventeen mutations pointed at strings the fix itself had deleted:
+L15 named `_apply_leverage_ownership` (renamed public when both paths were made
+to share it) and L14 named the inline `if` that edit 2 removed. The driver
+printed `ANCHOR MISSING -- mutation not applied` rather than a verdict, which is
+the correct behaviour and the opposite of the failure mode already on record
+(a no-op patch reporting SURVIVED). **But an un-run mutation is an un-run
+mutation, and both were the ones the handoff specifically owed.** Anchors
+rewritten against the shipped shape, and both die. The generalisable form: *a
+mutation driver is a test of the tree it was written against; the fix that kills
+a mutation is also what invalidates its anchor, so the driver is re-verified in
+the same pass, not trusted across one.* **17 run, 17 killed first pass**, targets
+restored byte-identical and the nine anchors grepped afterwards.
+
+***L17 was added because L16 could not tell which guard was load-bearing.***
+L16 reverts edit 2 (build_slate re-mints its own copy) and trips TWO assertions
+at once -- the shared call's position read and the no-second-copy read -- so it
+proves neither alone. L17 keeps the shared call and adds the second copy beside
+it, which reaches the no-second-copy assertion by itself. Same lesson as R267's
+survivor in a new place: *a guard with a test is not a guard that is tested until
+a mutation reaches it alone.*
+
+***The R233 enumeration found one genuine class member and it is filed, not
+fixed.*** Class A was every production entry point that builds a portfolio, taken
+by AST on the parameter name rather than by grep on the key names, which is what
+made the answer short and checkable: exactly four functions repo-wide declare
+`leverage`, and **none of them is on the swap path**. `run_slate` reaches both
+constraints, `build_slate` reaches them on BOTH its bank routes (the point of the
+item), `autobuild` reaches them through `--passthrough` with no change needed --
+and `late_swap.py` cannot reach them at all. **R284 filed**, with the reason it
+did not ship in this commit: the four-line version is probably wrong, because a
+pinned pool is strictly tighter than the build pool the cap was chosen against
+and R246 measured a real infeasibility edge on a FULL one. Class B (every reader
+of `ownership_pred_<tag>.json`) found no unwired reader R246 should have touched;
+`attach_projected_ownership`, the derived-from-features twin, still has zero
+production callers and that is deliberate.
+
 *2026-09-01 (second note this date), DEV, claim `engine` (`engine_2026-09-01`,
 re-taken): **R165 and R163 both SHIPPED, two commits with the gate run between
 them. Gate 1562 -> 1572 -> 1577. Slot 3 closes and is REFILLED with R249**; the
@@ -937,11 +988,17 @@ remaining claim is actually first, which is what the ordering is for. Slots
     value to ship). R203's R214 precondition is MET (landed 2026-08-28), so
     this pair is all that stands between the board and R203; its entry gains
     R244's design.
-10. **R164 + R246** — convenience batch, both S, both `build_slate`-adjacent:
-    the bank job grid (F-29) and the `--leverage` passthrough that makes
-    R154's two constraints reachable from the slate's own prediction file
-    (F-15's narrow accept; Ben has now asked for leverage twice in-slate and
-    the answer was "built but not connected").
+10. **R164 alone** — **R246 CLOSED 2026-09-01 (second commit this date) and has
+    left the batch.** The slot keeps its position with R164's bank job grid
+    (F-29) and the queue stays at fourteen: renumbering eleven through fourteen
+    to reclaim half a slot buys nothing, and R164 was always the half with the
+    larger lift. What R246 leaves behind for R164 is a fact rather than scope:
+    the sliced bank returns FEWER candidates under a cumulative cap at a fixed
+    budget (6 -> 4 measured on 1605_2g at cap 90), so the job grid's waste is
+    now paid twice on any leveraged build, which strengthens R164's case
+    without changing it. **R284 is filed** from R246's own enumeration and does
+    NOT ride here: it is a late-swap-path item and belongs with the swap
+    session, not with a bank-grid one.
 11. **R225 + R226 + R227** — archive integrity, unchanged; R225 still gates
     R10's Showdown cells. F-16/F-17/F-19/F-21/F-23 all corroborate this
     batch; R227's existing riders already carry the zip quotas and the
@@ -2985,6 +3042,56 @@ contains `_replay`, on BOTH contest types, is what the 08-16 commit lacked.
 manifest is what Ben checks a sha256 against before entering a contest, and a
 replay row for a played slate is a second answer to "what was delivered".
 
+### R284. A leverage cap binds at BUILD and not at REFINE: `late_swap.py` calls `extend_bank` twice with no `leverage` (P2, S) | new 2026-09-01, from R246's class-A R233 enumeration; verified in tree by AST, with production callers
+
+**What.** R246 wired `max_cumulative_ownership_pct` / `min_low_owned_hitters`
+into both bank routes a BUILD can take. It did not wire the third route a
+portfolio takes, which is the one after delivery. `tools/late_swap.py:632` (the
+general slice) and `:663` (the pinned per-entry slice) both call
+`bank_cache.extend_bank` with no `leverage` kwarg, and
+`execution_pipeline.run_late_swap` declares no `leverage` parameter -- confirmed
+by the AST walk for the parameter name, which returns exactly four functions
+repo-wide (`_leverage_kwargs`, `extend_bank`, `apply_leverage_ownership`,
+`run_slate`) and none of them on the swap path. A portfolio delivered under a
+cumulative cap of 90 is therefore refined by candidates built against no cap at
+all, in exactly the entries a swap touches.
+
+**Why it is P2 and not P1.** This is not R246's L14 failure arriving on a third
+path. There the cap BOUND against a flat 12.0 constant and read as working; here
+the cap is simply absent, so nothing false is reported -- the delivered file's
+leverage property just is not preserved across a refinement, silently. R153's
+"on every rung" is the rule it breaks, and the same rule's own remedy applies:
+a control enforced where the roster spots are spent, or not called a control.
+
+**Why it was NOT fixed in R246's commit, stated rather than deferred quietly.**
+The cheap version (thread `leverage` through both `extend_bank` calls) is four
+lines and is probably wrong on its own. A late-swap pool has 3 to 9 slots
+already pinned, so it is strictly tighter than the build pool the cap was
+chosen against, and R246's own measurement found a REAL infeasibility edge on a
+FULL pool (`min_low_owned_hitters` infeasible at 6, 7 and 8 on 1605_2g). Under
+pins that edge moves in the binding direction and nobody has measured where. A
+refusal during a lock window is worse than an unconstrained refinement, so this
+needs the measurement before it needs the four lines.
+
+**Fix.** Measure first, on an archived slate with a leveraged parent: at what
+pin count does a cap the parent satisfied become infeasible for the swap. Then
+one of two shapes, and the measurement picks it -- forward the parent brief's
+own leverage block (the swap inherits what the build chose), or forward it with
+a named relaxation ladder and COUNT the relaxations the way Showdown's three
+controls do. Either way the swap report states which, because "the parent was
+built at cap 90" and "this file is at cap 90" are different claims.
+
+**Rider, cheap and independent.** Whatever the fix, `late_swap` can read the
+parent brief's leverage block today and PRINT that the refinement is running
+unconstrained. Report-only, no refusal risk, and it is the half that stops an
+operator believing a delivered cap survived a swap.
+
+**Audit fields.** Moves: leverage, on the swap path only. Acceptance: a swap of
+a leveraged parent either preserves the cap or names that it did not. Falsifier:
+if the pinned pool makes any useful cap infeasible past ~4 pins, the honest
+outcome is the rider alone and the item closes at report-only. Owner: none.
+Rollback: drop the kwarg.
+
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 
 - **What:** `outputs/2026-06-03/upload_manifest.json` and
@@ -3465,30 +3572,33 @@ so the fit declares its null per 3.21 rather than inheriting flat-12.
   says so; that result is informative and ends the item. FOSS: existing
   adapters. Owner: none. Rollback: delete the tool.
 
-### R246. R154's leverage constraints have no production caller: a `--leverage` passthrough makes them reachable and gradeable (P2, S) | new 2026-08-27, merged from BUILD fragment `2026-08-27_BUILD_container-bank-and-r157-single-cap.md` §4, second sighting of the Quick Card's 08-19 Relay Throw reading; corroborated by the outside spec ed8 (F-15)
+### R246. CLOSED 2026-09-01 -- SHIPPED, entry migrated to CHANGELOG.md
 
-**What.** `max_cumulative_ownership_pct` and `min_low_owned_hitters` exist at
-`optimizer_v3.py:778-779` and are wired through `build_single_lineup`; grepped
-at this head, no caller in `build_slate.py`, `execution_pipeline.py`, or any
-tool, and `attach_projected_ownership` likewise. On 1905_5g qa priced all 14
-entries chalk-positive (+11.1 to +46.0 pp) and Ben's in-slate ask was
-explicitly to increase leverage; the honest answer was "the lever is built but
-not connected," and connecting it mid-slate means editing the engine, which
-the contract forbids.
+`--leverage` on `build_slate.py` reads the slate's own `ownership_pred_<tag>.json`
+through `qa_portfolio.find_prior_file` (one resolver, shared with qa) and forwards
+`max_cumulative_ownership_pct` / `min_low_owned_hitters` / `low_owned_threshold_pct`
+to the solver. **Both bank routes were wired, because the build picks one on the
+clock:** the sliced bank `build_slate` usually delivers from, and the auto bank
+`run_slate` builds. Measured on 1605_2g at cap 90 -- sliced 6 of 6 candidates over
+the cap becomes 0 of 4, auto 12 of 12 becomes 0 of 12. **The Fix line named
+`attach_projected_ownership` and the shipped fix uses a new sibling,
+`attach_predicted_ownership`, deliberately:** the entry's own requirement is that
+the brief record the prediction file's sha, and a sha describes an input that was
+READ, not one that was then recomputed from features. The two functions stay
+separate and the derived one still has no production caller.
 
-**Why.** R154 shipped the constraints deliberately OFF pending calibration;
-what was not intended is that no path can turn them ON. The distinction that
-keeps this truthful-labels-safe: the passthrough forwards numbers the CALLER
-chooses, defaults unchanged, prior still labeled.
+**Two mutations survived the first cut and both are one lesson: a decision that
+lives in the WIRING is not tested by any test that calls the function directly.**
+The sharper one is L14. `build_slate` inlined its own attach; disabled, the frame
+carries no `Projected_Ownership_Pct`, `_ownership_pct_for_row` falls back to a flat
+12.0 per player, and a cumulative cap of 90 binds against 10 x 12.0 = 120 -- a
+leverage control applied against a constant, reading as working while measuring
+nothing. Killed by making both paths call one engine function. Third instance of
+that shape in two commits (R249's M1, R246's L5 and L14).
 
-**Fix.** `--leverage` on `build_slate.py`: read the slate's own
-`ownership_pred_<tag>.json` (emitted pre-lock since R135, already resolved by
-brief date + tag in qa), call `attach_projected_ownership`, forward the two
-numbers when given. Brief records the prediction file's sha and the two
-values. The caveat rides the entry verbatim: within-file ORDER is what the
-prior supports, and ledger 3.17 has supersatellites chalk-NEGATIVE for
-winners, so this is a direction to test, never a number to apply. R209 owns
-the objective/calibration half, unchanged.
+**R284 is filed** from this entry's own R233 enumeration: `late_swap.py` calls
+`extend_bank` twice with no `leverage`, so a portfolio delivered under a cap is
+refined by a bank that never saw it. Not fixed here, with the reason on the entry.
 
 ### R252. The mispricing score: two anchors, components attributed, reported as a vector (P1, M; S with components (a)–(c) only) | new 2026-08-27, from Ben's greenfield instruction; the 2145_1g_sd session's hand-built BUY/FADE model (consumed into R247/R249) is the prototype; retitled 2026-08-28 (ed9)
 

@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import hashlib
 import json
 import os
 import sys
@@ -1528,7 +1529,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     from mlb_engine.intake.live_data_adapters import build_slate_pool
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
     from mlb_engine.pipeline.execution_pipeline import (
-        _assemble_projection_frame, run_slate,
+        _assemble_projection_frame, apply_leverage_ownership, run_slate,
     )
 
     # The stale-platoon condition prints as SOFT below, and CLAUDE.md's build
@@ -1744,6 +1745,31 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # matters: an infrastructure limit may reduce search effort, never the legal
     # player set, because trimming the pool is a strategy change that is invisible
     # in the certified output.
+    # R246. Resolved before any bank is built, so a missing prediction file
+    # costs the read and not the solve. The column goes on THIS frame for the
+    # sliced path; run_slate reassembles its own and attaches it there.
+    try:
+        leverage, leverage_brief = resolve_leverage(
+            args, salary, str(slate_signature(salary).get("tag") or ""))
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"status": "leverage_unresolved", "error": str(exc)},
+                         indent=1))
+        return 4, {}
+    # The ENGINE's own attach, not a second copy. A first cut inlined it here
+    # and a mutation disabling the branch SURVIVED: with no
+    # `Projected_Ownership_Pct` column the solver's reader falls back to a flat
+    # 12.0 for every player, so a cumulative cap would have bound against a
+    # constant and looked like it was working. Third instance of that class in
+    # one session; the remedy each time is a function the tests execute.
+    projections, _own_report = apply_leverage_ownership(projections, leverage)
+    if _own_report.get("applied"):
+        leverage_brief["players_unscored"] = _own_report["players_unscored"]
+        leverage_brief["players_scored"] = _own_report["players_scored"]
+        print(f"leverage: {_own_report['players_scored']} of "
+              f"{_own_report['players_scored'] + _own_report['players_unscored']} "
+              f"pool players carry a predicted share, from "
+              f"{leverage_brief['source']}", file=sys.stderr)
+
     t0 = time.monotonic()
     from mlb_engine.optimize.optimizer_v3 import (
         build_single_lineup, resolve_candidate_bank_size,
@@ -1785,6 +1811,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             cache, projections,
             time_budget_s=slice_budget,
             max_candidates=max(n_entries * 12, 60),
+            # R246. This is the bank that is DELIVERED on this path: its
+            # candidates go to run_slate as candidates_override, so run_slate
+            # builds no bank of its own and the auto-bank passthrough never
+            # runs. Both had to be wired or --leverage would be a no-op on
+            # whichever path a given slate's clock happened to choose.
+            leverage=leverage,
         )
         bank_report["budget_floored"] = bank_budget_floored
         # F15: score each contest shape the reserved CSV actually contains. A
@@ -1925,6 +1957,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         **enrich_kwargs,
         bank_time_budget_s=run_bank_budget,
         portfolio_controls_override=args.controls_override,
+        leverage=leverage or None,
         **slate_kwargs,
     )
 
@@ -2104,6 +2137,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "exposure": exposure,
         "verification": checks,
         "controls_override_applied": args.controls_override,
+        # R246. On every Classic brief, `applied: false` when nothing was asked
+        # for, so "was the ownership prior in this build" has an answer.
+        "leverage": leverage_brief,
         "enrichment": summarize_enrichment(
             reference["status"], enrichment, f4_report, degraded_reason,
             f1_report, f5_report, projections=projections),
@@ -2195,6 +2231,98 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     # than to infer from `teams_with_hand: 1`.
     note["teams_without_hand"] = sorted(t for t in teams if t not in hand)
     return bat_side, facing, note
+
+
+def resolve_leverage(args, salary: Path, slate_tag: str) -> tuple[dict, dict]:
+    """(leverage mapping for run_slate/extend_bank, brief block). R246.
+
+    R154 built two MILP constraints -- a cumulative predicted-ownership ceiling
+    and a floor on low-owned hitters -- and shipped them OFF pending calibration.
+    What was not intended is that no path could turn them ON: grepped at this
+    head they appear only in `optimizer_v3.py` and `tests/test_core.py`. On
+    1905_5g `qa_portfolio` priced all 14 delivered entries chalk-positive (+11.1
+    to +46.0 pp) while Ben was asking in-slate for more leverage, and the honest
+    answer was that the lever was built and not connected.
+
+    **The input is a LABELED, UNGRADED PRIOR.** R209 measured its ORDERING as
+    usable (Spearman +0.581 across 112 graded players) and said explicitly that
+    its LEVEL is not -- one slate cannot size a coefficient. So this forwards
+    numbers the CALLER chose, records the file they were read from, and claims
+    nothing about outcomes.
+
+    Absent prediction file with `--leverage` asked for: REFUSE, with the path
+    named. Building without the input the operator asked for, while the delivered
+    file looks like every other delivered file, is R242's silent-fallback shape
+    on the surface where it costs the most.
+    """
+    if not getattr(args, "leverage", None):
+        return {}, {"applied": False, "reason": "no --leverage supplied"}
+    # Both imports are LOCAL, deliberately. `build_slate.py` must still load
+    # with no engine on the path, so the dependency check at startup can print a
+    # one-line refusal instead of an ImportError traceback -- a top-level
+    # `from mlb_engine...` here failed `test_the_script_still_loads_without_the
+    # _engine_on_the_path` on the first cut, and the guard was right. Importing
+    # the key list rather than restating it keeps ONE definition; only the
+    # import site moves.
+    from mlb_engine.optimize.bank_cache import LEVERAGE_KEYS
+    from tools.qa_portfolio import find_prior_file
+
+    requested = dict(args.leverage)
+    unknown = sorted(set(requested) - set(LEVERAGE_KEYS) - {"archetype"})
+    if unknown:
+        raise ValueError(
+            f"--leverage does not take {unknown}; the keys are "
+            f"{sorted(LEVERAGE_KEYS)} plus an optional 'archetype'")
+    # `find_prior_file`'s own brief shape, not a second one: it reads `date` and
+    # `slate.tag`, and it is the ONE resolver for this file so `qa_portfolio` and
+    # the build cannot disagree about which prediction a slate has.
+    path, how = find_prior_file(
+        {"date": args.date, "slate": {"tag": slate_tag}},
+        getattr(args, "ownership_pred", None), REPO)
+    if path is None or not Path(path).exists():
+        raise FileNotFoundError(
+            f"--leverage needs this slate's ownership prediction and none was "
+            f"found at {path or f'outputs/{args.date}/ownership_pred_{slate_tag}.json'} "
+            f"({how}). Emit it with `python tools/ownership_pred.py emit` or "
+            f"drop --leverage; building without it would apply a cumulative "
+            f"ownership cap against a flat default for every player.")
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    archetype = str(requested.pop("archetype", "") or "").strip()
+    archetypes = payload.get("archetypes") or {}
+    if archetype and archetype not in archetypes:
+        raise ValueError(f"archetype {archetype!r} is not in {path}; it carries "
+                         f"{sorted(archetypes)}")
+    if not archetype:
+        # Named rather than picked from: more than one archetype in the file and
+        # no choice from the operator is a question, not a race won by sort
+        # order (R70's rule, and `find_prior_file`'s own).
+        if len(archetypes) != 1:
+            raise ValueError(
+                f"{path} carries {len(archetypes)} archetypes {sorted(archetypes)}; "
+                "name one with --leverage '{\"archetype\": \"large_field_gpp\", ...}'")
+        archetype = next(iter(archetypes))
+    own = (archetypes.get(archetype) or {}).get("own_pct_by_player_id") or {}
+    if not own:
+        raise ValueError(f"{path} archetype {archetype!r} carries no "
+                         "own_pct_by_player_id; refusing rather than capping "
+                         "against a flat default")
+    leverage = {k: v for k, v in requested.items() if v is not None}
+    leverage.update({"own_pct_by_player_id": {str(k): float(v)
+                                              for k, v in own.items()},
+                     "source": str(path)})
+    return leverage, {
+        "applied": True,
+        "source": str(path),
+        "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+        "resolved_by": how,
+        "archetype": archetype,
+        "players_in_prediction": len(own),
+        "constraints": {k: requested.get(k) for k in LEVERAGE_KEYS},
+        "label": ("an UNGRADED prior: R209 measured its ORDERING usable "
+                  "(Spearman +0.581 over 112 graded players) and its LEVEL not. "
+                  "The two numbers are the operator's, forwarded unchanged. "
+                  "Never an ROI, win-rate, cash-rate or probability claim."),
+    }
 
 
 def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: dict,
@@ -3444,6 +3572,26 @@ def main() -> int:
     ap.add_argument("--past-slate-replay", action="store_true",
                     help="build a slate whose first lock has already passed "
                          "(replays and evals only; a live build never needs it)")
+    # R246. R154 built two MILP leverage constraints and shipped them OFF
+    # pending calibration; what was not intended is that no path could turn them
+    # ON. Opt-in, defaults untouched, and the numbers are the operator's.
+    ap.add_argument("--leverage", default=None, type=json.loads,
+                    help="Classic only: JSON forwarding R154's leverage "
+                         "constraints to the bank solve, e.g. "
+                         "'{\"max_cumulative_ownership_pct\": 90, "
+                         "\"min_low_owned_hitters\": 2, "
+                         "\"low_owned_threshold_pct\": 10}'. Each is "
+                         "independently settable because the floor has a real "
+                         "infeasibility edge. Reads this slate's "
+                         "outputs/<date>/ownership_pred_<tag>.json and REFUSES "
+                         "with the path named when it is absent; add "
+                         "\"archetype\" when that file carries more than one. "
+                         "The prediction is an UNGRADED prior whose ordering is "
+                         "what has been measured, never an ROI, win-rate or "
+                         "probability claim.")
+    ap.add_argument("--ownership-pred", dest="ownership_pred", default=None,
+                    help="name the ownership prediction file --leverage should "
+                         "read, when the default resolution is ambiguous.")
     # R249. Showdown's only projection input. Classic reaches the whole F1-F5
     # enrichment stack through `_assemble_projection_frame`; Showdown reaches
     # AvgPointsPerGame and a salary regression, on roughly a third of entered
@@ -3564,6 +3712,21 @@ def main() -> int:
     # accept-and-ignore: a flag that silently does nothing is R242's complaint,
     # and it is worse here because the operator supplied a file and would read
     # the delivered lineups as having consumed it. Before staging, deliberately.
+    # R246. `--leverage` is a Classic seam. Showdown does not enter `run_slate`
+    # and its bank is `build_showdown_bank`, which builds no MILP row for
+    # either constraint; accepting the flag there would be the same silent
+    # no-op R242 is filed on. Before staging, and symmetric with --projections.
+    if getattr(args, "leverage", None) and contest == "showdown":
+        print(json.dumps({
+            "status": "leverage_not_supported_on_showdown",
+            "leverage": args.leverage,
+            "note": ("--leverage forwards R154's constraints to the Classic "
+                     "bank solve. Showdown does not pass through run_slate and "
+                     "its solver builds no ownership row, so nothing would "
+                     "apply it. Nothing was staged."),
+        }, indent=1))
+        return 4
+
     if getattr(args, "projections", None) and contest != "showdown":
         print(json.dumps({
             "status": "projections_not_supported_on_classic",

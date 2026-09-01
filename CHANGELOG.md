@@ -25,6 +25,179 @@ performance claim.
 
 ---
 
+## 2026-09-01 — R246: R154's two leverage constraints get a production caller, on BOTH bank routes because the build picks one on the clock — and the mutation that mattered proved the first cut was capping against a constant
+
+**What moved.** `mlb_engine/optimize/optimizer_v3.py` (three keys added to
+`build_diverse_candidate_bank`'s `passthrough_keys` whitelist — one line, and it
+is the engine half), `mlb_engine/optimize/bank_cache.py` (`LEVERAGE_KEYS` and
+`_leverage_kwargs`, the one definition of the key set, plus `extend_bank`'s new
+`leverage` parameter), `mlb_engine/field/ownership_prior.py`
+(`attach_predicted_ownership`, new, beside the existing
+`attach_projected_ownership`), `mlb_engine/pipeline/execution_pipeline.py`
+(`apply_leverage_ownership` as a public shared function, `run_slate`'s `leverage`
+parameter and its forwarding),
+`skills/generate-lineups/scripts/build_slate.py` (`--leverage`,
+`--ownership-pred`, `resolve_leverage`, the brief block, the Showdown refusal),
+`tests/test_core.py` (eighteen new, `LeveragePassthroughTests`), `tools/audit.py`
+and `CLAUDE.md` (the pin and the quoted line). Gate **1592 -> 1610**, golden
+replay unmoved: with no `--leverage` the frame gains no column, the bank builds
+take no kwargs, and every delivered byte is what it was.
+
+**The gap.** `max_cumulative_ownership_pct` and `min_low_owned_hitters` are
+declared at `optimizer_v3.py:788-789` and build real MILP rows at `:899-925`, and
+they had **no production caller anywhere** — re-verified at `14d7aed`, they
+appeared only in `optimizer_v3.py` and `tests/test_core.py`. R154 shipped them
+deliberately OFF pending calibration; what was not intended is that no path could
+turn them ON. On 1905_5g `qa_portfolio` priced all 14 delivered entries
+chalk-positive (+11.1 to +46.0 pp) while Ben asked in-slate for leverage, and the
+honest answer was that the lever was built and not connected.
+
+**Measured on 1605_2g (2026-08-30), that slate's own `ownership_pred_1605_2g.json`,
+archetype `large_field_gpp`, the delivered run's own projections frame.** Single
+lineup through `build_single_lineup`, unconstrained baseline cumulative **104.0
+pp**, low-owned-under-10 **5**, objective **127.160**:
+
+| cap | cumulative | low<10 | objective |
+|---|---|---|---|
+| 100 | 97.96 (-6.04) | 5 | -1.37% |
+| 95 | 93.37 (-10.63) | 5 | -3.15% |
+| 90 | 88.33 (-15.67) | 6 | -7.72% |
+| 85 | 84.88 (-19.12) | 6 | -13.47% |
+| 80 | 79.93 (-24.07) | 6 | -32.50% |
+| 75 | INFEASIBLE | | |
+
+The floor at threshold 6.0 is **infeasible at 6, 7 and 8** on this pool, whose
+best lineup carries zero hitters that cheap. That is a real infeasibility edge and
+it is why the two controls are independently settable rather than one dial — and
+it is the measurement R284 below turns on.
+
+**Both production bank routes carry the constraint, at cap 90:**
+
+| route | without leverage | with cap 90 |
+|---|---|---|
+| `bank_cache.extend_bank` (the SLICED bank `build_slate` delivers from) | 6 candidates, 113.98–126.37, **6 of 6 over cap** | 4 candidates, 88.16–89.75, **0 over** |
+| `build_diverse_candidate_bank` (the AUTO bank `run_slate` builds) | 12 candidates, 97.84–128.58, **12 of 12 over** | 12 candidates, 86.59–90.00, **0 over** |
+
+Both had to be wired or `--leverage` would be a no-op on whichever path a given
+slate's clock happened to choose. **The sliced bank returns FEWER candidates under
+the cap at a fixed budget (6 -> 4). That is search effort, not a pool reduction** —
+the legal player set is untouched and the budget is what ran out, which is the
+distinction CLAUDE.md's guardrail draws and the reason this is allowed to ship.
+
+**The design, and one substitution against the item's own Fix line.** The entry
+said call `attach_projected_ownership`; the shipped fix calls a new sibling,
+`attach_predicted_ownership`, and the reason is the entry's other requirement.
+`attach_projected_ownership` DERIVES the column from features; the new one writes
+it from an EMITTED prediction file. The brief records that file's sha256, and a
+sha describes an input that was read, not one that was then recomputed — collapsing
+the two would make a recorded sha a claim about something else. Both survive on
+purpose and answer different questions ("what did that file say" vs "what would
+this prior say"); **`attach_projected_ownership` still has zero production
+callers**, measured, and that is deliberate rather than an oversight this commit
+missed. `resolve_leverage` reads the slate's `ownership_pred_<tag>.json` through
+`qa_portfolio.find_prior_file` — one resolver, shared with qa, not a second — and
+REFUSES with the path named when the file is absent, when a key is unknown, or
+when it carries more than one archetype and none was chosen. `--leverage` on a
+Showdown build refuses before staging, because `build_showdown_bank` builds no
+ownership row and accepting it there would be R242's silent no-op.
+
+**Mutations: 17 run, 17 KILLED first pass at this head. Two of them could not run
+at all until their anchors were rewritten, and that is the finding.** L15 named
+`_apply_leverage_ownership` and L14 named an inline `if` — both strings the fix
+itself had deleted. The driver printed `ANCHOR MISSING — mutation not applied`
+rather than a verdict, which is the correct behaviour and the opposite of the
+failure already on record in this repo (a no-op patch reporting SURVIVED); the
+harness did not lie. **But an un-run mutation is an un-run mutation, and these two
+were exactly the ones owed.** The general form: *a mutation driver is a test of
+the tree it was written against, and the fix that kills a mutation is often what
+invalidates its anchor, so the driver is re-verified in the same pass rather than
+trusted across one.*
+
+**The two that survived the first cut, one commit earlier, are one lesson.**
+**L5**: the ownership attach was an `if` inline in `run_slate`, and the only test
+covering it read the source for the call and its position — a disabled `if` keeps
+both. **L14, the sharper one**: `build_slate` inlined its own attach on the sliced
+path; disabled, the frame carries no `Projected_Ownership_Pct`, so
+`optimizer_v3._ownership_pct_for_row` falls back to the tier default (**a flat
+12.0 for every player**) and a cumulative cap of 90 binds against 10 × 12.0 = 120
+— **a leverage control applied against a constant, reading as working while
+measuring nothing**, which is the worst thing this item could have shipped. Both
+killed by extracting `apply_leverage_ownership` and making both paths call it.
+With R249's M1 the same day that is three instances in two commits of one shape:
+*a decision that lives in the WIRING is not tested by any test that calls the
+function directly*, and the remedy each time is to make the wiring a function the
+tests execute.
+
+**L17 is new this pass and exists because L16 proves less than it looks.** L16
+reverts the shared-function edit (build_slate re-mints its own copy) and trips two
+assertions at once — the shared call's position read and the no-second-copy read —
+so it cannot say which is load-bearing. L17 keeps the shared call and adds the
+second copy beside it, reaching the no-second-copy assertion alone. R267's lesson
+in a new place: *a guard with a test is not a guard that is tested until a mutation
+reaches it alone.* Targets restored byte-identical after every batch and the nine
+anchors GREPPED afterwards rather than the driver's own restore trusted.
+
+**A third lesson, from the tests rather than the code.** The first cut of the bank
+tests read only `record["roster"]`, which `build_diverse_candidate_bank` does not
+write (it writes `player_ids`). Every diverse-bank record scored an empty list,
+cumulative **0.0**, and 0.0 passes every cap — a test asserting a bound while
+measuring nothing. Caught only because a derived cap went negative. `_ids()` now
+RAISES on an unrecognised record shape rather than returning `[]`.
+
+**R233, two classes, the caller half by AST and the FORM stated.** *Class A* is
+every production entry point that builds a portfolio and whether it can now reach
+the two constraints. Searched two ways because the key-name grep answers the wrong
+question: 79 sites name one of the three keys across 7 files (28 of them
+production code in 4 files — `optimizer_v3` 19, `bank_cache` 3,
+`execution_pipeline` 3, `build_slate` 3, the last being argparse help), but what
+decides reachability is who can be HANDED one, so the enumeration is an AST walk
+for `leverage` as a parameter. **It returns exactly four functions repo-wide**:
+`bank_cache._leverage_kwargs`, `bank_cache.extend_bank`,
+`execution_pipeline.apply_leverage_ownership`, `execution_pipeline.run_slate`.
+Against the four entry points: `run_slate` reaches both constraints;
+`build_slate.py` reaches them on BOTH its routes (`:1810` sliced, `:1959` auto);
+`tools/autobuild.py` reaches them through `--passthrough` with **no autobuild
+change needed**, since it shells out to `build_slate.py` and only lifts
+`--controls-override` out of the token list — correct as it stands, because
+leverage is a strategy preference and CLAUDE.md's Autonomy section keeps those
+Ben's; and **`tools/late_swap.py` cannot reach them at all**. One further site,
+`skills/generate-lineups-workspace/deepen_bank.py:64`, calls `extend_bank` with no
+leverage and is UNTRACKED (`git ls-files` empty), so it is named and not counted.
+
+*Class B* is every reader of `ownership_pred_<tag>.json` and of the column it
+feeds — **the half that was owed and not done on 09-01**. 179 sites across 20
+files, 68 of them production in 8 files: `ownership_prior.py` (both attaches),
+`optimizer_v3.py` (`_ownership_pct_for_row`, the consumer with the flat-12.0
+fallback that makes L14 sharp), `execution_pipeline.py` (the new shared attach),
+`build_slate.py` (`resolve_leverage`), `tools/ownership_pred.py` (the writer and
+grader), `tools/qa_portfolio.py` (`find_prior_file`, now shared), `tools/audit.py`
+(the pins), and `showdown_theses.py` — which reads a `Player_ID,Base` map from the
+same tool's `--base` output and is a DIFFERENT contract from the ownership map,
+named here so R249's input and R246's are not conflated by the next reader. **No
+unwired reader was found that this item should have touched.**
+
+**R284 FILED, and it is a genuine class member left unbuilt rather than a
+deferral.** `late_swap.py:632` and `:663` both call `extend_bank` with no
+`leverage`, and `run_late_swap` declares none, so a portfolio delivered under a
+cap is refined by candidates built against no cap — R153's "on every rung" broken
+on the one rung after delivery. It is P2 and not P1 because nothing false is
+reported: the cap is absent, not bound against a constant. It did not ship here
+because the four-line version is probably wrong on its own — a late-swap pool has
+3 to 9 slots pinned and is strictly tighter than the build pool the cap was chosen
+against, this commit measured a real infeasibility edge on a FULL pool, and a
+refusal inside a lock window is worse than an unconstrained refinement. The entry
+carries the measurement it needs first, and a report-only rider that is safe today.
+
+**Truthful labels.** `Projected_Ownership_Pct` is a labeled prior and never a
+measured share; the brief says so beside the sha. The two numbers are the
+CALLER's, defaults unchanged, and nothing here claims a cap improves an outcome —
+the caveat rides from the entry verbatim, that within-file ORDER is what the prior
+supports and ledger 3.17 has supersatellites chalk-NEGATIVE for winners, so this
+is a direction to test and never a number to apply. R209 owns the
+objective/calibration half, unchanged.
+
+---
+
 ## 2026-09-01 — R249: Showdown gets a projection input, and the insertion point is decided by measurement rather than by taste — a supplied number is the prior, because supplying it any earlier transmits 0.458 of it and reprices everyone else
 
 **What moved.** `mlb_engine/optimize/showdown_theses.py` (`read_supplied_base`,

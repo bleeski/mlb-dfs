@@ -4320,6 +4320,30 @@ def generate_positional_variant_candidates(projections: Any, focus_player_id: st
     return out
 
 
+def apply_leverage_ownership(projections, leverage):
+    """(frame, report). R246's ownership attach, as a function rather than as an
+    `if` inside `run_slate`.
+
+    It is separate because a test has to be able to EXECUTE it. Written inline,
+    a mutation that disabled the branch survived the whole suite: the only test
+    covering it read the source for the call and its position, and a disabled
+    `if` keeps both. That is the same shape as R249's M1 one commit earlier, and
+    the same remedy -- the decision moves into a function the tests call.
+
+    The call SITE stays source-enforced (it must precede
+    `validate_projection_schema`, because everything after that reads the
+    frame), because position is a property of the layout and not of any
+    function's return value.
+    """
+    if not (leverage or {}).get("own_pct_by_player_id"):
+        return projections, {"applied": False, "reason": "no leverage supplied"}
+    from mlb_engine.field.ownership_prior import attach_predicted_ownership
+    return attach_predicted_ownership(
+        projections, leverage["own_pct_by_player_id"],
+        source=(leverage or {}).get("source"), overwrite=True,
+    )
+
+
 def run_slate(
     *,
     runs_root: str | Path,
@@ -4357,6 +4381,7 @@ def run_slate(
     bank_time_budget_s: Optional[float] = None,
     solver_time_limit_s: Optional[float] = None,
     plan_solve_budget_s: Optional[float] = None,
+    leverage: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -4439,6 +4464,13 @@ def run_slate(
                 "projection_rows path, not when projections_override is supplied."
                 if platoon_order_by_player_id else "no projected order supplied",
     }
+
+    # R246. The leverage constraints read `Projected_Ownership_Pct` off this
+    # frame, and `run_slate` REASSEMBLES the frame rather than taking the
+    # caller's, so attaching the column upstream would reach the sliced bank and
+    # not this one. Applied here, once, before anything reads the frame; the
+    # three solver keys travel separately to the bank build below.
+    projections, leverage_report = apply_leverage_ownership(projections, leverage)
 
     schema = validate_projection_schema(projections)
     preflight = runtime_preflight()
@@ -4764,6 +4796,14 @@ def run_slate(
                 bank_projections["Excluded"] = False
             mask = bank_projections["Player_ID"].astype(str).isin(set(bank_excludes))
             bank_projections.loc[mask, "Excluded"] = True
+        # R246. The auto-bank path's half of the leverage passthrough. These
+        # cross into `build_candidate_lineup_bank` -> `build_multi_lineup` AND
+        # into the forced-augmentation pass, because the same three keys are on
+        # `build_diverse_candidate_bank`'s `passthrough_keys` whitelist. The
+        # OTHER production bank -- `build_slate.py`'s sliced `extend_bank`,
+        # which arrives here as `candidates_override` and never reaches this
+        # branch -- carries them through `bank_cache._leverage_kwargs`.
+        from mlb_engine.optimize.bank_cache import _leverage_kwargs
         bank = build_diverse_candidate_bank(
             bank_projections, requested_n=n, mode=mode, target="ceiling",
             contest_shapes=sorted(shape_counts) or None,
@@ -4772,6 +4812,7 @@ def run_slate(
             time_budget_s=bank_time_budget_s,
             solver_time_limit_s=solver_time_limit_s,
             excludes=bank_excludes or None,
+            **_leverage_kwargs(leverage),
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
         bank_diag = {
@@ -4846,6 +4887,16 @@ def run_slate(
         "feasibility": checkpoint["feasibility"],
         "exclusions": exclusion_block,
         "slate_clock": clock,
+        # R246. Present on every approved build, `applied: false` when no
+        # leverage was asked for, so "was the ownership prior in this build"
+        # has an answer rather than an absence.
+        "leverage": {
+            **leverage_report,
+            "constraints": {k: (leverage or {}).get(k)
+                            for k in ("max_cumulative_ownership_pct",
+                                      "min_low_owned_hitters",
+                                      "low_owned_threshold_pct")},
+        },
         "candidate_bank": bank_diag,
         "bank_player_coverage": bank_player_coverage,
         "script_routing": script_routing,

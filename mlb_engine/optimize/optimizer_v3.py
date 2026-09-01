@@ -3994,6 +3994,18 @@ def build_diverse_candidate_bank(
     passthrough_keys = {
         'excludes', 'locks', 'penalized_players', 'apply_suppression',
         'solver_backend', 'skip_feasibility_check', 'bringback_constraint',
+        # R246. R154's two leverage constraints have to cross BOTH routes out of
+        # this function or they are not constraints. `**bank_kwargs` already
+        # carries them to `build_candidate_lineup_bank` -> `build_multi_lineup`,
+        # which declares them; this whitelist is what decides whether the
+        # forced-augmentation pass below sees them, and it builds lineups with
+        # its own `build_single_lineup` call. Left off, the base bank would
+        # honour a cumulative-ownership cap and every augmented candidate would
+        # ignore it, with nothing saying so -- R153's "on every rung" shape.
+        # Off unless a caller passes a number, so a build that says nothing
+        # about ownership solves exactly the MILP it solved before.
+        'max_cumulative_ownership_pct', 'min_low_owned_hitters',
+        'low_owned_threshold_pct',
     }
     single_lineup_kwargs = {k: v for k, v in bank_kwargs.items() if k in passthrough_keys}
 

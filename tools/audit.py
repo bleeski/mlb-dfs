@@ -452,7 +452,20 @@ EXPECTED_SUITE_COUNTS = {
     # `proven_infeasible_lineup_indices`, site B still earning its step, and a
     # source guard that the high-water is assigned in exactly one place --
     # R233 made enforceable rather than re-derived by the next reader.
-    "tests.test_core": 998,
+    # R246, 2026-09-01: 998 -> 1016, the eighteen that pin the two leverage
+    # constraints reaching a production caller for the first time. Four on the
+    # engine half (the augmentation whitelist, the sliced bank's forwarding, the
+    # None-omitting kwargs builder, the three-key set), four on the ownership
+    # attach as a FUNCTION rather than an `if` (a disabled branch kept both the
+    # call string and its position, so the only test covering it passed), five
+    # on the operator surface's refusals (absent prediction file, unknown key,
+    # ambiguous archetype, the recorded sha, Showdown), two on the sliced and
+    # auto paths sharing ONE attach, and three on the constraints binding
+    # against a real bank. The sharpest is the shared-function one: with no
+    # `Projected_Ownership_Pct` column the solver's reader falls back to a flat
+    # 12.0 per player, so a cumulative cap of 90 binds against 10 x 12.0 = 120
+    # and reads as working while measuring nothing.
+    "tests.test_core": 1016,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
