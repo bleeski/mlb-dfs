@@ -208,6 +208,35 @@ after the edit — SKILL.md sits outside the gate's tree fingerprint (R216) but
 three `test_core` tests read it, so the suite was re-run rather than the gate
 re-reported.
 
+**Board work in the same commit, because the fragments were sitting unmerged and
+one of them turned out to be about this same shape.** The three 2026-09-01 BUILD
+fragments are merged and produced **one** new number for three findings. **R285
+filed**: `autobuild`'s bank-growth remedy reads
+`brief["solve"]["bank"]["job_list_exhausted"]`, and on the DIRECT path `solve.bank`
+is `null` while `bank_exploration` — the refusal path's own bank block — appears in
+**zero of 21 sampled briefs**, because it is guarded on a `bank_report` only the
+sliced branch assigns. So the fact reaches the operator as a SENTENCE ("78 of 720
+jobs attempted") and is read as a KEY that nothing wrote, the branch never fires,
+and the supervisor stops for a human on the remedy CLAUDE.md's Autonomy section
+lists FIRST as unattended. R153's "on every rung" inside the supervisor, one file
+over from where this commit fixed it for leverage. **The fragment's own stated
+mechanism (branch keyed on exit 10) was FALSE and checking it is what found the
+real one.** R285 was FILED and not built: the allocator's job-grid sentence
+requires a report the direct path's diagnostics do not carry, `autobuild` persists
+neither the subprocess output nor the parsed brief on a stop so `_ab1.out` is 0
+bytes, and the evidence that would say which producer supplied it is gone. The
+reader half of the fix is safe today and the entry says so; the writer half waits
+on the trace. **R238 gains a third sighting** (eight archetypes named on the command
+line, accepted, and `grep -c contest_shape` on the delivered brief returns 0 — the
+answer was supplied and thrown away, which is worse than having nothing to infer
+from) and **the F1 half of its fragment is CLOSED by measurement rather than built**
+(±2% tilt on a one-game slate against ±15% platoon corrections). **R122 gains the
+first measurement of its remainder**: the flat 0.94/1.04 platoon factor was
+directionally wrong for four of eighteen posted hitters on 1940_1g_sd and put a
+.530-vs-LHP bat on a captain slot; the same chain with a sample-shrunk evidence
+multiplier moved him off it, Vaughn 2 -> 5 of 11, review proxy median 53.26 ->
+54.76, zero relaxations either way.
+
 **Truthful labels.** `Projected_Ownership_Pct` is a labeled prior and never a
 measured share; the brief says so beside the sha. The two numbers are the
 CALLER's, defaults unchanged, and nothing here claims a cap improves an outcome —

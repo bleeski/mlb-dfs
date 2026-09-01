@@ -90,6 +90,41 @@ of `ownership_pred_<tag>.json`) found no unwired reader R246 should have touched
 `attach_projected_ownership`, the derived-from-features twin, still has zero
 production callers and that is deliberate.
 
+***The three 09-01 BUILD fragments are MERGED, and they produced ONE new number
+for three findings.*** **R285 filed** (the supervisor's bank-growth remedy reads a
+key the refusal brief does not write). **R238 gains its third sighting** and it is
+the worst one: the operator NAMED eight contest archetypes on the command line,
+the build accepted them, and `grep -c contest_shape` on the delivered brief returns
+0 — the earlier sightings were "inference had nothing to infer from", this one is
+"the answer was supplied and thrown away". **R122 gains the first MEASUREMENT of
+its remainder**, with a delivered consequence: the flat 0.94/1.04 platoon factor
+was directionally WRONG for four of eighteen posted hitters and put a .530-vs-LHP
+bat on a captain slot, and the same chain with a sample-shrunk evidence multiplier
+moved him off it. One number for three fragments, because two of them already had
+a class here.
+
+***R285's own fragment had a FALSE mechanism, and checking it is what found the
+real one.*** The fragment reported the bank-growth branch as keyed on exit 10. It
+is not — there is a second bank-growth branch on the code-3 refusal path that
+already says exactly the right thing. What fails is the READ: the branch tests
+`solve.bank.job_list_exhausted`, and on the direct path `solve.bank` is `null`
+while `bank_exploration`, the refusal path's own bank block, **appears in zero of
+21 sampled briefs** because it is guarded on a `bank_report` that only the sliced
+branch assigns. The fact reaches the operator as a SENTENCE and is read as a KEY.
+That is R153's "on every rung" inside the supervisor, one file over from where
+R246 fixed the same shape for leverage this session.
+
+***And R285 was FILED rather than built, deliberately, with the open question
+named.*** The allocator's "78 of 720 jobs" sentence requires a job-grid report that
+the direct path's own bank diagnostics do not carry, so something handed it one
+and the artifact that would say which is gone — `autobuild` captures the
+subprocess and persists neither the output nor the parsed brief on a stop, so
+`_ab1.out` is 0 bytes. Writing the fix on the remaining guess is R273's failure
+with the roles reversed: there an entry was built on a premise nobody rechecked;
+here the premise was rechecked, came back false, and the honest move is to file
+what is now known and name the one thing that is not. The reader half of the fix
+is safe today and independent of the answer; the entry says so.
+
 *2026-09-01 (second note this date), DEV, claim `engine` (`engine_2026-09-01`,
 re-taken): **R165 and R163 both SHIPPED, two commits with the gate run between
 them. Gate 1562 -> 1572 -> 1577. Slot 3 closes and is REFILLED with R249**; the
@@ -2485,6 +2520,50 @@ the missing half is the complement, by name. Severity follows the
   `mode: points_max_bank` with a reason naming the basis and the posted count.
   None of the rider's three symptoms can occur.
 
+**Rider added 2026-09-01, from BUILD fragment
+`2026-09-01_BUILD_showdown_flat_platoon_factor.md`. This is the FIRST measurement
+of what the flat factor costs, and it names a shape for the fix.** The remainder
+above says the factor is flat and silently so; the fragment says it also points
+the WRONG WAY often enough to move a captain. `apply_base_prior` applies **0.94
+same-handed / 1.04 opposite-handed**, keyed on the two hands alone and never on
+the hitter's own split. On 1940_1g_sd (MIL@CHC, both starters LHP, both sides
+posted, 100+ PA of 2026 vs-LHP on nearly every bat) the flat prior was
+directionally wrong for **four of eighteen posted hitters**, and under-credited
+three more:
+
+| hitter | B | vs-LHP 2026 | engine | evidence | error |
+|---|---|---|---|---|---|
+| Brice Turang | L | .530 OPS, 167 PA | 0.94 | 0.80 | under-penalized 14% |
+| Cooper Pratt | R | .465 OPS, 48 PA | **1.04** | 0.89 | wrong sign |
+| Pete Crow-Armstrong | L | .978 OPS, 201 PA | **0.94** | 1.02 | wrong sign |
+| Jake Bauers | L | .935 OPS, 132 PA | **0.94** | 1.03 | wrong sign |
+| Michael Busch | L | .741 OPS, 182 PA | **0.94** | 1.00 | wrong sign |
+| Carson Kelly | R | .953 OPS, 125 PA | 1.04 | 1.15 | under-credited 11% |
+| Andrew Vaughn | R | 1.009 OPS, 110 PA | 1.04 | 1.10 | under-credited 6% |
+
+**Delivered consequence, which is what makes this P1 rather than a modelling
+preference:** Turang was in 4 of 11 entries **and held a captain slot** at a .530
+vs-LHP OPS, while Vaughn (1.009 vs LHP, $5,400, batting 5th) sat at 2 of 11.
+Re-running the same prior chain with only the platoon factor swapped for a
+sample-shrunk evidence multiplier — `1 + PA/(PA+100) * (OPS_vsL/OPS_overall - 1)`,
+clipped 0.80–1.20 — moved Turang 4 -> 2 and **off the captain slot**, Pratt 2 -> 0,
+Vaughn 2 -> 5, PCA 4 -> 5, and put Bauers on a captain slot. Review proxy median
+53.26 -> 54.76, zero relaxations either way.
+
+**Shape for the fix, and the cost bound that makes it safe:** keep 0.94/1.04 as
+the FALLBACK for a hitter with no sample, and read a per-hitter split where one
+exists. StatsAPI `statSplits` with `sitCodes=vl,vr` returned a season split for 17
+of 18 bats in about 20 seconds. That bound is what scopes this to SHOWDOWN: two
+calls per hitter is fine for one game and is not fine for a 15-game Classic slate,
+so the entry is scoped to the Showdown path deliberately rather than by omission.
+The shrink term is doing real work — Pratt's 48 PA is exactly the sample the flat
+prior is defensible for — so ship the shrink with the read, not after it.
+
+**Also measured in the same fragment and worth carrying:** `max_shared_players=3`
+is infeasible on a Showdown pool this size and the engine says so honestly —
+tightening 4 -> 3 returned `overlap_relaxed_slots: 2` and `max_pairwise_overlap: 4`
+anyway. No defect; recorded so nobody re-derives it under a clock.
+
 ### R123. The Showdown ladder has no per-player exposure cap, relaxes the captain cap untargeted, and deals contests in ladder order (P1, S-M) | new 2026-08-14, merged from the same fragment, findings 2-4
 
 - **(a) Per-player exposure cap + small-sample guard.** `solve_ladder`
@@ -2794,6 +2873,31 @@ and R10's conditioning key is absent from every Showdown build the archive
 accumulates. Two of the nine names on 1905_1g_sd are also absent from
 `dk_contest_archetypes.csv`, so name inference would not have covered them.
 
+**Rider added 2026-09-01, from BUILD fragment
+`2026-09-01_BUILD_showdown_f1_and_archetype.md` §2 — THIRD sighting, and this one
+sharpens the cost.** On 1940_1g_sd the operator supplied `--postures` on the
+command line with **eight contest IDs named explicitly** (five `wta_satellite`,
+one `small_gpp`, one `single_entry`, one `large_gpp`). The build ACCEPTED them
+without blocking and `grep -c contest_shape` on the delivered brief returns **0**,
+so `qa_portfolio` reported all 8 as UNRESOLVED and declined to condition ownership
+on an archetype — correctly, since it will not default. **The earlier sightings
+were "inference had nothing to infer from"; this one is "the answer was supplied
+and thrown away"**, which is a worse failure and it is silent: accepting a flag
+whose value never reaches the artifact is R242's shape, and an operator who typed
+the archetypes has every reason to believe they took. Carry the posture into the
+brief's `per_contest` rows; it is known at build time.
+
+**The F1 half of that fragment is CLOSED by measurement, not built** (the sibling
+fragment did the arithmetic while checking something else). On a one-game slate
+the F1 tilt is bounded by construction: delivered odds total 10.0, consensus
+no-vig CHC .5298 / MIL .4702, implied team totals 5.10 and 4.90 against a slate
+mean of 5.00, so hitter F1 would be **CHC 1.021 / MIL 0.979** — a ±2% tilt, against
+platoon corrections reaching ±15% on the same build. Wiring F1 into
+`price_showdown_pool` is not worth it for a one-game slate. What IS owed is one
+sentence in the Showdown brief saying F1 is out of scope and why, so the next
+reviewer is not left inferring it from an absent `enrichment` key — which is R237's
+"absence of a key is not an answer" on a third surface. That sentence rides here.
+
 **Why.** A top-heavy single-entry contest and a one-ticket satellite want
 different things from the same bank, and today the build cannot tell them
 apart. This is the INPUT for R239's shape-aware half and for any per-contest
@@ -3091,6 +3195,98 @@ a leveraged parent either preserves the cap or names that it did not. Falsifier:
 if the pinned pool makes any useful cap infeasible past ~4 pins, the honest
 outcome is the rider alone and the item closes at report-only. Owner: none.
 Rollback: drop the kwarg.
+
+### R285. The supervisor's bank-growth remedy reads a key the refusal brief does not write, so on the direct path it can never fire and autobuild stops for a human on the one remedy CLAUDE.md lists FIRST as unattended (P1, S) | new 2026-09-01, merged from BUILD fragment `2026-09-01_BUILD_autobuild_exit3_bank_growth.md`; **the fragment's own mechanism is FALSE and the real one is below**, verified in tree and against the delivered artifacts
+
+**What happened.** Slate 2026-09-01 1840_6g, Classic turbo, 6 games, 9 entries.
+`tools/autobuild.py` attempt 1 stopped with `"refused with no remedy this
+supervisor may take"` while `outputs/2026-09-01/autobuild_decisions.json` records,
+in its own `errors` array, the engine having said:
+
+> `[BANK JOB LIST NOT EXHAUSTED -- see remedies below before relaxing any control]`
+> … `FIRST REMEDY, grow the bank: the job list was NOT exhausted (78 of 720 jobs
+> attempted, 10.8%) … Re-run the same build command; it exits 10 and resumes into
+> the same cache until the job list is exhausted.`
+
+A manual re-run of the identical command with a larger `--max-seconds` exhausted
+the job list in one call, and the refusal then came back WITHOUT the not-exhausted
+clause — which is the state R157's exposure-cap rescue requires before it may be
+applied. Cost was one call and about two minutes against 50 minutes of clock; on a
+12-game slate at T-15 it is the build.
+
+**The fragment's mechanism is FALSE, and checking it is what found the real one.**
+It reports the bank-growth branch as keyed on exit 10. It is not: `autobuild.py:390`
+handles exit 10, and there is a SECOND, separate bank-growth branch at **`:420` on
+the code-3 refusal path**, which is exactly the branch the fragment wanted and
+which already carries the right words ("refusal against a partial bank; the
+engine's first remedy is always to grow it, never to relax a control"). The
+supervisor's policy is right. **What fails is the read.**
+
+**The real mechanism: the fact is written in prose and read as a key, and the key
+has no writer on this path.** `:420` tests
+`brief["solve"]["bank"]["job_list_exhausted"] is False`. Measured on the delivered
+artifacts at this head:
+
+- `build_brief_1840_6g.json` (the refusal) has **no `solve` key at all** and **no
+  `bank_exploration` key**. Its `errors` array carries the counts as a SENTENCE.
+- `solve.bank` is written at `build_slate.py:2128` and is **`null` on the direct
+  path** — confirmed on `build_brief_final.json`, a CERTIFIED build, whose
+  `solve` block reads `['strategy','single_lineup_s','bank_budget_floored','bank']`
+  with `bank: null`. The comment at `:2124` says so outright: "`bank` is None on
+  the direct path".
+- `bank_exploration` (the refusal path's own bank block, `build_slate.py:2014`) is
+  guarded by `if bank_report is not None`, and `bank_report` is initialised None at
+  `:1798` and assigned only at `:1810`, inside the SLICED branch. **Sampled 21
+  briefs from 2026-08-3x and 2026-09-01: `bank_exploration` appears in ZERO of
+  them.**
+
+So `(brief.get("solve", {}) or {}).get("bank", {}) or {}` evaluates to `{}`,
+`.get("job_list_exhausted")` is `None`, `None is False` is False, and the branch is
+skipped. **It works on the sliced bank and not on the direct one** — R153's "on
+every rung", in the supervisor, one file over from where R246 just fixed the same
+shape for leverage.
+
+**The one OPEN question, and it must be closed before the fix is written.** The
+allocator composes that 720-job sentence at `contest_allocator.py:2808` from a
+`bank_report` whose `job_list_exhausted` is False — a job-grid report that only
+`extend_bank` produces. But the direct path's `bank_diag`
+(`execution_pipeline.py:4818`) carries no `job_list_exhausted`, no `jobs_attempted`
+and no `jobs_total`, because `build_diverse_candidate_bank` has no job list.
+**So something handed the allocator a job-grid report on a build whose
+`build_slate` local `bank_report` was None**, and until that is traced the writer
+half of the fix is aimed at a guess. The candidates are `caller_bank_diagnostics`
+(`:4422`, popped from metadata) and the plan leg's own sliced bank (`:3446`).
+Autobuild captures the subprocess with `capture_output=True` and persists neither
+the output nor the parsed brief on a stop, so `_ab1.out` is **0 bytes** and the
+evidence for attempt 1 no longer exists — which is a finding in its own right and
+the rider below.
+
+**Fix, in the order the open question allows.**
+1. Trace which producer supplied the allocator's report on the direct path. One
+   build with the subprocess output kept answers it.
+2. **Reader half, safe today and independent of (1):** the supervisor reads bank
+   exhaustion through ONE extractor over the brief, checking `solve.bank`, then
+   `bank_exploration`, then `bank_diagnostics` — rather than one hard-coded path.
+   R233's class is every consumer of bank exhaustion off a BRIEF (as distinct from
+   off a report), and `build_slate.py:199`, `late_swap.py:290` and
+   `autobuild.py:420` are three readers of one fact that do not share a definition.
+3. **Writer half, once (1) is closed:** the refusal brief carries the bank facts on
+   BOTH paths, so `bank_exploration` stops being a key that exists in zero briefs
+   and `infeasibility_hint` stops being fed `None` on the direct path.
+
+**Rider, independent and cheap: a `stop` should persist what it stopped on.**
+`autobuild` writes `autobuild_decisions.json` on a stop but keeps neither the
+subprocess stdout/stderr nor the parsed brief, so the artifact that would settle
+question (1) was discarded at the moment it became interesting. Write both beside
+the decisions file on any non-zero exit.
+
+**Audit fields.** Moves: search effort only — bank growth is explicitly search
+effort and never strategy (CLAUDE.md Autonomy), so no delivered lineup changes for
+a reason a human did not choose. Acceptance: a direct-path refusal against an
+unexhausted job list makes the supervisor grow the bank instead of stopping.
+Falsifier: if (1) shows the direct path genuinely cannot carry a job list, then the
+correct fix is the READER only plus an honest "no job list on this path" in the
+brief, and the entry closes smaller. Owner: none. Rollback: revert the extractor.
 
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 
