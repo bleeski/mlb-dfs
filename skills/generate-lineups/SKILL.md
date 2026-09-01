@@ -243,11 +243,17 @@ python tools/ownership_pred.py emit --salary <DKSalaries.csv> \
 # -> outputs/<date>/ownership_pred_<tag>.json
 ```
 
-Why it is not optional even though nothing reads it today: a slate that passes
-without a prediction file can never be graded, so skipping it does not defer the
-cost, it destroys the evidence. R10's bar is a fitted ownership prior that beats
-flat-12 in the satellite cell, graded into the ledger, and this is what starts
-that record accumulating now instead of on the day the fit begins.
+Why it is not optional: a slate that passes without a prediction file can never
+be graded, so skipping it does not defer the cost, it destroys the evidence.
+R10's bar is a fitted ownership prior that beats flat-12 in the satellite cell,
+graded into the ledger, and this is what starts that record accumulating now
+instead of on the day the fit begins.
+
+**Since R246 (2026-09-01) this file is also a BUILD input, not only a grading
+artifact.** The sentence here read "nothing reads it today" until that date and
+it is no longer true: `--leverage` reads this exact file. Emitting it before
+lock is now the precondition for the only lever that moves the portfolio off
+chalk, so the reason to run it got stronger rather than going away.
 
 It reads the same inputs the build does and reports each one as applied or INERT.
 Read that block: `implied_totals INERT` means every hitter fell back to a league
@@ -261,8 +267,53 @@ produces one. If you have already built and there is still time before lock, add
 `Player_ID` and `Base` columns this reads. Without it the tilt is inert and the
 prediction is salary, order, implied total and probable-SP only.
 
-Nothing here reaches the optimizer, projections, or `Ownership_Tier`. It is an
-UNCALIBRATED STRUCTURAL PRIOR and the file says so on every read.
+Emitting reaches nothing on its own: no projection, no `Ownership_Tier`, no
+solver row. It is an UNCALIBRATED STRUCTURAL PRIOR and the file says so on every
+read. What changed at R246 is that a SECOND, opt-in step can now feed it to the
+solver, and that step is the next section.
+
+### Leverage: the two constraints that move a portfolio off chalk (R246, opt-in)
+
+Default OFF, and it stays off unless Ben asks. When he does ask to get off chalk
+— and he has asked in-slate more than once — this is the answer, and it is a
+flag now rather than an engine edit the contract forbids mid-slate.
+
+```bash
+python skills/generate-lineups/scripts/build_slate.py ... \
+    --leverage '{"max_cumulative_ownership_pct": 90, "min_low_owned_hitters": 2}'
+```
+
+It reads the slate's own `outputs/<date>/ownership_pred_<tag>.json` (the file the
+step above emits), writes `Projected_Ownership_Pct` onto the frame, and forwards
+the numbers to the solver on **both** bank routes. Name the file explicitly with
+`--ownership-pred <path>` when resolution is ambiguous.
+
+Five things to know before you use it:
+
+- **Emit the prediction file FIRST.** With no file it REFUSES and names the path
+  rather than building unconstrained. That refusal is the feature: a leverage
+  build that silently ignored the flag is the failure this item exists to end.
+- **`max_cumulative_ownership_pct` is the sum over ten slots**, so an
+  unconstrained lineup lands near 100-105 and a cap of 90 is a real bind.
+  Measured on 1605_2g: cap 90 cost **-7.72%** of the single-lineup objective, cap
+  80 cost **-32.50%**, cap 75 was INFEASIBLE. Start at 90-95, not at 80.
+- **`min_low_owned_hitters` has a hard infeasibility edge**, at 6 on that same
+  pool. If the build refuses, lower the floor before you touch the cap; they are
+  independently settable for exactly this reason.
+- **The bank returns FEWER candidates under a cap at a fixed budget** (6 -> 4
+  measured). That is search effort, not a pool reduction, and on a tight clock it
+  means giving the bank more budget, never trimming the pool.
+- **It is a DIRECTION TO TEST, never a number to apply.** The prior is
+  uncalibrated and within-file ORDER is what it supports; ledger 3.17 has
+  supersatellites chalk-NEGATIVE for winners, so a cap is wrong for that
+  archetype. Record what you used in the brief (it does this itself, with the
+  file's sha256) so the next slate has something to compare against.
+
+Showdown refuses the flag before staging, because the Showdown bank builds no
+ownership row and accepting it there would be a silent no-op. **Late swap cannot
+carry it either** (R284, open): a portfolio delivered under a cap is refined by a
+bank that never saw the cap, so say so rather than implying the delivered file's
+leverage survived a swap.
 
 ### Projection enrichment (this is what makes the build more than APPG)
 
@@ -865,6 +916,14 @@ failure: on 2026-07-29 that mistake cost twenty minutes because the two failures
 printed the same sentence. The swap also inherits the parent build's posture-based
 caps now, so you should not need `--controls-override` at all unless the parent
 build itself used one.
+
+**What the swap does NOT inherit is leverage (R284, open).** The swap builds its
+candidates with no `max_cumulative_ownership_pct` and no `min_low_owned_hitters`,
+whatever the parent was built under, so a portfolio delivered at cap 90 comes back
+from a refinement with no cap on the entries the swap touched. Nothing false is
+reported — the control is absent, not applied against the wrong number — but if
+Ben asked for leverage on the build, say plainly that the swapped entries are not
+carrying it rather than letting the parent's brief speak for the new file.
 
 Details in `references/late_swap.md`.
 

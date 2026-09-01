@@ -188,6 +188,26 @@ against, this commit measured a real infeasibility edge on a FULL pool, and a
 refusal inside a lock window is worse than an unconstrained refinement. The entry
 carries the measurement it needs first, and a report-only rider that is safe today.
 
+**Rider, second commit the same date: `skills/generate-lineups/SKILL.md`, and it
+is a correction as much as an addition.** Two sentences there became FALSE the
+moment this shipped — "nothing reads it today" on the ownership-prediction emit
+step, and "Nothing here reaches the optimizer, projections, or `Ownership_Tier`"
+at the end of it. Both dated from when the prediction file was a grading artifact
+only. The step's reason to exist got STRONGER (it is now the precondition for the
+only lever that moves a portfolio off chalk) while its own documentation said the
+opposite, which is the stale-doc shape this repo keeps paying for. The new section
+is operator-facing and carries numbers rather than a flag list, because it is read
+under a clock: emit first or it refuses with the path named; the cap is a SUM over
+ten slots, so unconstrained lands near 100-105 and 90 is a real bind; 1605_2g's
+measured cost per cap so nobody starts at 80; the floor's infeasibility edge with
+the instruction to lower the floor before touching the cap; and the bank's smaller
+candidate count answered with budget and never with a smaller pool. R284 is named
+in TWO places, the second being the late-swap section, because that is where an
+operator reads during the window in which it matters. `tests.test_core` 1016 OK
+after the edit — SKILL.md sits outside the gate's tree fingerprint (R216) but
+three `test_core` tests read it, so the suite was re-run rather than the gate
+re-reported.
+
 **Truthful labels.** `Projected_Ownership_Pct` is a labeled prior and never a
 measured share; the brief says so beside the sha. The two numbers are the
 CALLER's, defaults unchanged, and nothing here claims a cap improves an outcome —
