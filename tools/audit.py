@@ -667,7 +667,23 @@ EXPECTED_SUITE_COUNTS = {
     # `upload_ready` on a loose file carrying NO manifest, which is the reserved
     # label on zero evidence -- the assertion was inverted, not loosened, and the
     # exit-code claim it exists for is untouched.
-    "tests.test_upload_integrity": 306,
+    # R267(a) + R272, 2026-08-31: 306 -> 321, the fifteen that pin the
+    # single-slot repair filter -- the one-slot search finding the answer the
+    # bank structurally could not, each of the six constraints removing exactly
+    # the row it is for, the opposing-SP constraint (which `verify_export`
+    # caught in the hand-built 1305_12g repair) refusing rather than shipping,
+    # the DEAD player not barring his own replacements, a no-legal-replacement
+    # refusal carrying its census and exiting 2, a refusal OUTRANKING the
+    # dry-run exit code (R176's rider in a new tool), the tool picking the mode
+    # on pin count rather than the caller (R267(b)), R267(c) asserted against
+    # the source because it is the whole safety argument for R272's contract
+    # clause, the observed tier barring a player who has already not started,
+    # the review-grade labelling, slot eligibility having ONE owner shared with
+    # this file's own checker, and an AMBIGUOUS --dead name refusing rather
+    # than taking the first hit (the mutation survivor: the guard existed and
+    # only the zero-hit half was tested, while R75 has this repo carrying two
+    # Luis Garcias).
+    "tests.test_upload_integrity": 321,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

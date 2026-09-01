@@ -5325,3 +5325,310 @@ class R234PersonKeyTests(unittest.TestCase):
                               pf.load_salary(salary), rep)
             self.assertEqual(
                 [f for f in rep.failures if "same person" in f], [], rep.failures)
+
+
+class SingleSlotRepairTests(unittest.TestCase):
+    """R267(a). The one-slot search `late_swap` structurally cannot perform.
+
+    The refusal it answers is `contest_allocator.py:2394`, and it is NOT a
+    search-effort problem: on `1305_12g` the bank went 566 -> 1425 candidates
+    across six invocations and the message never changed, because more whole
+    lineups do not make a 9-pin prefix more likely. Entry 5234627043 had 9 of
+    10 slots locked, only P2 open and $5,300 of cap, and the engine spent ~13
+    minutes failing to find a one-slot answer because it was searching the
+    wrong object. These fixtures reproduce that shape.
+    """
+
+    OPEN = "COL@ARI 08/29/2026 09:40PM ET"
+    LOCK = "STL@CHC 08/29/2026 04:05PM ET"
+    ROWS = [
+        # (id, name, roster position, team, salary, appg, game)
+        ("9001", "Sonny Gray", "P", "STL", 9000, 18.0, LOCK),
+        ("9002", "Willson Contreras", "C", "STL", 4500, 8.0, LOCK),
+        ("9003", "Nolan Gorman", "2B", "STL", 4000, 7.5, LOCK),
+        ("9004", "Nolan Arenado", "3B", "STL", 4200, 8.2, LOCK),
+        ("9005", "Masyn Winn", "SS", "STL", 3800, 7.0, LOCK),
+        ("9006", "Lars Nootbaar", "OF", "STL", 4300, 8.1, LOCK),
+        ("9007", "Ian Happ", "OF", "CHC", 4100, 7.9, LOCK),
+        ("9008", "Seiya Suzuki", "OF", "CHC", 4400, 8.4, LOCK),
+        ("9009", "Michael Busch", "1B", "CHC", 4600, 9.0, LOCK),
+        ("9100", "Ryan Feltner", "P", "COL", 5200, 10.0, OPEN),
+        ("9101", "Daniel Lynch IV", "P", "COL", 5400, 12.5, OPEN),
+        ("9102", "Zac Gallen", "P", "ARI", 5300, 14.0, OPEN),
+        ("9103", "Overpriced Ace", "P", "COL", 9900, 30.0, OPEN),
+        ("9104", "Unconfirmed Arm", "P", "COL", 5000, 20.0, OPEN),
+        ("9105", "Locked Arm", "P", "STL", 5000, 25.0, LOCK),
+        ("9106", "Bench Bat", "OF", "COL", 5000, 22.0, OPEN),
+        ("9107", "Ronald Acuna Jr.", "OF", "ARI", 5000, 11.0, OPEN),
+    ]
+    LINEUP = ["9001", "9100", "9002", "9009", "9003",
+              "9004", "9005", "9006", "9007", "9008"]
+
+    def setUp(self):
+        import repair_entry
+        self.re = repair_entry
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary_path = self.dir / "DKSalaries.csv"
+        self.entries_path = self.dir / "DKEntries.csv"
+        self.feed_path = self.dir / "lineups_feed.json"
+        self._write_salary()
+        self._write_entries()
+        self._write_feed()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write_salary(self, rows=None):
+        header = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+                  "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame"]
+        with self.salary_path.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(header)
+            for pid, name, pos, team, sal, appg, game in (rows or self.ROWS):
+                w.writerow([pos.split("/")[0], f"{name} ({pid})", name, pid,
+                            pos, sal, game, team, appg])
+
+    def _write_entries(self, lineup=None):
+        names = {r[0]: r[1] for r in self.ROWS}
+        header = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+                  "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        cells = [f"{names[p]} ({p})" for p in (lineup or self.LINEUP)]
+        with self.entries_path.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(header)
+            w.writerow(["5234627043", "Test GPP", "1111", "$5"] + cells)
+
+    def _write_feed(self):
+        feed = {"date": "2026-08-29", "fetched_at": "2026-08-29T23:30:00Z", "games": [
+            {"game_pk": 1, "game_date_utc": "2026-08-30T01:40:00Z",
+             "status": "Scheduled", "venue": "Chase",
+             "away": {"team_abbrev": "COL", "lineup_status": "confirmed", "lineup": [],
+                      "probable_pitcher": {"name": "Daniel Lynch IV", "id": 1}},
+             "home": {"team_abbrev": "ARI", "lineup_status": "confirmed",
+                      "lineup": [{"name": "Ronald Acuna Jr.", "order": 1}],
+                      "probable_pitcher": {"name": "Zac Gallen", "id": 2}}},
+            {"game_pk": 2, "game_date_utc": "2026-08-29T20:05:00Z",
+             "status": "In Progress", "venue": "Busch",
+             "away": {"team_abbrev": "STL", "lineup_status": "confirmed",
+                      "lineup": [{"name": "Willson Contreras", "order": 1}],
+                      "probable_pitcher": {"name": "Sonny Gray", "id": 3}},
+             "home": {"team_abbrev": "CHC", "lineup_status": "confirmed",
+                      "lineup": [], "probable_pitcher": None}}]}
+        self.feed_path.write_text(json.dumps(feed), encoding="utf-8")
+
+    def _run(self, *extra, dead=("Ryan Feltner",)):
+        args = ["--entries", str(self.entries_path), "--salary", str(self.salary_path),
+                "--feed", str(self.feed_path), "--as-of", "2026-08-29T23:40:00Z",
+                "--dry-run", "--json"]
+        for d in dead:
+            args += ["--dead", d]
+        args += list(extra)
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = self.re.main(args)
+        return code, json.loads(buf.getvalue())
+
+    def test_the_one_slot_search_finds_the_answer_the_bank_could_not(self):
+        code, out = self._run()
+        self.assertEqual(code, 4, "dry-run exits 4, never 0")
+        self.assertEqual(len(out["repairs"]), 1)
+        r = out["repairs"][0]
+        self.assertEqual(r["out_name"], "Ryan Feltner")
+        self.assertEqual(r["in_name"], "Zac Gallen")
+        self.assertEqual(r["runner_up"], "Daniel Lynch IV")
+        self.assertGreater(r["projection_delta"], 0)
+
+    def test_every_constraint_removes_exactly_the_row_it_is_for(self):
+        """The census is the argument. A refusal an operator cannot interrogate
+        under a lock clock is a refusal they will override."""
+        _, out = self._run()
+        census = out["repairs"][0]["rejection_census"]
+        self.assertEqual(census["over_headroom"], 2)      # the $9,900 ace, Gray
+        self.assertEqual(census["team_locked"], 1)        # the STL arm
+        self.assertEqual(census["not_confirmed"], 1)      # no feed evidence
+        self.assertEqual(census["slot_ineligible"], 10)   # every non-P row
+        self.assertEqual(census["eligible"], 2)
+
+    def test_a_candidate_opposing_a_rostered_SP_is_refused(self):
+        """`verify_export` caught exactly this in the hand-built `1305_12g`
+        repair, so the constraint is load-bearing, not decorative.
+
+        Gallen (ARI) takes P1, so every COL arm now opposes a rostered SP --
+        including the $9,900 ace that the freed salary would otherwise afford
+        and that outprojects the whole pool. The correct answer here is a
+        REFUSAL, and the constraint is what produces it."""
+        lineup = list(self.LINEUP)
+        lineup[0] = "9102"          # Gallen (ARI) takes P1; Feltner stays P2
+        self._write_entries(lineup)
+        code, out = self._run()
+        self.assertEqual(out["repairs"], [],
+                         "no legal arm survives once every COL candidate "
+                         "opposes the rostered ARI starter")
+        self.assertEqual(len(out["refusals"]), 1)
+        census = out["refusals"][0]["rejection_census"]
+        self.assertEqual(census["eligible"], 0)
+        # The census is FIRST-MATCH, not full attribution: the $9,900 ace and
+        # the unconfirmed arm are both COL and both would oppose Gallen, but
+        # each is removed by an earlier constraint and counted there. Only
+        # Lynch IV -- affordable, unlocked, confirmed -- reaches this one, and
+        # asserting 3 here would be asserting a census this tool does not keep.
+        self.assertEqual(census["opposes_rostered_sp"], 1)
+        self.assertEqual(census["not_confirmed"], 2)
+
+    def test_the_dead_player_does_not_bar_his_own_replacements(self):
+        """He is LEAVING the entry, so the game he was in stops being a
+        conflict. Counting him barred every ARI candidate from the COL arm's
+        own search on the first cut -- a constraint enforced against a state
+        that will not exist once the write lands."""
+        _, out = self._run()
+        self.assertEqual(out["repairs"][0]["rejection_census"]["opposes_rostered_sp"], 0)
+        self.assertEqual(out["repairs"][0]["in_team"], "ARI")
+
+    def test_no_legal_replacement_refuses_with_the_census_and_exits_2(self):
+        rows = [r for r in self.ROWS if r[0] not in {"9101", "9102"}]
+        self._write_salary(rows)
+        args = ["--entries", str(self.entries_path), "--salary", str(self.salary_path),
+                "--feed", str(self.feed_path), "--as-of", "2026-08-29T23:40:00Z",
+                "--dead", "Ryan Feltner", "--out", str(self.dir / "o.csv"), "--json"]
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = self.re.main(args)
+        out = json.loads(buf.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(len(out["refusals"]), 1)
+        self.assertTrue(out["refusals"][0]["rejection_census"])
+
+    def test_an_ambiguous_dead_name_refuses_rather_than_guessing(self):
+        """Under a lock clock the wrong guess is a second dead slot."""
+        code, _ = 0, None
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = self.re.main(
+                ["--entries", str(self.entries_path), "--salary", str(self.salary_path),
+                 "--feed", str(self.feed_path), "--dead", "Not A Real Player",
+                 "--dry-run", "--json"])
+        self.assertEqual(code, 3)
+
+    def test_the_tool_picks_the_mode_on_pin_count_not_the_caller(self):
+        """R267(b). An entry with more open slots than pins still belongs to the
+        whole-lineup solve, which optimises jointly."""
+        self.assertEqual(self.re.choose_mode(open_n=1, pinned=9), "repair")
+        self.assertEqual(self.re.choose_mode(open_n=8, pinned=2), "defer")
+        self.assertEqual(self.re.choose_mode(open_n=5, pinned=5), "repair")
+
+    def test_an_entry_with_freedom_is_deferred_rather_than_repaired(self):
+        _, out = self._run("--mode", "defer")
+        self.assertEqual(out["repairs"], [])
+        self.assertEqual(len(out["deferred"]), 1)
+        self.assertIn("whole-lineup solve", out["deferred"][0]["reason"])
+
+    def test_it_touches_no_portfolio_control(self):
+        """R267(c), and it is the whole safety argument for the CLAUDE.md repair
+        clause. If this ever fails, the contract edit built on top of it has to
+        be revisited in the same commit."""
+        source = Path(self.re.__file__).read_text(encoding="utf-8")
+        for control in ("max_player_exposure_pct", "max_pitcher_exposure_pct",
+                        "max_primary_stack_exposure_pct", "max_cpt_exposure_pct",
+                        "max_shared_players", "portfolio_controls",
+                        "stack_plan", "posture"):
+            self.assertNotIn(control, source.replace(
+                '"portfolio_controls_touched": [],  # R267(c): structurally '
+                'empty, and asserted.', ""),
+                f"the repair filter must not read or write {control}")
+        _, out = self._run()
+        self.assertEqual(out["portfolio_controls_touched"], [])
+
+    def test_the_observed_tier_bars_a_player_who_has_already_not_started(self):
+        """R270(b) is the confirmed-starter source after first pitch, and the
+        record outranks the feed: a player the boxscore says did not start
+        cannot be repaired INTO an entry however confirmed the feed calls him."""
+        box = {"games": [{
+            "gameData": {"game": {"pk": 1},
+                         "status": {"abstractGameState": "Live",
+                                    "detailedState": "In Progress"},
+                         "teams": {"away": {"abbreviation": "COL"},
+                                   "home": {"abbreviation": "ARI"}},
+                         "players": {"ID7": {"person": {"id": 7,
+                                                        "fullName": "Ronald Acuna Jr."}}}},
+            "liveData": {"boxscore": {"teams": {
+                "away": {"battingOrder": [], "pitchers": []},
+                "home": {"battingOrder": [7], "pitchers": [7]}}}}}]}
+        path = self.dir / "boxscores.json"
+        path.write_text(json.dumps(box), encoding="utf-8")
+        _, out = self._run("--boxscores", str(path))
+        r = out["repairs"][0]
+        self.assertGreaterEqual(r["rejection_census"]["did_not_start"], 1,
+                                "Gallen's game is underway and he is not in the "
+                                "observed set: that is an observation")
+        self.assertEqual(r["in_name"], "Daniel Lynch IV",
+                         "COL has not started, so its arms stay `unobserved` "
+                         "and fall through to the feed")
+
+    def test_output_is_labelled_review_grade_and_never_certified(self):
+        source = Path(self.re.__file__).read_text(encoding="utf-8")
+        self.assertIn("REVIEW-GRADE", source)
+        self.assertNotIn("upload_ready", source)
+        for gate in ("workflow_valid", "selection_certified", "allocation_certified"):
+            self.assertNotIn(gate, source)
+
+    def test_a_refusal_outranks_the_dry_run_exit_code(self):
+        """R176's rider in a new tool: an exit code that reports the MODE over
+        the finding hides the finding. 4 means clean-and-unwritten, never
+        merely unwritten."""
+        rows = [r for r in self.ROWS if r[0] not in {"9101", "9102"}]
+        self._write_salary(rows)
+        code, out = self._run()
+        self.assertEqual(len(out["refusals"]), 1)
+        self.assertEqual(code, 2, "the refusal outranks --dry-run's 4")
+        self.assertIsNone(out["written"])
+
+    def test_slot_eligibility_has_ONE_owner_shared_with_the_preflight(self):
+        """R267(a)'s R233 enumeration. The chooser and the checker must derive
+        eligibility from the same function: a chooser that drifts looser picks
+        a player the preflight then rejects, under a lock clock."""
+        import preflight_upload
+        self.assertIs(self.re.slot_admits, preflight_upload.slot_admits)
+        source = Path(self.re.__file__).read_text(encoding="utf-8")
+        self.assertNotIn('"Roster Position") or "").split("/")', source,
+                         "the repair filter must not carry a second copy of "
+                         "the slash-token eligibility rule")
+        row = {"Roster Position": "OF/1B"}
+        self.assertTrue(preflight_upload.slot_admits(row, "1B"))
+        self.assertTrue(preflight_upload.slot_admits(row, "of"))
+        self.assertFalse(preflight_upload.slot_admits(row, "P"))
+
+    def test_an_AMBIGUOUS_dead_name_refuses_rather_than_taking_the_first_hit(self):
+        """The case the first mutation pass left unproven, and it is a live one
+        here: R75 has this repo carrying two Luis Garcias. A `--dead` name
+        matching two salary rows must REFUSE -- under a lock clock the wrong
+        guess is a second dead slot, not a saved round trip, and 'took the
+        first hit' is indistinguishable in the output from 'resolved it'."""
+        rows = list(self.ROWS) + [
+            ("9200", "Luis Garcia", "P", "COL", 5100, 11.0, self.OPEN),
+            ("9201", "Luis Garcia", "P", "ARI", 5150, 11.5, self.OPEN)]
+        self._write_salary(rows)
+        resolved, unresolved = self.re.resolve_dead_players(
+            ["Luis Garcia"], self.re.load_salary(self.salary_path))
+        self.assertEqual(resolved, [])
+        self.assertEqual(len(unresolved), 1)
+        self.assertIn("2 salary rows", unresolved[0])
+        code = self.re.main(
+            ["--entries", str(self.entries_path), "--salary", str(self.salary_path),
+             "--feed", str(self.feed_path), "--dead", "Luis Garcia", "--dry-run"])
+        self.assertEqual(code, 3, "an unresolved --dead token refuses")
+
+    def test_an_unambiguous_dead_name_and_a_bare_id_both_resolve(self):
+        """The other side of the same guard, so the refusal above cannot be
+        satisfied by a tool that refuses everything."""
+        salary = self.re.load_salary(self.salary_path)
+        by_name, _ = self.re.resolve_dead_players(["Ryan Feltner"], salary)
+        by_id, _ = self.re.resolve_dead_players(["9100"], salary)
+        self.assertEqual(by_name, ["9100"])
+        self.assertEqual(by_id, ["9100"])

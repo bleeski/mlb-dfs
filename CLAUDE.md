@@ -118,8 +118,51 @@ What you may do unattended, because the engine has already classified it:
   "WHAT IT WILL NOT DO, EVER"); until it does, this is manual
   `--controls-override` reasoning, not the supervisor's own loop.
 
+**Repair is not strategy (R272, Ben 2026-08-29).** His instruction, quoted
+because it is the reason this clause exists: *"you made me intervene by
+answering questions and I want you to make those changes autonomously."* With a
+dead pitcher in 10 of 31 entries and locks at 16:05 and 16:10, BUILD raised two
+questions at 15:16 and both came back "recommended option" — the tell that the
+question was the session's to decide, and asking it spent Ben's clock inside a
+lock window. The section above classifies by what the ENGINE named and by
+strategy-vs-feasibility, so a scratched player fell through to "ask." Four
+additions, all autonomous:
+- **Replacing a player who will not play is a REPAIR, not a strategy change.**
+  A scratched arm, a bat absent from a posted lineup, an IL/OUT status. The
+  entered set already contains a zero; leaving it there is not the conservative
+  choice, it is the damaging one.
+- **Choosing among the legal replacements is autonomous.** Legality is
+  mechanical and enumerable: DK slot eligibility, salary cap, game not yet
+  locked, confirmed starter, not already rostered, not opposing a rostered SP.
+  Rank survivors by the build's own projection (APPG where no Base exists) and
+  take the top one. `tools/repair_entry.py` is that filter and it prints a
+  first-match rejection census, so a refusal can be argued with rather than
+  overridden.
+- **A collateral downgrade needed to afford a repair is autonomous when it is
+  the minimum-loss one.** Pick the open-game hitter swap costing the least
+  projection and record it.
+- **Shipping a hand-corrected file is autonomous when the engine cannot produce
+  one and both `verify_export.py` and `preflight_upload.py` exit 0.** Labeled
+  review-grade, never certified; full diff against the parent reported; sha256
+  stated. A preflight-clean repair beats an engine-certified file carrying ten
+  dead slots.
+
+The safety argument is narrow and it is checkable: **`repair_entry.py` touches
+no portfolio control** (R267(c)), so none of the above can move exposure, a
+stack plan or an overlap bound as a side effect. `SingleSlotRepairTests.
+test_it_touches_no_portfolio_control` asserts that against the source. If a
+change ever makes the repair path read one, this clause has lost its argument
+and the two are revisited together, in the same commit.
+
 What stays hard, and is not reopened by this section:
-- The money-and-entry wall and the manual-DK rule.
+- The money-and-entry wall and the manual-DK rule. Nothing in the repair clause
+  touches them: a repair writes a FILE, and Ben still uploads it by hand.
+- Any exposure or stack change with **no dead player behind it**. The repair
+  clause is licensed by a scratch; without one it does not apply, and the
+  strategy bullet below governs.
+- Anything needing `--force`, or leaving a gate failing.
+- Any reduction of the legal player pool, for any reason (restated because a
+  repair is the moment it would be tempting).
 - Truthful labels. Ben wrote that rule; autonomy does not license a
   probability claim, and the proxies below are proxies.
 - The preflight before upload, and blank reserved rows.
@@ -317,7 +360,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1520 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1535 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

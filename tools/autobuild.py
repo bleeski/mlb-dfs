@@ -34,6 +34,15 @@ WHAT IT WILL NOT DO, EVER
     failure (a team matching under 5 of 9 salary hitters).
   - Skip the preflight, bypass a blank reserved row, or touch DraftKings.
 
+This list is THIS TOOL'S remit and not the whole autonomy boundary, which is
+CLAUDE.md's. R272 (2026-08-31) added a repair clause -- replacing a player who
+will not play, and choosing among the mechanically legal replacements, are
+autonomous -- and it governs `tools/repair_entry.py` AFTER a delivery, not the
+build this supervisor runs. Nothing above is relaxed by it; the pointer is here
+because "WILL NOT DO, EVER" reads as a complete boundary to anyone who lands in
+this file first, and on 2026-08-29 a session asked Ben a repair question inside
+a lock window that it was entitled to answer itself.
+
 Exit: 0 certified, 3 refused with reasons, 4 bad input, 5 out of time.
 Every decision lands in outputs/<date>/autobuild_decisions.json.
 """

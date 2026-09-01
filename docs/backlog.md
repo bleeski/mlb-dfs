@@ -39,6 +39,57 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-08-31 (fourth note this date), DEV, claim `engine` (`engine_2026-09-01`):
+**R270(b), R267(a) and R272 all SHIPPED, in two commits with the gate run
+between them, and slots 1 and 2 are SWAPPED.** Gate 1509 -> 1520 -> 1535. The
+swap is the correction this board owed itself: the 08-31 session vacated slot 1
+when R273's premise failed and promoted the money boundary into it MECHANICALLY,
+as next in line, without re-adjudicating on the merits. Re-read on the merits,
+the repair path wins on every axis — the money-boundary batch is real but
+prospective (R248's own note says "hard checks clean, exit 0, so noise rather
+than a wrong verdict"; R174 guards a future regression; R242 is P2), while the
+repair path has a measured cost on `1305_12g`. Slot 1 <-> 2 only; nothing else
+renumbered, and the queue stays at fourteen.
+
+**Two premises were checked against the tree before anything was built, and one
+was FALSE.** R270(a) — "the doubleheader leg matcher exists on the odds path and
+not on the lineups path" — was already closed: one matcher,
+`select_one_leg_per_matchup`, both paths reach it, landed 2026-08-05 in
+`8a1b32b`, twenty-four days before R270 was filed and AST-pinned since. Closed on
+the board rather than built. **That is the second false premise in two days**
+(R273 was the first) and it is the same failure both times: an entry's citation
+is a photograph and the tree moves. What survived R270(a)'s enumeration is real
+and is on the board as R280.
+
+**Three new numbers, all from the enumerations rather than from review.** R279
+(three sites derive "confirmed" from a feed that stops carrying it after first
+pitch; the tier that answers them is built and unwired — into slot 2's money
+boundary, where it is now the strongest member because it is the only one with a
+field sighting). R280 (`tail_candidate_scanner._pitchers_by_game` has no leg
+filter and HAS a production caller — R58(b)'s shape in a third reader its own
+enumeration missed; into the smalls beside R221). R267 is rewritten to hold only
+(d); R272 and R270 have left the board.
+
+**Two dead sites were found and deliberately NOT filed as defects:**
+`slate_intake_manager.emit_slate_context_packet_template` and
+`late_swap_manager.cohort_refresh_plan` have no calls, no imports and no string
+references anywhere, by AST walk. R273 was filed P1 five days ago by a grep that
+counted exactly this kind of site, so they are quarantine candidates beside it
+rather than a P-anything. **The generalisable form of the 08-31 lesson, now that
+it has happened twice: an R233 enumeration counts SITES, and a site's liveness
+is a separate question that only a caller analysis answers.**
+
+**The finding worth carrying forward is about mutation testing, not about the
+code.** Eleven mutations on the repair filter, ten killed, and the SURVIVOR was
+the ambiguity guard on `--dead`: the guard existed, and only its zero-hit half
+had a test, so a mutation that resolved an ambiguous name to the first salary
+row passed everything. R75 records this repo carrying two Luis Garcias, so that
+is a live case, and under a lock clock the wrong guess is a second dead slot.
+**A guard with a test is not a guard that is tested — the test has to cover the
+branch the guard exists for**, and that is a different failure from this month's
+three passing-tests-over-defects, which were tests pinning wrong behaviour. This
+one pinned right behaviour on the wrong input.*
+
 *2026-08-31 (third note this date), DEV: **R277 CLOSED COMPLETELY and off the
 board. Slot 13 is R276 alone; the queue stays at fourteen and nothing
 resequenced.** Ben's first real run of the new fetcher returned 834 rows with a
@@ -615,42 +666,51 @@ remaining claim is actually first, which is what the ordering is for. Slots
 2-15 each move up one. No content below changed.*
 
 
-1. **R174 + R175 + R248 + R242** — the money-boundary batch, grown by
-   two field hits from this week: the preflight's feed matcher has no AZ→ARI
-   crosswalk and silently demotes ten hard checks to warnings (R248, F-33,
-   and it hit a SECOND slate 08-28), and the salary auto-resolve still reaches
-   across draftgroups before refusing (R242, F-11's surviving sliver). F-31
-   rides R174: `late_swap.py` prints the preflight command and returns success
-   without running it. **R266 SHIPPED 2026-08-29 and is out of this slot**; it
-   landed alone as its own note said it would, and its landing changed nothing
-   about the other four. **R279 JOINS this slot 2026-08-31**, from R270(b)'s
-   class-B enumeration: the observed-fact tier is built and `check_feed` still
-   derives "confirmed" from a feed that stops carrying it after first pitch, so
-   the preflight can read a dead slot as an unposted side. It is here rather
-   than with the reader because wiring it changes a HARD-GATE verdict, which is
-   this slot's whole subject.
-2. **The repair path: R267 + R272, then R268, R204's ceiling half rides** —
-   **INSERTED 2026-08-29, the one resequencing this date; everything below
-   moved down one and nothing else changed.** The argument is the same one that
-   moved the Showdown cluster on 08-27, field evidence rather than review:
-   `late_swap` structurally cannot repair a heavily-pinned entry, and on
-   `1305_12g` that cost ~13 minutes of a 45-minute lock window, six bank
-   invocations that could not have worked, and a hand-built delivered file.
-   R267(a)'s one-slot filter and R272's repair-is-not-strategy rule land
-   TOGETHER — the policy is only safe because the filter touches no portfolio
-   control, and the filter is only useful unattended because the policy says it
-   may run. R268 follows because both its halves are workarounds this same
-   sequence typed reflexively. R204's ceiling half rides here rather than in
-   the smalls: it prints the one remedy CLAUDE.md makes always-permitted, at a
-   moment when it cannot work, which is a live hazard for an unattended
-   supervisor and not a wording fix. **R270(b) SHIPPED 2026-08-31 and its
-   dependency on R267(a) is DISCHARGED** — the filter's "confirmed starter"
-   test had no source after first pitch, which is exactly when a repair runs;
-   `observed_starter_state` is now that source and the filter is its first
-   consumer. **R271 rides R272's quiet window**, not
-   the smalls: both edit CLAUDE.md, contract edits are allowed only with no
-   other session live, and two edits to one contract file in one window is an
-   ordering argument rather than a shared-surface convenience.
+1. **The repair path: R268 + R204's ceiling half** — **SWAPPED with the money
+   boundary 2026-08-31, and this slot's original members R267(a) + R272 SHIPPED
+   the same day.** The swap is slot 1 <-> slot 2 only; nothing else renumbered.
+   Why the swap: the 08-31 session vacated slot 1 (R273's premise was false) and
+   promoted the money-boundary batch into it MECHANICALLY, as next in line,
+   without re-adjudicating it against this slot on the merits. Re-read on the
+   merits: the money-boundary batch prevents a bad upload, and R248's own
+   second-sighting note concedes "hard checks clean, exit 0, so noise rather
+   than a wrong verdict" while R174 protects against "a future regression" and
+   R242 is P2 — real, and all prospective. The repair path has a MEASURED field
+   cost on `1305_12g`: a dead arm in 10 of 31 entries, ~13 minutes of a
+   45-minute lock window spent searching the wrong object, six bank invocations
+   that could not have worked, and a hand-built file as the delivery. Preventing
+   a washout and winning the entries already paid for are both real; when they
+   compete for the head of the queue, the one with a measured dollar cost goes
+   first. What remains here: **R268**, because both its halves are workarounds
+   this same sequence typed reflexively and R268(a) is the SECOND, independent
+   reason the `1305_12g` swap refused — the swap re-derived
+   `max_player_exposure_pct=0.50` against the parent's shipped 0.55, and when
+   most rows are frozen a tighter-than-parent cap is unsatisfiable by
+   construction, so fixing R267 alone leaves that refusal standing on the same
+   slate. **R204's ceiling half** rides here rather than in the smalls: it
+   prints the one remedy CLAUDE.md makes always-permitted, at a moment when it
+   cannot work, which is a live hazard for an unattended supervisor now that
+   R272 has widened what runs unattended. **R271 has lost its ride**: R272's
+   quiet window opened and closed on 2026-08-31 and R271 was not taken in it
+   (the window was spent on the repair clause itself), so R271 returns to
+   needing its own contract window — the ordering argument still holds, it just
+   has no partner queued.
+2. **R174 + R175 + R248 + R242 + R279** — the money-boundary batch, **moved
+   down one 2026-08-31 in the slot 1 <-> 2 swap described above**; its content is
+   unchanged and it lost nothing by the move. Grown by two field hits: the
+   preflight's feed matcher has no AZ->ARI crosswalk and silently demotes ten
+   hard checks to warnings (R248, F-33, and it hit a SECOND slate 08-28), and
+   the salary auto-resolve still reaches across draftgroups before refusing
+   (R242, F-11's surviving sliver). F-31 rides R174: `late_swap.py` prints the
+   preflight command and returns success without running it. **R266 SHIPPED
+   2026-08-29 and is out of this slot**; it landed alone as its own note said it
+   would. **R279 JOINED 2026-08-31**, from R270(b)'s class-B enumeration: the
+   observed-fact tier is built and `check_feed` still derives "confirmed" from a
+   feed that stops carrying it after first pitch, so the preflight can read a
+   dead slot as an unposted side. It is here rather than with the reader because
+   wiring it changes a HARD-GATE verdict, which is this slot's whole subject —
+   and R279 is now the strongest single claim in it, because it is the only
+   member with a field sighting rather than a prospective one.
 3. **R165 + R163** — unchanged content, down one: its evidence is unchanged
    while the Showdown slot gained two live hits.
 4. **Showdown ladder truth: R247 + R237 + R224** — **R158, R223 and R250 all
@@ -4365,55 +4425,31 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
   disagreement reports on top. This entry's "Jose Ramirez (12345678)" example is
   that defect one function over. Take the two together if either is taken.
 
-### R267. `late_swap` matches WHOLE lineups against an entry's pins, so it structurally cannot repair a heavily-pinned entry — and this is not a search-effort problem (P1, M; the repair filter itself is S and is the whole value) | new 2026-08-29, merged from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §B and §E; field-forced on slate `1305_12g`
+### R267(d). A build-time repair-feasibility count, so a thin price band is visible before it is load-bearing (P2, S; report only) | remainder after (a), (b) and (c) SHIPPED 2026-08-31; filed as an observation by BUILD, not a proposal
 
-**What.** The swap matches whole-lineup candidates out of the bank against an
-entry's pins. Late in a slate an entry has 3 to 9 slots frozen in locked games,
-and no generic bank lineup will ever reproduce that exact 9-player prefix. The
-refusal reads as a pin/exclusion problem and is accurate about the symptom:
+**(a), (b) and (c) SHIPPED 2026-08-31** as `tools/repair_entry.py` and are
+migrated to CHANGELOG.md: the single-slot filter, the tool picking its own mode
+on pin count, and the guarantee that it touches no portfolio control -- which is
+what made R272's contract clause safe and is asserted against the source by a
+test, so the clause cannot outlive its argument in silence.
 
-    no compatible candidate for Entry ID 5234627043
-      [not a portfolio control: this entry's pins and excluded_new_teams admit
-       none of the bank's candidates]
-
-**Why it is not search effort, measured.** On `1305_12g` (COL's probable moved
-from Feltner to Agnos after delivery, putting a dead arm in 10 of 31 entries
-with 45 minutes on the clock) the bank was grown from 566 to 1425 candidates
-across six invocations, 1176 of 5304 jobs attempted. The message never changed,
-**because more whole lineups do not make a 9-pin prefix more likely.** Worked
-example, entry `5234627043`: 9 of 10 slots locked, only P2 open, $5,300 of cap
-for the replacement. That is a one-slot search over the salary file. The engine
-spent roughly 13 minutes of wall clock across attempts and never found it,
-because it was searching the wrong object. The repair was hand-built, and the
-hand-built file is what shipped.
-
-**Fix. (a) A single-slot repair mode** — `late_swap.py --repair-slot`, or
-`tools/repair_entry.py` — that for each named dead player enumerates the legal
-replacements for THAT slot directly rather than through the bank: slot
-eligibility parsed from `Roster Position` against the DK column the player
-occupies; salary cap after removing the dead player; game not yet locked, from
-the feed clock the way `verify_export` already derives it; confirmed starter
-(R270's boxscore source after first pitch); not already in the entry; **not on
-a team opposing any SP rostered in that entry** — `verify_export` caught
-exactly that bug in the hand-built repair, so the constraint is load-bearing,
-not decorative. Rank survivors by projection (APPG where no Base exists), take
-the best, record the diff. A deterministic filter over ~1100 salary rows, well
-under a second. **(b) The tool picks the mode on pin count, not the caller.**
-The whole-lineup solve still belongs to any swap with meaningful freedom —
-early in a slate, or entries whose open slots outnumber their pins; the repair
-mode is for the tail. **(c) It touches no portfolio control**, which is what
-makes it safe to run autonomously under R272 and is the reason to build it that
-way rather than as a relaxation of the existing solve. **(d) A build-time
-repair-feasibility count** (filed as an observation by BUILD, not a proposal):
-Feltner was $5,200 and used as salary relief in 10 entries; when he was
-scratched, the entire set of confirmed starters in still-open games that fit
-the $5,200-$5,400 headroom was TWO arms — Sousa at $4,000 (a declared opener
+**What is left, and it belongs with the BUILD rather than the repair.** On
+`1305_12g`, Feltner was $5,200 and used as salary relief in 10 entries. When he
+was scratched, the entire set of confirmed starters in still-open games fitting
+the $5,200-$5,400 headroom was TWO arms -- Sousa at $4,000 (a declared opener
 the engine bars from P slots) and Lynch IV at $5,400. Eleven of 31 entries
 finished at exactly $0 salary left. Leaning on a sub-$5.5k arm carries a
 replacement risk nothing in the build measures: not the probability of a
-scratch, but the fact that if one happens there is no legal repair. A
-deterministic count — "arms in this price band on this slate: N" — makes the
-exposure visible at build time. Report only, no gate, no control.
+scratch, but the fact that if one happens there is no legal repair.
+
+- **Fix:** a deterministic count at build time -- "arms in this price band on
+  this slate: N" -- so the exposure is visible while it can still be priced in.
+  Report only, no gate, no control, on the surface CLAUDE.md already calls a
+  report. The filter now exists, so the count is the same enumeration run
+  against headroom bands rather than a named dead player, and it should SHARE
+  `repair_entry.candidates_for_slot` rather than mint a second definition of
+  "legal replacement" -- two answers to that question, one at build time and one
+  at repair time, is R167/R159's class waiting to happen.
 
 ### R268. Two shipped fixes whose SYMPTOM never closed, both on the swap path, both of which taught the operator to switch a protection off (P1, S) | new 2026-08-29, merged from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §C(2) and §C(4); both verified in tree
 
@@ -5706,61 +5742,16 @@ by name instead of recommending an install as if the vendored copy were merely
 absent; CLAUDE.md's step 2 states which host it is for. Cheap, and it stops a
 recurring dead end on a command the contract tells every session to run.
 
-### R272. Repair is not strategy: Ben's 2026-08-29 autonomy instruction, and the CLAUDE.md section that does not name the distinction (P1, S; DECIDED, needs the quiet window) | new 2026-08-29, from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §A; Ben's dated instruction, quoted
+### R272. CLOSED 2026-08-31 -- the repair clause is in CLAUDE.md's Autonomy section; entry migrated to CHANGELOG.md
 
-**The instruction, 2026-08-29, in Ben's words:** *"you made me intervene by
-answering questions and I want you to make those changes autonomously."*
-
-**What happened.** With a dead pitcher in 10 of 31 entries and locks at 16:05
-and 16:10, BUILD raised an `AskUserQuestion` at 15:16 with two questions: which
-arm goes in the six entries that could not take the obvious replacement, and
-whether to ship a hand-corrected file the engine could not produce. Both were
-answered "recommended option." **That is the tell: when the recommendation is
-the answer, the question was the session's to decide, and asking it spent Ben's
-clock inside a lock window.**
-
-**What CLAUDE.md's Autonomy section is missing.** It classifies by *what the
-engine named* (structural feasibility remedies, bank growth, pool blockers) and
-by *strategy vs feasibility*. It has no REPAIR category, so a scratched player
-falls through to "ask." The proposed additions, all four autonomous:
-
-- **Replacing a player who will not play is a REPAIR, not a strategy change.**
-  A scratched arm, a bat absent from a posted lineup, an IL/OUT status. The
-  entered set already contains a zero; leaving it there is not the conservative
-  choice, it is the damaging one.
-- **Choosing among the legal replacements is autonomous.** Legality is
-  mechanical and enumerable: DK slot eligibility, salary cap, game not yet
-  locked, confirmed starter, not already rostered, not opposing a rostered SP.
-  Rank survivors by the build's own projection (APPG where no Base exists) and
-  take the top one. This is R267(a)'s filter, which is why the two land
-  together.
-- **A collateral downgrade needed to afford a repair is autonomous when it is
-  the minimum-loss one.** Four entries needed $200 freed to fit Lynch IV; pick
-  the open-game hitter swap costing the least projection and record it.
-- **Shipping a hand-corrected file is autonomous when the engine cannot produce
-  one and both `verify_export.py` and `preflight_upload.py` exit 0.** Labeled
-  review-grade, never certified; full diff against the parent reported; sha256
-  stated. A preflight-clean repair beats an engine-certified file carrying ten
-  dead slots.
-
-**What stays Ben's, unchanged, and the entry states it so the edit cannot
-overreach:** any exposure or stack change with no dead player behind it;
-anything needing `--force` or leaving a gate failing; anything reducing the
-legal player pool; the money-and-entry wall. None of those is touched.
-
-**Why write it down rather than rely on judgment.** Under a lock clock the cost
-of asking is not one round trip, it is the remaining window. This is the same
-argument CLAUDE.md's Autonomy section already makes for feasibility remedies,
-extended to the case the section did not anticipate — and the reason it is a
-contract edit rather than a habit is that the next session has no memory of this
-slate.
-
-**Sequencing.** DECIDED, not owed: it is Ben's instruction, so nothing waits on
-a decision. It is a CLAUDE.md contract change, which the multi-session contract
-allows only with no other session live, and CLAUDE.md currently carries
-uncommitted foreign edits. Land it with R267(a) so the policy and the tool that
-makes it mechanical arrive together; a `Decided` CHANGELOG entry carries it
-until then.
+Landed with R267(a), as its own Sequencing note required. The four additions
+(replacing a player who will not play is a repair, choosing among the legal
+replacements, the minimum-loss collateral downgrade, and shipping a
+preflight-clean hand-corrected file) are in the Autonomy section verbatim,
+together with the "what stays Ben's" list that bounds them. The safety argument
+is R267(c) and it is now test-enforced rather than asserted: if the repair path
+ever reads a portfolio control, `test_it_touches_no_portfolio_control` fails in
+the same run, so the clause cannot quietly outlive the property it rests on.
 
 ### R76. Doc-truth batch: the strategy authority and the pinned references have drifted from the shipped tree (P2, S) | audit 2026-08-04, verified in tree
 

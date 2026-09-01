@@ -197,6 +197,26 @@ def _norm_name(value: Any) -> str:
     return re.sub(r"[^a-z]", "", text)
 
 
+def slot_admits(row: Mapping[str, Any], slot: str) -> bool:
+    """Does this salary row's ``Roster Position`` admit this DK column?
+
+    R267(a)'s R233 enumeration. DK writes multi-position eligibility as a
+    slash-joined token ("OF/1B"), and this repo derived that rule from the raw
+    string at two places once `repair_entry.py` arrived: `check_legality`'s
+    inline comprehension below, which is what a delivered file is CHECKED
+    against, and the repair filter's own copy, which is what a replacement is
+    CHOSEN by. Two definitions of the same rule, on the two sides of one
+    write, is R167/R159's class exactly -- and the failure mode is specific
+    rather than theoretical: the chooser drifting looser than the checker
+    means a repair that picks a player the preflight then rejects, under a
+    lock clock, which is the worst moment available to discover it. One owner,
+    here, because this file is where the rule is enforced against money.
+    """
+    roles = {r.strip().upper()
+             for r in str(row.get("Roster Position") or "").split("/")}
+    return str(slot).strip().upper() in roles
+
+
 def person_key(row: Mapping[str, Any]) -> str:
     """One human, whatever role their salary row is priced for.
 
@@ -865,8 +885,7 @@ def check_legality(contest: str, slots: Sequence[str], entries: Sequence[EntryRo
         ineligible = [
             f"{players[i].get('Name')}->{slots[i]}"
             for i in range(width)
-            if slots[i].upper() not in
-            {r.strip().upper() for r in str(players[i].get("Roster Position") or "").split("/")}
+            if not slot_admits(players[i], slots[i])
         ]
         if ineligible:
             rep.fail(f"{e.entry_id}: slot ineligibility {ineligible}")

@@ -25,6 +25,152 @@ performance claim.
 
 ---
 
+## 2026-08-31 — R267(a) + R272: the one-slot search the bank structurally cannot perform, and the contract clause that lets it run without asking
+
+**What moved.** `tools/repair_entry.py` (new, ~470 lines),
+`tools/preflight_upload.py` (one rule extracted to one owner),
+`tools/autobuild.py` (a pointer, no behaviour), `tests/test_upload_integrity.py`
+(fifteen new), `tools/audit.py` (the pin), `CLAUDE.md` (the Autonomy repair
+clause, the restated hard list, and the quoted gate line). Gate
+**1520 -> 1535**. They land TOGETHER on purpose: the policy is only safe
+because the filter touches no portfolio control, and the filter is only useful
+unattended because the policy says it may run.
+
+**The defect, and why it is not search effort.** `late_swap` matches
+whole-lineup candidates out of the bank against an entry's pins. Late in a
+slate an entry has 3 to 9 slots frozen in locked games and no generic bank
+lineup reproduces that exact prefix, so the refusal at
+`contest_allocator.py:2394` is STRUCTURAL. Measured on `1305_12g`: the bank went
+566 -> 1425 candidates across six invocations and the message never changed,
+because more whole lineups do not make a 9-pin prefix more likely. Entry
+5234627043 had 9 of 10 slots locked, only P2 open and $5,300 of cap — a
+one-slot search over ~1100 salary rows, which the engine spent ~13 minutes
+failing to find because it was searching the wrong object. The repair was
+hand-built and the hand-built file is what shipped.
+
+**What (a) is.** A deterministic filter over the salary file, six mechanical
+constraints, well under a second: slot eligibility, salary headroom after
+removing the dead player, the candidate's game not yet locked (through
+`verify_export.derive_locked_teams_from_feed`, so the tool that repairs and the
+tool that checks read one fact), confirmed starter (the R270(b) observed tier
+once the candidate's game is underway, the feed before that), not already in
+the entry by `person_key`, and **not on a team opposing any SP rostered in that
+entry**. Survivors rank by projection with APPG as the fallback, best wins, the
+diff is recorded, and a refusal carries a rejection census.
+
+**Two defects found in this tool's own first cut, both by running it.** First,
+the dead player was still counted in the opposing-SP set, so a dead COL arm
+barred every ARI candidate from **his own replacement search** — a constraint
+enforced against a state that stops existing the moment the write lands, which
+on a two-game slate removes most of the legal pool. `exclude_index` is the fix
+and it has its own test. Second, `--dry-run` returned 4 even over a dead slot
+with no legal replacement, hiding the finding behind the mode; that is R176's
+rider (the preflight computing its exit code before the fact that made it
+durable) arriving in a new tool, and a refusal now outranks the dry-run code.
+
+**The census is FIRST-MATCH and says so.** A row barred by three constraints is
+counted under the first to reject it. Stated in the docstring and pinned by a
+test, because the other reading is available and wrong:
+`opposes_rostered_sp: 1` means one row survived everything else and then
+opposed one, not that one row opposed a rostered arm. Evaluating all six per
+row would cost nothing; a census whose counts exceed the pool is a worse thing
+to hand someone under a lock clock than one that is merely partial.
+
+**R267(b), the mode.** The TOOL picks it, not the caller: `open <= pinned`
+routes to the repair, anything with more freedom stays with the whole-lineup
+solve, which optimises jointly. `--mode` overrides and the choice is always
+reported with its pin count.
+
+**R267(c), and it is the whole safety argument for R272.** The filter reads and
+writes no portfolio control — no exposure cap, no stack plan, no overlap bound.
+That is asserted against the source by
+`test_it_touches_no_portfolio_control`, so if a future change makes this path
+read one, the contract clause built on top of it fails a test in the same run
+rather than quietly outliving its argument. CLAUDE.md's clause names that
+dependency explicitly.
+
+**R272, the contract edit.** Ben's dated instruction, quoted in the clause
+because it is the reason it exists: *"you made me intervene by answering
+questions and I want you to make those changes autonomously."* The Autonomy
+section classified by what the ENGINE named and by strategy-vs-feasibility, so
+a scratched player fell through to "ask" — and on 2026-08-29, with locks at
+16:05 and 16:10, two questions raised at 15:16 both came back "recommended
+option," which is the tell that the question was the session's. Four additions,
+verbatim from the entry, plus the "what stays Ben's" list, which is in the edit
+so the clause cannot overreach: the money-and-entry wall (untouched — a repair
+writes a FILE and Ben still uploads by hand), any exposure or stack change with
+no dead player behind it, anything needing `--force` or leaving a gate failing,
+and any reduction of the legal player pool. `claims/` was re-read immediately
+before the write, not only at session start, per the multi-session contract:
+one claim held, this session's own.
+
+**R233 enumeration, three classes, run separately, callers by AST.**
+
+*R267(a) class 1 — callers reaching the whole-lineup match.* The refusal at
+`:2394` lives in `select_and_assign_entries` (`contest_allocator.py:2218-3177`).
+12 production references, and the live entry points are
+`execution_pipeline.py:378` and `:3302` plus four in-file recursions at `:2846`,
+`:2900`, `:2934` and `:3216` (R158's three ladder re-entries plus the top-level
+call, already pinned by a test). **Not one is changed.** The repair is a new
+path beside that function, which is what the item asked for and what keeps the
+certified path untouched; the item's own citation of `late_swap.py` for this
+string was wrong and the string has never lived there.
+
+*R267(a) class 2 — sites deriving slot eligibility from `Roster Position`.* 35
+raw hits, but most read the column for Showdown roles or column presence. The
+class that derives ELIGIBILITY from the slash token was 2 once this tool
+existed: `check_legality`'s inline comprehension (`preflight_upload.py:869`),
+which is what a delivered file is CHECKED against, and the repair filter's own
+copy, which is what a replacement is CHOSEN by. **Fixed rather than kept**:
+extracted as `preflight_upload.slot_admits`, one owner, imported by the repair
+filter, with a test asserting the two are the same function object and that the
+filter carries no second copy. The failure mode is specific — a chooser drifting
+looser than the checker picks a player the preflight then rejects, under a lock
+clock, which is the worst available moment to find out. Fixing it exposed a
+second copy of a different kind: importing a sibling tool as `tools.X` while the
+tests import it bare loads one file twice under two module names, so
+`slot_admits` was genuinely two function objects. `repair_entry.py` now uses
+`verify_export.py`'s own convention (`tools/` on `sys.path`, bare import) and
+the test pins object identity, not just source text.
+
+*R272 class — every place the Autonomy boundary is restated.* 4 live sites plus
+8 historical review documents. CLAUDE.md is the authority and is edited.
+`tools/autobuild.py`'s "WHAT IT WILL NOT DO, EVER" is KEPT unchanged in
+substance — none of its four items is relaxed by a repair clause that governs a
+different tool at a different moment — but it gained a pointer, because that
+heading reads as a complete boundary to anyone who lands in that file first, and
+a session on 2026-08-29 asked Ben a question inside a lock window that it was
+entitled to answer. `skills/generate-lineups/SKILL.md:104` and
+`build_slate.py:1610,2684` REFER to CLAUDE.md's Autonomy section rather than
+restating it, which is the correct form and is why they need no edit. The eight
+`docs/critique_*` and greenfield-review files are dated snapshots of outside
+reviews, not authorities, and are kept.
+
+**Mutations: eleven, ten killed first pass, one SURVIVOR killed on re-run
+alone.** Four batches, revert in a `finally`, `tools/repair_entry.py` restored
+byte-identical (sha256 `54a369bd46e5`) after every batch, and the anchors
+grepped afterwards rather than the driver's restore trusted (five anchors
+present, zero `if False:` tokens). M1-M10 removed the headroom check, the lock
+check, the confirmed test, the observed bar, the opposing-SP constraint, the
+already-in-entry check, the ranking direction, the `exclude_index` fix, the
+mode boundary, and the refusal-outranks-dry-run rule — all killed. **M11
+survived: the ambiguity guard on `--dead` existed and only its ZERO-hit half was
+tested**, so a mutation resolving an ambiguous name to the first salary row
+passed every test. That is a live case rather than a hypothetical — R75 records
+this repo carrying two Luis Garcias — and under a lock clock the wrong guess is
+a second dead slot. Two tests added (the ambiguous refusal and, so the refusal
+cannot be satisfied by a tool that refuses everything, the unambiguous
+name-and-id resolution), M11 re-run alone as M11b: KILLED. No test blocked a fix
+and none was loosened.
+
+**NOT in scope, and stated rather than dropped.** R267(d), the build-time
+repair-feasibility count, is report-only, separable, and belongs with the build
+rather than the repair; R267's entry is rewritten to hold only that remainder.
+This tool is REVIEW-GRADE and does not run the three gates — it says so in its
+own output, the preflight command is printed with the written path, and a test
+asserts the source contains none of `upload_ready`, `workflow_valid`,
+`selection_certified` or `allocation_certified`.
+
 ## 2026-08-31 — R270(b) SHIPPED and R270(a) was ALREADY CLOSED: the observed-fact tier arrives, and the half filed beside it had been fixed 24 days before it was filed
 
 **What moved.** `mlb_engine/intake/live_data_adapters.py` (the new tier, five
