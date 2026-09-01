@@ -93,6 +93,33 @@ carries the contract's own value instead of anyone assuming it. **A guard with a
 test is not a guard that is tested unless the fixture can tell the two answers
 apart.** Fixture moved to 45,000, M12 dies.*
 
+***The session ended on a dead sandbox and that is why R165 and R163 did not
+ship.** Immediately after `cd3e145` the Linux workspace stopped answering
+(`Failed to create bridge sockets after 5 attempts`, ten probes over ~10 minutes,
+confirmed as a transport failure and not a boot race: no stdout at all, not even
+an `echo`). No tests, no gate, no `git`. The R165 fix was fully written — one
+shared normalizer pair with `_prepare_single_lineup_df` routed through it, and
+all five live members of the class fixed — and then **backed out of the working
+tree**, because it changes a return dtype on two helpers and unverified edits to
+the file CLAUDE.md calls the lineup source of truth do not sit on disk waiting
+for someone else to discover them. `mlb_engine/optimize/optimizer_v3.py` is back
+to what `cd3e145` committed.*
+
+***What was kept instead is the analysis, in the entries, because that is the
+part that took the session.** R165's entry now carries a re-verified premise, the
+five-member enumeration with each unnamed member's mechanism, the two members
+kept with reasons, the model site, the revised fix, and the one fixture fact that
+would otherwise cost the next session an hour (these helpers read DK's ROSTER
+Position, not DK's `Position`, whose value for an arm is `SP`, and
+`_parse_positions('SP')` contains no `'P'` — so a repro built on the wrong column
+reports a zero-arm pool and the defect reads as having no reach). R163's entry
+carries its corrected citation and the two-site reading that makes its fix
+implementable, including which site is KEPT and why, and the budget consequence
+to measure rather than assert. **`docs/backlog.md` is the one dirty tracked file
+and it is documentation only** — it cannot change engine behaviour, which is the
+property that made it safe to leave when the engine edits were not. It needs a
+commit; the next DEV session or Ben takes it.*
+
 *2026-08-31 (fourth note this date), DEV, claim `engine` (`engine_2026-09-01`):
 **R270(b), R267(a) and R272 all SHIPPED, in two commits with the gate run
 between them, and slots 1 and 2 are SWAPPED.** Gate 1509 -> 1520 -> 1535. The
@@ -766,8 +793,14 @@ remaining claim is actually first, which is what the ordering is for. Slots
    and R279 is now the strongest single claim in it, because it is the only
    member with a field sighting rather than a prospective one.
 3. **R165 + R163** — unchanged content, down one: its evidence is unchanged
-   while the Showdown slot gained two live hits. **TAKEN 2026-09-01** with slot
-   4's lead item; see the note at the top for why slots 1 and 2 were jumped.
+   while the Showdown slot gained two live hits. **STILL SLOT 3: taken
+   2026-09-01 and NOT closed** — the sandbox died before either could be
+   verified, so the slot is unchanged and is the head of the next session's
+   work. R165's entry now carries a re-verified premise and a BIGGER class than
+   the entry filed (five live members, not two; two of the three unnamed ones
+   fail with no diagnostic at all), plus a revised fix and the reason the
+   written fix was backed out. R163's premise is re-verified in its own entry.
+   See the note at the top for why slots 1 and 2 were jumped.
 4. **Showdown ladder truth: R237 + R224** — **R247(a) and R247(c) SHIPPED
    2026-09-01** (see CHANGELOG.md), taken ahead of the rest of this slot because
    they are the instrument that makes R165's concentration change measurable and
@@ -4672,6 +4705,54 @@ Three scipy-native levers, each of which moves golden bytes and therefore sequen
   `relaxation_idx >= 0`; on `proven_infeasible` without DU violations, break
   instead of stepping.
 
+**Premise re-verified 2026-09-01, and the citation is off by one line.** The
+entry cites `:2501-2506`; the assignments are `:2503-2505` and the `continue` is
+`:2506`. Everything substantive holds. What the re-read adds, all of which the
+next session would otherwise re-derive:
+
+- **There are TWO sites that bump `du_relaxation_high_water`, and only one is the
+  defect.** Site A (`:2503-2506`) is reached when `lineup_df is None` — the
+  SOLVER produced nothing, so DU never entered the solve at all, since DU is
+  checked after the fact by `check_du_against_priors` (`:2523`). Site B
+  (`:2610-2612`) is reached when a lineup WAS produced and its DU violations
+  survived the penalty retries, so there DU genuinely is what blocked
+  acceptance and the step is earned. **Site B is KEPT.** Fixing both would
+  destroy the record the item wants to make truthful.
+- **On site A the re-solve is bit-identical, which is why R73(b)'s waste is
+  exactly this.** `_compute_relaxed_thresholds` (`:2450`) feeds only
+  `active_within` / `active_across`, which reach `check_du_against_priors` and
+  nothing else; `iteration_kwargs` is rebuilt from the same
+  `single_lineup_kwargs`, the same `sp_usage` (nothing was accepted), and the
+  same `_select_family_for_lineup(i, ...)`. So the `continue` at `:2506` re-runs
+  the identical overlap ladder against the identical pool, up to
+  `len(DU_RELAXATION_ORDER)` = 4 extra times per index. `break` is the fix, not
+  merely "step without bumping".
+- **The cleanest form of the fix moves the bump rather than deleting it.** Bump
+  at the ACCEPTANCE record (`:2617-2631`, beside the existing
+  `if accepted['relaxation_idx'] >= 0` that writes `du_relaxation_idx`), and
+  remove it from both stepping sites. That makes the high-water exactly "the
+  largest relaxation index any ACCEPTED lineup used", which is what the final
+  validation at `:2665` needs and what makes
+  `relaxations['du_relaxed_lineups']: 0` unable to coexist with a non-negative
+  high-water — the invariant to test. Note site B can currently bump one step
+  BEYOND what any accepted lineup used, when the last index exhausts the order
+  and fails; the entry's own Fix line ("only when a lineup is ACCEPTED") already
+  covers that and the two-site reading is what makes it implementable.
+- **Accepted lineups do not move, with one consequence to state rather than
+  hide.** For a given index and state the accept logic is untouched, so with no
+  `budget_s` the portfolio is identical (the golden replay is the check). Under a
+  BINDING budget the fix returns wasted seconds to later lineups, so MORE
+  lineups may be built than before — no lineup that was built becomes unbuilt,
+  and no accepted lineup's content changes for a fixed set of priors, but the
+  portfolio can differ because `prior_lineup_ids` gains an entry that the wasted
+  solves had crowded out. That is the budget working with less waste, and it is
+  the thing to measure rather than assert.
+- **`du_penalty_dict_for_target` (`:2052`) is a live R165 member on this exact
+  retry loop.** See R165's entry: on an int64 frame it returns an empty penalty
+  dict, so the penalty retries at `:2546-2598` run with no penalty at all. R165
+  lands first for that reason — measuring R163's solve-count drop against a
+  penalty path that is silently inert would measure the wrong thing.
+
 ### R164. The bank job grid wastes solves two ways, hardest on the pinned late-swap path (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro, (b)(c) VERIFIED-read (`bank_cache.py` unchanged since the review)
 
 - **What:** (a) when pins relax `stack_min` below 2 the stack constraint is
@@ -4700,6 +4781,71 @@ Three scipy-native levers, each of which moves golden bytes and therefore sequen
   seed pairs whose locks then die as `locked_player_unavailable`.
 - **Fix:** normalize once in each helper (or route both through R55's shared
   normalizer).
+
+**Premise re-verified 2026-09-01 and the CLASS IS BIGGER THAN THE ENTRY: five
+live members in `optimizer_v3.py`, not two.** Both cited sites hold exactly
+(`:1432` inside `_eligible_sp_ids_for_anchor_caps` at `:1428`, `:1461` inside
+`resolve_viable_sp_pool` at `:1445`). The enumeration the standing rule requires
+— every `isin(...)` or `== pid` against a `Player_ID` column in this file and its
+callers — found three more, and **two of the three are worse than the two
+filed**, because they fail with no diagnostic at all:
+
+- **`:1643`, in `build_sp_pair_coverage_plan`, which is the function that
+  CONSUMES `:1461`'s output.** `projections_df.loc[projections_df['Player_ID'] ==
+  pid, score_col]` inside the `for pid in viable_ids` loop. On an int64 frame
+  every lookup misses, `raw` stays empty, and every `sp_scores` entry stays 1.0
+  — so `pair_priority_scores` goes FLAT. That order decides which pairs a
+  budget-truncated bank covers at all, which is the exact failure R55's own
+  `rank_by_ceiling` note says cost a big-slate bank ("could never reach the two
+  best arms' pairings").
+- **`:2052`, in `du_penalty_dict_for_target`.** `drivers` come off a SOLVED
+  lineup frame, whose ids the solver has already normalized to strings, while
+  `projections_df` is the caller's raw frame. Every lookup misses, the `continue`
+  fires on all of them, and the function returns an EMPTY penalty dict — so every
+  DU penalty retry re-solves the identical MILP with no penalty applied. A
+  strategy control silently absent, on the same retry loop R163 is filed against,
+  and nothing in the run record says so.
+- **`:3991`, `_teams_of_pair` in `build_diverse_candidate_bank`.** Decides
+  whether a (pair, stack team) job is skipped as provably infeasible — R164(b)'s
+  own fix. On an int64 frame it returns an empty team set for every pair, so the
+  skip silently stops skipping.
+
+Two sites in the class are KEPT with reasons rather than fixed: `:542` in
+`_check_stack_feasibility`, where the early return at `:512` means
+`locked_player_ids` is always empty by the time the `isin` runs so the
+comparison cannot bind; and `:974` in `_build_single_lineup_scipy`, a self-join
+where `sp_pid` comes from the same frame's own `.tolist()` so the dtypes match by
+construction. `enumerate_sp_pairs` (`:1512`) is the MODEL the five should have
+followed: it stringifies both sides at the lookup already.
+
+**Fix, revised:** one shared normalizer pair (`normalize_id_frame(df)` and
+`normalize_ids(iterable)`), with `_prepare_single_lineup_df` becoming a CALLER of
+it rather than keeping the inline `astype` — R55's site is currently the only
+statement of the rule, and five sites restating it is what R167/R159 spent an
+entry undoing. Route all five live members through it. Note that this makes both
+helpers return STRINGS on every frame, which is `stable_union`'s own contract and
+is what makes `:1643` and `:3991` work; the three existing callers are
+dtype-tolerant (`execution_pipeline.py:3173` already does `{str(s) for s in
+sps}`, and the two test callers take `len()`), but that is the property to
+re-check first, because it is the one thing in this fix that is not local.
+
+**Written and REVERTED unverified, 2026-09-01.** The full fix above was
+implemented and then backed out of the working tree in the same session: the
+Linux sandbox died (`Failed to create bridge sockets`) immediately after commit
+`cd3e145`, so neither the test suite nor the gate could run, and unverified edits
+to the file CLAUDE.md calls the lineup source of truth do not stay on disk. The
+fix changes a return dtype on two helpers, which is precisely the kind of change
+that needs the suite. The reproduction harness is at `tools/_scratch_r165/`
+(gitignored, so it is local to this mount): it measures BEFORE against AFTER at
+one head by inlining the pre-fix body, needing no revert to compare.
+
+**One thing the repro established before the sandbox died, worth keeping because
+it would waste the next session's time:** the projections frame these helpers
+read carries DK's **Roster Position** in its `Position` column (`P`, `C`, `1B`,
+`OF`), not DK's own `Position` column, whose value for an arm is `SP` — and
+`_parse_positions('SP')` is `{'SP'}`, which contains no `'P'`. A repro built
+against the DK `Position` column gets a ZERO-arm SP pool on a real slate, which
+reads as "the defect has no reach" rather than as a fixture error.
 
 ### R166. The post-R61 controls never got fixed-row denominators: the reuse default is inert on scoped swaps, an operator's whole-file reuse cap is breachable, and the five-stack floor counts solve entries only (P1, S-M) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro (default-inert leg) + VERIFIED-read (`contest_allocator.py` unchanged since the review)
 
