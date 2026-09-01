@@ -2549,10 +2549,24 @@ def build_multi_lineup(
                     break
                 if solve_status.get('proven_infeasible'):
                     proven_infeasible_indices.append(i)
-                if du_enforced and relaxation_idx + 1 < len(DU_RELAXATION_ORDER):
-                    relaxation_idx += 1
-                    du_relaxation_high_water = max(du_relaxation_high_water, relaxation_idx)
-                    continue
+                # R163. This used to step `relaxation_idx`, bump the high-water
+                # and `continue`. The solver produced NOTHING here, so DU never
+                # entered the solve at all -- DU is checked after the fact by
+                # `check_du_against_priors` below -- and
+                # `_compute_relaxed_thresholds` feeds only `active_within` /
+                # `active_across`, which reach that check and nothing the solver
+                # sees. `iteration_kwargs` is rebuilt from the same
+                # `single_lineup_kwargs`, the same `sp_usage` (nothing was
+                # accepted) and the same family, so the `continue` re-ran a
+                # BIT-IDENTICAL overlap ladder up to len(DU_RELAXATION_ORDER)
+                # more times per index. Measured on the four-team fixture at
+                # n=6: 125 solver calls where 25 do the same work, with
+                # `du_relaxation_high_water` finishing at 3 beside
+                # `du_relaxed_lineups: 0` -- a recorded relaxation no accepted
+                # lineup used, which then weakened the FINAL portfolio
+                # validation at `_compute_relaxed_thresholds` below. The break
+                # also stops this index being written into
+                # `proven_infeasible_lineup_indices` five times over.
                 failed_indices.append(i)
                 break
 
@@ -2656,9 +2670,14 @@ def build_multi_lineup(
                 timed_out_indices.append(i)
                 failed_indices.append(i)
                 break
+            # R163 KEEPS this site. Here a lineup WAS produced and its DU
+            # violations survived the penalty retries, so DU genuinely is what
+            # blocked acceptance and the step is earned. What moved is the
+            # HIGH-WATER bump, to the acceptance record below: this site could
+            # step one index beyond anything an accepted lineup ever used, when
+            # the last index exhausts the order and fails.
             if relaxation_idx + 1 < len(DU_RELAXATION_ORDER):
                 relaxation_idx += 1
-                du_relaxation_high_water = max(du_relaxation_high_water, relaxation_idx)
                 continue
             failed_indices.append(i)
             break
@@ -2678,6 +2697,15 @@ def build_multi_lineup(
                     record['du_retry_count'] = accepted['retry_count']
                 if accepted['relaxation_idx'] >= 0:
                     record['du_relaxation_idx'] = accepted['relaxation_idx']
+                    # R163. The ONE place the high-water is set, so it means
+                    # exactly "the largest relaxation index any ACCEPTED lineup
+                    # used" -- which is what the final validation below needs,
+                    # and what makes `du_relaxed_lineups: 0` unable to coexist
+                    # with a non-negative high-water. Both stepping sites used
+                    # to bump it, and neither of them knew whether the lineup
+                    # they were stepping for would ever be accepted.
+                    du_relaxation_high_water = max(
+                        du_relaxation_high_water, accepted['relaxation_idx'])
             lineups.append(record)
             cost = _time.monotonic() - lineup_started
             # F13: only a lineup that actually solved tells you what the next one

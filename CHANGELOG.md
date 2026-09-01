@@ -25,6 +25,95 @@ performance claim.
 
 ---
 
+## 2026-09-01 — R163: a solver-infeasible index stops earning a DU relaxation it never used, and the identical ladder stops being re-run four more times
+
+**What moved.** `mlb_engine/optimize/optimizer_v3.py` (`build_multi_lineup`:
+site A's relaxation step deleted, site B's high-water bump removed, one bump
+added at the acceptance record), `tests/test_core.py` (five new),
+`tools/audit.py` and `CLAUDE.md` (the pin and the quoted line). Gate
+**1572 -> 1577**. Golden replay unmoved.
+
+**The defect.** On a DU-enforced multi-lineup build, an index whose solve
+returned NOTHING stepped `relaxation_idx`, bumped `du_relaxation_high_water` and
+`continue`d. DU never entered that solve: it is checked after the fact by
+`check_du_against_priors`, and `_compute_relaxed_thresholds` feeds only
+`active_within` / `active_across`, which reach that check and nothing the solver
+sees. `iteration_kwargs` is rebuilt from the same `single_lineup_kwargs`, the
+same `sp_usage` (nothing was accepted) and the same family, so the re-solve was
+BIT-IDENTICAL. The recorded high-water then set the thresholds the FINAL
+`validate_du_portfolio` ran at — a weakened validation justified by a relaxation
+no accepted lineup used.
+
+**Measured, on the four-team fixture with the solver forced to return proven
+infeasible after the first real lineups. R73(b)'s waste did drop:**
+
+| | solver calls | high-water | du_relaxed_lineups | `proven_infeasible_lineup_indices` |
+|---|---|---|---|---|
+| n=6, before | **125** | 3 | 0 | 24 entries for 5 indices |
+| n=6, after | **30** | -1 | 0 | 5 entries for 5 indices |
+| n=9, before | **200** | 3 | 0 | 39 entries for 8 indices |
+| n=9, after | **45** | -1 | 0 | 8 entries for 8 indices |
+
+Lineups built and `failed_indices` are unchanged in every case. The duplicated
+`proven_infeasible_lineup_indices` was not in the item and is the same
+`continue` seen from a published diagnostic: the index was appended once per
+relaxation step, so a reader counting that list counted relaxation steps.
+
+**Accepted lineups do not move, and that was measured rather than argued.**
+`du_threshold_row=(2, 2)` is the configuration where a relaxed lineup actually
+IS accepted, so it exercises site B and the new bump instead of site A. Reverting
+all three hunks in place and comparing at one head, at n=4, 6 and 9: rosters
+identical, objectives identical, solve counts identical (14 / 32 / 63 both ways),
+`failed_indices` empty both ways, high-water 1 both ways, `du_relaxed_lineups`
+1 / 3 / 6 both ways, `relaxation_applied` the same string, validation passing
+both ways. **The budget consequence, stated rather than hidden:** with no
+`budget_s` the portfolio is identical, which is what that comparison and the
+golden replay both say. Under a BINDING budget the fix returns the wasted
+seconds to later lineups, so more lineups may be built — no lineup that was
+built becomes unbuilt, but `prior_lineup_ids` can gain an entry the wasted
+solves had crowded out. That is the budget working with less waste.
+
+**Site B is KEPT, and the two-site reading is what made the fix implementable.**
+Site A (`lineup_df is None`) is the solver producing nothing. Site B (violations
+surviving the penalty retries) is DU genuinely blocking acceptance, and its step
+is earned. Fixing both would destroy the record the item exists to make truthful.
+What moved off site B is only the HIGH-WATER bump, because that site could step
+one index beyond anything an accepted lineup ever used, when the last index
+exhausts the order and fails.
+
+**`break`, not "step without bumping".** Since the re-solve is bit-identical,
+removing only the bump would have left the waste in place. The mutation check
+distinguishes the two: **N2 — site A steps without bumping — is killed**, so the
+suite pins the stronger fix rather than the weaker one that produces the same
+record.
+
+**R233 enumeration: every site that steps a relaxation counter or a high-water
+mark, and every reader of `du_relaxation_high_water` /
+`relaxations['du_relaxed_lineups']`.** Nine sites, all in `optimizer_v3.py`; the
+counts below are at the post-fix head.
+
+- **Steppers of `relaxation_idx`: two before, ONE after.** Site A (deleted) and
+  site B (kept, and it has a caller: it is the retry loop's own exit).
+- **Assignments to `du_relaxation_high_water`: three before, TWO after** — the
+  `-1` init and the single bump at the acceptance record. This is now
+  test-enforced by source inspection rather than left for the next reader to
+  re-derive, which is the part of R233 that keeps failing.
+- **Readers of `du_relaxation_high_water`: four, all live, all kept** — the final
+  `_compute_relaxed_thresholds`, `_relaxation_summary`, the `relaxations` record
+  key, and the warning string. All four now read a number that means what it
+  says.
+- **Readers of `relaxations['du_relaxed_lineups']`: four, all live** — its own
+  derivation from `du_relaxation_idx` on accepted records, the
+  any-relaxation-occurred test, and two in the warning. Outside
+  `optimizer_v3.py` the only readers are three assertions in `tests/test_core.py`
+  that already pinned `high_water == -1` beside `du_relaxed_lineups == 0`; they
+  pass unchanged, and what changes is that they can no longer disagree.
+
+**Mutation check: 5 mutations, 0 survivors.** N1 (the whole defect restored),
+N2 (the weaker fix), N3 (site B bumping again), N4 (the acceptance bump deleted),
+N5 (site B not stepping at all). Reverts in a `finally`, restored sha256 and a
+byte-identical check per mutation, anchors grepped after.
+
 ## 2026-09-01 — R165: the id-string rule gets one owner, and two of the five "live" members turn out to be sites the fix itself would have broken
 
 **What moved.** `mlb_engine/determinism.py` (`normalize_id`, `normalize_ids`,

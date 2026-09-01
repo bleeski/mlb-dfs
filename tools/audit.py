@@ -446,7 +446,13 @@ EXPECTED_SUITE_COUNTS = {
     # exist because the mutation check killed the first cut of them: the
     # diverse-bank one asserted legality where the guard only changes solves
     # SPENT, and nothing anywhere handed a helper int-typed EXCLUDES.
-    "tests.test_core": 993,
+    # R163, 2026-09-01: 993 -> 998, the five that pin the DU high-water. The
+    # invariant (0 relaxed lineups cannot sit beside a non-negative high-water),
+    # the solve count site A used to spend, the duplicated
+    # `proven_infeasible_lineup_indices`, site B still earning its step, and a
+    # source guard that the high-water is assigned in exactly one place --
+    # R233 made enforceable rather than re-derived by the next reader.
+    "tests.test_core": 998,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

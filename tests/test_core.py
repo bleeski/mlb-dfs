@@ -19053,6 +19053,92 @@ class ObservedStarterTierTests(unittest.TestCase):
         self.assertEqual(lda.boxscore_urls_for_feed(feed), {})
 
 
+class DuRelaxationHighWaterTests(unittest.TestCase):
+    """R163. A solver-infeasible index used to "earn" a DU relaxation it never
+    used, and the recorded high-water then weakened the FINAL portfolio
+    validation while `du_relaxed_lineups` truthfully said zero."""
+
+    @staticmethod
+    def _infeasible_after(frame, n, real_solves, du_row=(3, 3), mode="gpp"):
+        """Solve `real_solves` lineups for real, then refuse every solve as
+        PROVEN INFEASIBLE. Not a timeout: F13 already handles that path, and
+        conflating the two is what hid this."""
+        calls = {"n": 0}
+        real = opt.build_single_lineup
+
+        def fake(projections_df, **kwargs):
+            calls["n"] += 1
+            if calls["n"] <= real_solves:
+                return real(projections_df, **kwargs)
+            opt._record_solver_status(
+                kwargs.get("status_out"), status="infeasible", timed_out=False,
+                proven_infeasible=True, message="proven infeasible")
+            return None, None
+
+        opt.build_single_lineup = fake
+        try:
+            result = opt.build_multi_lineup(
+                frame, n_lineups=n, mode=mode, du_threshold_row=du_row)
+        finally:
+            opt.build_single_lineup = real
+        return result, calls["n"]
+
+    def test_a_recorded_relaxation_no_accepted_lineup_used_is_impossible(self):
+        """The invariant, and the whole point of the item: `du_relaxed_lineups`
+        of 0 can no longer sit beside a non-negative high-water."""
+        result, _ = self._infeasible_after(diverse_projection_frame(), 6, 2)
+        rel = result["relaxations"]
+        self.assertEqual(rel["du_relaxed_lineups"], 0)
+        self.assertEqual(rel["du_relaxation_high_water"], -1)
+
+    def test_an_infeasible_index_does_not_re_solve_the_identical_ladder(self):
+        """R73(b)'s waste. `_compute_relaxed_thresholds` feeds only the DU check
+        and nothing the solver sees, so the re-solve was bit-identical, up to
+        len(DU_RELAXATION_ORDER) extra times per index. Measured before the fix
+        on this fixture: 125 solver calls at n=6, 200 at n=9."""
+        self.assertEqual(len(opt.DU_RELAXATION_ORDER), 4)
+        result, solves = self._infeasible_after(diverse_projection_frame(), 6, 2)
+        self.assertEqual(result["failed_indices"], [1, 2, 3, 4, 5])
+        # One refusal per failed index on top of the real work, not five.
+        self.assertLessEqual(solves, 40, f"{solves} solves: the ladder re-ran")
+
+    def test_a_failed_index_is_recorded_infeasible_once_not_five_times(self):
+        """A side effect of the same `continue`, and it was corrupting a
+        published diagnostic: `proven_infeasible_lineup_indices` carried each
+        index once per relaxation step."""
+        result, _ = self._infeasible_after(diverse_projection_frame(), 6, 2)
+        idx = result["solver_report"]["proven_infeasible_lineup_indices"]
+        self.assertEqual(idx, sorted(set(idx)), f"duplicated indices: {idx}")
+
+    def test_a_lineup_ACCEPTED_at_a_relaxed_index_still_sets_the_high_water(self):
+        """Site B is KEPT. Here a lineup WAS produced and its DU violations
+        survived the retries, so DU genuinely blocked acceptance; fixing both
+        sites would destroy the record the item exists to make truthful. What
+        moved is only WHERE the bump happens."""
+        result = opt.build_multi_lineup(
+            diverse_projection_frame(), n_lineups=4, mode="gpp",
+            du_threshold_row=(2, 2))
+        rel = result["relaxations"]
+        self.assertGreater(rel["du_relaxed_lineups"], 0)
+        self.assertGreaterEqual(rel["du_relaxation_high_water"], 0)
+        used = [r["du_relaxation_idx"] for r in result["lineups"]
+                if "du_relaxation_idx" in r]
+        self.assertEqual(rel["du_relaxation_high_water"], max(used),
+                         "the high-water is not what any accepted lineup used")
+
+    def test_the_high_water_is_set_in_exactly_one_place(self):
+        """R233 made enforceable rather than re-derived. Two sites bumped this
+        and neither knew whether the lineup it was stepping for would ever be
+        accepted; a third appearing is the same defect returning."""
+        src = inspect.getsource(opt.build_multi_lineup)
+        assignments = [ln.strip() for ln in src.splitlines()
+                       if "du_relaxation_high_water" in ln
+                       and "=" in ln.split("du_relaxation_high_water")[1][:3]]
+        self.assertEqual(len(assignments), 2, assignments)   # the init, and the one bump
+        self.assertIn("-1", assignments[0])
+        self.assertIn("accepted['relaxation_idx']", "".join(assignments[1:]) + src)
+
+
 class IdNormalizationTests(unittest.TestCase):
     """R165. Every one of these has to be able to tell the two answers apart.
 
