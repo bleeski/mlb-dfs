@@ -1,10 +1,17 @@
 """field_miner.py — full-field standings decomposition for MLB Classic (untracked).
 
-STATUS: review-only companion, deliberately OUTSIDE the audited engine and
-outside the 26-file cap, on the same footing as ownership_prior.py and
-fetch_slate_bundle.py. Both open tracked slots stay reserved for the fitted
-ownership model (see ownership_prior.py header and Backlog B-8). Nothing here
-touches tracked engine bytes.
+STATUS: review-only in its OUTPUTS -- nothing here is auto-applied to
+projections, candidate selection, or the optimizer -- but this file is inside
+the audited engine and has been since it moved under ``mlb_engine/field/``.
+Corrected 2026-09-01 (R247(a)) because the two sentences that used to stand
+here were both false: ``audit.engine_module_count`` counts every ``.py`` under
+``mlb_engine/`` off the filesystem, so this is one of the counted modules and
+its tests are in the gated ``tests.test_core``; and tracked engine bytes DO
+reach in, deliberately, so that a definition lives once --
+``slate_intake_manager`` imports ``normalize_name`` for the DK-salary join, and
+``execution_pipeline`` and ``build_slate`` import ``degraded_entry_flags`` (which
+uses ``salary_left_bin``) so the archive's "at the cap" vocabulary and the
+delivered brief's cannot drift into disagreeing about the same dollar amount.
 
 TRUTHFUL LABELS: every output of this module is either an observed outcome
 read directly from a DK standings export or a deterministic descriptive
@@ -103,6 +110,30 @@ ROSTER_CONTRACTS = {
 MAX_UNPARSED_ENTRY_SHARE = 0.20
 AT_CAP_SALARY_LEFT = 100          # policy constant: "at the cap" band, dollars left
 SALARY_LEFT_BINS = (0, 100, 300, 700, 1500)  # bin edges for the salary-left histogram
+
+# R247(a). The bar for "this DELIVERED entry left money on the table", DERIVED
+# from the archive rather than chosen, because a number hardcoded forward is a
+# number nobody can argue with. Measured 2026-09-01 over data/archive/: 379
+# mined contests, 200,888 field entries carrying salary_left, slate dates
+# 2026-06-03 through 2026-08-13 (24 dates). Field salary_left runs median $200
+# Classic and $300 Showdown -- the "$200-$300" the item cites, confirmed at this
+# head -- with p99 $5,000 Classic and $3,900 Showdown. One bar at the Classic
+# p99 fires on about 1% of field entries and catches both filed sightings:
+# $6,100 on 1905_1g_sd is the 99.62nd percentile of the pooled field and
+# $10,300 on 1605_2g is the 99.94th. ONE bar rather than two on purpose; the
+# per-format numbers are in the CHANGELOG so a later session can split it on
+# evidence rather than on taste.
+DEGRADED_SALARY_LEFT = 5000
+# The second trigger's bar, and the archive CANNOT calibrate this one: the
+# archive carries observed `points` and not this run's own review proxy, so
+# setting a proxy bar against it would grade a prediction by an outcome, which
+# is the distinction CLAUDE.md's truthful-labels rule exists to keep. Measured
+# instead against OUR OWN delivered briefs, which is a prediction-only
+# comparison: of 174 briefs on disk 40 carry a frontier apex, and
+# ceiling_worst against ceiling_mean runs median 10.4% below, p90 21.0%, max
+# 24.2% -- and that max is 1605_2g, the filed sighting. A 25% bar therefore
+# sits just outside the observed p90 and catches the sighting.
+DEGRADED_PROXY_MARGIN_PCT = 25.0
 _SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 _ENTRYNAME_SEQ = re.compile(r"^(?P<user>.*?)\s*\((?P<k>\d+)\s*/\s*(?P<n>\d+)\)\s*$")
 
@@ -664,7 +695,14 @@ def resolve_salary_tiered(standings: Dict[str, Any], root: Path,
 # Per-contest mining
 # ---------------------------------------------------------------------------
 
-def _salary_left_bin(left: Optional[int]) -> str:
+def salary_left_bin(left: Optional[int]) -> str:
+    """One binning of salary-left, for the archived field and for our own file.
+
+    R247(a) made this public rather than copying it. It was `_salary_left_bin`
+    with one caller until 2026-09-01; the delivered-brief flag needs the same
+    bins, and a second set of edges is how the archive's histogram and the
+    build's histogram start describing the same dollar amount differently.
+    """
     if left is None:
         return "unknown"
     edges = SALARY_LEFT_BINS
@@ -674,6 +712,158 @@ def _salary_left_bin(left: Optional[int]) -> str:
         if lo < left <= hi:
             return f"{lo + 1}-{hi}"
     return f"> {edges[-1]}"
+
+
+def degraded_entry_flags(
+    entries: Sequence[Mapping[str, Any]],
+    salary_cap: int = SALARY_CAP,
+    salary_left_bar: int = DEGRADED_SALARY_LEFT,
+    proxy_margin_pct: float = DEGRADED_PROXY_MARGIN_PCT,
+) -> Dict[str, Any]:
+    """R247(a). Per-entry degradation flags over a DELIVERED portfolio.
+
+    A REPORT, never a gate. CLAUDE.md reserves "upload-ready" for a certified
+    export where the three certification gates pass, and nothing here touches
+    any of them: this function returns a dict and no caller may branch a
+    certification on it. It exists because a cap's cost lands on the tail of the
+    portfolio and every existing counter reads clean while it does -- the
+    1905_1g_sd sighting ($6,100 salary left, proxy 38.19 against a median of
+    54.87) and the 1605_2g Classic sighting ($10,300 left, all three gates
+    green) both had `counted_relaxations.clean` true, correctly, because
+    nothing relaxed.
+
+    ``entries`` is one mapping per ENTERED row, not per distinct lineup: two
+    entries holding one weak lineup are two degraded entries, and the entered
+    set is the object the operator uploads. Each mapping carries ``entry_id``,
+    a proxy under ``proxy``, and salary as either ``salary_used`` or
+    ``salary_left``. ``salary_cap`` is per format, so a caller with a contract
+    (Showdown) passes its own rather than assuming Classic's.
+
+    TWO INDEPENDENT TRIGGERS, deliberately beside each other and not nested.
+    Salary-left is the cheaper one and needs no proxy at all, so an entry with
+    no readable proxy still gets flagged on salary; the proxy margin catches the
+    lineup that spent the cap on the wrong players, which salary-left cannot
+    see. ``triggers`` names which fired, because "flagged" without the reason
+    sends the reader back to re-derive it.
+
+    Deterministic review proxy throughout. The proxy is whatever the caller's
+    own build scored with (Ceiling on Classic, Base on Showdown); it is a
+    projection input, so nothing here is ROI, a win rate, a cash rate, or a
+    probability claim.
+    """
+    rows = list(entries or [])
+    out: Dict[str, Any] = {
+        "available": False,
+        "unavailable_reason": None,
+        "entries": len(rows),
+        "is_review_proxy": True,
+        "is_gate": False,
+        "bars": {
+            "salary_left": int(salary_left_bar),
+            "salary_left_provenance": (
+                "archive p99: data/archive/, 379 mined contests, 200,888 field "
+                "entries, slate dates 2026-06-03 through 2026-08-13"),
+            "proxy_margin_pct": float(proxy_margin_pct),
+            "proxy_margin_provenance": (
+                "our own delivered briefs (40 of 174 carry a frontier apex): "
+                "ceiling_worst vs ceiling_mean median 10.4% below, p90 21.0%, "
+                "max 24.2%. NOT archive-derived -- the archive carries observed "
+                "points and not this run's proxy, and calibrating a proxy bar "
+                "against an outcome would grade a prediction by its result"),
+            "salary_cap": int(salary_cap),
+        },
+    }
+    if not rows:
+        out["unavailable_reason"] = "no entered rows to measure"
+        return out
+
+    measured: List[Dict[str, Any]] = []
+    for r in rows:
+        left = r.get("salary_left")
+        if left is None:
+            used = r.get("salary_used")
+            if used is not None:
+                try:
+                    left = int(round(float(salary_cap) - float(used)))
+                except (TypeError, ValueError):
+                    left = None
+        else:
+            try:
+                left = int(round(float(left)))
+            except (TypeError, ValueError):
+                left = None
+        try:
+            proxy = float(r.get("proxy"))
+        except (TypeError, ValueError):
+            proxy = None
+        measured.append({
+            "entry_id": str(r.get("entry_id") or ""),
+            "salary_left": left,
+            "proxy": proxy,
+        })
+
+    proxies = [m["proxy"] for m in measured if m["proxy"] is not None]
+    median_proxy = statistics.median(proxies) if proxies else None
+    out["median_proxy"] = round(median_proxy, 2) if median_proxy is not None else None
+    # Named rather than zeroed, R127's boundary: an entry with no proxy is not an
+    # entry with a proxy of zero, and it can still be flagged on salary.
+    out["entries_without_proxy"] = sum(1 for m in measured if m["proxy"] is None)
+    out["entries_without_salary"] = sum(1 for m in measured if m["salary_left"] is None)
+
+    flagged: List[Dict[str, Any]] = []
+    for m in measured:
+        triggers: List[str] = []
+        below = None
+        if m["salary_left"] is not None and m["salary_left"] > salary_left_bar:
+            triggers.append("salary_left")
+        if m["proxy"] is not None and median_proxy:
+            below = round(100.0 * (1.0 - m["proxy"] / median_proxy), 1)
+            if below >= proxy_margin_pct:
+                triggers.append("proxy_margin")
+        if triggers:
+            flagged.append({
+                "entry_id": m["entry_id"],
+                "triggers": triggers,
+                "salary_left": m["salary_left"],
+                "salary_left_bin": salary_left_bin(m["salary_left"]),
+                "proxy": round(m["proxy"], 2) if m["proxy"] is not None else None,
+                "proxy_pct_below_median": below,
+            })
+    # Worst first on salary, then entry id: the reader wants the most degraded
+    # row at the top and the ordering must not move between runs on a tie.
+    flagged.sort(key=lambda d: (-(d["salary_left"] or 0), d["entry_id"]))
+    out["available"] = True
+    out["flagged"] = flagged
+    out["flagged_count"] = len(flagged)
+    # Consumed by R247(c)'s design axis, which has to tell an entry that survived
+    # a failed game by design from one that survived it by having nothing at
+    # stake. Exposed as sorted lists so that caller does not re-derive the bars.
+    #
+    # SPLIT BY TRIGGER, and that split is load-bearing rather than tidy. Found by
+    # running the first cut: on a slate where the binding game is also the
+    # highest-ceiling game, ANY entry that sits that game out scores below the
+    # portfolio median by construction, so a design axis keyed on "flagged at
+    # all" classified a full-cap hedge as degraded -- the exact conflation R247(c)
+    # exists to end, arriving from the other side. Money UNSPENT is the fact that
+    # separates a dead entry from a hedge: the 1605_2g lineup had $10,300 of it.
+    # A proxy-only flag is genuinely ambiguous and is named as such rather than
+    # forced into either bucket, which is R237's rule and R270(b)'s three-valued
+    # return applied to a third surface.
+    out["flagged_entry_ids"] = sorted(d["entry_id"] for d in flagged)
+    out["flagged_on_salary_entry_ids"] = sorted(
+        d["entry_id"] for d in flagged if "salary_left" in d["triggers"])
+    out["flagged_on_proxy_only_entry_ids"] = sorted(
+        d["entry_id"] for d in flagged if d["triggers"] == ["proxy_margin"])
+    out["salary_left_histogram"] = dict(
+        Counter(salary_left_bin(m["salary_left"]) for m in measured).most_common())
+    out["note"] = (
+        "deterministic review proxy over the ENTERED set; a REPORT and never a "
+        "gate, and it touches none of the three certification gates -- this "
+        "function does not name them, so it cannot branch on one. Never ROI, "
+        "win rate, cash rate, or a probability claim. A flagged entry is not an "
+        "illegal entry: it is one the operator should look at before uploading, "
+        "because every existing counter reads clean on exactly this failure")
+    return out
 
 
 def mine_contest(
@@ -782,7 +972,7 @@ def mine_contest(
     sp_pair_freq = Counter(e["sp_pair"] for e in complete if len(e["sp_pair"]) == 2)
     if has_salary:
         stack_hist: Counter = Counter(e["max_stack"] for e in complete)
-        salary_left_hist: Counter = Counter(_salary_left_bin(e.get("salary_left")) for e in complete)
+        salary_left_hist: Counter = Counter(salary_left_bin(e.get("salary_left")) for e in complete)
         at_cap_n: Optional[int] = sum(
             1 for e in complete if e.get("salary_left") is not None and e["salary_left"] <= AT_CAP_SALARY_LEFT
         )

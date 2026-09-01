@@ -2033,6 +2033,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # it once out loud where the operator reads before approving.
     exposure["frontier"] = result.get("portfolio_frontier")
     print(f"frontier: {format_frontier_line(exposure['frontier'])}", file=sys.stderr)
+    # R247(a). Read before approving, on the same footing as the frontier line.
+    # The block itself lives inside the frontier (it is computed where the
+    # entered set and the Ceiling column are both in hand); it is echoed here
+    # because a degraded tail is invisible in every other line this build prints.
+    print(f"degraded: "
+          f"{format_degraded_line((exposure['frontier'] or {}).get('degraded_entries'))}",
+          file=sys.stderr)
     print(f"factors: {format_inert_factors_line(factors_inert)}", file=sys.stderr)
     brief = {
         "status": "certified" if checks["passed"] else "verify_failed",
@@ -2615,6 +2622,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     }
     realized_player_pct = max((v["pct"] for v in player_exposure.values()), default=0.0)
 
+    degraded_entries = showdown_degraded_entries(assignments, bank)
+    print(f"degraded: {format_degraded_line(degraded_entries)}", file=sys.stderr)
+
     brief = {
         # Showdown ships as v0.2-review (cpt exposure cap added 2026-07-23) and
         # Phase 3 is not complete, so this path is labeled review-grade. It is
@@ -2694,6 +2704,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # It steers nothing: no thesis, posture, or constraint reads this key, and
         # `steers: False` says so in the artifact rather than only in a comment.
         "construction_shadow": construction_shadow,
+        # R247(a). BOTH formats. The two sightings that filed this item were
+        # Showdown (1905_1g_sd, $6,100 left and proxy 38.19 against a median of
+        # 54.87) and the third was Classic, so instrumenting only the Classic
+        # frontier would leave the originals uninstrumented. Same function, same
+        # archive-derived bars, and the Showdown contract's OWN salary cap rather
+        # than Classic's assumed. Read `entries_intact_by_design` on the Classic
+        # side for the other half; Showdown has no frontier to carry it.
+        "degraded_entries": degraded_entries,
         "diversity": {
             "max_shared_players": share_cap,
             "max_pairwise_overlap": max_overlap,
@@ -2914,18 +2932,103 @@ def format_frontier_line(frontier: dict | None) -> str:
     wash = frontier.get("washout") or {}
     if wash.get("available"):
         n = frontier.get("entries")
+        # R247(c). "N/n entries untouched" is the phrase that misled on 1605_2g,
+        # so the split travels with it here too. Printing the bare count and the
+        # split only in the JSON would leave the misleading number as the one a
+        # session at T-10 actually reads.
+        intact = wash.get("entries_fully_intact_at_binding_game")
+        by_design = wash.get("entries_intact_by_design_at_binding_game")
+        degraded = wash.get("entries_intact_but_degraded_at_binding_game")
+        ambiguous = wash.get("entries_intact_proxy_only_at_binding_game")
+        untouched = f"{intact}/{n} entries untouched"
+        if by_design is not None:
+            split = [f"{by_design} by design"]
+            if degraded:
+                split.append(f"{degraded} DEGRADED -- nothing at stake, "
+                             f"not a hedge")
+            if ambiguous:
+                split.append(f"{ambiguous} low-proxy only, which on this slate "
+                             f"cannot tell a hedge from a bad build")
+            untouched += " (" + "; ".join(split) + ")"
         parts.append(
             f"washout binds on {wash.get('binding_game')}: zeroing its bats "
             f"retains {wash.get('worst_ceiling_retained_pct')}% of portfolio "
-            f"ceiling with {wash.get('entries_fully_intact_at_binding_game')}"
-            f"/{n} entries untouched")
+            f"ceiling with {untouched}")
     else:
         parts.append(f"washout UNAVAILABLE ({wash.get('unavailable_reason')})")
+    block = frontier.get("correlated_block") or {}
+    if block.get("available"):
+        trip = block.get("worst_triple") or {}
+        parts.append(
+            f"worst triple {trip.get('entries_sharing')}/{block.get('entries')} "
+            f"entries, {block.get('entries_with_at_most_one_of_top_trio')}"
+            f"/{block.get('entries')} carry at most one of the top trio")
     if frontier.get("unpriced_roster_players"):
         parts.append(
             f"{len(frontier['unpriced_roster_players'])} rostered player(s) "
             f"carry no Ceiling, so the totals are SHORT")
     return " | ".join(parts) + " [review proxies, not probabilities]"
+
+
+def showdown_degraded_entries(assignments, bank) -> dict:
+    """R247(a) on the Showdown brief: the ENTERED rows, marshalled once.
+
+    A separate function for the same reason ``format_frontier_line`` is one --
+    code built inline in ``run_showdown`` is code nothing can test without a
+    solver, and the marshalling is where the mistakes live: the zip pairing
+    (a flagged entry_id has to name a row in the DELIVERED file), and the cap.
+
+    The Showdown contract's cap comes off the bank's own lineups
+    (``showdown._assemble_lineup`` writes ``salary_cap`` into each), so this
+    path never assumes Classic's. When the bank does not state one unanimously
+    no cap is passed at all and ``field_miner.SALARY_CAP`` applies, because a
+    literal here would be one more spelling of a number this repo already
+    spells ten ways.
+    """
+    from mlb_engine.field.field_miner import degraded_entry_flags
+    lineups = list(bank or [])
+    rows = list(assignments or [])
+    caps = {int(lu.get("salary_cap") or 0) for lu in lineups if lu.get("salary_cap")}
+    kwargs = {"salary_cap": caps.pop()} if len(caps) == 1 else {}
+    return degraded_entry_flags(
+        [{"entry_id": a.get("entry_id"), "proxy": lu.get("proj_points"),
+          "salary_used": lu.get("salary")}
+         for a, lu in zip(rows, lineups)],
+        **kwargs,
+    )
+
+
+def format_degraded_line(degraded: dict | None) -> str:
+    """One review line for R247(a)'s block, printed before the operator approves.
+
+    A separate function for the same reason `format_frontier_line` is one: a
+    print built inline is a print nothing can test. The wording says REPORT out
+    loud, because the one thing this must never be read as is a gate -- every
+    existing counter reads clean on exactly the failure it names, so an operator
+    who reads it as a blocker will conclude the build is broken when it is not.
+    """
+    if not degraded or not degraded.get("available"):
+        reason = (degraded or {}).get("unavailable_reason") or "not computed"
+        return f"UNAVAILABLE ({reason})"
+    n = degraded.get("entries")
+    flagged = degraded.get("flagged") or []
+    bars = degraded.get("bars") or {}
+    if not flagged:
+        return (f"0/{n} entries flagged (bars: salary-left > "
+                f"${bars.get('salary_left')}, proxy > "
+                f"{bars.get('proxy_margin_pct')}% below the median "
+                f"{degraded.get('median_proxy')}) [report, never a gate]")
+    worst = flagged[0]
+    detail = ", ".join(
+        f"{d['entry_id']} (${d['salary_left']} left"
+        + (f", {d['proxy_pct_below_median']}% below median" if "proxy_margin" in d["triggers"] else "")
+        + ")"
+        for d in flagged[:4])
+    more = f" +{len(flagged) - 4} more" if len(flagged) > 4 else ""
+    return (f"{len(flagged)}/{n} entries FLAGGED degraded: {detail}{more} "
+            f"[worst trigger {worst['triggers']}; bars ${bars.get('salary_left')} "
+            f"left / {bars.get('proxy_margin_pct')}% below median "
+            f"{degraded.get('median_proxy')}; a REPORT, never a gate]")
 
 
 def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:

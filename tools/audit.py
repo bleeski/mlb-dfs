@@ -419,7 +419,25 @@ EXPECTED_SUITE_COUNTS = {
     # dropped (R32's reading), a substitution appended to the order not minting
     # a tenth starter, and the boxscore URL builder going through the one leg
     # filter rather than becoming a second matcher.
-    "tests.test_core": 956,
+    # R247(a)+(c), 2026-09-01: 956 -> 983, the twenty-seven that pin the
+    # degraded-tail flag and the correlated-block line -- eight on the two bars
+    # and their provenance (the salary bar IS the archive p99 and names its
+    # window, the proxy bar is NOT archive-derived and says why, the two triggers
+    # reachable independently, both named when both fire, the two filed sightings
+    # caught and an at-cap portfolio not, a missing proxy named rather than
+    # zeroed, the report-never-a-gate source check, and one function object for
+    # the salary-left binner), six on the block itself (entries failing together,
+    # a mutation guard on the count, entered rows rather than distinct lineups,
+    # a stable tie-break, one entry reporting unavailable, names when the frame
+    # carries them), six on the design axis including the finding that changed
+    # it (a dead entry is not a hedge, a full-cap hedge IS design, and a
+    # cap-spending low-proxy entry is NEITHER and says so, plus the three
+    # buckets partitioning the count they correct), and seven on the surfaces
+    # that read it (the Classic frontier surviving a frame with no Salary, both
+    # build_slate lines, qa_portfolio no longer publishing the bare untouched
+    # count and naming a pre-R247 brief, and the Showdown brief's own cap,
+    # never-a-literal fallback, and entry_id-to-lineup pairing).
+    "tests.test_core": 983,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

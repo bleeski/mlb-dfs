@@ -158,6 +158,7 @@ import json
 import shutil
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence
 
@@ -2210,6 +2211,89 @@ def compute_game_script_coverage(projections: Any, candidates: Sequence[Mapping[
 FRONTIER_MATERIAL_BATS = 3
 
 
+def _correlated_block_report(
+    rosters: Sequence[Tuple[str, Sequence[str]]],
+    name_of: Optional[Mapping[str, str]] = None,
+) -> Dict[str, Any]:
+    """R247(c) axis one: the worst k-subset and the top-trio spread.
+
+    The washout objective binds at the PORTFOLIO level -- correlated failure
+    ACROSS entries, per CLAUDE.md's dual-objective note -- and no counter
+    reported it. `max_shared_players` bounds one PAIR of lineups, the exposure
+    caps bound one PERSON across the set, and neither answers "how many entries
+    die together": a block of three players in seven of twenty-three entries is
+    seven entries that fail as one, with every pairwise bound and every
+    exposure cap clean. The fragment's measured example is worst triple 7 of 23
+    and 11 of 23 carrying at most one of the top trio.
+
+    Counted off each entry's OWN subsets, which is exact: a k-subset shared by
+    m entries is counted m times and never missed, because every entry
+    containing it enumerates it. 45 pairs and 120 triples per 10-slot entry.
+
+    Deterministic review proxy. A count of entries, never a probability that
+    they fail.
+    """
+    import itertools
+    rows = [(str(eid), sorted({str(p).strip() for p in ids if str(p).strip()}))
+            for eid, ids in (rosters or [])]
+    rows = [(eid, ids) for eid, ids in rows if ids]
+    n = len(rows)
+    out: Dict[str, Any] = {
+        "available": False, "unavailable_reason": None, "entries": n,
+        "is_review_proxy": True,
+    }
+    if n < 2:
+        out["unavailable_reason"] = (
+            "a correlated block is a property of two or more entries; this "
+            f"portfolio has {n}")
+        return out
+
+    def label(pid: str) -> str:
+        nm = (name_of or {}).get(pid) or ""
+        return f"{nm} ({pid})" if nm else pid
+
+    exposure: Counter = Counter()
+    for _eid, ids in rows:
+        exposure.update(ids)
+    worst: Dict[str, Any] = {}
+    for k in (2, 3):
+        counts: Counter = Counter()
+        for _eid, ids in rows:
+            if len(ids) >= k:
+                counts.update(itertools.combinations(ids, k))
+        if not counts:
+            continue
+        # Tie-break on the player ids so the named block does not move run to
+        # run: identical-count blocks are routine on a small slate.
+        block, cnt = max(counts.items(), key=lambda kv: (kv[1], tuple(kv[0])))
+        worst[f"worst_{'pair' if k == 2 else 'triple'}"] = {
+            "players": [label(p) for p in block],
+            "player_ids": list(block),
+            "entries_sharing": cnt,
+            "entries_sharing_pct": round(100.0 * cnt / n, 1),
+        }
+    out.update(worst)
+
+    # The top trio by exposure, tie-broken on the id. "At most one of the top
+    # trio" is the spread half of the same fact: the worst block says how many
+    # entries die together, this says how many are clear of the concentration.
+    trio = [p for p, _c in sorted(exposure.items(), key=lambda kv: (-kv[1], kv[0]))[:3]]
+    at_most_one = sum(1 for _eid, ids in rows if len(set(ids) & set(trio)) <= 1)
+    out["available"] = True
+    out["top_trio"] = [label(p) for p in trio]
+    out["top_trio_exposure"] = [[label(p), exposure[p]] for p in trio]
+    out["entries_with_at_most_one_of_top_trio"] = at_most_one
+    out["entries_with_at_most_one_of_top_trio_pct"] = round(100.0 * at_most_one / n, 1)
+    out["distinct_rostered_players"] = len(exposure)
+    out["note"] = (
+        "correlated failure across ENTRIES, which is where the washout "
+        "objective binds; deterministic review proxies, never a probability "
+        "that a block fails. entries_sharing counts ENTERED rows, so two "
+        "entries holding one lineup count twice -- they die together and pay "
+        "twice. A report, never a gate")
+    return out
+
+
 def compute_portfolio_frontier(
     projections: Any, assignments: Sequence[Mapping[str, Any]]
 ) -> Dict[str, Any]:
@@ -2275,11 +2359,24 @@ def compute_portfolio_frontier(
                     if c in cols), None)
     ceiling: Dict[str, float] = {}
     game_of: Dict[str, str] = {}
+    salary_of: Dict[str, float] = {}
+    name_of: Dict[str, str] = {}
     pitchers: set = set()
     for _, r in projections.iterrows():
         pid = str(r.get("Player_ID") or "").strip()
         if not pid:
             continue
+        # R247(a). Salary and Name are read on the same pass and are BOTH
+        # optional: a frame without Salary loses the salary-left trigger and
+        # keeps the proxy one, which is why the two triggers sit beside each
+        # other in `degraded_entry_flags` rather than one inside the other.
+        if "Salary" in cols:
+            try:
+                salary_of[pid] = float(r.get("Salary"))
+            except (TypeError, ValueError):
+                pass
+        if "Name" in cols:
+            name_of[pid] = str(r.get("Name") or "").strip()
         # Classification first, ceiling second. An unparseable Ceiling must not
         # also cost the row its game and its position: a player who fell out of
         # `ceiling` while staying out of `pitchers` would be counted as a bat in
@@ -2324,6 +2421,32 @@ def compute_portfolio_frontier(
         "ceiling_worst": round(worst[0], 2),
         "worst_entry_id": worst[1],
     }
+    # R247(a). The degraded-tail flag, on the ENTERED set, beside the apex block
+    # a reader has already reached. The bars and their provenance come from
+    # `field_miner`, which owns the "at the cap" vocabulary and the salary-left
+    # bins the archive is described in; restating either here is how the two
+    # start disagreeing about one dollar amount.
+    # Lazily, the way `slate_intake_manager` already imports this module's
+    # `normalize_name`: it is the established shape for taking a definition from
+    # field_miner rather than restating it, and it keeps a review-only module off
+    # the engine's load-time import graph.
+    from mlb_engine.field.field_miner import degraded_entry_flags
+    proxy_by_entry = {eid: total for total, eid in totals}
+    out["degraded_entries"] = degraded_entry_flags([
+        {
+            "entry_id": eid,
+            "proxy": proxy_by_entry.get(eid),
+            "salary_used": (sum(salary_of[p] for p in ids if p in salary_of)
+                            if salary_of and all(p in salary_of for p in ids)
+                            else None),
+        }
+        for eid, ids in rosters
+    ])
+    # R247(c) axis one: the worst k-subset and the top trio. Counted by walking
+    # each ENTRY's own C(10,k) subsets rather than every k-subset of the rostered
+    # pool, which is both exact and cheap -- 45 pairs and 120 triples per entry
+    # against C(100,3) = 161,700 triples for a 100-player pool.
+    out["correlated_block"] = _correlated_block_report(rosters, name_of)
     out["roster_players"] = sum(len(ids) for _, ids in rosters)
     out["unpriced_roster_players"] = sorted(unpriced)
     if unpriced:
@@ -2349,9 +2472,32 @@ def compute_portfolio_frontier(
     # finding, and it would dilute the ordering below.
     touched = sorted({game_of.get(p, "") for _, ids in rosters for p in ids
                       if p not in pitchers and game_of.get(p, "")})
+    # R247(c) axis two. `entries_fully_intact` cannot tell a designed hedge from
+    # an entry that had nothing at stake anywhere, and on 1605_2g it scored the
+    # defect as protection: the weaker of two builds showed "2 of 7 entries
+    # untouched" against the stronger one's 1 of 7, and its second untouched
+    # entry WAS the $10,300-salary-left lineup. It survived a zeroed BAL@ATH
+    # because it was cheap and weak, not because it avoided that game on purpose.
+    #
+    # THREE buckets, not two, and the third is the whole lesson of this cut. The
+    # first version keyed "degraded" on R247(a) flagging an entry AT ALL, and its
+    # own test caught the consequence: on a slate whose binding game is also the
+    # highest-ceiling game -- which is the common case, since the binding game
+    # binds by carrying the most portfolio ceiling -- an entry that sits that
+    # game out scores below the portfolio median BY CONSTRUCTION. So the proxy
+    # trigger fires on every real hedge, and keying on it inverted the very
+    # judgement R247(c) exists to make. Money UNSPENT is what separates a dead
+    # entry from a hedge (the 1605_2g lineup had $10,300 of it), so the degraded
+    # bucket keys on the SALARY trigger; an entry flagged on proxy alone is
+    # genuinely ambiguous and gets its own name rather than a forced answer,
+    # which is R237's rule and R270(b)'s three-valued return on a third surface.
+    deg_block = out.get("degraded_entries") or {}
+    dead_ids = set(deg_block.get("flagged_on_salary_entry_ids") or [])
+    proxy_only_ids = set(deg_block.get("flagged_on_proxy_only_entry_ids") or [])
     for g in touched:
         bats: List[int] = []
         retained = 0.0
+        intact_ids: List[str] = []
         for _eid, ids in rosters:
             drawn = 0
             for p in ids:
@@ -2360,14 +2506,27 @@ def compute_portfolio_frontier(
                     continue  # zeroed: this is the counterfactual
                 retained += ceiling.get(p, 0.0)
             bats.append(drawn)
+            if drawn == 0:
+                intact_ids.append(str(_eid))
         hist: Dict[int, int] = {}
         for k in bats:
             hist[k] = hist.get(k, 0) + 1
+        intact_dead = sorted(e for e in intact_ids if e in dead_ids)
+        intact_proxy_only = sorted(e for e in intact_ids if e in proxy_only_ids)
         by_game.append({
             "game": g,
             "ceiling_retained_pct": (round(100.0 * retained / ceiling_total, 1)
                                      if ceiling_total else None),
             "entries_fully_intact": hist.get(0, 0),
+            # The split, per game, on the same footing as the count it corrects.
+            # The three partition it: a hedge, an entry with nothing at stake,
+            # and one this measure cannot tell apart.
+            "entries_intact_by_design": (len(intact_ids) - len(intact_dead)
+                                         - len(intact_proxy_only)),
+            "entries_intact_but_degraded": len(intact_dead),
+            "entries_intact_proxy_only": len(intact_proxy_only),
+            "intact_but_degraded_entry_ids": intact_dead,
+            "intact_proxy_only_entry_ids": intact_proxy_only,
             "entries_materially_exposed": sum(
                 1 for k in bats if k >= FRONTIER_MATERIAL_BATS),
             "max_bats_in_one_entry": max(bats),
@@ -2388,6 +2547,14 @@ def compute_portfolio_frontier(
                                       if binding else None),
         "entries_fully_intact_at_binding_game": (binding["entries_fully_intact"]
                                                  if binding else None),
+        # R247(c). The number above is the one that misled on 1605_2g, so its
+        # split travels beside it at the top level and not only inside by_game.
+        "entries_intact_by_design_at_binding_game": (
+            binding["entries_intact_by_design"] if binding else None),
+        "entries_intact_but_degraded_at_binding_game": (
+            binding["entries_intact_but_degraded"] if binding else None),
+        "entries_intact_proxy_only_at_binding_game": (
+            binding["entries_intact_proxy_only"] if binding else None),
         "note": (
             "each row zeroes that game's HITTERS and keeps every arm, so "
             "ceiling_retained_pct is bounded below by the arms plus the other "
@@ -2397,7 +2564,13 @@ def compute_portfolio_frontier(
             "and it is the number that separated the two 2138_2g builds -- a "
             "portfolio where every entry draws bats from the binding game has "
             "nothing left when that game goes cold, whatever its retained "
-            "percent"),
+            "percent. R247(c): read entries_intact_by_design, not "
+            "entries_fully_intact. An entry with money UNSPENT that is 'intact' "
+            "here survived by having nothing at stake, which is a cost counted "
+            "as protection. entries_intact_proxy_only is neither answer and says "
+            "so: on a slate whose binding game carries the most ceiling, sitting "
+            "that game out costs proxy by construction, so a low proxy alone "
+            "cannot distinguish a hedge from a badly built entry"),
     }
     out["note"] = _FRONTIER_NOTE
     return out

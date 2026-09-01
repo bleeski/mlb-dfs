@@ -39,6 +39,60 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-01, DEV, claim `engine` (`engine_2026-09-01`, re-taken):
+**R247(a) and R247(c) SHIPPED. Gate 1535 -> 1562. Slot 4's lead item was taken
+ahead of slots 1 and 2, and that is a resequencing that needs its reason on the
+record.***
+
+***Slots 1 and 2 were BLOCKED, not outranked.** Slot 1's lead argument was lost
+to its own landing: R268(a) — the swap re-deriving `max_player_exposure_pct`
+tighter than the parent shipped — was the SECOND independent reason the
+`1305_12g` swap refused, and `tools/repair_entry.py` now routes around the swap's
+control re-derivation entirely, so R268(a) no longer blocks a REPAIR. It blocks a
+SWAP, which is a narrower claim than the entry was written against, and R268(b)
+is XS and belongs with the next swap-path session rather than leading a batch.
+Slot 2's strongest member is blocked on a fetch only Ben can run: R279 needs a
+boxscore artifact on disk and no session container reaches `statsapi.mlb.com`
+(proxy 403, measured twice). The rest of slot 2 is real but prospective, which
+R248's own second-sighting note concedes. Nothing below slot 4 renumbered.*
+
+***Why the instrument went before the two optimizer defects it measures.** R165
+changes concentration and R247(a)/(c) is what shows whether concentration got
+better or worse. Ship the instrument after the change and the change is
+unmeasurable; ship it first and the next two commits get a real before/after.
+That is R277's lesson applied to sequencing rather than to a measurement:
+construct the comparison that holds the variable fixed.*
+
+***And R247(c) was scoring the defect as protection.** The 08-30 rider measured a
+$10,300-salary-left Classic lineup counted as one of "2 of 7 entries untouched" —
+it survived a zeroed BAL@ATH because it had nothing at stake, not because it was
+a hedge. That number is now split three ways, and the third bucket is the finding
+this commit is worth remembering for: the first cut split it TWO ways on whether
+the degraded flag fired at all, and its own test caught that the binding game
+binds by carrying the most portfolio ceiling, so any entry sitting that game out
+scores below the median BY CONSTRUCTION — keying the design axis on the flag
+therefore called every real hedge degraded, inverting the judgement the item
+exists to make. Money UNSPENT is the discriminator; a low proxy alone is
+genuinely ambiguous and gets its own bucket rather than a forced answer.*
+
+***One premise came back FALSE and it was the premise CHECK, not the entry.** The
+handoff reported that `cap_reassignments` does not exist at this head. It does:
+`build_slate.py:2679` writes it onto the delivered Showdown brief, assembled from
+three engine lists. The check searched `mlb_engine/` and `tools/`; the brief is
+assembled in `skills/`. **An enumeration that excludes `skills/` cannot see the
+delivered brief** — worth carrying forward, because four of the last six R233
+enumerations were scoped that way. R247(b) is rewritten on the board to name the
+real key and its three sources. R281 is filed from the same enumeration: `50000`
+is spelled ten times across six modules and only `repair_entry.py` imports it.*
+
+***The mutation survivor is R267(a)'s survivor one session later, in a new
+place.** M12 deleted the Showdown contract-cap read and passed everything,
+because the fixture's cap was 50,000 — the number the default falls back to.
+Showdown's real cap equals Classic's today, which is exactly why the lineup
+carries the contract's own value instead of anyone assuming it. **A guard with a
+test is not a guard that is tested unless the fixture can tell the two answers
+apart.** Fixture moved to 45,000, M12 dies.*
+
 *2026-08-31 (fourth note this date), DEV, claim `engine` (`engine_2026-09-01`):
 **R270(b), R267(a) and R272 all SHIPPED, in two commits with the gate run
 between them, and slots 1 and 2 are SWAPPED.** Gate 1509 -> 1520 -> 1535. The
@@ -712,8 +766,15 @@ remaining claim is actually first, which is what the ordering is for. Slots
    and R279 is now the strongest single claim in it, because it is the only
    member with a field sighting rather than a prospective one.
 3. **R165 + R163** — unchanged content, down one: its evidence is unchanged
-   while the Showdown slot gained two live hits.
-4. **Showdown ladder truth: R247 + R237 + R224** — **R158, R223 and R250 all
+   while the Showdown slot gained two live hits. **TAKEN 2026-09-01** with slot
+   4's lead item; see the note at the top for why slots 1 and 2 were jumped.
+4. **Showdown ladder truth: R237 + R224** — **R247(a) and R247(c) SHIPPED
+   2026-09-01** (see CHANGELOG.md), taken ahead of the rest of this slot because
+   they are the instrument that makes R165's concentration change measurable and
+   because (c) is the only thing on this board that measures the washout
+   objective at the portfolio level. R247 keeps (b) — XS, Showdown-only, and its
+   target was misstated twice, so read the rewritten entry before building it —
+   and (d), which is Ben's. **R158, R223 and R250 all
    SHIPPED 2026-08-30** (see CHANGELOG.md), in that order and separately; what
    is left in this slot is the visibility half. The solver-status precondition
    (F-08) is met, so anything here may now trust a solve result and read a
@@ -2644,54 +2705,76 @@ pitchers-duel rework.
 scripts), weight decision-gated; measured against the archive's captain-salary
 distribution before any weight above minimal.
 
-### R247. Cap cost is invisible: tightening a cap moved twelve slots from the four best players to the four worst, degraded one lineup to $6,100 salary-left, and every counter read clean (P1, S for (a)–(c); (d) is Ben's) | new 2026-08-27, merged from BUILD fragments `2026-08-27_BUILD_player-exposure-cap-is-skill-blind.md` and `2026-08-27_BUILD_showdown_tightened_cap_degrades_bank_tail_uncounted.md`; corroborated by the outside spec ed8 (F-35, F-37)
+### R247. Cap cost is invisible, REMAINDER: the reassignment records a label move and not a proxy delta, and the skill-aware-cap direction is Ben's (P2, XS for (b); (d) is Ben's) | new 2026-08-27, merged from BUILD fragments `2026-08-27_BUILD_player-exposure-cap-is-skill-blind.md` and `2026-08-27_BUILD_showdown_tightened_cap_degrades_bank_tail_uncounted.md`; corroborated by the outside spec ed8 (F-35, F-37). **(a) and (c) CLOSED 2026-09-01**, migrated to CHANGELOG.md
 
-**What.** Two measured faces of one fact. On 2145_1g_sd, tightening
-`max_player_exposure_pct` 0.50→0.40 moved 12 roster slots off the four
-BUY-graded players onto the four FADE-graded ones (roster leverage 55.9→25.4
-against a labeled prior). On 1905_1g_sd the same tightening landed its whole
-cost on the last lineup off the ladder: $6,100 salary left (archive medians
-$200-$300), proxy 38.19 against a portfolio median of 54.87, label naming a
-captain the cap had reassigned away — and `counted_relaxations.clean` was
-true throughout, correctly, because nothing relaxed.
+**(a) and (c) shipped 2026-09-01** and left with the entry text that described
+them. What they built: the delivered brief on BOTH formats now flags any entry
+past an archive-derived salary-left bar ($5,000, the Classic p99 over 379 mined
+contests and 200,888 field entries, 2026-06-03 to 2026-08-13) or 25% below the
+portfolio median review proxy; and the washout block reports the correlated
+block (worst shared pair and triple, top trio, entries carrying at most one of
+it) plus a THREE-way split of `entries_fully_intact` that stops a dead entry
+being counted as a hedge. Report-only, no delivered byte changed. The design
+axis keys on money UNSPENT rather than on the flag as a whole, because the
+binding game binds by carrying the most portfolio ceiling, so an entry that
+sits it out scores below the median by construction and the first cut called
+every real hedge degraded.
 
-**Why.** R153's own lesson one level up: a portfolio is not clean because the
-counters read zero. The cap binds at the top of the exposure distribution,
-which is where a working build concentrates, so its first-order effect is to
-demote the players the projection liked most; whether that is protection or
-damage depends on whether the concentration was right, and nothing currently
-shows the operator the trade.
+**(b) REMAINS, and its target was misstated twice.** The Fix line said extend
+`cap_reassignments` with the proxy delta. The 2026-09-01 handoff's premise check
+then reported that no such key exists and that the entry should be rewritten to
+name `showdown_theses`' three reassignment lists. Both are wrong, and checked at
+`add35ac`:
 
-**Fix.** (a) Brief flags any lineup whose proxy falls a stated margin below
-the portfolio median or whose salary-left exceeds a bar (archive medians are
-the reference); (b) `cap_reassignments` records the proxy DELTA (thesis before
-and after substitution), not just that the label moved; (c) a correlated-block
-line: worst k-subset sharing count and "entries carrying at most one of the
-top trio" — the fragment's measured example (worst triple 7 of 23, 11 of 23
-with at most one) is the actual washout answer no counter reports. (d) The
-skill-aware-cap DIRECTION (scale the cap by the build's own Base rank, or cap
-correlated blocks instead of persons) is a strategy change and Ben's decision;
-it goes to Tier 4 with (a)–(c)'s numbers as its evidence.
+- The key IS real and singular where it matters. `build_slate.py:2679` writes
+  `player_exposure.cap_reassignments` onto the delivered Showdown brief.
+- It is assembled at `build_slate.py:2516-2518` from **three** engine lists, not
+  the two the handoff's "three lists" named: `player_cap_cpt_reassigned`
+  (`showdown_theses.py:940`), `cpt_cap_reassigned` (`:942`) and
+  `contest_cpt_reassigned` — the third is a fourth reassignment source the
+  handoff did not have. `player_cap_locks_dropped` (`:941`) goes to the SIBLING
+  brief key `locks_dropped`, not into this one.
+- The premise check missed it because it searched `mlb_engine/` and `tools/`, and
+  the brief is assembled in `skills/`, which is in the DEV write set. **An
+  enumeration that excludes `skills/` cannot see the delivered brief.**
 
-**First CLASSIC sighting, 2026-08-30** (from BUILD fragment
-`2026-08-30_BUILD_standing-data-driven-qa.md` §C, slate `1605_2g`, 7 entries on
-2 games). Both filed sightings were Showdown, which left open whether this is a
-Showdown-ladder artifact. It is not. A certified Classic build carried a lineup
-with **$10,300 salary left**, against the $6,100 the 1905_1g_sd sighting
-reported, with the same signature exactly: `counted_relaxations` zero,
-`relaxations: 0`, all three gates green, every counter clean because nothing
-relaxed. This strengthens R247(a): the flag belongs on the delivered brief for
-both formats, and the salary-left bar is the cheaper of the two triggers.
+So the work is: attach the proxy delta where the reassignment is DECIDED (per
+list, in `showdown_theses`, since only that function knows the thesis before and
+after substitution) and carry it through the three-list merge at
+`build_slate.py:2516`. The brief key does not need renaming. Anyone building
+this re-checks the three source names first: R223's own comment at
+`showdown_theses.py:1091-1094` records that this class has already been
+miscounted once.
 
-**And one consequence that changes what R247(c) has to measure: the degraded
-entry INFLATED the washout proxy.** Comparing two builds of that slate, the
-weaker one showed "2 of 7 entries untouched" against the stronger one's 1 of 7,
-and its second untouched entry WAS the $10,300 lineup. It survived a zeroed
-BAL@ATH because it was cheap and weak, not because it was a designed hedge. A
-washout count that cannot tell a hedge from a dead entry will keep scoring the
-defect as protection, so R247(c)'s correlated-block line needs a second axis:
-survival attributed to design (low overlap with the failed block) versus
-survival attributed to a lineup that had nothing at stake anywhere.
+**(d) REMAINS and is Ben's.** The skill-aware-cap DIRECTION (scale the cap by
+the build's own Base rank, or cap correlated blocks instead of persons) is a
+strategy change, in Tier 4. Its evidence now exists rather than being promised:
+(a)'s degraded-entry flag and (c)'s correlated-block line are numbers off
+delivered files, which is the whole reason they went first.
+
+### R281. `50000` is spelled ten times across six modules, and only one site imports it (P3, S) | new 2026-09-01, from R247(a)'s class-A R233 enumeration; verified in tree by AST walk
+
+- **What:** the DK salary cap is defined independently at
+  `mlb_engine/field/field_miner.py:89`, `mlb_engine/optimize/optimizer_v3.py:236`,
+  `mlb_engine/entries/dk_entries_manager.py:957` (a bare inline literal inside
+  the comparison), `mlb_engine/swap/late_swap_manager.py:91` and `:171`,
+  `mlb_engine/optimize/roster_contracts.py:51` and `:65`,
+  `tools/preflight_upload.py:103`, `tools/qa_portfolio.py:468` (a float, so a
+  separate object even at the same value), and
+  `skills/generate-lineups/scripts/build_slate.py:89`. `tools/repair_entry.py:97`
+  is the only site that IMPORTS rather than redefining, and its own comment at
+  `:85-86` states the rule the other nine break.
+- **Why it is P3 and not P1:** every copy currently holds the same value, so
+  nothing is wrong today. It is filed because the two `roster_contracts` entries
+  exist precisely so a contract can carry its own cap, and the moment one does,
+  eight sites disagree silently — this is R167/R159's shape with the disagreement
+  still in the future rather than already paid for.
+- **Fix:** `roster_contracts` is the natural owner (it already models the cap as
+  a per-contract property), so the direction is one definition there plus a
+  module-level alias where a hot path wants a bare int. What makes this its own
+  item rather than a rider: six modules, and it crosses the `optimize` /
+  `entries` / `field` / `tools` boundaries, so the dependency direction is a real
+  question and not a find-and-replace.
 
 ### R249. Showdown has no projection input, so the operator's only lever is rewriting the salary file, invisibly (P1, S) | new 2026-08-27, merged from BUILD fragment `2026-08-27_BUILD_showdown-has-no-projection-input.md`; corroborated by the outside spec ed8 (F-40)
 

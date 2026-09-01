@@ -25,6 +25,193 @@ performance claim.
 
 ---
 
+## 2026-09-01 — R247(a) + R247(c): the degraded tail gets a name, and the washout count stops scoring a dead entry as a hedge
+
+**What moved.** `mlb_engine/field/field_miner.py` (two archive-derived bars,
+`_salary_left_bin` made public as the one binner, `degraded_entry_flags`, and a
+header whose two status sentences were false),
+`mlb_engine/pipeline/execution_pipeline.py` (`_correlated_block_report` new;
+`compute_portfolio_frontier` gains `degraded_entries`, `correlated_block`, and
+the three-way split of `entries_fully_intact`),
+`skills/generate-lineups/scripts/build_slate.py`
+(`showdown_degraded_entries`, `format_degraded_line`, the split inside
+`format_frontier_line`, and the key on the Showdown brief),
+`tools/qa_portfolio.py` (it was the loudest publisher of the number this item
+corrects), `mlb_engine/optimize/optimizer_v3.py` (one enumeration hit fixed, no
+value change), `tests/test_core.py` (twenty-seven new), `tools/audit.py` and
+`CLAUDE.md` (the pin and the quoted line). Gate **1535 -> 1562**.
+**Report-only: no delivered byte changes on either format.**
+
+**The defect.** A cap binds at the top of the exposure distribution, which is
+where a working build concentrates, so its first-order effect is to demote the
+players the projection liked most and its cost lands on the tail of the
+portfolio. Every existing counter reads clean while that happens, and correctly:
+`counted_relaxations.clean` was true on all three filed sightings because
+nothing relaxed. 1905_1g_sd carried a lineup with $6,100 salary left and a proxy
+of 38.19 against a portfolio median of 54.87; 1605_2g, a CERTIFIED Classic build
+with all three gates green, carried one with **$10,300 left**.
+
+**The bars are DERIVED, and the two are derived differently on purpose.**
+Measured over `data/archive/` at this head: 379 mined contests, 200,888 field
+entries carrying `salary_left`, slate dates 2026-06-03 through 2026-08-13 (24
+dates). Field `salary_left` runs median **$200** Classic and **$300** Showdown,
+which confirms the "$200-$300" the item cites, with p99 **$5,000** Classic and
+**$3,900** Showdown. `DEGRADED_SALARY_LEFT = 5000` is that Classic p99: it fires
+on about 1% of field entries, and both filed sightings clear it ($6,100 is the
+99.62nd percentile of the pooled field, $10,300 the 99.94th). ONE bar rather
+than two, with the per-format numbers recorded here so a later session can split
+it on evidence rather than taste. The proxy bar could NOT be derived the same
+way and says so in the artifact: the archive carries observed `points` and not
+this run's own review proxy, so calibrating a proxy bar against it would grade a
+prediction by its outcome, which is exactly the line CLAUDE.md's truthful-labels
+rule draws. It is measured against OUR OWN briefs instead, a prediction-only
+comparison: of 174 briefs on disk 40 carry a frontier apex, and `ceiling_worst`
+against `ceiling_mean` runs median 10.4% below, p90 21.0%, max 24.2% — and that
+max IS 1605_2g. `DEGRADED_PROXY_MARGIN_PCT = 25.0` sits just outside the
+observed p90 and catches the sighting.
+
+**Two triggers, beside each other rather than nested.** Salary-left needs no
+proxy and the proxy margin needs no salary, so an entry with only one of the two
+inputs is still reachable by the trigger that input feeds — which is what
+"beside" means operationally, and it is tested from both sides. `triggers` names
+which fired, because "flagged" without the reason sends the reader back to
+re-derive it.
+
+**R247(c), and the finding that changed its design.** The first cut split
+`entries_fully_intact` two ways on whether R247(a) flagged the entry at all. Its
+own test caught the consequence: the binding game binds by carrying the most
+portfolio ceiling, so an entry that sits that game out scores below the
+portfolio median BY CONSTRUCTION, and keying "degraded" on any flag classified
+every real hedge as degraded — the exact conflation this item exists to end,
+arriving from the other side. **Money UNSPENT is what separates a dead entry
+from a hedge** (the 1605_2g lineup had $10,300 of it), so the degraded bucket
+keys on the SALARY trigger, and an entry flagged on proxy alone gets
+`entries_intact_proxy_only` rather than a forced answer. That is R237's rule and
+R270(b)'s three-valued return on a third surface, and the three buckets are
+tested to PARTITION the count they correct rather than sit beside it.
+
+**Axis one, the block no control measures.** `max_shared_players` bounds one
+PAIR of lineups and the exposure caps bound one PERSON across the set; neither
+answers "how many entries die together". `_correlated_block_report` reports the
+worst shared pair and triple with the entries sharing them, the top trio by
+exposure, and how many entries carry at most one of it. Counted off each entry's
+OWN subsets, which is exact and cheap: 45 pairs and 120 triples per 10-slot
+entry against C(100,3) = 161,700 for a 100-player pool. Counted over ENTERED
+rows, because two entries holding one lineup die together and pay twice.
+
+**BOTH formats.** The two sightings that filed the item were Showdown, so
+instrumenting only the Classic frontier would have left the originals
+uninstrumented. Showdown reads the CONTRACT's cap off the bank's own lineups
+(`showdown._assemble_lineup` already writes it) rather than assuming Classic's.
+Axis two stays Classic-only and that is stated rather than implied: it splits
+`entries_fully_intact`, and Showdown has no frontier to carry it.
+
+**A report, never a gate.** `is_gate: False` in the artifact, the note says so,
+and a test asserts `degraded_entry_flags`' source names none of `upload_ready`,
+`workflow_valid`, `selection_certified`, `allocation_certified` — a function
+that never mentions a gate cannot branch on one. The first cut FAILED that test
+on its own note, which named all three in prose to say it touched none of them;
+the prose was cut rather than the test loosened, because a check a comment can
+defeat is not a check.
+
+**R233 enumeration, two classes, run separately, callers by AST** (84 files
+walked for calls, imports, name loads and string constants; liveness is a
+separate question from existence).
+
+*Class A — every site computing salary-left or an "at the cap"/salary band over
+a lineup or entry, plus every writer of a per-entry flag onto a brief: **40
+sites**, zero dead* (the item named none; the handoff named four). Three FIXED:
+`_salary_left_bin` became the public `salary_left_bin` so the archive histogram
+and the delivered flag share one body rather than two sets of edges (the private
+name is GONE, not aliased, and a test asserts that); `optimizer_v3.py:3649`
+restated `COMMON_SALARY_BAND_THRESHOLD`'s 49800 as a literal ten lines from the
+constant that names it, which is R167/R159's shape at its cheapest — value
+unchanged, so no recorded band moves; and the second band's label now derives
+its upper edge from the same constant instead of hardcoding 49799. KEPT with
+reasons: the 49200 and 48500 edges (no constant exists for either and minting
+two would be inventing band vocabulary this item did not ask for), `field_miner`
+`score_duplication_risk`'s `at_cap_salary` flag (CLI-selftest-only and recorded
+as unwired on the board already), and `late_swap_manager.salary_remaining` /
+`partial_rebuild_constraints` (reachable only from a test).
+
+**And the count worth carrying forward: `50000` is spelled TEN times.**
+`field_miner:89`, `optimizer_v3:236`, `dk_entries_manager:957` (inline literal),
+`late_swap_manager:91` and `:171`, `roster_contracts:51` and `:65`,
+`preflight_upload:103`, `qa_portfolio:468` (a float, so a separate object), and
+`build_slate:89`. Only `repair_entry.py:97` imports rather than redefining, and
+its own comment at `:85-86` states the rule the other nine break. Filed as
+**R281** rather than fixed here: six modules and a cross-package dependency
+question is its own item, and this commit deliberately adds no eleventh — the
+Showdown path passes no cap at all when the bank does not state one, so
+`field_miner.SALARY_CAP` applies, and a test pins that.
+
+*Class B — every site counting entries that survive a failed block, or reporting
+portfolio-level correlation across entries: **24 sites**, one dead* (the item
+named the frontier only). One FIXED and it is the one that mattered:
+`qa_portfolio.frontier_from_brief` read six keys out of the washout block and
+printed `entries_fully_intact_at_binding_game` as "N/n entries untouched" — so
+the ADVERSARIAL REVIEWER was the loudest publisher of the number R247(c) exists
+to correct, on the same artifact that now carries the split. It reads the split,
+the degraded tail and the correlated block, and it NAMES an archived brief that
+predates the split rather than silently falling through to the bare count, which
+is how an old reading survives its own fix. `build_slate.format_frontier_line`
+carries the split too, because shipping it only into the JSON would leave the
+misleading number as the one a session at T-10 reads out loud. KEPT with
+reasons: `optimizer_v3.portfolio_redundancy_report` (pairwise by design, and it
+says so), the `max_shared_players` constraint sites (a bound, not a report), the
+Showdown ladder's own overlap counters (a different object — the bank, not the
+entered set), and the feasibility floor readers. DEAD:
+`contest_allocator.assign_lineups_to_contests` (~240 lines carrying its own
+`max_shared_players` limit, zero calls/imports/string refs) — that is R273's
+site, already adjudicated as a quarantine candidate and demoted to P3 on
+2026-08-31, so it is named here and NOT refiled.
+
+**Twelve mutations, three batches, eleven killed first pass, ONE SURVIVOR killed
+on re-run alone.** M12 deleted the Showdown contract-cap read entirely and
+passed everything, because the fixture's cap was 50,000 — the same number the
+default falls back to. That is R267(a)'s survivor shape exactly, one session
+later and in a new place: **a guard with a test is not a guard that is tested
+unless the fixture can tell the two answers apart.** Showdown's real cap equals
+Classic's today, which is precisely why `_assemble_lineup` writes the contract's
+own value onto every lineup instead of anyone assuming it; the fixture now uses
+45,000, asserts it differs from the default, and M12 dies. Target files restored
+byte-identical after all four batches (`0d790d341a9f`, `d1a71235e597`,
+`89123869f470`, `da5fcc6e7d42`) and the twelve anchors were GREPPED afterwards
+rather than the driver's own restore trusted.
+
+**Premise checks at this head, and one of them came back false.** R165 HOLDS
+with exact citations. R163 HOLDS. R247(a) HOLDS and the constants it needed are
+where the handoff said. R247(c) HOLDS and is genuinely new code (zero hits for
+worst-k-subset, correlated-block or a top-trio measure anywhere).
+**R247(b)'s premise check was itself wrong.** The handoff reported "there is no
+`cap_reassignments` key at this head" and told the next session to rewrite (b)
+to name `showdown_theses`' three lists. There IS one:
+`build_slate.py:2679` writes `player_exposure.cap_reassignments` onto the
+delivered Showdown brief, assembled at `:2516-2518` from **three** engine lists
+(`player_cap_cpt_reassigned`, `cpt_cap_reassigned`, `contest_cpt_reassigned` —
+the third is a fourth reassignment source the handoff's list of three did not
+have), with `player_cap_locks_dropped` going to the sibling key `locks_dropped`.
+The check searched `mlb_engine/` and `tools/` and the brief is assembled in
+`skills/`, which is in the DEV write set: **an enumeration that excludes
+`skills/` cannot see the delivered brief.** (b) is still out of scope and is
+rewritten on the board to name the real key and its three sources.
+
+**The `field_miner` header carried two false sentences and they are corrected.**
+It said the module is "deliberately OUTSIDE the audited engine and outside the
+26-file cap" and that "nothing here touches tracked engine bytes".
+`audit.engine_module_count` counts every `.py` under `mlb_engine/` off the
+filesystem, so it is one of the counted 27 and its tests are in the gated
+`tests.test_core`; and tracked engine bytes reach in deliberately, which is the
+point — `slate_intake_manager` has imported `normalize_name` since R270(b) for
+exactly this reason. The review-only claim that IS true (nothing here is
+auto-applied to projections, selection or the optimizer) stays.
+
+**Board.** R247 rewritten to hold (b) and (d) only, with (b)'s target corrected.
+R281 filed. Slot 4's lead item closes; slots 1 and 2 were JUMPED and the reason
+is recorded there, not here.
+
+---
+
 ## 2026-08-31 — R267(a) + R272: the one-slot search the bank structurally cannot perform, and the contract clause that lets it run without asking
 
 **What moved.** `tools/repair_entry.py` (new, ~470 lines),

@@ -348,12 +348,45 @@ def frontier_from_brief(brief: dict) -> List[str]:
             f"not compare this apex to another build's until the join is fixed.")
     wash = frontier.get("washout") or {}
     if wash.get("available"):
+        # R247(c). This tool used to print the bare "N/n entries untouched" and
+        # read nothing else, which made the adversarial reviewer the loudest
+        # publisher of the one number R247(c) exists to correct: on 1605_2g the
+        # weaker of two builds showed 2 of 7 untouched against the stronger
+        # one's 1 of 7, and its second untouched entry was the $10,300
+        # salary-left lineup. The split leads and the raw count follows it.
+        intact = wash.get("entries_fully_intact_at_binding_game")
+        by_design = wash.get("entries_intact_by_design_at_binding_game")
+        degraded = wash.get("entries_intact_but_degraded_at_binding_game")
+        ambiguous = wash.get("entries_intact_proxy_only_at_binding_game")
+        untouched = f"{intact}/{frontier.get('entries')} entries untouched"
+        if by_design is None:
+            untouched += (" (this brief predates R247(c), so the count is NOT "
+                          "split and a degraded entry in it reads as a hedge)")
+        elif degraded or ambiguous:
+            # by_game is sorted worst-first, so row 0 IS the binding game. Read
+            # defensively anyway: this tool reads an artifact it did not write.
+            binding_row = (wash.get("by_game") or [{}])[0]
+            untouched += f", of which {by_design} by DESIGN"
+            if degraded:
+                untouched += (
+                    f" and {degraded} DEGRADED: "
+                    f"{binding_row.get('intact_but_degraded_entry_ids')} "
+                    f"survived by having nothing at stake, which is a cost "
+                    f"being counted as protection")
+            if ambiguous:
+                untouched += (
+                    f" and {ambiguous} LOW-PROXY ONLY: "
+                    f"{binding_row.get('intact_proxy_only_entry_ids')} spent "
+                    f"the cap and still score low, which on a slate whose "
+                    f"binding game carries the most ceiling cannot tell a "
+                    f"hedge from a bad build")
+        else:
+            untouched += f", all {by_design} by DESIGN"
         out.append(
             f"WASHOUT binds on {wash.get('binding_game')}: zeroing that game's "
             f"bats and keeping the arms retains "
             f"{wash.get('worst_ceiling_retained_pct')}% of portfolio ceiling, "
-            f"with {wash.get('entries_fully_intact_at_binding_game')}/"
-            f"{frontier.get('entries')} entries untouched.")
+            f"with {untouched}.")
         for row in (wash.get("by_game") or [])[:6]:
             out.append(
                 f"  {row.get('game')}: retains {row.get('ceiling_retained_pct')}%, "
@@ -368,9 +401,52 @@ def frontier_from_brief(brief: dict) -> List[str]:
             "SAME apex and the SAME retained percent.")
         out.append(
             "ceiling_retained_pct falls as the slate shrinks, so it is not "
-            "comparable across slates; entries untouched is.")
+            "comparable across slates; entries untouched by DESIGN is.")
     else:
         out.append(f"WASHOUT: unavailable ({wash.get('unavailable_reason')})")
+    # R247(a)+(c). The two new blocks, read from the artifact on the same rule as
+    # everything above: when the brief states a number, the brief wins.
+    deg = frontier.get("degraded_entries") or {}
+    if deg.get("available"):
+        bars = deg.get("bars") or {}
+        if deg.get("flagged"):
+            out.append(
+                f"DEGRADED TAIL: {deg.get('flagged_count')}/{deg.get('entries')} "
+                f"entries flagged against archive-derived bars "
+                f"(salary-left > ${bars.get('salary_left')}, or proxy "
+                f"{bars.get('proxy_margin_pct')}% below the portfolio median "
+                f"{deg.get('median_proxy')}). A REPORT, never a gate: every "
+                f"relaxation counter reads clean on exactly this failure.")
+            for d in (deg.get("flagged") or [])[:6]:
+                out.append(
+                    f"  {d.get('entry_id')}: {d.get('triggers')}, "
+                    f"${d.get('salary_left')} left ({d.get('salary_left_bin')}), "
+                    f"proxy {d.get('proxy')}"
+                    + (f", {d.get('proxy_pct_below_median')}% below median"
+                       if d.get("proxy_pct_below_median") is not None else ""))
+        else:
+            out.append(
+                f"DEGRADED TAIL: none. 0/{deg.get('entries')} entries past "
+                f"${bars.get('salary_left')} salary-left or "
+                f"{bars.get('proxy_margin_pct')}% below the median proxy "
+                f"{deg.get('median_proxy')}.")
+    block = frontier.get("correlated_block") or {}
+    if block.get("available"):
+        trip = block.get("worst_triple") or {}
+        pair = block.get("worst_pair") or {}
+        n = block.get("entries")
+        out.append(
+            f"CORRELATED BLOCK: worst triple {trip.get('players')} in "
+            f"{trip.get('entries_sharing')}/{n} entries "
+            f"({trip.get('entries_sharing_pct')}%); worst pair "
+            f"{pair.get('entries_sharing')}/{n}; "
+            f"{block.get('entries_with_at_most_one_of_top_trio')}/{n} entries "
+            f"carry at most one of the top trio {block.get('top_trio')}.")
+        out.append(
+            "This is the washout objective's own axis and no cap measures it: "
+            "max_shared_players bounds one PAIR of lineups and the exposure "
+            "caps bound one PERSON, so a block of three in most of the entered "
+            "set passes both and still fails as one thing.")
     return out
 
 

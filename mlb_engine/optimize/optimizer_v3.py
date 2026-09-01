@@ -3639,10 +3639,17 @@ def _portfolio_exposure_summary(lineup_records, projections_df=None):
         for tier, count in rt['tier_counts'].items():
             right_tail_tier_counts[tier] += count
         salary = float(lineup_df['Salary'].sum()) if 'Salary' in lineup_df.columns else 0.0
-        if salary >= 49800:
-            band = '49800-50000'
+        # R247(a)'s enumeration, fixed rather than kept: COMMON_SALARY_BAND_
+        # THRESHOLD already names this exact number for this exact meaning
+        # ("the band the field crowds into") and this site restated it as a
+        # literal, which is the shape R167/R159 spent an entry undoing. Value
+        # unchanged, so no recorded band moves. The 49200 and 48500 edges below
+        # are NAMED and KEPT: no constant exists for either, and minting two
+        # here would be inventing band vocabulary this item did not ask for.
+        if salary >= COMMON_SALARY_BAND_THRESHOLD:
+            band = f'{COMMON_SALARY_BAND_THRESHOLD}-{SALARY_CAP}'
         elif salary >= 49200:
-            band = '49200-49799'
+            band = f'49200-{COMMON_SALARY_BAND_THRESHOLD - 1}'
         elif salary >= 48500:
             band = '48500-49199'
         else:

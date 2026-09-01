@@ -13799,6 +13799,497 @@ class PortfolioFrontierTests(unittest.TestCase):
         self.assertIn("Do not compare this apex to another build's", text)
 
 
+class DegradedTailAndCorrelatedBlockTests(unittest.TestCase):
+    """R247(a) and R247(c): the flag that names a degraded entry, and the two
+    axes of correlated failure across ENTRIES.
+
+    The item is one fact with two faces. Tightening a cap moves slots off the
+    players the projection liked most, the cost lands on the tail of the
+    portfolio, and every existing counter reads clean while it does --
+    `counted_relaxations.clean` was true on both filed sightings, correctly,
+    because nothing relaxed. The 1605_2g Classic sighting then showed the
+    second half: the degraded entry INFLATED the washout proxy, because a
+    lineup with nothing at stake survives a zeroed game exactly the way a
+    designed hedge does and `entries_fully_intact` cannot tell them apart.
+
+    So the discriminator for (c)'s design axis IS (a)'s flag, which is why the
+    two ship in one commit and why the tests sit in one class.
+    """
+
+    G1, G2 = "AAA@BBB", "CCC@DDD"
+
+    @staticmethod
+    def _flags():
+        from mlb_engine.field.field_miner import degraded_entry_flags
+        return degraded_entry_flags
+
+    @staticmethod
+    def _block():
+        from mlb_engine.pipeline.execution_pipeline import _correlated_block_report
+        return _correlated_block_report
+
+    @staticmethod
+    def _frontier():
+        from mlb_engine.pipeline.execution_pipeline import compute_portfolio_frontier
+        return compute_portfolio_frontier
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r247", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    # ------------------------------------------------------- R247(a), the bars
+
+    def test_the_salary_bar_is_the_archive_p99_and_says_which_window(self):
+        """Derived, not chosen. A bar hardcoded forward is a bar nobody can
+        argue with, and the item's own reference ($200-$300 archive medians) is
+        an archive quantity. The provenance travels IN the artifact so a reader
+        a month from now does not have to re-derive it."""
+        block = self._flags()([{"entry_id": "1", "salary_used": 50000,
+                                "proxy": 100.0}])
+        bars = block["bars"]
+        self.assertEqual(5000, bars["salary_left"])
+        self.assertIn("data/archive/", bars["salary_left_provenance"])
+        self.assertIn("2026-06-03", bars["salary_left_provenance"])
+        self.assertIn("2026-08-13", bars["salary_left_provenance"])
+        self.assertIn("200,888", bars["salary_left_provenance"])
+
+    def test_the_proxy_bar_is_not_archive_derived_and_says_why(self):
+        """The archive carries observed `points` and not this run's proxy, so
+        calibrating a proxy bar against it would grade a prediction by its
+        outcome -- the distinction CLAUDE.md's truthful-labels rule exists to
+        keep. Stating that in the artifact is the requirement; a silently
+        archive-flavoured proxy bar is the failure."""
+        bars = self._flags()([{"entry_id": "1", "proxy": 1.0}])["bars"]
+        self.assertEqual(25.0, bars["proxy_margin_pct"])
+        self.assertIn("NOT archive-derived", bars["proxy_margin_provenance"])
+        self.assertIn("grade a prediction", bars["proxy_margin_provenance"])
+
+    def test_the_two_triggers_are_beside_each_other_not_nested(self):
+        """Salary-left needs no proxy and the proxy margin needs no salary. An
+        entry with only one of the two inputs must still be reachable by the
+        trigger that input feeds, which is what 'beside rather than inside'
+        means operationally."""
+        salary_only = self._flags()([
+            {"entry_id": "cheap", "salary_used": 39000},
+            {"entry_id": "ok", "salary_used": 49900},
+            {"entry_id": "ok2", "salary_used": 49950},
+        ])
+        self.assertEqual(["cheap"], salary_only["flagged_entry_ids"])
+        self.assertEqual(["salary_left"], salary_only["flagged"][0]["triggers"])
+        self.assertEqual(3, salary_only["entries_without_proxy"])
+        self.assertIsNone(salary_only["median_proxy"])
+
+        proxy_only = self._flags()([
+            {"entry_id": "weak", "proxy": 60.0},
+            {"entry_id": "a", "proxy": 100.0},
+            {"entry_id": "b", "proxy": 101.0},
+        ])
+        self.assertEqual(["weak"], proxy_only["flagged_entry_ids"])
+        self.assertEqual(["proxy_margin"], proxy_only["flagged"][0]["triggers"])
+        self.assertEqual(3, proxy_only["entries_without_salary"])
+        self.assertEqual(40.0, proxy_only["flagged"][0]["proxy_pct_below_median"])
+
+    def test_both_triggers_are_named_when_both_fire(self):
+        """`flagged` without the reason sends the reader back to re-derive it,
+        and the two triggers mean different things: money unspent versus money
+        spent on the wrong players."""
+        out = self._flags()([
+            {"entry_id": "bad", "salary_used": 39700, "proxy": 38.19},
+            {"entry_id": "a", "salary_used": 49900, "proxy": 54.87},
+            {"entry_id": "b", "salary_used": 50000, "proxy": 56.0},
+        ])
+        self.assertEqual(1, out["flagged_count"])
+        flagged = out["flagged"][0]
+        self.assertEqual(["salary_left", "proxy_margin"], flagged["triggers"])
+        # The 1905_1g_sd sighting's own numbers: $10,300 left, 38.19 against a
+        # portfolio median of 54.87.
+        self.assertEqual(10300, flagged["salary_left"])
+        self.assertEqual(54.87, out["median_proxy"])
+        self.assertEqual(30.4, flagged["proxy_pct_below_median"])
+
+    def test_the_filed_classic_sighting_is_caught_and_a_clean_build_is_not(self):
+        """$10,300 on 1605_2g is the 99.94th percentile of the archived field
+        and $6,100 on 1905_1g_sd is the 99.62nd; a bar that misses either is
+        not the bar. A portfolio at the cap must flag nothing, or the flag is
+        noise and the operator stops reading it."""
+        for left in (6100, 10300):
+            out = self._flags()([{"entry_id": "x", "salary_used": 50000 - left}])
+            self.assertEqual(1, out["flagged_count"], f"${left} left must flag")
+        clean = self._flags()([{"entry_id": str(i), "salary_used": 50000 - 100 * i,
+                                "proxy": 100.0} for i in range(6)])
+        self.assertEqual(0, clean["flagged_count"])
+        self.assertEqual([], clean["flagged_entry_ids"])
+
+    def test_it_is_a_report_and_never_a_gate(self):
+        """CLAUDE.md reserves the three certification gates and `upload_ready`.
+        This block is read by an operator, not by a branch: `is_gate` says so in
+        the artifact, and the source may not mention a certification name."""
+        import inspect
+        from mlb_engine.field import field_miner
+        out = self._flags()([{"entry_id": "1", "salary_used": 30000}])
+        self.assertFalse(out["is_gate"])
+        self.assertTrue(out["is_review_proxy"])
+        self.assertIn("never a gate", out["note"])
+        src = inspect.getsource(field_miner.degraded_entry_flags)
+        for reserved in ("upload_ready", "workflow_valid", "selection_certified",
+                         "allocation_certified"):
+            self.assertNotIn(reserved, src,
+                             f"a report must not name {reserved}: a function "
+                             f"that never mentions a gate cannot branch on one, "
+                             f"and prose naming them defeats the check")
+
+    def test_the_salary_left_binner_is_one_function_and_the_archive_shares_it(self):
+        """R233's one-owner rule, asserted rather than described. The archive's
+        histogram and the delivered brief's flag describe the same dollar
+        amount, and two sets of bin edges is how they start disagreeing."""
+        import inspect
+        from mlb_engine.field import field_miner
+        self.assertTrue(callable(field_miner.salary_left_bin))
+        self.assertFalse(hasattr(field_miner, "_salary_left_bin"),
+                         "the private name is gone, not aliased: an alias is "
+                         "two names for one rule and invites a second body")
+        flag_src = inspect.getsource(field_miner.degraded_entry_flags)
+        self.assertIn("salary_left_bin(", flag_src)
+        self.assertNotIn("SALARY_LEFT_BINS", flag_src,
+                         "the flag must call the binner, not re-read its edges")
+        mine_src = inspect.getsource(field_miner.mine_contest)
+        self.assertIn("salary_left_bin(", mine_src)
+
+    def test_a_missing_proxy_is_named_rather_than_zeroed(self):
+        """R127's boundary. An entry with no proxy is not an entry with a proxy
+        of zero: zeroed, it would be the most degraded row in every portfolio
+        and the flag would be measuring a missing join."""
+        out = self._flags()([
+            {"entry_id": "nop", "salary_used": 49900},
+            {"entry_id": "a", "salary_used": 49900, "proxy": 100.0},
+            {"entry_id": "b", "salary_used": 49900, "proxy": 100.0},
+        ])
+        self.assertEqual(1, out["entries_without_proxy"])
+        self.assertEqual(0, out["flagged_count"])
+
+    # --------------------------------------------- R247(c) axis one, the block
+
+    def test_the_worst_block_counts_entries_that_fail_together(self):
+        """No existing control measures this. `max_shared_players` bounds one
+        PAIR of lineups and the exposure caps bound one PERSON across the set;
+        a block of three players in most of the entered set passes both."""
+        shared = ["p1", "p2", "p3"]
+        rosters = [(f"E{i}", shared + [f"u{i}a", f"u{i}b"]) for i in range(7)]
+        rosters += [(f"F{i}", [f"z{i}{j}" for j in range(5)]) for i in range(16)]
+        out = self._block()(rosters)
+        self.assertEqual(23, out["entries"])
+        self.assertEqual(7, out["worst_triple"]["entries_sharing"])
+        self.assertEqual(["p1", "p2", "p3"], out["worst_triple"]["player_ids"])
+        self.assertEqual(7, out["worst_pair"]["entries_sharing"])
+        self.assertEqual(30.4, out["worst_triple"]["entries_sharing_pct"])
+        # 16 of 23 carry none of the trio, so 16 carry at most one.
+        self.assertEqual(16, out["entries_with_at_most_one_of_top_trio"])
+
+    def test_the_block_moves_when_the_sharing_moves(self):
+        """Mutation guard: a hardwired count would agree with the fixture
+        forever while measuring nothing."""
+        shared = ["p1", "p2", "p3"]
+        rosters = [(f"E{i}", shared + [f"u{i}"]) for i in range(4)]
+        self.assertEqual(4, self._block()(rosters)["worst_triple"]["entries_sharing"])
+        rosters[0] = ("E0", ["p1", "p2", "q", "u0"])
+        self.assertEqual(3, self._block()(rosters)["worst_triple"]["entries_sharing"],
+                         "breaking one entry's block drops the count by one")
+
+    def test_the_block_counts_entered_rows_not_distinct_lineups(self):
+        """Two entries holding one lineup die together and pay twice, which is
+        why the washout objective binds at the entered set (CLAUDE.md)."""
+        one = ["p1", "p2", "p3", "p4"]
+        out = self._block()([("E1", one), ("E2", list(one))])
+        self.assertEqual(2, out["entries"])
+        self.assertEqual(2, out["worst_triple"]["entries_sharing"])
+
+    def test_the_block_is_stable_under_input_order_and_ties(self):
+        """Identical-count blocks are routine on a small slate, so the named
+        block must not move between runs."""
+        rosters = [("E1", ["a", "b", "c"]), ("E2", ["d", "e", "f"])]
+        first = self._block()(rosters)
+        again = self._block()(list(reversed(rosters)))
+        self.assertEqual(first["worst_triple"]["player_ids"],
+                         again["worst_triple"]["player_ids"])
+        self.assertEqual(first["top_trio"], again["top_trio"])
+
+    def test_one_entry_reports_unavailable_rather_than_a_meaningless_zero(self):
+        out = self._block()([("E1", ["a", "b", "c"])])
+        self.assertFalse(out["available"])
+        self.assertIn("two or more entries", out["unavailable_reason"])
+
+    def test_the_block_labels_players_by_name_when_the_frame_carries_one(self):
+        out = self._block()([("E1", ["a", "b", "c"]), ("E2", ["a", "b", "c"])],
+                            {"a": "Bat A", "b": "Bat B", "c": "Bat C"})
+        self.assertEqual(["Bat A (a)", "Bat B (b)", "Bat C (c)"],
+                         out["worst_triple"]["players"])
+
+    # ------------------------- R247(c) axis two, the half that actually matters
+
+    def _sighting(self):
+        """1605_2g in miniature: six entries exposed to the binding game and one
+        cheap, weak entry that is untouched by it. The old count called that 1
+        of 7 untouched and read it as a hedge."""
+        rows = []
+        rows.append({"Player_ID": "armA", "Team": "AAA", "Game_ID": self.G1,
+                     "Position": "P", "Ceiling": 30.0, "Salary": 9000,
+                     "Name": "Arm A"})
+        rows.append({"Player_ID": "armC", "Team": "CCC", "Game_ID": self.G2,
+                     "Position": "P", "Ceiling": 30.0, "Salary": 9000,
+                     "Name": "Arm C"})
+        for i in range(8):
+            rows.append({"Player_ID": f"g1b{i}", "Team": "AAA", "Game_ID": self.G1,
+                         "Position": "OF", "Ceiling": 14.0, "Salary": 4500,
+                         "Name": f"G1 Bat {i}"})
+        for i in range(8):
+            rows.append({"Player_ID": f"g2b{i}", "Team": "CCC", "Game_ID": self.G2,
+                         "Position": "OF", "Ceiling": 20.0, "Salary": 4500,
+                         "Name": f"G2 Bat {i}"})
+        for i in range(6):
+            rows.append({"Player_ID": f"g1c{i}", "Team": "BBB", "Game_ID": self.G1,
+                         "Position": "OF", "Ceiling": 4.0, "Salary": 2000,
+                         "Name": f"Cheap {i}"})
+        # Full-price G1 bats good enough that an entry built entirely from them
+        # spends the cap AND stays inside the proxy bar: that is what a real
+        # hedge looks like, and the first cut of the design axis could not tell
+        # it from the cheap tail above.
+        for i in range(6):
+            rows.append({"Player_ID": f"g1s{i}", "Team": "BBB", "Game_ID": self.G1,
+                         "Position": "OF", "Ceiling": 18.0, "Salary": 5300,
+                         "Name": f"Strong G1 {i}"})
+        proj = pd.DataFrame(rows)
+
+        def entry(eid, ids):
+            return {"entry_id": eid, "lineup_ids": ids,
+                    "sp_ids": [p for p in ids if p.startswith("arm")]}
+        strong = ["armA", "armC", "g1b0", "g1b1"] + [f"g2b{i}" for i in range(6)]
+        assigns = [entry(f"E{k}", list(strong)) for k in range(1, 7)]
+        weak = ["armA", "armC", "g1b2", "g1b3"] + [f"g1c{i}" for i in range(6)]
+        assigns.append(entry("E7", weak))
+        return proj, assigns
+
+    def test_a_degraded_entry_is_not_counted_as_a_hedge(self):
+        """THE defect. On 1605_2g the weaker of two builds showed 2 of 7
+        untouched against the stronger one's 1 of 7, and its second untouched
+        entry WAS the $10,300 lineup: it survived a zeroed BAL@ATH because it
+        was cheap and weak, not because it avoided that game on purpose. The
+        raw count is kept (it is a real number) and the split leads."""
+        proj, assigns = self._sighting()
+        fr = self._frontier()(proj, assigns)
+        wash = fr["washout"]
+        self.assertEqual(self.G2, wash["binding_game"])
+        self.assertEqual(1, wash["entries_fully_intact_at_binding_game"])
+        self.assertEqual(0, wash["entries_intact_by_design_at_binding_game"])
+        self.assertEqual(1, wash["entries_intact_but_degraded_at_binding_game"])
+        binding = wash["by_game"][0]
+        self.assertEqual(["E7"], binding["intact_but_degraded_entry_ids"])
+        self.assertIn("E7", fr["degraded_entries"]["flagged_entry_ids"])
+
+    def test_a_real_hedge_is_counted_as_design(self):
+        """The other half of the same test, and the one that stops the split
+        from being a rename: an entry that avoids the binding game while
+        spending the cap on players the projection liked is intact BY DESIGN."""
+        proj, assigns = self._sighting()
+        # Same shape, but the seventh entry spends the cap on full-price G1 bats
+        # instead of the cheap tail: $50,000 - (2 x 9000 + 6 x 5300) = $200 left,
+        # and a proxy 22.1% below the median, inside the 25% bar.
+        assigns[-1] = {"entry_id": "E7", "sp_ids": ["armA", "armC"],
+                       "lineup_ids": ["armA", "armC"]
+                       + [f"g1s{i}" for i in range(6)]}
+        fr = self._frontier()(proj, assigns)
+        wash = fr["washout"]
+        self.assertEqual(self.G2, wash["binding_game"])
+        self.assertEqual(1, wash["entries_fully_intact_at_binding_game"])
+        self.assertEqual(1, wash["entries_intact_by_design_at_binding_game"])
+        self.assertEqual(0, wash["entries_intact_but_degraded_at_binding_game"])
+        self.assertEqual(0, wash["entries_intact_proxy_only_at_binding_game"])
+        self.assertEqual([], fr["degraded_entries"]["flagged_entry_ids"])
+
+    def test_a_low_proxy_hedge_that_spent_the_cap_is_neither_answer(self):
+        """The finding that changed this design, and it came from running the
+        first cut rather than from the item. The binding game binds by carrying
+        the most portfolio ceiling, so an entry that sits it out scores below
+        the median BY CONSTRUCTION -- keying 'degraded' on any flag at all
+        therefore called every real hedge degraded. Money UNSPENT is the fact
+        that separates a dead entry from a hedge, so a proxy-only flag gets its
+        own bucket instead of a forced answer (R237's rule)."""
+        proj, assigns = self._sighting()
+        # Cap fully spent (2 x 9000 + 4 x 5300 + 2 x 5300 = $49,800, $200 left)
+        # but built from the weaker G1 side, so the proxy bar trips alone.
+        assigns[-1] = {"entry_id": "E7", "sp_ids": ["armA", "armC"],
+                       "lineup_ids": ["armA", "armC"]
+                       + [f"g1s{i}" for i in range(4)] + ["g1b4", "g1b5"]}
+        proj.loc[proj["Player_ID"].isin(["g1b4", "g1b5"]), "Salary"] = 5300
+        proj.loc[proj["Player_ID"].isin(["g1b4", "g1b5"]), "Ceiling"] = 5.0
+        fr = self._frontier()(proj, assigns)
+        wash = fr["washout"]
+        deg = fr["degraded_entries"]
+        self.assertEqual(["E7"], deg["flagged_entry_ids"])
+        self.assertEqual([], deg["flagged_on_salary_entry_ids"],
+                         "it spent the cap, so nothing is unspent")
+        self.assertEqual(["E7"], deg["flagged_on_proxy_only_entry_ids"])
+        self.assertEqual(1, wash["entries_fully_intact_at_binding_game"])
+        self.assertEqual(0, wash["entries_intact_by_design_at_binding_game"])
+        self.assertEqual(0, wash["entries_intact_but_degraded_at_binding_game"])
+        self.assertEqual(1, wash["entries_intact_proxy_only_at_binding_game"])
+
+    def test_the_split_is_reported_per_game_and_not_only_at_the_binding_game(self):
+        proj, assigns = self._sighting()
+        fr = self._frontier()(proj, assigns)
+        for row in fr["washout"]["by_game"]:
+            self.assertIn("entries_intact_by_design", row)
+            self.assertIn("entries_intact_but_degraded", row)
+            self.assertIn("entries_intact_proxy_only", row)
+            self.assertEqual(
+                row["entries_fully_intact"],
+                row["entries_intact_by_design"]
+                + row["entries_intact_but_degraded"]
+                + row["entries_intact_proxy_only"],
+                "the three buckets must PARTITION the count they correct, or "
+                "the split is a second number rather than a reading of the first")
+
+    def test_the_frontier_note_sends_the_reader_to_the_split(self):
+        proj, assigns = self._sighting()
+        note = self._frontier()(proj, assigns)["washout"]["note"]
+        self.assertIn("entries_intact_by_design", note)
+        self.assertIn("counted as protection", note)
+
+    # --------------------------------------------------- the surfaces that read
+
+    def test_the_salary_trigger_survives_a_frame_with_no_salary_column(self):
+        """The Classic frontier's own fixture history has frames without Salary,
+        and the proxy trigger must not go down with it."""
+        proj, assigns = self._sighting()
+        fr = self._frontier()(proj.drop(columns=["Salary"]), assigns)
+        deg = fr["degraded_entries"]
+        self.assertTrue(deg["available"])
+        self.assertEqual(len(assigns), deg["entries_without_salary"])
+        self.assertIn("E7", deg["flagged_entry_ids"],
+                      "the proxy margin alone must still reach it")
+
+    def test_build_slate_prints_the_degraded_line_before_approval(self):
+        proj, assigns = self._sighting()
+        mod = self._build_slate()
+        fr = self._frontier()(proj, assigns)
+        line = mod.format_degraded_line(fr["degraded_entries"])
+        self.assertIn("1/7 entries FLAGGED", line)
+        self.assertIn("E7", line)
+        self.assertIn("never a gate", line)
+        clean = mod.format_degraded_line(
+            self._flags()([{"entry_id": "1", "salary_used": 50000, "proxy": 10.0},
+                           {"entry_id": "2", "salary_used": 50000, "proxy": 10.0}]))
+        self.assertIn("0/2 entries flagged", clean)
+        self.assertIn("UNAVAILABLE", mod.format_degraded_line(None))
+
+    def test_the_frontier_line_carries_the_split_not_the_bare_count(self):
+        """The line a session at T-10 actually reads. Shipping the split only
+        into the JSON would leave the misleading number as the one that gets
+        read out loud."""
+        proj, assigns = self._sighting()
+        mod = self._build_slate()
+        line = mod.format_frontier_line(self._frontier()(proj, assigns))
+        self.assertIn("1/7 entries untouched", line)
+        self.assertIn("0 by design", line)
+        self.assertIn("1 DEGRADED", line)
+        self.assertIn("not a hedge", line)
+        self.assertIn("worst triple", line)
+
+    def test_qa_portfolio_stops_publishing_the_bare_untouched_count(self):
+        """The adversarial reviewer was the loudest publisher of the one number
+        R247(c) exists to correct, and it read nothing else from the block."""
+        from tools.qa_portfolio import frontier_from_brief
+        proj, assigns = self._sighting()
+        block = self._frontier()(proj, assigns)
+        text = "\n".join(frontier_from_brief({"exposure": {"frontier": block}}))
+        self.assertIn("1 DEGRADED", text)
+        self.assertIn("nothing at stake", text)
+        self.assertIn("DEGRADED TAIL", text)
+        self.assertIn("CORRELATED BLOCK", text)
+        self.assertIn("worst triple", text)
+        self.assertIn("untouched by DESIGN is", text)
+
+    def test_qa_portfolio_names_a_pre_r247_brief_rather_than_reading_a_hedge(self):
+        """An archived brief has no split. Falling through to the bare count
+        silently is how the old reading survives its own fix."""
+        from tools.qa_portfolio import frontier_from_brief
+        proj, assigns = self._sighting()
+        block = self._frontier()(proj, assigns)
+        block["washout"].pop("entries_intact_by_design_at_binding_game")
+        block["washout"].pop("entries_intact_but_degraded_at_binding_game")
+        text = "\n".join(frontier_from_brief({"exposure": {"frontier": block}}))
+        self.assertIn("predates R247(c)", text)
+        self.assertIn("reads as a hedge", text)
+
+    def test_the_showdown_brief_carries_the_flag_with_the_contracts_own_cap(self):
+        """BOTH formats. The two sightings that filed this item were Showdown,
+        so instrumenting only the Classic frontier would leave the originals
+        uninstrumented -- and Showdown's cap is the CONTRACT's, read off the
+        bank's own lineups rather than assumed to be Classic's.
+
+        The fixture cap is deliberately NOT 50,000. Written with 50,000 first,
+        this test passed a mutation that deleted the contract read entirely,
+        because the default it fell back to is the same number -- R267(a)'s
+        survivor shape exactly: a guard with a test is not a guard that is
+        tested unless the fixture can tell the two answers apart. Showdown's
+        real cap equals Classic's today, which is precisely why
+        `_assemble_lineup` writes the contract's own value onto every lineup
+        instead of anyone assuming it.
+        """
+        from mlb_engine.field.field_miner import SALARY_CAP
+        mod = self._build_slate()
+        self.assertNotEqual(45000, SALARY_CAP,
+                            "the fixture cap must differ from the default or "
+                            "this test cannot see the contract read at all")
+        assignments = [{"entry_id": "A1", "roster_ids": ["c1", "u1"]},
+                       {"entry_id": "A2", "roster_ids": ["c2", "u2"]},
+                       {"entry_id": "A3", "roster_ids": ["c3", "u3"]}]
+        bank = [{"salary": 44800.0, "proj_points": 100.0, "salary_cap": 45000},
+                {"salary": 44900.0, "proj_points": 101.0, "salary_cap": 45000},
+                {"salary": 38000.0, "proj_points": 55.0, "salary_cap": 45000}]
+        out = mod.showdown_degraded_entries(assignments, bank)
+        self.assertEqual(45000, out["bars"]["salary_cap"])
+        self.assertEqual(["A3"], out["flagged_entry_ids"])
+        self.assertEqual(["salary_left", "proxy_margin"],
+                         out["flagged"][0]["triggers"])
+        self.assertEqual(7000, out["flagged"][0]["salary_left"])
+        # And the two entries at the contract's cap are NOT flagged, which is
+        # the half a Classic-cap fallback would get wrong: against 50,000 they
+        # would read as $5,200 and $5,100 left.
+        self.assertEqual(2, out["entries"] - out["flagged_count"])
+
+    def test_the_showdown_cap_is_never_a_literal_when_the_bank_disagrees(self):
+        """A bank that does not state one cap unanimously gets field_miner's
+        SALARY_CAP, which is the one definition. A literal here would be the
+        eleventh spelling of a number this repo already spells ten ways, and
+        the enumeration that found those ten is in this commit's entry."""
+        from mlb_engine.field.field_miner import SALARY_CAP
+        mod = self._build_slate()
+        out = mod.showdown_degraded_entries(
+            [{"entry_id": "A1"}, {"entry_id": "A2"}],
+            [{"salary": 49000.0, "proj_points": 90.0, "salary_cap": 50000},
+             {"salary": 49000.0, "proj_points": 90.0, "salary_cap": 60000}])
+        self.assertEqual(SALARY_CAP, out["bars"]["salary_cap"])
+
+    def test_the_marshalling_pairs_an_entry_id_with_its_own_lineup(self):
+        """The mistake this function exists to make testable: a flagged
+        entry_id has to name the row in the DELIVERED file that carries that
+        lineup, and a zip in the wrong order names the wrong entry under a
+        lock clock."""
+        mod = self._build_slate()
+        out = mod.showdown_degraded_entries(
+            [{"entry_id": "first"}, {"entry_id": "second"}, {"entry_id": "third"}],
+            [{"salary": 50000.0, "proj_points": 100.0},
+             {"salary": 30000.0, "proj_points": 20.0},
+             {"salary": 50000.0, "proj_points": 100.0}])
+        self.assertEqual(["second"], out["flagged_entry_ids"])
+
+
 class LeveragePanelTests(unittest.TestCase):
     """R136: the field-facing third axis in qa_portfolio, and its labels.
 
