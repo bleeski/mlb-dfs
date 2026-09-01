@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import collections
 import contextlib
+import hashlib
 import json
 import math
 import tempfile
@@ -2654,6 +2655,270 @@ class ShowdownSolverStatusTests(unittest.TestCase):
         self.assertFalse(status["timed_out"])
         self.assertFalse(status["incumbent_rejected"])
         self.assertIsNotNone(status["elapsed_s"])
+
+
+class SuppliedBaseTests(unittest.TestCase):
+    """R249. Showdown had no projection input, so the operator's only lever was
+    rewriting the APPG column of the salary file -- which moved captains and
+    which nothing recorded.
+
+    The insertion point is the whole item, so it is pinned rather than left to
+    the next reader. Measured on 1920_1g_sd before it was chosen: supplying the
+    number BEFORE ``apply_base_prior`` transmits a slope of 0.458 of the asked-for
+    move, and refits the salary regression, so supplying ONE player moved all 17
+    other hitters' priors. Both of those are asserted below as properties, not as
+    the numbers, so the guard survives a fixture change.
+    """
+
+    def _priced(self):
+        raw = sd.melt_showdown_salary_csv(SAL)
+        return raw, st.apply_base_prior(raw, pitcher_hand={"MIN": "R", "CHC": "R"})
+
+    def _write(self, rows):
+        tmp = Path(tempfile.mkdtemp())
+        path = tmp / "projections.csv"
+        lines = ["Player_ID,Base"] + [f"{pid},{value}" for pid, value in rows]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+
+    def test_a_supplied_base_is_the_prior_and_is_not_regressed_toward_salary(self):
+        """The insertion point. ``apply_base_prior``'s docstring scopes the 0.60
+        salary weight to AvgPointsPerGame's small-sample noise; a supplied number
+        is not that, so nothing further is layered on it. If the seam ever moves
+        before the prior, the supplied number stops being the delivered one and
+        this fails."""
+        raw, priced = self._priced()
+        row = priced[priced["Batting_Order"].notna()].iloc[0]
+        asked = round(float(row["APPG_Raw"]) * 1.40, 3)
+        self.assertNotAlmostEqual(asked, float(row["Base"]), places=6,
+                                  msg="fixture cannot tell the two apart")
+        out = st.apply_supplied_base(priced, {str(row["UTIL_ID"]): asked})
+        got = float(out.loc[out["Name"] == row["Name"], "Base"].iloc[0])
+        self.assertAlmostEqual(got, asked, places=6)
+
+    def test_supplying_one_player_leaves_every_other_prior_byte_identical(self):
+        """The property that disqualified the pre-prior insertion point: there,
+        the supplied column is what ``np.polyfit`` fits, so a number supplied for
+        one player reprices everyone else. Supplying a number for Hoerner is not
+        a statement about Bregman."""
+        raw, priced = self._priced()
+        row = priced[priced["Batting_Order"].notna()].iloc[0]
+        out = st.apply_supplied_base(
+            priced, {str(row["UTIL_ID"]): round(float(row["APPG_Raw"]) * 1.40, 3)})
+        moved = [str(n) for n, before, after
+                 in zip(out["Name"], priced["Base"], out["Base"])
+                 if str(n) != str(row["Name"]) and abs(float(before) - float(after)) > 1e-12]
+        self.assertEqual(moved, [], f"untouched players were repriced: {moved}")
+
+    def test_a_supplied_base_moves_a_captain(self):
+        """The bar the item is filed against: a projection input that cannot move
+        the highest-leverage seat has not closed anything. A fixture whose
+        supplied Base equals APPG proves nothing, so this one differs enough to
+        change the answer."""
+        raw, priced = self._priced()
+        ml = {"MIN": -150, "CHC": 130}
+        before = st.build_thesis_ladder(priced, 12, moneyline=ml)
+        cheap = priced[priced["Batting_Order"].notna()].sort_values("Base").iloc[0]
+        boosted = st.apply_supplied_base(
+            priced, {str(cheap["UTIL_ID"]): float(priced["Base"].max()) * 2.0})
+        after = st.build_thesis_ladder(boosted, 12, moneyline=ml)
+        key = str(cheap["Player_Key"])
+        self.assertNotIn(key, {t["cpt"] for t in before["theses"]})
+        self.assertIn(key, {t["cpt"] for t in after["theses"]})
+
+    def test_it_reaches_pitchers_and_either_dk_id_resolves(self):
+        """A Showdown salary file lists every player twice under different ids
+        and an arm is a common captain, so both halves matter. The CPT_ID row
+        below is also the pitcher row, which is why one test covers both."""
+        raw, priced = self._priced()
+        arm = priced[priced["Batting_Order"].isna()].iloc[0]
+        bat = priced[priced["Batting_Order"].notna()].iloc[0]
+        out = st.apply_supplied_base(priced, {
+            str(arm["CPT_ID"]): 99.0,          # by CPT id, and a pitcher
+            str(bat["UTIL_ID"]): 88.0,         # by UTIL id
+        })
+        report = out.attrs["supplied_base_report"]
+        self.assertEqual(float(out.loc[out["Name"] == arm["Name"], "Base"].iloc[0]), 99.0)
+        self.assertEqual(float(out.loc[out["Name"] == bat["Name"], "Base"].iloc[0]), 88.0)
+        self.assertEqual(report["pitchers_covered"], 1)
+        self.assertEqual(report["hitters_covered"], 1)
+
+    def test_an_unmatched_id_is_named_and_changes_nothing(self):
+        raw, priced = self._priced()
+        out = st.apply_supplied_base(priced, {"999999999": 50.0})
+        report = out.attrs["supplied_base_report"]
+        self.assertEqual(report["unmatched_ids"], ["999999999"])
+        self.assertEqual(report["players_matched"], 0)
+        self.assertFalse(report["applied"])
+        self.assertTrue(all(abs(float(a) - float(b)) < 1e-12
+                            for a, b in zip(priced["Base"], out["Base"])))
+
+    def test_the_report_carries_the_provenance_the_item_requires(self):
+        """Source path, sha256, count differing from APPG, and min/median/max
+        ratio. The workaround this replaces was invisible; a fix that is also
+        invisible has not closed it."""
+        raw, priced = self._priced()
+        hitters = priced[priced["Batting_Order"].notna()]
+        rows, want = [], []
+        for mult, (_, row) in zip((1.50, 1.00, 0.50), hitters.iterrows()):
+            rows.append((str(row["UTIL_ID"]), round(float(row["APPG_Raw"]) * mult, 4)))
+            want.append(mult)
+        path = self._write(rows)
+        supplied, read_report = st.read_supplied_base(path)
+        out = st.apply_supplied_base(priced, supplied, read_report)
+        report = out.attrs["supplied_base_report"]
+        self.assertEqual(report["source"], str(path))
+        self.assertEqual(report["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+        self.assertEqual(report["players_matched"], 3)
+        # one of the three was supplied AT its APPG, so it is not a substitution
+        self.assertEqual(report["players_differing_from_appg"], 2)
+        self.assertAlmostEqual(report["ratio_min"], 0.50, places=3)
+        self.assertAlmostEqual(report["ratio_median"], 1.00, places=3)
+        self.assertAlmostEqual(report["ratio_max"], 1.50, places=3)
+        self.assertEqual(report["chain_bypassed_players"], 3)
+        self.assertEqual(report["players_on_derived_prior"], len(priced) - 3)
+
+    def test_a_named_file_that_cannot_be_read_refuses_rather_than_building_flat(self):
+        """R242's shape. A silent fallback looks identical to a build that was
+        never asked for the input, and here the operator supplied a file and
+        would read the delivered lineups as having consumed it."""
+        with self.assertRaises(FileNotFoundError):
+            st.read_supplied_base(Path(tempfile.mkdtemp()) / "absent.csv")
+        empty = Path(tempfile.mkdtemp()) / "headers_only.csv"
+        empty.write_text("Player_ID,Base\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            st.read_supplied_base(empty)
+        junk = Path(tempfile.mkdtemp()) / "wrong_columns.csv"
+        junk.write_text("name,points\nSomebody,9.0\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            st.read_supplied_base(junk)
+
+    def test_the_reader_matches_ownership_preds_column_contract(self):
+        """Same columns, same aliases, same case-insensitivity as
+        ``ownership_pred.py --base``, so an operator has one file format and not
+        two. Asserted against a file written the other tool's way."""
+        raw, priced = self._priced()
+        row = priced.iloc[0]
+        path = Path(tempfile.mkdtemp()) / "aliased.csv"
+        path.write_text(f"id,projection\n{row['UTIL_ID']},7.25\n", encoding="utf-8")
+        supplied, _ = st.read_supplied_base(path)
+        self.assertEqual(supplied[str(row["UTIL_ID"])], 7.25)
+
+    def test_the_label_names_an_operator_input_and_claims_no_performance(self):
+        """Truthful labels. The brief block says what was applied and what was
+        bypassed, and none of it is an ROI, win-rate or probability claim."""
+        raw, priced = self._priced()
+        row = priced.iloc[0]
+        out = st.apply_supplied_base(priced, {str(row["UTIL_ID"]): 9.0})
+        label = out.attrs["supplied_base_report"]["label"].lower()
+        for banned in ("roi", "win rate", "win-rate", "probability", "expected value",
+                       "profit", "upload-ready"):
+            self.assertNotIn(banned, label)
+        self.assertIn("operator input", label)
+        self.assertIn("not applied", label)
+        self.assertIn("game-state weight", label)
+
+    def test_the_thesis_game_state_multiplier_still_applies_to_a_supplied_base(self):
+        """The R233 enumeration found a FIFTH writer of Base on the Showdown
+        path that neither the item nor the handoff named: ``solve_ladder``
+        multiplies each thesis's working copy by that thesis's game-state
+        weight, AFTER this seam. It is left alone deliberately -- the operator
+        supplies how good a player is, the template says how much that side
+        matters in this scenario -- but "the supplied number is what the solver
+        ranks on" would be false without saying so, so the label says it and
+        this pins it."""
+        raw, priced = self._priced()
+        row = priced[priced["Batting_Order"].notna()].iloc[0]
+        key = str(row["Player_Key"])
+        out = st.apply_supplied_base(priced, {str(row["UTIL_ID"]): 10.0})
+        thesis = [{"name": "t", "cpt": key, "mult": {key: 0.5}}]
+        work = out.copy()
+        mult = thesis[0]["mult"]
+        work["Base"] = [float(b) * float(mult.get(k, 1.0))
+                        for b, k in zip(work["Base"], work["Player_Key"])]
+        self.assertEqual(float(work.loc[work["Player_Key"] == key, "Base"].iloc[0]), 5.0)
+        # and the seam did not consume or duplicate the weight
+        self.assertEqual(float(out.loc[out["Player_Key"] == key, "Base"].iloc[0]), 10.0)
+
+    def test_build_slate_refuses_projections_on_a_classic_build(self):
+        """A flag that silently does nothing on the contest type it was pointed
+        at is the defect this item is filed under, arriving through the flag
+        meant to close it. Read off the source: the refusal is keyed on the
+        contest and it precedes staging."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"status": "projections_not_supported_on_classic"', src)
+        refusal = src.index("projections_not_supported_on_classic")
+        staging = src.index('suffix = "_showdown" if contest == "showdown" else ""')
+        self.assertLess(refusal, staging,
+                        "the Classic refusal must land before anything is staged")
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_supplied_base_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_the_wiring_applies_the_supplied_number_last_on_the_ladder_path(self):
+        """The order is the decision, and the WIRING is where it lives. Written
+        as two inline call sites this was a property of the source layout that
+        nothing executed: a mutation supplying the number before the prior
+        survived the whole suite, because every other insertion-point test calls
+        the engine function directly on an already-priced frame. This one calls
+        what the build calls."""
+        mod = self._build_slate()
+        raw = sd.melt_showdown_salary_csv(SAL)
+        row = raw[raw["Batting_Order"].notna()].iloc[0]
+        asked = round(float(row["Base"]) * 1.40, 3)
+        priced = mod.price_showdown_pool(
+            raw, use_ladder=True, bat_side={}, pitcher_hand={"MIN": "R", "CHC": "R"},
+            supplied_base={str(row["UTIL_ID"]): asked}, supplied_read={})
+        got = float(priced.loc[priced["Name"] == row["Name"], "Base"].iloc[0])
+        self.assertAlmostEqual(got, asked, places=6,
+                               msg="the supplied number was transformed after it "
+                                   "was supplied; the prior must run FIRST")
+        # and the prior still ran, for everyone else
+        self.assertIn("Salary_Fit", priced.columns)
+        self.assertIn("APPG_Raw", priced.columns)
+
+    def test_the_wiring_reaches_the_fallback_bank_path_too(self):
+        """The ladder prices through ``apply_base_prior``; the fallback bank
+        ranks on raw APPG. Wiring only the ladder makes ``--projections`` a
+        silent no-op on exactly the `all_healthy` slates where the pool is
+        thinnest -- the R242 shape this flag's own refusal exists to avoid."""
+        mod = self._build_slate()
+        raw = sd.melt_showdown_salary_csv(SAL)
+        row = raw.iloc[0]
+        out = mod.price_showdown_pool(
+            raw, use_ladder=False, bat_side={}, pitcher_hand={},
+            supplied_base={str(row["UTIL_ID"]): 42.0}, supplied_read={})
+        self.assertEqual(float(out.loc[out["Name"] == row["Name"], "Base"].iloc[0]), 42.0)
+        self.assertTrue(out.attrs["supplied_base_report"]["applied"])
+        self.assertNotIn("Salary_Fit", out.columns)      # no prior on this path
+
+    def test_the_wiring_is_a_no_op_when_no_projections_were_supplied(self):
+        """Defaults unchanged: with no file the frame that reaches the ladder is
+        the frame that always reached it."""
+        mod = self._build_slate()
+        raw = sd.melt_showdown_salary_csv(SAL)
+        hand = {"MIN": "R", "CHC": "R"}
+        plain = st.apply_base_prior(raw, pitcher_hand=hand)
+        wired = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                        pitcher_hand=hand, supplied_base={},
+                                        supplied_read={})
+        self.assertTrue(all(abs(float(a) - float(b)) < 1e-12
+                            for a, b in zip(plain["Base"], wired["Base"])))
+        self.assertNotIn("Base_Supplied", wired.columns)
+
+    def test_the_brief_carries_the_block_on_both_paths(self):
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertEqual(src.count("price_showdown_pool("), 3)   # def + both paths
+        self.assertIn('"supplied_base": ((priced if use_ladder else df).attrs.get(', src)
 
 
 if __name__ == "__main__":

@@ -124,6 +124,144 @@ def apply_base_prior(df: pd.DataFrame,
 
 
 # --------------------------------------------------------------------------- #
+# Supplied Base (R249)
+# --------------------------------------------------------------------------- #
+def read_supplied_base(path) -> tuple[Dict[str, float], Dict[str, Any]]:
+    """Read a ``Player_ID,Base`` map, the columns ``ownership_pred.py --base``
+    already reads. Returns (by_dk_id, report).
+
+    Column names are matched case-insensitively and ``id`` / ``projection`` are
+    accepted as aliases, which is that tool's contract verbatim rather than a
+    second one. The report carries the sha256 so the brief can name the exact
+    bytes: an operator who edits the file between two builds gets two hashes,
+    which is the whole point of recording it.
+
+    A file that cannot be read is an ERROR here and not an empty map. R242's
+    complaint is that a silent fallback looks identical to a build that was
+    never asked for the input, and a projection file the operator named and the
+    engine could not open is the case where that costs the most.
+    """
+    import csv
+    import hashlib
+    from pathlib import Path
+
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"projections file not found: {p}")
+    raw = p.read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    out: Dict[str, float] = {}
+    skipped = 0
+    text = raw.decode("utf-8-sig", errors="replace").splitlines()
+    for row in csv.DictReader(text):
+        lower = {(k or "").strip().lower(): v for k, v in row.items()}
+        pid = lower.get("player_id") or lower.get("id")
+        value = lower.get("base") or lower.get("projection")
+        if pid is None or value in (None, ""):
+            skipped += 1
+            continue
+        try:
+            out[str(pid).strip()] = float(value)
+        except (TypeError, ValueError):
+            skipped += 1
+    if not out:
+        raise ValueError(
+            f"projections file {p} carried no usable Player_ID,Base rows "
+            f"({skipped} row(s) skipped); refusing rather than building "
+            "without the input that was asked for")
+    return out, {"source": str(p), "sha256": sha,
+                 "rows_usable": len(out), "rows_skipped": skipped}
+
+
+def apply_supplied_base(df: pd.DataFrame,
+                        supplied: Mapping[str, float],
+                        read_report: Optional[Mapping[str, Any]] = None) -> pd.DataFrame:
+    """Replace ``Base`` with an operator-supplied prior, keyed by DK player id.
+
+    INSERTION POINT, decided 2026-09-01 and measured rather than argued. This
+    runs AFTER ``apply_base_prior``, so a supplied number is the prior the solver
+    ranks on and nothing further is layered on it. Two reasons, in order:
+
+    1. ``apply_base_prior``'s own docstring scopes the 0.60 salary weight to
+       AvgPointsPerGame's small-sample noise. A supplied projection is not APPG
+       on a short sample; shrinking it toward the salary line is the exact
+       mechanism R249 was filed against. Measured on 1920_1g_sd: supplying the
+       number BEFORE the prior transmits a slope of 0.458 -- an operator asking
+       for +10% gets +4.6% -- and it also refits the salary regression, so
+       supplying ONE player moved all 17 other hitters' priors. Supplying a
+       number for Hoerner is not a statement about Bregman.
+    2. Recording is only truthful if the recorded number is the applied number.
+       The brief states supplied-vs-APPG ratios; under any earlier insertion
+       point those describe an input that a factor the brief does not state then
+       transformed, which is R122's prior_note defect in a new place.
+
+    The consequence, stated rather than discovered: for a covered player the
+    batting-order PA factor and the platoon factor are NOT applied, because the
+    operator supplied the finished prior. A partial file therefore ranks covered
+    players on a supplied prior and everyone else on the derived one, and
+    ``chain_bypassed_players`` counts exactly that.
+
+    Both DK ids resolve to the same player. A Showdown salary file lists every
+    player twice, CPT and UTIL, under different ids; an operator keying off
+    either row means the same person, and refusing one of the two would be a
+    trap with no upside. A row naming an id in neither column is reported in
+    ``unmatched_ids`` and changes nothing.
+    """
+    out = df.copy()
+    supplied = {str(k).strip(): float(v) for k, v in dict(supplied or {}).items()}
+    by_row: Dict[int, float] = {}
+    matched_ids: set[str] = set()
+    for idx, row in out.iterrows():
+        for col in ("UTIL_ID", "CPT_ID"):
+            pid = row.get(col)
+            key = str(pid).strip() if pid is not None else ""
+            if key and key in supplied:
+                by_row[idx] = supplied[key]
+                matched_ids.add(key)
+                break
+    appg = (out["APPG_Raw"] if "APPG_Raw" in out.columns else out["Base"]).astype(float)
+    ratios: List[float] = []
+    differing = 0
+    for idx, value in by_row.items():
+        raw = float(appg.loc[idx])
+        if raw > 0:
+            ratios.append(value / raw)
+            if abs(value - raw) > 1e-9:
+                differing += 1
+    hitters = out["Batting_Order"].notna() if "Batting_Order" in out.columns else None
+    covered_hitters = sum(1 for i in by_row if hitters is None or bool(hitters.loc[i]))
+    for idx, value in by_row.items():
+        out.at[idx, "Base"] = value
+    out["Base_Supplied"] = [idx in by_row for idx in out.index]
+    ordered = sorted(ratios)
+    report: Dict[str, Any] = dict(read_report or {})
+    report.update({
+        "applied": bool(by_row),
+        "players_supplied": len(supplied),
+        "players_matched": len(by_row),
+        "unmatched_ids": sorted(set(supplied) - matched_ids),
+        "players_differing_from_appg": differing,
+        "ratio_min": round(ordered[0], 4) if ordered else None,
+        "ratio_median": round(ordered[len(ordered) // 2], 4) if ordered else None,
+        "ratio_max": round(ordered[-1], 4) if ordered else None,
+        "hitters_covered": covered_hitters,
+        "pitchers_covered": len(by_row) - covered_hitters,
+        "chain_bypassed_players": len(by_row),
+        "players_on_derived_prior": int(len(out) - len(by_row)),
+        "label": ("Base for a covered player is the SUPPLIED number: the salary "
+                  "regression, the batting-order PA factor and the platoon "
+                  "factor were not applied to it. On the ladder path each "
+                  "thesis still multiplies Base by its own game-state weight, "
+                  "supplied and derived alike -- that is the template asking "
+                  "'in THIS scenario, how much does this side matter', not part "
+                  "of the prior chain this bypasses. A labeled operator input, "
+                  "never a projection this engine produced or graded."),
+    })
+    out.attrs["supplied_base_report"] = report
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Slate shape
 # --------------------------------------------------------------------------- #
 def _no_vig(moneyline: Mapping[str, float]) -> Dict[str, float]:

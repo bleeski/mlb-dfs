@@ -2197,6 +2197,35 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     return bat_side, facing, note
 
 
+def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: dict,
+                        supplied_base: dict, supplied_read: dict):
+    """The ONE place Base is finalised for a Showdown build, whichever path runs.
+
+    R249. This exists as a function rather than as two call sites because the
+    ORDER is the decision: ``apply_base_prior`` first, the supplied number last,
+    so a supplied number is the prior the solver ranks on and the salary
+    regression never touches it. Written as two inline call sites, that order was
+    a property of the source layout and nothing executed it -- a mutation that
+    supplied the number BEFORE the prior survived the whole suite, because every
+    insertion-point test called the engine function directly and the wiring was
+    the untested part. Now the order is a property of one function and the tests
+    call it.
+
+    ``use_ladder`` False is the fallback bank path, where no prior is computed
+    and Base is raw AvgPointsPerGame. A supplied number replaces that directly;
+    wiring only the ladder would make ``--projections`` a silent no-op on exactly
+    the `all_healthy` slates where the pool is thinnest.
+    """
+    from mlb_engine.optimize import showdown_theses as theses
+
+    priced = (theses.apply_base_prior(df, bat_side=bat_side,
+                                      pitcher_hand=pitcher_hand)
+              if use_ladder else df)
+    if supplied_base:
+        priced = theses.apply_supplied_base(priced, supplied_base, supplied_read)
+    return priced
+
+
 def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict]:
     """Return ({team: american odds}, note) for the single Showdown game.
 
@@ -2372,8 +2401,28 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # same entry. Passed through; nothing reads it for a decision yet.
     contest_of_entry = [r["contest_id"] for r in rows[:n_entries]]
 
+    # R249. The supplied prior, read before either build path so a file the
+    # engine cannot open costs nothing but the read. Both paths get it: the
+    # ladder prices through `apply_base_prior`, the fallback bank ranks on raw
+    # AvgPointsPerGame, and wiring only the ladder would make `--projections` a
+    # silent no-op on exactly the `all_healthy` slates where the pool is
+    # thinnest -- the R242 shape this flag's own refusal exists to avoid.
+    supplied_base: dict = {}
+    supplied_read: dict = {}
+    if getattr(args, "projections", None):
+        try:
+            supplied_base, supplied_read = st.read_supplied_base(args.projections)
+        except (OSError, ValueError) as exc:
+            print(json.dumps({"status": "projections_unreadable",
+                              "projections": str(args.projections),
+                              "error": str(exc)}, indent=1))
+            return 4, {}
+
     if use_ladder:
-        priced = st.apply_base_prior(df, bat_side=bat_side, pitcher_hand=pitcher_hand)
+        priced = price_showdown_pool(df, use_ladder=True, bat_side=bat_side,
+                                     pitcher_hand=pitcher_hand,
+                                     supplied_base=supplied_base,
+                                     supplied_read=supplied_read)
         ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
                                              max_cpt_exposure_pct=cpt_cap,
                                              contest_of_entry=contest_of_entry,
@@ -2394,6 +2443,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         report = st.portfolio_report(priced, theses, solved)
         certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
     else:
+        # R249. Same seam through the same function, with no prior to bypass: on
+        # this path Base IS raw AvgPointsPerGame, so a supplied number replaces
+        # it directly and the recorded ratio is against that same column.
+        df = price_showdown_pool(df, use_ladder=False, bat_side=bat_side,
+                                 pitcher_hand=pitcher_hand,
+                                 supplied_base=supplied_base,
+                                 supplied_read=supplied_read)
         bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
                                       max_shared_players=share_cap,
                                       max_player_exposure_pct=player_cap_pct,
@@ -2643,6 +2699,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
+        # R249. The whole point of the item is that the operator's previous
+        # workaround -- editing the APPG column of the salary file -- moved
+        # captains and was recorded NOWHERE. A fix that is also invisible has
+        # not closed it, so this block is present on every Showdown brief and
+        # says `applied: false` when no file was supplied, rather than being
+        # absent and leaving "was a projection used" unanswerable.
+        "supplied_base": ((priced if use_ladder else df).attrs.get(
+            "supplied_base_report") or {"applied": False, "source": None}),
         "pool": {
             "players": int(len(df)),
             "basis": (str(df["Pool_Basis"].iloc[0]) if len(df) else "empty"),
@@ -3380,6 +3444,21 @@ def main() -> int:
     ap.add_argument("--past-slate-replay", action="store_true",
                     help="build a slate whose first lock has already passed "
                          "(replays and evals only; a live build never needs it)")
+    # R249. Showdown's only projection input. Classic reaches the whole F1-F5
+    # enrichment stack through `_assemble_projection_frame`; Showdown reaches
+    # AvgPointsPerGame and a salary regression, on roughly a third of entered
+    # volume, and the operator's only previous lever was editing the APPG column
+    # of the salary file -- which worked and which nothing recorded.
+    ap.add_argument("--projections", default=None,
+                    help="Showdown only: CSV of Player_ID,Base (the columns "
+                         "`ownership_pred.py --base` reads) supplying the prior "
+                         "the solver ranks on. A covered player's supplied "
+                         "number is used AS the prior: the salary regression, "
+                         "the batting-order PA factor and the platoon factor "
+                         "are not applied to it. The brief records the path, "
+                         "the sha256, how many players differ from APPG and the "
+                         "min/median/max ratio. A labeled operator input, never "
+                         "a projection this engine produced or graded.")
     ap.add_argument("--feed-max-age-minutes", type=float, default=90.0,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "
@@ -3478,6 +3557,24 @@ def main() -> int:
     args.date = args.date or slate_date_from_salary(salary)
     contest = detect_contest_type(salary, entries)
     signature = slate_signature(salary)
+
+    # R249. `--projections` is a Showdown seam. On Classic the enrichment stack
+    # owns the projection and a supplied Base would have to be reconciled with
+    # it, which is R41/R252's question and not this flag's. Refuse rather than
+    # accept-and-ignore: a flag that silently does nothing is R242's complaint,
+    # and it is worse here because the operator supplied a file and would read
+    # the delivered lineups as having consumed it. Before staging, deliberately.
+    if getattr(args, "projections", None) and contest != "showdown":
+        print(json.dumps({
+            "status": "projections_not_supported_on_classic",
+            "projections": args.projections,
+            "contest": contest,
+            "note": ("--projections supplies the Showdown Base prior. Classic "
+                     "builds its projection through the F1-F5 enrichment stack, "
+                     "so a supplied Base has no defined place in it. Nothing "
+                     "was staged and no run directory was created."),
+        }, indent=1))
+        return 4
 
     # R28(3): a slate whose first lock has already passed is a replay or an eval,
     # never a live build, and the build path used to say nothing at all about the

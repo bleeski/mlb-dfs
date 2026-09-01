@@ -2378,57 +2378,55 @@ the batch's named rider and did not get pulled.
 - **Fix, decision first:** the accepted shape is Showdown through the EXISTING three gates — a Showdown-aware front door beside or inside `run_slate` — not the GF spec's unified roster-contract rewrite (A-16, rejected; see do-not-build). Two decisions before code: (1) sequencing, because this competes with R37's build work for the same DEV slots and touches the same solver surfaces; (2) relaxation policy, because Showdown's counted relaxations (overlap, then captain lock, then thesis) currently ship review-grade, and certification must state whether a nonzero relaxation count blocks the certified label or rides it as a named warning. Done when: a Showdown build produces a certified artifact through the same three gates Classic passes, `run_late_swap` can refine a promoted Showdown run, and CLAUDE.md's Showdown section retires the review-grade carve-out.
 - **Rider 2026-08-12, from the GF spec third edition's F-20 residual, verified in tree:** the empty-`Starting` fallback to an `all_healthy` pool (`showdown.py:109-175`) is deliberate, stamped `Pool_Basis` on every row, pinned by `test_showdown.py:111/141`, and reaches the checkpoint via `build_slate.py:1912/2069` — honest at review grade, which is all Showdown ships today. When this item brings Showdown under the gates, pool basis joins the certification evidence beside the relaxation counts: a pool built on `all_healthy` can certify only as what it is, never as starter-restricted, the same shape as decision (2)'s nonzero-relaxation question and decidable in the same pass.
 
-### R122. The Showdown prior_note claims a platoon factor the build never applied, and handedness dies at two intakes (P1, S) | new 2026-08-14, merged from BUILD fragment `2026-08-14_BUILD_showdown-platoon-inert-and-no-per-player-cap.md` finding 1; verified in tree
+### R122, REWRITTEN 2026-09-01 to its surviving remainder. The platoon factor dies at the HITTER intake, per player and silently, and the field that exists to report it is keyed on the PITCHER (P1, XS-S) | new 2026-08-14; **the ed6 rider and the LHP-only face are both CLOSED**, see below
 
-- **ed6 rider (2026-08-22, VERIFIED-read at ac8ac05; `showdown_theses.py`
-  edited since by R156, and it still reads no `Pool_Basis`):** the same
-  claim-vs-applied gap has a second, larger face on the `all_healthy` pool
-  (nothing posted yet). Every hitter then has `Batting_Order=None`, so
-  `apply_base_prior` leaves the ENTIRE thesis prior inert, the order bands
-  come back empty so ladders/locks/mults are mostly empty and the templates
-  converge to near-identical points-max solves, and `describe_slate` names
-  the highest-APPG arm — possibly a closer — as "the starter", while
-  `portfolio_report.prior_note` still asserts the full factor chain. Only the
-  melt frame's `Pool_Basis` carries the truth. Fix with this item: read
-  `Pool_Basis` in `build_thesis_ladder` and either refuse on `all_healthy` or
-  stamp the report and prior_note "order/platoon factors INERT: no posted
-  lineups".
+**What survives, and it was MEASURED on a delivered brief rather than read.** On
+`1920_1g_sd` (CIN@CHC, 2026-08-30) the delivered
+`build_brief_showdown_1920_1g_sd.json` carries
+`teams_with_hand: 2`, `teams_without_hand: []` and
+`construction.platoon_unresolved_teams: []` -- every platoon-reporting field
+clean -- while `hitters_with_side: 7` of 18. **Eleven of eighteen hitters took a
+flat 1.00 platoon factor and are named nowhere**, because the CHC block in that
+slate's feed carried zero hitters while still carrying its probable's hand.
+`apply_base_prior` adds to `platoon_unresolved_teams` only on `not opp_hand`
+(`showdown_theses.py:111-112`), so a resolved pitcher hand makes the report say
+"resolved" for a side whose bats have no handedness at all. That is R122's
+original headline -- a factor claimed and not applied -- arriving through the
+hitter intake on a slate where the pitcher intake worked.
 
-- **What:** `apply_base_prior` documents and `portfolio_report` emits
-  "salary-regressed APPG x batting-order PA factor x platoon factor"
-  (`showdown_theses.py:62,603`) while on 1915_1g_sd the platoon component
-  contributed nothing to any of 18 hitters: `showdown_handedness` only
-  accepts a hand the feed carries (`build_slate.py:1837-1838`, `if ... and
-  pitcher.get("hand")`), and a probable sourced from DK's `Starting` column
-  arrives `"hand": ""` — so `teams_with_hand` was 0 and every hitter took
-  the flat 1.00. The condition WAS disclosed (`platoon_unresolved_teams`),
-  in a nested construction block, while the headline note asserted the
-  opposite — and the in-code comment at `apply_base_prior` (`:70`) records
-  this exact bug from a previous round; that fix made it reportable, not
-  visible. This is a truthful-labels violation, the class CLAUDE.md calls
-  non-negotiable. Measured impact: recomputing with hands moved Ben Rice
-  9.27→9.64 and Okamoto 6.64→6.24, and the rebuild moved Rice 10→12 of 19
-  lineups.
-- **Fix, in the fragment's preference order, adopted:** (1) `prior_note`
-  states what was actually applied — an all-flat platoon says so. (2)
-  resolve handedness before falling back flat: the MLB Stats API `people`
-  endpoint returns `pitchHand` for an id in one allowlisted call (statsapi
-  is already in R88's allowlist), and **R117 LANDED 2026-08-18** and fixed the
-  paste side of the same hole — read its changelog entry before wiring (2): what
-  was broken was not a continuation line but `_HAND`'s `$` anchor against
-  mlb.com's second render, and `_match_hand` is the function to consume rather
-  than re-derive. R117's loudness half also shipped the surface (3) should
-  match rather than duplicate: `factors_inert` beside the gates, and one named
-  pool warning per slate rather than one per side. (3) an all-flat platoon
-  factor is LOUD at
-  the `stale_platoon_policy` precedent's severity: `'block'` engine default,
-  `'warn'` from build_slate.
-- **Audit fields.** Moves: robustness (label truth). Evidence: V2 (fragment
-  with measured rebuild + guard line verified this session). Acceptance: a
-  fixture feed with `hand: ""` produces a prior_note that names the flat
-  platoon and a loud warning; supplying hands restores the full note.
-  Falsifier: none — recording and resolution only. FOSS: stdlib + statsapi
-  (already allowlisted). Owner: none. Rollback: severity knob.
+**Fix.** Two lines and one field. `apply_base_prior` names the hitters it could
+not resolve (a `platoon_unresolved_hitters` beside the teams list, the same shape
+R190 gave `teams_without_hand`), and the flat-factor condition stops being a
+one-sided team fact. `showdown_handedness` already computes `hitters_with_side`;
+the missing half is the complement, by name. Severity follows the
+`stale_platoon_policy` precedent already adopted: loud, one warning per slate.
+
+**What CLOSED, with the evidence, so nobody re-derives it.**
+- **The LHP-only face is fixed and is a DIFFERENT defect from the one this item
+  filed.** `apply_base_prior` moved to `showdown_theses.py:71` and applies 0.94
+  same-handed / 1.04 opposite for both starter hands (`:114-117`); its docstring
+  records the LHP-only round in the past tense and two tests pin it
+  (`tests/test_showdown.py:554`, `:570`). A 2026-09-01 handoff read that
+  docstring as evidence THIS item was closed. It is not: R122 named
+  `showdown_handedness`'s `if ... and pitcher.get("hand")` guard and the static
+  `prior_note`, and both are unchanged at `build_slate.py:2174` and
+  `showdown_theses.py:1670`.
+- **The `prior_note` half is DEMOTED, not fixed, and the reason is that it is
+  DEAD.** `portfolio_report` still emits an unconditional "x platoon factor"
+  string, but an AST-and-grep sweep finds no production reader: `build_slate`
+  reads `lineups`, `player_exposure`, `all_unique_rosters`, `captain_exposure`
+  and `max_pairwise_overlap` off that dict and never `prior_note`, and the two
+  other `prior_note` keys in the repo (`ownership_pred.py:473`,
+  `qa_portfolio.py`) are the ownership prior's, a different subject. So the
+  mislabel cannot reach an operator through that key. The live label surface is
+  the brief's `construction` block, which is what the remainder above is about.
+- **The ed6 rider (`all_healthy`) is CLOSED.** `build_slate.py:2360` gates the
+  whole ladder path on `basis == "declared_starters" and posted >= 18`, so on an
+  `all_healthy` pool `apply_base_prior`, `build_thesis_ladder`, `describe_slate`
+  and `portfolio_report` are all unreachable -- each has exactly one production
+  caller and it is inside that branch. The brief's `construction` block reads
+  `mode: points_max_bank` with a reason naming the basis and the posted count.
+  None of the rider's three symptoms can occur.
 
 ### R123. The Showdown ladder has no per-player exposure cap, relaxes the captain cap untargeted, and deals contests in ladder order (P1, S-M) | new 2026-08-14, merged from the same fragment, findings 2-4
 
@@ -2928,63 +2926,64 @@ delivered files, which is the whole reason they went first.
   no defect today, the disagreement in the future) from R247(a)'s enumeration.
   Both are prevention, and both should be taken by a session with no slate clock.
 
-### R249. Showdown has no projection input, so the operator's only lever is rewriting the salary file, invisibly (P1, S) | new 2026-08-27, merged from BUILD fragment `2026-08-27_BUILD_showdown-has-no-projection-input.md`; corroborated by the outside spec ed8 (F-40)
+### R249. CLOSED 2026-09-01 -- SHIPPED, entry migrated to CHANGELOG.md
 
-**What.** `run_showdown` builds from `melt_showdown_salary_csv` and `Base` is
-`AvgPointsPerGame`, no override anywhere on the path; the module docstring
-anticipates "a richer projection" that cannot be supplied. On 2145_1g_sd the
-operator's workaround was a modified salary CSV whose only changed column was
-APPG — it worked (captains on BUY-graded players 6→11) and NOTHING in the
-file, brief, or preflight records that Base was substituted, which is the
-pool-trimming class of invisibility CLAUDE.md names.
+`--projections` supplies a `Player_ID,Base` map on both Showdown build paths and
+the brief records the substitution: source, sha256, count differing from APPG,
+min/median/max ratio, hitters and pitchers covered, and how many players are
+still on the derived prior. **The insertion point was the item, and it was
+decided by measurement:** supplied AFTER `apply_base_prior`, because supplying it
+before transmits **0.458** of the asked-for move and, being what `np.polyfit`
+fits, repriced **17 of 17** untouched hitters when ONE player was supplied.
+Reproduced on 1920_1g_sd: the three starved bats go 0 -> 5, 0 -> 5 and 0 -> 2 of
+ten entries and a captain moves. Two handoff premises came back false (there is
+no pre-seed door at `showdown.py:238`; the fallback bank path had no prior at
+all and is now wired too), and the R233 enumeration found a FIFTH writer of
+`Base` -- `solve_ladder`'s per-thesis game-state weight -- which is kept and now
+named in the report's own label. Full hit list, form searched, and the mutation
+that survived are in CHANGELOG.md.
 
-**Why.** APPG cannot know the opposing arm (a measured ~12% team-wide swing on
-this slate) or the platoon; and an invisible input substitution on a delivered
-file is worse than the gap it works around.
+### R283. `--past-slate-replay` protects the STAGED filenames and nothing else: a replay overwrites the delivered mirror, and on Showdown that mirror is the only copy (P1, XS) | new 2026-09-01, found by RUNNING it during the R249 verification; it cost a real file
 
-**Fix.** `--projections <csv>` (`Player_ID,Base`, the columns
-`ownership_pred.py --base` already reads); brief records source path, sha256,
-count of players whose Base differs from APPG, min/median/max ratio. The
-long-term answer (Showdown through the Classic enrichment stack) is R41's and
-unchanged; this is the cheap intermediate that also serves operator priors
-after R41 lands.
+**What.** The 2026-08-16 replay guard appends `_replay` to `suffix` in `main()`
+(`build_slate.py:3587`), and `suffix` governs the staged
+`DKSalaries*/DKEntries*` filenames and the `preserve_prior_slate` list. It never
+reaches either delivered path. Showdown builds its own destination inside
+`run_showdown` -- `dest = out_dir / f"DKEntries_showdown{slate_tag_suffix(salary)}.csv"`
+(`:2453`) -- from the slate TAG, consulting nothing about a replay. Classic's
+mirror comes from `execution_pipeline.mirror_to_outputs(result, salary_csv)`
+(`:4864`, defined `:4885`), whose signature carries no replay flag either;
+`past_slate_replay` appears at exactly TWO sites in `build_slate.py` (the
+past-lock refusal at `:3552` and the suffix at `:3587`) and ZERO times in
+`execution_pipeline.py`. The comment above the guard says *"A replay now carries
+its own name and can never land on the delivery path."* That sentence is false
+at this head, for both contest types.
 
-**Second sighting, 2026-08-30, and the first MEASUREMENT of what the gap costs**
-(from BUILD fragment `2026-08-30_BUILD_showdown-ranks-on-raw-appg.md`, slate
-`1920_1g_sd`, CIN@CHC, 10 entries). The build certified review-grade with
-`counted_relaxations.clean: true` and zero adversarial findings, so nothing that
-ran could have caught this. Savant expected stats for the 18 confirmed bats
-against delivered exposure: **three confirmed starters drew ZERO of 10 entries
-and all three carry POSITIVE xwOBA-minus-wOBA gaps**, results trailing contact
-quality, which is the exact correction the xwOBA Base step exists to make.
-Bleday (CIN, .350 xwOBA, +.017), Hoerner (CHC, .324, +.025), McLain (CIN, .311,
-+.028). Bleday ties the second-best CIN bat by xwOBA; Hoerner outranks three
-CHC bats that each drew 3 or 4 entries. The mirror holds: the two bats pinned at
-the 50% player cap carry the largest NEGATIVE gaps on the board (Crow-Armstrong
--.037, Suzuki -.035).
+**Evidence, and it is a sighting rather than a reading.** A
+`--past-slate-replay` Showdown build of 1920_1g_sd run on 2026-09-01 to verify
+R249's wiring staged correctly to `DKSalaries_showdown_replay.csv` and then
+**overwrote `outputs/2026-08-30/DKEntries_showdown_1920_1g_sd.csv`**, the
+delivered mirror of a slate that had already been played, and appended a second
+1920_1g_sd row to that date's `upload_manifest.json` dated 2026-09-01. Showdown
+is review-grade and promotes no run, so there is no
+`runs/<run_id>/final/DKEntries.csv` behind it: **that mirror was the only copy
+and it is gone.** Classic is exposed to the same overwrite but recoverable,
+because its certified artifact in `runs/` is immutable -- which is the asymmetry
+that makes the Showdown half P1 rather than P2.
 
-**State the mechanism so the fix can be aimed, because it is not a batting-order
-artifact.** Amaya bats 9th with the worst xwOBA of the 18 and still drew 3 of 10
-because he is cheap. The starved band is the 6-7 hole at mid salary: too
-expensive to be a punt, short of the top bats on APPG alone. APPG plus salary is
-the entire ranking, so a bat whose season results lag its contact quality has
-nothing that can lift it. Verified at this head: `showdown.py:223` reads
-`AvgPointsPerGame` for Base, and `grep -icE 'enrich|est_woba|xwoba|expected_stats'`
-over that module returns **0** against 23 `def` in the same file, so the absence
-is real and not a silent-grep failure. `build_slate.py:3441-3442` routes
-`contest == "showdown"` into `run_showdown` before the enrichment block at
-`:733`, and `run_showdown` touches none of it. Both Savant reference files were
-FRESH on the day (fetched 19:52Z; **636 and 831 data rows**, not the 637/832 the
-fragment reports, which are `wc -l` counts carrying the header). The inputs were
-on disk and current; nothing consumed them. `showdown.py:238` (`if base and not
-rec.get("Base"): rec["Base"] = base`, quoted exactly at this head) suggests a
-pre-seeded Base already survives the pool build, so
-the `--projections` seam may be narrower than R249's Fix assumes; check that
-before scoping. The truthful-label half of that fragment is filed on R237, not
-here. **R233 note for whoever takes this:** enumerate every `contest ==
-"showdown"` branch and every consumer of `reference_manifest.json` before
-claiming the class is closed. The fragment named two sites and did not count
-them.
+**Fix.** One rule, one place: the replay suffix belongs on the DELIVERED name,
+not only the staged one. `run_showdown`'s `dest` takes it directly;
+`mirror_to_outputs` needs the flag threaded or, better, the caller passes the
+destination it wants rather than the mirror deriving it. Whichever, the R233
+class is *every site that composes a delivered filename* -- there are at least
+three (`run_showdown`, `mirror_to_outputs`, `preserve_prior_slate`'s list) and
+the 08-16 fix touched one. A test asserting a replay build's `delivered_path`
+contains `_replay`, on BOTH contest types, is what the 08-16 commit lacked.
+
+**Rider, same commit.** A replay should not write a delivery row into
+`upload_manifest.json` at all, or should write one marked as a replay. The
+manifest is what Ben checks a sha256 against before entering a contest, and a
+replay row for a played slate is a second answer to "what was delivered".
 
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 

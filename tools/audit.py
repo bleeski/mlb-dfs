@@ -581,7 +581,22 @@ EXPECTED_SUITE_COUNTS = {
     # hold that never releases strands the budget), the hold bounded by the
     # captain cap, the hold not being counted as a relaxation, and `util_excludes`
     # blocking the UTIL seat while leaving the captain seat.
-    "tests.test_showdown": 151,
+    # R249, 2026-09-01: 151 -> 166, the fifteen that pin the supplied Base seam --
+    # the insertion point itself (a supplied number is the prior and is not
+    # regressed toward the salary fit), the property that disqualified the
+    # pre-prior insertion point (supplying one player leaves every other prior
+    # byte-identical), the captain move that is the item's own bar, both DK ids
+    # resolving and the pitcher reach, an unmatched id named and inert, the
+    # provenance the brief requires, three refusals on a named file that cannot
+    # be read, the shared column contract with `ownership_pred.py --base`, the
+    # truthful label, the Classic refusal landing before staging, and FOUR on
+    # the wiring itself: the order applied through `price_showdown_pool` on the
+    # ladder path, the fallback bank path reached, the no-file case unchanged,
+    # and the brief block present on both. The wiring tests exist because the
+    # first cut had none and a mutation moving the insertion point survived the
+    # whole suite -- every other test called the engine function directly on an
+    # already-priced frame, so nothing executed the decision.
+    "tests.test_showdown": 166,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

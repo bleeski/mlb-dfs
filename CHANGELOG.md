@@ -25,6 +25,169 @@ performance claim.
 
 ---
 
+## 2026-09-01 — R249: Showdown gets a projection input, and the insertion point is decided by measurement rather than by taste — a supplied number is the prior, because supplying it any earlier transmits 0.458 of it and reprices everyone else
+
+**What moved.** `mlb_engine/optimize/showdown_theses.py` (`read_supplied_base`,
+`apply_supplied_base` — the reader and the substitution, stated once, beside
+`apply_base_prior` whose output they replace), `skills/generate-lineups/scripts/build_slate.py`
+(`--projections`, the new `price_showdown_pool` that both build paths go through,
+the Classic refusal, the `supplied_base` brief block), `tests/test_showdown.py`
+(fifteen new), `tools/audit.py` and `CLAUDE.md` (the pin and the quoted line).
+Gate **1577 -> 1592**. Golden replay unmoved; a build with no `--projections`
+produces the same bytes, which is what the replay and
+`test_the_wiring_is_a_no_op_when_no_projections_were_supplied` both say.
+
+**The gap, re-measured at this head and it is wider than the entry states.**
+`build_slate.py:2376` was the only Showdown pricing call and there was no
+projections argument anywhere on the path, so Classic reached the whole F1–F5
+enrichment stack and Showdown reached AvgPointsPerGame plus a salary regression.
+The item's own measurement on 1920_1g_sd holds: three confirmed starters with
+positive xwOBA-minus-wOBA gaps drew zero of ten entries. Reproduced here through
+the real files, with a supplied projection built from
+`data/reference/expected_stats_batting.csv` — the Savant file the fragment says
+was fresh on the day and that nothing consumed — as `APPG × est_woba/woba`:
+
+| | BASE | supplied |
+|---|---|---|
+| Matt McLain | 0 of 10 | 5 of 10 |
+| Nico Hoerner | 0 of 10 | 5 of 10 |
+| JJ Bleday | 0 of 10 | 2 of 10 |
+
+and a captain moves. That is the diff of rostered players the item asked for,
+not an assertion that the flag works.
+
+**THE INSERTION POINT, and it is the whole item.** Three candidates were
+measured on the same pool, same moneyline, same caps: supply the number BEFORE
+`apply_base_prior` so it becomes `APPG_Raw`; supply it AFTER, replacing the
+finished prior; or supply it and skip only the salary regression. **After
+wins, on two numbers rather than on preference:**
+
+- **Transmission.** Regressing what the operator got on what they asked for,
+  through the origin: before **0.458**, after **1.105**, regression-skipped
+  **0.876**. An operator asking for +10% at the earliest insertion point gets
+  +4.6%, which is the mechanism R249 was filed against arriving inside its own
+  fix. `apply_base_prior`'s docstring scopes the 0.60 salary weight to
+  AvgPointsPerGame's small-sample noise; a supplied projection is not that.
+- **Cross-contamination, and this one is disqualifying on its own.** The
+  earliest insertion point is what `np.polyfit` fits, so the salary line moves
+  with the supplied column. Supplying a number for ONE player moved **17 of 17**
+  other hitters' priors (Bregman +0.033, De La Cruz +0.036, and so on) — after
+  and regression-skipped both moved **0 of 17**. Supplying a number for Hoerner
+  is not a statement about Bregman, and nothing in the brief would have said it
+  had been one.
+- **And the recording argument, which is the one that binds under this file's
+  truthful-labels rule.** The brief states supplied-vs-APPG ratios. Under any
+  earlier insertion point those describe an input that a factor the brief does
+  not state then transformed — R122's `prior_note` defect in a new place.
+
+**Stated rather than discovered: what a covered player LOSES.** The
+batting-order PA factor and the platoon factor are not applied to a supplied
+number, because the operator supplied the finished prior. A partial file
+therefore ranks covered players on a supplied prior and everyone else on the
+derived one; `chain_bypassed_players` and `players_on_derived_prior` count
+exactly that, in the brief, per build.
+
+**`--projections` DOES reach pitchers, deliberately.** `apply_base_prior` leaves
+arms on raw APPG (the `Batting_Order` NaN branch), the captain slot is the
+highest-leverage seat on a Showdown card, and on the 1920_1g_sd build arms took
+4 of 10 captain slots. `pitchers_covered` is its own field so a reader can see
+whether they were. Either DK id resolves to the same player: a Showdown salary
+file lists everyone twice, CPT and UTIL, and refusing one of the two would be a
+trap with no upside.
+
+**Two premises from the handoff came back FALSE, and both are findings.**
+(1) The board's note that `showdown.py:238`'s `if base and not rec.get("Base")`
+lets a pre-seeded Base survive the pool build, so "the seam may be narrower than
+R249's Fix assumes" — it does not. `melt_showdown_salary_csv` CREATES the record
+at `setdefault` with `Base` already set from APPG; `:238` only repairs a first
+row whose APPG was 0 from the second row. There is no pre-seed door and the seam
+is exactly as wide as the item assumed. (2) The handoff said `build_slate.py:2376`
+is the only Showdown pricing call. True of `apply_base_prior`, and it hid the
+larger half: `use_ladder` gates that branch, so on an `all_healthy` pool the
+fallback bank ranks on raw APPG with no prior at all. Both paths are wired.
+
+**R233 enumeration: every site that writes or overwrites a `Base` column, and
+every reader of `Base` on the Showdown path. AST, with the callers by AST too.**
+**FORM SEARCHED, so the next reader knows what this could not see:** every node
+whose subscript index or `.get`/`.setdefault`/`.pop` first argument is the string
+literal `"Base"` / `"Base_Prior"` / `"APPG_Raw"` / `"Base_Supplied"`, classified
+Store vs Load, over `mlb_engine/`, `tools/`, `tests/` and `skills/`. Blind to a
+column reached through a variable holding the name or through `**kwargs`. Two
+second sweeps were run for exactly that blindness: the attribute form (`df.Base`)
+returns **0 sites repo-wide**, and the bare-string form (`"Base"` in a column
+list, an `.at[]` target, a rename map) returns **20 outside tests**, all counted
+below.
+
+**Writers: 6 outside tests, and the item named one.**
+
+| site | verdict |
+|---|---|
+| `showdown.py:239` | KEPT — the melt's own zero-APPG repair, and the premise check above is what it settles |
+| `showdown_theses.py:99` `APPG_Raw` | KEPT — the prior's record of what it started from, and now the denominator of every recorded ratio |
+| `showdown_theses.py:120–121` `Base_Prior`/`Base` | KEPT — `apply_base_prior`, the site the item names |
+| `showdown_theses.py:234–235` | **NEW** — this seam, and its `Base_Supplied` marker |
+| `showdown_theses.py:1186` | **NOT IN THE ITEM, NOT IN THE HANDOFF, and it is the payoff.** `solve_ladder` multiplies each thesis's working copy of `Base` by that thesis's game-state weight, AFTER this seam. Kept, deliberately: the operator supplies how good a player is, the template says how much that side matters in this scenario, and the two compose. But "the supplied number is what the solver ranks on" would have been FALSE without saying so, so the report's label now says it and a test pins that the weight still applies and is not double-applied. |
+
+**Readers on the Showdown path: 9 outside tests, all live, all kept**, and all
+of them read whatever `Base` holds, which is the property that makes one seam
+enough — `showdown.py:410`, `:565` (the bank builder), `showdown_theses.py:95`,
+`:97` (the regression's own fit), `:105–106`, `:222` (this seam's ratio),
+`:301`, `:308`, `:321` (the band sorts), `:803`, `:1187`.
+**Outside the Showdown path: 11, all Classic, none touched** —
+`ownership_prior.py:406`, `execution_pipeline.py:3790`, `:3808`, `:3858`,
+`:4002`, `:4008`, `:4011`, `projection_builder.py:98` and five column-list
+sites, plus `bank_cache.py:542` and `repair_entry.py:116`. R41 owns bringing
+Showdown through that stack and this commit does not touch it.
+**`skills/` carries ZERO `"Base"` literals, checked rather than assumed** —
+grep-cross-checked against the AST count, because R247's own enumeration missed
+the delivered brief by excluding that root, and here the brief block is assembled
+from `.attrs` rather than from a `Base` reference, which is why the count is
+honestly zero.
+
+**One duplication KEPT with its reason.** `ownership_pred.py`'s `_load_base_map`
+reads the same `Player_ID,Base` columns. It is not unified here: it is a
+tool-side reader with its own JSON path and its own inert-reason strings, an
+engine module importing a tool inverts the dependency (R267's ruling), and
+moving a tested tool's reader is not a projection-seam commit. What IS shared is
+the CONTRACT — same column names, same `id`/`projection` aliases, same
+case-insensitivity, same `utf-8-sig` — and a test asserts it against a file
+written the other tool's way, so an operator has one file format and not two.
+
+**Mutation check: 12 mutations, ONE SURVIVOR, killed, and it found a real hole.**
+`__pycache__` cleared first; every apply paired with a revert in a `finally`, the
+restored sha256 and a byte-identical check printed per mutation, and the eleven
+anchors GREPPED afterwards rather than the driver's restore trusted.
+
+- **M1 (supply the number BEFORE the prior) SURVIVED the whole suite.** This is
+  the 09-01 shape one commit later and in a new place: every insertion-point
+  test called the engine function directly, on a frame `apply_base_prior` had
+  already produced, so **no test executed the wiring** — and the wiring is where
+  the decision lives. Two source-reading tests passed because the mutation kept
+  both call sites and the brief line. Killed by extracting `price_showdown_pool`,
+  which makes the order a property of one function instead of of a source
+  layout, and by three tests that call what the build calls. M1 now fails on the
+  ladder-path assertion; M12 (the helper collapsed to one path) fails on the
+  bank-path one.
+- **M5 was a BROKEN MUTATION, not a survivor, and it is recorded because the
+  two read identically.** It skipped pitchers with `row.get("Batting_Order") is
+  None`, and a pandas NaN is not `None`, so it was a no-op that reported OK.
+  Rewritten with `pd.isna`, it dies. A mutation that does not mutate is a
+  passing test wearing the other costume.
+- The other ten died first pass: M2 (only the UTIL id resolves), M3 (an
+  unreadable named file becomes an empty map), M4 (unmatched ids stop being
+  named), M6 (the differing count stops distinguishing a substitution from an
+  echo), M7 (the Classic refusal removed), M8 (only the ladder wired), M9
+  (`applied` true with nothing matched), M10 and M11 (the sha256 leaves the
+  report, and the file's own bytes stop being hashed).
+
+**Two refusals rather than two silent fallbacks**, both R242's shape: a
+`--projections` file the engine cannot open, or that carries no usable rows,
+exits 4 with the path named instead of building flat; and `--projections` on a
+Classic build refuses BEFORE staging rather than being accepted and ignored. A
+flag that silently does nothing on the contest type it was pointed at is the
+invisibility this item exists to close, arriving through the flag meant to close
+it.
+
 ## 2026-09-01 — R163: a solver-infeasible index stops earning a DU relaxation it never used, and the identical ladder stops being re-run four more times
 
 **What moved.** `mlb_engine/optimize/optimizer_v3.py` (`build_multi_lineup`:
