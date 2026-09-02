@@ -67,10 +67,15 @@ outage, which sends you debugging the wrong thing.
    and the audit.
 2. **Work.** Engine work belongs in the container when the suite matters: it
    runs in about 30 seconds there against several minutes chunked on the mount,
-   where a `device_bash` call is capped at 45 seconds and cannot hold a full
-   run. Small edits are fine written directly on the mount. When the gate has
-   to run ON the mount, it has a supported split since R152: repeat
-   `python tools/audit.py --gate-run` until it says complete, then
+   where a `device_bash` call ends around 180 seconds and still cannot hold a
+   full run. (This line said 45 seconds until 2026-09-02; R271(b) retired that
+   figure. The conclusion is unchanged — the five gated suites do not fit 180
+   either — but the chunking is coarser than it was, which is why the command
+   below now passes a budget.) Small edits are fine written directly on the
+   mount. When the gate has to run ON the mount, it has a supported split since
+   R152: repeat
+   `python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165`
+   until it says complete, then
    `python tools/audit.py --gate-report --terse`. It records per test class
    under `.audit_gate/` against a content fingerprint of the tree, so editing
    between calls resets the run rather than mixing two trees, and only a

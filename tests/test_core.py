@@ -17665,9 +17665,11 @@ class SplitGateTests(unittest.TestCase):
     """R152: the session-start gate assembled across several calls.
 
     `python tools/audit.py --run-tests --terse` is CLAUDE.md's step 2 and it
-    does not fit a Cowork `device_bash` call, which dies at 45 seconds:
-    measured 2026-08-18 on the device mount, tests.test_core alone needs ~89s
-    and one of its 792 tests needs 35.8s by itself. Backgrounding it is the
+    does not fit one Cowork `device_bash` call. The ceiling is ~180s with an
+    explicit timeout (R271(b), 2026-08-29, retired the 45s figure this
+    docstring carried), and the five gated suites together need more: measured
+    2026-08-18 on the device mount, tests.test_core alone needs ~89s and one of
+    its 792 tests needs 35.8s by itself. Backgrounding it is the
     trap, not the workaround -- nohup and setsid both die with the call, the
     log comes back EMPTY, which reads exactly like a silent pass, and a killed
     audit.py leaves a zero-byte .git/index.lock that strands the session's

@@ -1308,7 +1308,10 @@ class GateCallCeilingTests(unittest.TestCase):
         self.audit = importlib.import_module("tools.audit")
 
     def test_saying_nothing_keeps_the_device_default(self):
-        # The 45s device_bash figure is unchanged for a caller who does not ask.
+        # The conservative default is unchanged for a caller who does not ask.
+        # (It was described here as "the 45s device_bash figure" until
+        # 2026-09-02; R271(b) retired that number, the default did not move,
+        # and the reason it is kept is at GATE_DEFAULT_BUDGET_S.)
         import os
         with unittest.mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual(self.audit.gate_call_ceiling(),

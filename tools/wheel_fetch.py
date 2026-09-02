@@ -1,11 +1,13 @@
 """Resumable wheel fetcher for the bounded Cowork sandbox.
 
-Each bash call is a fresh container with a 45s ceiling, so a large wheel cannot
-be downloaded in one shot. This fetches with HTTP Range requests into a
-persistent mount directory and can be run repeatedly until complete.
+Each bash call is a fresh container with a bounded ceiling (about 180s on Cowork
+when the call passes an explicit timeout; 45s was this docstring's figure until
+R271(b) retired it on 2026-08-29), so a large wheel may not download in one shot.
+This fetches with HTTP Range requests into a persistent mount directory and can
+be run repeatedly until complete.
 
 Usage:
-    python tools/wheel_fetch.py --dest <dir> --seconds 35 numpy scipy
+    python tools/wheel_fetch.py --dest <dir> --seconds 120 numpy scipy
 Exit 0 when every requested wheel is complete, 10 when more calls are needed.
 """
 

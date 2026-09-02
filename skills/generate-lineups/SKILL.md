@@ -343,6 +343,50 @@ carry it either** (R284, open): a portfolio delivered under a cap is refined by 
 bank that never saw the cap, so say so rather than implying the delivered file's
 leverage survived a swap.
 
+### Batters facing your own SP: a control, not a wall (R288, Classic only)
+
+```bash
+python skills/generate-lineups/scripts/build_slate.py ... \
+    --max-opposing-hitters-per-sp 1
+```
+
+Default **0**, which is byte-for-byte what the engine did before this flag
+existed, so nothing changes unless you pass it. It is **per SP**, so a Classic
+lineup carrying two arms has a per-lineup worst case of twice the value.
+
+DraftKings does not prohibit the construction, and the evidence is DK's own
+scored output rather than a reading of its rules page (CLAUDE.md bars fetching
+draftkings.com by any route, and this section does not claim it was read):
+19,072 of 102,201 fully-resolvable archived Classic entries in `data/archive/`
+roster a hitter facing a rostered SP, and one 1,486-entry contest's ranks 1, 2
+**and** 3 all did. DK accepted, scored and paid them.
+
+**The frequency is slate-size dependent, and that is the whole reason to reach
+for it.** 62.5% of entries on an archived 2-game slate carry one; 3.2% on a
+12-game slate. So on a small slate the old wall forbade most of the legal space,
+and on a big one it barely bound. The measured cost of treating it as a rule: on
+1940_9g a hand builder held a 54%-exposure arm that banned every BAL bat from 20
+of 37 lineups, and BAL — highest implied team total on the slate at ~5.9, in an
+11.0-total game at Coors — took 2 roster slots out of 370. A pitcher-selection
+error became a hitter-distribution error through a constraint nobody re-examined.
+
+Four things follow:
+
+- **It is yours to move.** CLAUDE.md puts it with postures and stack plans among
+  the delegated decisions, not with the money-and-entry wall. Record the value
+  and the reason in the brief, which carries `anti_correlation` on every Classic
+  build including the default.
+- **The preflight WARNS and no longer fails**, so a legal roster no longer costs
+  a `--force`. You will see a line naming the entries and the count.
+- **The export validator grades against the DECLARED allowance**, so a raised
+  build reaches a file. Before R288 it hard-errored regardless and the control
+  would have been unusable end to end.
+- **Showdown refuses the flag** before staging rather than ignoring it, and
+  `tools/repair_entry.py` KEEPS the no-opposing-hitter filter as its default,
+  deliberately: a repair runs unattended inside a lock window, where the
+  conservative construction is the right default even though the wall is wrong
+  at build time.
+
 ### Projection enrichment (this is what makes the build more than APPG)
 
 The build applies six deterministic priors: the xwOBA Base correction, xISO
@@ -519,15 +563,26 @@ That is the fast path: one conversion call, then build.
 
 ## Running inside the Cowork sandbox
 
-Cowork's bash gives you one 45-second window per call, and that window includes
-container startup, so a `timeout 40` wrapper gets killed before its trailing
-`echo` ever runs. Budget the inner timeout at 25 to 33 seconds. Importing
-`mlb_engine.optimize.optimizer_v3` off the mounted filesystem costs about 15
-seconds by itself. That leaves roughly 15 to 20 seconds of real work per call,
-and you cannot escape it by backgrounding, because processes do not survive
-between calls.
+**The inner bash timeout is 130s. One number, and CLAUDE.md's `## Sandbox`
+section owns it.** The real per-call ceiling is about 180 seconds when the call
+passes an explicit timeout, and 130 is the safe inner budget underneath it. Do
+not re-derive it per call: a session reached for `timeout 168` against a ~164s
+harness ceiling on 2026-09-01 and lost the call and its work with it.
 
-**Put exactly one expensive thing in each call.** The default path does two
+This paragraph said **45 seconds** until 2026-09-02, and that number is retired
+(R271(b)). It was wrong in the expensive direction: it told a session under a
+lock clock that only 15 to 20 seconds of real work fit per call, so a build that
+needs one call got five. Under a deadline the minimal move is the expensive one,
+which is the same lesson the T-15 rung of CLAUDE.md's T-schedule now carries.
+`tools/rebuild_registry.py` had the right figure (170-180s) the whole time.
+
+What has not changed: the window includes container startup, so budget the inner
+timeout below the wall you are aiming at; importing
+`mlb_engine.optimize.optimizer_v3` off the mounted filesystem costs about 15
+seconds by itself; and you cannot escape the ceiling by backgrounding, because
+processes do not survive between calls.
+
+**Put one expensive thing in each call.** The default path does two
 network fetches inside the build: the MLB Stats API lineups pull, which alone has
 a 25-second timeout, and the RotoWire merge. Either can consume the whole
 remaining budget. Do the fetch in its own call instead, with a short standalone
@@ -718,7 +773,19 @@ engine, touches no network, and finishes in under two seconds.
 python <repo>/tools/preflight_upload.py --entries <delivered file>
 ```
 
-Three inputs resolve themselves, because a check that runs only when you remember
+**It hard-fails a player whose game has already started (R287), and that check
+needs no feed.** Start times come from the salary file's own `Game Info`, so a
+file built after first pitch is caught even when nothing else about the slate is
+available — which is exactly the state a slate is in at 19:56 on a night that
+went sideways. On 2026-09-01 this tool printed `first lock: 19:40 ET` and then
+`PASS ... all hard checks clean`, exit 0, on a file holding 151 roster slots from
+games that had already started; a second file that night carried 78 and also
+cleared. DK would have rejected both. It is a hard failure and not a warning,
+because a warning at the money boundary is one the clock talks someone past.
+`--as-of "19:56"` pins the clock to replay a check against a past moment, and a
+bare `HH:MM` is read as **Eastern**.
+
+Four inputs resolve themselves, because a check that runs only when you remember
 a flag is a check that does not run at T-5:
 
 - `--salary`: the promoted run's `inputs/DKSalaries.csv` snapshot, which cannot be
@@ -983,8 +1050,20 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 27 modules, 1645 tests
+python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165  # repeat to GATE COMPLETE
+python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 27 modules, 1645 tests
 ```
+
+**`--run-tests` in one call is not the supported path here and CLAUDE.md says
+so.** `tests.test_core` alone needs ~89s and one of its tests needs 35.8s by
+itself, so the single command overruns the call and takes its own report with
+it. The gate above is that same command assembled across calls: budget for five
+from a cold `__pycache__`, one warm. Do not background it — `nohup` and `setsid`
+both die with the call, the log comes back EMPTY (which reads exactly like a
+silent pass), and a killed `audit.py` strands the next commit on a zero-byte
+`.git/index.lock` this mount cannot unlink. Do not hand it to Ben either: his
+Windows Python has no scipy and `.pylibs/` is a Linux build, so `--run-tests`
+cannot pass on his host. The gate is the session's job.
 
 When the skill or its scripts change, run the fixture evals too (not part of
 the audit; they are the skill-development harness and each pins an exit code,
@@ -1022,7 +1101,8 @@ python <repo>/tools/verify_export.py --entries <file.csv> --parent <prior file> 
 
 It runs every preflight rule (blanks, partial rows, duplicate Entry IDs, header
 geometry, DK Status, embedded-pool overlap, cap, slot eligibility, duplicate
-persons, two games, five hitters per team, hitter versus rostered SP, Showdown
+persons, two games, five hitters per team, players whose games have already
+started, hitter versus rostered SP — a WARN since R288, not a failure — Showdown
 both-teams and recomputed captain price) and adds the swap-specific ones:
 contest-identity diff against the parent, per-entry slot churn, no player
 introduced from a game that has already started, and no replacement of a player

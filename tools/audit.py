@@ -1306,9 +1306,15 @@ def summarize_suite_results(results: Dict[str, Any], stdout_tail: str = "",
 # R152: the gate across several calls.
 #
 # CLAUDE.md's session-start step 2 is one command, and in a cloud Cowork
-# session it cannot finish: `device_bash` is hard-capped at 45 seconds and
-# tests.test_core alone measured 89s (84.9s of tests plus a 4.2s import) on
-# 2026-08-18. Backgrounding it is worse than useless -- nohup and setsid both
+# session it cannot finish. R271(b), 2026-08-29, RETIRED the 45s figure this
+# comment carried: the real `device_bash` ceiling is ~180s when the call passes
+# an explicit timeout. The split survives the correction because its reason was
+# never one suite -- tests.test_core alone measured 89s (84.9s of tests plus a
+# 4.2s import) on 2026-08-18, and the five gated suites together do not fit 180
+# either. What the correction changes is the SIZE of each slice, which is why
+# CLAUDE.md now says to pass `--gate-budget 130 --gate-ceiling 165` and gets the
+# whole assembly in one warm call or five cold ones, against the twenty-odd the
+# defaults below force. Backgrounding it is worse than useless -- nohup and setsid both
 # die when the call returns, the log comes back EMPTY, which looks exactly like
 # a silent pass, and a killed audit.py leaves a zero-byte .git/index.lock that
 # strands the session's commit half an hour later (R109).
@@ -1333,12 +1339,21 @@ def summarize_suite_results(results: Dict[str, Any], stdout_tail: str = "",
 GATE_DIR = ".audit_gate"
 GATE_UNITS_FILE = "units.jsonl"
 GATE_TIMINGS_FILE = "timings.json"
-# A device_bash call dies at 45s. The child stops taking new classes at the
-# deadline and the parent allows it a margin to finish the one in flight.
+# The child stops taking new classes at the deadline and the parent allows it a
+# margin to finish the one in flight.
+#
+# 28.0 and the 39.0 below were derived from a 45s device ceiling that R271(b)
+# RETIRED on 2026-08-29 (the real figure is ~180s with an explicit timeout).
+# They are KEPT anyway and the reason is that a default is a floor, not a
+# measurement: this value has to be safe on a host that has told us nothing,
+# and every host that can do better says so through --gate-budget /
+# --gate-ceiling / MLB_GATE_CEILING_S. Changing the default would be a
+# behaviour change for every silent caller, measured on one host. CLAUDE.md's
+# session-start command passes 130/165 explicitly and that is the supported way
+# up. What is NOT kept is any comment or --help string still asserting 45.
 GATE_DEFAULT_BUDGET_S = 28.0
-# The whole call, parent included. A device_bash call dies at 45s and takes the
-# parent's own report with it, so the parent stops the child while it can still
-# print what landed.
+# The whole call, parent included: an overrun takes the parent's own report with
+# it, so the parent stops the child while it can still print what landed.
 #
 # R190(d), 2026-08-23: 39.0 is the DEFAULT and no longer the only value.
 # `--gate-budget` was already tunable and it did nothing on its own, because
@@ -1354,8 +1369,8 @@ GATE_DEFAULT_BUDGET_S = 28.0
 # staleness class this file keeps rediscovering. So the ceiling is now the host's
 # to state: `--gate-ceiling`, or `MLB_GATE_CEILING_S`, floored at the budget plus
 # a margin so a raised budget can never again be silently capped underneath.
-# Nothing about the 45s device default changes; a caller that says nothing gets
-# exactly the old behaviour.
+# Nothing about the conservative device default changes; a caller that says
+# nothing gets exactly the old behaviour.
 GATE_CALL_CEILING_S = 39.0
 GATE_CEILING_ENV = "MLB_GATE_CEILING_S"
 
@@ -2438,8 +2453,9 @@ def main() -> None:
                              "measurement; the stale-ref reading is used and "
                              "labelled as such")
     # R152: the same gate across several calls, for a caller whose per-call
-    # ceiling cannot hold --run-tests (a Cowork device_bash call dies at 45s
-    # and tests.test_core alone needs ~89s).
+    # ceiling cannot hold --run-tests (a Cowork device_bash call ends around
+    # 180s with an explicit timeout, and the five gated suites together need
+    # more -- tests.test_core alone needs ~89s).
     parser.add_argument("--gate-run", action="store_true",
                         help="run as much of the gate as fits one call, "
                              "recording per-class results; repeat until it "
@@ -2452,12 +2468,16 @@ def main() -> None:
     parser.add_argument("--gate-budget", type=float,
                         default=GATE_DEFAULT_BUDGET_S,
                         help="seconds of testing one --gate-run may start "
-                             f"(default {GATE_DEFAULT_BUDGET_S:.0f}; a Cowork "
-                             "device_bash call dies at 45)")
+                             f"(default {GATE_DEFAULT_BUDGET_S:.0f}, a floor "
+                             "safe on any host; a Cowork device_bash call "
+                             "ends around 180s with an explicit timeout, so "
+                             "pass 130 there and assemble the gate in one "
+                             "warm call or five cold ones)")
     parser.add_argument("--gate-ceiling", type=float, default=None,
                         help="seconds of wall clock one --gate-run child may "
-                             f"use (default {GATE_CALL_CEILING_S:.0f}, the "
-                             "Cowork device_bash figure; also read from "
+                             f"use (default {GATE_CALL_CEILING_S:.0f}, a floor "
+                             "safe on any host, NOT the Cowork figure; also "
+                             "read from "
                              f"{GATE_CEILING_ENV}). Raise it on a host with a "
                              "longer call cap: a unit slower than the ceiling "
                              "can never land, and the gate then cannot print "

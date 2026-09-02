@@ -39,6 +39,38 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-02, DEV, claim `engine` (`engine_2026-09-02`, re-taken): **R271 mostly
+SHIPPED and rewritten in place to a one-line decision; no board slot moved and
+the fourteen-slot queue is untouched.** The session was a doc-truth sweep, not a
+queue item: read the repo, find what the tree has made false, fix it. R271 is
+what it found, and the R233 enumeration is why it is worth an entry.*
+
+***The item said "two files" and the class has EIGHT live members across five
+files.*** It named `CLAUDE.md` and `SKILL.md`. The 45-second figure was also
+compiled into `tools/audit.py` five times (including both `--gate-budget` and
+`--gate-ceiling` help strings, which CLAUDE.md sends every session to read),
+`tools/wheel_fetch.py`'s module docstring, `tests/test_core.py`'s
+`SplitGateTests` docstring, `tests/test_showdown.py`'s R190(d) comment, and two
+LIVE docs — `docs/cowork_sync_protocol.md`, which CLAUDE.md names as the
+disk/container/GitHub authority, and `docs/2026-07-18_implementation_guide.md`,
+which the project instructions name as orientation. Ninth time the pattern has
+paid: a fix closes N named sites and the class has N+1.
+
+***And the corroborating measurement was already in the tree.***
+`tools/rebuild_registry.py:91` has said "the Cowork sandbox caps a single call at
+roughly 170-180s" since it was written. Two files stated a number, one file
+stated the right one, and nothing reconciled them for weeks. When an enumeration
+turns up a site that already AGREES with the correction, that site is evidence
+the correction is right, and it belongs in the entry beside the members that were
+wrong.
+
+***What the correction does NOT change, stated because the temptation is to
+assume it does.*** R152's split gate survives: its reason was never one suite, it
+was the TOTAL, and the five gated suites do not fit 180 either. What changed is
+the SLICE SIZE. The two claims R152 got right and that are independent of any
+number also survive verbatim — backgrounding does not survive the call, and a
+killed `audit.py` strands the next commit on a lock this mount cannot unlink.
+
 *2026-09-01 (fourth note this date), DEV, claim `engine` (`engine_2026-09-02`):
 **R286, R287, R288 and R289 all SHIPPED in one commit. Gate 1610 -> 1645, golden
 replay unmoved, no delivered byte changes without a flag. R290 FILED in three
@@ -6387,7 +6419,34 @@ A harness applying single-line mutations — drop preflight's blank-row check, s
 - **What:** (a) `fetch_slate_bundle._scrub` (`:92`) lost the percent-encoded variant its parent covers (`live_data_adapters.py:144`), and error text containing the full odds URL persists into `slate_bundle.json` warnings — latent for hex keys, real for any key that URL-quotes differently. (b) `refresh_reference_data` and `fetch_rotowire_lineups` write validated-good files non-atomically: a mid-write crash truncates the exact file `_validate` was built to protect. (c) `lineups_from_paste` reads paste files without `utf-8-sig`, so a BOM can blind the first game's club-name cross-check.
 - **Fix:** one `_scrub` in `repo_env` imported everywhere; tmp+rename writes; `utf-8-sig` on paste reads.
 
-### R271. The documented Cowork bash ceiling is 45 seconds and the real one is ~180, and the understatement costs solve budget on every slate (P1, XS; two files) | new 2026-08-29, from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md`; independently re-measured by the filing DEV session
+### R271. MOSTLY SHIPPED 2026-09-02. The remainder is ONE decision: whether `audit.py`'s gate defaults move with the text (P3, XS; one file, one line) | new 2026-08-29, from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md`; independently re-measured by the filing DEV session
+
+**Status, 2026-09-02, DEV.** (a) and (c) CLOSED — CLAUDE.md landed 2026-08-29
+with R286-R289's batch, `skills/generate-lineups/SKILL.md` landed today, and
+(c)'s "do not hand it to Ben" clause is in CLAUDE.md's session-start step 2.
+(b) SHIPPED ITS TEXT HALF today: the two `--help` strings and five comments that
+cited "dies at 45" by name are corrected, so `--help` no longer prints a retired
+number at a session that CLAUDE.md sends there. **(b)'s "raise both defaults"
+instruction is REFUSED on the merits today, not deferred, and this is the whole
+remainder.** The item measured the cost correctly (~20 calls at 28/39 against 5
+at 130/165, on this host) but a default is a floor for a host that has told us
+nothing, not a measurement of the host we happen to be on, and the two failures
+are ASYMMETRIC: a default too LOW costs calls on a fast host and the gate still
+completes, while a default too HIGH on a slower host gets every child killed by
+the host before the parent can write its record, so the gate never completes and
+never says why — the false-signal-inside-the-gate family R152 built the pinned
+clean line to prevent. `--gate-budget` / `--gate-ceiling` / `MLB_GATE_CEILING_S`
+are the host's own statement (audit.py:523 already says the ceiling is "the
+HOST's to state") and CLAUDE.md's session-start command passes 130/165, so the
+known-fast host pays nothing for the conservative default. **What would settle
+it and is not measurable from a device session: the container's real per-call
+ceiling.** If it is also ~180, the "unknown host" is hypothetical, the argument
+above loses its second leg, and the defaults should move. Whoever measures it
+owns the decision; the reason for keeping them is recorded at
+`GATE_DEFAULT_BUDGET_S` so the next reader does not re-derive it. Demoted P1 ->
+P3 because nothing false is now reported: the numbers are conservative, they are
+labelled as floors rather than as this host's ceiling, and the flags are
+documented in three places.
 
 **What.** `CLAUDE.md:311` (R152's paragraph) says a Cowork `device_bash` call
 "dies at 45 seconds," and `skills/generate-lineups/SKILL.md:443` builds a whole
@@ -7634,7 +7693,11 @@ cannot finish inside a Cowork `device_bash` call (hard-capped at 45s;
 `tests.test_core` alone needs ~89s and one of its tests 35.8s), and the obvious
 workaround is worse than the problem: a backgrounded run dies with the call,
 its log comes back empty — which reads like a silent pass — and the killed
-process strands the next commit on a zero-byte `.git/index.lock` (R109). The
+process strands the next commit on a zero-byte `.git/index.lock` (R109).
+(Historical record, kept as written. R271(b) retired the 45s figure on
+2026-08-29; the real ceiling is ~180 s, R152's split survives the correction
+because the five gated suites together still do not fit one call, and only the
+slice SIZE changed.) The
 gate now runs across calls (`--gate-run` until complete, then `--gate-report`),
 and only a complete assembly may print the pinned clean line. Full entry and
 the two findings that outlived the item in CHANGELOG.md.

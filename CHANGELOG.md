@@ -25,6 +25,124 @@ performance claim.
 
 ---
 
+## 2026-09-02 — R271: the retired 45-second bash ceiling is swept out of the five files that still asserted it, the item's "two files" was eight live sites, and the one instruction refused is the one that would change behaviour
+
+**What moved.** `skills/generate-lineups/SKILL.md` (three sections),
+`tools/audit.py` (five comments and both gate help strings, no value changed),
+`tools/wheel_fetch.py` (module docstring), `tests/test_core.py` and
+`tests/test_showdown.py` (two docstring/comment corrections, no assertion
+touched), `docs/cowork_sync_protocol.md`, `docs/2026-07-18_implementation_guide.md`,
+`docs/cowork_migration_handoff.md`, `docs/backlog.md`. No engine module, no
+delivered byte, no test count.
+
+**Why.** R271 landed its CLAUDE.md half on 2026-08-29 and named "two files."
+`skills/generate-lineups/SKILL.md` was the other one and it was still teaching
+the retired rule at the worst possible moment: *"one 45-second window per
+call... Budget the inner timeout at 25 to 33 seconds... That leaves roughly 15 to
+20 seconds of real work per call."* SKILL.md is the per-slate procedural
+authority a BUILD session reads under a lock clock, and that paragraph tells it
+that a build needing one call needs five. It is the documentation half of the
+same failure CLAUDE.md's T-15 rung now names from the other side — *under a
+deadline the minimal move is the expensive one* — and 1940_9g spent five calls
+moving five controls one at a time and delivered nothing.
+
+**R233 enumeration. Class: every site in the DEV write set stating a Cowork
+per-call time budget.** Searched two ways because neither answers alone. The
+literal grep (`45 second|45-second|dies at 45|at 45s|one 45`) over
+`mlb_engine/ tools/ tests/ skills/ docs/ CLAUDE.md MLB_Classic.md` found the
+members; a second grep for the *correct* figure (`180s|170-180s|130s`) found the
+site that already agreed, which the first could not see. **8 live members across
+5 files where the item named 2.** All 8 fixed:
+
+| site | what it said | disposition |
+|---|---|---|
+| `skills/generate-lineups/SKILL.md` §Running inside the Cowork sandbox | the 25-to-33s budgeting rule | rewritten; 130s, pointer to CLAUDE.md `## Sandbox` as owner |
+| `skills/generate-lineups/SKILL.md` §Session hygiene | `--run-tests --terse` as one call | replaced with the `--gate-run` split CLAUDE.md already mandates |
+| `tools/audit.py:1309` | R152 design comment, "hard-capped at 45 seconds" | corrected; the split's reason restated as the TOTAL, not one suite |
+| `tools/audit.py:1336/1339` | two comments above the gate defaults | corrected, and the defaults' survival argued rather than assumed |
+| `tools/audit.py:1357` | "Nothing about the 45s device default changes" | corrected |
+| `tools/audit.py:2441` + both `--help` strings | `--help` printed "a Cowork device_bash call dies at 45" | corrected — CLAUDE.md sends every session to `--help` for a tool's flags |
+| `tools/wheel_fetch.py:3` | "a fresh container with a 45s ceiling" | corrected |
+| `tests/test_core.py` `SplitGateTests` docstring, `tests/test_showdown.py` R190(d) comment | both restated the figure in prose | corrected; **no assertion changed**, both suites reference the constants symbolically and nothing pins 28.0 or 39.0 as a literal |
+
+**Two LIVE docs the item did not reach, and they are live for a stated reason,
+not by size.** `docs/cowork_sync_protocol.md` is what CLAUDE.md names as the
+disk/container/GitHub authority, and its 45s claim steers a real decision (run
+engine work in the container rather than the mount) — corrected, and its gate
+command now passes the budget. `docs/2026-07-18_implementation_guide.md` is
+named in the project instructions as orientation, and its 45s claim is load
+bearing for a DROP decision — corrected in place with the decision preserved and
+its third reason explicitly weakened, because a feasible joint MILP measured
+53-156 s fits 180 and never fit 45. `docs/cowork_migration_handoff.md:85` is a
+third and its claim was false twice over (`timeout_ms` is CAPPED at ~178 s, not
+"rejected outright" above 45000) — corrected with the original text quoted.
+
+**KEPT with reasons, named so the count can be checked.** Three dated review
+documents (`2026-07-22_build_process_postmortem.md`,
+`2026-07-24_session_handoff.md`) and two backlog historical records
+(`docs/backlog.md`'s 08-29 amendment note and R152's closed stub) are records of
+what was believed on a date; R272 class 3's precedent is that those are restated
+with a pointer rather than rewritten, and R152's stub got the one-line pointer.
+**Three sites excluded from the class after reading them:** the "45 seconds" in
+`2026-08-01`, `2026-08-10` and `2026-08-12_critique_greenfield_spec.md` is a
+*proposed* end-to-end latency target for a hypothetical architecture and has
+nothing to do with a bash ceiling. A grep that counted them would have reported
+11 members and been wrong about 3.
+
+**The corroborating site is the finding worth carrying forward.**
+`tools/rebuild_registry.py:91` has read *"the Cowork sandbox caps a single call
+at roughly 170-180s, so 150 leaves room to print"* since it was written. Two
+files stated a number, a third stated the right one, and nothing reconciled them
+for weeks. **An enumeration that turns up a site already AGREEING with the
+correction has found evidence, not a member**, and it belongs in the entry beside
+the ones that were wrong — it is what made the correction checkable without
+re-measuring the host.
+
+**ONE INSTRUCTION REFUSED, and it is the only one that would have changed
+behaviour.** R271(b) says "Raise both defaults with the text."
+`GATE_DEFAULT_BUDGET_S = 28.0` and `GATE_CALL_CEILING_S = 39.0` are UNCHANGED.
+The item's measurement is not disputed — ~20 calls at the defaults against 5 at
+130/165, on this host — but a default is a floor for a host that has told us
+nothing, and the two failures are asymmetric. Too low: a fast host pays calls and
+the gate still completes. Too high: a slower host's every `--gate-run` child is
+killed by the host before the parent can write its record, so the gate never
+completes and never says why, which is the false-signal-inside-the-gate family
+R152 built the pinned clean line to prevent. `audit.py:523` already rules that
+the ceiling is "the HOST's to state," `--gate-budget` / `--gate-ceiling` /
+`MLB_GATE_CEILING_S` are how it states it, and CLAUDE.md's session-start command
+passes 130/165, so the known-fast host pays nothing for the conservative default.
+**What would settle it is one measurement no device session can take: the
+container's real per-call ceiling.** R271 is rewritten in place to exactly that
+question and demoted P1 -> P3, because nothing false is reported any more — the
+numbers are conservative and are now LABELLED as floors rather than as this
+host's ceiling. The reason they are kept lives at `GATE_DEFAULT_BUDGET_S`, in the
+source, so the next reader does not re-derive it.
+
+**What the correction does NOT change.** R152's split gate survives it: the
+reason for splitting was never one suite, it was the total, and the five gated
+suites do not fit 180 either — only the slice size moved. R152's two
+number-independent claims survive verbatim in every corrected site:
+backgrounding does not survive the call (`nohup` and `setsid` both die, the log
+comes back EMPTY, which reads exactly like a silent pass), and a killed
+`audit.py` strands the next commit on a `.git/*.lock` this mount cannot unlink.
+
+**Also corrected, same commit, same class of defect (the tree moved and a
+document did not).** `SKILL.md` gained the R287 started-game preflight check with
+its `--as-of` replay flag and the 2026-09-01 numbers, a new section documenting
+R288's `--max-opposing-hitters-per-sp` beside the existing leverage section, and
+a fix to its `verify_export` rule list, which still described the
+hitter-versus-rostered-SP rule as a failure after R288 made it a WARN. Checked
+and NOT a defect: `tools/verify_export.py` imports `check_legality` from
+`preflight_upload` rather than restating it, so R288's five-site class has no
+sixth member there — the property R275's "two implementations of one rule" note
+was written to guarantee, holding. Also corrected: `SKILL.md` introduced four
+bullets as "Three inputs."
+
+**Gate.** Run last, after every edit, because the recorded assembly is keyed on
+a content fingerprint of the tree. Result reported in the commit.
+
+---
+
 ## 2026-09-01 — R286 + R287 + R288 + R289: the four defects behind a slate that reached lock with no file at all — and two of the four premises the post-mortem rested on came back refined rather than confirmed
 
 **What moved.** `mlb_engine/allocate/contest_allocator.py`
