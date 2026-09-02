@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import csv
+import re
 import inspect
 import io
 import datetime as dtmod
@@ -3787,6 +3789,335 @@ class SlateClockTests(unittest.TestCase):
         clock = slate_clock()
         self.assertFalse(clock["available"])
         self.assertIn("note", clock)
+
+
+class R288OpposingHitterControlTests(unittest.TestCase):
+    """The anti-correlation wall becomes a named control with a zero default.
+
+    It was ten unlabelled MILP rows enforcing a DFS CONVENTION as though it were
+    a DraftKings rule. DK has no such rule: 19,072 of 102,201 fully-resolvable
+    Classic entries in this repo's own archive roster a hitter facing a rostered
+    SP, and one 1,486-entry contest's ranks 1, 2 AND 3 all did. Ben, 2026-09-01:
+    "the answer might be to have some lineups where we have batters facing
+    pitchers in the same lineup."
+    """
+
+    @staticmethod
+    def _frame():
+        """Four teams, two games, and the only SPs are on T1 and T3.
+
+        The eight hitter slots are C,1B,2B,3B,SS,OF,OF,OF. T1 supplies C,1B,2B
+        and T3 supplies 3B,SS, so the three OF slots can ONLY be filled from T2
+        or T4 -- both of which face a rostered SP. Every legal lineup therefore
+        carries exactly three opposing hitters, so k=0,1,2 are infeasible and
+        k=3 fits. That makes the frame's feasibility a direct read of the bound.
+        """
+        rows = []
+        pid = 0
+
+        def add(team, opp, game, position, salary, is_p=False):
+            nonlocal pid
+            pid += 1
+            rows.append({"Player_ID": str(pid),
+                         "Name": f"{team} {'P' if is_p else 'H'}{pid}",
+                         "Team": team, "Opponent": opp, "Position": position,
+                         "Salary": salary, "Game_ID": game,
+                         "Base": 18.0 if is_p else 9.0,
+                         "Floor": 14.0 if is_p else 7.0,
+                         "Ceiling": 22.0 if is_p else 12.0,
+                         "Excluded": False, "Locked": False})
+
+        add("T1", "T2", "T1@T2", "P", 6000, is_p=True)
+        add("T3", "T4", "T3@T4", "P", 6000, is_p=True)
+        for slot in ("C", "1B", "2B"):
+            add("T1", "T2", "T1@T2", slot, 3500)
+        for slot in ("3B", "SS"):
+            add("T3", "T4", "T3@T4", slot, 3500)
+        # The opposing sides, and only they, carry outfielders.
+        for _ in range(3):
+            add("T2", "T1", "T1@T2", "OF", 3500)
+        for _ in range(2):
+            add("T4", "T3", "T3@T4", "OF", 3500)
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def _opposing_count(lineup):
+        frame = lineup.copy()
+        frame["Player_ID"] = frame["Player_ID"].astype(str)
+        is_pitcher = frame["Position"].astype(str).str.contains("P")
+        opponents = set(frame.loc[is_pitcher, "Opponent"].astype(str))
+        return int((~is_pitcher & frame["Team"].astype(str).isin(opponents)).sum())
+
+    def test_the_default_is_zero_and_refuses_the_construction(self):
+        """Today's behaviour is the default, so an omitted argument builds what
+        the unconditional wall built."""
+        lineup, _ = opt.build_single_lineup(self._frame(), target="ceiling")
+        self.assertIsNone(
+            lineup,
+            "this frame can only be filled by facing the rostered SP, so the "
+            "default must refuse it")
+        explicit_zero, _ = opt.build_single_lineup(
+            self._frame(), target="ceiling", max_opposing_hitters_per_sp=0)
+        self.assertIsNone(explicit_zero)
+        self.assertEqual(opt.ANTI_CORRELATION_DEFAULT_MAX, 0)
+
+    def test_raising_it_ships_the_construction_ben_asked_for(self):
+        lineup, _ = opt.build_single_lineup(
+            self._frame(), target="ceiling", max_opposing_hitters_per_sp=3)
+        self.assertIsNotNone(lineup, "the control did not reach the solver")
+        self.assertEqual(len(lineup), 10)
+        count = self._opposing_count(lineup)
+        self.assertGreater(count, 0, "nothing was actually relaxed")
+        self.assertLessEqual(count, 2 * 3, f"the bound leaked: {count}")
+
+    def test_the_bound_is_exact_at_every_rung(self):
+        """A cap that admits k+1 is not a cap. Walked rather than spot-checked,
+        because this frame's feasibility turns on the number.
+
+        The frame needs three opposing hitters and there are two rostered SPs, so
+        the tightest feasible split is 2 against one arm and 1 against the other:
+        k=0 and k=1 cannot fit it, k=2 can. That arithmetic is what taught this
+        control its name -- see ANTI_CORRELATION_DEFAULT_MAX. The per-LINEUP total
+        at k is bounded by 2k on Classic and this test is the demonstration."""
+        for k in (0, 1, 2, 3):
+            lineup, _ = opt.build_single_lineup(
+                self._frame(), target="ceiling",
+                max_opposing_hitters_per_sp=k)
+            if k < 2:
+                self.assertIsNone(lineup, f"k={k} should not fit this frame")
+                continue
+            self.assertIsNotNone(lineup, f"k={k} should fit")
+            per_lineup = self._opposing_count(lineup)
+            self.assertLessEqual(per_lineup, 2 * k)
+            # Per SP is the bound the rows enforce, so check it per SP.
+            frame = lineup.copy()
+            frame["Team"] = frame["Team"].astype(str)
+            is_p = frame["Position"].astype(str).str.contains("P")
+            for opponent in set(frame.loc[is_p, "Opponent"].astype(str)):
+                against = int((~is_p & (frame["Team"] == opponent)).sum())
+                self.assertLessEqual(against, k, f"k={k} leaked on {opponent}")
+
+    def test_a_negative_allowance_raises_rather_than_clamping(self):
+        """A units slip that clamps silently builds a portfolio nobody asked
+        for, which is R167's rule about this project's clamps."""
+        with self.assertRaises(ValueError) as ctx:
+            opt.build_single_lineup(self._frame(), target="ceiling",
+                                    max_opposing_hitters_per_sp=-1)
+        self.assertIn("must be >= 0", str(ctx.exception))
+
+    def test_one_formulation_serves_every_value(self):
+        """Not two encodings keyed on a parameter regime, which is R167's class
+        and is what makes the two silently disagree later."""
+        src = inspect.getsource(opt._build_single_lineup_scipy)
+        block = src[src.index("R288, 2026-09-01"):src.index("if stack_constraints:")]
+        code = "\n".join(line for line in block.splitlines()
+                         if not line.strip().startswith("#"))
+        self.assertEqual(code.count("add_constraint("), 1, code)
+        # No branch on the value that picks a different encoding.
+        self.assertNotIn("if max_opposing ==", code)
+        self.assertNotIn("if max_opposing:", code)
+
+    def test_the_export_validator_grades_against_the_declared_allowance(self):
+        """The fifth member of the class, and the one that would have made the
+        control unusable end to end.
+
+        `dk_entries_manager.validate_dk_entries_file` hard-errored on any hitter
+        facing a rostered SP, sitting between the 5-hitter rule and the 2-game
+        rule -- both of which ARE DK's. A build raised to 2 would have solved,
+        produced the construction Ben asked for, and been rejected at the export
+        gate. The R233 enumeration found it; the item named the optimizer and
+        preflight and stopped there.
+        """
+        src = (REPO / "mlb_engine" / "entries"
+               / "dk_entries_manager.py").read_text(encoding="utf-8")
+        self.assertIn("max_opposing_hitters_per_sp", src)
+        self.assertIn("declared max_opposing_hitters_per_sp", src)
+        # A violation of the DECLARED value is still a hard error; what is gone
+        # is the assumption that the declared value is zero.
+        self.assertIn("above the ", src)
+        # And build_slate puts the value where the validator reads it.
+        build_src = (REPO / "skills" / "generate-lineups" / "scripts"
+                     / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"max_opposing_hitters_per_sp":', build_src)
+        self.assertIn("portfolio_controls_override={", build_src)
+
+    def test_it_reaches_the_sliced_bank_and_re_keys_the_cache(self):
+        """R246's lesson: build_slate.py delivers from extend_bank's cache, so a
+        control that reached only the auto-bank path is a silent no-op on most
+        builds. And a candidate built at 0 answers a different question than one
+        built at 2, so the bucket key has to separate them."""
+        signature = inspect.signature(bank_cache.extend_bank)
+        self.assertIn("max_opposing_hitters_per_sp", signature.parameters)
+        frame = self._frame()
+        base = bank_cache.conditions_signature(frame, [], 4, 5)
+        self.assertEqual(
+            base, bank_cache.conditions_signature(
+                frame, [], 4, 5, max_opposing_hitters_per_sp=0),
+            "the default must not change a signature already on disk")
+        self.assertEqual(
+            base, bank_cache.conditions_signature(
+                frame, [], 4, 5, max_opposing_hitters_per_sp=None))
+        self.assertNotEqual(
+            base, bank_cache.conditions_signature(
+                frame, [], 4, 5, max_opposing_hitters_per_sp=2))
+
+
+class R289SalaryExcludedColumnTests(unittest.TestCase):
+    """The salary file's Excluded column reaches the frame, or nothing does.
+
+    1940_9g: an operator staged DKSalaries_excl_locked.csv with Excluded=TRUE on
+    all 288 players whose games had locked, to restrict the pool to the six open
+    games. Verified on disk at the time: `has Excluded col: True`,
+    `Counter({'': 554, 'TRUE': 288})`. The build CERTIFIED and delivered a file
+    holding 151 of them, because `_pool_row` stamped `"Excluded": False` before
+    the frame existed and `excluded_flags` -- which is careful and correct about
+    tokens -- never received an operator exclusion.
+    """
+
+    @staticmethod
+    def _salary_with_excluded(path: Path, excluded_teams=("T3", "T4"), token="TRUE"):
+        """pool_salary_csv plus an Excluded column set on whole teams."""
+        pool_salary_csv(path)
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        team_col = rows[0].index("TeamAbbrev")
+        rows[0].append("Excluded")
+        n = 0
+        for row in rows[1:]:
+            if row[team_col] in excluded_teams:
+                row.append(token)
+                n += 1
+            else:
+                row.append("")
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return n
+
+    def _pool(self, tmp, **kwargs):
+        salary = Path(tmp) / "salary.csv"
+        n = self._salary_with_excluded(salary, **kwargs)
+        return n, lda.build_slate_pool(
+            salary, pool_lineups_feed(), platoon_json=pool_platoon_json())
+
+    def test_the_column_reaches_the_frame_and_the_report_names_the_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, pool = self._pool(tmp)
+            rows = pool["projection_rows"]
+            excluded = [r for r in rows if r["Excluded"]]
+            self.assertTrue(excluded, "the salary Excluded column was discarded")
+            self.assertEqual({r["Team"] for r in excluded}, {"T3", "T4"})
+            self.assertTrue(all(not r["Excluded"] for r in rows
+                                if r["Team"] in ("T1", "T2")))
+            block = pool["pool_report"]["excluded_column"]
+            self.assertTrue(block["column_present"])
+            self.assertEqual(block["applied"], len(excluded))
+            self.assertEqual(sorted(block["by_team"]), ["T3", "T4"])
+
+    def test_none_of_the_excluded_players_can_reach_a_lineup(self):
+        """The acceptance criterion. The optimizer still owns the removal -- a
+        drop in intake would put a second pool-reduction site on the front door
+        -- so this asserts the property end to end rather than the mechanism."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, pool = self._pool(tmp)
+            frame = pd.DataFrame(pool["projection_rows"])
+            frame["Base"] = frame["AvgPointsPerGame"].fillna(5.0)
+            frame["Floor"] = frame["Base"] * 0.8
+            frame["Ceiling"] = frame["Base"] * 1.3
+            frame["Locked"] = False
+            banned = {str(r["Player_ID"]) for r in pool["projection_rows"]
+                      if r["Excluded"]}
+            self.assertTrue(banned)
+            kept = opt._drop_excluded_rows(frame)
+            self.assertFalse(
+                banned & {str(x) for x in kept["Player_ID"]},
+                "an affirmatively excluded player survived the one removal site")
+            lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+            if lineup is not None:
+                self.assertFalse(banned & {str(x) for x in lineup["Player_ID"]})
+
+    def test_a_warning_states_the_legal_pool_the_build_actually_has(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            n, pool = self._pool(tmp)
+            self.assertTrue(
+                any("Excluded column" in w for w in pool["pool_report"]["warnings"]),
+                pool["pool_report"]["warnings"])
+            warning = next(w for w in pool["pool_report"]["warnings"] if "Excluded column" in w)
+            self.assertIn("legal pool is", warning)
+
+    def test_a_blank_or_absent_column_changes_nothing(self):
+        """The default has to stay byte-identical: the great majority of salary
+        files carry no Excluded column at all."""
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp) / "plain.csv"
+            pool_salary_csv(plain)
+            baseline = lda.build_slate_pool(
+                plain, pool_lineups_feed(), platoon_json=pool_platoon_json())
+            self.assertFalse(any(r["Excluded"] for r in baseline["projection_rows"]))
+            block = baseline["pool_report"]["excluded_column"]
+            self.assertFalse(block["column_present"])
+            self.assertEqual(block["applied"], 0)
+            self.assertFalse(any("Excluded column" in w
+                                 for w in baseline["pool_report"]["warnings"]))
+            _, blank = self._pool(tmp, token="")
+            self.assertFalse(any(r["Excluded"] for r in blank["projection_rows"]))
+            self.assertEqual(blank["pool_report"]["excluded_column"]["applied"], 0)
+
+    def test_an_unrecognized_token_keeps_the_player(self):
+        """F21's rule, unchanged and now reachable from the front door: guessing
+        'exclude' on an ambiguous cell is the pool reduction the rule forbids,
+        arriving as a data condition."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, pool = self._pool(tmp, token="maybe?")
+            self.assertFalse(any(r["Excluded"] for r in pool["projection_rows"]))
+            self.assertEqual(pool["pool_report"]["excluded_column"]["applied"], 0)
+
+    def test_the_scalar_and_the_frame_reading_are_one_function(self):
+        """R167's class: two implementations of the token rule is exactly the
+        F21 defect, and the front door is where it would cost the most."""
+        import inspect as _inspect
+        src = _inspect.getsource(opt.excluded_flags)
+        self.assertIn("read_excluded_cell(value)", src)
+        for token in ("TRUE", "true", "x", "Exclude", "1"):
+            self.assertEqual(opt.read_excluded_cell(token)[0], True, token)
+        for token in ("", "FALSE", "no", "0", "n/a", None, float("nan")):
+            self.assertEqual(opt.read_excluded_cell(token)[0], False, token)
+        self.assertEqual(opt.read_excluded_cell("maybe?"), (False, "unrecognized"))
+        # And the frame reading still agrees, counter for counter.
+        frame = pd.DataFrame({"Excluded": ["TRUE", "", "maybe?", None, "false"]})
+        flags, report = opt.excluded_flags(frame)
+        self.assertEqual(list(flags), [True, False, False, False, False])
+        self.assertEqual(report["excluded_true"], 1)
+        self.assertEqual(report["unrecognized_kept"], 1)
+        self.assertEqual(report["unrecognized_values"], ["maybe?"])
+        self.assertEqual(report["coerced_from_blank"], 2)
+        self.assertEqual(report["coerced_from_text"], 2)
+
+    def test_the_neutral_shell_still_ignores_the_column_on_purpose(self):
+        """The post-mortem named two hardcoded sites as equivalent and they are
+        not. optimizer_shell_preflight asks whether the salary file's SHAPE can
+        make a legal lineup, with projections that are deliberately not a DFS
+        opinion; honouring an operator exclusion there would make a narrowed pool
+        read as a broken salary file."""
+        src = (REPO / "mlb_engine" / "intake"
+               / "slate_intake_manager.py").read_text(encoding="utf-8")
+        self.assertIn('"Excluded": False', src)
+        self.assertIn("KEPT hardcoded", src)
+
+    def test_an_exclusion_re_keys_the_bank_cache(self):
+        """Free, and worth pinning: the projection digest already hashes the
+        Excluded column, so a bank built without the restriction is not reused
+        for a build with it."""
+        columns = (REPO / "mlb_engine" / "optimize"
+                   / "bank_cache.py").read_text(encoding="utf-8")
+        self.assertIn('"Excluded"', columns)
+        frame = pd.DataFrame({
+            "Player_ID": ["1", "2"], "Ceiling": [1.0, 2.0], "Floor": [1.0, 2.0],
+            "Base": [1.0, 2.0], "Salary": [3000, 4000], "Excluded": [False, False],
+        })
+        other = frame.copy()
+        other.loc[0, "Excluded"] = True
+        self.assertNotEqual(bank_cache.projection_digest(frame),
+                            bank_cache.projection_digest(other))
 
 
 class BuildSlatePoolTests(unittest.TestCase):
@@ -10689,7 +11020,7 @@ class SwapFailureClassificationTests(unittest.TestCase):
             # the starve refusal
             "Entry ID 1: every compatible candidate is ruled out by the 8 row(s) "
             "this solve cannot change",
-            # contest_allocator._infeasibility_remedies (R98(2))
+            # ca._infeasibility_remedies (R98(2))
             "FIRST REMEDY, grow the bank: the job list was NOT exhausted",
             "NEXT REMEDY, --controls-override, and the two kinds are not alike:",
         ]
@@ -13028,6 +13359,219 @@ class FalseSignalBatchTests(unittest.TestCase):
         self.assertIn("feasibility_inputs=feasibility_inputs", pipeline_src)
         alloc_src = (REPO / "mlb_engine" / "allocate" / "contest_allocator.py").read_text(encoding="utf-8")
         self.assertIn("feasibility_inputs=feasibility_inputs", alloc_src)
+
+    # -- R286: the refusal leads with the SLATE check that FAILED, and never --
+    # -- with a bank count over a control whose slate check passed ------------
+
+    # The 1940_9g checks, verbatim from outputs/2026-09-01/_b5.out. One fails.
+    _CHECKS_1940_9G = (
+        {"name": "sp_pair_capacity", "passed": True,
+         "detail": "113 viable SP pairs x cap 2 = 226 lineup-slots vs 37 entries",
+         "remedy": None},
+        {"name": "shared_players_floor", "passed": False,
+         "detail": "max_shared_players 6 vs inherent overlap floor 7 "
+                   "(5-stack + shared SP pair)",
+         "remedy": "raise max_shared_players to >= 7"},
+        {"name": "pitcher_exposure_capacity", "passed": True,
+         "detail": "max_pitcher_exposure_pct 0.43 -> cap 15 x 16 viable SPs = 240 "
+                   "vs 74 pitcher slots",
+         "remedy": None},
+        {"name": "player_exposure_floor", "passed": True,
+         "detail": "max_player_exposure_pct 0.4 -> cap 14 vs structural floor 5",
+         "remedy": None},
+        {"name": "same_contest_unique_capacity", "passed": True,
+         "detail": "largest single contest needs 7 distinct lineups"},
+    )
+
+    def test_the_refusal_leads_with_the_failing_check_and_names_no_passing_one(self):
+        """R286 acceptance. Exactly one structural check fails; errors[0] must be
+        that check with its remedy, and must not name a check that passed.
+
+        This is the 1940_9g shape reproduced: a bank-level count on
+        max_sp_pair_repetition (the SLATE check for which, sp_pair_capacity, is
+        PASSING at 113 pairs) while shared_players_floor is the one real bind.
+        Before this item errors[0] was the bank count and the failing check
+        appeared in errors[] not at all.
+        """
+        cands = self._shared_pair_candidates(3)
+        result = select_and_assign_entries(
+            cands, _entry_reqs(6), {"max_sp_pair_repetition": 1},
+            feasibility_inputs={"viable_sp_pairs": 113},
+            feasibility_checks=list(self._CHECKS_1940_9G))
+        self.assertFalse(result["passed"])
+        first = result["errors"][0]
+        self.assertIn("shared_players_floor", first)
+        self.assertIn("raise max_shared_players to >= 7", first)
+        for check in self._CHECKS_1940_9G:
+            if check["passed"] is True:
+                self.assertNotIn(check["name"], first, first)
+        # And the control the passing check governs is not what leads either:
+        # naming `max_sp_pair_repetition` first is the defect itself.
+        self.assertNotIn("max_sp_pair_repetition", first)
+        # The bank count is not deleted, it is demoted and RELABELLED, so a
+        # reader cannot mistake it for slate arithmetic.
+        bank_line = next(e for e in result["errors"]
+                         if "max_sp_pair_repetition" in e)
+        self.assertIn(ca.BANK_LEVEL_PREFIX, bank_line)
+
+    def test_every_failing_check_is_enumerated_not_just_the_first(self):
+        checks = [
+            {"name": "shared_players_floor", "passed": False,
+             "detail": "d1", "remedy": "raise max_shared_players to >= 7"},
+            {"name": "stack_exposure_capacity", "passed": False,
+             "detail": "d2", "remedy": "raise max_primary_stack_exposure_pct to >= 0.5"},
+        ]
+        lines = ca.compose_infeasibility_errors(
+            [], {"max_shared_players": 6}, "", feasibility_checks=checks)
+        self.assertEqual(len(lines), 2, lines)
+        self.assertIn("shared_players_floor", lines[0])
+        self.assertIn("stack_exposure_capacity", lines[1])
+        self.assertIn("raise max_primary_stack_exposure_pct to >= 0.5", lines[1])
+
+    def test_the_interaction_message_is_never_said_while_a_check_fails(self):
+        """The _b7 case, and the reason this is not merely a reordering.
+
+        On 2026-09-01 `_b7` printed "no single control is arithmetically binding
+        ... the interaction of the active controls is" with
+        shared_players_floor passed=False in the same brief. That message is the
+        reassuring wording of the same defect: it tells the operator no single
+        control is the problem while one named control demonstrably is.
+        """
+        lines = ca.compose_infeasibility_errors(
+            [], {"max_shared_players": 6, "max_sp_pair_repetition": 10},
+            "", feasibility_checks=list(self._CHECKS_1940_9G))
+        self.assertTrue(lines)
+        for line in lines:
+            self.assertNotIn("no single control is arithmetically binding", line)
+        self.assertIn("shared_players_floor", lines[0])
+
+    def test_the_interaction_message_survives_when_nothing_failed(self):
+        lines = ca.compose_infeasibility_errors(
+            [], {"max_shared_players": 8, "max_sp_pair_repetition": 2}, "",
+            feasibility_checks=[{"name": "sp_pair_capacity", "passed": True,
+                                 "detail": "d", "remedy": None}])
+        self.assertEqual(len(lines), 1)
+        self.assertIn("no single control is arithmetically binding", lines[0])
+
+    def test_a_none_verdict_is_not_a_failure(self):
+        """R237's rule here: `passed is None` means the structural inputs were
+        unavailable. Reading it as a failure would invent a slate impossibility
+        out of a missing input and send the operator to raise a control that was
+        never binding."""
+        unavailable = [{"name": "feasibility_inputs", "passed": None,
+                        "detail": "structural feasibility inputs unavailable"}]
+        self.assertEqual(
+            ca.failing_feasibility_checks(unavailable), [])
+        lines = ca.compose_infeasibility_errors(
+            [], {"max_shared_players": 8}, "", feasibility_checks=unavailable)
+        self.assertIn("no single control is arithmetically binding", lines[0])
+
+    def test_omitting_the_checks_leaves_the_message_byte_identical(self):
+        """What keeps the frozen golden replay and the plan-time leg unmoved:
+        `_plan_joint_allocation` passes no feasibility inputs at all, so the
+        pre-R286 wording is what a caller with nothing to add still gets."""
+        controls = {"max_pitcher_exposure_pct": 0.43, "max_player_exposure_pct": 0.4,
+                    "max_primary_stack_exposure_pct": 0.35,
+                    "max_shared_players": 8, "max_sp_pair_repetition": 2}
+        expected = (
+            "entry-level joint MILP proven infeasible: no single control is "
+            "arithmetically binding against this bank, so the interaction of "
+            "the active controls is. Active: max_pitcher_exposure_pct=0.43, "
+            "max_player_exposure_pct=0.4, max_primary_stack_exposure_pct=0.35, "
+            "max_shared_players=8, max_sp_pair_repetition=2")
+        self.assertEqual(
+            ca.compose_infeasibility_errors([], controls, ""),
+            [expected])
+        self.assertEqual(
+            ca.compose_infeasibility_errors(
+                [], controls, "", feasibility_checks=None),
+            [expected])
+        bank = ["max_sp_pair_repetition: 3 distinct SP pairs x cap 2 = 6 < 37 entries"]
+        self.assertEqual(
+            ca.compose_infeasibility_errors(bank, controls, ""),
+            [f"entry-level joint MILP proven infeasible: {bank[0]}"])
+
+    def test_the_bank_growth_remedy_stops_leading_when_a_slate_check_fails(self):
+        """Growing the bank cannot clear a slate floor, and on 1940_9g the
+        operator grew it twice because this line said FIRST REMEDY."""
+        slice_report = {"job_list_exhausted": False, "jobs_attempted": 78,
+                        "jobs_total": 720}
+        without = ca._infeasibility_remedies(slice_report, [])
+        self.assertIn("FIRST REMEDY, grow the bank", without[0])
+        with_failure = ca._infeasibility_remedies(
+            slice_report, [], feasibility_checks=list(self._CHECKS_1940_9G))
+        self.assertIn("FIRST REMEDY, raise the control", with_failure[0])
+        self.assertIn("NEXT REMEDY, grow the bank", with_failure[1])
+        # Demoted, never deleted: the bank may still be a slice and the numbers
+        # stay on the record.
+        self.assertIn("78 of 720 jobs attempted", with_failure[1])
+        self.assertEqual(
+            sum(1 for line in with_failure if line.startswith("FIRST REMEDY")), 1)
+
+    def test_checkpoint_verdicts_cannot_go_stale_across_a_ladder_re_entry(self):
+        """The safety argument for threading a verdict into a self-re-entering
+        function: the three relaxation ladders must never move a control any
+        feasibility check reads. A fourth ladder that did would make a stale
+        verdict the reported bind, so it fails here instead."""
+        self.assertEqual(
+            ca.CHECKED_CONTROLS
+            & ca.LADDER_RELAXED_CONTROLS,
+            frozenset())
+        # CHECKED_CONTROLS is only as good as its agreement with the one owner of
+        # the arithmetic, so read the controls _feasibility_report actually
+        # consults off its own source rather than trusting the constant.
+        pipeline_src = (REPO / "mlb_engine" / "pipeline"
+                        / "execution_pipeline.py").read_text(encoding="utf-8")
+        tree = ast.parse(pipeline_src)
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef) and n.name == "_feasibility_report")
+        def _get_args(name):
+            out = set()
+            for node in ast.walk(fn):
+                if (isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                        and node.func.attr == "get"
+                        and isinstance(node.func.value, ast.Name)
+                        and node.func.value.id == name
+                        and node.args
+                        and isinstance(node.args[0], ast.Constant)):
+                    out.add(str(node.args[0].value))
+            return out
+
+        # `controls.get("x")` is the direct form. The pct checks loop over a
+        # tuple of control names instead, so bare `max_*` identifier constants
+        # count too -- minus the ones read off `feas`, which are feasibility
+        # INPUT keys (max_stack_size) and not controls at all.
+        from_feas = _get_args("feas")
+        read = _get_args("controls")
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                value = node.value
+                if (re.fullmatch(r"max_[a-z_]+", value)
+                        and value not in from_feas):
+                    read.add(value)
+        self.assertTrue(read, "no controls found; the AST probe has gone stale")
+        self.assertTrue(
+            read <= ca.CHECKED_CONTROLS,
+            f"_feasibility_report reads {sorted(read - ca.CHECKED_CONTROLS)} "
+            f"which CHECKED_CONTROLS does not list")
+
+    def test_feasibility_checks_thread_from_run_slate_to_the_allocator(self):
+        """Plumbing, and the R246 lesson about wiring: the decision lives in the
+        argument being passed, which no test calling the renderer directly
+        executes."""
+        pipeline_src = (REPO / "mlb_engine" / "pipeline"
+                        / "execution_pipeline.py").read_text(encoding="utf-8")
+        self.assertIn('feasibility_checks=list(feasibility_report.get("checks") or [])',
+                      pipeline_src)
+        self.assertIn("feasibility_checks=feasibility_checks", pipeline_src)
+        alloc_src = (REPO / "mlb_engine" / "allocate"
+                     / "contest_allocator.py").read_text(encoding="utf-8")
+        # Every ladder re-entry carries it, or a relaxed rung loses the verdict
+        # (R153's "on every rung", the same shape one module over).
+        self.assertGreaterEqual(
+            alloc_src.count("feasibility_checks=feasibility_checks"), 5, alloc_src.count(
+                "feasibility_checks=feasibility_checks"))
 
     # -- R103: a hard-pinned same-game SP pair is a fact, not a diversity ---
     # -- candidate, so it survives the same-game filter ----------------------

@@ -131,9 +131,15 @@ additions, all autonomous:
   A scratched arm, a bat absent from a posted lineup, an IL/OUT status. The
   entered set already contains a zero; leaving it there is not the conservative
   choice, it is the damaging one.
-- **Choosing among the legal replacements is autonomous.** Legality is
-  mechanical and enumerable: DK slot eligibility, salary cap, game not yet
-  locked, confirmed starter, not already rostered, not opposing a rostered SP.
+- **Choosing among the legal replacements is autonomous.** Five of the six
+  filters are mechanical legality and enumerable: DK slot eligibility, salary
+  cap, game not yet locked, confirmed starter, not already rostered. The sixth,
+  **not opposing a rostered SP, is NOT legality — it is the anti-correlation
+  CONVENTION** (R288, corrected 2026-09-01; this sentence listed all six as
+  legality and that was false about DK's rules). It is KEPT as the repair's
+  default anyway, and the reason is narrow: a repair runs unattended inside a
+  lock window, so the conservative construction is the right default there even
+  though the wall is wrong at build time.
   Rank survivors by the build's own projection (APPG where no Base exists) and
   take the top one. `tools/repair_entry.py` is that filter and it prints a
   first-match rejection census, so a refusal can be argued with rather than
@@ -146,6 +152,35 @@ additions, all autonomous:
   review-grade, never certified; full diff against the parent reported; sha256
   stated. A preflight-clean repair beats an engine-certified file carrying ten
   dead slots.
+
+**The no-hitter-versus-rostered-SP rule is a GUIDELINE, not a wall, and
+overriding it is autonomous (R288, Ben 2026-09-01).** His instruction, verbatim:
+*"the answer might be to have some lineups where we have batters facing pitchers
+in the same lineup."* DraftKings does not prohibit the construction and the
+evidence is DK's own scored output rather than a reading of its rules page:
+across 22 archived slate dates, 19,072 of 102,201 fully-resolvable Classic
+entries in `data/archive/` roster a hitter facing a rostered SP, and
+contest-standings-192464310 (2026-07-19, 1,486 entries) has ranks 1, 2 AND 3 all
+holding Ryan McMahon (NYY) beside a rostered Yamamoto (LAD) starting against NYY.
+DK accepted, scored and paid those. The frequency is slate-size dependent — 62.5%
+of entries on that 2-game slate, 3.2% on the 12-game 2026-08-11 slate — so on a
+small slate the convention forbids most of the legal space.
+
+So it sits with postures and stack plans among the delegated decisions, NOT with
+the money-and-entry wall. The control is `--max-opposing-hitters-per-sp` (engine
+default 0, which is the behaviour the unconditional constraint enforced); it is
+PER SP, so a Classic lineup holding two arms has a per-lineup worst case of twice
+the value. Move it on judgment without asking, and record the value and the
+reason in the brief, which carries `anti_correlation` on every Classic build
+including the default. `preflight_upload.py` WARNS and no longer fails, so
+`--force` is not the price of a legal roster; `--force` stays frightening.
+
+The measured cost of treating it as a wall, on 1940_9g: a hand builder carried
+the convention as a hard rule with Gabriel Hughes at 54% exposure, which banned
+every BAL bat from 20 of 37 lineups. BAL was the highest implied team total on
+the slate (~5.9, in an 11.0-total game at Coors) and finished with 2 roster slots
+out of 370. A pitcher-selection error became a hitter-distribution error through
+a constraint nobody re-examined.
 
 The safety argument is narrow and it is checkable: **`repair_entry.py` touches
 no portfolio control** (R267(c)), so none of the above can move exposure, a
@@ -195,6 +230,22 @@ reports both ends as deterministic review proxies. Note that in a one-ticket
 satellite a non-winning finish and a last-place finish pay the same, so the
 washout objective binds at the PORTFOLIO level (correlated failure across
 entries), not within a lineup. Say so rather than quietly building for floor.
+
+**Blank or unfilled entries are the MAXIMUM washout, not a conservative
+outcome. The washout objective never justifies withholding a deliverable. If
+the choice is a concentrated file or no file, ship the concentrated file, state
+the concentration plainly, and let Ben decide whether to enter it. Refusal is
+only correct when the file would be ILLEGAL — a player in a started game, a
+blown cap, a slot violation — never when it is merely poorly shaped.**
+
+That paragraph is here because the rule above it was read backwards and cost a
+slate (2026-09-01, 1940_9g). At T-5 the BUILD session wrote *"I'm stopping
+rather than shipping 37 entries stacked on three pitcher pairs"* and cited the
+portfolio-level washout clause to defend it. Thirty-seven blank entries is not
+a hedge against washout; it is a washout with certainty 1.0, and three SP pairs
+across 37 entries is a bad portfolio that can still win a satellite. Three
+games left the addressable pool permanently. The clause exists to stop a
+session quietly building for floor, never to license refusing to build.
 
 ## Build contract
 The steps are in SKILL.md. These five hold whatever path a build takes:
@@ -360,7 +411,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1610 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1645 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -431,6 +482,16 @@ inventory checks fail while the suite passes in full, build and flag it.
   Exit 0 clean, 2 hard failure, 3 IO error, 4 acknowledged (`--force` prints
   the failures and exits 4, never 0). This sentence is the pre-upload rule;
   nothing else is.
+  **It hard-fails a player whose game has already started (R287), and `--as-of`
+  pins the clock for a replay.** It did not until 2026-09-01, and the miss is
+  the worst kind because the tool reported PASS: a 37-entry file holding 151
+  roster slots from three games that started at 19:40 ET was run through
+  preflight at ~19:56, which PRINTED `first lock: 2026-09-01 19:40 ET` and then
+  `PASS ... all hard checks clean`, exit 0. A second file that night carried 78
+  such slots and also cleared. DK would have rejected both. The start times come
+  from the salary file's `Game Info`, so the check needs no lineups feed —
+  `verify_export.py` had the rule and needed both a feed and a `--parent`, which
+  meant a freshly built post-lock file was checked by nobody.
 - Never trim the player pool to fit a compute limit. An infrastructure limit
   may reduce search effort; it may never reduce the legal player set, because
   that is a strategy change and it is invisible in the certified output. A
@@ -439,11 +500,28 @@ inventory checks fail while the suite passes in full, build and flag it.
   verified against the constraint matrix and then
   accepted, tagged `optimality='time_limited'`. The allocator says "time limit
   at gap X" or "proven infeasible: <constraint>", never both.
-- The Excluded column has one reading, in `optimizer_v3.excluded_flags`. Only
-  an affirmative token removes a player; blank, NaN, "False" and unrecognized
-  cells keep them. Never compare the column to False directly. A player
-  leaving the pool on a blank cell is the forbidden pool reduction arriving as
-  a data condition.
+- The Excluded column has one reading, in `optimizer_v3.excluded_flags` and its
+  scalar half `optimizer_v3.read_excluded_cell`. Only an affirmative token
+  removes a player; blank, NaN, "False" and unrecognized cells keep them. Never
+  compare the column to False directly, and never re-derive the token rule.
+  A player leaving the pool on a blank cell is the forbidden pool reduction
+  arriving as a data condition.
+  **A salary-file `Excluded` column now reaches the frame, and the pool report
+  carries the count (R289).** It did not until 2026-09-01: both intake sites
+  stamped `"Excluded": False` before the frame existed, so an operator who staged
+  a salary file with `Excluded=TRUE` on all 288 players from locked games got a
+  CERTIFIED build delivering 151 of them, with nothing on the record saying the
+  instruction had been dropped. Read the direction: the guardrail above forbids
+  trimming the pool because a trim is invisible in the output, and this was the
+  mirror image — an explicit, visible, instructed restriction silently ignored
+  while the build certified. Same shape, pool membership not represented in the
+  artifact. `pool_report.excluded_column` names the count, the teams and the
+  ids, a warning states the legal pool the build actually has, and the
+  projection digest already keys the bank cache on the column so a restricted
+  build cannot reuse an unrestricted bank. `optimizer_shell_preflight`'s
+  hardcode is KEPT on purpose: it is a neutral feasibility test of the salary
+  file's shape and honouring an operator exclusion there would make a narrowed
+  pool read as a broken file.
 - Determinism: every set reaching the solver is sorted first
   (`mlb_engine.determinism.stable_union`) and entry points pin
   `PYTHONHASHSEED=0`. Never write `list(set(player_ids))`.
@@ -549,9 +627,38 @@ brief states the delivered file's sha256; Ben checks it at upload before
 entering anything.
 
 ## T-schedule
-At T-20 skip optional steps. At T-10 approve on posture defaults and
-auto-floors. At T-5 present the best certified file immediately with zero
-diagnostic narration.
+A ladder with ACTIONS, not a list of postures. Rewritten 2026-09-01 after a
+23-minute window produced no file at all, because every rung said what to be
+and none said what to do.
+
+- **T-20.** Skip every optional step.
+- **T-15. Open every binding control AT ONCE, not stepwise.** The 1940_9g
+  session moved `max_sp_pair_repetition` 1 -> 2 -> 10, then three exposure caps,
+  then `max_shared_players`, one per ~2-minute call, five calls. Under a
+  deadline the minimal move is the expensive one: five careful steps cost more
+  than one crude step, and the crude step is reversible while the lock is not.
+- **T-10. The best legal file is the deliverable and certification is a bonus.**
+  Approve on posture defaults and auto-floors. Stop optimizing.
+- **T-6. Hand-build if the engine has not produced one**, and run the preflight
+  on it. `tools/repair_entry.py` and a throwaway greedy script are both
+  legitimate here. Label it review-grade, state the sha256, never say certified.
+- **T-5.** Present the best file immediately with zero diagnostic narration.
+
+Two readings that are not optional. **Read the clock from the clock**: print
+`TZ=America/New_York date` in the same bash call as every build, and never infer
+elapsed time from turn count — on 1940_9g a session believed it was 19:38 with
+lock two minutes away, it was 19:28, and it spent one of its twelve remaining
+minutes writing a post-mortem. **Read `feasibility.checks` where `passed=False`
+BEFORE `errors[]`**; `build_slate.py` prints both on every refusal now, so this
+costs nothing.
+
+## Sandbox
+**The inner bash timeout is 130s. One number, this one.** Cowork's real ceiling
+is ~180s when the call passes an explicit timeout, and the safe inner budget
+underneath it is 130 (which is also `--gate-budget`'s value in the session-start
+gate command above). A session that reached for `timeout 168` against a ~164s
+harness ceiling on 2026-09-01 lost the call and its work with it; the number came
+from a different measurement. Do not re-derive it per call.
 
 ## Showdown
 Showdown ships **review-grade**, not certified. It does not pass through

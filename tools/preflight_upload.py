@@ -774,6 +774,114 @@ def check_status(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
         rep.warn(f"day-to-day player rostered: {hit}")
 
 
+def parse_as_of(value: Any) -> datetime:
+    """``--as-of`` -> aware datetime. Bare local times are read as ET.
+
+    Accepts a full ISO timestamp (``2026-09-01T19:56:00-04:00``), an ISO
+    timestamp with no offset, or ``HH:MM``/``HH:MM:SS`` alone, which takes
+    today's date. A naive value is stamped Eastern, because every other clock in
+    this file is: the salary file's ``Game Info`` carries ET and nothing else,
+    and guessing UTC for a bare "19:56" would move the comparison four hours and
+    silently pass exactly the file this check exists to stop.
+    """
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("--as-of given with no value")
+    if re.fullmatch(r"\d{1,2}:\d{2}(:\d{2})?", text):
+        today = datetime.now(tz=_eastern_tz(datetime.now().month, datetime.now().day))
+        parts = [int(p) for p in text.split(":")]
+        while len(parts) < 3:
+            parts.append(0)
+        stamped = today.replace(hour=parts[0], minute=parts[1], second=parts[2],
+                                microsecond=0)
+        return stamped
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(
+            f"--as-of {text!r} is not an ISO timestamp or HH:MM: {exc}") from exc
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=_eastern_tz(parsed.month, parsed.day))
+    return parsed
+
+
+def check_started_games(entries: Sequence[EntryRow],
+                        salary: Dict[str, Dict[str, str]],
+                        as_of: datetime, rep: Report) -> None:
+    """Hard check: no roster slot holds a player whose game has already begun.
+
+    R287, 2026-09-01. The defect this closes cost a slate and it is the worst
+    kind, because the tool reported PASS. `outputs/2026-09-01/DKEntries_1940_9g.csv`
+    (sha256 947e09856d0f...) held 151 roster slots drawn from DET@MIN, MIA@KC and
+    MIL@CHC, all of which started at 19:40 ET. Preflight ran against it at ~19:56
+    ET, PRINTED `first lock: 2026-09-01 19:40 ET`, and exited 0 with "all hard
+    checks clean". A second file that night carried 78 such slots and also
+    cleared every check. DK would have rejected both. The tool computed the first
+    lock, displayed it, and never compared it -- or any other game's start -- to
+    the clock.
+
+    Three properties, each deliberate:
+
+    - It reads the SALARY FILE only. `verify_export.py` has this rule already and
+      it lives on the swap path behind `--parent`, so a freshly built post-lock
+      file was checked by nobody; and its version needs a lineups feed, which is
+      exactly what is missing at 19:56 on a slate that went sideways. `Game Info`
+      is in the file the operator is already passing.
+    - It HARD FAILS. A warning at the money boundary is a warning the clock will
+      talk someone past. `--force` still exists and still exits 4.
+    - `--as-of` exists for replay determinism. Absent, it is now(), because the
+      question this check asks is about the moment of upload.
+
+    A row whose `Game Info` does not parse is named in `started_unparsed` rather
+    than passed or failed, on R237's rule: an unreadable start time is not
+    evidence the game has not begun.
+    """
+    started: Dict[str, List[str]] = collections.defaultdict(list)
+    unparsed: List[str] = []
+    affected_entries: set[str] = set()
+    slots = 0
+    for e in entries:
+        for pid in e.cells:
+            if not pid:
+                continue
+            row = salary.get(pid)
+            if not row:
+                continue
+            start = parse_game_info_datetime(row.get("Game Info"))
+            if start is None:
+                unparsed.append(f"{row.get('Name', pid)} ({pid})")
+                continue
+            if start <= as_of:
+                slots += 1
+                affected_entries.add(e.entry_id)
+                game = _matchup(row.get("Game Info")) or "?"
+                started[game].append(
+                    f"{e.entry_id}: {row.get('Name', pid)} "
+                    f"({row.get('TeamAbbrev', '?')})")
+    rep.info["as_of_et"] = as_of.astimezone(
+        _eastern_tz(as_of.month, as_of.day)).strftime("%Y-%m-%d %H:%M ET")
+    rep.info["started_slots"] = slots
+    rep.info["started_games"] = sorted(started)
+    rep.info["started_entries"] = len(affected_entries)
+    rep.info["started_unparsed"] = sorted(set(unparsed))
+    if unparsed:
+        rep.warn(f"{len(set(unparsed))} rostered player(s) have no parseable "
+                 f"Game Info start time, so the started-game check could not "
+                 f"read them: {sorted(set(unparsed))[:5]}")
+    if slots:
+        examples = []
+        for game in sorted(started):
+            hits = sorted(set(started[game]))
+            examples.append(f"{game} ({len(hits)}): {'; '.join(hits[:3])}"
+                            + (" ..." if len(hits) > 3 else ""))
+        rep.fail(
+            f"{slots} roster slot(s) across {len(affected_entries)} entr"
+            f"{'y' if len(affected_entries) == 1 else 'ies'} hold a player whose "
+            f"game has ALREADY STARTED as of {rep.info['as_of_et']}; DK rejects "
+            f"these. Games: {', '.join(sorted(started))}. "
+            + " | ".join(examples))
+
+
 def _classic_legality(entry: EntryRow, players: Sequence[Dict[str, str]],
                       slots: Sequence[str], rep: Report) -> None:
     games = {_matchup(p.get("Game Info")) for p in players}
@@ -800,7 +908,45 @@ def _classic_legality(entry: EntryRow, players: Sequence[Dict[str, str]],
         if str(p.get("TeamAbbrev") or "").upper() in sp_opponents
     })
     if clashes:
-        rep.fail(f"{entry.entry_id}: hitter opposing a rostered SP ({'; '.join(clashes)})")
+        # R288, 2026-09-01. WARN, not FAIL. DK does not prohibit this and the
+        # evidence is DK's own scored output rather than a reading of its rules
+        # page: across 22 archived slate dates, 19,072 of 102,201 fully-resolvable
+        # DK Classic entries (18.7%) roster a hitter facing a rostered SP, and
+        # contest-standings-192464310 (2026-07-19, 1,486 entries) has ranks 1, 2
+        # AND 3 all holding Ryan McMahon (NYY) alongside Yamamoto (LAD) starting
+        # against NYY. DK accepted, scored and paid those. The frequency is
+        # slate-size dependent -- 62.5% of entries on that 2-game slate, 3.2% on
+        # the 12-game 2026-08-11 slate -- which is the tell that on a small slate
+        # the convention forbids most of the legal space.
+        #
+        # It is a DFS CONVENTION about negative correlation, and a good one by
+        # default. Enforcing it here as a hard failure meant the only way to ship
+        # the construction Ben asked for was --force, which reports the file as
+        # having been pushed past a failing check. That is false about a legal
+        # roster, and it teaches a session to normalise --force, which has to stay
+        # frightening. The control lives in the optimizer as
+        # `max_opposing_hitters_per_sp` (default 0, so today's behaviour is
+        # the default); this line's job is to REPORT what the delivered file
+        # actually did.
+        #
+        # Measured cost of the wall on 1940_9g: a hand builder carrying the same
+        # convention as a hard rule had Gabriel Hughes at 54% exposure, which
+        # banned every BAL bat from 20 of 37 lineups. BAL was the highest implied
+        # team total on the slate (~5.9, in an 11.0-total game at Coors) and
+        # finished with 2 roster slots out of 370. A pitcher-selection error
+        # became a hitter-distribution error through a constraint nobody
+        # re-examined.
+        rep.warn(f"{entry.entry_id}: hitter opposing a rostered SP "
+                 f"({len(clashes)}: {'; '.join(clashes)}) -- DK-LEGAL. This is the "
+                 f"anti-correlation CONVENTION, not a DK rule; see "
+                 f"max_opposing_hitters_per_sp")
+        # The COUNT, so the portfolio-level fact is one line rather than N
+        # warnings a reader under a clock has to add up.
+        block = rep.info.setdefault(
+            "opposing_hitters", {"entries": 0, "slots": 0, "by_entry": {}})
+        block["entries"] += 1
+        block["slots"] += len(clashes)
+        block["by_entry"][entry.entry_id] = len(clashes)
 
 
 def _showdown_legality(entry: EntryRow, players: Sequence[Dict[str, str]],
@@ -1943,6 +2089,14 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     check_pool_membership(entries, salary, parse_embedded_pool(raw_rows),
                           args.min_pool_overlap, rep)
     check_status(entries, salary, rep)
+    # R287. Before the legality walk, deliberately: a started game makes every
+    # other verdict about that entry moot, and this is the one failure a reader
+    # at T-0 must see first.
+    check_started_games(entries, salary,
+                        parse_as_of(getattr(args, "as_of", None))
+                        if getattr(args, "as_of", None)
+                        else datetime.now(timezone.utc),
+                        rep)
     details = check_legality(contest, slots, entries, salary, rep)
 
     manifest = Path(args.manifest) if args.manifest else None
@@ -2051,6 +2205,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help="hard-fail unless the entries file hashes to this "
                          "sha256 (full hex, or a prefix of 12+ chars); pairs "
                          "the upload with the brief's delivered_sha256 (R20a)")
+    ap.add_argument("--as-of", metavar="ISO|HH:MM",
+                    help="the moment to judge 'has this game started' against; "
+                         "defaults to now. A bare HH:MM is Eastern, because the "
+                         "salary file's Game Info is. Exists for replay "
+                         "determinism (R287)")
     ap.add_argument("--min-pool-overlap", type=float, default=0.95)
     # R266. Default WARN. A deliberate double-up is a legitimate play and
     # CLAUDE.md reserves concentration to Ben, so this must not block on its own
@@ -2165,6 +2324,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         adv = report["advisory"]
         if adv.get("first_lock_et"):
             print(f"  first lock: {adv['first_lock_et']}")
+        # R287. The first lock was already printed here and read as reassurance.
+        # The clock it is being compared AGAINST is what was missing, so the two
+        # numbers now sit on adjacent lines and the verdict is stated rather than
+        # left to the reader's arithmetic.
+        if info.get("as_of_et"):
+            started = int(info.get("started_slots") or 0)
+            verdict = (f"{started} slot(s) in {info.get('started_entries')} "
+                       f"entr{'y' if info.get('started_entries') == 1 else 'ies'} "
+                       f"ALREADY STARTED" if started else "none started")
+            print(f"  as of: {info['as_of_et']}  [{verdict}]")
         if adv.get("top_exposure"):
             top = ", ".join(f"{x['player']} {x['pct']}%" for x in adv["top_exposure"][:5])
             print(f"  top exposure: {top}  (the PERSON, either role)")

@@ -21,6 +21,10 @@ from mlb_engine.intake.slate_intake_manager import (
     SalaryPlayer, parse_dk_salary_csv, salary_status_tier,
 )
 from mlb_engine.optimize.roster_contracts import CLASSIC, SHOWDOWN
+# R288: the engine's own default for the anti-correlation allowance, so the
+# export gate cannot grade a file against a different number than the solver
+# built it under.
+from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
 
 VERSION = "v1.6"
 ENTRY_ID_COL = 0
@@ -965,10 +969,42 @@ def validate_dk_entries_file(
             games = {players[pid].game_id for pid in roster if players[pid].game_id}
             if len(games) < 2:
                 errors.append(f"Entry ID {entry.entry_id}: fewer than two games represented")
+            # R288, 2026-09-01. Graded against the DECLARED allowance, not
+            # against zero.
+            #
+            # This site is the fifth member of the class and the one that would
+            # have made the new control unusable end to end: it sat here between
+            # the 5-hitter rule and the 2-game rule, both of which ARE DK's, and
+            # it is not. A build raised to `max_opposing_hitters_per_sp: 2` would
+            # have solved, produced the lineup Ben asked for, and then been
+            # rejected at the export gate by a line that reads like a DK rule.
+            # Found by the R233 enumeration, not by the item, which named the
+            # optimizer and preflight and stopped there.
+            #
+            # A violation of the declared allowance is still a hard error -- that
+            # is a real disagreement between what the build was asked for and
+            # what the file holds, which is exactly what this validator is for.
+            # What is gone is the assumption that the allowance is zero.
+            allowed_opposing = controls.get("max_opposing_hitters_per_sp")
+            allowed_opposing = (ANTI_CORRELATION_DEFAULT_MAX
+                                if allowed_opposing is None
+                                else max(0, int(allowed_opposing)))
             for spid in pitcher_ids:
                 opponent = players[spid].opponent
-                if any(players[hid].team == opponent for hid in roster[2:]):
-                    errors.append(f"Entry ID {entry.entry_id}: hitter against rostered opposing pitcher {spid}")
+                facing = [hid for hid in roster[2:]
+                          if players[hid].team == opponent]
+                if len(facing) > allowed_opposing:
+                    errors.append(
+                        f"Entry ID {entry.entry_id}: {len(facing)} hitter(s) "
+                        f"against rostered opposing pitcher {spid}, above the "
+                        f"declared max_opposing_hitters_per_sp "
+                        f"{allowed_opposing}")
+                elif facing:
+                    warnings.append(
+                        f"Entry ID {entry.entry_id}: {len(facing)} hitter(s) "
+                        f"facing rostered SP {spid}, within the declared "
+                        f"allowance of {allowed_opposing}. DK-legal; the "
+                        f"anti-correlation convention was deliberately relaxed")
             if confirmed:
                 for pid in roster[2:]:
                     hitter_team = players[pid].team if pid in players else ""

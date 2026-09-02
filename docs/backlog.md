@@ -39,6 +39,73 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-01 (fourth note this date), DEV, claim `engine` (`engine_2026-09-02`):
+**R286, R287, R288 and R289 all SHIPPED in one commit. Gate 1610 -> 1645, golden
+replay unmoved, no delivered byte changes without a flag. R290 FILED in three
+parts. No board slot moved: all four came from the 09-01 BUILD post-mortem
+fragment and closed on arrival, and the fourteen-slot queue is untouched. Both
+2026-09-01 BUILD fragments are consumed and deleted.***
+
+***The slate that earned this batch delivered NOTHING.*** 1940_9g, 37 reserved
+entries across 16 contests, first lock 19:40 ET, files at 19:17. At 19:40 there
+was no file at all and three games left the addressable pool permanently. That is
+the worst outcome this project has, and the four defects below are why the
+session could not recover inside 23 minutes.
+
+***The premise checks earned their place: two of four came back describing a
+DIFFERENT mechanism than the fragment claimed, and one of those changed the
+fix.*** `errors[0]` does not name a passing CHECK; it names a CONTROL, composed
+by a counting argument over the BANK, while the slate-level check for the same
+control passes. Neither half was lying — one counts 12 sampled SP pairs, the
+other counts 113 viable ones — and the defect is that the bank finding was the
+only voice and points at a lever that cannot move a slate floor. So R286 is an
+ORDERING with a labelled distinction, not "render from the checks instead". **And
+the fragment was WRONG that `_b7`'s "no single control is arithmetically binding"
+message was accurate:** `shared_players_floor` was failing in that same brief.
+That message is the same defect in reassuring clothes, which is why barring it
+while any check fails is its own test rather than a side effect of reordering.
+
+***The DK premise came back on better evidence than the citation asked for.***
+CLAUDE.md bars fetching draftkings.com by any route, so the rules page was not
+read and the entry does not claim it was. DK's own SCORED OUTPUT was read
+instead, already on disk: 19,072 of 102,201 fully-resolvable archived Classic
+entries roster a hitter facing a rostered SP, and one 1,486-entry contest's ranks
+1, 2 AND 3 all did. A platform rule would have rejected those at entry. That is
+affirmative proof of absence, and the slate-size gradient (62.5% of entries on a
+2-game slate, 3.2% on a 12-game one) is what makes the control's zero default
+right and the wall wrong.
+
+***The R233 enumeration found the member that would have made R288 useless.***
+The item named two enforcement sites. There are five, and the third is the export
+validator (`dk_entries_manager.py:968`), sitting between the 5-hitter rule and
+the 2-game rule — both of which ARE DK's — hard-erroring on any hitter facing a
+rostered SP. A build raised to 2 would have solved, produced the construction Ben
+asked for, and then been rejected at the export gate. Eighth time this pattern
+has paid: a fix closes N named sites and the class has N+1.
+
+***Two renderers that were ALREADY CORRECT are the sharpest finding in the
+batch.*** `build_slate.infeasibility_hint` read `feasibility.checks`, filtered to
+`passed=False`, and printed `shared_players_floor: raise max_shared_players to
+>= 7` to stderr on every one of the four builds the session spent escalating the
+wrong cap. And `tools/autobuild.py` reads the same checks and applies a failing
+STRUCTURAL remedy unattended — the supervisor SKILL.md tells a session to reach
+for FIRST would have fixed this slate in one move. Neither needed changing. The
+slate was lost with the answer on screen and an unused tool that would have acted
+on it, which is why this commit's doc half is not decoration: the T-schedule is
+now a ladder with ACTIONS, and the refusal prints the failing checks and the
+clock itself rather than relying on a session remembering to.
+
+***D3 did NOT ship and that is a refusal on the merits, recorded as R290(c) with
+the enumeration.*** Its acceptance criterion — "refusal must be unreachable while
+entries are blank and time remains" — is a claim over EIGHT distinct `return 3`
+exits in `build_slate.py`, measured and tabulated in the item. The fragment treats
+them as one. The post-mortem's own rule draws the line correctly (refuse only
+when the file would be ILLEGAL) and applied per site that line does not fall in
+one place: a name-crosswalk failure and an export failure are illegality at T-0.
+A `--deliver-by` covering one of eight exits, in front of an operator inside a
+lock window, reads as though it covers the deadline. Classifying the eight is the
+first commit, not the last.
+
 *2026-09-01 (third note this date), DEV, claim `engine` (`engine_2026-09-01`,
 re-taken a second time): **R246 SHIPPED. Gate 1592 -> 1610, golden replay
 unmoved. Slot 10's R246 half closes; the slot KEEPS its position with R164
@@ -3287,6 +3354,110 @@ unexhausted job list makes the supervisor grow the bank instead of stopping.
 Falsifier: if (1) shows the direct path genuinely cannot carry a job list, then the
 correct fix is the READER only plus an honest "no job list on this path" in the
 brief, and the entry closes smaller. Owner: none. Rollback: revert the extractor.
+
+### R290. Three residues of the 09-01 no-file-at-lock batch: a bank cache that ignores leverage, a plan-time verdict that carries no feasibility, and the deadline governor that is eight refusal exits and not one (P1 / P2 / P0-by-value, S / XS / M-L) | new 2026-09-01, DEV, found while shipping R286-R289; every count below is measured at this head
+
+Three parts, filed together because they were all found by the same enumeration
+and one of them is the reason D3 of the post-mortem did not ship.
+
+**(a) `conditions_signature` does not include R246's leverage controls (P1, S).**
+`bank_cache.conditions_signature(projections_df, excludes, stack_min, stack_max)`
+is the BUCKET key: it identifies the exact question a stored candidate answered.
+R246's three controls (`max_cumulative_ownership_pct`, `min_low_owned_hitters`,
+`low_owned_threshold_pct`) build real MILP rows and are not in it, so a candidate
+built under a 90pp cumulative cap sits in the same bucket as one built
+unconstrained and `as_candidates` serves both to either build. The reuse is
+invisible: nothing in the brief says the bank a capped build delivered from was
+partly built without the cap. R288 closed exactly this property for
+`max_opposing_hitters_per_sp` in the same commit, appending to the signature ONLY
+when the value is non-default so every signature already written to a live cache
+file keeps its meaning — the same one-line shape works here.
+- **Why it is not just that one line:** the measurement. Appending changes which
+  buckets a leverage build reads, so a session has to know what it invalidates
+  before it lands mid-slate, and R246's own entry measured a real infeasibility
+  edge (a `min_low_owned_hitters` floor of 6 is infeasible on a full pool) whose
+  interaction with a re-keyed bucket is unmeasured. Do the append and the
+  invalidation measurement in one commit.
+- **Done when:** two builds differing only in `--leverage` produce different
+  `conditions_signature` values, a build without leverage is byte-identical to
+  today, and the entry states how many live cache buckets the change orphans.
+
+**(b) `_plan_joint_allocation` supplies the allocator no feasibility at all
+(P2, XS).** `execution_pipeline.py:3475` calls
+`select_and_assign_entries(candidates, entries, dict(controls))` with neither
+`feasibility_inputs` (R112) nor `feasibility_checks` (R286). So the plan-time
+verdict at `:3514` — `"proven infeasible at plan time on <bank>: " + errors[0]` —
+carries neither the BANK-LIMITED clause that names the bank as the limiter nor
+R286's ordering, and it is the leg `run_slate(approve=False)` reports. The
+checkpoint has both objects in scope roughly 240 lines above.
+- **Why P2 and not P1:** `build_slate.py` deliberately does NOT run a plan leg
+  (its own comment says so: on the sliced path it solves the identical MILP on
+  the identical candidates twice, and on the direct path it builds a second bank
+  that is not the build's), so no live build path reads this string. It is the
+  API front door's verdict, not the operator's.
+- **Watch for the trap:** the frozen golden replay's `pure_verdict.errors` is
+  exactly this message, so supplying the checks changes a pinned artifact the
+  moment a fixture has a failing check. That golden currently has
+  `max_shared_players=8` against an inherent floor of 7, so nothing fails and
+  the string is stable — verify that before assuming the fixture protects you.
+
+**(c) The deadline governor, and it is EIGHT refusal exits rather than one
+(P0 by value, M-L).** This is D3 of
+`2026-09-01_BUILD_no-file-at-lock-full-postmortem.md`, refused on the merits in
+the R286-R289 commit rather than deferred for room, and the enumeration is the
+part a next session did not have.
+
+The ask: `--deliver-by <ISO or HH:MM ET>` defining T-minus; from T-6 the build
+stops exploring, walks a fixed documented relaxation ladder until the joint MILP
+is feasible, writes the file, stamps the brief `deadline_forced: true` with the
+ladder it walked, and labels the result `review_grade_deadline_build`, never
+certified. Blank reserved rows keep blocking CERTIFICATION and stop blocking
+DELIVERY. Same governor in `tools/autobuild.py` so the two do not diverge.
+
+**The acceptance criterion is the problem.** "Refusal must be unreachable while
+entries are blank and time remains" is a claim over every refusal exit in
+`build_slate.py`, and the fragment treats them as one. Measured at this head,
+eight distinct `return 3` sites:
+
+| line | what refuses |
+|---|---|
+| `:1578` | pool blockers, hard |
+| `:1604` | name-crosswalk failure (the one `--ignore-pool-blockers` refuses by name, R133) |
+| `:2047` | the Classic allocator refusal — this is the 1940_9g one |
+| `:2569` | `ladder_infeasible` |
+| `:2588` | `bank_short` |
+| `:2596` | `bank_short`, second site |
+| `:2609` | `not_certified` from failed contests |
+| `:2632` | `showdown_export_failed` |
+
+The post-mortem's own O3 clause draws the line correctly — *refusal is only
+correct when the file would be ILLEGAL, never when it is merely badly shaped* —
+and applied per site that line does not fall in one place. A crosswalk failure
+and an export failure are illegality at T-0 and must still refuse. `:2047` and
+the two `bank_short` sites are the "badly shaped" case the governor is for.
+`:2569` and `:2609` need reading. Which is which is a per-site judgment on
+evidence, not a global flag.
+- **Why this matters more than shipping something:** a `--deliver-by` that covers
+  one of eight exits, in front of an operator inside a lock window, reads as
+  though it covers the deadline. That is this repo's named false-reassurance
+  failure with a command-line switch on it, and the cost of getting it wrong is
+  paid at exactly the moment the flag is reached for.
+- **Fix, in order:** (1) classify all eight sites ILLEGAL / BADLY-SHAPED /
+  READ-IT, in the entry, before any code; (2) build the governor over the
+  BADLY-SHAPED set only and have it say which exits it does not cover; (3) the
+  ladder is documented and fixed, never derived per slate; (4) `autobuild.py`
+  gets the same governor in the same commit.
+- **What already shipped of D3's operational half, and why the rest is still
+  worth building:** the refusal now prints its failing `feasibility.checks` and
+  the clock to stderr itself, and CLAUDE.md's T-schedule is a ladder with actions
+  (T-15 open every binding control at once, T-10 the best legal file is the
+  deliverable, T-6 hand-build and preflight it). That moves the pressure off a
+  session's memory. It does not put a clock inside the engine, which is what the
+  flag is for.
+- **Done when:** an over-constrained slate with `--deliver-by` two minutes out
+  returns exit 0, a fully non-blank file, a non-empty ladder in the stamp, and
+  the label `review_grade_deadline_build`; and the entry names every refusal exit
+  the governor deliberately does not cover.
 
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 

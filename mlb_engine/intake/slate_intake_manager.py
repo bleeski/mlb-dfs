@@ -1455,6 +1455,17 @@ def optimizer_shell_preflight(players: Sequence[SalaryPlayer]) -> Dict[str, Any]
             "Ownership_Tier": "Mid",
             "Confidence_Tier": "NeutralShell",
             "Locked": False,
+            # R289: KEPT hardcoded, and this is the one of the two sites the
+            # post-mortem named that should NOT change. This is the NEUTRAL
+            # feasibility shell: it asks whether the salary file's
+            # salary/position/game shape can produce a legal lineup at all, with
+            # projections that are deliberately not a DFS opinion. Honouring an
+            # operator exclusion here would answer a different question -- "can a
+            # lineup be built from the restricted pool" -- and a shell that
+            # reports infeasible because the operator narrowed the pool would
+            # read as a broken salary file. The production front door is
+            # `live_data_adapters._pool_row` and that is where the column is now
+            # carried.
             "Excluded": False,
             "Stack_Group": p.team,
             "Notes": "",

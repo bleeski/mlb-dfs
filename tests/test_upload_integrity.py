@@ -114,9 +114,26 @@ def blank_classic_entry(entry_id, contest_id, name="MLB Test Contest"):
     return [entry_id, name, contest_id, "$1"] + [""] * 10 + ["", "1. instructions"]
 
 
+# R287. The fixtures date their slate 07/25/2026 and that date is load-bearing
+# elsewhere (the feed resolver looks for data/slates/2026-07-25/, and the
+# schedule fixtures pin the same day), so it cannot simply be moved into the
+# future. Which means every fixture game is permanently in the PAST, and the new
+# started-game hard check would fail all forty-odd preflight tests -- none of
+# which is a test about the clock.
+#
+# So the shared runner pins the clock unless the caller pins it itself. This is
+# what --as-of is for: a replay states its own moment rather than inheriting the
+# wall clock. A test that IS about the started-game check passes its own --as-of
+# and this default steps aside.
+FIXTURE_AS_OF_BEFORE_FIRST_PITCH = "2026-07-25T18:00:00-04:00"
+
+
 def run_preflight(*args) -> subprocess.CompletedProcess:
+    argv = list(args)
+    if "--as-of" not in argv:
+        argv += ["--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH]
     return subprocess.run(
-        [sys.executable, str(REPO / "tools" / "preflight_upload.py"), *args],
+        [sys.executable, str(REPO / "tools" / "preflight_upload.py"), *argv],
         capture_output=True, text=True)
 
 
@@ -589,6 +606,203 @@ class PreflightToolTests(unittest.TestCase):
         self.assertEqual(payload["info"]["contest_type"], "classic")
 
 
+class R287StartedGameTests(unittest.TestCase):
+    """The 1940_9g false PASS: 151 slots from games that started 16 minutes ago.
+
+    `outputs/2026-09-01/DKEntries_1940_9g.csv` (sha256 947e09856d0f...) was run
+    through preflight at ~19:56 ET against games that started at 19:40. It
+    printed `first lock: 2026-09-01 19:40 ET`, then `PASS 37 classic entries, all
+    hard checks clean`, exit 0. The tool computed the lock, displayed it, and
+    compared it to nothing.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    def test_a_started_game_hard_fails_and_names_the_player(self):
+        """R287 acceptance: pinned --as-of after a game start, against a file
+        rostering a player from that game, exits 2 and names him."""
+        # GAME_A starts 07/25/2026 07:05PM ET. One minute later, the file's AAA
+        # players are unenterable.
+        result = self._run("--as-of", "2026-07-25T19:06:00-04:00")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("ALREADY STARTED", result.stdout)
+        self.assertIn("AAA@BBB", result.stdout)
+        # The lineup stacks AAA, so the named names are AAA's.
+        self.assertIn("AAA Aster", result.stdout)
+        payload = json.loads(
+            self._run("--as-of", "2026-07-25T19:06:00-04:00", "--json").stdout)
+        self.assertEqual(payload["verdict"], "blocked")
+        self.assertGreater(payload["info"]["started_slots"], 0)
+        self.assertEqual(payload["info"]["started_games"], ["AAA@BBB"])
+        self.assertEqual(payload["info"]["started_entries"], 1)
+
+    def test_before_first_pitch_it_says_none_started_and_exits_zero(self):
+        result = self._run("--as-of", "2026-07-25T19:04:00-04:00")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("none started", result.stdout)
+        payload = json.loads(
+            self._run("--as-of", "2026-07-25T19:04:00-04:00", "--json").stdout)
+        self.assertEqual(payload["info"]["started_slots"], 0)
+
+    def test_the_boundary_minute_counts_as_started(self):
+        """First pitch is not "still enterable". DK locks a game AT its start."""
+        result = self._run("--as-of", "2026-07-25T19:05:00-04:00")
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("ALREADY STARTED", result.stdout)
+
+    def test_it_needs_no_lineups_feed(self):
+        """The rule already existed in verify_export and needed a feed and a
+        --parent, so a freshly built post-lock file was checked by nobody. This
+        one reads Game Info out of the salary file the operator already passes,
+        which is what makes it usable at 19:56 on a slate that went sideways.
+
+        Asserted against the SOURCE, because a stdout assertion would pass by
+        accident on a repo that happens to have no feed on disk for the fixture
+        date -- and this repo does have one."""
+        src = (REPO / "tools" / "preflight_upload.py").read_text(encoding="utf-8")
+        start = src.index("def check_started_games")
+        body = src[start:src.index("\ndef ", start + 10)]
+        code = body.split('"""')[2]
+        for forbidden in ("feed", "confirmed", "posted", "urlopen", "requests"):
+            self.assertNotIn(forbidden, code,
+                             f"check_started_games reads {forbidden!r}")
+        # And its only inputs are the entries, the salary rows and a clock.
+        signature = body[:body.index('"""')]
+        self.assertIn("entries", signature)
+        self.assertIn("salary", signature)
+        self.assertIn("as_of", signature)
+
+    def test_force_acknowledges_it_and_never_reports_clean(self):
+        forced = self._run("--as-of", "2026-07-25T19:06:00-04:00", "--force")
+        self.assertEqual(forced.returncode, 4)
+        self.assertIn("ALREADY STARTED", forced.stdout)
+
+    def test_an_unparseable_game_info_warns_and_is_not_read_as_not_started(self):
+        """R237's rule: an unreadable start time is not evidence the game has
+        not begun, so it is NAMED rather than silently passed."""
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        for row in rows[1:]:
+            if row[7] == "AAA":
+                row[6] = "Postponed"
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        payload = json.loads(
+            self._run("--as-of", "2026-07-25T19:06:00-04:00", "--json").stdout)
+        self.assertTrue(payload["info"]["started_unparsed"])
+        self.assertTrue(any("no parseable Game Info" in w
+                            for w in payload["warnings"]), payload["warnings"])
+
+    def test_a_bare_hh_mm_as_of_is_eastern_not_utc(self):
+        """Reading "19:56" as UTC would move the comparison four hours and pass
+        exactly the file this check exists to stop."""
+        import preflight_upload
+        parsed = preflight_upload.parse_as_of("19:56")
+        self.assertEqual(parsed.strftime("%H:%M"), "19:56")
+        # Eastern is UTC-4 or UTC-5, never UTC. Reading it as UTC would give 0.
+        self.assertIn(parsed.utcoffset().total_seconds(), (-4 * 3600, -5 * 3600))
+        explicit = preflight_upload.parse_as_of("2026-07-25T19:06:00-04:00")
+        self.assertEqual(explicit.utcoffset().total_seconds(), -4 * 3600)
+        naive = preflight_upload.parse_as_of("2026-07-25T19:06:00")
+        self.assertEqual(naive.utcoffset().total_seconds(), -4 * 3600)
+        with self.assertRaises(ValueError):
+            preflight_upload.parse_as_of("not a time")
+
+
+class R288AntiCorrelationIsAConventionTests(unittest.TestCase):
+    """A hitter facing a rostered SP is DK-LEGAL, so it warns and never fails.
+
+    The evidence is DK's own scored output, not a reading of its rules page:
+    across 22 archived slate dates, 19,072 of 102,201 fully-resolvable DK Classic
+    entries roster one, and contest-standings-192464310 (2026-07-19) has ranks 1,
+    2 and 3 all holding Ryan McMahon (NYY) beside Yamamoto (LAD) starting against
+    NYY. DK accepted, scored and paid those.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _clashing_lineup(self):
+        """Swap one AAA hitter for a BBB hitter. BBB faces the rostered AAA SP."""
+        import preflight_upload
+        salary = preflight_upload.load_salary(self.salary)
+        lineup = list(self.lineup)
+        target_slot = 2  # the C slot
+        want = preflight_upload.CLASSIC_SLOTS[target_slot]
+        replacement = next(
+            pid for pid, row in sorted(salary.items())
+            if str(row.get("TeamAbbrev")).upper() == "BBB"
+            and preflight_upload.slot_admits(row, want)
+            and pid not in lineup)
+        lineup[target_slot] = replacement
+        return lineup
+
+    def _run(self, *extra):
+        return run_preflight("--entries", str(self.entries),
+                             "--salary", str(self.salary), *extra)
+
+    def test_it_warns_and_exits_zero_instead_of_failing(self):
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self._clashing_lineup())])
+        result = self._run("--json")
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(payload["failures"], [])
+        self.assertTrue(any("hitter opposing a rostered SP" in w
+                            for w in payload["warnings"]), payload["warnings"])
+        warning = next(w for w in payload["warnings"]
+                       if "hitter opposing a rostered SP" in w)
+        self.assertIn("DK-LEGAL", warning)
+        self.assertIn("max_opposing_hitters_per_sp", warning)
+
+    def test_the_count_is_reported_as_one_portfolio_level_fact(self):
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self._clashing_lineup()),
+                       classic_entry("901", "5", self._clashing_lineup())])
+        payload = json.loads(self._run("--json").stdout)
+        block = payload["info"]["opposing_hitters"]
+        self.assertEqual(block["entries"], 2)
+        self.assertEqual(block["slots"], 2)
+        self.assertEqual(sorted(block["by_entry"]), ["900", "901"])
+
+    def test_a_clean_file_carries_no_opposing_hitters_block_at_all(self):
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+        payload = json.loads(self._run("--json").stdout)
+        self.assertNotIn("opposing_hitters", payload["info"])
+
+    def test_forcing_is_no_longer_the_only_way_to_ship_the_construction(self):
+        """Before this, --force was the only route and it exits 4
+        "acknowledged", which obliges the session to report a LEGAL file as
+        having been pushed past a failing check. --force has to stay
+        frightening, so it stops being the price of a legal roster."""
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self._clashing_lineup())])
+        self.assertEqual(self._run().returncode, 0)
+        self.assertNotIn("ACKNOWLEDGED", self._run().stdout)
+
+
 class PreflightManifestBindingTests(unittest.TestCase):
     """R3: the manifest binding stops failing open at the check.
 
@@ -787,7 +1001,11 @@ class PreflightManifestBindingTests(unittest.TestCase):
 
         self._write_manifest()
         module, _ = self._preflight_in_process()
-        argv = ["--entries", str(self.entries), "--salary", str(self.salary)]
+        # R287: this fixture's games are permanently in the past, and this
+        # test is about the stamp, not the clock. Same reason run_preflight
+        # pins one.
+        argv = ["--entries", str(self.entries), "--salary", str(self.salary),
+                "--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH]
         self.assertEqual(module.main(list(argv)), 0,
                          "control: this file is clean and its row matches")
         with mock.patch.object(module, "stamp_manifest_status",
@@ -821,7 +1039,11 @@ class PreflightManifestBindingTests(unittest.TestCase):
 
         self._write_manifest()
         module, _ = self._preflight_in_process()
-        argv = ["--entries", str(self.entries), "--salary", str(self.salary)]
+        # R287: this fixture's games are permanently in the past, and this
+        # test is about the stamp, not the clock. Same reason run_preflight
+        # pins one.
+        argv = ["--entries", str(self.entries), "--salary", str(self.salary),
+                "--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH]
         with mock.patch.object(module, "stamp_manifest_status",
                                return_value={"stamped": True,
                                              "status": "upload_ready",

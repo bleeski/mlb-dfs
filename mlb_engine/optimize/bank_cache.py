@@ -58,7 +58,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import (
-    build_single_lineup, _new_solver_status, resolve_solver_time_limit,
+    ANTI_CORRELATION_DEFAULT_MAX, build_single_lineup, _new_solver_status,
+    resolve_solver_time_limit,
 )
 
 VERSION = "v1.3"
@@ -583,6 +584,7 @@ def conditions_signature(
     excludes: Optional[Sequence[str]] = None,
     stack_min: Optional[int] = None,
     stack_max: Optional[int] = None,
+    max_opposing_hitters_per_sp: Optional[int] = None,
 ) -> str:
     """A short digest of everything outside (pair, team, locks) that moves a solve.
 
@@ -593,11 +595,27 @@ def conditions_signature(
 
     The byte stream is unchanged from v1.2 on purpose, so the signatures already
     written into live cache files keep their meaning across this change.
+
+    R288 rider. ``max_opposing_hitters_per_sp`` changes the constraint matrix,
+    so a candidate built at 0 answers a different question than one built at 2 --
+    reusing the first for the second would serve a bank that structurally cannot
+    contain what was asked for, and the reuse would be invisible. It is appended
+    ONLY when non-default, so every signature already written to a live cache file
+    keeps its meaning, which is the same rule the v1.2 byte stream follows above.
+
+    NOTE, filed and not fixed here: R246's three leverage controls are NOT in this
+    signature and have the same property, so a bank built under
+    `max_cumulative_ownership_pct` is reused for a build without it. Filed as
+    R290; the fix is one more append and the measurement of what it invalidates
+    is the part that needs a session.
     """
     digest = hashlib.sha256()
     digest.update(b"v2")
     digest.update(("|".join(sorted(str(x) for x in (excludes or []))) + "\n").encode())
     digest.update(f"{stack_min}:{stack_max}\n".encode())
+    if max_opposing_hitters_per_sp not in (None, ANTI_CORRELATION_DEFAULT_MAX):
+        digest.update(
+            f"opp:{int(max_opposing_hitters_per_sp)}\n".encode())
     digest.update(_projection_bytes(projections_df))
     return digest.hexdigest()[:16]
 
@@ -652,6 +670,7 @@ def extend_bank(
     max_candidates: Optional[int] = None,
     solver_time_limit_s: Optional[float] = None,
     leverage: Optional[Mapping[str, Any]] = None,
+    max_opposing_hitters_per_sp: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
 
@@ -702,7 +721,9 @@ def extend_bank(
     # R101 splits it in two: the pool digest is the half that INVALIDATES, the
     # full signature is the bucket this slice writes into. Register before the
     # drop, so the bucket this call is about to fill is placeable by the next one.
-    conditions_sig = conditions_signature(projections_df, excl, stack_min, stack_max)
+    conditions_sig = conditions_signature(
+        projections_df, excl, stack_min, stack_max,
+        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp)
     pool_digest = projection_digest(projections_df)
     cache.register_conditions(conditions_sig, pool_digest)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
@@ -844,6 +865,11 @@ def extend_bank(
                 # `--leverage` that reached only the auto-bank path would be a
                 # silent no-op on every sliced build, which is most of them.
                 **_leverage_kwargs(leverage),
+                # R288. Reaches the sliced path for R246's reason: this is
+                # the bank build_slate.py actually delivers from, and a
+                # control that reached only the auto-bank would be a silent
+                # no-op on most builds.
+                max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
             )
         except Exception as exc:  # noqa: BLE001
             worst = max(worst, time.monotonic() - attempt_started)

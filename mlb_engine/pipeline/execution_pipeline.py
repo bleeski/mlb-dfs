@@ -330,6 +330,11 @@ def execute_portfolio(
     # bank as the limiter when the slate itself supports more than the bank
     # sampled. Advisory; omitting it costs nothing.
     feasibility_inputs: Optional[Mapping[str, Any]] = None,
+    # R286: the checkpoint's already-computed feasibility VERDICTS, so a
+    # proven-infeasible refusal leads with the slate-level check that failed
+    # instead of with a count over the bank. Advisory; omitting it restores the
+    # pre-R286 message exactly.
+    feasibility_checks: Optional[Sequence[Mapping[str, Any]]] = None,
     # F11. Explicit rather than smuggled through ``metadata``: metadata goes into
     # the run manifest, and these carry frozenset-keyed pair counts that a
     # manifest cannot serialise. They belong in diagnostics.json only.
@@ -378,7 +383,8 @@ def execute_portfolio(
     # whether the honest remedy is another slice or a control change.
     allocation = select_and_assign_entries(
         candidates, entry_requirements, controls, bank_report=bank_diagnostics,
-        fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs)
+        fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs,
+        feasibility_checks=feasibility_checks)
     if not allocation.get("passed"):
         diagnostics = {
             "run_id": run["run_id"], "mode": mode, "allocation": allocation,
@@ -4856,6 +4862,11 @@ def run_slate(
         # R112: the checkpoint's own feasibility inputs, so a proven-infeasible
         # refusal from this build can name the bank as the limiter.
         feasibility_inputs=feasibility_inputs,
+        # R286: and its own feasibility VERDICTS, so the refusal leads with the
+        # slate-level check that failed. The checkpoint computed these ~350 lines
+        # above and, until this argument existed, printed them into the brief
+        # while the allocator refused without ever seeing them.
+        feasibility_checks=list(feasibility_report.get("checks") or []),
         metadata={**(metadata or {}), "front_door": "run_slate",
                   "front_door_version": VERSION,
                   "workflow_gate_evidence": gate_evidence,

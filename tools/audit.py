@@ -465,7 +465,26 @@ EXPECTED_SUITE_COUNTS = {
     # `Projected_Ownership_Pct` column the solver's reader falls back to a flat
     # 12.0 per player, so a cumulative cap of 90 binds against 10 x 12.0 = 120
     # and reads as working while measuring nothing.
-    "tests.test_core": 1016,
+    # R286+R288+R289, 2026-09-01: 1016 -> 1039, the twenty-three that pin the
+    # 09-01 no-file-at-lock batch's engine half. Nine on the refusal renderer
+    # (the failing SLATE check leading errors[0], every failing check
+    # enumerated, the interaction message barred while one fails and surviving
+    # when none does, `passed is None` not read as a failure, the pre-R286
+    # message byte-identical with no checks supplied so the frozen golden and
+    # the plan leg are unmoved, the bank-growth remedy demoted, CHECKED_CONTROLS
+    # disjoint from LADDER_RELAXED_CONTROLS by AST over _feasibility_report, and
+    # the wiring). Six on the anti-correlation control (zero default refusing the
+    # construction, a raised value shipping it, the bound exact at every rung, a
+    # negative value raising rather than clamping, ONE formulation for every
+    # value, and the sliced-bank reach plus the conditions-signature re-key).
+    # Eight on the salary Excluded column (reaching the frame, none reaching a
+    # lineup, the legal-pool warning, a blank or absent column changing nothing,
+    # an unrecognized token keeping the player, the scalar and frame readings
+    # being one function, the neutral shell's deliberate keep, and the bank
+    # re-key). The sharpest is the byte-identical one: without it the golden
+    # replay is the only thing standing between this change and a silently
+    # reworded refusal on every path that supplies no feasibility inputs.
+    "tests.test_core": 1040,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -744,7 +763,18 @@ EXPECTED_SUITE_COUNTS = {
     # than taking the first hit (the mutation survivor: the guard existed and
     # only the zero-hit half was tested, while R75 has this repo carrying two
     # Luis Garcias).
-    "tests.test_upload_integrity": 321,
+    # R287+R288, 2026-09-01: 321 -> 332, the eleven that pin the 09-01 batch's
+    # tool half. Seven on the started-game hard check (the acceptance case at a
+    # pinned --as-of naming the player, before-first-pitch exiting 0, the
+    # boundary MINUTE counting as started, needing no lineups feed asserted
+    # against the SOURCE rather than stdout because this repo HAS a feed for the
+    # fixture date, --force acknowledging it, an unparseable Game Info warning
+    # rather than passing, and a bare HH:MM --as-of being Eastern and not UTC --
+    # which would move the comparison four hours and pass exactly the file the
+    # check exists to stop). Four on the anti-correlation demotion (warning and
+    # exiting 0, the count as one portfolio-level fact, a clean file carrying no
+    # block at all, and --force no longer being the price of a legal roster).
+    "tests.test_upload_integrity": 332,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

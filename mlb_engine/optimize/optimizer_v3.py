@@ -250,6 +250,26 @@ MAX_HITTERS_PER_TEAM = 5
 HITTER_POSITIONS = {'C', '1B', '2B', '3B', 'SS', 'OF'}
 MAX_OVERLAP_CEILING = ROSTER_SIZE - 2
 
+# R288, 2026-09-01. How many hitters facing ONE rostered SP a lineup may carry.
+# ZERO, so the default builds exactly what the unconditional wall built before
+# this constant existed. It is a CONVENTION about negative correlation and NOT a
+# DraftKings rule -- see `_build_single_lineup_scipy` for the archive evidence --
+# so it sits beside MAX_HITTERS_PER_TEAM (which IS DK's rule) with the difference
+# stated rather than left for a reader to infer from the neighbourhood.
+#
+# PER SP, and the name says so. The post-mortem asked for
+# `max_opposing_hitters_per_lineup` and that name would have been FALSE about
+# this constraint: the rows are emitted one per starting pitcher, so a Classic
+# lineup holding two SPs has a per-lineup worst case of 2k, not k. A true
+# per-lineup bound needs the product of two binaries (which SPs are selected
+# times which of their opponents are), so it is not linear in the assignment
+# variables and would need auxiliary rows. Found by a test that asserted the
+# per-lineup reading and got a legal 3-opposing-hitter lineup back at k=2 --
+# 2 against one arm, 1 against the other, both within bound. Naming a per-SP
+# row per-lineup is the mislabel this project's truthful-labels rule exists to
+# stop, so the name moved rather than the semantics being fudged.
+ANTI_CORRELATION_DEFAULT_MAX = 0
+
 SUPPRESSION_TIEBREAKER_WEIGHT = 0.0003
 SUPPRESSION_PER_PLAYER_CAP = 0.25
 SUPPRESSION_LINEUP_CAP = 0.75
@@ -606,6 +626,36 @@ EXCLUDED_FALSE_TOKENS = frozenset({
 })
 
 
+def read_excluded_cell(value):
+    """(flag, kind) for ONE Excluded cell. The scalar half of the one reading.
+
+    ``kind`` is one of 'bool', 'numeric', 'blank', 'text', 'unrecognized' and is
+    what the report's counters are keyed on.
+
+    R289, 2026-09-01. Extracted from :func:`excluded_flags` byte-for-byte in
+    behaviour, because the intake front door has to read a SINGLE salary-file
+    cell and the only reading of this column lived inside a loop over a
+    DataFrame. Re-deriving the token rule at the front door would be the second
+    implementation this comment block was written to prevent -- and the direction
+    of the failure would be worse there, since the front door decides pool
+    MEMBERSHIP.
+    """
+    if isinstance(value, bool):
+        return value, 'bool'
+    if value is None or (not isinstance(value, str) and pd.isna(value)):
+        return False, 'blank'
+    if isinstance(value, (int, float)):
+        return bool(value), 'numeric'
+    token = str(value).strip().lower()
+    if token in EXCLUDED_TRUE_TOKENS:
+        return True, 'text'
+    if token in EXCLUDED_FALSE_TOKENS:
+        if token in ('', 'nan', 'none', 'null', 'na', 'n/a'):
+            return False, 'blank'
+        return False, 'text'
+    return False, 'unrecognized'
+
+
 def excluded_flags(projections_df):
     """(boolean Series, report). The only reading of the Excluded column.
 
@@ -631,31 +681,15 @@ def excluded_flags(projections_df):
     flags = []
     unrecognized = []
     for value in raw:
-        if isinstance(value, bool):
-            flags.append(value)
-            continue
-        if value is None or (not isinstance(value, str) and pd.isna(value)):
+        flag, kind = read_excluded_cell(value)
+        if kind == 'blank':
             report['coerced_from_blank'] += 1
-            flags.append(False)
-            continue
-        if isinstance(value, (int, float)):
-            flags.append(bool(value))
-            continue
-        token = str(value).strip().lower()
-        if token in EXCLUDED_TRUE_TOKENS:
+        elif kind == 'text':
             report['coerced_from_text'] += 1
-            flags.append(True)
-            continue
-        if token in EXCLUDED_FALSE_TOKENS:
-            if token in ('', 'nan', 'none', 'null', 'na', 'n/a'):
-                report['coerced_from_blank'] += 1
-            else:
-                report['coerced_from_text'] += 1
-            flags.append(False)
-            continue
-        report['unrecognized_kept'] += 1
-        unrecognized.append(str(value))
-        flags.append(False)
+        elif kind == 'unrecognized':
+            report['unrecognized_kept'] += 1
+            unrecognized.append(str(value))
+        flags.append(flag)
 
     series = pd.Series(flags, index=projections_df.index, dtype=bool)
     report['excluded_true'] = int(series.sum())
@@ -788,6 +822,7 @@ def _build_single_lineup_scipy(
     max_cumulative_ownership_pct=None,
     min_low_owned_hitters=None,
     low_owned_threshold_pct=None,
+    max_opposing_hitters_per_sp=None,
     time_limit_s=None,
     status_out=None,
 ):
@@ -979,19 +1014,59 @@ def _build_single_lineup_scipy(
             return None, None
         add_constraint({assign_index[(pid, slot)]: 1.0}, 1.0, 1.0)
 
+    # R288, 2026-09-01. The anti-correlation rule, and it is a CONTROL now rather
+    # than an unconditional wall. `max_opposing_hitters_per_sp` is how many
+    # hitters facing a rostered SP one lineup may carry; it defaults to
+    # ANTI_CORRELATION_DEFAULT_MAX = 0, so an omitted argument builds exactly what
+    # this block built before, row for row.
+    #
+    # Two things this block did NOT have and now does: a name, and a reason. It
+    # was ten lines of unlabelled MILP rows enforcing a DFS CONVENTION as though
+    # it were a DraftKings rule. DK has no such rule -- 19,072 of 102,201
+    # resolvable Classic entries in this repo's own archive roster a hitter facing
+    # a rostered SP, and one 1,486-entry contest's ranks 1, 2 and 3 all did, so
+    # DK accepted, scored and paid them. Ben's instruction on 2026-09-01: "the
+    # answer might be to have some lineups where we have batters facing pitchers
+    # in the same lineup."
+    #
+    # ONE FORMULATION FOR EVERY VALUE, deliberately, rather than keeping the
+    # pairwise rows at 0 and adding an aggregate row above it. Two encodings of
+    # one rule keyed on a parameter regime is R167's class and it is exactly the
+    # thing that costs a session a day when the two disagree. The k=0 aggregate
+    # row is `sum(opposing hitters) + M*x_sp <= M`, whose integer feasible set is
+    # identical to the pairwise `x_sp + x_h <= 1` family -- verified against the
+    # frozen golden replay, which is byte-unmoved by this change.
+    max_opposing = ANTI_CORRELATION_DEFAULT_MAX
+    if max_opposing_hitters_per_sp is not None:
+        max_opposing = int(max_opposing_hitters_per_sp)
+        if max_opposing < 0:
+            raise ValueError(
+                f"max_opposing_hitters_per_sp must be >= 0, got "
+                f"{max_opposing_hitters_per_sp}. There is no such thing as a "
+                f"negative allowance; a value below zero is a units slip, and "
+                f"clamping one would silently build a portfolio nobody asked for")
     sp_pids = df[df['_pos_set'].apply(lambda pos: 'P' in pos)]['Player_ID'].tolist()
     for sp_pid in sp_pids:
         sp_row = df[df['Player_ID'] == sp_pid].iloc[0]
         opponent = sp_row['Opponent']
         opponent_hitters = df[(df['Team'] == opponent) & (df['_pos_set'].apply(lambda pos: bool(pos & HITTER_POSITIONS) and 'P' not in pos))]['Player_ID'].tolist()
+        if not opponent_hitters:
+            continue
+        big_m = float(len(opponent_hitters))
+        if max_opposing >= len(opponent_hitters):
+            # The allowance already exceeds the whole opposing side, so the row
+            # bounds nothing. Emitting it anyway would add a slack row to every
+            # solve and make the constraint matrix depend on a control that is
+            # not binding, which is a branch-and-bound tie-break input (F19).
+            continue
+        coefs = {}
+        for idx in pid_to_var_idxs.get(sp_pid, []):
+            coefs[idx] = coefs.get(idx, 0.0) + big_m
         for hitter_pid in opponent_hitters:
-            coefs = {}
-            for idx in pid_to_var_idxs.get(sp_pid, []):
-                coefs[idx] = coefs.get(idx, 0.0) + 1.0
             for idx in pid_to_var_idxs.get(hitter_pid, []):
                 coefs[idx] = coefs.get(idx, 0.0) + 1.0
-            if coefs:
-                add_constraint(coefs, -np.inf, 1.0)
+        if coefs:
+            add_constraint(coefs, -np.inf, big_m + float(max_opposing))
 
     if stack_constraints:
         team = stack_constraints['team']
@@ -1130,6 +1205,7 @@ def build_single_lineup(
     max_cumulative_ownership_pct=None,
     min_low_owned_hitters=None,
     low_owned_threshold_pct=None,
+    max_opposing_hitters_per_sp=None,
     time_limit_s=None,
     status_out=None,
 ):
@@ -1158,6 +1234,7 @@ def build_single_lineup(
         max_cumulative_ownership_pct=max_cumulative_ownership_pct,
         min_low_owned_hitters=min_low_owned_hitters,
         low_owned_threshold_pct=low_owned_threshold_pct,
+        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
         time_limit_s=time_limit_s, status_out=status_out,
     )
 

@@ -47,6 +47,7 @@ Design rules:
 """
 from __future__ import annotations
 
+import collections
 import json
 import math
 import statistics
@@ -61,6 +62,10 @@ from mlb_engine.swap.late_swap_manager import (
     CONFIRMED_STARTER, PROJECTED_STARTER, UNKNOWN, PlayerLineupStatus,
 )
 from mlb_engine.intake.slate_intake_manager import normalize_name
+# R289: the ONE reading of the Excluded column, imported rather than restated.
+# The front door decides pool MEMBERSHIP, so a second token rule here would be
+# the F21 defect in the one place it costs the most.
+from mlb_engine.optimize.optimizer_v3 import read_excluded_cell
 
 VERSION = "v1.6"
 
@@ -1435,6 +1440,28 @@ def _pool_row(sp: Any, batting_order: Optional[int] = None) -> Dict[str, Any]:
             except (TypeError, ValueError):
                 appg = None
             break
+    # R289, 2026-09-01. The salary file's own Excluded column, CARRIED rather
+    # than overwritten with False.
+    #
+    # What the hardcode cost, on 1940_9g: an operator built
+    # data/slates/2026-09-01/DKSalaries_excl_locked.csv with Excluded=TRUE on all
+    # 288 players from games that had locked, to restrict the pool to the six
+    # open games. The build read the column, threw it away, CERTIFIED, and
+    # delivered a file holding 151 of those players. `optimizer_v3.excluded_flags`
+    # is careful and correct about which tokens exclude, and it never received an
+    # operator exclusion because this line and its sibling in
+    # slate_intake_manager stamped the field before the frame ever existed.
+    #
+    # Note which direction the failure runs. CLAUDE.md forbids trimming the legal
+    # pool because a trim is invisible in the certified output; here the operator
+    # asked for an explicit, visible, instructed restriction and it was silently
+    # ignored while the output certified. Both failures are the same shape --
+    # pool membership not represented in the artifact -- and this is the one the
+    # guardrail's wording does not cover.
+    #
+    # The token rule is `read_excluded_cell`'s, imported rather than restated:
+    # only an affirmative token excludes, blank and unrecognized keep the player.
+    excluded, excluded_kind = read_excluded_cell(raw.get("Excluded"))
     row: Dict[str, Any] = {
         "Player_ID": str(sp.player_id),
         "Name": sp.name,
@@ -1444,7 +1471,9 @@ def _pool_row(sp: Any, batting_order: Optional[int] = None) -> Dict[str, Any]:
         "Salary": float(sp.salary),
         "Game_ID": sp.game_id or sp.game_info,
         "AvgPointsPerGame": appg,
-        "Excluded": False,
+        "Excluded": excluded,
+        "Excluded_Source": ("salary_file" if excluded_kind != 'blank'
+                            else "absent_or_blank"),
         # Carried so every downstream consumer, including the checkpoint and the
         # export validators, can re-derive availability without re-reading the
         # salary CSV. Rows reaching here are already status-filtered, so a
@@ -2293,6 +2322,32 @@ def build_slate_pool(
         )
 
     rows = sorted(keep.values(), key=lambda r: (r["Team"], r["Player_ID"]))
+    # R289. The operator exclusion, counted where the brief can print it. The
+    # 1940_9g failure was not that the exclusion was refused, it was that it was
+    # accepted, discarded, and NOTHING SAID SO -- the build certified and the
+    # locked-game players were in the delivered file. A count that reaches the
+    # brief is what makes the instruction auditable at T-5; the rows themselves
+    # are still carried and the optimizer still owns the removal, because a drop
+    # here would put a second pool-reduction site in the intake path.
+    excluded_rows = [r for r in rows if r.get("Excluded")]
+    excluded_report = {
+        "column_present": any(r.get("Excluded_Source") == "salary_file" for r in rows),
+        "applied": len(excluded_rows),
+        "by_team": dict(sorted(collections.Counter(
+            str(r.get("Team") or "?") for r in excluded_rows).items())),
+        "player_ids": sorted(str(r["Player_ID"]) for r in excluded_rows)[:50],
+        "note": ("salary-file Excluded column carried through the front door; "
+                 "only an affirmative token excludes (optimizer_v3."
+                 "read_excluded_cell), and the optimizer is what removes the row"),
+    }
+    if excluded_rows:
+        warnings.append(
+            f"salary file excludes {len(excluded_rows)} of {len(rows)} kept "
+            f"rows via its Excluded column "
+            f"({', '.join(f'{t}={n}' for t, n in excluded_report['by_team'].items())}); "
+            f"those players are carried into the frame and removed by the "
+            f"optimizer, and this build's legal pool is {len(rows) - len(excluded_rows)}"
+        )
     missing_appg = [r["Player_ID"] for r in rows if r.get("AvgPointsPerGame") in (None, "")]
     if missing_appg:
         warnings.append(
@@ -2395,6 +2450,11 @@ def build_slate_pool(
             # R26: the bucket that stayed empty on 2026-07-28. One key, so a
             # caller checks postponement exclusions without walking teams.
             "excluded_postponed_teams": sorted(excluded_teams),
+            # R289. The OPERATOR's exclusion, distinct from the postponement one
+            # above: that key is the engine excluding a game, this one is the
+            # operator excluding players. Conflating them would hide the
+            # instruction inside a fact about the schedule.
+            "excluded_column": excluded_report,
             "pitchers": [
                 {"player_id": pid, "name": by_id[pid].name, "team": by_id[pid].team,
                  "role": role}

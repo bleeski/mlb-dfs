@@ -25,6 +25,369 @@ performance claim.
 
 ---
 
+## 2026-09-01 — R286 + R287 + R288 + R289: the four defects behind a slate that reached lock with no file at all — and two of the four premises the post-mortem rested on came back refined rather than confirmed
+
+**What moved.** `mlb_engine/allocate/contest_allocator.py`
+(`compose_infeasibility_errors` and `failing_feasibility_checks`, both new and
+public; `_infeasibility_remedies` gains the checks and demotes bank growth;
+`select_and_assign_entries` gains `feasibility_checks` and carries it on all
+three ladder re-entries; `CHECKED_CONTROLS` / `LADDER_RELAXED_CONTROLS`),
+`mlb_engine/pipeline/execution_pipeline.py` (`execute_portfolio` gains
+`feasibility_checks`, `run_slate` supplies `feasibility_report["checks"]`),
+`mlb_engine/optimize/optimizer_v3.py` (`ANTI_CORRELATION_DEFAULT_MAX`,
+`max_opposing_hitters_per_sp` on both single-lineup functions, the
+anti-correlation rows rewritten to one formulation, and `read_excluded_cell`
+extracted as the scalar half of the one Excluded reading),
+`mlb_engine/optimize/bank_cache.py` (`extend_bank` and `conditions_signature`
+gain the allowance), `mlb_engine/entries/dk_entries_manager.py` (the export
+validator grades the opposing-hitter count against the DECLARED allowance),
+`mlb_engine/intake/live_data_adapters.py` (the salary file's `Excluded` column
+carried through the front door, `pool_report.excluded_column`),
+`mlb_engine/intake/slate_intake_manager.py` (the sibling hardcode KEPT, with the
+reason), `tools/preflight_upload.py` (`check_started_games`, `parse_as_of`,
+`--as-of`, the as-of print line, and the opposing-hitter check demoted FAIL ->
+WARN with a count), `skills/generate-lineups/scripts/build_slate.py`
+(`--max-opposing-hitters-per-sp`, the Showdown refusal for it, the
+`anti_correlation` brief block, the allowance riding `portfolio_controls`, and the
+refusal now printing failing checks and the clock to stderr),
+`tests/test_core.py` (+24), `tests/test_upload_integrity.py` (+11),
+`tools/audit.py` (both pins), `CLAUDE.md`, `MLB_Classic.md`,
+`skills/generate-lineups/SKILL.md`. Gate **1610 -> 1645**, golden replay
+unmoved, and no delivered byte changes without a flag.
+
+**What it cost.** 2026-09-01, slate 1940_9g: 37 reserved entries across 16
+contests, first lock 19:40 ET, files handed over at 19:17. At 19:40 there was no
+file — not an imperfect one, none. Three games (DET@MIN, MIA@KC, MIL@CHC) left
+the addressable pool permanently. A file existed only at ~20:00, hand-built by a
+throwaway greedy script after Ben stopped the session.
+
+### Premise checks first, because two came back refined and one came back wider
+
+The post-mortem was written mid-failure by a session that had already published
+one confident wrong diagnosis that night (the superseded
+`bank-samples-too-few-sp-pairs` fragment, whose central claim was that bank
+SP-pair sampling was the bind; it was not, and both fragments are consumed and
+deleted by this commit). Four premises were named for checking. All four hold as
+observable facts. Two of them describe a different mechanism than the fragment
+claims, and the difference changed the fix.
+
+**Premise 1, `errors[0]` can name a check whose `passed` is True — HOLDS as
+fact, and the MECHANISM is not what the fragment says.** Reproduced from
+`outputs/2026-09-01/_b5.out` through `_b8.out`, on disk. `_b5`, `_b6` and `_b8`
+each carry `errors[0]` naming `max_sp_pair_repetition` while
+`feasibility.checks` reads `sp_pair_capacity passed=true` and
+`shared_players_floor passed=false remedy="raise max_shared_players to >= 7"`.
+But `errors[0]` does not name a CHECK at all and never did. It names a CONTROL,
+composed by `_diagnose_binding_constraints`, which is a counting argument over
+the BANK: 12 sampled SP pairs x cap 2 = 24 < 37 entries, true. The checkpoint's
+`sp_pair_capacity` is the same arithmetic over the SLATE: 113 viable pairs x cap
+2 = 226 >= 37, also true. Neither half was lying. The defect is that the bank
+finding was the only voice, and it points at a lever that cannot fix a slate
+floor. So the fix is not "render from the checks instead" — it is an ORDERING
+with a labelled distinction, because both facts are worth having.
+
+**And the fragment is WRONG about `_b7`.** It says the "no single control is
+arithmetically binding ... the interaction of the active controls is" message
+"appeared in `_b7` and was accurate". It was not. `_b7` carries
+`shared_players_floor passed=false` in the same brief. That message is the same
+defect wearing the reassuring wording instead of the misleading one: it tells the
+operator no single control is the problem while one named control demonstrably
+is. That is why R286 is not merely a reordering, and the guard that bars the
+interaction message while any check fails is its own test.
+
+**Premise 2, `preflight_upload.py` has no already-started-game check — HOLDS
+exactly as described.** `grep -niE "already started|game has started|first lock"`
+returns one hit, line 2167, and it is a `print` of `adv['first_lock_et']`. No
+hard check compares any rostered player's game time to any clock. The tool
+computed the first lock, displayed it, and never used it.
+
+**Premise 3, both intake sites hardcode `"Excluded": False` — HOLDS, and the two
+sites are NOT equivalent.** `live_data_adapters.py:1447` is the production front
+door and is fixed. `slate_intake_manager.py:1458` is `optimizer_shell_preflight`,
+a neutral MILP feasibility shell whose projections are deliberately not a DFS
+opinion; it asks whether the salary file's salary/position/game SHAPE can produce
+a legal lineup at all. Honouring an operator exclusion there would answer a
+different question and make a narrowed pool read as a broken salary file. KEPT,
+with that reason in the source and a test asserting it.
+
+**Premise 4, DK does not prohibit a hitter facing your own rostered SP — HOLDS,
+on stronger evidence than the citation the fragment asked for.** CLAUDE.md's
+hard guardrail bars fetching draftkings.com by any route, so DK's rules page was
+not read and this entry does not claim it was. What was read instead is DK's own
+SCORED OUTPUT, already on disk: across 22 archived slate dates in
+`data/archive/`, **19,072 of 102,201 fully-resolvable DK Classic entries (18.7%)
+roster a hitter facing a rostered SP**, and
+`data/archive/2026-07-19/contest-standings-192464310.csv` (1,486 entries, 2-game
+slate) has **ranks 1, 2 AND 3** all holding Ryan McMahon (NYY) beside a rostered
+Yoshinobu Yamamoto (LAD) starting against NYY. DK accepted, scored and paid
+those. A platform roster rule would have rejected them at entry, so this is
+affirmative proof of absence rather than "did not find". Frequency is
+slate-size dependent and the numbers matter for the control's default: 62.5% of
+resolvable entries on that 2-game slate, 34.2% on a 3-game slate, 3.2% on the
+12-game 2026-08-11 slate, where no top-3 finisher did it. On a small slate the
+convention forbids most of the legal space; on a big one it costs almost nothing.
+Two secondary sources contradict each other on the strategy question, which is
+itself evidence it is convention: one optimizer vendor's FAQ says keep hitters
+out of your pitchers' games, and a named GPP pro writes "I don't discriminate
+against using both in the same lineup."
+
+### R286. The refusal leads with the SLATE check that failed, and the interaction message may not be said while one is failing
+
+One renderer, `compose_infeasibility_errors`, replacing the two inline branches
+that lived in `select_and_assign_entries`. Order: every failing slate-level check
+first, each naming itself, its detail and its own remedy and saying plainly that
+no bank growth can clear it; then every bank-level finding, labelled
+`BANK-LEVEL count against the candidates handed in`; then, only when no check
+failed AND no bank finding was made, the interaction message. `_infeasibility_
+remedies` demotes its `FIRST REMEDY, grow the bank` line to `NEXT REMEDY` behind
+a failing slate check — demoted, never deleted, because the bank may still be a
+slice and that is still true and still worth knowing second. On 1940_9g the
+operator grew the bank twice on that line's instruction against a floor no bank
+can move.
+
+The checks are not recomputed here. They arrive from their one owner,
+`_feasibility_report`, so there is no second implementation of the floor
+arithmetic to drift (R167's class). The safety question that creates is
+staleness, because `select_and_assign_entries` re-enters ITSELF with relaxed
+controls three times: `CHECKED_CONTROLS` and `LADDER_RELAXED_CONTROLS` state the
+two sets as data, `test_checkpoint_verdicts_cannot_go_stale_across_a_ladder_re_
+entry` asserts they are disjoint AND walks `_feasibility_report`'s own AST for
+the controls it consults, so a fourth ladder that ever relaxed
+`max_shared_players` fails a test here instead of quietly reporting a stale
+verdict as the bind.
+
+`compose_infeasibility_errors` with no checks supplied returns the pre-R286
+message **byte for byte**, and a test pins the exact string. That is what keeps
+the frozen golden replay and the plan-time leg unmoved:
+`_plan_joint_allocation` passes no feasibility inputs at all.
+
+### R287. `preflight_upload.py` hard-fails a player whose game has started
+
+The worst defect in the batch, because the tool reported PASS.
+`outputs/2026-09-01/DKEntries_1940_9g.csv` (sha256 `947e09856d0f...`) held **151
+roster slots** from three games that started at 19:40 ET. Preflight ran against
+it at ~19:56, printed `first lock: 2026-09-01 19:40 ET`, then `PASS 37 classic
+entries, all hard checks clean`, exit 0. A second file (`e2492cb0e36c...`)
+carried 78 such slots and also cleared every hard check. DK would have rejected
+both.
+
+`check_started_games` resolves each rostered player's start from the salary
+file's `Game Info` and hard-fails with the count, the entry count and the games.
+Three properties, each deliberate. It reads the salary file ONLY: `verify_export.
+py` has this rule already, and it lives on the swap path behind `--parent` and
+needs a lineups feed, so a freshly built post-lock file was checked by nobody —
+and a feed is precisely what is missing at 19:56 on a slate that went sideways.
+It HARD FAILS, because a warning at the money boundary is one the clock will talk
+someone past; `--force` still exits 4. And `--as-of` pins the clock for replay,
+where a bare `HH:MM` is read as **Eastern**, because reading it as UTC would move
+the comparison four hours and pass exactly the file this check exists to stop.
+A row whose `Game Info` will not parse is named in `started_unparsed` and warned
+rather than passed, on R237's rule: an unreadable start time is not evidence the
+game has not begun. The print line now sits directly under `first lock:`, so the
+two numbers and the verdict are adjacent instead of leaving the reader the
+arithmetic.
+
+One test-suite consequence worth stating rather than burying: the preflight
+fixtures date their slate `07/25/2026` and that date is load-bearing elsewhere
+(the feed resolver looks for `data/slates/2026-07-25/`), so every fixture game is
+permanently in the past and this check would have failed all forty-odd preflight
+tests, none of which is about the clock. The shared `run_preflight` helper now
+pins `--as-of` unless the caller pins its own, which is what `--as-of` is for.
+The one test that calls `main()` in process got the same treatment explicitly.
+
+### R288. The anti-correlation wall becomes a control, and the class had FIVE members where the item named two
+
+`max_opposing_hitters_per_sp`, engine default 0, so an omitted argument builds
+exactly what the unconditional constraint built. Reachable from
+`build_slate.py --max-opposing-hitters-per-sp`, recorded on every Classic brief
+under `anti_correlation` including the default (R237's rule: an absent key is not
+an answer), refused on Showdown rather than silently ignored (R242's shape, since
+`build_showdown_bank` emits no such row), and it keys the bank cache's conditions
+signature when non-default so a candidate built at 0 is not served to a build
+asking for 2. The signature append happens ONLY when non-default, so every
+signature already written to a live cache file keeps its meaning.
+
+**The name is not the one the item asked for, and the reason is the finding.**
+The item said `max_opposing_hitters_per_lineup`. That name would have been FALSE:
+the rows are emitted one per starting pitcher, so a Classic lineup holding two
+arms has a per-lineup worst case of 2k. Found by a test written to assert the
+per-lineup reading, which got back a perfectly legal 3-opposing-hitter lineup at
+k=2 — two against one arm, one against the other, both within bound. A true
+per-lineup bound needs the product of two binaries and is not linear in the
+assignment variables. Naming a per-SP row per-lineup is the mislabel this
+project's truthful-labels rule exists to stop, so the name moved rather than the
+semantics being fudged.
+
+**One formulation for every value**, not the pairwise rows at 0 with an aggregate
+row bolted on above them. Two encodings of one rule keyed on a parameter regime
+is R167's class. The aggregate row is `sum(opposing hitters) + M*x_sp <= M + k`,
+whose integer feasible set at k=0 is identical to the pairwise `x_sp + x_h <= 1`
+family; verified against the frozen golden replay, which is byte-unmoved. A
+negative value RAISES rather than clamping, and a value at or above the whole
+opposing side emits no row at all rather than a slack row that would make the
+constraint matrix depend on a non-binding control (F19's tie-break input).
+
+### R289. A salary-file `Excluded` column reaches the frame, and the count reaches the brief
+
+An operator staged `data/slates/2026-09-01/DKSalaries_excl_locked.csv` with
+`Excluded=TRUE` on all 288 players from games that had locked, to restrict the
+pool to the six open games. Verified on disk at the time: `has Excluded col:
+True`, `Counter({'': 554, 'TRUE': 288})`. The build read the column, threw it
+away, CERTIFIED, and delivered a file holding 151 of those players, then 78 on a
+second attempt.
+
+Note which direction this failure runs, because CLAUDE.md's guardrail only covers
+the other one. That rule forbids trimming the legal pool because a trim is
+invisible in the certified output. Here an operator asked for an explicit,
+visible, instructed restriction and it was silently ignored **while the output
+certified**. Same shape — pool membership not represented in the artifact — and
+the wording did not cover it. It does now.
+
+`read_excluded_cell` is the scalar half of `excluded_flags`, extracted rather
+than reimplemented, so the front door and the frame share one token rule; the
+frame reading now calls it and a test pins every counter. `pool_report.
+excluded_column` carries the count, the per-team split and the ids; a warning
+states the legal pool the build actually has. The rows are still CARRIED and the
+optimizer still owns the removal, because a drop in intake would put a second
+pool-reduction site on the front door. And the projection digest already hashes
+the `Excluded` column, so a restricted build cannot reuse an unrestricted bank —
+free, and now pinned by a test.
+
+### R233, two classes, callers by AST, and the FORM stated
+
+**Class A: producers and readers of the joint-MILP infeasibility diagnosis.** The
+key-name grep answers the wrong question here (87 string sites, 53 production,
+most of them docstrings), so the class is taken two ways: every producer of the
+operator-facing refusal text, plus an AST walk for every subscript or `.get`
+whose index is `checks` or `binding_constraints` — **25 sites, 19 production
+across 6 files**. Twelve members, 4 FIXED, 6 KEPT with reasons, 2 FILED.
+
+- FIXED: `contest_allocator.compose_infeasibility_errors` (the new single
+  renderer, replacing the branches at the old `:2811`/`:2814`);
+  `contest_allocator._infeasibility_remedies` (remedy ordering);
+  `build_slate.py:2025` (the refusal now prints failing checks and the clock);
+  `dk_entries_manager.py:968` (class B's member, counted there).
+- KEPT: `_diagnose_binding_constraints` — not wrong about the bank, the defect
+  was that it was the only voice. `contest_allocator:3103` — the same finding
+  recorded as report DATA rather than rendered as the lead diagnosis.
+  `execution_pipeline._feasibility_report` — the slate-level owner, and it was
+  RIGHT all along. `execution_pipeline:4571` — the checkpoint's warnings.
+  `stage_slate.py:672` — the Blockers line, already reads the slate verdict.
+  `late_swap.classify_swap_failure` — reads `errors`, and the swap has no
+  checkpoint so there are no checks to read.
+- **The two findings in this class that matter most are both about renderers
+  that were ALREADY CORRECT.** `build_slate.infeasibility_hint:217` reads
+  `feasibility.checks`, filters to `passed=False`, and named
+  `shared_players_floor: raise max_shared_players to >= 7` in `_b5` through
+  `_b8`. It printed to stderr on every one of those calls. And
+  `tools/autobuild.py:428` reads the same checks and applies a failing
+  STRUCTURAL remedy unattended — the supervisor SKILL.md tells a session to
+  reach for first would have fixed this slate in one move. Neither is changed by
+  this commit and neither needed changing. The slate was lost with the answer
+  printed on screen and an unused tool that would have acted on it.
+- FILED, R290: (a) `conditions_signature` does not include R246's three leverage
+  controls, so a bank built under `max_cumulative_ownership_pct` is reused for a
+  build without it — same property this commit closed for the anti-correlation
+  allowance, one more append, and the part needing a session is measuring what it
+  invalidates. (b) `_plan_joint_allocation` calls
+  `select_and_assign_entries` with no feasibility arguments at all, so the
+  plan-time verdict carries neither the BANK-LIMITED clause nor the R286
+  ordering.
+
+**Class B: every site enforcing the hitter-vs-rostered-SP rule.** Grepped as
+`sp_opponents|opposing.{0,25}(sp|pitcher)|opposes_rostered` over
+`mlb_engine/ tools/ tests/ skills/ docs/`, then read. **FIVE live members, the
+item named two.**
+
+1. `optimizer_v3._build_single_lineup_scipy:982` — the unconditional MILP rows.
+   FIXED into the control.
+2. `preflight_upload._classic_legality` — exit 2. FIXED to WARN, with the count
+   in `info.opposing_hitters` so the portfolio-level fact is one line instead of
+   N warnings a reader under a clock has to add up.
+3. **`dk_entries_manager.validate_dk_entries_file:968` — the export validator,
+   and this is the R233 payoff.** It hard-errored on any hitter facing a rostered
+   SP, sitting between the 5-hitter rule and the 2-game rule, both of which ARE
+   DK's. A build raised to 2 would have solved, produced the construction Ben
+   asked for, and then been rejected at the export gate by a line that reads like
+   a DK rule — the control would have been unusable end to end. It now grades
+   against the DECLARED allowance from `portfolio_controls` (a violation of the
+   declared value is still a hard error, which is a real disagreement between
+   what the build was asked for and what the file holds), and `build_slate.py`
+   puts the value there. The item named the optimizer and preflight and stopped.
+4. `tools/repair_entry.py:306` — the replacement filter's
+   `opposes_rostered_sp` census. **KEPT as the repair's default, and the reason
+   is narrow: a repair runs unattended inside a lock window, so the conservative
+   construction is right there even though the wall is wrong at build time.**
+   What is FIXED is CLAUDE.md's R272 clause, which listed all six repair filters
+   as "legality is mechanical and enumerable". Five are. The sixth is this
+   convention, and calling it legality was false about DK's rules.
+5. `MLB_Classic.md:66` — and this one is its own finding. The strategy authority
+   has read **"No hitter against a rostered opposing pitcher unless the user
+   explicitly overrides"** from the start, and NO OVERRIDE EXISTED: the optimizer
+   emitted the constraint with no parameter and preflight returned exit 2. Three
+   readers, two of them disagreeing with the authority, for as long as the line
+   has been there. That is why the wall survived unexamined into a hand builder
+   on 1940_9g, where Gabriel Hughes at 54% exposure banned every BAL bat from 20
+   of 37 lineups and BAL — highest implied team total on the slate at ~5.9, in an
+   11.0-total game at Coors — finished with 2 roster slots out of 370. A
+   pitcher-selection error became a hitter-distribution error through a
+   constraint nobody re-examined.
+6. NOT a member, checked and stated: `mlb_engine/optimize/showdown.py` has zero
+   such sites (one game, so both SPs face each other and the rule is
+   inapplicable), and `tools/verify_export.py` has none either — CLAUDE.md's
+   R272 text credits it with catching this in the hand-built repair, and the
+   check it actually ran was `repair_entry`'s.
+
+### Doc changes, this commit
+
+`CLAUDE.md` dual objective gains the blank-entries clause **verbatim** as the
+post-mortem proposed it, plus the incident that earned it: at T-5 the session
+wrote *"I'm stopping rather than shipping 37 entries stacked on three pitcher
+pairs"* and cited the portfolio-level washout clause to defend it. Thirty-seven
+blank entries is a washout with certainty 1.0. The clause exists to stop a
+session quietly building for floor, never to license refusing to build.
+`CLAUDE.md` Autonomy gains the anti-correlation guideline with the archive
+numbers and the measured cost, and corrects R272's legality list. The T-schedule
+is now a LADDER WITH ACTIONS — T-15 open every binding control at once rather
+than stepwise (the session moved five controls in five ~2-minute calls; under a
+deadline the minimal move is the expensive one and the crude step is reversible
+while the lock is not), T-10 the best legal file is the deliverable and
+certification is a bonus, T-6 hand-build and run the preflight on it — plus the
+two readings that are not optional. A new `## Sandbox` section pins the inner
+bash timeout at **130s in one place**; a session reached for `timeout 168`
+against a ~164s harness ceiling and lost the call and its work.
+`skills/generate-lineups/SKILL.md` gains the print-the-clock-in-every-build-call
+rule, the read-checks-before-errors rule, and the slate-versus-bank distinction.
+`MLB_Classic.md` §2 rewrites the guideline. All three quoted gate lines moved to
+1645.
+
+### D3 did NOT ship, and this is a refusal on the merits rather than a deferral
+
+The deadline governor is the item with the most value on the board and it is not
+here. Its own acceptance criterion is that **"refusal must be unreachable while
+entries are blank and time remains"**, and that is a claim over every refusal
+exit in `build_slate.py`, not over the allocator's. Measured: **eight distinct
+`return 3` sites** (`:1578`, `:1604`, `:2047`, `:2569`, `:2588`, `:2596`,
+`:2609`, `:2632`) covering pool blockers, a name-crosswalk failure, the Classic
+allocator refusal, ladder infeasibility, two bank-short paths, and a Showdown
+export failure. The fragment treats them as one. They are not: the post-mortem's
+own O3 clause says refusal is correct when the file would be ILLEGAL, and a
+crosswalk failure and an export failure are exactly that at T-0. Which sites the
+governor may override, and which must still refuse with the clock run out, is a
+per-site judgment on evidence this session does not have.
+
+Shipping a ladder walker over the allocator alone and calling it `--deliver-by`
+would put a flag in front of an operator under a clock that covers one of eight
+exits while reading as though it covers the deadline. That is this repo's named
+false-reassurance failure with a command-line switch on it. R290(c) carries it
+with the enumeration, which is the part a next session did not have.
+
+What DID ship of D3's operational half, because it is what the flag was for:
+the refusal now prints the failing checks and the clock itself, and the
+T-schedule says what to DO at each rung rather than what to be.
+
+---
+
 ## 2026-09-01 — R246: R154's two leverage constraints get a production caller, on BOTH bank routes because the build picks one on the clock — and the mutation that mattered proved the first cut was capping against a constant
 
 **What moved.** `mlb_engine/optimize/optimizer_v3.py` (three keys added to

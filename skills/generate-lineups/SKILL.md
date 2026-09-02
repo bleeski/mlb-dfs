@@ -59,6 +59,34 @@ brief, or `TZ=America/New_York date`. The same session estimated elapsed time
 from how many turns it had taken, concluded it was at T-2, and nearly stood down
 a build that had 28 minutes left. Turn count is not a clock.
 
+**Print `TZ=America/New_York date` in the SAME bash call as every build.** The
+paragraph above was already here on 2026-09-01 and had been read in-session when
+a BUILD session concluded, at what it believed was 19:38, that lock was two
+minutes away. It was 19:28. Twelve minutes were left, one of them went to writing
+a failure narrative, and the slate delivered nothing. A reading printed by the
+same call as the build cannot be stale by more than that call.
+
+**On a refusal, read `feasibility.checks` where `passed=False` FIRST, before
+`errors[]`.** `build_slate.py` prints them to stderr on every refusal now, ahead
+of the hint and the clock, so this needs no discipline — but read them there
+rather than scrolling to `errors[0]` out of habit. The reason is a whole lost
+slate: on 1940_9g `errors[0]` named `max_sp_pair_repetition` on four consecutive
+builds, which is a count over the BANK, while the one failing SLATE check
+(`shared_players_floor`, carrying `remedy: raise max_shared_players to >= 7`)
+never appeared in `errors[]` at all. The session escalated the cap 1 -> 2 -> 10
+and grew the bank twice, spending ten minutes of a twenty-three minute window on
+a check that was passing. Since R286 the refusal leads with the failing check and
+subordinates the bank count, so `errors[0]` is now the right thing to read — but
+the artifact is still the authority and the check list is still where the remedy
+is.
+
+**A slate-level check and a bank-level count are different objects.** A failing
+`feasibility.checks` entry is arithmetic about the SLATE: no bank growth can
+clear it, so fix it first. A `BANK-LEVEL` line in `errors[]` is arithmetic about
+the candidates this slice happened to build, and growing the bank is the right
+first move against it. The refusal now labels which is which; do not treat them
+as the same lever.
+
 ## Multi-session check, before anything else
 
 CLAUDE.md carries the multi-session contract; a build session is BUILD,
@@ -955,7 +983,7 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 27 modules, 1386 tests
+python tools/audit.py --run-tests --terse    # expect PASS v2.26.0, 27 modules, 1645 tests
 ```
 
 When the skill or its scripts change, run the fixture evals too (not part of

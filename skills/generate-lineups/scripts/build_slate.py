@@ -1528,6 +1528,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 feed: dict, deadline: float) -> tuple[int, dict]:
     from mlb_engine.intake.live_data_adapters import build_slate_pool
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
+    # R288: the engine's own default, read rather than restated, so the brief's
+    # `applied` cannot disagree with what the solver did.
+    from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
     from mlb_engine.pipeline.execution_pipeline import (
         _assemble_projection_frame, apply_leverage_ownership, run_slate,
     )
@@ -1817,6 +1820,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             # runs. Both had to be wired or --leverage would be a no-op on
             # whichever path a given slate's clock happened to choose.
             leverage=leverage,
+            # R288: same reason as leverage above -- the sliced bank is what most
+            # builds deliver from, so a control wired only to the auto path is a
+            # silent no-op on whichever path the clock happens to choose.
+            max_opposing_hitters_per_sp=getattr(
+                args, "max_opposing_hitters_per_sp", None),
         )
         bank_report["budget_floored"] = bank_budget_floored
         # F15: score each contest shape the reserved CSV actually contains. A
@@ -1956,7 +1964,20 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # enriched projections and then certify against unenriched ones.
         **enrich_kwargs,
         bank_time_budget_s=run_bank_budget,
-        portfolio_controls_override=args.controls_override,
+        # R288. The allowance rides portfolio_controls, not just the bank
+        # parameter, because the EXPORT validator grades the delivered file
+        # against `controls` and would otherwise reject a raised build with a
+        # line that reads like a DK rule. That is the fifth member of the class
+        # and it is the one that made the control unusable end to end. Merged
+        # under any explicit --controls-override, so an operator who sets the key
+        # both ways gets their own value rather than the flag's.
+        portfolio_controls_override={
+            **({"max_opposing_hitters_per_sp":
+                int(args.max_opposing_hitters_per_sp)}
+               if getattr(args, "max_opposing_hitters_per_sp", None) is not None
+               else {}),
+            **(args.controls_override or {}),
+        } or None,
         leverage=leverage or None,
         **slate_kwargs,
     )
@@ -2007,6 +2028,48 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # be read without re-deriving them. That is R98(4) on the REFUSAL path
         # only; carrying them into the certified brief beside
         # controls_override_applied is the open half and stays in the backlog.
+        # R286(b), 2026-09-01. The failing checks print FIRST, before the hint
+        # and before anything else on this path, because O4 of the 1940_9g
+        # post-mortem is that the answer was in the artifact the whole time and
+        # the operator read `errors[]` eight times without ever printing
+        # `feasibility`. SKILL.md now instructs a session to read these first;
+        # printing them makes the instruction unnecessary, which is the stronger
+        # form. Two lines, stderr, no JSON parsing required.
+        failing_checks = [c for c in (feas.get("checks") or [])
+                          if c.get("passed") is False]
+        if failing_checks:
+            print(f"FEASIBILITY: {len(failing_checks)} slate-level check(s) FAILED "
+                  f"-- read these before errors[]:", file=sys.stderr)
+            for check in failing_checks:
+                print(f"  {check.get('name')}: {check.get('detail')}"
+                      + (f"  REMEDY: {check.get('remedy')}"
+                         if check.get("remedy") else ""), file=sys.stderr)
+        else:
+            print("FEASIBILITY: no slate-level check failed; the bind is the "
+                  "interaction of the active controls against this bank",
+                  file=sys.stderr)
+        # R286(c). The clock, on the refusal, from the clock. O1 of the same
+        # post-mortem: the session inferred elapsed time from turn count, decided
+        # lock was two minutes away when it was twelve, and stopped building. A
+        # reading printed by the refusal itself cannot be stale by more than the
+        # call that produced it.
+        # `clock` is the pool's own, assigned at the top of run_classic from the
+        # salary file's Game Info. Read it rather than reaching into the result:
+        # the result's copy is absent on some refusal paths and the salary file
+        # is present on all of them.
+        if clock.get("available"):
+            payload["slate_clock"] = {
+                "first_lock_utc": clock.get("first_lock_utc"),
+                "minutes_to_deadline": clock.get("minutes_to_deadline"),
+                "past_deadline": clock.get("past_deadline"),
+                "buffer_minutes": clock.get("buffer_minutes"),
+            }
+            print(f"CLOCK: first lock {clock.get('first_lock_utc')}  minutes to the "
+                  f"T-{clock.get('buffer_minutes', 5)} deadline: "
+                  f"{clock.get('minutes_to_deadline')}"
+                  + ("  PAST THE DEADLINE -- the best legal file is the "
+                     "deliverable and certification is a bonus"
+                     if clock.get("past_deadline") else ""), file=sys.stderr)
         hint = infeasibility_hint(feas, bank_report)
         if hint:
             payload["hint"] = hint
@@ -2140,6 +2203,20 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R246. On every Classic brief, `applied: false` when nothing was asked
         # for, so "was the ownership prior in this build" has an answer.
         "leverage": leverage_brief,
+        # R288. On EVERY Classic brief, including the default, because "did this
+        # build allow hitters facing its own arms" has to be answerable from the
+        # artifact rather than from the absence of a key -- R237's rule, and the
+        # reason R238 has three sightings. `requested: null` means the flag was
+        # not passed and `applied` is the engine default the build actually ran.
+        "anti_correlation": {
+            "requested": getattr(args, "max_opposing_hitters_per_sp", None),
+            "applied": (getattr(args, "max_opposing_hitters_per_sp", None)
+                        if getattr(args, "max_opposing_hitters_per_sp", None)
+                        is not None else ANTI_CORRELATION_DEFAULT_MAX),
+            "unit": "hitters facing ONE rostered SP; per-lineup worst case is "
+                    "twice this on Classic",
+            "note": "a CONVENTION about negative correlation, not a DK rule",
+        },
         "enrichment": summarize_enrichment(
             reference["status"], enrichment, f4_report, degraded_reason,
             f1_report, f5_report, projections=projections),
@@ -3589,6 +3666,21 @@ def main() -> int:
                          "The prediction is an UNGRADED prior whose ordering is "
                          "what has been measured, never an ROI, win-rate or "
                          "probability claim.")
+    # R288. The anti-correlation convention, settable. Default None means the
+    # engine default (0), which is exactly what the unconditional wall enforced.
+    ap.add_argument("--max-opposing-hitters-per-sp", dest="max_opposing_hitters_per_sp",
+                    type=int, default=None,
+                    help="Classic only: how many hitters facing ONE rostered SP "
+                         "a lineup may carry. Default 0, which is the behaviour "
+                         "the engine had as an unconditional constraint. PER SP, "
+                         "so a Classic lineup holding two arms has a per-lineup "
+                         "worst case of twice this. DraftKings does NOT prohibit "
+                         "the construction -- 18.7%% of resolvable Classic entries "
+                         "in this repo's archive carry one and contest 192464310's "
+                         "top three all did -- so this is a CONVENTION about "
+                         "negative correlation that the session may override on "
+                         "judgment, recording the value and the reason in the "
+                         "brief (CLAUDE.md Autonomy).")
     ap.add_argument("--ownership-pred", dest="ownership_pred", default=None,
                     help="name the ownership prediction file --leverage should "
                          "read, when the default resolution is ambiguous.")
@@ -3716,6 +3808,22 @@ def main() -> int:
     # and its bank is `build_showdown_bank`, which builds no MILP row for
     # either constraint; accepting the flag there would be the same silent
     # no-op R242 is filed on. Before staging, and symmetric with --projections.
+    # R288, same shape and the same reason: the control is wired into the Classic
+    # bank solve, Showdown's bank is build_showdown_bank and builds no such row,
+    # so accepting the flag there would be R242's silent no-op with an operator
+    # reading the delivered lineups as having honoured it.
+    if (getattr(args, "max_opposing_hitters_per_sp", None) is not None
+            and contest == "showdown"):
+        print(json.dumps({
+            "status": "anti_correlation_control_not_supported_on_showdown",
+            "max_opposing_hitters_per_sp": args.max_opposing_hitters_per_sp,
+            "note": ("--max-opposing-hitters-per-sp forwards a constraint to the "
+                     "Classic bank solve. Showdown does not pass through "
+                     "run_slate and build_showdown_bank emits no opposing-hitter "
+                     "row, so nothing would change and the brief would say "
+                     "otherwise. Nothing was staged."),
+        }, indent=1))
+        return 4
     if getattr(args, "leverage", None) and contest == "showdown":
         print(json.dumps({
             "status": "leverage_not_supported_on_showdown",

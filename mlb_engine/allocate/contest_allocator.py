@@ -780,9 +780,133 @@ def _is_cash_only(entries: Sequence[Mapping[str, Any]]) -> bool:
     )
 
 
+# R286, 2026-09-01. The infeasibility message is rendered in ONE place and it
+# leads with the SLATE-level check that failed, never with a bank-level finding
+# about a control whose slate check passed.
+#
+# The 1940_9g cost, and the shape is worth stating because neither half was
+# lying. `_diagnose_binding_constraints` above is a counting argument on the BANK
+# as handed in: 12 sampled SP pairs x cap 2 = 24 < 37 entries, true. The
+# checkpoint's `sp_pair_capacity` check is the same arithmetic on the SLATE: 113
+# viable pairs x cap 2 = 226 >= 37, also true. So `errors[0]` named
+# `max_sp_pair_repetition` on four consecutive builds while the ONE failing
+# check, `shared_players_floor`, carried its own arithmetic remedy ("raise
+# max_shared_players to >= 7") and never appeared in `errors[]` at all. The
+# operator escalated the sampled cap 1 -> 2 -> 10 and grew the bank twice,
+# because that is what errors[0] and the FIRST REMEDY line together told him to
+# do, and no amount of bank growth can clear a slate floor.
+#
+# Two orderings follow from that and both are load-bearing:
+#   1. A failing slate check is PRIOR to every bank finding. It is an
+#      impossibility of the slate, so it survives any bank; a bank finding is a
+#      fact about candidates that another slice can change.
+#   2. "no single control is arithmetically binding ... the interaction is" may
+#      only be said when no slate check failed. In `_b7` it was said with
+#      `shared_players_floor` failing, which is the same defect wearing the
+#      reassuring message instead of the misleading one. That case is why this
+#      guard is not just a reordering.
+#
+# Checks arrive already computed by their one owner, `_feasibility_report`; this
+# function reads `passed` and `remedy` and computes no floor of its own, so there
+# is no second implementation of the arithmetic to drift (R167's class).
+SLATE_LEVEL_PREFIX = "SLATE-LEVEL structural check"
+BANK_LEVEL_PREFIX = "BANK-LEVEL count against the candidates handed in"
+
+# R286. Threading a verdict computed at the checkpoint into a function that
+# re-enters itself with RELAXED controls is only safe while the relaxations touch
+# nothing the verdict was computed from. These two sets say which is which as
+# data, and `test_checkpoint_verdicts_cannot_go_stale_across_a_ladder_re_entry`
+# asserts they stay disjoint -- so a fourth ladder that ever relaxes
+# `max_shared_players` or an exposure cap fails a test here instead of silently
+# reporting a stale check as the bind. The alternative was recomputing the floors
+# in this module, which is the duplicate-arithmetic failure R167 is filed on.
+CHECKED_CONTROLS = frozenset({
+    "max_sp_pair_repetition", "max_shared_players",
+    "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct",
+    "max_player_exposure_pct",
+})
+LADDER_RELAXED_CONTROLS = frozenset({
+    "max_candidate_reuse", "five_stack_share_quota", "primary_stack_min_size",
+})
+
+
+def failing_feasibility_checks(
+    feasibility_checks: Optional[Sequence[Mapping[str, Any]]],
+) -> List[Mapping[str, Any]]:
+    """The checks whose ``passed`` is exactly False, in the order given.
+
+    ``passed is None`` means the structural inputs were unavailable and is NOT a
+    failure -- conflating "not checked" with "checked and failed" is R237's rule,
+    and here it would invent a slate impossibility out of a missing input and
+    send the operator to raise a control that was never binding.
+    """
+    out: List[Mapping[str, Any]] = []
+    for check in (feasibility_checks or []):
+        if not isinstance(check, Mapping):
+            continue
+        if check.get("passed") is False:
+            out.append(check)
+    return out
+
+
+def compose_infeasibility_errors(
+    binding: Sequence[str],
+    controls: Mapping[str, Any],
+    bank_flag: str,
+    feasibility_checks: Optional[Sequence[Mapping[str, Any]]] = None,
+) -> List[str]:
+    """The one renderer for a PROVEN-infeasible joint allocation.
+
+    Order: every failing slate-level check first, each naming itself and its own
+    remedy; then every bank-level finding, labelled as such; then, only when no
+    slate check failed AND no bank finding was made, the interaction message.
+
+    With no ``feasibility_checks`` supplied this returns exactly what the two
+    inline branches it replaced returned, byte for byte, which is what keeps the
+    plan-time leg (`_plan_joint_allocation`, which passes no feasibility inputs)
+    and the frozen golden replay unmoved.
+    """
+    failing = failing_feasibility_checks(feasibility_checks)
+    lines: List[str] = []
+    for check in failing:
+        name = str(check.get("name") or "unnamed_check")
+        detail = str(check.get("detail") or "").strip()
+        remedy = str(check.get("remedy") or "").strip()
+        text = f"entry-level joint MILP proven infeasible: {SLATE_LEVEL_PREFIX} {name}"
+        if detail:
+            text += f": {detail}"
+        if remedy:
+            text += f" -- REMEDY: {remedy}"
+        text += (". This is arithmetic about the SLATE, so no bank growth and no "
+                 "further search can clear it; fix this before reading anything "
+                 "below.")
+        lines.append(text)
+    if binding:
+        label = f"{BANK_LEVEL_PREFIX}, " if failing else ""
+        lines.extend(
+            f"entry-level joint MILP proven infeasible: {label}{b}{bank_flag}"
+            for b in binding
+        )
+    elif not failing:
+        lines.append(
+            "entry-level joint MILP proven infeasible: no single control is "
+            "arithmetically binding against this bank, so the interaction of "
+            "the active controls is. Active: "
+            + ", ".join(
+                f"{k}={controls.get(k)}" for k in sorted((
+                    "max_player_exposure_pct", "max_pitcher_exposure_pct",
+                    "max_primary_stack_exposure_pct", "max_sp_pair_repetition",
+                    "max_shared_players", "max_candidate_reuse",
+                )) if controls.get(k) is not None
+            ) + bank_flag
+        )
+    return lines
+
+
 def _infeasibility_remedies(
     bank_report: Optional[Mapping[str, Any]],
     binding: Sequence[str],
+    feasibility_checks: Optional[Sequence[Mapping[str, Any]]] = None,
 ) -> List[str]:
     """R98(2). The ordered remedies for a PROVEN-infeasible joint allocation.
 
@@ -797,8 +921,24 @@ def _infeasibility_remedies(
     Returns [] when there is nothing honest to add: an absent or silent
     ``bank_report`` is not evidence that the bank was complete, and this
     function never guesses which it was.
+
+    R286. ``feasibility_checks`` outranks the bank-growth remedy when one of them
+    FAILED. Bank growth is the right first move against a bank-limited count and
+    it is the wrong move against a slate floor: on 1940_9g the operator grew the
+    bank twice on this line's instruction while `shared_players_floor` was
+    failing, which no bank can fix. So a failing slate check demotes the growth
+    line and says why, rather than the growth line being deleted -- the bank may
+    still be a slice, and that is still true and still worth knowing second.
     """
     lines: List[str] = []
+    slate_failed = bool(failing_feasibility_checks(feasibility_checks))
+    if slate_failed:
+        lines.append(
+            "FIRST REMEDY, raise the control the failing SLATE-LEVEL check names "
+            "above: it is arithmetic about this slate and neither a bigger bank "
+            "nor a looser cap elsewhere can satisfy it. Everything below is "
+            "secondary and none of it clears that check."
+        )
     exhausted = (bank_report or {}).get("job_list_exhausted")
     if exhausted is False:
         attempted = (bank_report or {}).get("jobs_attempted")
@@ -811,8 +951,9 @@ def _infeasibility_remedies(
         if (bank_report or {}).get("budget_floored"):
             floored = (" and its time budget bottomed out on the engine floor "
                        "rather than the requested window")
+        bank_label = "NEXT REMEDY" if slate_failed else "FIRST REMEDY"
         lines.append(
-            f"FIRST REMEDY, grow the bank: the job list was NOT exhausted{scope}"
+            f"{bank_label}, grow the bank: the job list was NOT exhausted{scope}"
             f"{floored}, so this proof is about the candidates that were built, "
             f"not about the slate. Re-run the same build command; it exits 10 and "
             f"resumes into the same cache until the job list is exhausted. Do not "
@@ -2223,6 +2364,7 @@ def select_and_assign_entries(
     bank_report: Optional[Mapping[str, Any]] = None,
     fixed_exposure: Optional[Mapping[str, Any]] = None,
     feasibility_inputs: Optional[Mapping[str, Any]] = None,
+    feasibility_checks: Optional[Sequence[Mapping[str, Any]]] = None,
     _floor_state: Optional[Mapping[str, Any]] = None,
     _reuse_state: Optional[Mapping[str, Any]] = None,
     _quota_state: Optional[Mapping[str, Any]] = None,
@@ -2270,6 +2412,17 @@ def select_and_assign_entries(
     ``bank_report``: it lets a binding-constraint finding name the bank as the
     limiter when the slate itself could support more than this bank sampled.
     Omitting it costs nothing.
+
+    ``feasibility_checks`` (R286) is ``_feasibility_report(...)["checks"]`` -- the
+    checkpoint's already-computed verdicts, not a second implementation of the
+    arithmetic. Read on the proven-infeasible path only, where a check whose
+    ``passed`` is False is a SLATE impossibility and therefore prior to every
+    count this module can take over a bank. Omitting it returns the pre-R286
+    message byte for byte. The allocator's three relaxation ladders
+    (``max_candidate_reuse``, the five-stack quota, the primary-stack floor) move
+    no control any of these checks reads, so a checkpoint verdict cannot go stale
+    across a re-entry; ``CHECKED_CONTROLS`` and ``LADDER_RELAXED_CONTROLS`` state
+    that as data and a test asserts they stay disjoint.
 
     ``controls['max_candidate_reuse']`` (R116, v1.15) is how many entries may
     share one lineup SIGNATURE across the whole file. Absent, it now DEFAULTS to
@@ -2807,29 +2960,23 @@ def select_and_assign_entries(
                 "relaxing any control]"
                 if (bank_report or {}).get("job_list_exhausted") is False else ""
             )
-            if binding:
-                errors = [f"entry-level joint MILP proven infeasible: {b}{bank_flag}"
-                          for b in binding]
-            else:
-                errors = [
-                    "entry-level joint MILP proven infeasible: no single control is "
-                    "arithmetically binding against this bank, so the interaction of "
-                    "the active controls is. Active: "
-                    + ", ".join(
-                        f"{k}={controls.get(k)}" for k in sorted((
-                            "max_player_exposure_pct", "max_pitcher_exposure_pct",
-                            "max_primary_stack_exposure_pct", "max_sp_pair_repetition",
-                            "max_shared_players", "max_candidate_reuse",
-                        )) if controls.get(k) is not None
-                    ) + bank_flag
-                ]
+            # R286. One renderer, and the failing SLATE check leads it. Before
+            # this call the two branches lived inline here and neither could see
+            # `feasibility.checks`, so `errors[0]` was composed entirely from a
+            # count over the bank while the checkpoint's own failing check sat
+            # in the same brief with its remedy attached.
+            errors = compose_infeasibility_errors(
+                binding, controls, bank_flag,
+                feasibility_checks=feasibility_checks,
+            )
             # R98(2). Appended, never substituted: the arithmetic above is what
             # the solver proved and it stays first among the facts. What follows
             # is what to DO about it, and the order matters more than the words
             # -- on 1910_9g both lines above were true and the operator still
             # reached for the wrong lever, because nothing said the bank was
             # 1.8% explored.
-            errors = errors + _infeasibility_remedies(bank_report, binding)
+            errors = errors + _infeasibility_remedies(
+                bank_report, binding, feasibility_checks=feasibility_checks)
 
         # R116. The engine's own default goes FIRST, before the floor ladder
         # steps and before the refusal is written. The ordering is the point: a
@@ -2847,6 +2994,7 @@ def select_and_assign_entries(
                 _all_candidates, entry_requirements, portfolio_controls,
                 bank_report=bank_report, fixed_exposure=fixed_exposure,
                 feasibility_inputs=feasibility_inputs,
+                feasibility_checks=feasibility_checks,
                 _floor_state=_floor_state,
                 _reuse_state={
                     "rung_index": reuse_rung_index + 1,
@@ -2901,6 +3049,7 @@ def select_and_assign_entries(
                     _all_candidates, entry_requirements, portfolio_controls,
                     bank_report=bank_report, fixed_exposure=fixed_exposure,
                     feasibility_inputs=feasibility_inputs,
+                    feasibility_checks=feasibility_checks,
                     _floor_state=_floor_state,
                     _reuse_state=_reuse_state,
                     _quota_state={
@@ -2935,6 +3084,7 @@ def select_and_assign_entries(
                     _all_candidates, entry_requirements, portfolio_controls,
                     bank_report=bank_report, fixed_exposure=fixed_exposure,
                     feasibility_inputs=feasibility_inputs,
+                    feasibility_checks=feasibility_checks,
                     # R116: the reuse state rides the floor's re-entry too, or a
                     # ladder step would silently re-add the default this solve
                     # already proved infeasible and buy an extra round trip per
