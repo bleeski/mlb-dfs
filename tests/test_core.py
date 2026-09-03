@@ -20500,5 +20500,602 @@ class LeveragePassthroughTests(unittest.TestCase):
         self.assertLess(refusal, staging)
 
 
+class LostWindowFlagValueTests(unittest.TestCase):
+    """R296(a)+(b). Five flag VALUES that exited 1 with no brief.
+
+    Every one of these was first READ somewhere inside `run_classic`:
+    `--postures` at the shape-scoring call after the bank spend, `--assume-gates`
+    at the pool-override notice, `--declare-pitcher` inside the
+    `build_slate_pool` call itself, `--leverage` at `dict(args.leverage)`. They
+    aborted with `raise SystemExit(str)` -- exit 1, off the documented
+    0/3/4/5/10 contract, past `run_classic`'s own `except Exception` (SystemExit
+    is not an Exception), with no brief for anyone to read. On 1940_9g's shape
+    that is a lost window: minutes of bank, then a crash.
+
+    Driven through `main()` rather than by calling the parsers, because the
+    decision under test is WHERE the value is read, and a test that calls the
+    parser directly passes whether main() validates or not."""
+
+    _SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r296_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _run(self, extra_argv):
+        """(exit code, parsed stdout payload, whether run_classic was reached).
+
+        `run_classic` and `run_showdown` are both patched to record and fail:
+        reaching either means the value was not checked before the expensive
+        work, which is the whole defect."""
+        import contextlib
+        import io
+        mod = self._module()
+        reached = {"build": False}
+
+        def fake(*_a, **_k):
+            reached["build"] = True
+            return 3, {}
+
+        argv = ["build_slate.py", "--salary", str(self._SALARY),
+                "--entries", str(self._SALARY), "--past-slate-replay",
+                *extra_argv]
+        out, err = io.StringIO(), io.StringIO()
+        with unittest.mock.patch.object(mod, "REPO", self.root), \
+                unittest.mock.patch.object(mod, "run_classic", fake), \
+                unittest.mock.patch.object(mod, "run_showdown", fake), \
+                unittest.mock.patch.object(sys, "argv", argv):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = mod.main()
+        try:
+            payload = json.loads(out.getvalue())
+        except ValueError:
+            payload = {}
+        return code, payload, reached["build"]
+
+    def _assert_refused(self, extra_argv, flag, needle):
+        code, payload, reached = self._run(extra_argv)
+        self.assertEqual(code, 4, f"{flag} did not refuse at exit 4")
+        self.assertFalse(reached, f"{flag} was validated AFTER the build began")
+        self.assertEqual(payload.get("status"), "cli_value_invalid")
+        self.assertEqual(payload.get("flag"), flag)
+        self.assertIn(needle, payload.get("error", ""))
+        self.assertEqual(
+            list(self.root.glob("data/slates/*/DKSalaries*.csv")), [],
+            f"{flag} refused but the salary file was already staged")
+
+    def test_an_unknown_posture_refuses_before_the_pool_build(self):
+        self._assert_refused(["--postures", "192707612=bogus"],
+                             "--postures", "unknown posture 'bogus'")
+
+    def test_a_posture_entry_without_an_equals_refuses(self):
+        self._assert_refused(["--postures", "192707612"],
+                             "--postures", "is not <contest>=<posture>")
+
+    def test_an_unknown_assumed_gate_refuses_before_the_pool_build(self):
+        self._assert_refused(["--assume-gates", "not_a_gate"],
+                             "--assume-gates", "unknown gate 'not_a_gate'")
+
+    def test_a_declared_pitcher_with_no_id_refuses_before_the_pool_build(self):
+        self._assert_refused(["--declare-pitcher", "=viable_bulk_or_alt_sp"],
+                             "--declare-pitcher", "no player ID before")
+
+    def test_a_non_object_controls_override_refuses_rather_than_crashing(self):
+        """`type=json.loads` accepts any JSON. `[1,2]` reached
+        `override.get(key)` as an AttributeError at exit 1 (reproduced at HEAD
+        on 2026-09-03 before this fix)."""
+        self._assert_refused(["--controls-override", "[1, 2]"],
+                             "--controls-override", "got list")
+
+    def test_a_non_object_leverage_refuses_rather_than_crashing(self):
+        """The sibling, and the worse one: `--leverage 5` parsed fine and died
+        at `dict(5)` AFTER the pool build, so the crash cost the pool."""
+        self._assert_refused(["--leverage", "5"], "--leverage", "got int")
+
+    def test_a_string_is_refused_too_not_just_a_list(self):
+        """A quoted JSON string is the shape an operator most easily produces by
+        double-quoting, and `"x".get` is the same AttributeError."""
+        self._assert_refused(["--controls-override", '"max_shared_players"'],
+                             "--controls-override", "got str")
+
+    def test_a_good_object_still_reaches_the_build(self):
+        """The positive control. Without it, refusing every value passes every
+        test above and retires the two flags."""
+        code, _payload, reached = self._run(
+            ["--controls-override", '{"max_shared_players": 8}',
+             "--postures", "192707612=cash"])
+        self.assertTrue(reached, "a legal --controls-override was refused")
+        self.assertEqual(code, 3)
+
+    def test_no_flag_parser_raises_systemexit_any_more(self):
+        """The regression guard on the MECHANISM, not the three instances.
+        SystemExit is not an Exception, so it walks through every
+        `except Exception` handler in the file; a fourth parser added later with
+        `raise SystemExit` would re-open exactly this door."""
+        import ast
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        offenders = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if not (node.name.startswith("parse_")
+                    or node.name.startswith("validate_")):
+                continue
+            for inner in ast.walk(node):
+                if (isinstance(inner, ast.Raise)
+                        and isinstance(inner.exc, ast.Call)
+                        and getattr(inner.exc.func, "id", "") == "SystemExit"):
+                    offenders.append(f"{node.name}:{inner.lineno}")
+        self.assertEqual(offenders, [], f"flag parsers still raise SystemExit "
+                                        f"(exit 1, no brief): {offenders}")
+
+    def test_every_flag_the_validator_covers_is_read_only_after_it(self):
+        """The validator has to be the FIRST reader, or it is decoration.
+        Asserted positionally against `main()` rather than by trusting the call
+        order to stay put."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        validate = src.index("bad_value = validate_cli_values(args)")
+        parse_args = src.index("args = ap.parse_args()")
+        first_stage = src.index("staged_salary = _stage(")
+        self.assertLess(parse_args, validate)
+        self.assertLess(validate, first_stage,
+                        "values are validated after the salary file is staged")
+
+
+class LostWindowExitCodeTests(unittest.TestCase):
+    """R296(h). One refusal on the wrong side of build_slate's own contract."""
+
+    _PATH = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+
+    def test_the_two_supplied_feed_refusals_agree_on_their_exit_code(self):
+        """`supplied_feed_unreadable` returned 4 and `supplied_feed_rejected`
+        returned 3, thirty lines apart, for the same class of fact: the operator
+        named a feed this build cannot use. Exit 3 means BUILT AND REFUSED,
+        which is what `tools/autobuild.py` spends attempts on -- it grows the
+        bank, reads `feasibility`, applies floors. None of that can fix a feed
+        for another slate, and nothing was solved here to refuse."""
+        import ast
+        src = self._PATH.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        lines = src.splitlines()
+
+        def code_after(status: str) -> int:
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Dict):
+                    continue
+                for key, value in zip(node.keys, node.values):
+                    if (isinstance(key, ast.Constant) and key.value == "status"
+                            and isinstance(value, ast.Constant)
+                            and value.value == status):
+                        for line in lines[node.lineno - 1: node.lineno + 40]:
+                            m = re.match(r"^\s*return (\d+)\s*$", line)
+                            if m:
+                                return int(m.group(1))
+            self.fail(f"{status} payload not found")
+
+        self.assertEqual(code_after("supplied_feed_unreadable"), 4)
+        self.assertEqual(code_after("supplied_feed_rejected"), 4,
+                         "a feed for another slate still exits 3, which tells "
+                         "the supervisor to retry against a verdict that does "
+                         "not exist")
+
+    def test_every_refusal_payload_carries_the_slate_date(self):
+        """R296(e), the half that lives in this file. `_decision_log_date` reads
+        `brief['date']` FIRST, so a payload without one sends the supervisor's
+        own post-mortem to a fallback. 25 of the 26 status payloads carry it;
+        the exception is `lineups_feed_unavailable`, which is a note nested in
+        the brief rather than a refusal printed to stdout."""
+        import ast
+        tree = ast.parse(self._PATH.read_text(encoding="utf-8"))
+        missing = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Dict):
+                continue
+            keys = [k.value for k in node.keys
+                    if isinstance(k, ast.Constant) and isinstance(k.value, str)]
+            if "status" not in keys or "date" in keys:
+                continue
+            status = None
+            for key, value in zip(node.keys, node.values):
+                if (isinstance(key, ast.Constant) and key.value == "status"
+                        and isinstance(value, ast.Constant)):
+                    status = value.value
+            if status is not None:
+                missing.append(status)
+        self.assertEqual(sorted(set(missing)), ["lineups_feed_unavailable"],
+                         f"status payloads with no slate date: "
+                         f"{sorted(set(missing))}")
+
+
+class SupervisorLostWindowTests(unittest.TestCase):
+    """R296(d)+(e)+(f). The supervisor CLAUDE.md tells a session to reach for
+    FIRST, and until 2026-09-03 it could not write a decision log at all."""
+
+    def setUp(self):
+        import importlib
+        self.ab = importlib.import_module("tools.autobuild")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.salary = (REPO / "tests" / "fixtures" / "slates"
+                       / "DKSalaries_frozen_2026-07-29.csv")
+
+    def _run(self, side_effect, extra_argv=(), root=None):
+        cmds = []
+
+        def fake_run(cmd, **kwargs):
+            cmds.append(list(cmd))
+            return side_effect(len(cmds), cmd, kwargs)
+
+        argv = ["autobuild.py", "--salary", str(self.salary),
+                "--entries", str(self.salary), *extra_argv]
+        root = root or Path(self.tmp.name)
+        with unittest.mock.patch.object(self.ab, "REPO", root), \
+                unittest.mock.patch.object(self.ab.subprocess, "run", fake_run), \
+                unittest.mock.patch.object(sys, "argv", argv), \
+                unittest.mock.patch.object(self.ab, "assert_classification_in_sync",
+                                           lambda: None):
+            code = self.ab.main()
+        records = []
+        logs = sorted(root.glob("outputs/*/autobuild_decisions.json"))
+        for path in logs:
+            records += json.loads(path.read_text(encoding="utf-8"))["decisions"]
+        return code, records, cmds, logs
+
+    @staticmethod
+    def _proc(returncode, brief=None, stderr=""):
+        return types.SimpleNamespace(
+            returncode=returncode,
+            stdout=json.dumps(brief) if brief is not None else "",
+            stderr=stderr)
+
+    # ---- (e) the path insert -------------------------------------------
+
+    def test_autobuild_puts_the_repo_on_sys_path_like_every_other_engine_caller(self):
+        """R296(e), the actual defect, exercised the way an operator hits it.
+
+        `python tools/autobuild.py` puts `tools/` on sys.path[0] and NOT the
+        cwd, so `from mlb_engine.repo_env import today_et` raised
+        ModuleNotFoundError -- OUTSIDE `_write`'s try block, so the process died
+        at exit 1 with the decision log unwritten, on EVERY terminal exit. This
+        file was the only engine-importing module in tools/ without the insert.
+        Run as a real subprocess from a neutral cwd, because the bug is entirely
+        about sys.path and an in-process test cannot see it.
+
+        It asserts the INSERT, not the date, and that distinction cost a
+        mutation: the first version of this test called `_decision_log_date` and
+        checked the answer, which the R296(e) FALLBACK also satisfies, so
+        reverting the path insert left it green. Two fixes masking each other is
+        exactly the shape this repo keeps paying for. Here the mutation reaches
+        the insert alone; `test_the_decision_log_survives_an_unimportable_repo_env`
+        reaches the guard alone."""
+        import subprocess as sp
+        code = ("import runpy, sys;"
+                "runpy.run_path(%r, run_name='not_main');"
+                "import mlb_engine.repo_env as r;"
+                "print('IMPORTED', r.__file__)" %
+                str(REPO / "tools" / "autobuild.py"))
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        result = sp.run([sys.executable, "-c", code], capture_output=True,
+                        text=True, cwd=self.tmp.name, env=env)
+        self.assertEqual(result.returncode, 0,
+                         f"loading autobuild.py did not make the engine "
+                         f"importable: {result.stderr[-400:]}")
+        self.assertIn("IMPORTED", result.stdout)
+
+    def test_the_decision_log_survives_an_unimportable_repo_env(self):
+        """The guard, and it is not belt-and-braces: the import that crashed was
+        the one placing the log. Whatever happens to it, a log gets written and
+        a fallback date is LABELLED rather than passed off as the schedule's."""
+        root = Path(self.tmp.name)
+        real_import = __import__
+
+        def no_repo_env(name, *rest):
+            if name == "mlb_engine.repo_env":
+                raise ModuleNotFoundError("no module named 'mlb_engine'")
+            return real_import(name, *rest)
+
+        def boom(n, cmd, kwargs):
+            raise subprocess.TimeoutExpired(cmd, 1)
+
+        with unittest.mock.patch("builtins.__import__", no_repo_env):
+            code, records, _cmds, logs = self._run(
+                boom, extra_argv=["--max-attempts", "1"], root=root)
+        self.assertEqual(code, 5)
+        self.assertEqual(len(logs), 1, "the decision log was lost to an import")
+        self.assertEqual([r["action"] for r in records], ["build_timed_out"])
+
+    # ---- (d) off-contract exits ----------------------------------------
+
+    def test_an_off_contract_exit_is_named_with_its_code_and_stderr(self):
+        """R296(d). Any exit outside {0,4,10} fell through to the code-3 handler,
+        which asks the brief what the ENGINE refused for -- and a crash writes no
+        brief, so the log read "refused with no remedy this supervisor may take,
+        errors=[]". That sentence is in outputs/2026-09-01/_ab1.err. It is a
+        crash wearing a refusal's label, one file downstream of where R168 fixed
+        the same shape, and neither fact that identifies the crash was
+        recorded."""
+        def crash(n, cmd, kwargs):
+            return self._proc(2, stderr="build_slate.py: error: unrecognized "
+                                        "arguments: --nope")
+        code, records, _cmds, _logs = self._run(
+            crash, extra_argv=["--max-attempts", "3"])
+        self.assertEqual(code, 3)
+        self.assertEqual([r["action"] for r in records], ["stop"])
+        stop = records[0]
+        self.assertEqual(stop["returncode"], 2)
+        self.assertIn("unrecognized arguments", stop["stderr"])
+        self.assertIn("outside its documented", stop["why"])
+        self.assertNotIn("refused with no remedy", stop["why"],
+                         "a crash is still being reported as a refusal")
+
+    def test_a_contract_exit_is_still_classified_not_swept_up(self):
+        """The positive control. Treating everything as off-contract passes the
+        test above and retires the supervisor's whole remedy path."""
+        def refuse(n, cmd, kwargs):
+            return self._proc(3, brief={
+                "status": "not_certified", "date": "2026-07-29",
+                "solve": {"bank": {"job_list_exhausted": False,
+                                   "jobs_attempted": 40, "jobs_total": 720}}})
+        code, records, cmds, _logs = self._run(
+            refuse, extra_argv=["--max-attempts", "2"])
+        self.assertEqual(code, 3)
+        self.assertIn("grow_bank", [r["action"] for r in records])
+        self.assertEqual(len(cmds), 2, "the bank-growth retry never happened")
+
+    # ---- (f) flush, call budget, resume ---------------------------------
+
+    def test_every_decision_is_on_disk_before_the_next_one_is_taken(self):
+        """R296(f). The log was durable only at terminal exits, so an outer kill
+        -- the call ceiling, a Ctrl-C, the sandbox dying -- lost every decision
+        taken. R212 and R169(a) each fixed one non-flushing RETURN; the class is
+        not the returns, it is that a decision lived in memory only."""
+        root = Path(self.tmp.name)
+        seen = []
+
+        def refuse(n, cmd, kwargs):
+            logs = sorted(root.glob("outputs/*/autobuild_decisions.json"))
+            seen.append(sum(len(json.loads(p.read_text(encoding="utf-8"))
+                                ["decisions"]) for p in logs))
+            return self._proc(10, brief={
+                "status": "partial", "date": "2026-07-29",
+                "solve": {"bank": {"jobs_attempted": 10 * n}}})
+
+        self._run(refuse, extra_argv=["--max-attempts", "3"], root=root)
+        self.assertEqual(seen, [0, 1, 2],
+                         f"decisions were not on disk when the next build "
+                         f"started: {seen}")
+
+    def test_the_call_budget_stops_before_an_attempt_it_cannot_finish(self):
+        """The defaults -- 8 attempts, each up to --per-build-seconds + 90,
+        under a 12-minute wall -- describe a run that CANNOT fit the ~130s
+        Cowork bash ceiling CLAUDE.md pins. Being killed from outside is the one
+        exit that leaves no record of itself, so the supervisor now stops
+        cleanly and says it is resumable."""
+        def grow(n, cmd, kwargs):
+            return self._proc(10, brief={"status": "partial", "date": "2026-07-29"})
+        code, records, cmds, _logs = self._run(
+            grow, extra_argv=["--max-attempts", "5", "--per-build-seconds", "60",
+                              "--call-budget-seconds", "1"])
+        self.assertEqual(code, 5)
+        self.assertEqual(len(cmds), 1,
+                         "the first attempt must always run; refusing to try is "
+                         "the process preventing the lineup")
+        stop = records[-1]
+        self.assertEqual(stop["action"], "stop")
+        self.assertIs(stop["resumable"], True)
+        self.assertIn("--resume", stop["remedy"])
+
+    def test_the_budget_check_never_costs_the_first_attempt(self):
+        """The wall this guard must not become. A budget of zero disables it
+        entirely; a tiny one still gets one honest build."""
+        def grow(n, cmd, kwargs):
+            return self._proc(10, brief={"status": "partial", "date": "2026-07-29"})
+        _code, _records, cmds, _logs = self._run(
+            grow, extra_argv=["--max-attempts", "4", "--call-budget-seconds", "0"])
+        self.assertEqual(len(cmds), 4, "a disabled budget still capped the run")
+
+    def test_resume_restores_the_attempt_count_the_floors_and_the_override(self):
+        """Without it a second call re-derives every structural floor from
+        attempt 1, and each floor was paid for with a full build."""
+        root = Path(self.tmp.name)
+        out = root / "outputs" / "2026-07-29"
+        out.mkdir(parents=True)
+        (out / "autobuild_decisions.json").write_text(json.dumps({
+            "decisions": [
+                {"attempt": 1, "action": "override_pool_blockers", "why": "x"},
+                {"attempt": 2, "action": "apply_structural_floor", "why": "y"},
+            ],
+            "controls": {"user_controls": {}, "effective_controls": {},
+                         "derived_controls": {"max_shared_players": 7}},
+        }), encoding="utf-8")
+
+        def certify(n, cmd, kwargs):
+            return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                        "delivered_sha256": "a" * 64})
+        code, records, cmds, _logs = self._run(
+            certify, extra_argv=["--max-attempts", "8", "--resume"], root=root)
+        self.assertEqual(code, 0)
+        self.assertIn("resumed", [r["action"] for r in records])
+        self.assertEqual([r["action"] for r in records][:2],
+                         ["override_pool_blockers", "apply_structural_floor"],
+                         "the resumed log dropped the history that explains the "
+                         "floors it is carrying")
+        joined = " ".join(cmds[0])
+        self.assertIn('"max_shared_players": 7', joined,
+                      "the derived floor was not carried into the resumed build")
+        self.assertIn("build_asserted.py", joined,
+                      "the pool override was not carried into the resumed build")
+        self.assertEqual(records[-1]["attempt"], 3,
+                         "the resumed run restarted the attempt numbering")
+
+    def test_a_fresh_run_ignores_a_stale_log_unless_resume_is_asked_for(self):
+        """The positive control on the other side: resume is opt-in, so an
+        ordinary run is never silently continued from yesterday's decisions."""
+        root = Path(self.tmp.name)
+        out = root / "outputs" / "2026-07-29"
+        out.mkdir(parents=True)
+        (out / "autobuild_decisions.json").write_text(json.dumps({
+            "decisions": [{"attempt": 6, "action": "apply_structural_floor",
+                           "why": "old"}],
+            "controls": {"derived_controls": {"max_shared_players": 9}},
+        }), encoding="utf-8")
+
+        def certify(n, cmd, kwargs):
+            return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                        "delivered_sha256": "b" * 64})
+        _code, records, cmds, _logs = self._run(certify, root=root)
+        self.assertEqual([r["action"] for r in records], ["certified"])
+        self.assertNotIn("max_shared_players", " ".join(cmds[0]))
+
+
+class SwapAndProbeLostWindowTests(unittest.TestCase):
+    """R296(c)+(g). The other two tools' doors, driven as subprocesses."""
+
+    _SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv"
+    _ENTRIES_HEADER = ("Entry ID,Contest Name,Contest ID,Entry Fee,"
+                       "P,P,C,1B,2B,3B,SS,OF,OF,OF,,Instructions\n")
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def _parent_entries(self) -> Path:
+        path = self.root / "parent_DKEntries.csv"
+        path.write_text(self._ENTRIES_HEADER
+                        + "5200941022,Test Contest,192784653,$0.25,"
+                          ",,,,,,,,,,,x\n", encoding="utf-8")
+        return path
+
+    def _late_swap(self, feed_text, extra=()):
+        import subprocess as sp
+        feed = self.root / "lineups_feed.json"
+        feed.write_text(feed_text, encoding="utf-8")
+        return sp.run(
+            [sys.executable, str(REPO / "tools" / "late_swap.py"),
+             "--date", "2026-07-29", "--salary", str(self._SALARY),
+             "--lineups", str(feed),
+             "--parent-entries", str(self._parent_entries()), *extra],
+            capture_output=True, text=True, cwd=str(REPO))
+
+    def test_a_torn_swap_feed_blocks_by_name_instead_of_tracebacking(self):
+        """R296(c). `json.loads(feed_path.read_text())` was unguarded at
+        late_swap.py:552 -- the FOURTH door of the class R213 closed in
+        build_slate.main(). A torn `lineups_feed.json` is the ordinary
+        consequence of a killed Cowork call, and here it raised JSONDecodeError
+        past every handler: exit 1, no FEED BLOCKER line, no record, on the tool
+        that runs closest to lock."""
+        result = self._late_swap('{"games": [{"away"')
+        self.assertEqual(result.returncode, 3,
+                         f"expected a blocked swap, got {result.returncode}: "
+                         f"{result.stderr[-400:]}")
+        self.assertIn("FEED BLOCKER", result.stderr)
+        self.assertIn("JSONDecodeError", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_the_torn_feed_is_refused_rather_than_treated_as_empty(self):
+        """Deliberately the opposite of solver_probe's answer to the same file.
+        A swap derives its locked-game exclusions from this feed, so an empty
+        one is not a cheaper swap, it is a swap that believes no game started."""
+        result = self._late_swap('not json at all')
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("refused rather than treated as empty", result.stderr)
+
+    def test_a_non_object_controls_override_on_the_swap_refuses_at_exit_4(self):
+        """R296(b)'s third site, which the item named only two of. This is the
+        worst of the three: it is the tool that runs closest to lock."""
+        result = self._late_swap('{"games": []}',
+                                 extra=["--controls-override", "[1, 2]"])
+        self.assertEqual(result.returncode, 4)
+        self.assertIn("JSON OBJECT", result.stderr)
+        self.assertIn("got list", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_the_probe_times_the_projected_pool_when_no_feed_exists(self):
+        """R296(g). `solver_probe` exited 4 "missing inputs" whenever
+        `data/slates/<date>/lineups_feed.json` was absent -- which since R143 is
+        the NORMAL state of a fully DK-covered slate, because DK publishes the
+        batting order in the salary file and nothing writes a feed. CLAUDE.md's
+        session-start step 3 mandates this probe before any build, so the
+        mandated step refused on the ordinary case."""
+        import subprocess as sp
+        result = sp.run(
+            [sys.executable, str(REPO / "tools" / "solver_probe.py"),
+             "--salary", str(self._SALARY),
+             "--lineups", str(self.root / "no_such_feed.json"),
+             "--entries", "2", "--budget", "600", "--json"],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertNotEqual(result.returncode, 4,
+                            f"an absent feed is still 'missing inputs': "
+                            f"{result.stderr[-300:]}")
+        self.assertIn("timing the platoon-projected pool", result.stderr)
+        self.assertIn("absent", result.stderr)
+
+    def test_a_torn_boxscores_file_refuses_instead_of_tracebacking(self):
+        """R296(c), a class member the item did not name. `repair_entry`'s
+        `--feed` read is wrapped and its `--boxscores` read eleven lines below
+        was bare, so a torn boxscore file tracebacks at exit 1 -- inside a lock
+        window, on the tool R272 licensed to run unattended there."""
+        import subprocess as sp
+        torn = self.root / "boxscores.json"
+        torn.write_text('{"games": [{"sides"', encoding="utf-8")
+        result = sp.run(
+            [sys.executable, str(REPO / "tools" / "repair_entry.py"),
+             "--entries", str(self._parent_entries()),
+             "--salary", str(self._SALARY), "--boxscores", str(torn)],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertNotIn("JSONDecodeError", result.stdout)
+        self.assertNotIn("Traceback", result.stderr,
+                         "a torn --boxscores still tracebacks")
+        self.assertIn("cannot be read or parsed", result.stderr)
+        self.assertEqual(result.returncode, 4)
+
+    def test_a_torn_slate_bundle_names_its_remedy_instead_of_tracebacking(self):
+        """R296(c), the third member. Every other `_load_json` in stage_slate is
+        wrapped; the bundle the whole stage depends on was bare, and a truncated
+        `slate_bundle.json` is what a killed fetch leaves behind."""
+        import shutil
+        from tools import stage_slate as ss
+        slates = self.root / "slates"
+        day = slates / "2026-07-29"
+        day.mkdir(parents=True)
+        shutil.copy(self._SALARY, day / "DKSalaries.csv")
+        shutil.copy(self._parent_entries(), day / "DKEntries.csv")
+        (day / "slate_bundle.json").write_text('{"lineups": {"games"',
+                                               encoding="utf-8")
+        with self.assertRaises(ValueError) as caught:
+            ss.stage_slate(date="2026-07-29", slates_dir=slates,
+                           runs_root=self.root / "runs", enrich=False)
+        message = str(caught.exception)
+        self.assertIn("cannot be read or parsed", message)
+        self.assertIn("JSONDecodeError", message)
+        self.assertIn("fetch_slate_bundle.py", message)
+
+    def test_the_probe_still_refuses_a_missing_salary_file(self):
+        """The positive control. The salary file is the pool; without it there
+        is nothing to time, and degrading THAT to an empty answer would be the
+        silent no-op this repo is filed against."""
+        import subprocess as sp
+        result = sp.run(
+            [sys.executable, str(REPO / "tools" / "solver_probe.py"),
+             "--salary", str(self.root / "no_such_salary.csv"),
+             "--lineups", str(self.root / "no_such_feed.json")],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertEqual(result.returncode, 4)
+        self.assertIn("salary file", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

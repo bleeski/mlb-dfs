@@ -408,7 +408,21 @@ def stage_slate(
             f"`python tools/fetch_slate_bundle.py --date {date} "
             f"--out {slate_dir}/slate_bundle.json` first."
         )
-    bundle = _load_json(bundle_path)
+    # R296(c), the third member of the same class. Every OTHER `_load_json` call
+    # in this file is wrapped -- the sniff loop, the platoon override, the
+    # declared-pitcher file -- and this one, the bundle the whole stage depends
+    # on, was bare: a truncated `slate_bundle.json` (the ordinary consequence of
+    # a killed fetch) raised JSONDecodeError instead of the FileNotFoundError
+    # sibling's named remedy eight lines above.
+    try:
+        bundle = _load_json(bundle_path)
+    except (OSError, ValueError) as exc:
+        raise ValueError(
+            f"{bundle_path.name} cannot be read or parsed ({type(exc).__name__}: "
+            f"{exc}). A truncated bundle is what a killed fetch leaves behind; "
+            f"re-run `python tools/fetch_slate_bundle.py --date {date} "
+            f"--out {bundle_path}`."
+        ) from exc
     lineups_feed = bundle.get("lineups")
     if not lineups_feed or not (lineups_feed.get("games")):
         raise ValueError(

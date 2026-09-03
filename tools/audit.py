@@ -502,7 +502,24 @@ EXPECTED_SUITE_COUNTS = {
     # smaller than -- and the Classic brief carrying the count zero or not,
     # which is the 09-02 BUILD fragment's own bar: on the 2138_2g build the
     # brief had NO `pool.excluded_column` key, so absent read as zero.
-    "tests.test_core": 1047,
+    # R296, 2026-09-03: 1047 -> 1075, the twenty-eight that pin the lost-window
+    # doors. Twelve on flag VALUES read in main() before anything is staged
+    # (three parsers that used to `raise SystemExit` past every handler, two
+    # `type=json.loads` flags that accepted `[1,2]` and `5`), including the
+    # positive control that a legal value still reaches the build and the
+    # property test that no flag parser raises SystemExit again. Two on exit
+    # codes: the two supplied-feed refusals now agree on 4, and every status
+    # payload carries the slate date the supervisor's log is placed from. Nine
+    # on the supervisor -- the sys.path insert that made the decision log
+    # writable AT ALL (reached alone, after the first cut was masked by its own
+    # fallback), the fallback that survives an unimportable engine, off-contract
+    # child exits named with returncode and stderr, the per-decision flush, the
+    # call budget that stops before an attempt it cannot finish, the first
+    # attempt that always runs anyway, and resume. Seven on the swap, the
+    # repair tool, stage_slate and the probe: three torn-input doors (two of
+    # which the item did not name) and the probe timing the projected pool
+    # instead of refusing a normal DK-covered slate.
+    "tests.test_core": 1075,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

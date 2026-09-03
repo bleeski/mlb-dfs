@@ -1767,7 +1767,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         leverage, leverage_brief = resolve_leverage(
             args, salary, str(slate_signature(salary).get("tag") or ""))
     except (OSError, ValueError) as exc:
-        print(json.dumps({"status": "leverage_unresolved", "error": str(exc)},
+        print(json.dumps({"status": "leverage_unresolved", "date": args.date,
+                              "error": str(exc)},
                          indent=1))
         return 4, {}
     # The ENGINE's own attach, not a second copy. A first cut inlined it here
@@ -2028,7 +2029,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # it here so the fix is "rerun with --controls-override" instead of a
         # from-scratch debugging session.
         feas = result.get("feasibility") or {}
-        payload = {"status": "not_certified", "errors": result.get("errors"),
+        payload = {"status": "not_certified", "date": args.date,
+                   "errors": result.get("errors"),
                    **detail}
         if not feas.get("passed", True):
             payload["feasibility"] = feas
@@ -2620,6 +2622,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     if sd_excluded["applied"] and len(sd_excluded["legal_teams"]) < 2:
         print(json.dumps({
             "status": "showdown_excluded_column_leaves_one_team",
+            "date": args.date,
             "excluded_column": sd_excluded,
             "remedy": "a DK Showdown lineup must carry both sides of the "
                       "matchup, so an Excluded column that leaves one team "
@@ -2633,7 +2636,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     rows = [r for r in (reserved.get("reserved") or []) if not r.get("is_complete")]
     n_entries = min(args.entries, len(rows)) if args.entries else len(rows)
     if not n_entries:
-        print(json.dumps({"status": "no_blank_reserved_entries"}, indent=1))
+        print(json.dumps({"status": "no_blank_reserved_entries",
+                          "date": args.date}, indent=1))
         return 4, {}
 
     overrides = args.controls_override or {}
@@ -2687,7 +2691,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         try:
             supplied_base, supplied_read = st.read_supplied_base(args.projections)
         except (OSError, ValueError) as exc:
-            print(json.dumps({"status": "projections_unreadable",
+            print(json.dumps({"status": "projections_unreadable", "date": args.date,
                               "projections": str(args.projections),
                               "error": str(exc)}, indent=1))
             return 4, {}
@@ -2709,7 +2713,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                  contest_of_entry=contest_of_entry,
                                  max_cpt_per_contest=cpt_per_contest)
         if any(lu is None for lu in solved):
-            print(json.dumps({"status": "ladder_infeasible",
+            print(json.dumps({"status": "ladder_infeasible", "date": args.date,
                               "unsolved": [t["name"] for t, lu in zip(theses, solved)
                                            if lu is None]}, indent=1))
             return 3, {}
@@ -2729,7 +2733,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                       max_player_exposure_pct=player_cap_pct,
                                       diagnostics=cpt_diagnostics)
         if len(bank) < n_entries:
-            print(json.dumps({"status": "bank_short",
+            print(json.dumps({"status": "bank_short", "date": args.date,
                               "built": len(bank), "needed": n_entries}, indent=1))
             return 3, {}
         bank = bank[:n_entries]
@@ -2737,7 +2741,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
 
     failed = [c for c in certs if not c.get("passed")]
     if failed:
-        print(json.dumps({"status": "not_certified",
+        print(json.dumps({"status": "not_certified", "date": args.date,
                           "errors": [c.get("errors") for c in failed]}, indent=1))
         return 3, {}
 
@@ -2746,6 +2750,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     if len(bank) < len(rows):
         print(json.dumps({
             "status": "bank_short_of_reserved_rows",
+            "date": args.date,
             "reserved_blank_rows": len(rows),
             "lineups_built": len(bank),
             "shortfall": len(rows) - len(bank),
@@ -2773,7 +2778,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments,
                                              promote=False)
     if not write_report.get("passed"):
-        print(json.dumps({"status": "showdown_export_failed",
+        print(json.dumps({"status": "showdown_export_failed", "date": args.date,
                           "errors": write_report.get("errors")}, indent=1))
         return 3, {}
     provisional = unrecorded_name(dest)
@@ -3465,6 +3470,25 @@ VALID_POSTURES = ("cash", "wta_satellite", "single_entry", "small_gpp",
                   "large_gpp", "mme")
 
 
+class CliValueError(ValueError):
+    """A command-line VALUE this build cannot use. R296(a).
+
+    These parsers used to ``raise SystemExit(str)``, which exits 1. Exit 1 is
+    off build_slate's documented 0/3/4/5/10 contract, so every consumer reads it
+    as a crash: ``tools/autobuild.py`` logged it as "refused with no remedy",
+    the SKILL's rerun-on-10 loop cannot classify it, and no brief exists to say
+    what was wrong. R168(a) fixed exactly that shape for the one refusal in
+    ``main()``; this is the same shape reached through a flag value.
+
+    A ValueError rather than a SystemExit for a second reason: SystemExit is not
+    an Exception, so it walked straight through ``run_classic``'s own
+    ``try/except Exception`` handlers. A CliValueError raised anywhere late is
+    caught there and becomes a brief. It should never be raised late, because
+    ``validate_cli_values`` runs in ``main()`` before anything is staged -- but
+    the fallback direction matters and this one fails toward a record.
+    """
+
+
 def parse_postures_arg(value: str | None) -> dict[str, str]:
     """'<id_or_name>=<posture>,...' -> {key: posture}, validated eagerly.
 
@@ -3480,10 +3504,10 @@ def parse_postures_arg(value: str | None) -> dict[str, str]:
         if not item:
             continue
         if "=" not in item:
-            raise SystemExit(f"--postures entry {item!r} is not <contest>=<posture>")
+            raise CliValueError(f"--postures entry {item!r} is not <contest>=<posture>")
         key, posture = (x.strip() for x in item.split("=", 1))
         if posture not in VALID_POSTURES:
-            raise SystemExit(
+            raise CliValueError(
                 f"--postures: unknown posture {posture!r}; valid: "
                 + ", ".join(VALID_POSTURES))
         out[key] = posture
@@ -3525,7 +3549,7 @@ def parse_declared_pitchers(values) -> dict:
         pid, _, role = text.partition("=")
         pid = pid.strip()
         if not pid:
-            raise SystemExit(f"--declare-pitcher {raw!r}: no player ID before '='")
+            raise CliValueError(f"--declare-pitcher {raw!r}: no player ID before '='")
         out[pid] = role.strip() or "declared_probable_sp"
     return out
 
@@ -3581,10 +3605,71 @@ def parse_assume_gates_arg(value: str | None) -> list[str]:
         if not name:
             continue
         if name not in ASSUMABLE_GATES:
-            raise SystemExit(f"--assume-gates: unknown gate {name!r}; valid: "
-                             + ", ".join(ASSUMABLE_GATES))
+            raise CliValueError(f"--assume-gates: unknown gate {name!r}; valid: "
+                                + ", ".join(ASSUMABLE_GATES))
         out.append(name)
     return out
+
+
+# R296(a)+(b). The flags whose VALUES this build validates, and where they were
+# validated before: nowhere main() could see. `--postures` was first parsed at
+# the shape-scoring call AFTER the pool build, the enrichment and the bank spend
+# (and again after it, unguarded); `--assume-gates` at the pool-override notice;
+# `--declare-pitcher` inside the `build_slate_pool` call itself. All three
+# aborted with `raise SystemExit(str)` = exit 1, past every handler, with no
+# brief. On 1940_9g's shape that is a lost window: minutes of bank spent, then a
+# crash, then a supervisor that cannot classify exit 1.
+#
+# `--controls-override` and `--leverage` are `type=json.loads`, which accepts any
+# JSON -- `[1,2]`, `5`, `"x"`, `null` all parse. A non-object then reached
+# `override.get(key)` (AttributeError, exit 1, pre-staging) or `dict(5)`
+# (TypeError, exit 1, AFTER the pool build). `autobuild.lift_controls_override`
+# already refuses non-objects; this is that rule reaching the tool it guards.
+_JSON_OBJECT_FLAGS = (("controls_override", "--controls-override"),
+                      ("leverage", "--leverage"))
+
+
+def validate_cli_values(args) -> dict | None:
+    """Every flag VALUE checked in one place, before anything is staged.
+
+    Returns the refusal payload, or None when the values are usable. The caller
+    prints it and exits 4: bad input, nothing built, nothing staged, no run
+    directory. Exit 4 is what `--lineups`-unreadable and the units check already
+    return for the same class of mistake, and it is on the documented contract,
+    so `tools/autobuild.py` stops with "inputs missing; nothing to decide"
+    instead of logging a crash as a refusal.
+    """
+    for attr, flag in _JSON_OBJECT_FLAGS:
+        value = getattr(args, attr, None)
+        if value is None or isinstance(value, dict):
+            continue
+        return {
+            "status": "cli_value_invalid",
+            "date": getattr(args, "date", None),
+            "flag": flag,
+            "error": (f"{flag} takes a JSON OBJECT; got "
+                      f"{type(value).__name__} ({json.dumps(value)[:120]})"),
+            "note": ("the value parsed as JSON but is not a dict of "
+                     "name -> value, and every reader of this flag subscripts "
+                     "it. Nothing was staged and no run directory was created."),
+        }
+    for parse, attr, flag in (
+            (parse_postures_arg, "postures", "--postures"),
+            (parse_assume_gates_arg, "assume_gates", "--assume-gates"),
+            (parse_declared_pitchers, "declare_pitcher", "--declare-pitcher")):
+        try:
+            parse(getattr(args, attr, None))
+        except CliValueError as exc:
+            return {
+                "status": "cli_value_invalid",
+                "date": getattr(args, "date", None),
+                "flag": flag,
+                "error": str(exc),
+                "note": ("checked in main() before staging, before the pool "
+                         "build and before the bank. Nothing was staged and no "
+                         "run directory was created."),
+            }
+    return None
 
 
 BARE_STAGED_NAMES = {"DKSalaries.csv", "DKEntries.csv"}
@@ -3795,12 +3880,21 @@ def main() -> int:
                          "orders while better information exists.")
     args = ap.parse_args()
 
+    # R296(a)+(b). FIRST, before the clock, before the input existence test and
+    # before any import that can raise. Every one of these values used to be
+    # read for the first time somewhere inside run_classic, so a typo in
+    # `--postures` was worth minutes of bank and then exit 1 with no brief.
+    bad_value = validate_cli_values(args)
+    if bad_value is not None:
+        print(json.dumps(bad_value, indent=1))
+        return 4
+
     started = time.monotonic()
     deadline = started + args.max_seconds
 
     salary, entries = Path(args.salary), Path(args.entries_csv)
     if not salary.exists() or not entries.exists():
-        print(json.dumps({"status": "missing_inputs"}, indent=1))
+        print(json.dumps({"status": "missing_inputs", "date": args.date}, indent=1))
         return 4
 
     # R28(4): the front-door dependency check, before staging and before any
@@ -3814,6 +3908,7 @@ def main() -> int:
     if not deps["passed"]:
         print(json.dumps({
             "status": "missing_dependencies",
+            "date": args.date,
             "missing": deps["missing"],
             "scipy_milp_available": deps["scipy_milp_available"],
             "remedy": deps["remedy"],
@@ -3871,6 +3966,7 @@ def main() -> int:
     if bad_units:
         print(json.dumps({
             "status": "controls_override_bad_units",
+            "date": args.date,
             "controls": bad_units,
             "note": ("these controls are FRACTIONS of the entered set, not "
                      "percentages: 0.45 for 45%. A value above 1.0 caps nobody, "
@@ -3905,6 +4001,7 @@ def main() -> int:
             and contest == "showdown"):
         print(json.dumps({
             "status": "anti_correlation_control_not_supported_on_showdown",
+            "date": args.date,
             "max_opposing_hitters_per_sp": args.max_opposing_hitters_per_sp,
             "note": ("--max-opposing-hitters-per-sp forwards a constraint to the "
                      "Classic bank solve. Showdown does not pass through "
@@ -3916,6 +4013,7 @@ def main() -> int:
     if getattr(args, "leverage", None) and contest == "showdown":
         print(json.dumps({
             "status": "leverage_not_supported_on_showdown",
+            "date": args.date,
             "leverage": args.leverage,
             "note": ("--leverage forwards R154's constraints to the Classic "
                      "bank solve. Showdown does not pass through run_slate and "
@@ -3927,6 +4025,7 @@ def main() -> int:
     if getattr(args, "projections", None) and contest != "showdown":
         print(json.dumps({
             "status": "projections_not_supported_on_classic",
+            "date": args.date,
             "projections": args.projections,
             "contest": contest,
             "note": ("--projections supplies the Showdown Base prior. Classic "
@@ -3948,6 +4047,7 @@ def main() -> int:
             passed_h = (now - first_lock).total_seconds() / 3600.0
             print(json.dumps({
                 "status": "past_slate_locks_passed",
+                "date": args.date,
                 "first_lock": signature["first_lock"],
                 "hours_past_first_lock": round(passed_h, 1),
                 "note": ("this slate's first lock passed "
@@ -4050,6 +4150,7 @@ def main() -> int:
             except (OSError, ValueError) as exc:
                 print(json.dumps({
                     "status": "supplied_feed_unreadable",
+                    "date": args.date,
                     "feed": str(args.lineups),
                     "error": f"{type(exc).__name__}: {exc}",
                     "note": ("--lineups names a file this build cannot read or "
@@ -4078,12 +4179,15 @@ def main() -> int:
             if slate_teams and covered * 2 < len(slate_teams):
                 print(json.dumps({
                     "status": "supplied_feed_rejected",
+                    "date": args.date,
                     "feed": str(args.lineups),
                     "slate_teams": sorted(slate_teams),
                     "covered": covered,
                     "note": "the supplied feed covers under half this draftgroup's "
                             "teams, so it is a feed for a different slate. The "
-                            "staged feed was NOT overwritten.",
+                            "staged feed was NOT overwritten. The salary and "
+                            "entries files are staged; nothing was solved and no "
+                            "run directory was created.",
                 }, indent=1))
                 # R168(a). `return 3, {}` here, in main(). run_classic and
                 # run_showdown legitimately return (code, brief) tuples; main()
@@ -4093,7 +4197,16 @@ def main() -> int:
                 # rerun-on-10 loop, and build_asserted.py, which inherits main().
                 # So the one refusal in this file that says "your feed is for
                 # another slate" arrived looking like a bug in the build.
-                return 3
+                #
+                # R296(h). 3, not 4, and its own SIBLING thirty lines above
+                # disagreed: `supplied_feed_unreadable` returns 4 for the same
+                # class of fact -- the operator named a feed this build cannot
+                # use. Exit 3 means BUILT AND REFUSED, which is what autobuild
+                # spends attempts on: it grows the bank, reads `feasibility`,
+                # applies floors. None of that can fix a feed for another slate,
+                # and nothing was solved here to refuse. 4 is bad input, and 4
+                # stops the supervisor with "inputs missing; nothing to decide".
+                return 4
             staged_feed.write_text(json.dumps(feed), encoding="utf-8")
             feed_note = {"source": str(args.lineups), "age_minutes": feed_age_minutes(feed),
                          "draftgroup_coverage": f"{covered}/{len(slate_teams)}"}

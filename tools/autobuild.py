@@ -44,7 +44,21 @@ this file first, and on 2026-08-29 a session asked Ben a repair question inside
 a lock window that it was entitled to answer itself.
 
 Exit: 0 certified, 3 refused with reasons, 4 bad input, 5 out of time.
-Every decision lands in outputs/<date>/autobuild_decisions.json.
+Every decision lands in outputs/<date>/autobuild_decisions.json, flushed as it
+is taken rather than at the end, so a killed call keeps what it had decided.
+
+R296, 2026-09-03. Three things this docstring promised and the file could not
+deliver. (d) An exit outside {0, 4, 10} fell through to the code-3 handler,
+which asks the BRIEF what the engine refused for -- and a crash writes no brief,
+so the log read "refused with no remedy this supervisor may take, errors=[]"
+with neither the exit code nor the child's stderr recorded. (e) This was the one
+engine-importing module in tools/ that never put REPO on sys.path, so
+`_decision_log_date`'s import raised ModuleNotFoundError OUTSIDE `_write`'s try
+block and the process died at exit 1 with the log unwritten -- on EVERY terminal
+exit, on the invocation SKILL.md prints. (f) The defaults cannot fit one Cowork
+call and the log was durable only at terminal exits, so the outer kill that ends
+the call took every decision with it; `--call-budget-seconds` and `--resume` are
+the answer to the first half and the flush is the answer to the second.
 """
 from __future__ import annotations
 
@@ -60,8 +74,36 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 REPO = Path(__file__).resolve().parents[1]
+
+# R296(e). This file imports `mlb_engine` twice inside `_decision_log_date` and
+# was the ONLY module in tools/ that imports the engine without putting REPO on
+# the path (measured across tools/ and the build script: 20 importers, 19 with
+# the insert, this one without). `python tools/autobuild.py` from the repo root
+# puts `tools/` on sys.path[0] and NOT the cwd, so both imports raised
+# ModuleNotFoundError -- the first swallowed by its own `except Exception`, the
+# second unguarded, escaping `_write` before its try block and taking the whole
+# process down at exit 1 with the decision log unwritten. Every terminal exit,
+# on the invocation SKILL.md prints. Reproduced 2026-09-03.
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+_PYLIBS = REPO / ".pylibs"
+if _PYLIBS.is_dir() and str(_PYLIBS) not in sys.path:
+    sys.path.insert(0, str(_PYLIBS))
+
 BUILD = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
 ASSERTED = REPO / "tools" / "build_asserted.py"
+
+# R296(f). CLAUDE.md pins the safe inner bash budget at 130s. The defaults here
+# (8 attempts, each up to --per-build-seconds + 90 = 110s, under a 12-minute
+# wall) describe a process that CANNOT finish inside one call, and until this
+# change the decision log was flushed only at terminal exits -- so the outer
+# kill that ends the call took every decision with it. First bad moment is the
+# first run that grows the bank once.
+DEFAULT_CALL_BUDGET_S = 130.0
+
+# build_slate.py's documented exit vocabulary. Anything else is a crash wearing
+# a refusal's label; see the off-contract branch in main().
+BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 5, 10)
 
 # lineup_gate_passed derives from the pool report, so overriding a benign pool
 # blocker is not enough on its own: the gate keeps reading the same finding and
@@ -200,6 +242,16 @@ class Decisions:
         # and never the override they displaced.
         self.user_controls: Dict[str, Any] = {}
         self.derived_controls: Dict[str, Any] = {}
+        # R296(f). The log was durable only at terminal exits, so an outer kill
+        # -- the Cowork call ceiling, a Ctrl-C, the sandbox dying -- lost every
+        # decision taken up to that point. R212 and R169(a) each fixed one
+        # non-flushing RETURN; the class is not the returns, it is that a
+        # decision existed in memory only. Every `add` now flushes through this
+        # writer, so the log on disk is never behind the decisions taken.
+        self._writer: Optional[Any] = None
+
+    def attach_writer(self, writer) -> None:
+        self._writer = writer
 
     @property
     def effective_controls(self) -> Dict[str, Any]:
@@ -216,6 +268,8 @@ class Decisions:
                "utc": datetime.now(timezone.utc).isoformat(), **extra}
         self.log.append(rec)
         print(f"[autobuild {attempt}] {action}: {why}", file=sys.stderr)
+        if self._writer is not None:
+            self._writer()
 
 
 def parse_brief(stdout: str) -> Dict[str, Any]:
@@ -245,6 +299,30 @@ def main() -> int:
     ap.add_argument("--per-build-seconds", type=int, default=20)
     ap.add_argument("--stop-after-minutes", type=float, default=12.0,
                     help="wall clock for the whole supervised run")
+    # R296(f). Two clocks, because they answer different questions.
+    # --stop-after-minutes is the SLATE's budget: how long this supervisor may
+    # keep working before the window is gone. --call-budget-seconds is THIS
+    # PROCESS's budget: how long the caller's shell will let it live. They were
+    # the same number implicitly and the implicit answer was wrong, because the
+    # defaults (8 x 110s under a 12-minute wall) cannot fit the ~130s Cowork
+    # bash ceiling CLAUDE.md pins. The supervisor now stops CLEANLY before an
+    # attempt that cannot finish, and --resume picks it back up in the next
+    # call instead of restarting from attempt 1 with the derived floors lost.
+    ap.add_argument("--call-budget-seconds", type=float,
+                    default=DEFAULT_CALL_BUDGET_S,
+                    help=f"wall clock for THIS process, distinct from the slate "
+                         f"budget (default {DEFAULT_CALL_BUDGET_S:.0f}, the safe "
+                         f"inner budget under Cowork's ~180s call ceiling). When "
+                         f"the next attempt cannot finish inside it, the run "
+                         f"stops at exit 5 with resumable=true; re-invoke with "
+                         f"--resume. 0 disables the check.")
+    ap.add_argument("--resume", action="store_true",
+                    help="continue the run recorded in "
+                         "outputs/<date>/autobuild_decisions.json: attempt "
+                         "numbering, the derived structural floors, and whether "
+                         "pool blockers were already overridden. Without it a "
+                         "second call re-derives every floor from attempt 1 and "
+                         "spends the window twice.")
     ap.add_argument("--passthrough", default="",
                     help="extra args forwarded to build_slate. Split with shlex, "
                          "so quote a JSON argument the way you would in a shell: "
@@ -268,6 +346,27 @@ def main() -> int:
     # this file's own docstring promise that every decision lands in
     # outputs/<date>/autobuild_decisions.json.
     dec = Decisions()
+
+    # R296(f). The writer hook, wired before the first `add`. `state` carries the
+    # latest brief by reference so the flush always writes the current one
+    # without threading it through every call site (which is how R212's and
+    # R169(a)'s siblings got missed in the first place).
+    state: Dict[str, Any] = {"brief": {}}
+    dec.attach_writer(lambda: _write(dec, state["brief"], salary=a.salary))
+
+    a._resumed_attempts = 0
+    a._resumed_ignore_pool = False
+    if a.resume:
+        resumed = _resume_state(dec, a.salary)
+        if resumed["attempts_done"]:
+            a._resumed_attempts = resumed["attempts_done"]
+            a._resumed_ignore_pool = resumed["ignore_pool"]
+            dec.add(0, "resumed",
+                    f"continuing a run recorded in {resumed['path']}: "
+                    f"{resumed['attempts_done']} attempts already made, "
+                    f"pool blockers {'already' if resumed['ignore_pool'] else 'not'} "
+                    f"overridden",
+                    **dec.controls_block())
 
     drift = assert_classification_in_sync()
     if drift:
@@ -295,11 +394,43 @@ def main() -> int:
                 "rather than by dropping the operator's whole dict",
                 **dec.controls_block())
 
-    deadline = time.monotonic() + a.stop_after_minutes * 60.0
-    ignore_pool = False
+    started = time.monotonic()
+    deadline = started + a.stop_after_minutes * 60.0
+    call_deadline = (started + a.call_budget_seconds
+                     if a.call_budget_seconds and a.call_budget_seconds > 0
+                     else None)
+    ignore_pool = bool(getattr(a, "_resumed_ignore_pool", False))
+    attempts_done = int(getattr(a, "_resumed_attempts", 0))
     last_brief: Dict[str, Any] = {}
 
-    for attempt in range(1, a.max_attempts + 1):
+    for attempt in range(attempts_done + 1, a.max_attempts + 1):
+        # R296(f). Checked BEFORE the attempt, not after: an attempt started
+        # with 20 seconds of call budget left is killed from outside, which is
+        # the one exit that leaves no record of itself. Stopping cleanly costs
+        # one attempt and keeps the log, the floors and the resume point.
+        build_timeout = a.per_build_seconds + 90
+        # The FIRST attempt of a call always runs. A supervisor that refuses to
+        # try because the budget is tight is the process preventing the lineup,
+        # which is the failure this whole file is filed against; being killed
+        # after one honest attempt is strictly better than delivering nothing
+        # and calling it prudence. The guard exists to stop the SECOND and later
+        # attempts from being cut off mid-build with the log unflushed.
+        first_attempt_of_this_call = attempt == attempts_done + 1
+        if (call_deadline is not None and not first_attempt_of_this_call
+                and time.monotonic() + build_timeout > call_deadline):
+            remaining_slate = max(0.0, deadline - time.monotonic())
+            dec.add(attempt, "stop",
+                    f"this call's budget ({a.call_budget_seconds:.0f}s) cannot "
+                    f"hold another {build_timeout}s attempt; stopping with the "
+                    f"log intact rather than being killed mid-build",
+                    resumable=True,
+                    attempts_made=attempt - 1,
+                    slate_seconds_remaining=round(remaining_slate, 1),
+                    remedy="re-invoke the same command with --resume",
+                    **dec.controls_block())
+            _write(dec, last_brief, salary=a.salary)
+            return 5
+
         if time.monotonic() > deadline:
             # R212. This was the one return in main() that did not flush, so
             # the run that spent its entire window -- precisely the run whose
@@ -374,7 +505,32 @@ def main() -> int:
             return 5
         brief = parse_brief(proc.stdout) or parse_brief(proc.stderr)
         last_brief = brief or last_brief
+        state["brief"] = last_brief
         code = proc.returncode
+
+        # R296(d). Anything outside build_slate's documented vocabulary fell
+        # through to the code-3 handler below, which asks the brief what the
+        # engine refused for -- and on a crash there is no brief, so the log
+        # read "refused with no remedy this supervisor may take, errors=[]".
+        # That sentence appears in outputs/2026-09-01/_ab1.err and it is a
+        # CRASH WEARING A REFUSAL'S LABEL, the exact thing R168 was filed to
+        # stop, reached one file downstream of where R168 fixed it. Worse, the
+        # two facts that identify the crash -- the exit code and what the child
+        # printed -- were recorded nowhere, so the artifact that should explain
+        # the stop cannot even name it. Named, with both facts, before any
+        # classification is attempted.
+        if code not in BUILD_SLATE_CONTRACT_CODES:
+            dec.add(attempt, "stop",
+                    f"{Path(entry).name} exited {code}, outside its documented "
+                    f"{list(BUILD_SLATE_CONTRACT_CODES)} contract. That is a "
+                    f"crash, not a refusal: there is no verdict to classify and "
+                    f"no remedy this supervisor may take. The child's stderr "
+                    f"tail is recorded below.",
+                    returncode=code,
+                    stderr=(proc.stderr or "")[-2000:],
+                    brief_parsed=bool(brief))
+            _write(dec, last_brief, salary=a.salary)
+            return 3
 
         if code == 0:
             dec.add(attempt, "certified",
@@ -476,6 +632,46 @@ def main() -> int:
     return 0 if any(d["action"] == "certified" for d in dec.log) else 3
 
 
+def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:
+    """R296(f). Read back the decision log this run is continuing.
+
+    Restores the three things a second call would otherwise re-derive at the
+    cost of the window: how many attempts were already spent, the structural
+    floors already applied, and whether pool blockers were already overridden.
+    The floors are the expensive one -- each was paid for with a full build.
+
+    Never fatal. A missing or unreadable log means "nothing to resume", which is
+    exactly the fresh-run state, and refusing to start because a resume file is
+    torn would be the process preventing the lineup.
+    """
+    out: Dict[str, Any] = {"attempts_done": 0, "ignore_pool": False, "path": None}
+    date = _decision_log_date({}, salary)
+    path = REPO / "outputs" / str(date) / "autobuild_decisions.json"
+    out["path"] = str(path)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return out
+    records = payload.get("decisions") or []
+    if not isinstance(records, list) or not records:
+        return out
+    attempts = [int(r.get("attempt") or 0) for r in records
+                if isinstance(r, dict) and isinstance(r.get("attempt"), int)]
+    out["attempts_done"] = max(attempts) if attempts else 0
+    out["ignore_pool"] = any(
+        isinstance(r, dict) and r.get("action") == "override_pool_blockers"
+        for r in records)
+    derived = ((payload.get("controls") or {}).get("derived_controls") or {})
+    if isinstance(derived, dict):
+        dec.derived_controls.update(derived)
+    # The prior log is the run's history, so keep it rather than starting a new
+    # file: the flush rewrites the whole document and a resumed run that dropped
+    # the earlier attempts would make the artifact say the floors appeared from
+    # nowhere.
+    dec.log.extend(r for r in records if isinstance(r, dict))
+    return out
+
+
 def _decision_log_date(brief: Dict[str, Any], salary: Optional[str] = None) -> str:
     """Which outputs/<date>/ this decision log belongs in.
 
@@ -504,8 +700,32 @@ def _decision_log_date(brief: Dict[str, Any], salary: Optional[str] = None) -> s
                     return parsed.date().isoformat()
         except Exception:  # noqa: BLE001 - an undatable salary file is not fatal
             pass
-    from mlb_engine.repo_env import today_et
-    return today_et()
+    # R296(e). Guarded, and the guard is not belt-and-braces. This import ran
+    # OUTSIDE `_write`'s try block, so when it raised -- which it did on every
+    # invocation, see the sys.path note at the top of this file -- the whole
+    # process died at exit 1 and the decision log this function exists to place
+    # was never written at all. The path insert is the fix; this is the promise
+    # that no future import failure can cost the log again.
+    #
+    # The fallback is ET, never `date.today()`: R169(b) is on record that the
+    # container's calendar is UTC, so after 8pm ET every pre-brief stop filed
+    # its log under TOMORROW. If zoneinfo cannot answer either, the date is
+    # LABELLED rather than guessed, so a reader never mistakes a fallback for
+    # the schedule's answer.
+    try:
+        from mlb_engine.repo_env import today_et
+        return today_et()
+    except Exception as exc:  # noqa: BLE001
+        print(f"autobuild: repo_env unavailable ({type(exc).__name__}); dating "
+              f"this decision log from zoneinfo", file=sys.stderr)
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+    except Exception as exc:  # noqa: BLE001
+        print(f"autobuild: no ET clock available ({type(exc).__name__}); this "
+              f"decision log is filed under a UTC-dated fallback directory and "
+              f"the date is NOT the schedule's", file=sys.stderr)
+        return f"_undated_utc_{datetime.now(timezone.utc).date().isoformat()}"
 
 
 def _write(dec: Decisions, brief: Dict[str, Any],

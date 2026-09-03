@@ -138,6 +138,20 @@ python <repo>/tools/autobuild.py \
   --per-build-seconds 20 --stop-after-minutes 12
 ```
 
+**Two clocks, and they are not the same number** (R296(f)).
+`--stop-after-minutes` is the SLATE's budget; `--call-budget-seconds` (default
+130, matching CLAUDE.md's inner bash budget) is THIS PROCESS's. The defaults
+describe eight attempts of up to 110s under a twelve-minute wall, which cannot
+fit one Cowork call, so the supervisor stops CLEANLY before an attempt that
+cannot finish, exits 5 with `resumable: true`, and the next call picks it up
+with **`--resume`**: attempt numbering, the structural floors already applied,
+and the pool override are all restored. Without `--resume` a second call
+re-derives every floor from attempt 1, and each floor was paid for with a full
+build. The first attempt of a call always runs whatever the budget says.
+
+Every `dec.add` is flushed to disk immediately, so a killed call leaves the
+decisions it had already taken rather than nothing.
+
 It runs `build_slate.py` in a loop and takes the decisions a human was taking
 by hand: grow the bank on exit 10, apply a feasibility remedy the engine named
 and classified structural, override a pool blocker whose shape is classified
@@ -201,10 +215,24 @@ no byproducts (R28):
   lineup built from it can be entered. Replays and evals pass
   `--past-slate-replay`; a live build never needs it.
 - **`missing_inputs`** — the salary or entries path does not exist.
+- **`cli_value_invalid`** — a flag VALUE this build cannot use: an unknown
+  posture or gate name, a `--declare-pitcher` with no id, or a
+  `--controls-override` / `--leverage` that parsed as JSON but is not an object.
+  Checked in `main()` before anything is staged. Until R296 these were first
+  read inside `run_classic` and aborted at exit 1 with no brief, so a typo in
+  `--postures` cost the whole bank spend and then read as a crash.
 
-A build that runs and then does not certify (exit `3`) now always writes its
-brief, including to an explicit `--brief` path, carrying `status: not_certified`
-with `failed_gates` and `pool_blockers`. A refusal is no longer stdout-only.
+A build that runs and then does not certify writes its brief, including to an
+explicit `--brief` path, carrying `status: not_certified` with `failed_gates`
+and `pool_blockers`. **That is true of the exit-3 sites that BUILT and refused,
+and it is not true of exit 3 as a code** (R296(h), corrected 2026-09-03; this
+paragraph read "exit 3 now always writes its brief" and was false for seven of
+the nine `return 3` sites). Exit 3 means BUILT AND REFUSED, which is what
+`autobuild` spends attempts on: it grows the bank, reads `feasibility`, applies
+floors. A refusal that happened BEFORE any solve — bad input, a feed for another
+slate — is exit `4`, so the supervisor stops instead of retrying against a
+verdict that does not exist. Classifying the remaining pre-build `return 3`
+sites is R290(c).
 
 Inside Cowork's bash sandbox this command usually will not fit in one call. Read
 "Running inside the Cowork sandbox" below before you start, and confirm the salary

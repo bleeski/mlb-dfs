@@ -510,6 +510,18 @@ def main() -> int:
                          "and the run's own looser values have to be restated.")
     args = ap.parse_args()
 
+    # R296(b), third site. `type=json.loads` accepts any JSON, so `[1,2]`, `5`
+    # and `"x"` all parse and then reach `.get()` / `**` as an AttributeError or
+    # TypeError at exit 1. build_slate.py had two of these; this is the third
+    # and the worst, because this is the tool that runs closest to lock.
+    if args.controls_override is not None and not isinstance(
+            args.controls_override, dict):
+        print(f"--controls-override takes a JSON OBJECT; got "
+              f"{type(args.controls_override).__name__} "
+              f"({json.dumps(args.controls_override)[:120]}). Nothing was read "
+              f"and no swap was attempted.", file=sys.stderr)
+        return 4
+
     slate = REPO / "data" / "slates" / args.date
     # R29(4): the salary path was hardcoded to the shared, date-keyed staged
     # name. On 2026-07-29 a concurrent Showdown build for the same date
@@ -549,7 +561,26 @@ def main() -> int:
         return 3
 
     now = dt.datetime.now(dt.timezone.utc)
-    feed = json.loads(feed_path.read_text(encoding="utf-8"))
+    # R296(c). Unguarded until 2026-09-03, and this is the FOURTH door of the
+    # class R213 closed in build_slate.main(): a torn `lineups_feed.json` is the
+    # ordinary consequence of a killed Cowork call, and here it raised
+    # JSONDecodeError past every handler -- exit 1, no `FEED BLOCKER` line, no
+    # record, on the tool that runs closest to lock.
+    #
+    # It BLOCKS rather than degrading to `{"games": []}`, which is the opposite
+    # of what `tools/solver_probe.py` does with the same absent file and is
+    # deliberate: the probe is a timing instrument and a swap computes
+    # locked-game exclusions from this feed. An empty feed there is not a
+    # cheaper swap, it is a swap that believes no game has started.
+    try:
+        feed = json.loads(feed_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"FEED BLOCKER: {feed_path} cannot be read or parsed "
+              f"({type(exc).__name__}: {exc}). A swap derives its locked-game "
+              f"exclusions from this feed, so an unreadable one is refused "
+              f"rather than treated as empty. Re-fetch it, or pass --lineups at "
+              f"a good copy. Nothing was swapped.", file=sys.stderr)
+        return 3
 
     # F16: the feed was read from disk with no check that it describes this
     # slate or this hour. A swap is the one build that runs after lineups move,

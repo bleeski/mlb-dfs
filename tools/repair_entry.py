@@ -607,7 +607,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.boxscores:
         from mlb_engine.intake.live_data_adapters import (
             build_observed_starters, parse_boxscore_feed)
-        payload = _load_json(args.boxscores)
+        # R296(c), a member the item did not name and the R233 sweep found:
+        # the SIBLING read eleven lines above (`--feed`) is wrapped and this one
+        # is bare, so a torn `--boxscores` tracebacks at exit 1 -- inside a lock
+        # window, on the tool R272 licensed to run unattended there. Same door,
+        # same file, one flag over.
+        try:
+            payload = _load_json(args.boxscores)
+        except (OSError, ValueError) as exc:
+            print(f"repair_entry: --boxscores {args.boxscores} cannot be read or "
+                  f"parsed ({type(exc).__name__}: {exc}). Fix the file or drop "
+                  f"the flag; nothing was repaired.", file=sys.stderr)
+            return 4
         raw = payload.get("games") if isinstance(payload, Mapping) else payload
         boxes = [b if "sides" in b else parse_boxscore_feed(b) for b in (raw or [])]
         # The salary PATH, not the parsed dict. R292(b), second half, and it is

@@ -39,6 +39,61 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-03, DEV, claim `engine` (`engine_2026-09-03`, re-taken): **R296 CLOSED
+and migrated to CHANGELOG.md, all eight parts in one commit. Gate
+`PASS v2.26.0 27 modules 1675 tests` -> `PASS v2.26.0 27 modules 1703 tests`
+(`test_core` 1047 -> 1075, `grew`; the other four suites unchanged and all
+`ok`); golden replay 9 tests unmoved; no delivered byte changes, because every
+path touched is a refusal, a log write, or an input read that previously
+raised.**
+
+**Slot 1 KEEPS its position with `R290(c)` alone, and the queue stays at
+sixteen.** The slot was always "R296 first, then R290(c)"; the R246/R164
+precedent applies exactly — renumbering fifteen slots to reclaim half of one
+buys nothing, and R290(c) was always the larger half. Every slot number in the
+notes BELOW this one still reads one higher than the current list; read the
+list.
+
+**The entry's own claims, measured, and it got two wrong in the useful
+direction.** (e) was the one part marked PLAUSIBLE rather than VERIFIED, and it
+is the worst member of the batch: `tools/autobuild.py` was the ONLY
+engine-importing module in `tools/` without `sys.path.insert(REPO)` (20
+importers, 19 with the insert), so BOTH engine imports in `_decision_log_date`
+raised `ModuleNotFoundError` — the salary-date branch had never once worked, and
+the unguarded one sat OUTSIDE `_write`'s try block, so the supervisor died at
+exit 1 with the decision log unwritten on **every terminal exit**, on the
+invocation SKILL.md prints. The item read that as a data-quality nit about
+missing `date` keys. And (a)'s class was three rather than two:
+`--declare-pitcher` is parsed inside the `build_slate_pool` call itself and
+raised the same `SystemExit`.
+
+**The R233 enumeration paid for the tenth consecutive time, on two classes at
+once.** (b) named two `type=json.loads` argparse sites; there are three, and the
+third is `late_swap.py:501`, the tool that runs closest to lock. (c) named
+`late_swap.py:552` as the fourth door of R213's class; an AST sweep for an
+enclosing `try` over all 54 `json.loads(<path>.read_text())` sites in
+`tools/`, `skills/` and `mlb_engine/` returned 13 unguarded, of which two more
+are live members — `repair_entry.py`'s `--boxscores` read, whose own `--feed`
+SIBLING eleven lines above is wrapped, on the tool R272 licensed to run
+unattended inside a lock window; and `stage_slate.py`'s bundle read, the one
+`_load_json` call in that file that is not wrapped. Both closed here; the
+remaining unguarded sites are named in the changelog entry with the reason they
+survive, and one that reads unguarded to the sweep
+(`build_slate.py:2380`) is NOT a member because its caller wraps it.
+
+**Two refusals on the merits, both filed on the stub.** `solver_probe.py`'s
+`--budget` default of 43.0 is a live ninth member of R271's retired-45s class
+and is LEFT IN PLACE, because changing it changes the probe's VERDICT and R271's
+own precedent is that it refused the one instruction that would have changed
+behaviour. And (d)'s exit-10 `jobs_attempted` read stays with R285, whose entry
+names an open question the fix would have to guess past.
+
+**And a mutation SURVIVED first pass because two of this item's own fixes masked
+each other.** M5 reverts the `sys.path` insert and the test stayed green, since
+R296(e)'s FALLBACK produces a valid date without the engine. The test now
+asserts that loading `autobuild.py` makes `mlb_engine` importable — the insert
+alone — and a separate test reaches the guard alone. 15 mutations, 15 killed.*
+
 *2026-09-02 (fourth note this date), DEV, claim `engine` (`engine_2026-09-03`,
 UTC-named; the entries and this note are dated ET, which is what the repo dates
 by): **R292 CLOSED and migrated to CHANGELOG.md. Gate
@@ -1144,13 +1199,22 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R296 first, then R290(c)** — the no-file-at-lock family (P1 S, then P0
-   M-L). Impact: every exit-1 crash, refusal-without-brief, or supervisor stop
-   inside a window is a certain zero; 1940_9g was one. R296's eight doors are
-   XS each and close most of the value this week; R290(c)'s first commit is the
-   classification its entry tabulates (now nine sites plus two conditionals,
-   R296(h)), then the governor. Rider: the solver_probe refusal on a normal
-   slate (R296(g)) is why CLAUDE.md step 3 is skipped in practice.
+1. **R290(c)** — the no-file-at-lock family's remaining half (P0, M-L).
+   **R296 CLOSED 2026-09-03** and migrated; the slot keeps its position rather
+   than renumbering fifteen others, per the R246/R164 precedent, and R290(c) was
+   always the larger half. Impact unchanged: every refusal-without-a-file inside
+   a window is a certain zero, and 1940_9g was one. Its first commit is still
+   the classification its entry tabulates — nine literal `return 3` sites plus
+   two conditionals, re-derived at the R296 head — and then the governor. Two
+   riders R296 hands it. `SKILL.md`'s "exit 3 always writes its brief" is now
+   CORRECTED rather than merely false, and says so, so the classification lands
+   in a document an operator already reads under a clock. And R296(h) settled
+   ONE of the nine by moving `supplied_feed_rejected` to exit 4, which is the
+   worked example of the line R290(c) has to draw eight more times: nothing was
+   solved, so there is no verdict for the supervisor to retry against.
+   Third rider, from R296(g): `solver_probe.py`'s `--budget` default of 43.0 is
+   a live member of R271's retired-45s class, deliberately unchanged because it
+   moves a verdict; decide it here.
 2. **R293 — the bank on every rung** (P1, XS-S). Impact on winning: the
    SP-plus-own-offense stack is the highest-correlation legal construction and
    the augmentation pass cannot reach it (it attempts the barred opponent
@@ -5846,9 +5910,40 @@ Two things the entry did not name, both found in the batch. The proposed (b) con
 
 Remaining, filed not fixed: `check_started_games` has no postponed-game exemption, and it is now in both referees rather than one. `docs/backlog_inbox/2026-09-02_DEV_started-games-has-no-postponed-exemption.md` carries the condition, the input that already exists and is discarded (`resolve_locked_teams` computes `not_locked` and does not return it), and the DK fact nobody has verified. It belongs to R287.
 
-### R296. Lost-window doors, second family: flags validated after the bank spend, non-object JSON crashes, an unguarded feed read on the swap tool, a supervisor that logs a crash as a refusal and cannot fit the call ceiling, a probe that refuses the normal slate, and one exit code on the wrong side of the contract (P1, S total; XS each) | new 2026-09-02, from the greenfield tenth edition (GF10-T8, T9, T14, T11, T12, T13, T15, T17); VERIFIED-read except T12 (PLAUSIBLE); extends R168/R213/R285/R169(b)
+### R296. CLOSED 2026-09-03 -- eight lost-window doors, entry migrated to CHANGELOG.md
 
-(a) `build_slate.py:1618, :1840, :1863, :1934`: `--postures` and `--assume-gates` are parsed inside `run_classic` AFTER the pool build, enrichment and bank spend, and abort via `raise SystemExit(str)` = exit 1 (the `try/except Exception` at :1835-1848 does not catch it). Fix: parse both in `main()` after `parse_args`; refuse at exit 4 with a payload. (b) `build_slate.py:3618-3619, :3754-3756, :2347`: `--controls-override`/`--leverage` are `type=json.loads`; a non-object crashes (`AttributeError` pre-staging; `TypeError` after the pool build). `autobuild.lift_controls_override` already refuses non-objects. Fix: `type=_json_object`. (c) `tools/late_swap.py:552` unguarded `json.loads(feed_path.read_text())`; a torn feed tracebacks at exit 1 with no `FEED BLOCKER` line. R213 closed `build_slate.main()` only; fourth door. (d) `tools/autobuild.py:375-377, :396-473`: any child exit outside {0, 4, 10} is handled as a code-3 refusal ("refused with no remedy, errors=[]", visible in `outputs/2026-09-01/_ab1.err`) with neither `returncode` nor a stderr tail recorded; :393 reads `brief.solve.bank.jobs_attempted` on exit 10 but the partial payload has no `solve` (R285's shape, third reader). Fix: refuse off-contract codes by name with `returncode` and `stderr[-2000:]`. (e) `autobuild.py:496-508, :513`: `_decision_log_date`'s fallback import of `mlb_engine.repo_env` is unguarded and the file never inserts REPO on `sys.path`; 17 of `build_slate.py`'s 20 status payloads carry no `date` (R169(b) added it to three). PLAUSIBLE. Fix: `sys.path.insert`, guard, `"date": args.date` on every payload after :3797. (f) `autobuild.py:302-317, :363-364, :475`: defaults (8 attempts × up to 110 s, 12-minute wall) cannot fit the ~130 s call ceiling CLAUDE.md pins, and the decision log is flushed only at terminal exits, so an outer kill loses every decision; first bad moment is the first run that grows the bank once. Fix: `_write` after every `dec.add`; `--resume`; cap attempts by the ceiling. (g) `tools/solver_probe.py:80-83` exits 4 "missing inputs" when `data/slates/<date>/lineups_feed.json` is absent, the NORMAL state of a fully DK-covered slate (R143 writes no feed); CLAUDE.md step 3 mandates the probe before any build. Fix: absent feed → `{"games": []}`, say so, guard the `json.loads`. (h) `build_slate.py:4007` `supplied_feed_rejected` exits 3 while its sibling `supplied_feed_unreadable` (:3973) exits 4; nothing ran, 4 is the truthful code. Rider to R290(c): nine literal `return 3` sites plus two conditionals at HEAD (1581, 1607, 2110, 2646, 2665, 2673, 2686, 2709, 4007; 2224, 3131), not eight; only 2110 and the conditionals write a brief, so SKILL.md:205-207 "exit 3 now always writes its brief" is false for seven of them.
+All eight shipped in one commit. Gate 1675 -> 1703, golden replay unmoved, no
+delivered byte changes. Two things this entry got wrong, both in the useful
+direction. **(e) was marked PLAUSIBLE and is the worst member**: `autobuild.py`
+was the only engine-importing module in `tools/` without `sys.path.insert(REPO)`,
+so BOTH engine imports in `_decision_log_date` raised `ModuleNotFoundError` --
+the salary-date branch had never once worked, and the unguarded one sat outside
+`_write`'s try block, so the supervisor died at exit 1 with the decision log
+unwritten on EVERY terminal exit, on the invocation SKILL.md prints. Reproduced
+before the fix and after. **And the R233 enumeration paid on two classes**: (b)
+named two `type=json.loads` sites and the class has three (`late_swap.py:501`,
+the tool closest to lock), and (c) named one unguarded feed read where an AST
+sweep for an enclosing `try` over all 54 `json.loads(<path>.read_text())` sites
+found two more live members (`repair_entry.py`'s `--boxscores`, whose own
+`--feed` sibling eleven lines above is wrapped; `stage_slate.py`'s bundle read,
+the one unwrapped `_load_json` in that file). Both closed. 15 mutations, 15
+killed, one only after the test that two of this item's own fixes were masking
+was rewritten to reach the insert alone. Full reasoning in CHANGELOG.md.
+
+**Rider, filed not built: `tools/solver_probe.py`'s `--budget` default of 43.0
+is a live ninth member of R271's retired-45-second class.** Found by (g) and
+LEFT IN PLACE, because changing it changes the probe's VERDICT rather than a
+doc string, and R271's own precedent is that it refused the one instruction that
+would have changed behaviour. CLAUDE.md step 3 now says to pass `--budget`
+explicitly and why. Decide the default with R290(c), which is the other item
+about a refusal an operator reads under a clock.
+
+**Rider, deliberately left to R285: `autobuild.py`'s exit-10 read of
+`brief.solve.bank.jobs_attempted`** against a partial payload with no `solve`
+(named inside (d) as R285's third reader). It returns `None` rather than
+crashing, and R285's entry names an open question about which producer writes
+the "78 of 720 jobs" sentence; writing the shared extractor on the remaining
+guess is R273's failure with the roles reversed.
 
 ### R297. Referee fail-opens: the validator certifies any ten ids when the salary pool is empty; `workflow_gates` overrides ANY derived gate; a crash between `create_run` and the first refusal strands a run at `building`; the preflight's pitcher test is dead on Showdown; `report["passed"]` is frozen before the R176 read-back (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P3, P4, P7, T5, T6); (a) VERIFIED-repro and coordinator re-read at `dk_entries_manager.py:878-947`, rest VERIFIED-read
 

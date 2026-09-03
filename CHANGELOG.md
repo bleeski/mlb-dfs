@@ -25,6 +25,135 @@ performance claim.
 
 ---
 
+## 2026-09-03 — R296: eight lost-window doors, and the supervisor CLAUDE.md sends you to first could not write its decision log at all
+
+**What moved.**
+
+- `skills/generate-lineups/scripts/build_slate.py`. New `CliValueError` and
+  `validate_cli_values`, called in `main()` on the line after `parse_args()`;
+  the three flag parsers raise `CliValueError` instead of `SystemExit`; nine
+  status payloads gained `"date": args.date` and ten more got it in the same
+  pass; `supplied_feed_rejected` returns 4 (a, b, e, h).
+- `tools/autobuild.py`. `sys.path.insert` for `REPO` and `.pylibs` at module
+  level; `Decisions.attach_writer` and a flush on every `add`; an off-contract
+  exit branch recording `returncode` and `stderr[-2000:]`; `_resume_state` and
+  `--resume`; `--call-budget-seconds`; the `today_et` import guarded with a
+  labelled ET fallback (d, e, f).
+- `tools/late_swap.py`. The feed read guarded; `--controls-override` refuses a
+  non-object (b third site, c).
+- `tools/solver_probe.py`. An absent or unreadable feed becomes `{"games": []}`
+  with a printed reason; only a missing salary file is exit 4 (g).
+- `tools/repair_entry.py`, `tools/stage_slate.py`. The two unguarded
+  operator-input reads the enumeration found (c).
+- `tools/audit.py` pin 1047 -> 1075; `CLAUDE.md` step 2's quoted line and step
+  3's probe paragraph; `skills/generate-lineups/SKILL.md`'s exit-3 claim and the
+  supervisor's two clocks.
+
+**Why.** 1940_9g reached lock with no file at all. R290 closed four of the
+defects behind it; this is the second family, and every member is the same
+shape: a fact the operator could have fixed in one move arrives as exit 1 with
+no brief, inside a window, where a crash and a refusal are indistinguishable.
+
+***The item marked (e) PLAUSIBLE and it is the worst thing in the batch, verified
+by running it.*** `tools/autobuild.py` was the ONLY engine-importing module in
+`tools/` without `sys.path.insert(REPO)` — measured, not assumed: 24 files
+mention `mlb_engine`, 20 import it, 19 insert, this one did not, and the other
+four mention it only in comments. `python tools/autobuild.py` puts `tools/` on
+`sys.path[0]` and **not** the cwd, so *both* engine imports in
+`_decision_log_date` raised `ModuleNotFoundError`: the first was swallowed by
+its own `except Exception`, so the salary-file date branch had never once
+worked, and the second was unguarded and sat OUTSIDE `_write`'s try block. The
+process therefore died at exit 1 with the decision log unwritten, on **every
+terminal exit**, on the invocation `SKILL.md` prints. Reproduced at HEAD
+2026-09-03:
+
+    $ python tools/autobuild.py --salary /tmp/nope.csv --entries /tmp/nope2.csv
+    [autobuild 1] stop: inputs missing; nothing to decide
+    ModuleNotFoundError: No module named 'mlb_engine'   (exit 1, no log)
+
+CLAUDE.md's Autonomy section rests on that log being the record of every
+decision, and `docs/backlog.md` slot 1 says to reach for this tool first. After
+the insert, the same command exits 4 and files the log — under `2026-07-27` when
+handed a real salary file, which is the date branch working for the first time.
+
+***The R233 enumeration paid for the tenth consecutive time, on two classes.***
+(b) named two `type=json.loads` argparse sites and the class has **three**:
+`late_swap.py:501` is the third and the worst, because it is the tool that runs
+closest to lock. (c) named `late_swap.py:552` as the fourth door of R213's class;
+sweeping every `json.loads(<path>.read_text())` by AST for an enclosing `try`
+returns 54 sites, 13 unguarded, and **two more are live members** —
+`repair_entry.py`'s `--boxscores` read, whose own `--feed` SIBLING eleven lines
+above is wrapped, on the tool R272 licensed to run unattended inside a lock
+window; and `stage_slate.py`'s bundle read, the one `_load_json` call in that
+file that is not wrapped. Both closed here. The remaining unguarded sites are
+named and deliberately left: `contest_library`, `build_state_manager`,
+`rebuild_registry`, `run_evals` and the untracked `deepen_bank.py` are not
+operator-named inputs on a lock-window path. `build_slate.py:2380` reads
+UNGUARDED to the sweep and is not a member: its caller wraps `resolve_leverage`
+in `except (OSError, ValueError)` and exits 4 with a payload.
+
+***(a)'s class was three, not two, and the third is the one that costs the pool.***
+The item named `--postures` and `--assume-gates`. `--declare-pitcher` is parsed
+inside the `build_slate_pool` call itself and raised the same `SystemExit`. All
+three now raise `CliValueError`, which is a `ValueError` — and that type change
+is load-bearing rather than cosmetic: `SystemExit` is not an `Exception`, so it
+walked straight through `run_classic`'s own `except Exception` at the
+shape-scoring call, where a caught error would have degraded to
+"scoring wta only". The regression guard is on the mechanism (no `parse_*` or
+`validate_*` function raises `SystemExit`), not on the three instances.
+
+***(h) is one line and the doc sentence it falsifies is the point.*** `SKILL.md`
+said "a build that runs and then does not certify (exit 3) now always writes its
+brief". False for seven of the nine `return 3` sites, which is R290(c)'s
+tabulation arriving in a document an operator reads under a clock. Exit 3 means
+BUILT AND REFUSED, which is what `autobuild` spends attempts on: it grows the
+bank, reads `feasibility`, applies floors. None of that can fix a feed for
+another slate, and `supplied_feed_unreadable` thirty lines above already returned
+4 for the same class of fact. Classifying the other eight is R290(c) and is
+deliberately not in this commit.
+
+***(f) is two clocks that were one number implicitly, and the implicit answer was
+wrong.*** The defaults describe 8 attempts of up to 110s under a 12-minute wall,
+against the ~130s inner budget CLAUDE.md pins — so the outer kill that ends the
+call was reachable by construction, and the log was durable only at terminal
+exits, so that kill took every decision with it. R212 and R169(a) each fixed one
+non-flushing RETURN; the class is not the returns, it is that a decision lived
+in memory only, so the flush moved into `Decisions.add`. `--call-budget-seconds`
+stops cleanly before an attempt that cannot finish and `--resume` restores the
+attempt count, the structural floors (each paid for with a full build) and the
+pool override. **The guard exempts the first attempt of a call, deliberately**:
+a supervisor that refuses to try because the budget is tight is the process
+preventing the lineup, and M13 exists to keep it from becoming a wall.
+
+***15 mutations, 15 killed — and the one that survived first pass is the lesson.***
+M5 reverts the `sys.path` insert, and the test still passed, because R296(e)'s
+own FALLBACK produces a valid date without the engine. Two fixes in one item
+masking each other, with the test measuring neither alone. The test now asserts
+that loading `autobuild.py` makes `mlb_engine` importable, which reaches the
+insert by itself, and `test_the_decision_log_survives_an_unimportable_repo_env`
+reaches the guard by itself. M4 printed `ANCHOR MISSING` rather than a verdict,
+which is correct behaviour and the opposite of a no-op reporting SURVIVED.
+Targets restored byte-identical after every batch.
+
+**What did NOT ship, with the reason.** (d) also names `autobuild.py:393`
+reading `brief.solve.bank.jobs_attempted` on exit 10 against a partial payload
+with no `solve` — R285's shape, third reader. It returns `None` through `.get()`
+chains rather than crashing, and R285's entry names an OPEN question about which
+producer writes the "78 of 720 jobs" sentence. Writing the shared extractor on
+the remaining guess is R273's failure with the roles reversed, so it stays with
+R285. And `solver_probe.py`'s `--budget` default of 43.0 is a live member of
+R271's retired-45s class, found by this work and **left in place**: changing it
+changes the probe's VERDICT, and R271's own precedent is that it refused the one
+instruction that would have changed behaviour. CLAUDE.md step 3 now says to pass
+`--budget` explicitly and why. One status payload, `lineups_feed_unavailable`,
+has no `date` on purpose: it is a note nested in the brief, not a refusal
+printed to stdout, and the test asserts that it is the only exception.
+
+**Gate.** `PASS v2.26.0 27 modules 1675 tests` -> `PASS v2.26.0 27 modules 1703
+tests` (`test_core` 1047 -> 1075, `grew`; the other four suites unchanged and all
+`ok`). Golden replay 9 tests unmoved. No delivered byte changes: every path
+touched is a refusal, a log write, or an input read that previously raised.
+
 ## 2026-09-02 — R292: the repair tool writes a DK-valid file, refuses a player whose game is underway, and one `--as-of` reader serves three sibling tools; `verify_export` runs the started-game check
 
 **What moved.**

@@ -424,7 +424,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1675 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1703 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -469,6 +469,17 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
 3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
    before any build. Exit 3 means the bank does not fit: pass `time_budget_s`
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.
+   **Pass `--budget` explicitly. The default is 43, a number inherited from the
+   retired 45-second bash ceiling R271 swept out of five other files, and it is
+   the one member of that class left in place because changing it changes the
+   probe's VERDICT rather than a doc string (R296(g), 2026-09-03).** Use the
+   inner budget the build will actually get, which is 130 on this mount.
+   **An absent `lineups_feed.json` is no longer "missing inputs".** It used to
+   exit 4 there, which since R143 is the NORMAL state of a fully DK-covered
+   slate (DK publishes the batting order in the salary file, so nothing writes a
+   feed) -- the mandated step refused on the ordinary case, which is why this
+   step was skipped in practice. It now times the platoon-projected pool and
+   says so; only a missing SALARY file is exit 4.
 4. Read the ledger Quick Card: ledger/MLB_Classic_Calibration_Ledger.md
    section 0 plus section headers. The full read is post-slate work.
 

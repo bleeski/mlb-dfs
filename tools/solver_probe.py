@@ -77,12 +77,40 @@ def main() -> int:
     args = ap.parse_args()
 
     salary, feed_path = _resolve_inputs(args)
-    if not salary.exists() or not feed_path.exists():
-        print(f"missing inputs: salary={salary.exists()} lineups={feed_path.exists()}",
-              file=sys.stderr)
+    if not salary.exists():
+        print(f"missing input: salary file {salary} does not exist", file=sys.stderr)
         return 4
 
-    pool = build_slate_pool(str(salary), json.loads(feed_path.read_text(encoding="utf-8")))
+    # R296(g). This refused at exit 4 -- "missing inputs" -- whenever the feed
+    # was absent, which since R143 is the NORMAL state of a fully DK-covered
+    # slate: DK publishes the batting order in the salary file's `Starting`
+    # column, `build_slate.py` makes no API call at all, and nothing writes
+    # `data/slates/<date>/lineups_feed.json`. CLAUDE.md's session-start step 3
+    # mandates this probe before any build, so the mandated step refused on the
+    # ordinary case and the step is skipped in practice.
+    #
+    # An absent feed is not missing input here. `build_slate_pool` takes
+    # `{"games": []}` and falls through to the platoon projection, which is what
+    # the probe is timing anyway: this instrument answers "does the bank fit the
+    # budget", and the answer moves with the pool SIZE, not with which nine bats
+    # per team are confirmed. Say which pool was timed rather than implying a
+    # confirmed one.
+    feed: dict = {"games": []}
+    feed_source = "absent"
+    if feed_path.exists():
+        try:
+            feed = json.loads(feed_path.read_text(encoding="utf-8"))
+            feed_source = str(feed_path)
+        except (OSError, ValueError) as exc:
+            feed = {"games": []}
+            feed_source = f"unreadable ({type(exc).__name__})"
+    if feed_source != str(feed_path):
+        print(f"lineups feed {feed_source}: timing the platoon-projected pool. "
+              f"On a DK-covered slate this is the normal state (R143) and the "
+              f"timing still answers whether the bank fits the budget; pass "
+              f"--lineups to time a confirmed pool instead.", file=sys.stderr)
+
+    pool = build_slate_pool(str(salary), feed)
     kwargs = pool["run_slate_kwargs"]
     projections, _ = _assemble_projection_frame(
         str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
