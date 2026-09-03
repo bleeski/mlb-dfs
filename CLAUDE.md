@@ -424,7 +424,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1703 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1723 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -469,11 +469,19 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
 3. `python tools/solver_probe.py --date <date> --entries <n> --budget <s>`
    before any build. Exit 3 means the bank does not fit: pass `time_budget_s`
    and accept a partial bank, or slice with `mlb_engine.optimize.bank_cache`.
-   **Pass `--budget` explicitly. The default is 43, a number inherited from the
-   retired 45-second bash ceiling R271 swept out of five other files, and it is
-   the one member of that class left in place because changing it changes the
-   probe's VERDICT rather than a doc string (R296(g), 2026-09-03).** Use the
-   inner budget the build will actually get, which is 130 on this mount.
+   **The default is now 130, the inner budget a build on this mount actually
+   gets, so `--budget` no longer has to be passed and is an override rather
+   than a correction (R290(c) rider, 2026-09-03).** It was 43 until then, the
+   ninth and last live member of the retired 45-second ceiling; R271 swept the
+   class out of five files and deliberately left this one because changing it
+   changes the probe's VERDICT rather than a doc string. R290(c) is the item
+   about refusals an operator reads under a clock and that is exactly what a
+   stale `EXCEEDS` was: against 43 the probe exited 3 for banks that fit the
+   real window with 87 seconds to spare, and sent a session slicing a bank
+   that never needed slicing. A verdict measured against a ceiling that no
+   longer exists is not conservative, it is wrong. The report and the printed
+   line both name `budget_source` now, so the next `EXCEEDS` can be told from
+   a stale constant without reading this file.
    **An absent `lineups_feed.json` is no longer "missing inputs".** It used to
    exit 4 there, which since R143 is the NORMAL state of a fully DK-covered
    slate (DK publishes the batting order in the salary file, so nothing writes a

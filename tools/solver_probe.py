@@ -13,8 +13,21 @@ change bought to relieve an infrastructure limit that had been misdiagnosed. Thi
 probe answers the question in about ten seconds.
 
 Usage:
-    python tools/solver_probe.py --date 2026-07-22 [--entries 10] [--budget 43]
+    python tools/solver_probe.py --date 2026-07-22 [--entries 10] [--budget 130]
     python tools/solver_probe.py --salary path/to/DKSalaries.csv --lineups feed.json
+
+The default budget is 130s, which is the inner bash budget a build on this
+mount actually gets (CLAUDE.md, Sandbox). It was 43.0 until 2026-09-03 -- the
+ninth and last live member of the retired 45-second ceiling R271 swept out of
+five other files, deliberately left in place there because changing it changes
+this probe's VERDICT rather than a doc string. R290(c) is the item about
+refusals an operator reads under a clock, and that is exactly what this one was:
+against 43 the probe answered EXCEEDS, exit 3, for banks that fit the real
+window with 87 seconds to spare, and it sent a session slicing a bank that
+never needed slicing. A verdict measured against a ceiling that no longer
+exists is not conservative, it is wrong. Pass --budget to measure against a
+different window; the report and the printed line both name the number used and
+where it came from.
 
 Exit codes:
     0  projected build fits the budget
@@ -41,6 +54,13 @@ from mlb_engine.optimize.optimizer_v3 import (  # noqa: E402
     build_multi_lineup, build_single_lineup, resolve_candidate_bank_size,
 )
 from mlb_engine.pipeline.execution_pipeline import _assemble_projection_frame  # noqa: E402
+
+# The one number, named once. CLAUDE.md's Sandbox section: "The inner bash
+# timeout is 130s. One number, this one." Do not re-derive it per call; that is
+# how 43.0 outlived the ceiling it described.
+DEFAULT_BUDGET_S = 130.0
+DEFAULT_BUDGET_SOURCE = ("CLAUDE.md Sandbox: the inner bash budget a build on "
+                         "this mount gets")
 
 
 def _resolve_inputs(args) -> tuple[Path, Path]:
@@ -71,8 +91,13 @@ def main() -> int:
     ap.add_argument("--salary", help="DKSalaries.csv path")
     ap.add_argument("--lineups", help="mlb-lineups feed JSON path")
     ap.add_argument("--entries", type=int, default=10, help="entries to build for")
-    ap.add_argument("--budget", type=float, default=43.0,
-                    help="seconds of compute available per call (default 43)")
+    # R290(c) rider, 2026-09-03. See the module docstring: 43.0 was the retired
+    # 45-second ceiling's ninth member and it moved this tool's verdict, which
+    # is why R271 left it and why this item is the right place to decide it.
+    ap.add_argument("--budget", type=float, default=DEFAULT_BUDGET_S,
+                    help=f"seconds of compute available per call "
+                         f"(default {DEFAULT_BUDGET_S:.0f}, the inner bash "
+                         f"budget a build on this mount gets)")
     ap.add_argument("--json", action="store_true", help="emit JSON only")
     args = ap.parse_args()
 
@@ -169,6 +194,12 @@ def main() -> int:
         "projected_augmentation_s": round(augmentation_s, 1),
         "projected_total_s": round(projected_s, 1),
         "budget_s": args.budget,
+        # R290(c) rider. A verdict states the ceiling it was measured against
+        # and where that number came from, so the next reader of an EXCEEDS can
+        # tell a real overrun from a stale constant.
+        "budget_source": (DEFAULT_BUDGET_SOURCE
+                          if args.budget == DEFAULT_BUDGET_S
+                          else "--budget, supplied by the caller"),
         "fits_budget": fits,
         "slices_needed": max(1, int(projected_s / args.budget) + (0 if fits else 1)),
         "note": "measured on this pool and machine; deterministic review input, "
@@ -183,7 +214,8 @@ def main() -> int:
               f"({built} built)")
         print(f"projected: base bank {base_bank_s:.0f}s + augmentation "
               f"{augmentation_s:.0f}s = {projected_s:.0f}s")
-        print(f"budget {args.budget:.0f}s -> {'FITS' if fits else 'EXCEEDS'}")
+        print(f"budget {args.budget:.0f}s ({report['budget_source']}) -> "
+              f"{'FITS' if fits else 'EXCEEDS'}")
         if not fits:
             print(f"\nrun_slate will not finish in one call. Either:")
             print(f"  - pass time_budget_s={args.budget:.0f} and accept a partial bank, or")

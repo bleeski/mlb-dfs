@@ -21097,5 +21097,394 @@ class SwapAndProbeLostWindowTests(unittest.TestCase):
         self.assertIn("salary file", result.stderr)
 
 
+class RefusalClassificationTests(unittest.TestCase):
+    """R290(c) commit 1, 2026-09-03. The deadline governor's acceptance
+    criterion is a claim over EVERY refusal exit in build_slate.py, and the
+    item that asked for it treated them as one. These tests pin the
+    classification and, more importantly, pin its COMPLETENESS: a refusal exit
+    added later without a class fails here rather than silently becoming
+    something a governor may relax."""
+
+    @staticmethod
+    def _path():
+        return (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+
+    @classmethod
+    def _module(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_refusal_under_test", cls._path())
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @classmethod
+    def _refusal_return_sites(cls):
+        """Every return site that can hand the caller a refusal exit code.
+
+        The question asked is deliberately wider than the item's: it grepped
+        `return 3` and the class is refusal EXITS, so this walks returns whose
+        first tuple element can evaluate to 3 OR 10, literal or through a
+        conditional expression. Exit 4 is excluded and that exclusion is itself
+        pinned by `test_exit_four_is_named_out_of_scope`.
+        """
+        import ast
+        tree = ast.parse(cls._path().read_text(encoding="utf-8"))
+
+        def codes(node):
+            if isinstance(node, ast.Constant) and node.value in (3, 10):
+                return [node.value]
+            if isinstance(node, ast.IfExp):
+                return codes(node.body) + codes(node.orelse)
+            return []
+
+        sites = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Return) and node.value is not None:
+                value = node.value
+                first = (value.elts[0] if isinstance(value, ast.Tuple)
+                         and value.elts else value)
+                if codes(first):
+                    sites.append((node.lineno, codes(first)))
+        return sites
+
+    @classmethod
+    def _stamped_keys(cls):
+        """Every literal key handed to `refusal_stamp(...)` in the source."""
+        import ast
+        tree = ast.parse(cls._path().read_text(encoding="utf-8"))
+        keys = []
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and getattr(node.func, "id", "") == "refusal_stamp"
+                    and node.args
+                    and isinstance(node.args[0], ast.Constant)):
+                keys.append(node.args[0].value)
+        return keys
+
+    def test_every_refusal_exit_is_classified(self):
+        """The N+1 guard, and this repo has found N+1 ten editions running.
+        Counted BOTH directions: no refusal exit without a stamp, and no table
+        row without a site. The item's own table said eight; the measured
+        answer at this head is eleven, because exit 10 refuses too."""
+        mod = self._module()
+        sites = self._refusal_return_sites()
+        stamped = self._stamped_keys()
+        self.assertEqual(
+            len(sites), len(stamped),
+            f"{len(sites)} refusal return sites but {len(stamped)} "
+            f"refusal_stamp() calls; an unclassified refusal exit is the N+1 "
+            f"this table exists to prevent. Sites: {sites}")
+        self.assertEqual(
+            sorted(stamped), sorted(r["key"] for r in mod.REFUSAL_SITES),
+            "REFUSAL_SITES and the stamped call sites disagree")
+        self.assertEqual(len(set(stamped)), len(stamped),
+                         "a refusal key is stamped at two different sites, so "
+                         "one payload's class is describing another site")
+        self.assertEqual(len(mod.REFUSAL_SITES), 11)
+
+    def test_every_refusal_row_carries_a_class_an_authority_and_a_reason(self):
+        mod = self._module()
+        allowed = {mod.REFUSAL_ILLEGAL, mod.REFUSAL_BADLY_SHAPED,
+                   mod.REFUSAL_READ_IT, mod.REFUSAL_SPLIT}
+        for row in mod.REFUSAL_SITES:
+            self.assertIn(row["klass"], allowed, row["key"])
+            self.assertTrue(row["authority"], row["key"])
+            self.assertGreater(len(row["why"]), 80,
+                               f"{row['key']}: a classification without its "
+                               f"evidence is an assertion")
+            self.assertIn(row["exit_code"], (3, 10), row["key"])
+
+    def test_the_two_split_sites_are_the_ones_with_sub_maps(self):
+        """The substantive finding: two exits stand over several failures with
+        different classes, and collapsing either would have made the governor
+        useless (refuse everything) or unsafe (relax a DK rule)."""
+        mod = self._module()
+        split = {r["key"] for r in mod.REFUSAL_SITES
+                 if r["klass"] == mod.REFUSAL_SPLIT}
+        self.assertEqual(split, {"classic_not_certified",
+                                 "classic_verify_failed"})
+
+    def test_every_workflow_gate_is_classified(self):
+        """CLASSIC_GATE_CLASS_DEFAULT is a safety net that must never fire.
+        A gate added to the engine without a row here fails the suite, which is
+        the point: an unclassified gate defaulting to READ-IT is correct but
+        silent, and silent is how this repo loses things."""
+        mod = self._module()
+        from mlb_engine.entries.dk_entries_manager import (
+            POST_EXPORT_GATES, PRE_EXPORT_GATES,
+        )
+        engine_gates = set(PRE_EXPORT_GATES) | set(POST_EXPORT_GATES)
+        self.assertEqual(
+            engine_gates - set(mod.CLASSIC_GATE_CLASS), set(),
+            "a workflow gate the engine enforces has no classification")
+        self.assertEqual(
+            set(mod.CLASSIC_GATE_CLASS) - engine_gates, set(),
+            "CLASSIC_GATE_CLASS classifies a gate the engine no longer has")
+
+    def test_portfolio_caps_is_badly_shaped_and_roster_legality_is_not(self):
+        """The finding this commit exists for. `roster_legality_passed` is
+        everything in the validator that is NOT an exposure or overlap error;
+        `portfolio_caps_passed` is exactly those errors, every one of which is
+        one of Ben's own numbers and every one of which DK accepts. One exit
+        stood over both, so the refusal that lost 1940_9g could not distinguish
+        'DK will reject this' from 'this is more concentrated than you asked
+        for' -- and the second is the whole reason the governor exists."""
+        mod = self._module()
+        self.assertEqual(mod.CLASSIC_GATE_CLASS["portfolio_caps_passed"],
+                         (mod.REFUSAL_BADLY_SHAPED, "ben_preference"))
+        for dk_gate in ("roster_legality_passed", "template_preservation_passed",
+                        "entry_reconciliation_passed", "locked_immutability_passed"):
+            self.assertEqual(mod.CLASSIC_GATE_CLASS[dk_gate],
+                             (mod.REFUSAL_ILLEGAL, "dk_rule"), dk_gate)
+        # Provenance is its own answer: the file may be legal while the record
+        # binding a sha256 to it is broken, and every brief states a sha256 Ben
+        # checks at upload.
+        self.assertEqual(mod.CLASSIC_GATE_CLASS["export_hash_binding_passed"],
+                         (mod.REFUSAL_READ_IT, "provenance"))
+
+    def test_one_illegal_gate_among_preference_misses_is_still_illegal(self):
+        """The conservative direction, asserted rather than assumed. A block is
+        BADLY-SHAPED only when EVERY failing gate is."""
+        mod = self._module()
+        mixed = mod.refusal_class_of_failed_gates(
+            ["portfolio_caps_passed", "roster_legality_passed"])
+        self.assertEqual(mixed["refusal_class"], mod.REFUSAL_ILLEGAL)
+        clean = mod.refusal_class_of_failed_gates(["portfolio_caps_passed"])
+        self.assertEqual(clean["refusal_class"], mod.REFUSAL_BADLY_SHAPED)
+        read_it = mod.refusal_class_of_failed_gates(
+            ["portfolio_caps_passed", "odds_gate_passed"])
+        self.assertEqual(read_it["refusal_class"], mod.REFUSAL_READ_IT)
+        # No gate named is the allocation-failed member -- the 1940_9g case,
+        # where the allocator never passed and nothing is on disk.
+        self.assertEqual(mod.refusal_class_of_failed_gates([])["refusal_class"],
+                         mod.REFUSAL_BADLY_SHAPED)
+        self.assertEqual(mod.CLASSIC_ALLOCATION_FAILED_CLASS[0],
+                         mod.REFUSAL_BADLY_SHAPED)
+
+    def test_an_unclassified_gate_defaults_to_read_it(self):
+        """Reached alone, because the completeness test above means production
+        never gets here. R267's lesson: a guard two other fixes mask is a guard
+        nothing tested."""
+        mod = self._module()
+        self.assertEqual(mod.classic_gate_class("a_gate_that_does_not_exist"),
+                         (mod.REFUSAL_READ_IT, "unclassified"))
+
+    def test_refusal_stamp_refuses_an_unknown_key(self):
+        mod = self._module()
+        with self.assertRaises(KeyError):
+            mod.refusal_stamp("no_such_refusal_site")
+
+    def test_the_stamp_carries_the_class_and_the_override_flag(self):
+        mod = self._module()
+        hard = mod.refusal_stamp("pool_blocked_hard")
+        self.assertEqual(hard["refusal_class"], mod.REFUSAL_READ_IT)
+        self.assertEqual(hard["refusal_override"], "--ignore-pool-blockers")
+        # The crosswalk site has NO override, by name, since R133.
+        crosswalk = mod.refusal_stamp("pool_blocked_crosswalk")
+        self.assertEqual(crosswalk["refusal_class"], mod.REFUSAL_ILLEGAL)
+        self.assertNotIn("refusal_override", crosswalk)
+        self.assertEqual(crosswalk["refusal_authority"], "claude_md_wall")
+
+    def test_the_crosswalk_wall_is_not_labelled_a_dk_rule(self):
+        """Truthful labels, applied to this table. A name-crosswalk failure is
+        unoverridable because CLAUDE.md's hard list says so and R133 enforced
+        it, NOT because DraftKings would reject the file. Both are ILLEGAL to
+        the governor and they are different facts; `authority` is what keeps
+        the class name from implying the wrong one."""
+        mod = self._module()
+        by_key = {r["key"]: r for r in mod.REFUSAL_SITES}
+        self.assertEqual(by_key["pool_blocked_crosswalk"]["authority"],
+                         "claude_md_wall")
+        dk = {r["key"] for r in mod.REFUSAL_SITES if r["authority"] == "dk_rule"}
+        self.assertEqual(dk, {"showdown_not_certified", "showdown_export_failed",
+                              "showdown_template_broken"})
+
+    def test_the_table_does_not_shadow_the_payload_status_key(self):
+        """Found by R296(e)'s own test, which is the argument for keeping it.
+        The first cut of REFUSAL_SITES named its field `status`, and
+        `test_every_refusal_payload_carries_the_slate_date` walks every dict
+        literal in the file looking for a `status` key without a `date` -- so
+        eleven table rows read as eleven refusal payloads with no slate date
+        and the suite went red on a table that is not a payload at all. The
+        field is `prints_status`, and this pins it: a lookup table that adopts
+        a payload's key names starts answering questions asked of payloads."""
+        mod = self._module()
+        for row in mod.REFUSAL_SITES:
+            self.assertNotIn("status", row,
+                             f"{row['key']}: the table row shadows the payload "
+                             f"key `status`")
+            self.assertIn("prints_status", row, row["key"])
+
+    def test_exit_four_is_named_out_of_scope_with_its_reason(self):
+        """R296(h)'s worked example, generalized. Every exit-4 site refuses
+        before anything is solved, so there is no verdict for a supervisor to
+        retry against and no shape for a ladder to relax. A deadline does not
+        conjure a salary file."""
+        mod = self._module()
+        self.assertIn(4, mod.REFUSAL_OUT_OF_SCOPE)
+        self.assertIn("before any solve", mod.REFUSAL_OUT_OF_SCOPE[4])
+
+    def test_bank_thin_at_exit_ten_is_a_refusal_the_item_did_not_count(self):
+        """The R233 payoff for this item. The entry enumerated `return 3` and
+        the class is refusal exits; exit 10 refuses too, and the remedy it
+        prints is 'run the same command again', which is the one remedy a
+        deadline cannot buy."""
+        mod = self._module()
+        row = {r["key"]: r for r in mod.REFUSAL_SITES}["bank_thin_partial"]
+        self.assertEqual(row["exit_code"], 10)
+        self.assertEqual(row["klass"], mod.REFUSAL_BADLY_SHAPED)
+        self.assertEqual(row["authority"], "search_effort")
+        self.assertTrue(any(code == 10 for _, codes in
+                            self._refusal_return_sites() for code in codes),
+                        "no exit-10 return site found, so the row is stale")
+
+
+class BlankRowVersusPartialRowTests(unittest.TestCase):
+    """R290(c). `verify_classic` emitted ONE failure string, "blank slot", over
+    two facts with opposite classifications: a PARTIALLY filled row, which DK
+    rejects, and an ALL-blank reserved row, which DK simply does not enter.
+    Ben's guardrail blocks certification on the second and this item is the
+    decision that it stops blocking delivery, so a check that cannot tell them
+    apart cannot implement either half."""
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position", "Salary",
+              "Game Info", "AvgPointsPerGame", "TeamAbbrev"]
+    SLOTS = ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_blankrow_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _write(self, tmp, roster_cells):
+        teams = ["A", "C", "A", "A", "A", "A", "C", "C", "C", "C"]
+        games = ["A@B"] * 6 + ["C@D"] * 4
+        salary = Path(tmp) / "s.csv"
+        with salary.open("w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(self.HEADER)
+            for i, slot in enumerate(self.SLOTS):
+                w.writerow([slot, f"P{i} ({i})", f"P{i}", i, slot, 4000,
+                            f"{games[i]} 07/10/2026 07:05PM ET", 8.0, teams[i]])
+        entries = Path(tmp) / "e.csv"
+        with entries.open("w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["Entry ID", "Contest Name", "Contest ID", "Entry Fee"]
+                       + self.SLOTS)
+            w.writerow(["1", "c", "2", "$1"] + roster_cells)
+        return salary, entries
+
+    def test_an_all_blank_reserved_row_is_badly_shaped_not_illegal(self):
+        mod = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._write(tmp, [""] * 10)
+            result = mod.verify_classic(salary, entries)
+        self.assertFalse(result["passed"], "a blank row still blocks certification")
+        self.assertEqual([k["kind"] for k in result["failure_kinds"]], ["blank_row"])
+        self.assertFalse(result["delivery_blocked"],
+                         "DK enters nothing for a blank reserved row; it is not "
+                         "a reason the FILE cannot be delivered")
+        self.assertEqual(result["illegal_failures"], [])
+        self.assertEqual(mod.VERIFY_CLASSIC_FAILURE_CLASS["blank_row"],
+                         (mod.REFUSAL_BADLY_SHAPED, "ben_wall"))
+        # The original string survives for every existing reader.
+        self.assertTrue(any("blank slot" in f for f in result["failures"]),
+                        result["failures"])
+
+    def test_a_partially_filled_row_is_illegal(self):
+        """The positive control, and the reason the split is not cosmetic: DK
+        rejects a half-filled entry, so this one must keep refusing at any
+        clock."""
+        mod = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._write(tmp, [str(i) for i in range(4)] + [""] * 6)
+            result = mod.verify_classic(salary, entries)
+        self.assertFalse(result["passed"])
+        self.assertEqual([k["kind"] for k in result["failure_kinds"]], ["partial_row"])
+        self.assertTrue(result["delivery_blocked"])
+        self.assertIn("4 of 10 filled", result["failure_kinds"][0]["detail"])
+        self.assertEqual(mod.VERIFY_CLASSIC_FAILURE_CLASS["partial_row"],
+                         (mod.REFUSAL_ILLEGAL, "dk_rule"))
+
+    def test_every_verify_classic_failure_kind_is_classified(self):
+        """Completeness, by reading the source rather than by trusting the
+        list: every `kind` argument the function can pass to its own `fail`
+        helper has a row in the class map, and the map has no extras."""
+        import ast
+        mod = self._module()
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        target = next(n for n in ast.walk(tree)
+                      if isinstance(n, ast.FunctionDef) and n.name == "verify_classic")
+        emitted = {n.args[1].value for n in ast.walk(target)
+                   if isinstance(n, ast.Call)
+                   and getattr(n.func, "id", "") == "fail"
+                   and len(n.args) > 1 and isinstance(n.args[1], ast.Constant)}
+        self.assertEqual(emitted - set(mod.VERIFY_CLASSIC_FAILURE_CLASS), set())
+        self.assertEqual(set(mod.VERIFY_CLASSIC_FAILURE_CLASS) - emitted, set())
+        self.assertEqual(len(emitted), 8)
+
+    def test_a_legal_file_reports_no_failures_and_no_kinds(self):
+        mod = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, entries = self._write(tmp, [str(i) for i in range(10)])
+            result = mod.verify_classic(salary, entries)
+        self.assertTrue(result["passed"], result["failures"])
+        self.assertEqual(result["failure_kinds"], [])
+        self.assertFalse(result["delivery_blocked"])
+
+
+class ProbeBudgetDefaultTests(unittest.TestCase):
+    """R290(c) rider, from R296(g). `solver_probe --budget` defaulted to 43.0,
+    the ninth and last live member of the retired 45-second ceiling. R271 left
+    it because changing it changes this tool's VERDICT rather than a doc
+    string; R290(c) is the item about refusals an operator reads under a clock,
+    which is exactly what a stale EXCEEDS is."""
+
+    def test_the_default_is_the_one_sandbox_number(self):
+        from tools import solver_probe as sp
+        self.assertEqual(sp.DEFAULT_BUDGET_S, 130.0)
+
+    def test_the_argparse_default_is_not_a_second_copy(self):
+        """The class this repo keeps finding: one number, two places, and they
+        drift. Read the parser rather than the constant."""
+        import ast
+        path = Path(__file__).resolve().parents[1] / "tools" / "solver_probe.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and getattr(node.func, "attr", "") == "add_argument"
+                    and node.args and getattr(node.args[0], "value", "") == "--budget"):
+                default = next(k.value for k in node.keywords if k.arg == "default")
+                self.assertIsInstance(default, ast.Name)
+                self.assertEqual(default.id, "DEFAULT_BUDGET_S")
+                break
+        else:
+            self.fail("no --budget argument found in solver_probe")
+        # And the retired ceiling is not a live VALUE anywhere in the module.
+        # Asked as an AST question rather than a text one on purpose: the first
+        # cut grepped for "43.0" and failed on the comment explaining why 43.0
+        # is gone, which is a test measuring prose instead of behaviour.
+        live = [n.value for n in ast.walk(tree)
+                if isinstance(n, ast.Constant) and n.value in (43, 43.0, 45, 45.0)]
+        self.assertEqual(live, [],
+                         "a retired-45s-class constant is still a live value")
+
+    def test_the_report_names_the_budget_it_measured_against(self):
+        """A verdict that does not say which ceiling it used is how 43.0
+        survived eight sweeps."""
+        from tools import solver_probe as sp
+        self.assertIn("CLAUDE.md", sp.DEFAULT_BUDGET_SOURCE)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

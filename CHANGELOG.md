@@ -25,6 +25,166 @@ performance claim.
 
 ---
 
+## 2026-09-03 — R290(c) commit 1: eleven refusal exits, not eight, and the one exit that lost 1940_9g cannot tell a DK rejection from an exposure cap
+
+The classification the deadline governor needs, and no governor. R290(c)'s own
+Fix line puts the classification first; this entry is step 1 and step 2 is still
+open on the backlog stub. Shipping a `--deliver-by` before this existed would
+have covered one exit of eleven in front of an operator inside a lock window,
+which is this repo's named false-reassurance failure with a command-line switch
+on it.
+
+**What moved.**
+
+- `skills/generate-lineups/scripts/build_slate.py`. New module-level
+  `REFUSAL_SITES` (eleven rows, each with `key`, `exit_code`, `prints_status`,
+  `klass`, `authority`, `override`, `why`), the three class constants plus
+  `REFUSAL_SPLIT`, `REFUSAL_BY_KEY`, `refusal_stamp()`, `CLASSIC_GATE_CLASS`
+  (all fifteen workflow gates), `CLASSIC_GATE_CLASS_DEFAULT`,
+  `classic_gate_class()`, `refusal_class_of_failed_gates()`,
+  `CLASSIC_ALLOCATION_FAILED_CLASS`, `CLASSIC_CONTEST_IDENTITY_CLASS`,
+  `VERIFY_CLASSIC_FAILURE_CLASS` (eight kinds) and `REFUSAL_OUT_OF_SCOPE`. All
+  eleven refusal sites now stamp `refusal` / `refusal_class` /
+  `refusal_authority` (and `refusal_override` where one exists) into the payload
+  or brief they already emit. `verify_classic` tags every failure with a `kind`
+  and returns `failure_kinds`, `illegal_failures` and `delivery_blocked`
+  alongside the unchanged `failures` strings.
+- `tools/solver_probe.py`. `--budget` default 43.0 -> `DEFAULT_BUDGET_S` =
+  130.0, plus `DEFAULT_BUDGET_SOURCE`, a `budget_source` key in the report and
+  the source named on the printed verdict line.
+- `tests/test_core.py`. Three new classes, twenty tests:
+  `RefusalClassificationTests` (13), `BlankRowVersusPartialRowTests` (4),
+  `ProbeBudgetDefaultTests` (3).
+- `tools/audit.py`. `tests.test_core` pin 1075 -> 1095 with the comment saying
+  what the twenty pin.
+- `skills/generate-lineups/SKILL.md`. The exit-3 paragraph corrected for the
+  second time and a new operator-facing section, "Read the refusal's class
+  before you read its errors", with the class table and the two splits.
+- `CLAUDE.md`. Step 2's quoted gate line; step 3's `--budget` instruction,
+  which existed only to work around the wrong default and is now an override
+  rather than a correction.
+- `docs/backlog.md`. R290's (c) section rewritten to the landed classification;
+  its ed10 rider's superseded count marked superseded in place; a dated note at
+  the top of the ordered list.
+
+**Why.** "Refusal must be unreachable while entries are blank and time remains"
+is a claim over every refusal exit in the file, and three successive filings
+treated them as one. Applied per site, the post-mortem's own O3 line (*refusal
+is only correct when the file would be ILLEGAL, never when it is merely badly
+shaped*) does not fall in one place: five sites are the governor's, four must
+refuse at any clock, and two are one exit standing over failures with opposite
+classifications.
+
+**R233, and the question asked.** The enumeration is an AST walk for `Return`
+nodes whose first tuple element can evaluate to 3 **or 10**, literal or through
+a conditional expression — not `grep -n "return 3"`, which is the question the
+item asked and the reason its count was wrong. Hit list at `5d4b679`, by
+enclosing function: `run_classic` 1593, 1619, 2124, 2238(cond); `run_showdown`
+2719, 2738, 2746, 2760, 2783, 3225(cond); plus `run_classic` 1873 at exit 10.
+Eleven. Fourteen further sites return exit 4 and are named out of scope with
+the reason. No `sys.exit(3)` or `raise SystemExit(3)` exists in the file. The
+enumeration is now enforced rather than recorded:
+`test_every_refusal_exit_is_classified` counts both directions and fails on
+N+1.
+
+**Premises that came back false.**
+
+1. **`tools/build_slate.py` does not exist.** Two handoffs and the entry write
+   the bare name; the file is `skills/generate-lineups/scripts/build_slate.py`.
+   The path is now in the entry.
+2. **The inherited table mislabels two of its own rows, and the mislabel hid
+   the item's own subject.** It lists two `bank_short` sites and one
+   `not_certified from failed contests`. Measured: one `bank_short`, one
+   `not_certified` from failed per-lineup certifications, and one
+   `bank_short_of_reserved_rows`. So the site the Fix line dismissed as a
+   duplicate `bank_short` is the BLANK RESERVED ROW site — exactly the wall
+   R290(c) exists to move.
+3. **The count was eleven, not the eight filed or the nine the ed10 rider
+   claimed.** Exit 10 refuses too, and the remedy it prints is "run the same
+   command again to add a slice", which is the one remedy a deadline cannot buy.
+4. **`:2124` is not one refusal, it is two shapes with opposite evidence.** On
+   an allocation failure `_blocked_result` returns before any export, so
+   nothing is on disk — that is the 1940_9g case. On a gate failure the
+   allocation passed and a candidate file is already written at
+   `runs/<run_id>/candidate/DO_NOT_UPLOAD_DKEntries.csv`, so there is nothing
+   left to relax and the only question is the label.
+5. **Both conditional exit-3 sites refuse a file that already exists and is
+   mirrored.** Neither is a no-file refusal at all, so the governor's premise
+   does not apply to them; `:3225` is illegality and `:2238` is the split.
+
+**The finding.** `portfolio_caps_passed` is, in
+`dk_entries_manager.validate_dk_entries`, exactly the player, pitcher,
+primary-stack, SP-pair, per-game and `max_shared_players` errors — every one of
+them one of Ben's own numbers, and every one of them a file DraftKings accepts.
+`roster_legality_passed` is defined as everything that is *not* one of those.
+One exit code stood over both, so the refusal that lost 1940_9g could not
+distinguish "DK will reject this" from "this is more concentrated than you asked
+for", and the second is the entire reason the governor exists. Same shape one
+function over: `verify_classic` emitted one string, `blank slot`, over a
+partially filled row (DK rejects) and an all-blank reserved row (DK enters
+nothing for it). A check that cannot separate them cannot implement "blank rows
+keep blocking certification and stop blocking delivery" in either direction.
+
+`export_hash_binding_passed` is classified READ-IT rather than ILLEGAL and the
+distinction is deliberate: the file may be perfectly legal while the record
+binding a sha256 to it is broken, every brief states a sha256 Ben checks at
+upload, and "the record failed" is a different sentence from "the lineups are
+wrong". The nine pre-export gates are READ-IT for one reason each — a ladder
+relaxes outputs, and each of those gates reports that an input is wrong.
+
+**Truthful labels applied to the table itself.** `pool_blocked_crosswalk` is
+ILLEGAL to the governor because CLAUDE.md's hard list and R133's by-name refusal
+make it a wall, **not** because DraftKings would reject the file. Every row
+carries an `authority`, `dk_rule` and `claude_md_wall` are separate values, and
+`test_the_crosswalk_wall_is_not_labelled_a_dk_rule` pins that exactly three
+rows are `dk_rule`.
+
+**Mutations: 13 written, 13 killed, 0 survived, 0 anchors missing.** Targets
+restored byte-identical after each and the sha256 asserted. Three were re-run
+against their intended guard ALONE (`tools/_scratch_r290c/mutate_alone.py`),
+because M2, M9 and M1 were each first reported killed by a sibling test that
+sorts earlier — R296's M5 lesson, that a mutation killed by *some* test is not a
+mutation killed by the guard it was written for. M13 was added after the
+`prints_status` rename below and pins it.
+
+**One regression this batch caused and the fix chosen.** The table's first cut
+named its field `status`. R296(e)'s `test_every_refusal_payload_carries_the_
+slate_date` walks every dict literal in the file for a `status` key without a
+`date`, so eleven table rows read as eleven refusal payloads with no slate date
+and the gate went red. The field is `prints_status` and a test pins it; the
+alternative — loosening R296(e)'s walk to skip the table — would have traded a
+live guard for a naming convenience. Recorded because the guard did its job on
+a construct written a day after it, and because a scripted rename is what
+briefly made it worse: a blanket replace of the 8-space-indented key hit 30
+sites instead of 11, and the 16 strays were found by re-reading the diff rather
+than by the suite.
+
+**What did NOT ship, and why.**
+
+- **The governor.** By the item's own Fix ordering. Its set is now named on the
+  stub: `bank_thin_partial`, `showdown_ladder_infeasible`,
+  `showdown_bank_short`, `showdown_bank_short_of_reserved_rows`, the
+  allocation-failed and `portfolio_caps_passed` / `selection_certified` members
+  of `classic_not_certified`, and the `blank_row` member of
+  `classic_verify_failed`. It will read `refusal_class`, never a site identity,
+  so a later correction to a class changes its reach without editing it.
+- **R290(a) and (b).** Neither shares a surface with (c) and (a) needs its own
+  cache-invalidation measurement in the same commit; both stay on the entry.
+- **Nothing was renamed in `dk_entries_manager`.** `roster_legality_passed`
+  bundling blank reserved rows with duplicate player IDs is the conflation this
+  entry names, and splitting it moves a gate the money-boundary items depend on.
+  The classification reads the split from `verify_classic` instead, which is a
+  read and not a gate change; changing the gate belongs to step 2 with its own
+  evidence.
+
+**Gate.** `PASS v2.26.0 27 modules 1703 tests` -> `PASS v2.26.0 27 modules 1723
+tests` (`test_core` 1075 -> 1095, `grew`; the other four suites unchanged and
+all `ok`); golden replay 2 units / 9 tests unmoved. **No delivered byte
+changes**: every path touched is a refusal payload, a docstring, a new return
+key, or a probe default. `verify_classic`'s `failures` strings are unchanged
+except the two blank-slot variants, which keep `blank slot` as their prefix so
+existing substring readers still match.
+
 ## 2026-09-03 — R296: eight lost-window doors, and the supervisor CLAUDE.md sends you to first could not write its decision log at all
 
 **What moved.**

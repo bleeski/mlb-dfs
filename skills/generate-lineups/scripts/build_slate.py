@@ -105,6 +105,355 @@ MIN_GAMES_PER_LINEUP = 2
 # on stderr and in the record.
 BANK_BUDGET_FLOOR_S = 5.0
 
+# --------------------------------------------------------------------------- #
+# R290(c) commit 1, 2026-09-03. Every refusal this script can hand its caller,
+# and WHAT CLASS of thing failed at it.
+#
+# Why this is a table and not a paragraph. The deadline governor's acceptance
+# criterion is "refusal must be unreachable while entries are blank and time
+# remains", which is a claim over every refusal exit in this file, and the
+# post-mortem that asked for it treated them as one. They are not one. The
+# post-mortem's own O3 clause draws the line correctly -- refusal is only
+# correct when the file would be ILLEGAL, never when it is merely badly shaped
+# -- and applied per site that line does not fall in one place. A `--deliver-by`
+# that covers one exit, in front of an operator inside a lock window, reads as
+# though it covers the deadline; that is this repo's named false-reassurance
+# failure with a command-line switch on it.
+#
+# Why it is keyed on a KEY and not on a line number or a status string. Line
+# numbers moved three times in three days while this item sat: the entry's own
+# table, its ed10 rider and R296(h) each measured a different set. And the
+# status strings do not identify a site -- `pool_blocked` is printed by two
+# different refusals with opposite classifications, and `not_certified` by two
+# in different contest types. The key is stamped INTO the printed payload, so
+# the artifact names its own class instead of a reader inferring it (R237).
+#
+# The three classes, defined by what the governor may do, not by how bad the
+# news is:
+#   ILLEGAL       DraftKings would reject the file, or a named hard wall in
+#                 CLAUDE.md forbids the override. Refusal is correct at any
+#                 clock and the governor may NEVER reach it. Read `authority`
+#                 to see which of the two it is; they are not the same fact and
+#                 this table does not blur them.
+#   BADLY-SHAPED  what failed is one of Ben's own portfolio preferences, or
+#                 search effort. The file is LEGAL and merely more concentrated,
+#                 or thinner, than was asked for. This is the governor's set,
+#                 and it is the set CLAUDE.md means by "if the choice is a
+#                 concentrated file or no file, ship the concentrated file".
+#   READ-IT       the refusal reports a fact about the INPUTS or the RECORD,
+#                 not about the shape of the output. No relaxation rung reaches
+#                 it, an operator override already exists where one is
+#                 appropriate, and pressing it is a judgment a clock cannot
+#                 supply. The governor refuses too, and names the flag.
+#
+# Two sites are SPLIT: one exit code standing over several distinct failures
+# with different classes. Those carry `klass=REFUSAL_SPLIT` and a sub-map, and
+# the split is the substantive finding of this commit -- see CLASSIC_GATE_CLASS
+# and VERIFY_CLASSIC_FAILURE_CLASS.
+# --------------------------------------------------------------------------- #
+REFUSAL_ILLEGAL = "illegal"
+REFUSAL_BADLY_SHAPED = "badly_shaped"
+REFUSAL_READ_IT = "read_it"
+REFUSAL_SPLIT = "split"
+
+REFUSAL_SITES = (
+    {
+        "key": "pool_blocked_hard",
+        "exit_code": 3,
+        "prints_status": "pool_blocked",
+        "klass": REFUSAL_READ_IT,
+        "authority": "input_identity",
+        "override": "--ignore-pool-blockers",
+        "why": "the pool this build would use is structurally wrong for this "
+               "slate, so the file is a certified file for a DIFFERENT slate. "
+               "No relaxation of any output control changes that, which is why "
+               "no ladder rung reaches it. The override exists and pressing it "
+               "means classifying a specific blocker benign -- the one input a "
+               "clock cannot supply.",
+    },
+    {
+        "key": "pool_blocked_crosswalk",
+        "exit_code": 3,
+        "prints_status": "pool_blocked",
+        "klass": REFUSAL_ILLEGAL,
+        "authority": "claude_md_wall",
+        "override": None,
+        "why": "a name-crosswalk failure. NOT a DK rule, and this table says so "
+               "rather than letting the class name imply one: the authority is "
+               "CLAUDE.md's hard list, which names this stop-and-ask above all "
+               "others, and R133, which made --ignore-pool-blockers refuse it "
+               "BY NAME instead of spending the build and losing it at the "
+               "gate. The real posted lineup is in hand and a projection is "
+               "being substituted for it.",
+    },
+    {
+        "key": "bank_thin_partial",
+        "exit_code": 10,
+        "prints_status": "partial",
+        "klass": REFUSAL_BADLY_SHAPED,
+        "authority": "search_effort",
+        "override": None,
+        "why": "the sliced bank holds fewer than twice the entry count and the "
+               "job list is not exhausted. This site is ABSENT from the R290 "
+               "entry's table, which enumerated `return 3` while the class is "
+               "refusal EXITS -- eleventh member, found by asking the right "
+               "question (R233). It belongs to the governor for the sharpest "
+               "possible reason: the remedy it prints is 'run the same command "
+               "again to add a slice', which is the one remedy a deadline "
+               "cannot buy, and a thin bank is search effort and never a "
+               "reduction of the legal player set.",
+    },
+    {
+        "key": "classic_not_certified",
+        "exit_code": 3,
+        "prints_status": "not_certified",
+        "klass": REFUSAL_SPLIT,
+        "authority": "see CLASSIC_GATE_CLASS",
+        "override": None,
+        "why": "ONE exit standing over an allocation failure, six post-export "
+               "gates and the contest-identity blockers. The 1940_9g refusal is "
+               "the allocation-failed member, where the allocator never passed "
+               "and nothing is on disk. The gate members are the opposite case: "
+               "the lineups exist and a candidate file is already written at "
+               "runs/<run_id>/candidate/DO_NOT_UPLOAD_DKEntries.csv, so there "
+               "is nothing left to relax and the only question is the label. "
+               "Four of the six gates are DK rules, one is provenance, and one "
+               "is Ben's own exposure preference; classifying the exit as a "
+               "unit would have made the governor either useless or unsafe.",
+    },
+    {
+        "key": "classic_verify_failed",
+        "exit_code": 3,
+        "prints_status": "brief",
+        "klass": REFUSAL_SPLIT,
+        "authority": "see VERIFY_CLASSIC_FAILURE_CLASS",
+        "override": None,
+        "why": "verify_classic on the DELIVERED file, which by this point "
+               "exists and is mirrored. Six of its seven failure kinds are DK "
+               "rules and refusal is right. The seventh is a blank roster cell, "
+               "and that one kind covers two different facts the check cannot "
+               "currently tell apart: a PARTIALLY filled row, which DK rejects, "
+               "and an ALL-blank reserved row, which DK simply does not enter.",
+    },
+    {
+        "key": "showdown_ladder_infeasible",
+        "exit_code": 3,
+        "prints_status": "ladder_infeasible",
+        "klass": REFUSAL_BADLY_SHAPED,
+        "authority": "ben_preference",
+        "override": "--controls-override",
+        "why": "solve_ladder left at least one thesis unsolved under the three "
+               "Showdown portfolio controls. All three are Ben's own, the "
+               "relaxation ORDER is already documented and counted in CLAUDE.md "
+               "(overlap, then player exposure, then captain lock, then "
+               "thesis), and a relaxed rung ships a legal file. This is the "
+               "governor's set and the ladder already exists for it.",
+    },
+    {
+        "key": "showdown_bank_short",
+        "exit_code": 3,
+        "prints_status": "bank_short",
+        "klass": REFUSAL_BADLY_SHAPED,
+        "authority": "search_effort",
+        "override": None,
+        "why": "build_showdown_bank returned fewer lineups than entries under "
+               "the same three caps. Search effort against preferences, not a "
+               "legality wall.",
+    },
+    {
+        "key": "showdown_not_certified",
+        "exit_code": 3,
+        "prints_status": "not_certified",
+        "klass": REFUSAL_ILLEGAL,
+        "authority": "dk_rule",
+        "override": None,
+        "why": "certify_showdown failed on at least one lineup: exactly one "
+               "CPT, five UTIL, no player in two slots, and a salary recomputed "
+               "from the pool's own role columns under the cap. Every member is "
+               "a DK rejection.",
+    },
+    {
+        "key": "showdown_bank_short_of_reserved_rows",
+        "exit_code": 3,
+        "prints_status": "bank_short_of_reserved_rows",
+        "klass": REFUSAL_BADLY_SHAPED,
+        "authority": "ben_wall",
+        "override": None,
+        "why": "the bank is shorter than the reserved-row count, so rows would "
+               "ship blank. Ben's guardrail blocks CERTIFICATION on a blank "
+               "reserved row and R290(c) is the decision that it stops blocking "
+               "DELIVERY -- thirty-seven blank entries is a washout with "
+               "certainty 1.0, not a hedge against one. The site's own note "
+               "already prints the governor's rung ('lower --entries-count to "
+               "the number built'), which is why this is the clearest member "
+               "of the badly-shaped set rather than the most doubtful.",
+    },
+    {
+        "key": "showdown_export_failed",
+        "exit_code": 3,
+        "prints_status": "showdown_export_failed",
+        "klass": REFUSAL_ILLEGAL,
+        "authority": "dk_rule",
+        "override": None,
+        "why": "write_showdown_entries refused, so no DK-valid file was "
+               "produced. There is nothing to deliver and nothing to relax.",
+    },
+    {
+        "key": "showdown_template_broken",
+        "exit_code": 3,
+        "prints_status": "brief",
+        "klass": REFUSAL_ILLEGAL,
+        "authority": "dk_rule",
+        "override": None,
+        "why": "verify_template_preserved found a non-roster cell changed, so "
+               "the file is no longer the template DK issued -- the row count, "
+               "an Entry ID, a contest id or a fee. DK rejects or misattributes "
+               "it and no label makes that safe.",
+    },
+)
+REFUSAL_BY_KEY = {r["key"]: r for r in REFUSAL_SITES}
+
+# The SPLIT half of `classic_not_certified`, one row per post-export gate, and
+# it is the finding this commit exists for. `roster_legality_passed` is
+# everything in dk_entries_manager's validator that is NOT an exposure or
+# overlap error; `portfolio_caps_passed` is exactly the exposure and overlap
+# errors (player, pitcher, primary-stack, SP-pair, per-game caps and
+# max_shared_players), all of which are Ben's own numbers and every one of
+# which DK accepts. So the single exit that lost 1940_9g cannot distinguish "DK
+# will reject this" from "this is more concentrated than you asked for", and
+# the second is the whole reason the governor exists.
+CLASSIC_GATE_CLASS = {
+    # Pre-export, the nine in dk_entries_manager.PRE_EXPORT_GATES. Seven of
+    # them are READ-IT for one reason: each reports that an INPUT is wrong or
+    # absent -- the salary file's shape, the entry grid, who is starting, a
+    # weather or odds feed, the projection schema. A relaxation ladder relaxes
+    # OUTPUT controls; there is no rung that fixes an input, so the governor
+    # would be pressing past a fact rather than loosening a preference.
+    "salary_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "entry_grid_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "lineup_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "pitcher_audit_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "weather_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "odds_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "projection_schema_gate_passed": (REFUSAL_READ_IT, "input_identity"),
+    "optimizer_gate_passed": (REFUSAL_READ_IT, "provenance"),
+    # The allocator's own verdict on the selection it made under the portfolio
+    # controls, so it is the same family as an outright allocation failure and
+    # it relaxes the same way.
+    "selection_certified": (REFUSAL_BADLY_SHAPED, "ben_preference"),
+    # Post-export, the six in dk_entries_manager.POST_EXPORT_GATES.
+    "template_preservation_passed": (REFUSAL_ILLEGAL, "dk_rule"),
+    "entry_reconciliation_passed": (REFUSAL_ILLEGAL, "dk_rule"),
+    "roster_legality_passed": (REFUSAL_ILLEGAL, "dk_rule"),
+    "locked_immutability_passed": (REFUSAL_ILLEGAL, "dk_rule"),
+    # Not a DK rule and not a preference: the file may be perfectly legal while
+    # the record that binds a sha256 to it is broken. Delivering a file whose
+    # hash does not bind is what the money-boundary items forbid, and every
+    # brief states a sha256 Ben checks at upload, so this refuses -- but it
+    # refuses because the RECORD failed, which is a different sentence from
+    # "the lineups are wrong" and an operator under a clock needs the
+    # difference.
+    "export_hash_binding_passed": (REFUSAL_READ_IT, "provenance"),
+    "portfolio_caps_passed": (REFUSAL_BADLY_SHAPED, "ben_preference"),
+}
+CLASSIC_ALLOCATION_FAILED_CLASS = (REFUSAL_BADLY_SHAPED, "ben_preference")
+CLASSIC_CONTEST_IDENTITY_CLASS = (REFUSAL_READ_IT, "input_identity")
+# A gate this table has never classified is READ-IT, and the default is a
+# safety property rather than a convenience: the governor never passes what it
+# has not been told about. It should never fire --
+# `test_every_workflow_gate_is_classified` asserts every name in both gate
+# tuples has a row above, so a gate added to the engine without a row here
+# fails the suite instead of silently becoming relaxable.
+CLASSIC_GATE_CLASS_DEFAULT = (REFUSAL_READ_IT, "unclassified")
+
+
+def classic_gate_class(name: str) -> tuple:
+    return CLASSIC_GATE_CLASS.get(name, CLASSIC_GATE_CLASS_DEFAULT)
+
+
+def refusal_class_of_failed_gates(failed_gates) -> dict:
+    """Classify a Classic gate refusal, gate by gate, worst class first.
+
+    The block is BADLY-SHAPED only when EVERY failing gate is, which is the
+    conservative direction: one DK rejection among five preference misses is
+    still a file DK rejects.
+    """
+    names = [str(n) for n in (failed_gates or [])]
+    per_gate = {n: classic_gate_class(n) for n in names}
+    classes = {k for k, _ in per_gate.values()}
+    if not names:
+        overall = REFUSAL_BADLY_SHAPED  # the allocation-failed member; no gate named
+    elif REFUSAL_ILLEGAL in classes:
+        overall = REFUSAL_ILLEGAL
+    elif REFUSAL_READ_IT in classes:
+        overall = REFUSAL_READ_IT
+    else:
+        overall = REFUSAL_BADLY_SHAPED
+    return {
+        "refusal_class": overall,
+        "refusal_class_by_gate": {n: k for n, (k, _) in per_gate.items()},
+        "refusal_authority_by_gate": {n: a for n, (_, a) in per_gate.items()},
+    }
+
+# The SPLIT half of `classic_verify_failed`. Keys are the `kind` tags
+# verify_classic now emits beside its human-readable failure strings; the
+# strings are unchanged for every existing reader.
+VERIFY_CLASSIC_FAILURE_CLASS = {
+    "blank_row": (REFUSAL_BADLY_SHAPED, "ben_wall"),
+    "partial_row": (REFUSAL_ILLEGAL, "dk_rule"),
+    "unknown_player_id": (REFUSAL_ILLEGAL, "dk_rule"),
+    "over_cap": (REFUSAL_ILLEGAL, "dk_rule"),
+    "duplicate_player": (REFUSAL_ILLEGAL, "dk_rule"),
+    "slot_ineligible": (REFUSAL_ILLEGAL, "dk_rule"),
+    "team_stack_over_max": (REFUSAL_ILLEGAL, "dk_rule"),
+    "too_few_games": (REFUSAL_ILLEGAL, "dk_rule"),
+}
+
+# What this table deliberately does NOT cover, stated here rather than left to
+# be discovered, because "which exits does the governor not reach" is the
+# question the item makes the governor answer out loud.
+#
+# EXIT 4, fourteen sites (run_classic:1 through leverage_unresolved,
+# run_showdown:3, main:10). Every one refuses BEFORE anything is solved: a
+# missing or unreadable salary file, a feed for another slate, a flag value this
+# build cannot use, a projections file that will not parse. R296(h) moved
+# `supplied_feed_rejected` here from exit 3 for exactly this reason and it is
+# the worked example -- nothing was solved, so there is no verdict for a
+# supervisor to retry against and no shape for a ladder to relax. A deadline
+# does not conjure a salary file. These stay refusals at every clock.
+#
+# EXIT 2 is not produced by this script; it is preflight_upload's blocked
+# verdict, and SKILL.md's four-exit-code table describes that tool rather than
+# this one. Named because the two vocabularies collide: exit 3 means BUILT AND
+# REFUSED here and IO ERROR there.
+REFUSAL_OUT_OF_SCOPE = {
+    4: "refused before any solve; no verdict to retry and no shape to relax",
+}
+
+
+def refusal_stamp(key: str, **extra) -> dict:
+    """The classification, in the refusal's own payload.
+
+    Every refusal in this script prints JSON. Until now that JSON said WHAT
+    failed and never what CLASS of thing failed, so a session under a clock had
+    to infer whether it was looking at a DK rejection or at its own exposure
+    cap -- and on 1940_9g it inferred wrong, cited the portfolio-level washout
+    clause, and delivered nothing. The stamp is three keys and it removes the
+    inference. Raises on an unknown key on purpose: a refusal site added
+    without a row in REFUSAL_SITES is the N+1 this table exists to prevent, and
+    `test_every_refusal_exit_is_classified` catches it before it ships.
+    """
+    rec = REFUSAL_BY_KEY[key]
+    out = {
+        "refusal": key,
+        "refusal_class": rec["klass"],
+        "refusal_authority": rec["authority"],
+    }
+    if rec.get("override"):
+        out["refusal_override"] = rec["override"]
+    out.update(extra)
+    return out
+
 # R98(2). Which failing feasibility checks name a floor the ENGINE derived from
 # the slate, and which name a number that is merely the minimum clearing THIS
 # bank. `max_shared_players` below the inherent stack-plus-pair overlap is
@@ -686,30 +1035,57 @@ def resolve_platoon_json(args):
 # it directly rather than trusting the build report.
 # --------------------------------------------------------------------------- #
 def verify_classic(salary_csv: Path, entries_csv: Path) -> dict:
+    """Independent DK-legality read of a delivered Classic file.
+
+    R290(c), 2026-09-03: every failure now carries a `kind` beside its string,
+    and `failures` itself is unchanged for every existing reader. Two reasons
+    the kinds had to exist. The classification this file's REFUSAL_SITES table
+    makes cannot be checked against free text without becoming the fragile
+    substring grep R233 is filed on. And "blank slot" was ONE string over two
+    different facts: a PARTIALLY filled row, which DK rejects, and an
+    ALL-blank reserved row, which DK simply does not enter. Ben's guardrail
+    blocks certification on the second and R290(c) is the decision that it
+    stops blocking delivery, so a check that cannot tell them apart cannot
+    implement either half.
+    """
     with salary_csv.open(encoding="utf-8-sig", newline="") as fh:
         salary = {r["ID"]: r for r in csv.DictReader(fh)}
     failures, lineups = [], []
+    kinds: list = []
+
+    def fail(eid: str, kind: str, message: str) -> None:
+        failures.append(f"{eid}: {message}")
+        kinds.append({"entry_id": eid, "kind": kind, "detail": message})
+
     with entries_csv.open(encoding="utf-8-sig", newline="") as fh:
         for row in csv.reader(fh):
             if len(row) < 14 or not row[0].strip().isdigit():
                 continue
             eid, ids = row[0].strip(), [c.strip() for c in row[4:14]]
             if any(not p for p in ids):
-                failures.append(f"{eid}: blank slot")
+                filled = sum(1 for p in ids if p)
+                if filled == 0:
+                    fail(eid, "blank_row",
+                         "blank slot (reserved row entirely blank: DK enters "
+                         "nothing for it, and it blocks certification)")
+                else:
+                    fail(eid, "partial_row",
+                         f"blank slot ({filled} of 10 filled: DK rejects a "
+                         f"partially filled entry)")
                 continue
             if any(p not in salary for p in ids):
-                failures.append(f"{eid}: unknown player id")
+                fail(eid, "unknown_player_id", "unknown player id")
                 continue
             players = [salary[p] for p in ids]
             total = sum(int(p["Salary"]) for p in players)
             if total > SALARY_CAP:
-                failures.append(f"{eid}: salary {total} over cap")
+                fail(eid, "over_cap", f"salary {total} over cap")
             if len(set(ids)) != 10:
-                failures.append(f"{eid}: duplicate player")
+                fail(eid, "duplicate_player", "duplicate player")
             bad = [i for i in range(10)
                    if CLASSIC_SLOTS[i] not in str(players[i]["Roster Position"]).split("/")]
             if bad:
-                failures.append(f"{eid}: slot ineligibility at {bad}")
+                fail(eid, "slot_ineligible", f"slot ineligibility at {bad}")
             teams = {}
             for p in players[2:]:
                 teams[p["TeamAbbrev"]] = teams.get(p["TeamAbbrev"], 0) + 1
@@ -718,16 +1094,32 @@ def verify_classic(salary_csv: Path, entries_csv: Path) -> dict:
             # hitters from one team, and players from at least 2 games.
             over = [f"{t} {n}" for t, n in teams.items() if n > MAX_HITTERS_PER_TEAM]
             if over:
-                failures.append(f"{eid}: more than {MAX_HITTERS_PER_TEAM} hitters "
-                                f"from one team ({', '.join(sorted(over))})")
+                fail(eid, "team_stack_over_max",
+                     f"more than {MAX_HITTERS_PER_TEAM} hitters from one team "
+                     f"({', '.join(sorted(over))})")
             games = {str(p.get("Game Info", "")).split(" ", 1)[0] for p in players}
             games.discard("")
             if len(games) < MIN_GAMES_PER_LINEUP:
-                failures.append(f"{eid}: players from {len(games)} game(s), "
-                                f"DK requires {MIN_GAMES_PER_LINEUP}")
+                fail(eid, "too_few_games",
+                     f"players from {len(games)} game(s), DK requires "
+                     f"{MIN_GAMES_PER_LINEUP}")
             top = sorted(teams.items(), key=lambda kv: -kv[1])[:2]
             lineups.append({"entry_id": eid, "salary": total, "stack": top})
-    return {"passed": not failures, "failures": failures, "lineups": lineups}
+    # R290(c). The classification of THIS file's failures, so the caller does
+    # not re-derive it and cannot re-derive it differently. `delivery_blocked`
+    # is the honest half: it is False when every failure is a blank reserved
+    # row, which is a file DK will accept for the rows that are filled.
+    illegal = [k for k in kinds
+               if VERIFY_CLASSIC_FAILURE_CLASS.get(
+                   k["kind"], (REFUSAL_ILLEGAL, ""))[0] == REFUSAL_ILLEGAL]
+    return {
+        "passed": not failures,
+        "failures": failures,
+        "failure_kinds": kinds,
+        "illegal_failures": [k["detail"] for k in illegal],
+        "delivery_blocked": bool(illegal),
+        "lineups": lineups,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -1581,6 +1973,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             print(f"POOL BLOCKER: {b}", file=sys.stderr)
         print(json.dumps({
             "status": "pool_blocked",
+            **refusal_stamp("pool_blocked_hard"),
             "date": args.date,
             "blockers": hard,
             "soft_blockers": soft,
@@ -1603,6 +1996,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             print(f"POOL BLOCKER NOT OVERRIDABLE: {b}", file=sys.stderr)
         print(json.dumps({
             "status": "pool_blocked",
+            **refusal_stamp("pool_blocked_crosswalk"),
             "date": args.date,
             "blockers": unoverridable,
             "other_hard_blockers": [b for b in hard if b not in unoverridable],
@@ -1864,6 +2258,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:
             print(json.dumps({
                 "status": "partial",
+                **refusal_stamp("bank_thin_partial"),
                 "date": args.date,
                 "strategy": strategy,
                 "candidates": len(candidates),
@@ -2029,9 +2424,21 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # it here so the fix is "rerun with --controls-override" instead of a
         # from-scratch debugging session.
         feas = result.get("feasibility") or {}
-        payload = {"status": "not_certified", "date": args.date,
+        payload = {"status": "not_certified",
+                   **refusal_stamp("classic_not_certified"),
+                   "date": args.date,
                    "errors": result.get("errors"),
                    **detail}
+        # R290(c). The split, resolved here rather than left to the reader. The
+        # stamp above says SPLIT; these three keys say which way it split on
+        # THIS refusal, gate by gate, so the operator sees "portfolio_caps:
+        # badly_shaped" instead of inferring from a gate name whether DK would
+        # have taken the file.
+        payload.update(refusal_class_of_failed_gates(detail.get("failed_gates")))
+        if detail.get("contest_identity_blockers") or result.get(
+                "contest_identity_blockers"):
+            payload["refusal_class_contest_identity"] = (
+                CLASSIC_CONTEST_IDENTITY_CLASS[0])
         if not feas.get("passed", True):
             payload["feasibility"] = feas
         # R98(2). The old hint fired only on a feasibility failure and named one
@@ -2235,6 +2642,19 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             reference["status"], enrichment, f4_report, degraded_reason,
             f1_report, f5_report, projections=projections),
     }
+    # R290(c). The conditional refusal stamps its own class, on the brief this
+    # site already writes. Both halves matter to the governor: `delivery_blocked`
+    # False means every failure is an all-blank reserved row, so the file DK
+    # would take for the rows that ARE filled is sitting on disk, mirrored, and
+    # this exit is the only thing standing between it and the operator.
+    if not checks["passed"]:
+        brief.update(refusal_stamp(
+            "classic_verify_failed",
+            refusal_class=(REFUSAL_ILLEGAL if checks.get("delivery_blocked")
+                           else REFUSAL_BADLY_SHAPED),
+            refusal_failure_kinds=sorted({k["kind"] for k in
+                                          checks.get("failure_kinds") or []}),
+        ))
     return (0 if checks["passed"] else 3), brief
 
 
@@ -2713,7 +3133,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                  contest_of_entry=contest_of_entry,
                                  max_cpt_per_contest=cpt_per_contest)
         if any(lu is None for lu in solved):
-            print(json.dumps({"status": "ladder_infeasible", "date": args.date,
+            print(json.dumps({"status": "ladder_infeasible",
+                              **refusal_stamp("showdown_ladder_infeasible"),
+                              "date": args.date,
                               "unsolved": [t["name"] for t, lu in zip(theses, solved)
                                            if lu is None]}, indent=1))
             return 3, {}
@@ -2733,7 +3155,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                       max_player_exposure_pct=player_cap_pct,
                                       diagnostics=cpt_diagnostics)
         if len(bank) < n_entries:
-            print(json.dumps({"status": "bank_short", "date": args.date,
+            print(json.dumps({"status": "bank_short",
+                              **refusal_stamp("showdown_bank_short"),
+                              "date": args.date,
                               "built": len(bank), "needed": n_entries}, indent=1))
             return 3, {}
         bank = bank[:n_entries]
@@ -2741,7 +3165,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
 
     failed = [c for c in certs if not c.get("passed")]
     if failed:
-        print(json.dumps({"status": "not_certified", "date": args.date,
+        print(json.dumps({"status": "not_certified",
+                          **refusal_stamp("showdown_not_certified"),
+                          "date": args.date,
                           "errors": [c.get("errors") for c in failed]}, indent=1))
         return 3, {}
 
@@ -2750,6 +3176,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     if len(bank) < len(rows):
         print(json.dumps({
             "status": "bank_short_of_reserved_rows",
+            **refusal_stamp("showdown_bank_short_of_reserved_rows"),
             "date": args.date,
             "reserved_blank_rows": len(rows),
             "lineups_built": len(bank),
@@ -2778,7 +3205,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments,
                                              promote=False)
     if not write_report.get("passed"):
-        print(json.dumps({"status": "showdown_export_failed", "date": args.date,
+        print(json.dumps({"status": "showdown_export_failed",
+                          **refusal_stamp("showdown_export_failed"),
+                          "date": args.date,
                           "errors": write_report.get("errors")}, indent=1))
         return 3, {}
     provisional = unrecorded_name(dest)
@@ -3222,6 +3651,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        f"those players were KEPT in the pool."
                        if sd_excluded["unrecognized_kept"] else "")),
     }
+    # R290(c). ILLEGAL unconditionally: a changed non-roster cell means this is
+    # no longer the template DK issued, and no label makes that enterable.
+    if not template.get("passed"):
+        brief.update(refusal_stamp("showdown_template_broken"))
     return (0 if template.get("passed") else 3), brief
 
 

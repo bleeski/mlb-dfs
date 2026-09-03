@@ -226,13 +226,53 @@ A build that runs and then does not certify writes its brief, including to an
 explicit `--brief` path, carrying `status: not_certified` with `failed_gates`
 and `pool_blockers`. **That is true of the exit-3 sites that BUILT and refused,
 and it is not true of exit 3 as a code** (R296(h), corrected 2026-09-03; this
-paragraph read "exit 3 now always writes its brief" and was false for seven of
-the nine `return 3` sites). Exit 3 means BUILT AND REFUSED, which is what
-`autobuild` spends attempts on: it grows the bank, reads `feasibility`, applies
-floors. A refusal that happened BEFORE any solve — bad input, a feed for another
-slate — is exit `4`, so the supervisor stops instead of retrying against a
-verdict that does not exist. Classifying the remaining pre-build `return 3`
-sites is R290(c).
+paragraph read "exit 3 now always writes its brief" and was false for most of
+them). Exit 3 means BUILT AND REFUSED, which is what `autobuild` spends
+attempts on: it grows the bank, reads `feasibility`, applies floors. A refusal
+that happened BEFORE any solve — bad input, a feed for another slate — is exit
+`4`, so the supervisor stops instead of retrying against a verdict that does
+not exist.
+
+**Measured at R290(c) (2026-09-03), which is also the second correction to the
+count in this paragraph: there are ELEVEN refusal exits, not nine and not
+eight.** Eight literal `return 3`, two conditional returns of 3, and one at
+exit `10`. Three of the eleven write a brief; the other eight print their JSON
+to stdout and nothing else. The count moved three times in three days while the
+item sat, which is why nothing here quotes a line number: read
+`REFUSAL_SITES` in `build_slate.py`, which is the one table, and
+`test_every_refusal_exit_is_classified` fails the suite if a refusal exit is
+ever added without a row in it.
+
+### Read the refusal's class before you read its errors
+
+Every refusal now stamps its own payload with `refusal`, `refusal_class` and
+`refusal_authority`, so you do not have to infer whether you are looking at a
+DK rejection or at one of Ben's own exposure caps. **On 1940_9g a session
+inferred wrong, cited the portfolio-level washout clause, and delivered nothing
+into a lock window.** The three classes:
+
+| `refusal_class` | what it means | what you do |
+|---|---|---|
+| `illegal` | DK would reject the file, or a named CLAUDE.md wall forbids the override. Read `refusal_authority` to see which — `dk_rule` and `claude_md_wall` are different facts | refuse, at any clock. Fix the cause or build the next slate |
+| `badly_shaped` | what failed is one of Ben's own portfolio preferences, or search effort. The file is LEGAL and merely more concentrated, or thinner, than asked for | open the controls and ship it. CLAUDE.md: if the choice is a concentrated file or no file, ship the concentrated file |
+| `read_it` | a fact about the INPUTS or the RECORD, not about the shape of the output. No relaxation reaches it | read the blocker. `refusal_override` names the flag where one exists |
+| `split` | one exit standing over several failures with different classes | read `refusal_class_by_gate`, which resolves it per gate on this refusal |
+
+Two exits are `split`, and the split is the thing worth knowing under a clock.
+`not_certified` on Classic covers an allocation failure, six workflow gates and
+the contest-identity blockers: four of those gates are DK rules, one
+(`export_hash_binding_passed`) is provenance, and one
+(`portfolio_caps_passed`) is purely Ben's exposure and overlap numbers, every
+one of which DK accepts. And `verify_classic`'s "blank slot" was one string
+over two facts — a PARTIALLY filled row, which DK rejects, and an ALL-blank
+reserved row, which DK simply does not enter. The brief now carries
+`failure_kinds` and `delivery_blocked`; `delivery_blocked: false` with
+`passed: false` means the file on disk is legal for every row that is filled
+and only the blank rows are stopping it.
+
+Exit `4` is deliberately outside all of this and stays a refusal at every
+clock: nothing was solved, so there is no verdict to retry and no shape to
+relax. A deadline does not conjure a salary file.
 
 Inside Cowork's bash sandbox this command usually will not fit in one call. Read
 "Running inside the Cowork sandbox" below before you start, and confirm the salary

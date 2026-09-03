@@ -39,6 +39,64 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-03 (second note this date), DEV, claim `engine` (`engine_2026-09-03`,
+re-taken): **R290(c) STEP 1 SHIPPED and migrated to CHANGELOG.md: the
+classification, and no governor. Gate
+`PASS v2.26.0 27 modules 1703 tests` -> `PASS v2.26.0 27 modules 1723 tests`
+(`test_core` 1075 -> 1095, `grew`; the other four suites unchanged and all
+`ok`); golden replay 9 tests unmoved; no delivered byte changes, because every
+path touched is a refusal payload, a docstring, a new return key or a probe
+default.**
+
+**Slot 1 KEEPS its position and the list below is FOURTEEN. Counted, not
+inherited — the numbered list runs 1 through 14.** R290(c) closed only its first
+step, so the slot holds the remainder (step 2, the governor) and renumbering
+would be wrong twice over.
+
+**The count was ELEVEN refusal exits, against eight in the entry and nine in its
+ed10 rider, and the extra one is the R233 payoff for the eleventh consecutive
+edition.** The item enumerated `return 3`; the class is refusal EXITS, and exit
+10 refuses too — with the sharpest possible remedy, "run the same command again
+to add a slice", which is the one remedy a deadline cannot buy. The table now
+lives in code as `REFUSAL_SITES`, keyed on a stable key stamped into each
+refusal's own payload, with a test that fails on N+1 in either direction. No
+line numbers anywhere: the count moved three times in three days.
+
+**Five premises came back false and two of them are more useful than the fix.**
+`tools/build_slate.py` does not exist (it is
+`skills/generate-lineups/scripts/build_slate.py`, and two handoffs wrote the
+bare name). The inherited table mislabels two of its own Showdown rows, and the
+mislabel hid the item's own subject: the site its Fix line dismissed as a
+duplicate `bank_short` is `bank_short_of_reserved_rows`, the BLANK RESERVED ROW
+site, which is exactly the wall R290(c) exists to move. And both conditional
+exit-3 sites refuse a file that already exists and is mirrored, so the
+governor's no-file premise never applied to them at all.
+
+**The finding.** `portfolio_caps_passed` is exactly the exposure and overlap
+errors — Ben's own numbers, every one of them a file DK accepts — while
+`roster_legality_passed` is defined as everything that is not one of those, and
+ONE exit code stood over both. So the refusal that lost 1940_9g could not
+distinguish "DK will reject this" from "this is more concentrated than you asked
+for", and the second is the entire reason the governor exists. Same shape one
+function over: `verify_classic` emitted one string, `blank slot`, over a
+partially filled row (DK rejects) and an all-blank reserved row (DK enters
+nothing for it).
+
+**Two riders discharged.** SKILL.md's exit-3 paragraph is corrected for the
+second time and gained an operator-facing class table. And `solver_probe`'s
+`--budget` default moved 43.0 -> 130.0: R271 left it because changing it changes
+a VERDICT, and a verdict measured against a retired ceiling is not conservative,
+it is wrong. R296's `autobuild` clock reconciliation stays with step 2, which is
+where the third clock lands.
+
+**13 mutations, 13 killed, and three re-run against their intended guard
+ALONE** — R296's M5 lesson, that a mutation killed by some test is not a
+mutation killed by the guard it was written for. One self-inflicted regression
+recorded rather than smoothed over: the table's first cut named its field
+`status`, which made R296(e)'s payload-shape walk read eleven table rows as
+eleven payloads with no slate date. The field is `prints_status`; loosening
+R296(e)'s walk would have traded a live guard for a naming convenience.*
+
 *2026-09-03, DEV, claim `engine` (`engine_2026-09-03`, re-taken): **R296 CLOSED
 and migrated to CHANGELOG.md, all eight parts in one commit. Gate
 `PASS v2.26.0 27 modules 1675 tests` -> `PASS v2.26.0 27 modules 1703 tests`
@@ -1205,22 +1263,19 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R290(c)** — the no-file-at-lock family's remaining half (P0, M-L).
-   **R296 CLOSED 2026-09-03** and migrated; the slot keeps its position rather
-   than renumbering fifteen others, per the R246/R164 precedent, and R290(c) was
-   always the larger half. Impact unchanged: every refusal-without-a-file inside
-   a window is a certain zero, and 1940_9g was one. Its first commit is still
-   the classification its entry tabulates — nine literal `return 3` sites plus
-   two conditionals, re-derived at the R296 head — and then the governor. Two
-   riders R296 hands it. `SKILL.md`'s "exit 3 always writes its brief" is now
-   CORRECTED rather than merely false, and says so, so the classification lands
-   in a document an operator already reads under a clock. And R296(h) settled
-   ONE of the nine by moving `supplied_feed_rejected` to exit 4, which is the
-   worked example of the line R290(c) has to draw eight more times: nothing was
-   solved, so there is no verdict for the supervisor to retry against.
-   Third rider, from R296(g): `solver_probe.py`'s `--budget` default of 43.0 is
-   a live member of R271's retired-45s class, deliberately unchanged because it
-   moves a verdict; decide it here.
+1. **R290(c) STEP 2 — the deadline governor itself** (P0, M). **Step 1 SHIPPED
+   2026-09-03** and migrated: eleven refusal exits classified, in code as
+   `REFUSAL_SITES` with an N+1 test, and both riders discharged (SKILL.md's
+   exit-3 paragraph, `solver_probe`'s `--budget` default). The slot keeps its
+   position because the remainder is still the largest thing on the board:
+   every refusal-without-a-file inside a window is a certain zero, and 1940_9g
+   was one. What is left is `--deliver-by` over the BADLY-SHAPED set, a fixed
+   documented ladder, `deadline_forced` and `review_grade_deadline_build`, and
+   the same governor in `autobuild.py`. Its set is named on the entry, it reads
+   `refusal_class` rather than a site identity, and the third rider is live:
+   `autobuild` already has two clocks (`--stop-after-minutes`,
+   `--call-budget-seconds`) and the governor must not become a fourth answer to
+   "how long do we have".
 2. **R293 — the bank on every rung** (P1, XS-S). Impact on winning: the
    SP-plus-own-offense stack is the highest-correlation legal construction and
    the augmentation pass cannot reach it (it attempts the barred opponent
@@ -3518,7 +3573,7 @@ brief, and the entry closes smaller. Owner: none. Rollback: revert the extractor
 
 ### R290. Three residues of the 09-01 no-file-at-lock batch: a bank cache that ignores leverage, a plan-time verdict that carries no feasibility, and the deadline governor that is eight refusal exits and not one (P1 / P2 / P0-by-value, S / XS / M-L) | new 2026-09-01, DEV, found while shipping R286-R289; every count below is measured at this head
 
-**Rider 2026-09-02 (ed10, GF10-S6 and GF10-T17).** (a) is TWO omissions, not one: the three leverage controls are absent from the bucket key AND `Projected_Ownership_Pct`, the column those constraints read, is absent from `bank_cache._PROJECTION_COLUMNS` (:542-544), so `apply_leverage_ownership`'s overwrite (`execution_pipeline.py:4479`) moves neither the bucket nor the digest; the allocator has no per-candidate ownership filter, so the "bank is a superset" argument (`bank_cache.py:39-43`) does not hold for this control. Append `lev:` and the sorted ownership column only when leverage is non-empty. (c)'s count at HEAD is NINE literal `return 3` sites plus two conditionals (1581, 1607, 2110, 2646, 2665, 2673, 2686, 2709, 4007; 2224, 3131), not eight; `main():4007` should be exit 4 (R296(h)). Only 2110 and the conditionals write a brief.
+**Rider 2026-09-02 (ed10, GF10-S6 and GF10-T17).** (a) is TWO omissions, not one: the three leverage controls are absent from the bucket key AND `Projected_Ownership_Pct`, the column those constraints read, is absent from `bank_cache._PROJECTION_COLUMNS` (:542-544), so `apply_leverage_ownership`'s overwrite (`execution_pipeline.py:4479`) moves neither the bucket nor the digest; the allocator has no per-candidate ownership filter, so the "bank is a superset" argument (`bank_cache.py:39-43`) does not hold for this control. Append `lev:` and the sorted ownership column only when leverage is non-empty. (c)'s count is SUPERSEDED — see the classification table below, which is the landed answer at 2026-09-03: eleven refusal exits (eight literal `return 3`, two conditionals, one at exit 10), no line numbers, and the table now lives in code as `REFUSAL_SITES`. This rider's own list (1581, 1607, 2110, 2646, 2665, 2673, 2686, 2709, 4007; 2224, 3131) is kept only as the record of the third of three different counts this item carried in three days; `main():4007` did become exit 4 (R296(h)), and the rider's "only 2110 and the conditionals write a brief" is the one part that held.
 
 Three parts, filed together because they were all found by the same enumeration
 and one of them is the reason D3 of the post-mortem did not ship.
@@ -3577,39 +3632,95 @@ ladder it walked, and labels the result `review_grade_deadline_build`, never
 certified. Blank reserved rows keep blocking CERTIFICATION and stop blocking
 DELIVERY. Same governor in `tools/autobuild.py` so the two do not diverge.
 
-**The acceptance criterion is the problem.** "Refusal must be unreachable while
+**STEP 1 OF THE FIX SHIPPED 2026-09-03 and its record is in CHANGELOG.md.** The
+classification below is the landed answer, not a plan. What remains open in (c)
+is step 2, the governor itself, and the two conditions this classification puts
+on it.
+
+**The acceptance criterion was the problem.** "Refusal must be unreachable while
 entries are blank and time remains" is a claim over every refusal exit in
-`build_slate.py`, and the fragment treats them as one. Measured at this head,
-eight distinct `return 3` sites:
+`skills/generate-lineups/scripts/build_slate.py` (the path, because there is no
+`tools/build_slate.py` and two handoffs in a row wrote the bare name), and the
+fragment treats them as one.
 
-| line | what refuses |
-|---|---|
-| `:1578` | pool blockers, hard |
-| `:1604` | name-crosswalk failure (the one `--ignore-pool-blockers` refuses by name, R133) |
-| `:2047` | the Classic allocator refusal — this is the 1940_9g one |
-| `:2569` | `ladder_infeasible` |
-| `:2588` | `bank_short` |
-| `:2596` | `bank_short`, second site |
-| `:2609` | `not_certified` from failed contests |
-| `:2632` | `showdown_export_failed` |
+**The count is ELEVEN, not eight and not nine, and no line numbers appear
+below.** It moved three times in three days while this item sat — the entry's
+own table said eight at 09-01 lines, the ed10 rider said nine plus two
+conditionals at 09-02 lines, R296(h) then moved one off exit 3 — so the table
+now lives in code as `REFUSAL_SITES`, keyed on a stable key that is stamped
+into each refusal's own payload, and
+`test_every_refusal_exit_is_classified` fails the suite if a refusal exit is
+added without a row. Eight literal `return 3`, two conditional returns of 3,
+and **one at exit 10, which the item's own table missed entirely because it
+enumerated `return 3` while the class is refusal EXITS** (R233, eleventh
+consecutive edition finding N+1).
 
-The post-mortem's own O3 clause draws the line correctly — *refusal is only
-correct when the file would be ILLEGAL, never when it is merely badly shaped* —
-and applied per site that line does not fall in one place. A crosswalk failure
-and an export failure are illegality at T-0 and must still refuse. `:2047` and
-the two `bank_short` sites are the "badly shaped" case the governor is for.
-`:2569` and `:2609` need reading. Which is which is a per-site judgment on
-evidence, not a global flag.
-- **Why this matters more than shipping something:** a `--deliver-by` that covers
-  one of eight exits, in front of an operator inside a lock window, reads as
-  though it covers the deadline. That is this repo's named false-reassurance
-  failure with a command-line switch on it, and the cost of getting it wrong is
+| key | class | authority | why |
+|---|---|---|---|
+| `pool_blocked_hard` | READ-IT | input_identity | wrong pool for this slate; no output control reaches it. `--ignore-pool-blockers` exists and pressing it means classifying a blocker benign |
+| `pool_blocked_crosswalk` | ILLEGAL | claude_md_wall | **not a DK rule, and the table says so.** CLAUDE.md's hard list plus R133's by-name refusal |
+| `bank_thin_partial` (exit 10) | BADLY-SHAPED | search_effort | the remedy it prints is "run the same command again", the one remedy a deadline cannot buy |
+| `classic_not_certified` | **SPLIT** | see below | one exit over an allocation failure, six workflow gates and contest identity |
+| `classic_verify_failed` | **SPLIT** | see below | `verify_classic` on the delivered file; six of seven kinds are DK rules |
+| `showdown_ladder_infeasible` | BADLY-SHAPED | ben_preference | the three Showdown caps, whose relaxation order CLAUDE.md already documents and counts |
+| `showdown_bank_short` | BADLY-SHAPED | search_effort | fewer lineups than entries under the same caps |
+| `showdown_not_certified` | ILLEGAL | dk_rule | `certify_showdown`: one CPT, five UTIL, no duplicate, recomputed salary under cap |
+| `showdown_bank_short_of_reserved_rows` | BADLY-SHAPED | ben_wall | blank reserved rows. Blocks certification, and this item is the decision that it stops blocking delivery |
+| `showdown_export_failed` | ILLEGAL | dk_rule | no DK-valid file was produced; nothing to deliver and nothing to relax |
+| `showdown_template_broken` | ILLEGAL | dk_rule | a non-roster template cell changed, so this is not the file DK issued |
+
+**Two premises in the inherited table were FALSE, and the second is the whole
+finding.** It labelled two Showdown sites `bank_short` and one
+`not_certified from failed contests`; measured, there is one `bank_short`, one
+`not_certified` from failed per-lineup CERTIFICATIONS, and one
+`bank_short_of_reserved_rows`. So the site the Fix line called a duplicate
+`bank_short` is the BLANK RESERVED ROW site — precisely the wall the item's own
+scope moves — and it had been classified as a repeat of its neighbour.
+
+**The SPLIT half is the substantive result, and collapsing either site would
+have made the governor useless or unsafe.** `classic_not_certified` stands over
+six workflow gates: four are DK rules, `export_hash_binding_passed` is
+provenance (the file may be legal while the record binding its sha256 is
+broken, and every brief states a sha256 Ben checks at upload), and
+**`portfolio_caps_passed` is purely Ben's exposure and overlap numbers, every
+one of which DK accepts.** `roster_legality_passed` is defined in
+`dk_entries_manager` as everything that is NOT one of those errors, so the
+single exit that lost 1940_9g cannot distinguish "DK will reject this" from
+"this is more concentrated than you asked for" — and the second is the entire
+reason the governor exists. The nine pre-export gates are classified too, seven
+READ-IT for one reason: each reports that an INPUT is wrong, and a ladder
+relaxes outputs. A block is BADLY-SHAPED only when EVERY failing gate is.
+
+And `verify_classic` emitted ONE string, `blank slot`, over two facts with
+opposite classifications: a PARTIALLY filled row, which DK rejects, and an
+ALL-blank reserved row, which DK simply does not enter. It now tags every
+failure with a `kind` and reports `delivery_blocked`, which is False exactly
+when every failure is a blank row.
+
+**Exit 4 is named out of scope, with its reason**: all fourteen sites refuse
+before anything is solved, so there is no verdict to retry and no shape to
+relax. R296(h) moved `supplied_feed_rejected` there and it is the worked
+example. A deadline does not conjure a salary file.
+
+- **Why this mattered more than shipping something:** a `--deliver-by` that
+  covers one of eleven exits, in front of an operator inside a lock window,
+  reads as though it covers the deadline. That is this repo's named
+  false-reassurance failure with a command-line switch on it, and the cost is
   paid at exactly the moment the flag is reached for.
-- **Fix, in order:** (1) classify all eight sites ILLEGAL / BADLY-SHAPED /
-  READ-IT, in the entry, before any code; (2) build the governor over the
+- **Fix, in order:** (1) classify every site ILLEGAL / BADLY-SHAPED / READ-IT
+  before any code — **DONE 2026-09-03**; (2) build the governor over the
   BADLY-SHAPED set only and have it say which exits it does not cover; (3) the
   ladder is documented and fixed, never derived per slate; (4) `autobuild.py`
-  gets the same governor in the same commit.
+  gets the same governor in the same commit, reconciled with the two clocks
+  R296 gave it.
+- **Two conditions step 2 inherits from step 1.** The governor's set is
+  `bank_thin_partial`, `showdown_ladder_infeasible`, `showdown_bank_short`,
+  `showdown_bank_short_of_reserved_rows`, the allocation-failed member of
+  `classic_not_certified`, its `portfolio_caps_passed` and
+  `selection_certified` members, and the `blank_row` member of
+  `classic_verify_failed`. Everything else refuses at every clock. And the
+  governor reads `refusal_class`, never a site identity, so a site whose class
+  is later corrected changes the governor's reach without editing it.
 - **What already shipped of D3's operational half, and why the rest is still
   worth building:** the refusal now prints its failing `feasibility.checks` and
   the clock to stderr itself, and CLAUDE.md's T-schedule is a ladder with actions

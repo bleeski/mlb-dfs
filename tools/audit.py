@@ -519,7 +519,25 @@ EXPECTED_SUITE_COUNTS = {
     # repair tool, stage_slate and the probe: three torn-input doors (two of
     # which the item did not name) and the probe timing the projected pool
     # instead of refusing a normal DK-covered slate.
-    "tests.test_core": 1075,
+    # R290(c) commit 1, 2026-09-03: 1075 -> 1095, the twenty that pin the
+    # refusal classification. Twelve on the table itself -- its COMPLETENESS in
+    # both directions (no refusal exit without a stamp, no row without a site,
+    # eleven of them and not the eight the item filed), every row carrying a
+    # class AND an authority AND its evidence, the two SPLIT sites being the two
+    # with sub-maps, every workflow gate the engine enforces having a row, and
+    # the finding itself: portfolio_caps is BADLY-SHAPED where roster_legality
+    # and the three DK gates are ILLEGAL, one illegal gate among preference
+    # misses still resolving ILLEGAL, the unclassified-gate default reached
+    # alone, refusal_stamp refusing an unknown key, the crosswalk wall NOT
+    # labelled a DK rule, exit 4 named out of scope, and the exit-10 site the
+    # item never counted. Four on the blank-versus-partial row split, which was
+    # one string over two facts with opposite classifications. Three on the
+    # probe's --budget default, the retired 45-second class's ninth member,
+    # asked of the parser rather than the constant. The twentieth pins the
+    # table's field name: its first cut called the field `status`, which made
+    # R296(e)'s payload-shape walk read eleven table rows as eleven refusal
+    # payloads with no slate date.
+    "tests.test_core": 1095,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
