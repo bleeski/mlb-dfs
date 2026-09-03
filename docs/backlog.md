@@ -48,11 +48,17 @@ path touched is a refusal, a log write, or an input read that previously
 raised.**
 
 **Slot 1 KEEPS its position with `R290(c)` alone, and the queue stays at
-sixteen.** The slot was always "R296 first, then R290(c)"; the R246/R164
-precedent applies exactly — renumbering fifteen slots to reclaim half of one
-buys nothing, and R290(c) was always the larger half. Every slot number in the
-notes BELOW this one still reads one higher than the current list; read the
-list.
+FOURTEEN.** The slot was always "R296 first, then R290(c)"; the R246/R164
+precedent applies exactly — renumbering thirteen slots to reclaim half of one
+buys nothing, and R290(c) was always the larger half. **Correction to this note's
+own first draft, caught by counting the list rather than trusting the newest
+number in prose: it said "sixteen", which was the ed10 merge's count before R291
+and R292 closed.** The R292 note directly below already says "RENUMBERED to
+fourteen slots" and it is right. Fourteen is the count at this head; the slot
+numbers in every note BELOW the R292 one still read one higher than the current
+list, so read the list. **And R290's own siblings (a) and (b) hold no slot at
+all** — they live in the R290 entry only, which is easy to misread as "slot 1 is
+all of R290". (a) is P1/S and shares no surface with (c).
 
 **The entry's own claims, measured, and it got two wrong in the useful
 direction.** (e) was the one part marked PLAUSIBLE rather than VERIFIED, and it
