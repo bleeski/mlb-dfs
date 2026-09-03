@@ -274,6 +274,43 @@ Exit `4` is deliberately outside all of this and stays a refusal at every
 clock: nothing was solved, so there is no verdict to retry and no shape to
 relax. A deadline does not conjure a salary file.
 
+### `--deliver-by`: a clock inside the build
+
+Pass `--deliver-by <ISO or HH:MM ET>` and a `badly_shaped` refusal stops being
+a refusal from T-6. The build opens every portfolio control in **one move**,
+re-solves, and delivers the file labelled `review_grade_deadline_build` with
+the ladder it walked in `brief.deadline`. One crude step, not a stepwise walk,
+because CLAUDE.md's T-15 rung measured the alternative: five careful control
+changes cost 1940_9g five two-minute calls and produced no file.
+
+Use it whenever you are inside a lock window. It is opt-in and a build without
+it is byte-identical to before, so there is no reason to hold it back.
+
+The ladder is fixed and has two rungs:
+
+1. `open_controls` — every portfolio control to its open value at once.
+   Overlap opens to roster size **minus one**, never roster size: two lineups
+   sharing every slot are the same lineup, and two identical entries in one
+   contest are a DK rejection.
+2. `accept_blank_rows` — deliver the rows the bank filled, leave the rest
+   blank. **Showdown only.** On Classic the engine passes
+   `require_all_reserved_filled=True` at both validator calls, so a short bank
+   fails inside the engine before any caller can label it; the refusal stands
+   and stderr says so.
+
+What it never does, and none of this is negotiable: it never reaches an
+`illegal` or `read_it` refusal, never reduces the legal player pool, never
+relabels anything `upload_ready`, and blank reserved rows still block
+CERTIFICATION. Read `brief.deadline.deadline_ladder` for what was opened and
+from what, and **run `tools/preflight_upload.py` on the file** — a governed
+delivery is review-grade, so the preflight is the last independent look.
+
+`tools/autobuild.py` takes the same flag and forwards it. There it also clamps
+`--stop-after-minutes` to the lock, because `--deliver-by` is an external fact
+and the other two clocks are budgets; the clamp lands in the decision log as
+`clock_clamped`. `--call-budget-seconds` is untouched: it is a fact about the
+shell, not about the slate.
+
 Inside Cowork's bash sandbox this command usually will not fit in one call. Read
 "Running inside the Cowork sandbox" below before you start, and confirm the salary
 file is the slate Ben meant.

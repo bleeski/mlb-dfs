@@ -25,6 +25,159 @@ performance claim.
 
 ---
 
+## 2026-09-03 — R290(c) commit 2: a clock inside the build, and its own acceptance test found that four DK-rule gates were classified as preference misses
+
+`--deliver-by`. From T-6 a `badly_shaped` refusal stops being a refusal: the
+build opens every portfolio control in one move, re-solves, and delivers the
+file labelled `review_grade_deadline_build` with the ladder it walked. Opt-in,
+so a build without the flag is byte-identical to before.
+
+**What moved.**
+
+- `mlb_engine/pipeline/deadline_governor.py`, new. `parse_deliver_by`,
+  `DeadlineGovernor` (clock injected, `governs`, `next_rung`, `take_rung`,
+  `stamp`), `LADDER`, `OPEN_CONTROL_VALUES`, `OPEN_SHOWDOWN_CONTROL_VALUES`,
+  `governed_classes`, `merge_open_controls`, `WINDOW_MINUTES = 6`,
+  `DEADLINE_LABEL`. Twenty-eighth module.
+- `skills/generate-lineups/scripts/build_slate.py`. `--deliver-by` parsed in
+  `main()` beside R296(a)'s check, refusing at exit 4 before staging; the
+  `run_slate` invocation extracted to a `_solve(controls)` closure so ONE call
+  serves both attempts; a governed retry loop on the Classic refusal and
+  another around the Showdown solve; rung 2 wired at
+  `bank_short_of_reserved_rows`; `classic_refusal_class`;
+  `_POST_EXPORT_GATE_ERROR_RE`; the deadline block on every brief and every
+  governed refusal payload.
+- `tools/autobuild.py`. `--deliver-by`, clamping `stop_after_minutes` to the
+  lock with a `clock_clamped` decision record, and forwarding the flag to
+  `build_slate`.
+- `tests/test_core.py`. Thirty-two tests in three new classes plus three added
+  to `RefusalClassificationTests`. `R288OpposingHitterControlTests`'s source
+  string pin replaced with an AST question and an executed sibling.
+- `tools/audit.py` pin 1095 -> 1127; `CLAUDE.md` step 2's quoted line
+  (`27 modules 1723 tests` -> `28 modules 1755 tests`);
+  `skills/generate-lineups/SKILL.md` gained a `--deliver-by` section.
+
+**The ladder is TWO rungs, and that is a reconciliation stated rather than a
+shortcut taken.** R290(c)'s Fix line says "walks a fixed documented relaxation
+ladder". CLAUDE.md's T-15 rung, written hours later from the same post-mortem
+and carrying the measured cost, says the opposite about STEP SIZE: *open every
+binding control AT ONCE, not stepwise... five careful steps cost more than one
+crude step, and the crude step is reversible while the lock is not.* CLAUDE.md
+is binding and it is the instruction with a measurement behind it, so the
+ladder is fixed and documented (which is what the item asked for) and it is:
+
+1. `open_controls` — every portfolio control to its open value, one move.
+2. `accept_blank_rows` — deliver the rows the bank filled, leave the rest
+   blank. **Showdown only**; see the boundary below.
+
+**A bug in this commit's own first cut, caught by writing the acceptance
+test.** `OPEN_CONTROL_VALUES["max_shared_players"]` was the roster size. Two
+lineups sharing every slot are the SAME lineup, and two identical entries in one
+contest are `duplicate_same_contest` — a DK rejection inside
+`roster_legality_passed`. So the rung would have invited the allocator to build
+the one thing the governor may never deliver, converting a BADLY-SHAPED refusal
+it is allowed to fix into an ILLEGAL one it is not. The value is roster size
+minus one, on both contest types, pinned against `roster_contracts`.
+
+**The worst defect in either commit, and commit 1 shipped it.**
+`_GATE_ERROR_RE` matches `"Missing|Failed PRE-export gate: X"`.
+`execute_portfolio` emits post-export failures as
+`"failed post-export gate: X"` — lowercase, and the other half of the gate set.
+So `gate_failure_detail` returned `{}` for all six post-export gates, the
+operator never saw which one failed, and commit 1's classification (which reads
+gate names) fell through to the no-gate-named default for
+`roster_legality_passed`, `template_preservation_passed`,
+`entry_reconciliation_passed` and `locked_immutability_passed`. That default was
+BADLY-SHAPED. **The governor would have re-solved past a DK illegality.** Two
+fixes: the post-export shape is parsed, and the no-gate-named default is now
+READ-IT, with the allocation-failed case decided by its own positive evidence
+(a `feasibility` report, the allocator's own artifact) in
+`classic_refusal_class`. Found by running the acceptance test, not by reading —
+which is why the item's Fix line putting classification before the governor was
+right and also insufficient: the classification needed the governor's test to
+be checked.
+
+**A third finding, from a SURVIVING mutation.** G20 flipped
+`refusal_class_of_failed_gates`'s empty branch back to BADLY-SHAPED and the
+suite stayed green, because `classic_refusal_class` handles the empty case
+itself and the payload was writing `refusal_class` TWICE with the second write
+winning. The first was a live-looking value with no reader — a latent
+two-writers-of-one-fact. The duplicate write is gone; the payload takes only the
+per-gate breakdown from that call and the overall class from
+`classic_refusal_class`, which is the same function the governor's filter calls.
+
+**The boundary the governor states out loud.** Rung 2 is unavailable on
+Classic: `execute_portfolio` passes `require_all_reserved_filled=True` at BOTH
+validator calls, so a short bank fails `roster_legality_passed` inside the
+engine before any caller can label the result. Making it reachable is an engine
+change on the certification path and it is the named remainder, not something to
+smuggle in behind a flag. After rung 1 the Classic refusal stands, once, and
+stderr says why; `test_rung_two_is_unavailable_on_classic_and_the_refusal_says_so`
+asserts the cited engine constraint still exists, so the boundary cannot go
+stale silently.
+
+**The three clocks, reconciled by kind rather than by comparison.**
+`--deliver-by` is an ABSOLUTE time and an EXTERNAL fact: when the slate locks.
+`--stop-after-minutes` is a RELATIVE budget and a choice, so it is CLAMPED to
+the lock at the point where `deadline` is assigned — one place, so no downstream
+read can disagree — and the clamp is recorded as `clock_clamped` with both
+values. `--call-budget-seconds` is untouched: it is a fact about this shell, not
+about the slate, and a call killed at 130s is killed whatever the lock says.
+
+**Walls not moved.** `upload_ready` stays reserved for a certified export and a
+governed delivery is labelled, never relabelled. Blank reserved rows still block
+CERTIFICATION. No rung reduces the legal player pool. The governor reaches only
+`badly_shaped`, never `illegal` or `read_it`, and a payload naming no class is
+never governed (R237: an absent key is not an answer). The money-and-entry wall
+and the manual-DK rule are untouched — this writes a FILE.
+
+**R233 enumeration.** The refusal-exit sweep re-run at this head: the AST
+question (returns whose first tuple element can evaluate to 3 or 10, literal or
+through a conditional) returns **10 return statements over 11 semantic sites**,
+because the Showdown governed loop now shares one `return 3, {}` reached with a
+per-refusal key. Commit 1's completeness test asserted one statement per key and
+this commit broke it the next day — the assertion was measuring the file's
+syntax where the class is its semantics. It is three invariants now: the keys
+match both ways, every function returning a refusal code also stamps, and the
+statement count is pinned so a NEW `return 3` fails and forces its author to
+classify it. The literal-first-argument sweep also had to become a
+"does the code name this key at all" sweep, for the same reason.
+
+**Mutations: 26 written, 26 killed, 0 survived, 0 anchors missing** after G20
+was re-aimed (see above) and G26 added. Targets restored byte-identical with
+the sha256 asserted; every mutation is run against the single guard written for
+it, which is R296's M5 lesson applied by construction rather than after the
+fact.
+
+**Acceptance criterion, run.** `test_a_deadline_turns_a_badly_shaped_refusal_
+into_a_delivery` drives the production `run_classic` with only `run_slate`
+faked: exit 0, two solves, the second carrying every opened control, a fully
+non-blank two-entry file verified by the real `verify_classic`
+(`failure_kinds == []`), a non-empty `deadline_ladder`, and
+`label == review_grade_deadline_build`.
+
+**What did NOT ship.**
+
+- **Rung 2 on Classic.** The engine constraint above. Named remainder.
+- **A Showdown end-to-end refusal test.** Measured: the MIN@CHC fixture
+  delivers under every cap this session tried, including
+  `max_shared_players: 0` and `max_cpt_exposure_pct: 0.05` at 30, 60 and 200
+  entries, because the Showdown ladder relaxes its own three controls before it
+  truncates. So the Showdown wiring is covered by the shared loop shape, the
+  governor's own tests and the rung-2 code path, and NOT by an executed
+  Showdown refusal. Stated rather than implied: a fixture whose pool cannot
+  fill its reserved rows is what that test needs and this session did not build
+  one.
+- **R290(a) and (b).** Unchanged, on the entry.
+
+**Gate.** `PASS v2.26.0 27 modules 1723 tests` -> `PASS v2.26.0 28 modules
+1755 tests` (`test_core` 1095 -> 1127, `grew`; the other four suites unchanged
+and all `ok`; the module count moved on its own with the new engine module).
+Golden replay 2 units / 9 tests unmoved. **No delivered byte changes without
+`--deliver-by`**: `_solve` passes the identical kwargs the single `run_slate`
+call passed before, and with no flag `args._governor` is None and every
+governed branch is skipped.
+
 ## 2026-09-03 — R290(c) commit 1: eleven refusal exits, not eight, and the one exit that lost 1940_9g cannot tell a DK rejection from an exposure cap
 
 The classification the deadline governor needs, and no governor. R290(c)'s own

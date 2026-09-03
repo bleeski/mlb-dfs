@@ -371,6 +371,38 @@ def classic_gate_class(name: str) -> tuple:
     return CLASSIC_GATE_CLASS.get(name, CLASSIC_GATE_CLASS_DEFAULT)
 
 
+def classic_refusal_class(result, report) -> str:
+    """The class the `classic_not_certified` payload WILL carry.
+
+    R290(c) step 2 needs this before the payload exists, because the governor
+    decides whether to re-solve and a re-solve happens instead of building the
+    payload. One definition, called from both places, so the governor can never
+    act on a class different from the one the artifact reports -- which is this
+    repo's named failure shape (two readers of one fact sharing no definition).
+    """
+    detail = gate_failure_detail(result, report) or {}
+    if detail.get("contest_identity_blockers") or result.get(
+            "contest_identity_blockers"):
+        return CLASSIC_CONTEST_IDENTITY_CLASS[0]
+    names = detail.get("failed_gates") or []
+    if names:
+        return refusal_class_of_failed_gates(names)["refusal_class"]
+    # No gate was named. BADLY-SHAPED only on POSITIVE evidence that the
+    # ALLOCATOR is what refused -- a feasibility report exists, which is the
+    # allocator's own artifact and is absent when the refusal came from
+    # somewhere else. Without that evidence the answer is READ-IT, because the
+    # governor never passes what it cannot classify and "no gate named" is not
+    # the same fact as "the caps were too tight".
+    #
+    # This branch used to be BADLY-SHAPED unconditionally, and the combination
+    # of that default with the unparsed post-export gate names above meant a
+    # DK-rule gate failure read as a preference miss. Found by this item's own
+    # acceptance test.
+    if result.get("feasibility") is not None:
+        return CLASSIC_ALLOCATION_FAILED_CLASS[0]
+    return REFUSAL_READ_IT
+
+
 def refusal_class_of_failed_gates(failed_gates) -> dict:
     """Classify a Classic gate refusal, gate by gate, worst class first.
 
@@ -382,7 +414,13 @@ def refusal_class_of_failed_gates(failed_gates) -> dict:
     per_gate = {n: classic_gate_class(n) for n in names}
     classes = {k for k, _ in per_gate.values()}
     if not names:
-        overall = REFUSAL_BADLY_SHAPED  # the allocation-failed member; no gate named
+        # R290(c) step 2 correction. This returned BADLY-SHAPED, on the reading
+        # that "no gate named" means the allocator refused. It does not: it also
+        # means a gate failed whose name this reader could not parse, which is
+        # what the unparsed post-export shape produced for four DK-rule gates.
+        # The allocator case is decided by its own POSITIVE evidence in
+        # `classic_refusal_class`; here, unknown is READ-IT.
+        overall = REFUSAL_READ_IT
     elif REFUSAL_ILLEGAL in classes:
         overall = REFUSAL_ILLEGAL
     elif REFUSAL_READ_IT in classes:
@@ -2362,33 +2400,44 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # nothing spends.
         run_bank_budget = max(deadline - time.monotonic() - 6.0, BANK_BUDGET_FLOOR_S)
 
-    result = run_slate(
-        runs_root=str(REPO / "runs"),
-        salary_csv=str(salary), entries_csv=str(entries),
-        approve=True, requested_n=n_entries,
-        candidates_override=candidates,
-        # Same enrichment inputs the probe frame used. run_slate reassembles the
-        # frame internally, so passing anything less here would build the bank on
-        # enriched projections and then certify against unenriched ones.
-        **enrich_kwargs,
-        bank_time_budget_s=run_bank_budget,
-        # R288. The allowance rides portfolio_controls, not just the bank
-        # parameter, because the EXPORT validator grades the delivered file
-        # against `controls` and would otherwise reject a raised build with a
-        # line that reads like a DK rule. That is the fifth member of the class
-        # and it is the one that made the control unusable end to end. Merged
-        # under any explicit --controls-override, so an operator who sets the key
-        # both ways gets their own value rather than the flag's.
-        portfolio_controls_override={
-            **({"max_opposing_hitters_per_sp":
-                int(args.max_opposing_hitters_per_sp)}
-               if getattr(args, "max_opposing_hitters_per_sp", None) is not None
-               else {}),
-            **(args.controls_override or {}),
-        } or None,
-        leverage=leverage or None,
-        **slate_kwargs,
-    )
+    # R288. The allowance rides portfolio_controls, not just the bank
+    # parameter, because the EXPORT validator grades the delivered file
+    # against `controls` and would otherwise reject a raised build with a
+    # line that reads like a DK rule. That is the fifth member of the class
+    # and it is the one that made the control unusable end to end. Merged
+    # under any explicit --controls-override, so an operator who sets the key
+    # both ways gets their own value rather than the flag's.
+    attempt_controls = {
+        **({"max_opposing_hitters_per_sp":
+            int(args.max_opposing_hitters_per_sp)}
+           if getattr(args, "max_opposing_hitters_per_sp", None) is not None
+           else {}),
+        **(args.controls_override or {}),
+    }
+
+    def _solve(controls: dict):
+        # R290(c) step 2. Extracted so the deadline governor can re-solve with
+        # the controls open WITHOUT a second copy of this call. A governor that
+        # re-solves through a duplicated invocation is R267's dependency
+        # problem and R153's "on every rung" problem at once: the copy drifts,
+        # and the rung that matters is the one the copy forgot.
+        return run_slate(
+            runs_root=str(REPO / "runs"),
+            salary_csv=str(salary), entries_csv=str(entries),
+            approve=True, requested_n=n_entries,
+            candidates_override=candidates,
+            # Same enrichment inputs the probe frame used. run_slate reassembles
+            # the frame internally, so passing anything less here would build the
+            # bank on enriched projections and then certify against unenriched
+            # ones.
+            **enrich_kwargs,
+            bank_time_budget_s=run_bank_budget,
+            portfolio_controls_override=dict(controls) or None,
+            leverage=leverage or None,
+            **slate_kwargs,
+        )
+
+    result = _solve(attempt_controls)
 
     # Contest identity, one line per contest, with where it came from. The
     # objective the portfolio is built to is the single most consequential
@@ -2403,6 +2452,45 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             extra += "]"
         print(f"contest {cid} {info.get('posture')} ({src}){extra}: "
               f"{info.get('contest_name')}", file=sys.stderr)
+
+    # R290(c) step 2. The governor sits HERE, on a refusal the build has
+    # already produced, and it reads `refusal_class` off that refusal's own
+    # payload -- never a site identity. Rung 1 opens every portfolio control in
+    # ONE move and re-solves, which is CLAUDE.md's T-15 rung rather than a
+    # stepwise walk: five careful steps cost more than one crude step under a
+    # clock, and the crude step is reversible while the lock is not.
+    from mlb_engine.pipeline import deadline_governor as dg  # noqa: PLC0415
+    governor = getattr(args, "_governor", None)
+    while not result.get("passed"):
+        payload_class = classic_refusal_class(result, report)
+        if not (governor and governor.governs({"refusal_class": payload_class})):
+            break
+        if governor.next_rung() != dg.RUNG_OPEN_CONTROLS:
+            # Rung 2 (accept blank reserved rows) is NOT AVAILABLE on Classic
+            # and this says so rather than pretending. `execute_portfolio`
+            # passes `require_all_reserved_filled=True` at both of its
+            # validator calls, so a short bank fails `roster_legality_passed`
+            # inside the engine, before any caller can label the result. Making
+            # it reachable is an engine change on the certification path and it
+            # is the named remainder of this item, not something to smuggle in
+            # behind a flag.
+            print("DEADLINE: rung 1 is spent and rung 2 (accept blank reserved "
+                  "rows) is unavailable on Classic -- the engine enforces "
+                  "require_all_reserved_filled at both validator calls. "
+                  "Delivering the refusal.", file=sys.stderr)
+            break
+        opened = governor.take_rung(
+            dg.RUNG_OPEN_CONTROLS, contest_type="classic",
+            before=attempt_controls,
+            reason=f"refusal_class={payload_class} inside the "
+                   f"T-{governor.window_minutes:.0f} window")
+        attempt_controls = dg.merge_open_controls(attempt_controls, opened)
+        print(f"DEADLINE: {round(governor.minutes_remaining(), 1)} min to "
+              f"deliver-by; opening every portfolio control in one move and "
+              f"re-solving. Opened: {json.dumps(opened, sort_keys=True)}. This "
+              f"file will be labelled {dg.DEADLINE_LABEL} and never certified.",
+              file=sys.stderr)
+        result = _solve(attempt_controls)
 
     if not result.get("passed"):
         for blocker in result.get("contest_identity_blockers") or []:
@@ -2434,11 +2522,27 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # THIS refusal, gate by gate, so the operator sees "portfolio_caps:
         # badly_shaped" instead of inferring from a gate name whether DK would
         # have taken the file.
-        payload.update(refusal_class_of_failed_gates(detail.get("failed_gates")))
+        # ONE writer of `refusal_class`, and it is the same function the
+        # governor's filter called, so the class the artifact reports and the
+        # class the governor acted on cannot differ. Two readers of one fact
+        # sharing no definition is this repo's named failure shape with three
+        # sightings; this is not a fourth. The per-gate breakdown comes from
+        # the same call, with its own overall verdict DISCARDED -- a mutation
+        # found that key being written twice and the second write winning, so
+        # the first was a live-looking value with no reader (R290(c) step 2).
+        by_gate = refusal_class_of_failed_gates(detail.get("failed_gates"))
+        payload["refusal_class_by_gate"] = by_gate["refusal_class_by_gate"]
+        payload["refusal_authority_by_gate"] = by_gate["refusal_authority_by_gate"]
+        payload["refusal_class"] = classic_refusal_class(result, report)
         if detail.get("contest_identity_blockers") or result.get(
                 "contest_identity_blockers"):
             payload["refusal_class_contest_identity"] = (
                 CLASSIC_CONTEST_IDENTITY_CLASS[0])
+        if governor is not None:
+            # A governed build that STILL refused says what it walked. Without
+            # this the operator cannot tell "the deadline governor tried and the
+            # slate was genuinely infeasible" from "the flag did nothing".
+            payload["deadline"] = governor.stamp()
         if not feas.get("passed", True):
             payload["feasibility"] = feas
         # R98(2). The old hint fired only on a feasibility failure and named one
@@ -2642,6 +2746,23 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             reference["status"], enrichment, f4_report, degraded_reason,
             f1_report, f5_report, projections=projections),
     }
+    # R290(c) step 2. On a DELIVERED Classic file the deadline block records
+    # whether a rung moved this build, and the LABEL is what changes -- never
+    # the gates, which stay exactly as strict as they were. `upload_ready` is
+    # reserved for a certified export and a governed file is not one.
+    if governor is not None:
+        brief["deadline"] = governor.stamp()
+        if governor.walked:
+            brief["label"] = dg.DEADLINE_LABEL
+            brief["label_note"] = (
+                "REVIEW-GRADE, not certified: a deadline rung opened portfolio "
+                "controls this build would otherwise have refused under. Read "
+                "deadline.deadline_ladder for what was opened and from what, "
+                "and run tools/preflight_upload.py before uploading.")
+            print(f"DEADLINE: delivered as {dg.DEADLINE_LABEL} after "
+                  f"{len(governor.walked)} rung(s): "
+                  f"{', '.join(governor.rungs_walked())}", file=sys.stderr)
+
     # R290(c). The conditional refusal stamps its own class, on the brief this
     # site already writes. Both halves matter to the governor: `delivery_blocked`
     # False means every failure is an all-blank reserved row, so the file DK
@@ -3116,52 +3237,91 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                               "error": str(exc)}, indent=1))
             return 4, {}
 
-    if use_ladder:
-        priced = price_showdown_pool(df, use_ladder=True, bat_side=bat_side,
+    # R290(c) step 2. The solve is a governed loop rather than a straight line.
+    # Both refusals below are BADLY-SHAPED against Showdown's three portfolio
+    # controls, all three of which are Ben's own, so inside the window rung 1
+    # opens all three in ONE move and re-solves. `solve_diag` and
+    # `cpt_diagnostics` are cleared per attempt: they are relaxation COUNTERS
+    # and the brief's "a portfolio is clean when the counts are zero" rule is
+    # about the delivered attempt, not the sum of the abandoned ones.
+    from mlb_engine.pipeline import deadline_governor as dg  # noqa: PLC0415
+    governor = getattr(args, "_governor", None)
+    while True:
+        solve_diag.clear()
+        cpt_diagnostics.clear()
+        sd_refusal = None
+        if use_ladder:
+            priced = price_showdown_pool(df, use_ladder=True, bat_side=bat_side,
+                                         pitcher_hand=pitcher_hand,
+                                         supplied_base=supplied_base,
+                                         supplied_read=supplied_read)
+            ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
+                                                 max_cpt_exposure_pct=cpt_cap,
+                                                 contest_of_entry=contest_of_entry,
+                                                 max_cpt_per_contest=cpt_per_contest)
+            theses = ladder_meta["theses"]
+            solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
+                                     max_player_exposure_pct=player_cap_pct,
+                                     max_cpt_exposure_pct=cpt_cap,
+                                     diagnostics=solve_diag,
+                                     contest_of_entry=contest_of_entry,
+                                     max_cpt_per_contest=cpt_per_contest)
+            if any(lu is None for lu in solved):
+                sd_refusal = ("showdown_ladder_infeasible", "ladder_infeasible",
+                              {"unsolved": [t["name"] for t, lu in zip(theses, solved)
+                                            if lu is None]})
+            else:
+                bank = list(solved)
+                report = st.portfolio_report(priced, theses, solved)
+                certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
+        else:
+            # R249. Same seam through the same function, with no prior to
+            # bypass: on this path Base IS raw AvgPointsPerGame, so a supplied
+            # number replaces it directly and the recorded ratio is against
+            # that same column.
+            df = price_showdown_pool(df, use_ladder=False, bat_side=bat_side,
                                      pitcher_hand=pitcher_hand,
                                      supplied_base=supplied_base,
                                      supplied_read=supplied_read)
-        ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
-                                             max_cpt_exposure_pct=cpt_cap,
-                                             contest_of_entry=contest_of_entry,
-                                             max_cpt_per_contest=cpt_per_contest)
-        theses = ladder_meta["theses"]
-        solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
-                                 max_player_exposure_pct=player_cap_pct,
-                                 max_cpt_exposure_pct=cpt_cap,
-                                 diagnostics=solve_diag,
-                                 contest_of_entry=contest_of_entry,
-                                 max_cpt_per_contest=cpt_per_contest)
-        if any(lu is None for lu in solved):
-            print(json.dumps({"status": "ladder_infeasible",
-                              **refusal_stamp("showdown_ladder_infeasible"),
-                              "date": args.date,
-                              "unsolved": [t["name"] for t, lu in zip(theses, solved)
-                                           if lu is None]}, indent=1))
-            return 3, {}
-        bank = list(solved)
-        report = st.portfolio_report(priced, theses, solved)
-        certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
-    else:
-        # R249. Same seam through the same function, with no prior to bypass: on
-        # this path Base IS raw AvgPointsPerGame, so a supplied number replaces
-        # it directly and the recorded ratio is against that same column.
-        df = price_showdown_pool(df, use_ladder=False, bat_side=bat_side,
-                                 pitcher_hand=pitcher_hand,
-                                 supplied_base=supplied_base,
-                                 supplied_read=supplied_read)
-        bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
-                                      max_shared_players=share_cap,
-                                      max_player_exposure_pct=player_cap_pct,
-                                      diagnostics=cpt_diagnostics)
-        if len(bank) < n_entries:
-            print(json.dumps({"status": "bank_short",
-                              **refusal_stamp("showdown_bank_short"),
-                              "date": args.date,
-                              "built": len(bank), "needed": n_entries}, indent=1))
-            return 3, {}
-        bank = bank[:n_entries]
-        certs = [sd.certify_showdown(lineup, df) for lineup in bank]
+            bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
+                                          max_shared_players=share_cap,
+                                          max_player_exposure_pct=player_cap_pct,
+                                          diagnostics=cpt_diagnostics)
+            if len(bank) < n_entries:
+                sd_refusal = ("showdown_bank_short", "bank_short",
+                              {"built": len(bank), "needed": n_entries})
+            else:
+                bank = bank[:n_entries]
+                certs = [sd.certify_showdown(lineup, df) for lineup in bank]
+        if sd_refusal is None:
+            break
+        refusal_key, refusal_status, refusal_extra = sd_refusal
+        governable = governor is not None and governor.governs(
+            {"refusal_class": REFUSAL_BY_KEY[refusal_key]["klass"]})
+        if governable and governor.next_rung() == dg.RUNG_OPEN_CONTROLS:
+            opened = governor.take_rung(
+                dg.RUNG_OPEN_CONTROLS, contest_type="showdown",
+                before={"max_shared_players": share_cap,
+                        "max_cpt_exposure_pct": cpt_cap,
+                        "max_player_exposure_pct": player_cap_pct},
+                reason=f"{refusal_status} inside the "
+                       f"T-{governor.window_minutes:.0f} window")
+            share_cap = opened.get("max_shared_players", share_cap)
+            cpt_cap = opened.get("max_cpt_exposure_pct", cpt_cap)
+            player_cap_pct = opened.get("max_player_exposure_pct", player_cap_pct)
+            print(f"DEADLINE: {round(governor.minutes_remaining(), 1)} min to "
+                  f"deliver-by; {refusal_status} -- opening all three Showdown "
+                  f"controls in one move and re-solving. Opened: "
+                  f"{json.dumps(opened, sort_keys=True)}. This file will be "
+                  f"labelled {dg.DEADLINE_LABEL} and never certified.",
+                  file=sys.stderr)
+            continue
+        payload = {"status": refusal_status, **refusal_stamp(refusal_key),
+                   "date": args.date, **refusal_extra}
+        if governor is not None:
+            payload["deadline"] = governor.stamp()
+        print(json.dumps(payload, indent=1))
+        return 3, {}
 
     failed = [c for c in certs if not c.get("passed")]
     if failed:
@@ -3173,18 +3333,47 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
 
     # zip() silently truncates to the shorter side, so a bank short of the
     # reserved-row count left the remainder blank and shipped. Say so instead.
+    deadline_blank_rows = 0
     if len(bank) < len(rows):
-        print(json.dumps({
-            "status": "bank_short_of_reserved_rows",
-            **refusal_stamp("showdown_bank_short_of_reserved_rows"),
-            "date": args.date,
-            "reserved_blank_rows": len(rows),
-            "lineups_built": len(bank),
-            "shortfall": len(rows) - len(bank),
-            "note": "a blank reserved row blocks certification; lower --entries-count "
-                    "to the number built, or rerun to deepen the bank",
-        }, indent=1))
-        return 3, {}
+        # R290(c) step 2, RUNG 2 -- and this is the only place in the repo where
+        # it is reachable. Ben's guardrail blocks CERTIFICATION on a blank
+        # reserved row and this item is the decision that it stops blocking
+        # DELIVERY: "thirty-seven blank entries is not a hedge against washout;
+        # it is a washout with certainty 1.0." Leaving the remaining template
+        # rows untouched is also what PRESERVES the template, so the file stays
+        # the one DK issued and the unfilled rows are simply not entered.
+        governable = governor is not None and governor.governs(
+            {"refusal_class":
+             REFUSAL_BY_KEY["showdown_bank_short_of_reserved_rows"]["klass"]})
+        if governable and dg.RUNG_ACCEPT_BLANK_ROWS not in governor.rungs_walked():
+            governor.take_rung(
+                dg.RUNG_ACCEPT_BLANK_ROWS, contest_type="showdown",
+                reason=f"bank built {len(bank)} of {len(rows)} reserved rows "
+                       f"inside the T-{governor.window_minutes:.0f} window")
+            deadline_blank_rows = len(rows) - len(bank)
+            print(f"DEADLINE: {round(governor.minutes_remaining(), 1)} min to "
+                  f"deliver-by; delivering {len(bank)} of {len(rows)} reserved "
+                  f"rows and leaving {deadline_blank_rows} BLANK. Those rows "
+                  f"are not entered and the file is NOT certified; it is "
+                  f"{dg.DEADLINE_LABEL}. Run tools/preflight_upload.py before "
+                  f"uploading.", file=sys.stderr)
+        else:
+            payload = {
+                "status": "bank_short_of_reserved_rows",
+                **refusal_stamp("showdown_bank_short_of_reserved_rows"),
+                "date": args.date,
+                "reserved_blank_rows": len(rows),
+                "lineups_built": len(bank),
+                "shortfall": len(rows) - len(bank),
+                "note": "a blank reserved row blocks certification; lower "
+                        "--entries-count to the number built, rerun to deepen "
+                        "the bank, or pass --deliver-by to deliver the rows "
+                        "that were built and leave the rest blank",
+            }
+            if governor is not None:
+                payload["deadline"] = governor.stamp()
+            print(json.dumps(payload, indent=1))
+            return 3, {}
 
     out_dir = REPO / "outputs" / args.date
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -3651,6 +3840,24 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        f"those players were KEPT in the pool."
                        if sd_excluded["unrecognized_kept"] else "")),
     }
+    # R290(c) step 2. Same shape as the Classic delivered brief: the LABEL is
+    # what a rung changes, never the gates.
+    if governor is not None:
+        brief["deadline"] = governor.stamp()
+        if governor.walked:
+            brief["label"] = dg.DEADLINE_LABEL
+            brief["label_note"] = (
+                "REVIEW-GRADE, not certified -- which Showdown always is, and "
+                "this is a second reason rather than a first. A deadline rung "
+                "opened portfolio controls, or left reserved rows blank, that "
+                "this build would otherwise have refused under. Read "
+                "deadline.deadline_ladder, and run tools/preflight_upload.py.")
+            if deadline_blank_rows:
+                brief["deadline_blank_reserved_rows"] = deadline_blank_rows
+            print(f"DEADLINE: delivered as {dg.DEADLINE_LABEL} after "
+                  f"{len(governor.walked)} rung(s): "
+                  f"{', '.join(governor.rungs_walked())}", file=sys.stderr)
+
     # R290(c). ILLEGAL unconditionally: a changed non-roster cell means this is
     # no longer the template DK issued, and no label makes that enterable.
     if not template.get("passed"):
@@ -3998,6 +4205,13 @@ UNOVERRIDABLE_POOL_BLOCKER_RE = _re.compile(r"crosswalk failure", _re.I)
 
 # The two shapes validate_upload_ready_gates emits, and nothing else.
 _GATE_ERROR_RE = _re.compile(r"^(?:Missing|Failed) pre-export gate: (\w+)")
+# R290(c) step 2. The other half of the gate set, in the exact shape
+# `execute_portfolio` emits: `f"failed post-export gate: {x}"`. Case-insensitive
+# and `search` rather than `match`, because the one thing worse than not parsing
+# the engine's own sentence is parsing it only when it is punctuated the way one
+# caller happens to punctuate it.
+_POST_EXPORT_GATE_ERROR_RE = _re.compile(
+    r"failed post-export gate:\s*(\w+)", _re.I)
 
 
 def gate_failure_detail(result: dict, pool_report: dict | None) -> dict:
@@ -4018,6 +4232,19 @@ def gate_failure_detail(result: dict, pool_report: dict | None) -> dict:
         match = _GATE_ERROR_RE.match(str(err))
         if match and match.group(1) not in names:
             names.append(match.group(1))
+        # R290(c) step 2, 2026-09-03. POST-export gates were never named here,
+        # and the miss was found by this item's own acceptance test rather than
+        # by reading. `_GATE_ERROR_RE` matches "Missing|Failed PRE-export
+        # gate: X"; `execute_portfolio` emits post-export failures as
+        # "failed post-export gate: X" -- lowercase, and the other half of the
+        # gate set. So `failed_gates` came back EMPTY for every one of the six
+        # post-export gates, the operator saw only the raw error string, and
+        # commit 1's classification (which reads gate names) silently got the
+        # no-gate-named default for four DK-rule gates. The engine said it and
+        # the reader did not parse it: R237's shape on a new surface.
+        post = _POST_EXPORT_GATE_ERROR_RE.search(str(err))
+        if post and post.group(1) not in names:
+            names.append(post.group(1))
     detail: dict = {}
     if names:
         detail["failed_gates"] = names
@@ -4273,6 +4500,23 @@ def main() -> int:
                          "The prediction is an UNGRADED prior whose ordering is "
                          "what has been measured, never an ROI, win-rate or "
                          "probability claim.")
+    # R290(c) step 2. A clock inside the build. Absent by default, so a build
+    # without the flag is byte-identical to before.
+    ap.add_argument("--deliver-by", dest="deliver_by", default=None,
+                    help="a clock inside the build: an ISO timestamp or HH:MM "
+                         "ET. From T-6 a refusal whose refusal_class is "
+                         "badly_shaped stops being a refusal: the build opens "
+                         "every portfolio control in ONE move (CLAUDE.md's T-15 "
+                         "rung -- five careful steps cost more than one crude "
+                         "step under a clock), re-solves, and delivers the file "
+                         "labelled review_grade_deadline_build with the ladder "
+                         "it walked in brief.deadline. It NEVER reaches an "
+                         "illegal or read_it refusal, never reduces the legal "
+                         "player pool, never relabels anything upload_ready, "
+                         "and blank reserved rows still block certification. "
+                         "Rung 2 (accept blank reserved rows) is Showdown-only; "
+                         "on Classic the engine enforces "
+                         "require_all_reserved_filled and the refusal stands.")
     # R288. The anti-correlation convention, settable. Default None means the
     # engine default (0), which is exactly what the unconditional wall enforced.
     ap.add_argument("--max-opposing-hitters-per-sp", dest="max_opposing_hitters_per_sp",
@@ -4321,6 +4565,27 @@ def main() -> int:
     if bad_value is not None:
         print(json.dumps(bad_value, indent=1))
         return 4
+
+    # R290(c) step 2. Built here, in the same place and for the same reason as
+    # the check above: an unparseable `--deliver-by` refuses at exit 4 before
+    # anything is staged, rather than after the bank is spent. Exit 4 and not 3
+    # per commit 1's own boundary -- nothing was solved, so there is no verdict.
+    args._governor = None
+    if getattr(args, "deliver_by", None):
+        from mlb_engine.pipeline import deadline_governor as _dg  # noqa: PLC0415
+        try:
+            deliver_by_utc, tz_source = _dg.parse_deliver_by(args.deliver_by)
+        except ValueError as exc:
+            print(json.dumps({"status": "deliver_by_unparseable",
+                              "date": args.date, "error": str(exc)}, indent=1))
+            return 4
+        args._governor = _dg.DeadlineGovernor(deliver_by_utc,
+                                              tz_source=tz_source)
+        print(f"DEADLINE: deliver-by {args._governor.deliver_by_utc.isoformat()} "
+              f"({round(args._governor.minutes_remaining(), 1)} min); the "
+              f"governor takes over at T-{_dg.WINDOW_MINUTES:.0f} and reaches "
+              f"{sorted(_dg.governed_classes())} refusals only",
+              file=sys.stderr)
 
     started = time.monotonic()
     deadline = started + args.max_seconds

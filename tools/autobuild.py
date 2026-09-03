@@ -316,6 +316,28 @@ def main() -> int:
                          f"the next attempt cannot finish inside it, the run "
                          f"stops at exit 5 with resumable=true; re-invoke with "
                          f"--resume. 0 disables the check.")
+    # R290(c) step 2. The THIRD clock, and it is the AUTHORITY over the other
+    # two rather than a third answer to "how long do we have". The distinction
+    # is what each one is a fact about:
+    #   --deliver-by          an ABSOLUTE time, and an EXTERNAL fact: when the
+    #                         slate locks. Nothing here can move it.
+    #   --stop-after-minutes  a RELATIVE budget: how long this supervisor may
+    #                         keep trying. A choice, and it may not outlive the
+    #                         lock, so it is CLAMPED to the deliver-by time and
+    #                         the clamp is recorded.
+    #   --call-budget-seconds a RELATIVE budget: how long THIS process may live
+    #                         before checkpointing for --resume. Untouched: it
+    #                         is about the shell, not the slate, and a call
+    #                         killed at 130s is killed whatever the lock says.
+    # Forwarded to build_slate so the engine-side governor fires on the refusal
+    # itself. Passing it here and not forwarding would be a supervisor that
+    # knows the deadline while the thing doing the work does not.
+    ap.add_argument("--deliver-by", dest="deliver_by", default=None,
+                    help="an ISO timestamp or HH:MM ET. Clamps "
+                         "--stop-after-minutes so the supervisor cannot outlive "
+                         "the lock, and is forwarded to build_slate, whose "
+                         "governor turns a badly_shaped refusal into a "
+                         "review_grade_deadline_build from T-6.")
     ap.add_argument("--resume", action="store_true",
                     help="continue the run recorded in "
                          "outputs/<date>/autobuild_decisions.json: attempt "
@@ -395,7 +417,40 @@ def main() -> int:
                 **dec.controls_block())
 
     started = time.monotonic()
-    deadline = started + a.stop_after_minutes * 60.0
+    # R290(c) step 2. One authority, two subordinate budgets. The slate budget
+    # is CLAMPED here rather than compared later, so every downstream read of
+    # `deadline` already respects the lock and there is no second place where
+    # the two could disagree.
+    stop_after_minutes = float(a.stop_after_minutes)
+    if getattr(a, "deliver_by", None):
+        from mlb_engine.pipeline import deadline_governor as _dg
+        try:
+            deliver_by_utc, tz_source = _dg.parse_deliver_by(a.deliver_by)
+        except ValueError as exc:
+            dec.add(0, "stop", f"--deliver-by is unparseable: {exc}",
+                    remedy="pass an ISO timestamp or HH:MM ET")
+            _write(dec, {}, salary=a.salary)
+            return 4
+        minutes_to_lock = (deliver_by_utc - datetime.now(
+            timezone.utc)).total_seconds() / 60.0
+        if minutes_to_lock < stop_after_minutes:
+            dec.add(0, "clock_clamped",
+                    f"--stop-after-minutes {stop_after_minutes:.1f} outlives "
+                    f"--deliver-by ({minutes_to_lock:.1f} min to lock), so the "
+                    f"slate budget is clamped to the lock. --deliver-by is an "
+                    f"external fact and the other two clocks are budgets; a "
+                    f"budget that outlives the lock is spending time the slate "
+                    f"does not have",
+                    deliver_by_utc=deliver_by_utc.isoformat().replace(
+                        "+00:00", "Z"),
+                    deadline_tz_source=tz_source,
+                    stop_after_minutes_requested=stop_after_minutes,
+                    stop_after_minutes_applied=round(max(minutes_to_lock, 0.0), 2),
+                    call_budget_seconds=a.call_budget_seconds,
+                    call_budget_note="unchanged: it is a fact about this shell, "
+                                     "not about the slate")
+            stop_after_minutes = max(minutes_to_lock, 0.0)
+    deadline = started + stop_after_minutes * 60.0
     call_deadline = (started + a.call_budget_seconds
                      if a.call_budget_seconds and a.call_budget_seconds > 0
                      else None)
@@ -474,7 +529,13 @@ def main() -> int:
         cmd += ["--salary", a.salary, "--entries", a.entries,
                 "--max-seconds", str(a.per_build_seconds)]
         for flag, val in (("--lineups", a.lineups), ("--odds", a.odds),
-                          ("--postures", a.postures)):
+                          ("--postures", a.postures),
+                          # R290(c) step 2. Forwarded, not merely consumed. A
+                          # supervisor that knows the lock while the thing doing
+                          # the work does not is the two-readers-one-fact shape
+                          # this repo keeps paying for, and the governor that
+                          # matters is the one on the refusal itself.
+                          ("--deliver-by", getattr(a, "deliver_by", None))):
             if val:
                 cmd += [flag, val]
         effective = dec.effective_controls

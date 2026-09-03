@@ -3936,10 +3936,29 @@ class R288OpposingHitterControlTests(unittest.TestCase):
         # is the assumption that the declared value is zero.
         self.assertIn("above the ", src)
         # And build_slate puts the value where the validator reads it.
+        #
+        # R290(c) step 2, 2026-09-03: this asserted the literal source text
+        # `portfolio_controls_override={`, which R290(c)'s governed re-solve
+        # moved -- the dict is built into a variable now so ONE `run_slate`
+        # call can be re-invoked with it. The behaviour is unchanged and the
+        # test failed anyway, which is R300(c)'s named anti-pattern (a string
+        # pin standing in for behaviour on a money-adjacent claim) collecting
+        # its cost. Asked as an AST question instead, and the EXECUTED version
+        # of the same claim is
+        # DeadlineGovernorWiringTests.test_the_anti_correlation_flag_reaches_
+        # the_controls_the_validator_grades.
+        import ast
         build_src = (REPO / "skills" / "generate-lineups" / "scripts"
                      / "build_slate.py").read_text(encoding="utf-8")
         self.assertIn('"max_opposing_hitters_per_sp":', build_src)
-        self.assertIn("portfolio_controls_override={", build_src)
+        tree = ast.parse(build_src)
+        calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", None) == "run_slate"]
+        self.assertEqual(len(calls), 1, "build_slate grew a second run_slate call")
+        self.assertIn("portfolio_controls_override",
+                      [kw.arg for kw in calls[0].keywords],
+                      "the run_slate call no longer passes the controls the "
+                      "export validator grades against")
 
     def test_it_reaches_the_sliced_bank_and_re_keys_the_cache(self):
         """R246's lesson: build_slate.py delivers from extend_bank's cache, so a
@@ -21163,26 +21182,97 @@ class RefusalClassificationTests(unittest.TestCase):
                 keys.append(node.args[0].value)
         return keys
 
+    @classmethod
+    def _referenced_keys(cls, table_keys):
+        """Every table key the refusing code names, OUTSIDE the table itself.
+
+        A literal-first-argument sweep is not the right question and R290(c)'s
+        own step 2 proved it: the Showdown governed retry loop carries the key
+        in a variable (`refusal_stamp(refusal_key)`), so two keys that ARE
+        stamped on every pass read as unstamped. The question is whether the
+        code that refuses names the key at all.
+        """
+        import ast
+        src = cls._path().read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        lines = src.splitlines()
+        start = next(i for i, ln in enumerate(lines)
+                     if ln.startswith("REFUSAL_SITES = ("))
+        end = next(i for i, ln in enumerate(lines)
+                   if i > start and ln.startswith("REFUSAL_BY_KEY"))
+        found: dict = {}
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and node.value in set(table_keys)
+                    and not (start < node.lineno <= end)):
+                found.setdefault(node.value, []).append(node.lineno)
+        return found
+
     def test_every_refusal_exit_is_classified(self):
-        """The N+1 guard, and this repo has found N+1 ten editions running.
-        Counted BOTH directions: no refusal exit without a stamp, and no table
-        row without a site. The item's own table said eight; the measured
-        answer at this head is eleven, because exit 10 refuses too."""
+        """The N+1 guard, and this repo has found N+1 eleven editions running.
+
+        Its first cut asserted one `return` STATEMENT per stamped key, and
+        R290(c)'s own step 2 broke that the next commit: the Showdown governed
+        retry loop merged two refusals into one shared `return 3, {}` reached
+        with a per-refusal key. The assertion was measuring the file's syntax
+        where the class is its semantics, so it is three invariants now.
+        """
         mod = self._module()
         sites = self._refusal_return_sites()
         stamped = self._stamped_keys()
+
+        # A. The keys. Both directions, so neither an unreferenced table row nor
+        # a stamp with no row survives.
+        table_keys = [r["key"] for r in mod.REFUSAL_SITES]
+        referenced = self._referenced_keys(table_keys)
         self.assertEqual(
-            len(sites), len(stamped),
-            f"{len(sites)} refusal return sites but {len(stamped)} "
-            f"refusal_stamp() calls; an unclassified refusal exit is the N+1 "
-            f"this table exists to prevent. Sites: {sites}")
-        self.assertEqual(
-            sorted(stamped), sorted(r["key"] for r in mod.REFUSAL_SITES),
-            "REFUSAL_SITES and the stamped call sites disagree")
+            sorted(referenced), sorted(table_keys),
+            f"REFUSAL_SITES rows the refusing code never names: "
+            f"{sorted(set(table_keys) - set(referenced))}")
         self.assertEqual(len(set(stamped)), len(stamped),
-                         "a refusal key is stamped at two different sites, so "
-                         "one payload's class is describing another site")
+                         "a refusal key is stamped LITERALLY at two different "
+                         "sites, so one payload's class describes another site")
         self.assertEqual(len(mod.REFUSAL_SITES), 11)
+        for key in stamped:
+            self.assertIn(key, table_keys, f"{key} is stamped with no row")
+
+        # B. No orphan return. Every exit-3/10 return sits in a function that
+        # stamps, so a bare `return 3` added in a new helper fails here.
+        import ast
+        tree = ast.parse(self._path().read_text(encoding="utf-8"))
+        stamping_funcs, refusing_funcs = set(), set()
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for child in ast.walk(node):
+                if (isinstance(child, ast.Call)
+                        and getattr(child.func, "id", "") == "refusal_stamp"):
+                    stamping_funcs.add(node.name)
+                if isinstance(child, ast.Return) and child.value is not None:
+                    value = child.value
+                    first = (value.elts[0] if isinstance(value, ast.Tuple)
+                             and value.elts else value)
+                    def _codes(n):
+                        if isinstance(n, ast.Constant) and n.value in (3, 10):
+                            return [n.value]
+                        if isinstance(n, ast.IfExp):
+                            return _codes(n.body) + _codes(n.orelse)
+                        return []
+                    if _codes(first):
+                        refusing_funcs.add(node.name)
+        self.assertEqual(
+            refusing_funcs - stamping_funcs, set(),
+            "a function returns a refusal exit code and stamps no class; an "
+            "unclassified refusal exit is the N+1 this table prevents")
+
+        # C. The shape pin. Ten `return` statements yield 3 or 10 today, over
+        # eleven semantic sites, because the Showdown loop shares one. A NEW
+        # return statement of 3 or 10 fails here and forces its author to
+        # classify it; a deliberate merge or split updates this number and says
+        # so in the CHANGELOG entry, which is where R233 puts an enumeration.
+        self.assertEqual(len(sites), 10,
+                         f"the count of refusal return statements moved: "
+                         f"{sites}")
 
     def test_every_refusal_row_carries_a_class_an_authority_and_a_reason(self):
         mod = self._module()
@@ -21256,12 +21346,65 @@ class RefusalClassificationTests(unittest.TestCase):
         read_it = mod.refusal_class_of_failed_gates(
             ["portfolio_caps_passed", "odds_gate_passed"])
         self.assertEqual(read_it["refusal_class"], mod.REFUSAL_READ_IT)
-        # No gate named is the allocation-failed member -- the 1940_9g case,
-        # where the allocator never passed and nothing is on disk.
+        # No gate named is UNKNOWN, and unknown is READ-IT. This asserted
+        # BADLY-SHAPED until R290(c) step 2, and the combination of that default
+        # with the unparsed post-export gate names made a DK-rule gate failure
+        # read as a preference miss. The allocator case has its own positive
+        # evidence and lives in `classic_refusal_class`.
         self.assertEqual(mod.refusal_class_of_failed_gates([])["refusal_class"],
-                         mod.REFUSAL_BADLY_SHAPED)
+                         mod.REFUSAL_READ_IT)
         self.assertEqual(mod.CLASSIC_ALLOCATION_FAILED_CLASS[0],
                          mod.REFUSAL_BADLY_SHAPED)
+
+    def test_post_export_gate_names_reach_the_classifier(self):
+        """R290(c) step 2, and the worst defect in either commit.
+
+        `_GATE_ERROR_RE` matches "Missing|Failed PRE-export gate: X".
+        `execute_portfolio` emits post-export failures as "failed post-export
+        gate: X" -- lowercase, and the other half of the gate set -- so
+        `failed_gates` came back EMPTY for all six post-export gates and four
+        DK-rule gates were classified by the no-gate-named default. The governor
+        would have re-solved past a DK illegality. Found by this item's own
+        acceptance test, not by reading."""
+        mod = self._module()
+        for gate, expected in (
+                ("roster_legality_passed", mod.REFUSAL_ILLEGAL),
+                ("template_preservation_passed", mod.REFUSAL_ILLEGAL),
+                ("entry_reconciliation_passed", mod.REFUSAL_ILLEGAL),
+                ("locked_immutability_passed", mod.REFUSAL_ILLEGAL),
+                ("export_hash_binding_passed", mod.REFUSAL_READ_IT),
+                ("portfolio_caps_passed", mod.REFUSAL_BADLY_SHAPED)):
+            result = {"passed": False,
+                      "errors": [f"failed post-export gate: {gate}"]}
+            detail = mod.gate_failure_detail(result, {})
+            self.assertEqual(detail.get("failed_gates"), [gate],
+                             f"{gate} still does not reach failed_gates")
+            self.assertEqual(mod.classic_refusal_class(result, {}), expected, gate)
+
+    def test_pre_export_gate_names_still_reach_the_classifier(self):
+        """The regression guard on the half that already worked."""
+        mod = self._module()
+        result = {"passed": False,
+                  "errors": ["Failed pre-export gate: odds_gate_passed"]}
+        self.assertEqual(mod.gate_failure_detail(result, {})["failed_gates"],
+                         ["odds_gate_passed"])
+        self.assertEqual(mod.classic_refusal_class(result, {}),
+                         mod.REFUSAL_READ_IT)
+
+    def test_no_gate_named_is_badly_shaped_only_on_allocator_evidence(self):
+        """The allocation-failed member is the 1940_9g case and the governor's
+        whole reason to exist, so it must stay reachable -- but on POSITIVE
+        evidence (a feasibility report, which is the allocator's own artifact)
+        rather than on the absence of a gate name."""
+        mod = self._module()
+        allocator = {"passed": False, "errors": ["proven infeasible"],
+                     "feasibility": {"passed": False, "checks": []}}
+        self.assertEqual(mod.classic_refusal_class(allocator, {}),
+                         mod.REFUSAL_BADLY_SHAPED)
+        unknown = {"passed": False, "errors": ["something else went wrong"]}
+        self.assertEqual(mod.classic_refusal_class(unknown, {}),
+                         mod.REFUSAL_READ_IT,
+                         "an unclassifiable refusal must not be governable")
 
     def test_an_unclassified_gate_defaults_to_read_it(self):
         """Reached alone, because the completeness test above means production
@@ -21484,6 +21627,551 @@ class ProbeBudgetDefaultTests(unittest.TestCase):
         survived eight sweeps."""
         from tools import solver_probe as sp
         self.assertIn("CLAUDE.md", sp.DEFAULT_BUDGET_SOURCE)
+
+
+class DeadlineGovernorTests(unittest.TestCase):
+    """R290(c) step 2, 2026-09-03. The clock, the filter and the ladder, pure.
+
+    Every clock is injected. CLAUDE.md's own T-schedule rule is *read the clock
+    from the clock*, and a test that reads the wall clock cannot pin a window --
+    it passes or fails depending on when it runs, which is the opposite of a
+    gate."""
+
+    @staticmethod
+    def _dg():
+        from mlb_engine.pipeline import deadline_governor as dg
+        return dg
+
+    def _at(self, minutes_out, **kw):
+        """A governor whose deliver-by is `minutes_out` minutes from a fixed now."""
+        import datetime as dt
+        dg = self._dg()
+        now = dt.datetime(2026, 9, 3, 23, 0, tzinfo=dt.timezone.utc)
+        by = now + dt.timedelta(minutes=minutes_out)
+        return dg.DeadlineGovernor(by, now_fn=lambda: now, **kw)
+
+    # -- parsing --------------------------------------------------------- #
+    def test_hhmm_is_read_as_eastern_on_the_slate_day(self):
+        import datetime as dt
+        dg = self._dg()
+        now = dt.datetime(2026, 9, 3, 23, 38, tzinfo=dt.timezone.utc)  # 19:38 ET
+        parsed, _ = dg.parse_deliver_by("19:40", now=now)
+        self.assertEqual(parsed, dt.datetime(2026, 9, 3, 23, 40,
+                                             tzinfo=dt.timezone.utc))
+
+    def test_an_iso_stamp_with_an_offset_is_taken_as_given(self):
+        import datetime as dt
+        dg = self._dg()
+        parsed, _ = dg.parse_deliver_by("2026-09-03T19:40:00-04:00")
+        self.assertEqual(parsed, dt.datetime(2026, 9, 3, 23, 40,
+                                             tzinfo=dt.timezone.utc))
+
+    def test_a_naive_iso_stamp_is_read_as_eastern_not_as_utc(self):
+        """The operator types the slate's own timezone. Reading a naive stamp as
+        UTC would put the deadline four hours late, which on a lock window is
+        the whole error."""
+        import datetime as dt
+        dg = self._dg()
+        parsed, _ = dg.parse_deliver_by("2026-09-03T19:40:00")
+        self.assertEqual(parsed, dt.datetime(2026, 9, 3, 23, 40,
+                                             tzinfo=dt.timezone.utc))
+
+    def test_an_unparseable_value_names_both_accepted_forms(self):
+        """This is parsed inside a lock window. A refusal that does not say what
+        it wanted costs a second call, and there may not be one."""
+        dg = self._dg()
+        for bad in ("", "   ", "tomorrow", "25:00", "19:99"):
+            with self.assertRaises(ValueError) as caught:
+                dg.parse_deliver_by(bad)
+            self.assertIn("HH:MM", str(caught.exception), bad)
+
+    # -- the window ------------------------------------------------------ #
+    def test_the_window_opens_at_t_minus_six_and_stays_open_past_the_lock(self):
+        self.assertFalse(self._at(7).in_window())
+        self.assertTrue(self._at(6).in_window())
+        self.assertTrue(self._at(2).in_window())
+        self.assertTrue(self._at(-30).in_window(),
+                        "past the deadline must stay INSIDE the window: a build "
+                        "that already spent the bank should produce the file, "
+                        "which a late swap and the next slate both read better "
+                        "against than against nothing")
+
+    # -- the filter ------------------------------------------------------ #
+    def test_only_badly_shaped_is_governed(self):
+        dg = self._dg()
+        governor = self._at(2)
+        self.assertTrue(governor.governs({"refusal_class": dg.CLASS_BADLY_SHAPED}))
+        for refused in (dg.CLASS_ILLEGAL, dg.CLASS_READ_IT, dg.CLASS_SPLIT):
+            self.assertFalse(governor.governs({"refusal_class": refused}), refused)
+        self.assertEqual(dg.governed_classes(), frozenset({dg.CLASS_BADLY_SHAPED}))
+
+    def test_a_payload_that_names_no_class_is_never_governed(self):
+        """R237: an absent key is not an answer. The safe reading of 'this
+        refusal did not say' is 'do not override it'."""
+        governor = self._at(2)
+        self.assertFalse(governor.governs({}))
+        self.assertFalse(governor.governs(None))
+        self.assertFalse(governor.governs({"status": "bank_short"}))
+
+    def test_outside_the_window_nothing_is_governed(self):
+        dg = self._dg()
+        self.assertFalse(
+            self._at(30).governs({"refusal_class": dg.CLASS_BADLY_SHAPED}))
+
+    def test_the_class_vocabularies_agree_with_build_slate(self):
+        """The governor lives in the engine and build_slate is a skill script
+        with a test forbidding top-level engine imports, so the dependency runs
+        one way and the STRINGS are the contract. This is where they are held
+        in step."""
+        dg = self._dg()
+        mod = RefusalClassificationTests._module()
+        self.assertEqual(dg.CLASS_ILLEGAL, mod.REFUSAL_ILLEGAL)
+        self.assertEqual(dg.CLASS_BADLY_SHAPED, mod.REFUSAL_BADLY_SHAPED)
+        self.assertEqual(dg.CLASS_READ_IT, mod.REFUSAL_READ_IT)
+        self.assertEqual(dg.CLASS_SPLIT, mod.REFUSAL_SPLIT)
+
+    # -- the ladder ------------------------------------------------------ #
+    def test_the_ladder_is_two_rungs_in_a_fixed_order(self):
+        """Two, not seven, and that is a reconciliation rather than a shortcut.
+        R290(c) said "walks a ladder"; CLAUDE.md's T-15 rung, written hours later
+        from the same post-mortem and carrying the measured cost, says open every
+        binding control AT ONCE because five careful steps cost more than one
+        crude step under a clock. CLAUDE.md is binding."""
+        dg = self._dg()
+        self.assertEqual(dg.LADDER,
+                         (dg.RUNG_OPEN_CONTROLS, dg.RUNG_ACCEPT_BLANK_ROWS))
+
+    def test_the_open_overlap_value_cannot_produce_an_identical_pair(self):
+        """A safety property, and the first cut of this module got it wrong.
+
+        Two lineups sharing ALL their slots are the same lineup, and two
+        identical entries in one contest are `duplicate_same_contest` -- a DK
+        rejection, inside `roster_legality_passed`. Opening overlap to the full
+        roster size would have invited the allocator to build the one thing the
+        governor may never deliver, converting a BADLY-SHAPED refusal it is
+        allowed to fix into an ILLEGAL one it is not."""
+        dg = self._dg()
+        self.assertEqual(dg.OPEN_CONTROL_VALUES["max_shared_players"],
+                         dg.CLASSIC_ROSTER_SIZE - 1)
+        self.assertEqual(dg.OPEN_SHOWDOWN_CONTROL_VALUES["max_shared_players"],
+                         dg.SHOWDOWN_ROSTER_SIZE - 1)
+        from mlb_engine.optimize.roster_contracts import CLASSIC, SHOWDOWN
+        self.assertEqual(dg.CLASSIC_ROSTER_SIZE, CLASSIC.roster_size)
+        self.assertEqual(dg.SHOWDOWN_ROSTER_SIZE, SHOWDOWN.roster_size)
+
+    def test_rung_one_opens_every_portfolio_control_in_one_move(self):
+        dg = self._dg()
+        governor = self._at(2)
+        opened = governor.take_rung(dg.RUNG_OPEN_CONTROLS, contest_type="classic")
+        self.assertEqual(opened, dg.OPEN_CONTROL_VALUES)
+        self.assertEqual(governor.rungs_walked(), [dg.RUNG_OPEN_CONTROLS])
+        self.assertEqual(governor.next_rung(), dg.RUNG_ACCEPT_BLANK_ROWS)
+
+    def test_showdown_gets_its_own_three_controls(self):
+        dg = self._dg()
+        opened = self._at(2).take_rung(dg.RUNG_OPEN_CONTROLS,
+                                       contest_type="showdown")
+        self.assertEqual(opened, dg.OPEN_SHOWDOWN_CONTROL_VALUES)
+        self.assertNotIn("max_primary_stack_exposure_pct", opened,
+                         "a Classic-only control leaked onto the Showdown rung")
+
+    def test_a_rung_is_walked_once_and_an_unknown_rung_refuses(self):
+        dg = self._dg()
+        governor = self._at(2)
+        governor.take_rung(dg.RUNG_OPEN_CONTROLS)
+        with self.assertRaises(ValueError):
+            governor.take_rung(dg.RUNG_OPEN_CONTROLS)
+        with self.assertRaises(ValueError):
+            governor.take_rung("open_everything_twice_more")
+
+    def test_the_record_names_what_was_opened_and_from_what(self):
+        """A governed file that does not say which controls were opened, from
+        what, is the false-reassurance failure this item is filed against
+        wearing a different hat."""
+        dg = self._dg()
+        governor = self._at(2)
+        governor.take_rung(dg.RUNG_OPEN_CONTROLS, contest_type="classic",
+                           before={"max_shared_players": 6,
+                                   "max_player_exposure_pct": 0.35},
+                           reason="bank_short inside the window")
+        record = governor.walked[0]
+        self.assertEqual(record["rung"], dg.RUNG_OPEN_CONTROLS)
+        self.assertEqual(record["from"]["max_shared_players"], 6)
+        self.assertEqual(record["from"]["max_player_exposure_pct"], 0.35)
+        self.assertIsNone(record["from"]["max_sp_pair_repetition"],
+                          "a control the operator never set reads None, not a "
+                          "fabricated prior value")
+        self.assertIn("bank_short", record["reason"])
+        self.assertEqual(record["minutes_remaining"], 2.0)
+
+    # -- the stamp ------------------------------------------------------- #
+    def test_the_stamp_is_present_unforced_and_carries_no_label(self):
+        """On every build that passed --deliver-by, forced or not, so 'did a
+        deadline move this build' is answerable from the artifact rather than
+        from the absence of a key (R237)."""
+        stamp = self._at(30).stamp()
+        self.assertFalse(stamp["deadline_forced"])
+        self.assertIsNone(stamp["label"])
+        self.assertEqual(stamp["deadline_ladder"], [])
+        self.assertFalse(stamp["in_window"])
+        self.assertEqual(stamp["minutes_remaining"], 30.0)
+
+    def test_a_walked_rung_forces_the_stamp_and_names_the_label(self):
+        dg = self._dg()
+        governor = self._at(2)
+        governor.take_rung(dg.RUNG_OPEN_CONTROLS)
+        stamp = governor.stamp()
+        self.assertTrue(stamp["deadline_forced"])
+        self.assertEqual(stamp["label"], "review_grade_deadline_build")
+        self.assertNotEqual(stamp["label"], "upload_ready")
+        self.assertEqual(len(stamp["deadline_ladder"]), 1)
+        self.assertIn("never certified", stamp["note"])
+
+    def test_the_governor_values_win_over_the_operators_own_override(self):
+        """The one place the governor outranks a person, and it is bounded: it
+        fires only inside the window, and inside it the choice is the operator's
+        numbers or no file. The displaced values are kept in the rung record."""
+        dg = self._dg()
+        merged = dg.merge_open_controls(
+            {"max_shared_players": 6, "max_opposing_hitters_per_sp": 2},
+            dg.OPEN_CONTROL_VALUES)
+        self.assertEqual(merged["max_shared_players"],
+                         dg.CLASSIC_ROSTER_SIZE - 1)
+        self.assertEqual(merged["max_opposing_hitters_per_sp"], 2,
+                         "a control the rung does not open is left alone")
+
+    def test_a_naive_deliver_by_is_refused_by_the_constructor(self):
+        import datetime as dt
+        dg = self._dg()
+        with self.assertRaises(ValueError):
+            dg.DeadlineGovernor(dt.datetime(2026, 9, 3, 19, 40))
+
+
+class DeadlineGovernorWiringTests(unittest.TestCase):
+    """R290(c) step 2's acceptance criterion, executed.
+
+    R246 and R249 both shipped a control that was wired wrong while every test
+    passed, because the tests called the engine function directly and NOTHING
+    EXECUTED THE WIRING. These drive `run_classic` itself with the real pool
+    build, and only `run_slate` is faked -- so the governor's filter, the rung,
+    the re-solve, the merged controls and the label are all the production
+    path."""
+
+    _SALARY = (REPO / "tests" / "fixtures" / "slates"
+               / "DKSalaries_frozen_2026-07-29.csv")
+    _SLOTS = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF")
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def _legal_ids(self):
+        """A legal Classic lineup off the fixture, greedily and deterministically.
+
+        No solver: cheapest-first with a stable tiebreak on ID, so the delivered
+        file this test verifies is the same file on every machine. It satisfies
+        every rule `verify_classic` checks -- slots, cap, distinctness, the
+        five-hitter team cap and the two-game minimum -- which is the point,
+        since the assertion is that the governor DELIVERS a legal file."""
+        with self._SALARY.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        rows.sort(key=lambda r: (int(r["Salary"]), r["ID"]))
+        chosen, teams = [], {}
+        for slot in self._SLOTS:
+            for row in rows:
+                if row in chosen:
+                    continue
+                if slot not in str(row["Roster Position"]).split("/"):
+                    continue
+                if slot != "P" and teams.get(row["TeamAbbrev"], 0) >= 5:
+                    continue
+                chosen.append(row)
+                if slot != "P":
+                    teams[row["TeamAbbrev"]] = teams.get(row["TeamAbbrev"], 0) + 1
+                break
+            else:
+                self.fail(f"the fixture has no candidate for slot {slot}")
+        return [r["ID"] for r in chosen]
+
+    def _entries_csv(self):
+        path = self.root / "DKEntries.csv"
+        header = ("Entry ID,Contest Name,Contest ID,Entry Fee,"
+                  + ",".join(self._SLOTS) + ",,Instructions\n")
+        path.write_text(
+            header
+            + "5200941022,Test Contest,192784653,$0.25,,,,,,,,,,,,x\n"
+            + "5200941023,Test Contest,192784653,$0.25,,,,,,,,,,,,x\n",
+            encoding="utf-8")
+        return path
+
+    def _delivered_csv(self):
+        ids = self._legal_ids()
+        path = self.root / "delivered.csv"
+        header = ("Entry ID,Contest Name,Contest ID,Entry Fee,"
+                  + ",".join(self._SLOTS) + "\n")
+        body = "".join(
+            f"{eid},Test Contest,192784653,$0.25," + ",".join(ids) + "\n"
+            for eid in ("5200941022", "5200941023"))
+        path.write_text(header + body, encoding="utf-8")
+        return path
+
+    _REFUSAL = {
+        # `gate_failure_detail` derives failed_gates from THIS string shape, so
+        # the fixture speaks the engine's own vocabulary rather than presetting
+        # the key the code under test is supposed to derive.
+        "passed": False, "run_id": "r1", "workflow_valid": False,
+        "errors": ["failed post-export gate: portfolio_caps_passed"],
+        "feasibility": {"passed": False, "checks": []},
+    }
+
+    def test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades(self):
+        """R288's claim, EXECUTED rather than grepped.
+
+        `R288OpposingHitterControlTests` asserted the literal source text
+        `portfolio_controls_override={`, which this item's refactor moved
+        without changing the behaviour -- a string pin standing in for
+        behaviour on a money-adjacent claim, which is exactly R300(c). This
+        drives the production call and reads what `run_slate` was actually
+        handed, so the claim survives any future refactor of the punctuation."""
+        _code, _brief, calls, _err = self._run(
+            30, args_overrides={"max_opposing_hitters_per_sp": 2})
+        self.assertTrue(calls, "run_slate was never called")
+        self.assertEqual(calls[0].get("max_opposing_hitters_per_sp"), 2,
+                         "the flag did not reach portfolio_controls_override, "
+                         "which is the dict the export validator grades against")
+
+    def _run(self, minutes_out, second_result=None, refusal=None,
+             args_overrides=None):
+        """Drive run_classic. Returns (code, brief, controls per run_slate call)."""
+        import contextlib
+        import datetime as dt
+        import importlib.util
+        import io
+        import shutil
+        import time as _time
+        import types
+        from mlb_engine.pipeline import deadline_governor as dg
+        import mlb_engine.pipeline.execution_pipeline as epi
+
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_governor_wiring", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.REPO = self.root
+
+        calls = []
+
+        def fake_run_slate(**kw):
+            calls.append(dict(kw.get("portfolio_controls_override") or {}))
+            if len(calls) == 1:
+                return dict(refusal or self._REFUSAL)
+            return dict(second_result or (refusal or self._REFUSAL))
+
+        now = dt.datetime.now(dt.timezone.utc)
+        governor = dg.DeadlineGovernor(now + dt.timedelta(minutes=minutes_out))
+        args = types.SimpleNamespace(
+            date="2026-07-29", entries=2, controls_override=None,
+            projections=None, lineups=None, odds=None, postures=None,
+            deliver_by="set", _governor=governor, max_seconds=20.0,
+            declare_pitcher=None, ignore_pool_blockers=True, assume_gates=None,
+            rotowire=False, enrichment=False, reference_dir=None,
+            reference_max_age_days=14.0, past_slate_replay=True, leverage=None,
+            max_opposing_hitters_per_sp=None, ownership_pred=None,
+            feed_max_age_minutes=90.0, bundle=None, tbd_fallback=None,
+            brief=None)
+        for key, value in (args_overrides or {}).items():
+            setattr(args, key, value)
+        slate_dir = self.root / "slate"
+        slate_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(self._SALARY, slate_dir / "DKSalaries.csv")
+        original = epi.run_slate
+        epi.run_slate = fake_run_slate
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code, brief = mod.run_classic(
+                    args, slate_dir, self._SALARY, self._entries_csv(),
+                    {"games": []}, _time.monotonic() + 60)
+        finally:
+            epi.run_slate = original
+        return code, brief, calls, err.getvalue()
+
+    def test_a_deadline_turns_a_badly_shaped_refusal_into_a_delivery(self):
+        """R290(c)'s done-when, run: an over-constrained slate with a deliver-by
+        two minutes out returns exit 0, a fully non-blank file, a non-empty
+        ladder in the stamp, and the label review_grade_deadline_build."""
+        delivered = self._delivered_csv()
+        second = {"passed": True, "run_id": "r2", "workflow_valid": True,
+                  "selection_certified": True, "allocation_certified": True,
+                  "delivered_path": str(delivered)}
+        code, brief, calls, err = self._run(2, second_result=second)
+
+        self.assertEqual(code, 0, f"the governed build did not deliver: "
+                                  f"{brief.get('status')} / {err[-400:]}")
+        self.assertEqual(len(calls), 2, "the governor did not re-solve")
+        self.assertEqual(calls[0], {}, "the FIRST solve must use the operator's "
+                                       "own controls, untouched")
+        from mlb_engine.pipeline import deadline_governor as dg
+        self.assertEqual(calls[1], dg.OPEN_CONTROL_VALUES,
+                         "the re-solve did not receive every opened control")
+        self.assertEqual(brief["label"], "review_grade_deadline_build")
+        self.assertNotEqual(brief["label"], "upload_ready")
+        self.assertTrue(brief["deadline"]["deadline_forced"])
+        self.assertEqual(brief["deadline"]["rungs_walked"], ["open_controls"])
+        self.assertTrue(brief["deadline"]["deadline_ladder"])
+        # The file, and it is FULLY non-blank.
+        self.assertTrue(brief["verification"]["passed"],
+                        brief["verification"]["failures"])
+        self.assertEqual(brief["verification"]["failure_kinds"], [])
+        self.assertEqual(len(brief["verification"]["lineups"]), 2)
+        self.assertIn("REVIEW-GRADE", brief["label_note"])
+        self.assertIn("preflight_upload.py", brief["label_note"])
+
+    def test_an_illegal_refusal_is_never_governed(self):
+        """The safety property, executed. A name-crosswalk wall and a DK
+        rejection must refuse at every clock, and one solve is the evidence
+        nothing was retried."""
+        illegal = dict(self._REFUSAL,
+                       errors=["failed post-export gate: roster_legality_passed"])
+        code, brief, calls, _err = self._run(2, refusal=illegal)
+        self.assertEqual(code, 3)
+        self.assertEqual(len(calls), 1, "an ILLEGAL refusal was re-solved")
+        self.assertEqual(brief["refusal_class"], "illegal")
+        self.assertEqual(brief["deadline"]["rungs_walked"], [])
+        self.assertFalse(brief["deadline"]["deadline_forced"])
+        # The per-gate breakdown rides along, so the operator sees WHICH gate
+        # made this illegal rather than inferring it from the class alone.
+        self.assertEqual(brief["refusal_class_by_gate"],
+                         {"roster_legality_passed": "illegal"})
+        self.assertEqual(brief["refusal_authority_by_gate"],
+                         {"roster_legality_passed": "dk_rule"})
+
+    def test_outside_the_window_a_badly_shaped_refusal_still_refuses(self):
+        """The governor is a deadline mechanism, not a permanent relaxation. At
+        T-30 there is time to fix the build properly and the refusal is the
+        useful answer."""
+        code, brief, calls, _err = self._run(30)
+        self.assertEqual(code, 3)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(brief["refusal_class"], "badly_shaped")
+        self.assertFalse(brief["deadline"]["in_window"])
+        self.assertEqual(brief["deadline"]["rungs_walked"], [])
+
+    def test_rung_two_is_unavailable_on_classic_and_the_refusal_says_so(self):
+        """The boundary the item demands the governor state out loud. Rung 2
+        (accept blank reserved rows) needs `require_all_reserved_filled=False`,
+        which `execute_portfolio` passes True at BOTH validator calls, so a
+        short bank fails inside the engine before any caller can label it.
+        After rung 1 the refusal stands, once, with the reason on stderr."""
+        code, brief, calls, err = self._run(2)
+        self.assertEqual(code, 3)
+        self.assertEqual(len(calls), 2, "rung 1 must still have been taken")
+        self.assertEqual(brief["deadline"]["rungs_walked"], ["open_controls"])
+        self.assertIn("rung 2", err)
+        self.assertIn("require_all_reserved_filled", err)
+        from mlb_engine.pipeline import execution_pipeline as epi
+        import inspect
+        self.assertIn("require_all_reserved_filled=True",
+                      inspect.getsource(epi.execute_portfolio),
+                      "the engine constraint this refusal cites is gone, so the "
+                      "boundary is stale and rung 2 may now be reachable")
+
+
+class DeadlineGovernorCliTests(unittest.TestCase):
+    """--deliver-by at the front door, and the supervisor's three clocks."""
+
+    _SALARY = (REPO / "tests" / "fixtures" / "slates"
+               / "DKSalaries_frozen_2026-07-29.csv")
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def _main(self, extra_argv):
+        import contextlib
+        import importlib.util
+        import io
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_deliverby_cli", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        seen = {}
+
+        def fake(args, *_rest):
+            seen["governor"] = getattr(args, "_governor", None)
+            return 3, {}
+
+        argv = ["build_slate.py", "--salary", str(self._SALARY),
+                "--entries", str(self._SALARY), "--past-slate-replay", *extra_argv]
+        out, err = io.StringIO(), io.StringIO()
+        with unittest.mock.patch.object(mod, "REPO", self.root), \
+                unittest.mock.patch.object(mod, "run_classic", fake), \
+                unittest.mock.patch.object(mod, "run_showdown", fake), \
+                unittest.mock.patch.object(sys, "argv", argv):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = mod.main()
+        try:
+            payload = json.loads(out.getvalue())
+        except ValueError:
+            payload = {}
+        return code, payload, seen
+
+    def test_an_unparseable_deliver_by_refuses_at_exit_4_before_staging(self):
+        """Exit 4 and not 3, per commit 1's own boundary: nothing was solved, so
+        there is no verdict for a supervisor to retry against. And before
+        staging, because the whole point is not to spend the bank first."""
+        code, payload, seen = self._main(["--deliver-by", "half past six"])
+        self.assertEqual(code, 4)
+        self.assertEqual(payload["status"], "deliver_by_unparseable")
+        self.assertIn("HH:MM", payload["error"])
+        self.assertNotIn("governor", seen, "the build ran anyway")
+        self.assertEqual(list(self.root.glob("data/slates/*/DKSalaries*.csv")), [])
+
+    def test_a_valid_deliver_by_reaches_the_build_as_a_governor(self):
+        code, _payload, seen = self._main(["--deliver-by", "23:40"])
+        self.assertEqual(code, 3)
+        self.assertIsNotNone(seen.get("governor"),
+                             "--deliver-by parsed and then reached nothing")
+        self.assertTrue(hasattr(seen["governor"], "governs"))
+
+    def test_no_deliver_by_means_no_governor_at_all(self):
+        """A build without the flag must be byte-identical to before, and the
+        cheapest proof is that the object does not exist."""
+        code, _payload, seen = self._main([])
+        self.assertEqual(code, 3)
+        self.assertIsNone(seen.get("governor"))
+
+    def test_the_supervisor_clamps_the_slate_budget_to_the_lock(self):
+        """R296's rider: the governor must not become a FOURTH answer to 'how
+        long do we have'. --deliver-by is an absolute external fact and the
+        other two clocks are budgets, so the slate budget is clamped to the lock
+        and the clamp is recorded. --call-budget-seconds is untouched: it is a
+        fact about this shell, not about the slate."""
+        import ast
+        source = (REPO / "tools" / "autobuild.py").read_text(encoding="utf-8")
+        self.assertIn("clock_clamped", source)
+        self.assertIn("stop_after_minutes_applied", source)
+        # The clamp reaches the deadline the loop actually reads, which is the
+        # part a comment cannot promise.
+        tree = ast.parse(source)
+        assigns = [n for n in ast.walk(tree)
+                   if isinstance(n, ast.Assign)
+                   and any(getattr(t, "id", "") == "deadline" for t in n.targets)]
+        self.assertTrue(assigns, "autobuild lost its `deadline` assignment")
+        self.assertIn("stop_after_minutes", ast.unparse(assigns[0].value))
+        self.assertNotIn("a.stop_after_minutes * 60.0",
+                         ast.unparse(assigns[0].value),
+                         "the loop's deadline still reads the UNCLAMPED flag")
+
+    def test_the_supervisor_forwards_deliver_by_to_the_build(self):
+        """A supervisor that knows the lock while the thing doing the work does
+        not is the two-readers-one-fact shape this repo keeps paying for."""
+        source = (REPO / "tools" / "autobuild.py").read_text(encoding="utf-8")
+        self.assertIn('("--deliver-by", getattr(a, "deliver_by", None))', source)
 
 
 if __name__ == "__main__":

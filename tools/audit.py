@@ -537,7 +537,25 @@ EXPECTED_SUITE_COUNTS = {
     # table's field name: its first cut called the field `status`, which made
     # R296(e)'s payload-shape walk read eleven table rows as eleven refusal
     # payloads with no slate date.
-    "tests.test_core": 1095,
+    # R290(c) step 2, 2026-09-03: 1095 -> 1127, the thirty-two that pin the
+    # deadline governor. Nineteen pure ones on the clock, the filter and the
+    # ladder (every clock injected, because CLAUDE.md's own rule is read the
+    # clock from the clock and a test on the wall clock cannot pin a window):
+    # HH:MM and ISO parsing including a NAIVE stamp read as ET rather than UTC,
+    # the window opening at T-6 and staying open PAST the lock, only
+    # badly_shaped governed, a payload naming no class never governed, the
+    # two-rung ladder, the open overlap value being roster size MINUS ONE so a
+    # rung cannot produce an identical pair, and the label never being
+    # upload_ready. Five WIRING ones that drive run_classic itself with only
+    # run_slate faked -- the item's done-when executed, an ILLEGAL refusal
+    # never re-solved, T-30 still refusing, rung 2's Classic boundary cited
+    # against the engine source, and R288's claim re-asserted as behaviour
+    # after this item's refactor broke its string pin (R300(c)). Five CLI ones
+    # on --deliver-by at the front door and the supervisor's clock clamp. Three
+    # on the classification defect this item's own acceptance test found: POST-
+    # export gate names never reached the classifier, so four DK-rule gates
+    # took the no-gate-named default.
+    "tests.test_core": 1127,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

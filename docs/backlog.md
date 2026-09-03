@@ -39,6 +39,53 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-03 (third note this date), DEV, claim `engine` (`engine_2026-09-03`,
+re-taken): **R290(c) CLOSED, step 2 shipped and migrated to CHANGELOG.md. Gate
+`PASS v2.26.0 27 modules 1723 tests` -> `PASS v2.26.0 28 modules 1755 tests`
+(`test_core` 1095 -> 1127, `grew`; the other four unchanged and all `ok`; the
+module count moved on its own with the new engine module); golden replay 9
+tests unmoved; no delivered byte changes without `--deliver-by`.**
+
+**The list is RENUMBERED to THIRTEEN slots, counted rather than inherited: the
+numbered list runs 1 through 13.** R290(c) held slot 1 and closed, so the old
+slot 2 (R293) is now slot 1 and everything below moved up one, per the
+2026-08-27 and 2026-09-02 precedents. Slot numbers in every note below this one
+read one higher than the current list.
+
+**The ladder is TWO rungs and that is a reconciliation, not a shortcut.**
+R290(c) said "walks a fixed documented relaxation ladder"; CLAUDE.md's T-15
+rung, written hours later from the same post-mortem and carrying the measured
+cost, says open every binding control AT ONCE because five careful steps cost
+more than one crude step under a clock. CLAUDE.md is binding, so the ladder is
+fixed and documented and it has one crude rung plus the blank-row rung.
+
+**Two defects this commit found in its own work, and the second is worse than
+anything in the filing.** The first cut opened overlap to the ROSTER SIZE — two
+lineups sharing every slot are the same lineup, two identical entries in one
+contest are a DK rejection, so the rung would have converted a BADLY-SHAPED
+refusal it may fix into an ILLEGAL one it may not. And **commit 1's
+classification was silently wrong for four DK-rule gates**: `_GATE_ERROR_RE`
+matches only PRE-export gate errors, `execute_portfolio` emits post-export
+failures in a different shape, so `failed_gates` came back empty and
+`roster_legality_passed` took the no-gate-named default of BADLY-SHAPED. The
+governor would have re-solved past a DK illegality. Both found by writing the
+acceptance test rather than by reading, which is the argument for putting the
+executed test in the same commit as the mechanism.
+
+**A third finding from a SURVIVING mutation:** the refusal payload was writing
+`refusal_class` twice with the second write winning, so the first was a
+live-looking value no reader saw. One writer now.
+
+**26 mutations, 26 killed, each against the single guard written for it.** And
+one string pin retired opportunistically: R288's source-text assertion is now
+an AST question plus an executed test, which is one member of R300(c).
+
+**The named remainder, holding no slot:** rung 2 (accept blank reserved rows) is
+Showdown-only, because `execute_portfolio` passes
+`require_all_reserved_filled=True` at both validator calls. It is filed on the
+R290 stub with the engine change it needs, and a test asserts the cited
+constraint still exists so the boundary cannot go stale quietly.*
+
 *2026-09-03 (second note this date), DEV, claim `engine` (`engine_2026-09-03`,
 re-taken): **R290(c) STEP 1 SHIPPED and migrated to CHANGELOG.md: the
 classification, and no governor. Gate
@@ -1263,47 +1310,43 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R290(c) STEP 2 — the deadline governor itself** (P0, M). **Step 1 SHIPPED
-   2026-09-03** and migrated: eleven refusal exits classified, in code as
-   `REFUSAL_SITES` with an N+1 test, and both riders discharged (SKILL.md's
-   exit-3 paragraph, `solver_probe`'s `--budget` default). The slot keeps its
-   position because the remainder is still the largest thing on the board:
-   every refusal-without-a-file inside a window is a certain zero, and 1940_9g
-   was one. What is left is `--deliver-by` over the BADLY-SHAPED set, a fixed
-   documented ladder, `deadline_forced` and `review_grade_deadline_build`, and
-   the same governor in `autobuild.py`. Its set is named on the entry, it reads
-   `refusal_class` rather than a site identity, and the third rider is live:
-   `autobuild` already has two clocks (`--stop-after-minutes`,
-   `--call-budget-seconds`) and the governor must not become a fourth answer to
-   "how long do we have".
-2. **R293 — the bank on every rung** (P1, XS-S). Impact on winning: the
+1. **R293 — the bank on every rung** (P1, XS-S). **R290(c) CLOSED 2026-09-03**,
+   both commits, and migrated; the queue is RENUMBERED to thirteen slots rather
+   than annotated, per the 2026-08-27 and 2026-09-02 precedents, because nothing
+   about closing it changes any other item's rank. Impact on winning: the
    SP-plus-own-offense stack is the highest-correlation legal construction and
-   the augmentation pass cannot reach it (it attempts the barred opponent
-   stack instead, paying for infeasible solves); `--max-opposing-hitters-per-sp`,
-   the control Ben asked for on 09-01, is silently off on the direct path while
-   the brief says it is on. Lift XS. Re-scopes R164(b).
-3. **R294 — allocator truth** (P1, S). Impact: the primary-stack floor, the
+   the augmentation pass cannot reach it (it attempts the barred opponent stack
+   instead, paying for infeasible solves); `--max-opposing-hitters-per-sp`, the
+   control Ben asked for on 09-01, is silently off on the direct path while the
+   brief says it is on. Lift XS. Re-scopes R164(b). **One rider from R290(c):**
+   that item replaced this control's source-string pin with an AST question and
+   an executed test, so the claim "the flag reaches the controls the export
+   validator grades" is now behaviour rather than punctuation. R290(c)'s named
+   remainder — rung 2 on Classic, which needs
+   `require_all_reserved_filled=False` in `execute_portfolio` — is filed on the
+   R290 stub and holds no slot.
+2. **R294 — allocator truth** (P1, S). Impact: the primary-stack floor, the
    GPP construction lever, is relaxed by a search-effort prefilter and the
    record blames the bank; refusals of the 1940_9g shape pay up to seven
    30-second solves before saying no; status 4 is called "proven". Lift S.
-4. **R118 — the replay tool** (P1, M; Tier 2 head, PROMOTED). Impact: the only
+3. **R118 — the replay tool** (P1, M; Tier 2 head, PROMOTED). Impact: the only
    instrument that says which construction finishes where against the fields
    we actually enter, conditioned on archetype and field size; `player_table`
    with per-player FPTS already survives in every `mined_*.json`, so no miner
    change and no re-mine (ed7 §3.1, re-confirmed). Everything strategic below
    is gated on it, and so is the R302 start condition. Then, unchanged in
    order: R48 + R83 → R10 (gated on R225) → R140, R13 the funding gate.
-5. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S). Reason
+4. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S). Reason
    unchanged from the 08-31 note (measured cost on 1305_12g). **Its dependency
    is DISCHARGED (2026-09-02): R292 shipped, so the tool R268's remedies run
    through now writes a DK-valid file, refuses a player whose game is underway,
    and reads one clock.** Nothing else about its rank changed.
-6. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Impact:
+5. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Impact:
    single-game and small-field prizes ride on the three caps holding and on
    the degraded flag being true; measured realized exposure 58% under a 50%
    cap, and duel/blowout rosters flagged degraded by construction. R247(b)'s
    premise must be re-read against R295(b) first (rider on the entry).
-7. **R174 + R175 + R248 + R242 + R279 + R297** — the money boundary (P1, S).
+6. **R174 + R175 + R248 + R242 + R279 + R297** — the money boundary (P1, S).
    Impact: prevents a bad upload; R279 has a field sighting, R297(a)(d)(e)
    are fail-opens ON the referee, the rest are prospective. Lift S. R297(b)
    (the `workflow_gates` door) also closes the last unrestricted path around
@@ -1312,34 +1355,36 @@ R292 rather than leads it.*
    branch, so the weaker checker can finally see a post-lock file with nothing
    to diff against. What is left in R175 is the contest-identity check and the
    downgraded delivered-manifest failures.
-8. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2,
+7. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2,
    S-M). Impact: Showdown entries dealt to contests without shape; medium.
    Dependency: R238 before R239(a). Tail unchanged: R122-rider, R123,
    R189(3), R210 (+R303's three unread-flag siblings), R211; R240 decision-first.
-9. **R298 + R300's remainder** — evidence and tests (P2 + P1, S). Impact: the
+8. **R298 + R300's remainder** — evidence and tests (P2 + P1, S). Impact: the
    T-5 read (`manifest_strategy_state`, the Classic brief's mirror status) is
    wrong today. **R300(a) SHIPPED under R291 and R300(b) SHIPPED under R292,
    both 2026-09-02**, so what remains is (c), the string pins standing in for
    behaviour on money-adjacent claims, and (d), the R155 fixture class. Lift S.
-10. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
+9. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
     hardening (was slots 6-8). No member changes a delivered byte; R216 still
     lands alone at a session boundary. Then **R207 + R244 → R203**, **R164**
     (re-scoped by R293, and its `Excluded` third SHIPPED under R291),
     **R284**, **R276**, **R225 + R226 + R227** (R225 gates R10's Showdown
-    cells, so it must land before slot 4's R10 leg).
-11. **R301 — the instruction corpus** (P2, M). The four money-boundary
+    cells, so it must land before slot 3's R10 leg — slot 3 after the
+    2026-09-03 renumbering, and the reference is to R118's tail, not to a
+    number).
+10. **R301 — the instruction corpus** (P2, M). The four money-boundary
     contradictions first (showdown.md caps, late_swap.md `--locked-teams`,
     the ledger pin, `timeout 33`); then CLAUDE.md to ≤ 6 KB and SKILL.md to
     ≤ 150 lines with the incident narrative moved to the CHANGELOG entries it
     cites; then the prose-pinning tests removed so the files can shrink.
-12. **R302 — the strangler engine** (Tier 3, L). START CONDITION: R118 built
+11. **R302 — the strangler engine** (Tier 3, L). START CONDITION: R118 built
     and ten deliveries graded. Ben may pull it forward or strike it; either is
     a one-line edit here.
-13. **Smalls, batched opportunistically:** R299 (six intake seams), R303's
+12. **Smalls, batched opportunistically:** R299 (six intake seams), R303's
     non-demoted members, and the standing set: R264 + R265, R236(b), R221 +
     R280, R222, R229, R230 (+(d)), R231, R232, R241, R243, R269 (with R245),
     R271's two-line remainder.
-14. **The pre-existing Tier 1 remainder from R121**, standing order,
+13. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged, except that its clock half is now inside R290(c)'s scope.
 
 *(The previous fourteen-slot list, with its 08-30/08-31/09-01 slot reasoning
@@ -3571,12 +3616,74 @@ Falsifier: if (1) shows the direct path genuinely cannot carry a job list, then 
 correct fix is the READER only plus an honest "no job list on this path" in the
 brief, and the entry closes smaller. Owner: none. Rollback: revert the extractor.
 
-### R290. Three residues of the 09-01 no-file-at-lock batch: a bank cache that ignores leverage, a plan-time verdict that carries no feasibility, and the deadline governor that is eight refusal exits and not one (P1 / P2 / P0-by-value, S / XS / M-L) | new 2026-09-01, DEV, found while shipping R286-R289; every count below is measured at this head
+### R290. CLOSED 2026-09-03 -- (c) the deadline governor, both commits, entry migrated to CHANGELOG.md. (a) and (b) SURVIVE below and hold no slot
 
-**Rider 2026-09-02 (ed10, GF10-S6 and GF10-T17).** (a) is TWO omissions, not one: the three leverage controls are absent from the bucket key AND `Projected_Ownership_Pct`, the column those constraints read, is absent from `bank_cache._PROJECTION_COLUMNS` (:542-544), so `apply_leverage_ownership`'s overwrite (`execution_pipeline.py:4479`) moves neither the bucket nor the digest; the allocator has no per-candidate ownership filter, so the "bank is a superset" argument (`bank_cache.py:39-43`) does not hold for this control. Append `lev:` and the sorted ownership column only when leverage is non-empty. (c)'s count is SUPERSEDED — see the classification table below, which is the landed answer at 2026-09-03: eleven refusal exits (eight literal `return 3`, two conditionals, one at exit 10), no line numbers, and the table now lives in code as `REFUSAL_SITES`. This rider's own list (1581, 1607, 2110, 2646, 2665, 2673, 2686, 2709, 4007; 2224, 3131) is kept only as the record of the third of three different counts this item carried in three days; `main():4007` did become exit 4 (R296(h)), and the rider's "only 2110 and the conditionals write a brief" is the one part that held.
+**(c) closed in two commits.** Commit 1 classified ELEVEN refusal exits, not
+the eight this entry filed nor the nine its ed10 rider claimed -- exit 10
+refuses too, and the item enumerated `return 3` while the class is refusal
+EXITS. The table lives in code as `REFUSAL_SITES` with an N+1 test rather than
+in prose, because the count moved three times in three days. Commit 2 built
+`--deliver-by` over the BADLY-SHAPED set. Gate 1703 -> 1723 -> 1755, golden
+replay unmoved, no delivered byte changes without the flag.
 
-Three parts, filed together because they were all found by the same enumeration
-and one of them is the reason D3 of the post-mortem did not ship.
+**Two premises in this entry were false and one of them hid its own subject.**
+The table labelled two Showdown sites `bank_short`; measured, the second is
+`bank_short_of_reserved_rows`, the BLANK RESERVED ROW site -- exactly the wall
+(c) exists to move, filed as a duplicate of its neighbour. And `tools/build_
+slate.py` does not exist; the file is
+`skills/generate-lineups/scripts/build_slate.py`.
+
+**The finding.** `portfolio_caps_passed` is exactly the exposure and overlap
+errors, every one of them Ben's own number and every one a file DK accepts,
+while `roster_legality_passed` is DEFINED as everything that is not one of
+those -- and one exit stood over both, so the refusal that lost 1940_9g could
+not tell a DK rejection from a concentration preference. Same shape one
+function over: `verify_classic` emitted one string over a partially filled row
+(DK rejects) and an all-blank reserved row (DK enters nothing).
+
+**And commit 1 shipped a defect commit 2's acceptance test found.**
+`_GATE_ERROR_RE` matches only PRE-export gate errors, so `failed_gates` came
+back empty for all six post-export gates and four DK-rule gates took the
+no-gate-named default of BADLY-SHAPED. The governor would have re-solved past a
+DK illegality. Both halves fixed in commit 2; the reasoning is in the CHANGELOG
+entries.
+
+**SURVIVING REMAINDER, no slot: rung 2 on Classic.** `accept_blank_rows` is
+Showdown-only. `execute_portfolio` passes `require_all_reserved_filled=True` at
+BOTH of its `validate_dk_entries` calls, so a bank short of the reserved rows
+fails `roster_legality_passed` inside the engine before any caller can label the
+result -- which means Ben's "blank rows block certification" and R290(c)'s
+"blank rows stop blocking delivery" cannot both be implemented on Classic
+without an engine change on the certification path. Not smuggled in behind a
+flag. `test_rung_two_is_unavailable_on_classic_and_the_refusal_says_so` asserts
+the cited constraint still exists, so this boundary cannot go stale silently.
+- **Fix shape:** a `require_all_reserved_filled` that the CALLER sets, defaulting
+  True, with the blank-row error moved out of `roster_legality_errors` into its
+  own reported fact so the gate keeps failing while the file becomes
+  deliverable. That is a change to a gate the money-boundary items depend on,
+  so it wants its own commit and its own evidence.
+- **Also open, and measured rather than assumed:** there is no executed Showdown
+  refusal test. The MIN@CHC fixture delivers under every cap tried
+  (`max_shared_players: 0`, `max_cpt_exposure_pct: 0.05`, at 30/60/200 entries)
+  because the Showdown ladder relaxes its own three controls before it
+  truncates, so what that test needs is a fixture whose pool cannot fill its
+  reserved rows.
+
+**(a) and (b) below are UNCHANGED and hold no slot.** They live here only, are
+easy to misread as part of the closed work, and share no surface with (c).
+
+**Rider 2026-09-02 (ed10, GF10-S6), RETAINED because it is (a)'s and it was
+nearly lost with (c)'s migration.** (a) is TWO omissions, not one: the three
+leverage controls are absent from the bucket key AND `Projected_Ownership_Pct`,
+the column those constraints read, is absent from
+`bank_cache._PROJECTION_COLUMNS` (:542-544), so `apply_leverage_ownership`'s
+overwrite (`execution_pipeline.py:4479`) moves neither the bucket nor the
+digest; the allocator has no per-candidate ownership filter, so the "bank is a
+superset" argument (`bank_cache.py:39-43`) does not hold for this control.
+Append `lev:` and the sorted ownership column only when leverage is non-empty.
+**Rider 2026-09-02 (ed10, GF10-D3), (b)'s half:** (b)'s proxy delta must be
+computed on the UNWEIGHTED `Base` or it inherits the thesis weighting; R295(b)
+carries the fix, so re-verify (b)'s premise against it before building.
 
 **(a) `conditions_signature` does not include R246's leverage controls (P1, S).**
 `bank_cache.conditions_signature(projections_df, excludes, stack_min, stack_max)`
@@ -3618,120 +3725,6 @@ checkpoint has both objects in scope roughly 240 lines above.
   moment a fixture has a failing check. That golden currently has
   `max_shared_players=8` against an inherent floor of 7, so nothing fails and
   the string is stable — verify that before assuming the fixture protects you.
-
-**(c) The deadline governor, and it is EIGHT refusal exits rather than one
-(P0 by value, M-L).** This is D3 of
-`2026-09-01_BUILD_no-file-at-lock-full-postmortem.md`, refused on the merits in
-the R286-R289 commit rather than deferred for room, and the enumeration is the
-part a next session did not have.
-
-The ask: `--deliver-by <ISO or HH:MM ET>` defining T-minus; from T-6 the build
-stops exploring, walks a fixed documented relaxation ladder until the joint MILP
-is feasible, writes the file, stamps the brief `deadline_forced: true` with the
-ladder it walked, and labels the result `review_grade_deadline_build`, never
-certified. Blank reserved rows keep blocking CERTIFICATION and stop blocking
-DELIVERY. Same governor in `tools/autobuild.py` so the two do not diverge.
-
-**STEP 1 OF THE FIX SHIPPED 2026-09-03 and its record is in CHANGELOG.md.** The
-classification below is the landed answer, not a plan. What remains open in (c)
-is step 2, the governor itself, and the two conditions this classification puts
-on it.
-
-**The acceptance criterion was the problem.** "Refusal must be unreachable while
-entries are blank and time remains" is a claim over every refusal exit in
-`skills/generate-lineups/scripts/build_slate.py` (the path, because there is no
-`tools/build_slate.py` and two handoffs in a row wrote the bare name), and the
-fragment treats them as one.
-
-**The count is ELEVEN, not eight and not nine, and no line numbers appear
-below.** It moved three times in three days while this item sat — the entry's
-own table said eight at 09-01 lines, the ed10 rider said nine plus two
-conditionals at 09-02 lines, R296(h) then moved one off exit 3 — so the table
-now lives in code as `REFUSAL_SITES`, keyed on a stable key that is stamped
-into each refusal's own payload, and
-`test_every_refusal_exit_is_classified` fails the suite if a refusal exit is
-added without a row. Eight literal `return 3`, two conditional returns of 3,
-and **one at exit 10, which the item's own table missed entirely because it
-enumerated `return 3` while the class is refusal EXITS** (R233, eleventh
-consecutive edition finding N+1).
-
-| key | class | authority | why |
-|---|---|---|---|
-| `pool_blocked_hard` | READ-IT | input_identity | wrong pool for this slate; no output control reaches it. `--ignore-pool-blockers` exists and pressing it means classifying a blocker benign |
-| `pool_blocked_crosswalk` | ILLEGAL | claude_md_wall | **not a DK rule, and the table says so.** CLAUDE.md's hard list plus R133's by-name refusal |
-| `bank_thin_partial` (exit 10) | BADLY-SHAPED | search_effort | the remedy it prints is "run the same command again", the one remedy a deadline cannot buy |
-| `classic_not_certified` | **SPLIT** | see below | one exit over an allocation failure, six workflow gates and contest identity |
-| `classic_verify_failed` | **SPLIT** | see below | `verify_classic` on the delivered file; six of seven kinds are DK rules |
-| `showdown_ladder_infeasible` | BADLY-SHAPED | ben_preference | the three Showdown caps, whose relaxation order CLAUDE.md already documents and counts |
-| `showdown_bank_short` | BADLY-SHAPED | search_effort | fewer lineups than entries under the same caps |
-| `showdown_not_certified` | ILLEGAL | dk_rule | `certify_showdown`: one CPT, five UTIL, no duplicate, recomputed salary under cap |
-| `showdown_bank_short_of_reserved_rows` | BADLY-SHAPED | ben_wall | blank reserved rows. Blocks certification, and this item is the decision that it stops blocking delivery |
-| `showdown_export_failed` | ILLEGAL | dk_rule | no DK-valid file was produced; nothing to deliver and nothing to relax |
-| `showdown_template_broken` | ILLEGAL | dk_rule | a non-roster template cell changed, so this is not the file DK issued |
-
-**Two premises in the inherited table were FALSE, and the second is the whole
-finding.** It labelled two Showdown sites `bank_short` and one
-`not_certified from failed contests`; measured, there is one `bank_short`, one
-`not_certified` from failed per-lineup CERTIFICATIONS, and one
-`bank_short_of_reserved_rows`. So the site the Fix line called a duplicate
-`bank_short` is the BLANK RESERVED ROW site — precisely the wall the item's own
-scope moves — and it had been classified as a repeat of its neighbour.
-
-**The SPLIT half is the substantive result, and collapsing either site would
-have made the governor useless or unsafe.** `classic_not_certified` stands over
-six workflow gates: four are DK rules, `export_hash_binding_passed` is
-provenance (the file may be legal while the record binding its sha256 is
-broken, and every brief states a sha256 Ben checks at upload), and
-**`portfolio_caps_passed` is purely Ben's exposure and overlap numbers, every
-one of which DK accepts.** `roster_legality_passed` is defined in
-`dk_entries_manager` as everything that is NOT one of those errors, so the
-single exit that lost 1940_9g cannot distinguish "DK will reject this" from
-"this is more concentrated than you asked for" — and the second is the entire
-reason the governor exists. The nine pre-export gates are classified too, seven
-READ-IT for one reason: each reports that an INPUT is wrong, and a ladder
-relaxes outputs. A block is BADLY-SHAPED only when EVERY failing gate is.
-
-And `verify_classic` emitted ONE string, `blank slot`, over two facts with
-opposite classifications: a PARTIALLY filled row, which DK rejects, and an
-ALL-blank reserved row, which DK simply does not enter. It now tags every
-failure with a `kind` and reports `delivery_blocked`, which is False exactly
-when every failure is a blank row.
-
-**Exit 4 is named out of scope, with its reason**: all fourteen sites refuse
-before anything is solved, so there is no verdict to retry and no shape to
-relax. R296(h) moved `supplied_feed_rejected` there and it is the worked
-example. A deadline does not conjure a salary file.
-
-- **Why this mattered more than shipping something:** a `--deliver-by` that
-  covers one of eleven exits, in front of an operator inside a lock window,
-  reads as though it covers the deadline. That is this repo's named
-  false-reassurance failure with a command-line switch on it, and the cost is
-  paid at exactly the moment the flag is reached for.
-- **Fix, in order:** (1) classify every site ILLEGAL / BADLY-SHAPED / READ-IT
-  before any code — **DONE 2026-09-03**; (2) build the governor over the
-  BADLY-SHAPED set only and have it say which exits it does not cover; (3) the
-  ladder is documented and fixed, never derived per slate; (4) `autobuild.py`
-  gets the same governor in the same commit, reconciled with the two clocks
-  R296 gave it.
-- **Two conditions step 2 inherits from step 1.** The governor's set is
-  `bank_thin_partial`, `showdown_ladder_infeasible`, `showdown_bank_short`,
-  `showdown_bank_short_of_reserved_rows`, the allocation-failed member of
-  `classic_not_certified`, its `portfolio_caps_passed` and
-  `selection_certified` members, and the `blank_row` member of
-  `classic_verify_failed`. Everything else refuses at every clock. And the
-  governor reads `refusal_class`, never a site identity, so a site whose class
-  is later corrected changes the governor's reach without editing it.
-- **What already shipped of D3's operational half, and why the rest is still
-  worth building:** the refusal now prints its failing `feasibility.checks` and
-  the clock to stderr itself, and CLAUDE.md's T-schedule is a ladder with actions
-  (T-15 open every binding control at once, T-10 the best legal file is the
-  deliverable, T-6 hand-build and preflight it). That moves the pressure off a
-  session's memory. It does not put a clock inside the engine, which is what the
-  flag is for.
-- **Done when:** an over-constrained slate with `--deliver-by` two minutes out
-  returns exit 0, a fully non-blank file, a non-empty ladder in the stamp, and
-  the label `review_grade_deadline_build`; and the entry names every refusal exit
-  the governor deliberately does not cover.
 
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 
