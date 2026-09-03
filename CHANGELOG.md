@@ -25,6 +25,263 @@ performance claim.
 
 ---
 
+## 2026-09-02 — R291: the salary file's `Excluded` column reaches the frame, the bank grid, the Showdown melt and the late swap, and the two counts in one brief agree
+
+**What moved.** `mlb_engine/pipeline/execution_pipeline.py` (`_assemble_projection_frame`
+carries `Excluded`/`Excluded_Source`); `mlb_engine/projections/projection_builder.py`
+(`refresh_confirmed_lineups` preserves an operator flag instead of assigning the
+starter test, and writes the provenance token back so the read is idempotent;
+`build_projections`' default gets a comment saying it is a default);
+`mlb_engine/optimize/bank_cache.py` (`extend_bank` enumerates the pitcher and
+team axes from the legal pool and reports what the column removed);
+`mlb_engine/optimize/showdown.py` (the melt reads the token and OR's it across a
+player's CPT and UTIL rows and records a per-frame report on `attrs`;
+`build_showdown_lineup` enforces it, and refuses a pool narrowed to one side);
+`skills/generate-lineups/scripts/build_slate.py` (`showdown_excluded_block`, the
+Showdown brief's `pool.excluded_column`, two caution NOTEs, a front-door refusal,
+and the CLASSIC brief's `pool.excluded_column`, which this block dropped);
+`tests/test_core.py` (+7, and the R289 acceptance test rewritten);
+`tests/test_showdown.py` (+7); `tools/audit.py` (two suite pins); `CLAUDE.md`
+(two false sentences corrected, gate line); `skills/generate-lineups/SKILL.md`
+and `NEXT_SESSION_PROMPT.md` (gate line); `docs/backlog.md` (R291 migrated here,
+R164 and R300 riders, a dated note);
+`ledger/inbox/2026-09-02_DEV_gate-pin-1659.md` and
+`docs/backlog_inbox/2026-09-02_DEV_coerce-excluded-column-has-no-caller.md` (new
+fragments).
+
+**No delivered byte changes for a salary file without an `Excluded` column.** A
+file WITH one now certifies the smaller pool. The evidence for the first half is
+the digest, not an argument: `projection_digest` on a frame assembled from the
+plain fixture is `9b9577bc53c73866` before this change and after it, so no live
+bank bucket is orphaned. `Excluded_Source` is the one new column and it is not in
+`bank_cache._PROJECTION_COLUMNS`; for a file with no column every row is `False`,
+which is exactly what `build_projections` stamped before. Golden replay: 9 tests,
+unmoved, and its fixtures carry no `Excluded` column.
+
+**Why.** R289 (`6ebcdb9`, one commit earlier) made `_pool_row` read the column
+and the pool report count it, and closed on that. Five sites downstream then
+dropped, re-stamped, overwrote, never read, or enumerated around it, so the
+defect the entry describes as closed was live on every Classic build path. It is
+worse in one respect than before R289: the pool report and its warning now tell
+the operator "this build's legal pool is N − 288" while the frame, the bank and
+the certified file hold all 288. The operator behind it is Ben on 1940_9g, who
+staged `DKSalaries_excl_locked.csv` with `Excluded=TRUE` on all 288 players from
+games that had locked, in order to restrict the pool to the six open games; the
+build certified and delivered 151 of them, then 78 on a second attempt. And the
+R289 acceptance test could not have caught any of it: it built
+`pd.DataFrame(pool["projection_rows"])` by hand, called `_drop_excluded_rows`
+directly, and guarded its lineup assert with `if lineup is not None:` — on that
+fixture the restricted pool is two teams whose only two arms oppose every
+remaining hitter, so the solve returns None and the assert never ran. That is
+R300(a), and it is the reason every test added here runs a production function.
+
+**Repro, before and after.** Synthetic 4-team salary (the R289 fixture,
+`Excluded=TRUE` on T3/T4), through `live_data_adapters.build_slate_pool` then
+`execution_pipeline._assemble_projection_frame`:
+
+```
+                                       b4ad0f7   after
+pool rows Excluded=True                     20      20
+pool_report.excluded_column.applied         20      20
+frame Excluded=True                          0      20
+T3+T4 rows still in the frame               20      20   (carried on purpose)
+checkpoint exclusions...excluded_true        0      20
+projection_digest, restricted file    9b9577bc…  16b4f94d…
+projection_digest, PLAIN file         9b9577bc…  9b9577bc…
+```
+
+The last two lines are the whole of R289's digest claim: it was true of a
+hand-built frame and false end to end, because the frame the digest hashes is the
+assembled one. A restricted build was being served an unrestricted bank's bucket.
+
+`extend_bank` on the same fixture with T4 excluded, against the exact
+counterfactual (same restricted frame, `_drop_excluded_rows` patched to identity,
+which is what the code did before):
+
+```
+                    before   after
+jobs_total              16       6
+jobs attempted          16       6
+candidates built         2       2
+```
+
+Identical bank, ten fewer solves. 62.5% of that grid was work
+`build_single_lineup` was always going to refuse, and each refusal was then
+recorded in `attempted`, so no later slice could tell "answered" from "never
+legal" — the F13 misdiagnosis one door over.
+
+**The five sites, and what each now does.**
+
+- `execution_pipeline._assemble_projection_frame` (:3806-3843) built a new dict
+  per row with a fixed key set that omitted the column. It carries
+  `"Excluded": bool(r.get("Excluded", False))` and `"Excluded_Source"` verbatim.
+  No token rule is re-derived: `_pool_row` already applied `read_excluded_cell`.
+  Every Classic build passes through here (`run_slate`; both `build_slate.py`
+  routes), which is why this one site accounted for the frame, the bank, the
+  digest and the checkpoint at once.
+- `projection_builder.build_projections` (:126-132) stamped `Excluded=False` when
+  the column was absent. Unchanged in behaviour and correct as written now that
+  the column arrives; it kept the site because a caller may hand in a frame that
+  genuinely has none. It gets a comment saying so, because for one day it was the
+  line that erased the instruction.
+- `projection_builder.refresh_confirmed_lineups` (:189-193) ASSIGNED
+  `Excluded = pid not in starter_set` on the late-swap path, so an operator
+  exclusion on a player who IS in the confirmed lineup was revoked by the one
+  refresh that runs after the instruction. It now takes
+  `operator_flag or (pid not in starter_set)`. The operator flag is read off
+  `Excluded_Source == "salary_file"`, and the branch WRITES that token back
+  (`confirmed_lineup` / `confirmed_starter`) whenever it imposes or clears an
+  exclusion of its own. Without the write-back the read is not idempotent: a row
+  whose salary cell said `FALSE` (source `salary_file`, flag False) would be
+  excluded once as a non-starter and then read as an operator flag forever, which
+  would freeze exactly the correction this function exists to make. Both
+  directions are tested.
+- `showdown.melt_showdown_salary_csv` (:206-241) read no `Excluded` at all —
+  `grep -n Excluded mlb_engine/optimize/showdown*.py` returned nothing. It reads
+  the cell through `read_excluded_cell` (lazy import, the pattern the
+  `SCIPY_MILP_STATUS` import already uses) and OR's the flag across a player's
+  two role rows: an operator who marks the CPT row has said "not this player",
+  not "not as captain". Enforcement is in `build_showdown_lineup`, folded into
+  the same mask as the `excludes` kwarg, because that is the ONE function every
+  Showdown path funnels through — `build_showdown_bank`'s loop and
+  `showdown_theses.solve_ladder`'s every rung — so no relaxation can restore an
+  excluded player. A lock naming him lands in R54(c)'s `ignored_locks` rather
+  than overriding the pool. Showdown still ships review-grade.
+- `bank_cache.extend_bank` (:731-737) enumerated excluded arms and all-excluded
+  teams into the job grid. It applies `_drop_excluded_rows` before the
+  pitcher/team enumeration and reports `excluded_column_dropped:
+  {rows, arms, stack_teams}`. `projections_df` itself is deliberately not
+  narrowed: the signature and the digest hash the whole frame including the
+  column, and every solve is handed the full frame, so
+  `optimizer_v3._drop_excluded_rows` stays the one site that removes a player
+  from a lineup. This is R291(d) and the `Excluded` third of R164's rider;
+  R164's opponent-direction half is R293 and is untouched.
+
+**A sixth site, from the BUILD fragment rather than the review, and it is why
+the operator edited the salary file by hand.** `build_slate.py`'s
+`pool_brief_block` (:1252) never copied `excluded_column` out of the pool
+report, so on the 2026-09-02 2138_2g build the brief carried no
+`pool.excluded_column` key AT ALL — absent, which is not the same fact as zero
+and is the one thing a reader cannot recover. Ben's staged
+`DKSalaries_2138_2g_excl.csv` produced a byte-identical delivery
+(`delivered_sha256 22a0dea16eda…` both times) with nothing in the brief saying
+the instruction had been dropped, and the workaround that shipped was clearing a
+`Starting` cell in the authoritative salary file — exactly the edit the
+`Excluded` column exists to make unnecessary. It is present unconditionally now
+and its own test asserts the zero case, because the fragment's suggested bar is
+the right one. This is `pool_brief_block`'s own documented failure shape a third
+time (R190: the brief holds the symptom and not the fact it joins to), which is
+worth saying out loud: that docstring describes the class and the function kept
+one more member of it.
+
+Two guesses BUILD filed with that report are ruled out by measurement rather
+than argument, and both are worth recording so nobody re-chases them:
+`parse_dk_salary_csv` DOES carry an unknown column into `SalaryPlayer.raw` (the
+R289 fixture reads 20 rows True through the front door), and nothing in
+`build_slate.py` rewrites the salary CSV (no `to_csv`, no `DictWriter`, no
+`writerows`). The brief block was the whole of it. Fragment consumed.
+
+**A seventh thing, found by a test that failed for the right reason.** The
+Showdown both-teams MILP rows are built from the LEGAL pool (`work`), so a pool
+narrowed to one side makes that rule vacuously true and the solve returns a
+six-man one-team lineup DK rejects outright. That is precisely the vacuity
+`melt_showdown_salary_csv` refuses a single-team FILE for (its own comment says
+so), and until an `Excluded` column existed the only way to reach it was the
+`excludes` kwarg. Adding the column opened a second door to it, so
+`build_showdown_lineup` now refuses when
+`required_teams_from_pool(df)` is not covered by `work` — the matchup read off
+`Game_ID`, not off who is left in the pool. `certify_showdown_lineup` would have
+caught it (it already reads the matchup that way), but a solver should not return
+a lineup it can already tell is illegal, and `run_showdown` refuses at the front
+door with the count and the remedy rather than letting it surface as an empty
+bank three hundred lines later.
+
+**Deliberately KEPT, with the reason.** `slate_intake_manager.
+optimizer_shell_preflight`'s `"Excluded": False` (:1458-1469), on R289's own
+reasoning: that function asks whether the salary file's SHAPE can make a legal
+lineup, with projections that are deliberately not a DFS opinion, and honouring
+an operator exclusion there would make a narrowed pool read as a broken file. The
+two bank-stamp sites at `execution_pipeline.py:3446-3449` and `:4823-4826` are
+also kept unchanged: both are ADD-only (`if "Excluded" not in columns: … = False`
+then `.loc[mask] = True`), so with the column arriving the guard is a no-op and
+the typed excludes still compose on top of the operator's.
+
+**R233 enumeration.** `grep -rn "Excluded" mlb_engine tools skills --include=*.py`
+at this head: 76 hits across 9 files (the ninth is `tools/audit.py`, two pin
+comments). Classified — 12 CARRY or STAMP, 14 READ, 1 SCHEMA-LIST each in two
+modules, the rest comments and message text.
+
+READERS of the token rule (4 sites, all one function): `optimizer_v3.
+read_excluded_cell` (:629, the definition) called from `excluded_flags` (:684),
+`live_data_adapters._pool_row` (:1464, imported at :68) and
+`showdown.melt_showdown_salary_csv` (:245, lazy). READERS of the frame:
+`optimizer_v3.excluded_flags` (:659) called from `_drop_excluded_rows` (:714),
+`coerce_excluded_column` (:704), `execution_pipeline._exclusion_block` (:3109),
+`showdown.build_showdown_lineup`, and `build_slate.showdown_excluded_block`.
+REMOVAL sites: `_drop_excluded_rows` only (defined `optimizer_v3.py:710`),
+called at `optimizer_v3.py:754`, `:1526`, `:1559`, `:3997` and now
+`bank_cache.py:744`.
+
+CARRY / STAMP sites, the class this item is filed on — 5 fixed, 3 kept:
+
+- FIXED: `execution_pipeline.py:3842-3843` (carry, was absent);
+  `projection_builder.py:213-220` (was assign, now preserve + provenance);
+  `showdown.py:254-257` (carry, was absent); `showdown.py:328` (the melt's
+  `attrs` report, new); `bank_cache.py:744` (drop before enumeration, was
+  absent).
+- KEPT: `slate_intake_manager.py:1469` (the neutral shell, reason above);
+  `execution_pipeline.py:3447-3449` and `:4823-4826` (add-only, reason above).
+- UNCHANGED and correct: `projection_builder.py:131-132` (the default);
+  `bank_cache.py:543` (`_PROJECTION_COLUMNS`); `optimizer_v3.py:402` and
+  `projection_builder.py:51` (schema lists).
+
+`grep -rn "Excluded_Source"`: 8 hits, 4 files — written at
+`live_data_adapters.py:1475` and `execution_pipeline.py:3843`, read at
+`live_data_adapters.py:2334` (the pool report's `column_present`) and
+`projection_builder.py:214`, written back at `projection_builder.py:220`.
+
+**Which FORM was searched, and what the second form found.** The token grep is
+the wider net here, because every access to this column spells the name as a
+string literal. An AST walk of `mlb_engine/ tools/ skills/ tests/` for subscripts
+and `.get`/`.setdefault`/`.pop` calls indexed by the literal `Excluded`,
+`Excluded_Source` or `excluded_column_report` returns 18 production sites, all of
+them already in the grep's hit list, and one hit for a runtime-constructed name
+containing `xclud` which is prose inside an operator message
+(`execution_pipeline.py:1341`). Stated because the walk is the WEAKER net at this
+site and a session should not read it as the stronger one: it sees
+`df["Excluded"]` but not `frame.at[index, "Excluded"]` or
+`frame.loc[mask, "Excluded"]`, whose index is a Tuple rather than a Constant, and
+those are three of the sites this item fixed. Read both, and know which one is
+missing what.
+
+**Two false sentences in CLAUDE.md, corrected in place.** The R289 paragraph said
+the column "now reaches the frame" and that "the projection digest already keys
+the bank cache on the column so a restricted build cannot reuse an unrestricted
+bank". Neither was true at `b4ad0f7`, and both were load-bearing: a session
+reading that paragraph would have believed an operator exclusion was honoured.
+The paragraph now names the five sites, carries the measured numbers, and says
+which claim has a test that executes the wiring.
+
+**Gate.** `PASS  v2.26.0  27 modules  1645 tests` -> `PASS  v2.26.0  27 modules
+1659 tests`, state `grew` on both moved suites. `tests.test_core` 1040 -> 1047,
+`tests.test_showdown` 166 -> 173; `test_upload_integrity` 332,
+`test_golden_replay` 9, `test_paste_lineups` 98 all unchanged. The pins moved in
+`tools/audit.py`; the quoted line moved in `CLAUDE.md`,
+`skills/generate-lineups/SKILL.md` and `NEXT_SESSION_PROMPT.md`; the ledger Quick
+Card's copy is ARCHIVE's and got a fragment.
+
+**Filed, not fixed.** `optimizer_v3.coerce_excluded_column` (:700) has no caller
+anywhere — one grep hit, the definition — which makes it a third exported entry
+point into the one reading of this column with nothing exercising it. Fragment at
+`docs/backlog_inbox/2026-09-02_DEV_coerce-excluded-column-has-no-caller.md`.
+
+**Done when, from the migrated entry, and where it stands.** The `grep` is
+enumerated above with every reader and stamp site listed (R233); the two counts
+in one brief agree (`pool_report.excluded_column.applied` and
+`exclusions.excluded_column.excluded_true`, both 20 on the fixture, asserted);
+and the R289 fixture certifies a smaller pool on the production path. The R289
+class had five members, not the two its own enumeration named.
+
 ## 2026-09-02 — Board: the tenth greenfield edition is merged (R291-R303 filed, twelve riders, one Do-not-build paragraph) and the queue is re-prioritized by prize impact, lift and dependency on Ben's instruction (docs only)
 
 **What moved.** `docs/backlog.md` (thirteen new entries in Workstreams 1, 3, 4, 5, 6; riders on R290, R285, R164, R82, R271, R175, R283, R242, R247; the "Do not build (updated)" ed10 paragraph; the "What do we tackle next" list rewritten to sixteen slots with a dated note at the top of the section and the ordering rule plus every adjudication immediately above the list); `docs/2026-09-02_critique_greenfield_spec_ed10.md` (new, the edition; written by the review half of the same session); `docs/backlog_inbox/2026-09-02_REVIEW_greenfield-spec-ed10.md` (consumed; marked so in place because the session had no shell to move it — see below); `NEXT_SESSION_PROMPT.md` (untracked handoff, addendum). No engine module, no tool, no test, no delivered byte, no test count. Gate not re-run: the session ran on file tools only (bash denied) and no code moved; the tree's gate line is the 09-02 `PASS v2.26.0 27 modules 1645 tests`.

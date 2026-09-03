@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import collections
 import contextlib
+import csv
 import hashlib
+import importlib.util
+import io
 import json
 import math
 import tempfile
+import types
 import unittest
 import unittest.mock
 from pathlib import Path
@@ -2922,6 +2926,195 @@ class SuppliedBaseTests(unittest.TestCase):
                / "build_slate.py").read_text(encoding="utf-8")
         self.assertEqual(src.count("price_showdown_pool("), 3)   # def + both paths
         self.assertIn('"supplied_base": ((priced if use_ladder else df).attrs.get(', src)
+
+
+class R291ShowdownExcludedColumnTests(unittest.TestCase):
+    """R291(c). The salary file's Excluded column, read by the Showdown path.
+
+    Until 2026-09-02 `grep -n Excluded mlb_engine/optimize/showdown*.py` returned
+    NOTHING: the melt did not read the token, the solve could not enforce it, and
+    the path has no pool report, so an accepted exclusion left no trace anywhere.
+    That is the 1940_9g failure one contest type over -- an explicit, visible,
+    instructed restriction silently ignored -- and Showdown is where it is
+    cheapest to hit, because a Showdown file is one game and an operator
+    shelving one arm has shelved a sixth of the pool.
+
+    Showdown still ships review-grade. Nothing here changes that.
+    """
+
+    @staticmethod
+    def _build_slate():
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_r291_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _staged(tmp, names, token="TRUE", roles=("CPT", "UTIL"), name="sal.csv"):
+        """The MIN@CHC fixture plus an Excluded column set on named players."""
+        out = Path(tmp) / name
+        with open(SAL, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        name_col = rows[0].index("Name")
+        role_col = rows[0].index("Roster Position")
+        rows[0].append("Excluded")
+        marked = 0
+        for row in rows[1:]:
+            if row[name_col] in names and row[role_col].strip().upper() in roles:
+                row.append(token)
+                marked += 1
+            else:
+                row.append("")
+        with open(out, "w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return out, marked
+
+    def _declared_target(self):
+        base = sd.melt_showdown_salary_csv(SAL)
+        declared = base[base["Is_Declared_Starter"]]
+        self.assertTrue(len(declared), "the fixture lost its declared starters")
+        key = str(declared["Player_Key"].iloc[0])
+        return key, key.split("|")[0]
+
+    def test_a_fixture_with_no_excluded_column_is_unchanged(self):
+        """The default. Every Showdown salary file DK ships carries no such
+        column, so the melt has to be byte-identical for them."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        self.assertIn("Excluded", df.columns)
+        self.assertEqual(int(df["Excluded"].sum()), 0)
+        bank = sd.build_showdown_bank(df, 3)
+        self.assertEqual(len(bank), 3)
+
+    def test_the_flag_is_ord_across_the_two_role_rows(self):
+        """A Showdown file has two rows per person. An operator who marks the
+        CPT row has said 'not this player', not 'not as captain' -- the roles
+        are one player's price list, not two players."""
+        key, name = self._declared_target()
+        with tempfile.TemporaryDirectory() as tmp:
+            for roles in (("CPT",), ("UTIL",), ("CPT", "UTIL")):
+                path, marked = self._staged(tmp, {name}, roles=roles,
+                                            name=f"{'_'.join(roles)}.csv")
+                self.assertEqual(marked, len(roles))
+                df = sd.melt_showdown_salary_csv(str(path))
+                self.assertTrue(
+                    bool(df.loc[df["Player_Key"] == key, "Excluded"].iloc[0]),
+                    roles)
+                self.assertEqual(int(df["Excluded"].sum()), 1, roles)
+
+    def test_an_excluded_declared_sp_reaches_no_lineup_in_the_bank(self):
+        """The acceptance criterion, and it runs the production bank rather than
+        a hand-built frame: the R289 test that did the latter is why this defect
+        shipped green (R300(a))."""
+        key, name = self._declared_target()
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _ = self._staged(tmp, {name})
+            df = sd.melt_showdown_salary_csv(str(path))
+            self.assertTrue(bool(df.loc[df["Player_Key"] == key, "Excluded"].iloc[0]))
+            bank = sd.build_showdown_bank(df, 5)
+            self.assertEqual(len(bank), 5, "vacuous: the bank built nothing")
+            for i, lineup in enumerate(bank):
+                keys = {p["player_key"] for p in lineup["players"]}
+                self.assertNotIn(key, keys, f"lineup {i}")
+
+    def test_no_caller_instruction_can_put_him_back(self):
+        """`build_showdown_lineup` is the one enforcement point every rung of
+        every path funnels through, so no relaxation can restore an excluded
+        player: the overlap bound, the player cap, the captain lock and the
+        thesis itself all give way before this does, and none of them is the
+        pool.
+
+        A lock naming him lands in R54(c)'s `ignored_locks` -- the loudest
+        channel this module has, because a lock that lost its player is an
+        instruction that did not arrive rather than a control that relaxed."""
+        key, name = self._declared_target()
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _ = self._staged(tmp, {name})
+            df = sd.melt_showdown_salary_csv(str(path))
+            locked = sd.build_showdown_lineup(df, locks=[key])
+            self.assertIsNotNone(locked, "vacuous: nothing solved")
+            self.assertNotIn(key, {p["player_key"] for p in locked["players"]})
+            self.assertIn(key, locked["ignored_locks"])
+            capped = sd.build_showdown_lineup(df, cpt_lock=key)
+            self.assertIsNotNone(capped, "vacuous: nothing solved")
+            self.assertNotIn(key, {p["player_key"] for p in capped["players"]})
+            self.assertIn(f"cpt:{key}", capped["ignored_locks"])
+
+    def test_the_brief_names_the_count_and_the_legal_pool(self):
+        """Classic's `pool_report.excluded_column`, on the path that has no pool
+        report. Without it the only trace of an accepted exclusion was a smaller
+        pool nobody counted."""
+        key, name = self._declared_target()
+        mod = self._build_slate()
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _ = self._staged(tmp, {name})
+            df = sd.melt_showdown_salary_csv(str(path))
+            block = mod.showdown_excluded_block(df)
+            self.assertTrue(block["column_present"])
+            self.assertEqual(block["applied"], 1)
+            self.assertEqual(block["player_keys"], [key])
+            self.assertEqual(block["legal_players"], len(df) - 1)
+            self.assertEqual(sorted(block["legal_teams"]), ["CHC", "MIN"])
+            self.assertEqual(sum(block["by_team"].values()), 1)
+            plain = mod.showdown_excluded_block(sd.melt_showdown_salary_csv(SAL))
+            self.assertFalse(plain["column_present"])
+            self.assertEqual(plain["applied"], 0)
+            self.assertEqual(plain["legal_players"], len(df))
+
+    def test_an_unrecognized_token_keeps_the_player_here_too(self):
+        """F21's rule reaches this path unchanged: guessing 'exclude' on an
+        ambiguous cell is the pool reduction CLAUDE.md forbids, arriving as a
+        data condition."""
+        key, name = self._declared_target()
+        mod = self._build_slate()
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _ = self._staged(tmp, {name}, token="maybe?")
+            df = sd.melt_showdown_salary_csv(str(path))
+            self.assertFalse(bool(df.loc[df["Player_Key"] == key, "Excluded"].iloc[0]))
+            block = mod.showdown_excluded_block(df)
+            self.assertEqual(block["applied"], 0)
+            # CELLS, not players: a Showdown file carries two rows per person and
+            # the operator typo'd both. Counting players here would understate
+            # how much of the file the engine could not read.
+            self.assertEqual(block["unrecognized_kept"], 2)
+            self.assertEqual(block["unrecognized_values"], ["maybe?"])
+            self.assertTrue(block["column_present"],
+                            "a column that excluded nobody is still a column, "
+                            "and that is the fact that says the tokens are wrong")
+
+    def test_an_exclusion_that_leaves_one_team_refuses_with_the_reason(self):
+        """A DK Showdown lineup must carry both sides, so an exclusion covering a
+        whole team cannot produce a legal entry. The melt's own single-team
+        refusal cannot see this -- it runs on the CARRIED pool, which is the
+        point of carrying rather than dropping -- so the refusal lives at the
+        build's front door, before anything is priced or solved."""
+        mod = self._build_slate()
+        df = sd.melt_showdown_salary_csv(SAL)
+        chc = {str(n) for n in df.loc[df["Team"] == "CHC", "Name"]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _ = self._staged(tmp, chc)
+            melted = sd.melt_showdown_salary_csv(str(path))
+            block = mod.showdown_excluded_block(melted)
+            self.assertEqual(block["legal_teams"], ["MIN"])
+            # The both-teams rows are built from the LEGAL pool, so a one-sided
+            # pool used to make that rule vacuously true and return a six-man
+            # one-team lineup. The solve refuses instead.
+            self.assertIsNone(sd.build_showdown_lineup(melted))
+            self.assertEqual(sd.build_showdown_bank(melted, 3), [],
+                             "a one-team legal pool produced a lineup")
+            args = types.SimpleNamespace(date="2026-07-18", entries=None,
+                                         controls_override=None, projections=None)
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                code, brief = mod.run_showdown(
+                    args, Path(tmp), path, Path(tmp) / "no_such_entries.csv")
+            printed = json.loads(out.getvalue())
+            self.assertEqual(printed["status"],
+                             "showdown_excluded_column_leaves_one_team")
+            self.assertEqual(printed["excluded_column"]["legal_teams"], ["MIN"])
+            self.assertIn("both sides", printed["remedy"])
+            self.assertEqual(code, 4)
+            self.assertEqual(brief, {})
 
 
 if __name__ == "__main__":

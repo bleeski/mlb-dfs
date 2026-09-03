@@ -39,6 +39,41 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-02 (third note this date), DEV, claim `engine` (`engine_2026-09-03`,
+UTC-named): **R291 CLOSED and migrated to CHANGELOG.md. Gate
+`PASS v2.26.0 27 modules 1645 tests` -> `PASS v2.26.0 27 modules 1659 tests`
+(`test_core` 1040 -> 1047, `test_showdown` 166 -> 173, both `grew`); golden
+replay 9 tests unmoved; no delivered byte changes for a salary file without an
+`Excluded` column, and the plain-file `projection_digest` is the same
+`9b9577bc53c73866` before and after, so no live bank bucket is orphaned.**
+
+**Slot 1 is REFILLED by promotion, and the list below is RENUMBERED to fifteen
+slots rather than annotated** — the 2026-08-27 precedent, and the reason is that
+nothing about closing R291 changes any other item's rank: R292 was slot 2 on the
+same three criteria (prize impact, then lift, then dependency) and is now slot 1.
+Every slot number in the notes BELOW this one is therefore one higher than the
+current list; read the list, not the older notes' numbers.
+
+Two riders this landing earns. **R300(a) shipped with it** and R300 keeps its
+slot for (b), (c) and (d) — (b) is the wall-clock preflight branch that printed
+the 09-01 false PASS, and it sits with slot 1 now because R292 touches the same
+referee. **R164's `Excluded` third shipped with it**; what remains there is (a),
+(c) and the opponent-direction half of (b), which is the same shape (a job the
+solve can never answer) reached from a different fact and belongs beside the
+`eligible` frame this landing added.
+
+**And the enumeration paid for the ninth consecutive time.** R289 named two stamp
+sites; the class had five. A sixth defect surfaced only because a new test failed
+for the right reason: the Showdown both-teams MILP rows are built from the LEGAL
+pool, so an exclusion covering one side made that rule vacuously true and the
+solve returned a one-team lineup DK rejects — the exact vacuity
+`melt_showdown_salary_csv` refuses a single-team FILE for, reached through a door
+the fix itself opened. Two of the sentences R289 wrote into CLAUDE.md were also
+false and are corrected in place, which is the part worth carrying forward: a
+closing entry that asserts a property is a claim, and R233's rule about
+enumerating the class in the entry is worth nothing if the entry's own claims are
+not measured.*
+
 *2026-09-02 (second note this date), DEV, claim `engine` (`engine_2026-09-02`,
 re-taken; bash denied to the session, so this note, the entries and the riders
 were written with file tools and the gate was NOT re-run — the tree carries the
@@ -1063,80 +1098,76 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R291 — the `Excluded` class, second landing** (P0, S). Impact: a
-   certified file can roster players the operator excluded (dead slots or a
-   rejected upload) while the pool report says the pool is smaller; the fix
-   for the lost slate does not reach the optimizer on any Classic path, the
-   Showdown melt, the late-swap refresh or the bank grid. Lift S, four sites,
-   one enumeration, no dependency. Its test must run THROUGH
-   `_assemble_projection_frame` (R300(a)).
-2. **R292 — the repair path and its clocks** (P0, S). Impact: the in-window
+1. **R292 — the repair path and its clocks** (P0, S). Impact: the in-window
    recovery tool cannot write a clean file, can insert a player whose game is
    underway, and its second referee passes a post-lock file; the R272 clause
    rests on it. Lift S. No dependency; R268 + R204 wait on it.
-3. **R296 first, then R290(c)** — the no-file-at-lock family (P1 S, then P0
+2. **R296 first, then R290(c)** — the no-file-at-lock family (P1 S, then P0
    M-L). Impact: every exit-1 crash, refusal-without-brief, or supervisor stop
    inside a window is a certain zero; 1940_9g was one. R296's eight doors are
    XS each and close most of the value this week; R290(c)'s first commit is the
    classification its entry tabulates (now nine sites plus two conditionals,
    R296(h)), then the governor. Rider: the solver_probe refusal on a normal
    slate (R296(g)) is why CLAUDE.md step 3 is skipped in practice.
-4. **R293 — the bank on every rung** (P1, XS-S). Impact on winning: the
+3. **R293 — the bank on every rung** (P1, XS-S). Impact on winning: the
    SP-plus-own-offense stack is the highest-correlation legal construction and
    the augmentation pass cannot reach it (it attempts the barred opponent
    stack instead, paying for infeasible solves); `--max-opposing-hitters-per-sp`,
    the control Ben asked for on 09-01, is silently off on the direct path while
    the brief says it is on. Lift XS. Re-scopes R164(b).
-5. **R294 — allocator truth** (P1, S). Impact: the primary-stack floor, the
+4. **R294 — allocator truth** (P1, S). Impact: the primary-stack floor, the
    GPP construction lever, is relaxed by a search-effort prefilter and the
    record blames the bank; refusals of the 1940_9g shape pay up to seven
    30-second solves before saying no; status 4 is called "proven". Lift S.
-6. **R118 — the replay tool** (P1, M; Tier 2 head, PROMOTED). Impact: the only
+5. **R118 — the replay tool** (P1, M; Tier 2 head, PROMOTED). Impact: the only
    instrument that says which construction finishes where against the fields
    we actually enter, conditioned on archetype and field size; `player_table`
    with per-player FPTS already survives in every `mined_*.json`, so no miner
    change and no re-mine (ed7 §3.1, re-confirmed). Everything strategic below
    is gated on it, and so is the R302 start condition. Then, unchanged in
    order: R48 + R83 → R10 (gated on R225) → R140, R13 the funding gate.
-7. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S). Reason
+6. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S). Reason
    unchanged from the 08-31 note (measured cost on 1305_12g); sequenced after
    R292 because R292 fixes the tool R268's remedies run through.
-8. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Impact:
+7. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Impact:
    single-game and small-field prizes ride on the three caps holding and on
    the degraded flag being true; measured realized exposure 58% under a 50%
    cap, and duel/blowout rosters flagged degraded by construction. R247(b)'s
    premise must be re-read against R295(b) first (rider on the entry).
-9. **R174 + R175 + R248 + R242 + R279 + R297** — the money boundary (P1, S).
+8. **R174 + R175 + R248 + R242 + R279 + R297** — the money boundary (P1, S).
    Impact: prevents a bad upload; R279 has a field sighting, R297(a)(d)(e)
    are fail-opens ON the referee, the rest are prospective. Lift S. R297(b)
    (the `workflow_gates` door) also closes the last unrestricted path around
    `OVERRIDABLE_GATES`.
-10. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2,
-    S-M). Impact: Showdown entries dealt to contests without shape; medium.
-    Dependency: R238 before R239(a). Tail unchanged: R122-rider, R123,
-    R189(3), R210 (+R303's three unread-flag siblings), R211; R240 decision-first.
-11. **R298 + R300** — evidence and tests (P2 + P1, S). Impact: the T-5 read
+9. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2,
+   S-M). Impact: Showdown entries dealt to contests without shape; medium.
+   Dependency: R238 before R239(a). Tail unchanged: R122-rider, R123,
+   R189(3), R210 (+R303's three unread-flag siblings), R211; R240 decision-first.
+10. **R298 + R300** — evidence and tests (P2 + P1, S). Impact: the T-5 read
     (`manifest_strategy_state`, the Classic brief's mirror status) is wrong
-    today; R300's two tests are the ones that would have caught R291 and the
-    09-01 false PASS, so they land WITH slots 1-3, not after them. Lift S.
-12. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
+    today; R300(b), the wall-clock preflight branch that printed the 09-01 false
+    PASS, is still exercised by one test that does not assert the return code,
+    so it lands with slot 1 (R292 touches the same referee). R300(a) SHIPPED
+    under R291 on 2026-09-02. Lift S.
+11. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
     hardening (was slots 6-8). No member changes a delivered byte; R216 still
     lands alone at a session boundary. Then **R207 + R244 → R203**, **R164**
-    (re-scoped by R293), **R284**, **R276**, **R225 + R226 + R227** (R225 gates
-    R10's Showdown cells, so it must land before slot 6's R10 leg).
-13. **R301 — the instruction corpus** (P2, M). The four money-boundary
+    (re-scoped by R293, and its `Excluded` third SHIPPED under R291),
+    **R284**, **R276**, **R225 + R226 + R227** (R225 gates R10's Showdown
+    cells, so it must land before slot 5's R10 leg).
+12. **R301 — the instruction corpus** (P2, M). The four money-boundary
     contradictions first (showdown.md caps, late_swap.md `--locked-teams`,
     the ledger pin, `timeout 33`); then CLAUDE.md to ≤ 6 KB and SKILL.md to
     ≤ 150 lines with the incident narrative moved to the CHANGELOG entries it
     cites; then the prose-pinning tests removed so the files can shrink.
-14. **R302 — the strangler engine** (Tier 3, L). START CONDITION: R118 built
+13. **R302 — the strangler engine** (Tier 3, L). START CONDITION: R118 built
     and ten deliveries graded. Ben may pull it forward or strike it; either is
     a one-line edit here.
-15. **Smalls, batched opportunistically:** R299 (six intake seams), R303's
+14. **Smalls, batched opportunistically:** R299 (six intake seams), R303's
     non-demoted members, and the standing set: R264 + R265, R236(b), R221 +
     R280, R222, R229, R230 (+(d)), R231, R232, R241, R243, R269 (with R245),
     R271's two-line remainder.
-16. **The pre-existing Tier 1 remainder from R121**, standing order,
+15. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged, except that its clock half is now inside R290(c)'s scope.
 
 *(The previous fourteen-slot list, with its 08-30/08-31/09-01 slot reasoning
@@ -4424,16 +4455,22 @@ replaced.
 
 ## Workstream 3 — Intake and pool truth
 
-### R291. The `Excluded` column stops at the pool report: dropped at frame assembly, re-stamped False, overwritten on late swap, never read by the Showdown melt, and never read by the bank job grid (P0, S) | new 2026-09-02, from the greenfield tenth edition (GF10-I1, GF10-D2, GF10-S5's Excluded half); VERIFIED-repro (frame count) and coordinator re-read at `execution_pipeline.py:3806-3822`, `projection_builder.py:126-127`, `showdown.py:206-241`; REOPENS the R289 class
+### R291. CLOSED 2026-09-02 -- SHIPPED, entry migrated to CHANGELOG.md
 
-**What.** R289 (`6ebcdb9`) made `_pool_row` carry `Excluded`/`Excluded_Source` and the pool report count them. Every Classic build then passes `pool["projection_rows"]` through `_assemble_projection_frame` (`run_slate` :4449; both `build_slate.py` routes :1700/:1725), which builds a new dict per row with a fixed key set that omits `Excluded`; `build_projections` (:126-127) then stamps `Excluded=False` on every row. The bank (`extend_bank` at `build_slate.py:1813`, the plan bank at :3443-3455, the auto-bank at :4798-4804 which sets the column from TYPED excludes only) and `projection_digest` (`bank_cache._PROJECTION_COLUMNS` hashes the assembled frame's column) all see all-False. The checkpoint's `exclusions.excluded_column` (:3109 reads the assembled frame) reports 0 while `pool_report.excluded_column` reports the salary count: one brief, two disagreeing numbers. Two more sites: `refresh_confirmed_lineups` (`projection_builder.py:189-193`) ASSIGNS `Excluded = pid not in starter_set` on the late-swap path, overwriting any operator flag once carried; `melt_showdown_salary_csv` (`showdown.py:206-241`) reads no `Excluded` at all and the Showdown path has no pool report to count it (grep of `showdown*.py` for the token: zero hits). `extend_bank` (`bank_cache.py:731-737`) enumerates excluded arms and teams into the job grid and pays a full solve per `proven_infeasible` job.
-Repro: synthetic 4-team salary, `Excluded=TRUE` on T3/T4, through `build_slate_pool` then `_assemble_projection_frame`: `pool Excluded=True: 20 / pool_report.excluded_column.applied: 20 / frame Excluded=True count: 0 / T3,T4 rows in frame: 20`.
-
-**Why P0.** It is the 1940_9g defect, still live on every Classic build path one commit after the entry that says it is closed, and now WORSE in one respect: the pool report and a warning tell the operator "legal pool is N−288" while the frame, the bank and the certified file hold all 288. The R289 acceptance test (`tests/test_core.py:4016-4036`) builds `pd.DataFrame(pool["projection_rows"])` and calls `_drop_excluded_rows` directly, so nothing executed the wiring (the R249-M1 shape). The R289 enumeration named two stamp sites; the class has five.
-
-**Fix.** (a) `execution_pipeline.py:3806-3822`: carry `"Excluded": bool(r.get("Excluded", False))` and `"Excluded_Source": r.get("Excluded_Source") or "absent_or_blank"` in the assembled row. (b) `projection_builder.py:189-193`: `excluded = operator_flag or (pid not in starter_set)` where `operator_flag` is the carried salary-file flag. (c) `showdown.py` melt: read the cell through `optimizer_v3.read_excluded_cell` (lazy import, the pattern :391 already uses), OR across the two role rows, fold into the `excl` filter at :393-394, add `pool.excluded_column` to the Showdown brief and one warning naming the legal pool. (d) `bank_cache.extend_bank`: apply `_drop_excluded_rows` before the pitcher/team enumeration at :731-737. **Tests through the wiring:** call `_assemble_projection_frame` (or `run_slate(approve=False)`) on the R289 fixture and assert `projections["Excluded"].sum() == 20` and that `projection_digest` differs between the plain and the excluded salary file; a Showdown fixture with `Excluded=TRUE` on a declared SP asserting he is absent from every bank lineup and named in the brief.
-
-**Done when.** `grep -rn "Excluded" mlb_engine tools skills` is enumerated in the CHANGELOG entry (R233) with every reader and every stamp site listed; the two counts in one brief agree; the R289 fixture certifies a 20-row-smaller pool on the production path.
+The salary file's `Excluded` column now reaches the assembled frame, the bank
+job grid, the Showdown melt and its solve, and survives the late-swap refresh;
+the pool report's count and the checkpoint's read the same number. **The R289
+class had FIVE members, not the two its own enumeration named**, and two of the
+sentences R289 wrote into CLAUDE.md were false: the column reached the pool
+report and stopped, and the digest re-key was true only of a hand-built frame
+(measured: the same `9b9577bc53c73866` for the plain and the restricted salary
+file). One site was found by a test failing for the right reason -- the Showdown
+both-teams MILP rows are built from the LEGAL pool, so an exclusion covering one
+side made that rule vacuously true and returned a one-team lineup DK rejects,
+the same vacuity the melt refuses a single-team FILE for. Full hit list, both
+grep forms with what each one misses, the before/after repro and the job-grid
+counterfactual are in CHANGELOG.md. R300(a) shipped with it; R164's `Excluded`
+third shipped with it; R164's opponent-direction half is R293 and is untouched.
 
 ### R299. Six intake seams, small and independent: UTC slate date, an `at` inside a team name, two missing team codes, a `1.0` slot token, an escaping read timeout, and one blank APPG killing a build (P2, XS each) | new 2026-09-02, from the greenfield tenth edition (GF10-I2..I7); five VERIFIED-repro, one PLAUSIBLE
 
@@ -5365,7 +5402,9 @@ the single assignment site is pinned by source inspection.
 
 ### R164. The bank job grid wastes solves two ways, hardest on the pinned late-swap path (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro, (b)(c) VERIFIED-read (`bank_cache.py` unchanged since the review)
 
-**Rider 2026-09-02 (ed10, GF10-S1 and GF10-S5): (b)'s premise is REVERSED in the sibling grid, and the class has a third member.** The diverse bank's `_teams_of_pair` (`optimizer_v3.py:4163-4174`) returns the arms' OWN teams and skips those, so it attempts the opponent stacks the anti-correlation rows bar and never attempts the legal own-team stack (repro: 6 of 13 augmentation attempts infeasible, 0 own-team). Re-scope (b) to BOTH grids with the direction stated: skip `team ∈ {Opponent(a), Opponent(b)}` when the effective `max_opposing_hitters_per_sp < stack_min`. The R293 entry carries the optimizer-side fix; this item keeps the `extend_bank` side. Third member: `extend_bank` (:731-737) reads `excl` but never the `Excluded` column, so an all-excluded team or a shelved arm still costs a full `proven_infeasible` solve per job (R291(d)).
+**Rider 2026-09-02 (ed10, GF10-S1 and GF10-S5): (b)'s premise is REVERSED in the sibling grid, and the class has a third member.** The diverse bank's `_teams_of_pair` (`optimizer_v3.py:4163-4174`) returns the arms' OWN teams and skips those, so it attempts the opponent stacks the anti-correlation rows bar and never attempts the legal own-team stack (repro: 6 of 13 augmentation attempts infeasible, 0 own-team). Re-scope (b) to BOTH grids with the direction stated: skip `team ∈ {Opponent(a), Opponent(b)}` when the effective `max_opposing_hitters_per_sp < stack_min`. The R293 entry carries the optimizer-side fix; this item keeps the `extend_bank` side. Third member: `extend_bank` (:731-737) read `excl` but never the `Excluded` column, so an all-excluded team or a shelved arm cost a full `proven_infeasible` solve per job (R291(d)).
+
+**The `Excluded` third SHIPPED under R291, 2026-09-02.** `extend_bank` applies `_drop_excluded_rows` before the pitcher and team enumeration and reports `excluded_column_dropped: {rows, arms, stack_teams}`. Measured on the R289 fixture with one team excluded, against the exact counterfactual (same frame, the drop patched out): 16 jobs -> 6, same 2 candidates. What REMAINS on this item is (a), (c) and the opponent-direction half of (b) -- and note the interaction the R291 landing makes concrete: the two are the same shape (a job the solve can never answer) reached from two different facts, so (b)'s fix belongs beside the `eligible` frame this landing added rather than in a second place.
 
 - **What:** (a) when pins relax `stack_min` below 2 the stack constraint is
   nulled but the job grid still fans out one job per team, so the IDENTICAL
@@ -6203,7 +6242,7 @@ which is R196's. Filed there, not here.
 
 ### R300. The two tests that would have caught the two worst recent classes, and the string pins standing in for behaviour on money-adjacent claims (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-X1, X2, X3, X5); VERIFIED-read
 
-(a) `tests/test_core.py:4016-4036` (R289 acceptance) builds `pd.DataFrame(pool["projection_rows"])`, calls `_drop_excluded_rows` directly, and guards the lineup assert with `if lineup is not None:`; it never executes `_assemble_projection_frame`, which is where R291's column is dropped, and is vacuous when the solver returns None. Fix: the test in R291's Done-when. (b) The wall-clock branch of preflight (`parse_as_of` :777-791, `datetime.now` :2096-2098), the path that printed the false PASS on 09-01, is exercised by exactly one test (`tests/test_upload_integrity.py:1703`), which asserts only `feed_autoresolve` fields and not the return code; every other preflight test runs under the injected `FIXTURE_AS_OF_BEFORE_FIRST_PITCH` (:117-138). Fix: one test builds a fixture whose game time is `now + 1h` at test time and runs the real clock path asserting exit 0, and one at `now − 1h` asserting exit 2. (c) String pins on money-adjacent claims: `tests/test_core.py:3921-3941` (R288 export-validator allowance: four `assertIn(…, src)`, nothing runs the validator; its docstring calls this "the one that would have made the control unusable end to end"); `tests/test_upload_integrity.py:5754-5763` (R272 "touches no portfolio control": `assertNotIn` on source with a hand-excised comment, which CLAUDE.md calls the whole of the safety argument); :5796-5798 (`assertIn("REVIEW-GRADE", source)`); :669-683. Fix: each becomes a behaviour test (run the validator against a fixture with the allowance breached; run the repair and diff the controls object). (d) R155 class at HEAD: `tests/test_core.py:13021` copies the live `data/reference/fangraphs_platoon_lineups.json` (ARCHIVE's write set; three sibling files are modified on disk now); :9567 pins the real `dk_contest_paid_places.json`; :15737 runs `sync_check.py` behind an `.env`-exists guard (skipped in every clone). Measured shape of the suite for the record: 1,645 methods; 152 (9.2%) call a solver or pipeline entry; 126 (7.7%) read source or walk an AST; 1,182 of 5,207 assertions (22.7%) are substring checks, 185 of them on ≥3-word English phrases; 33 high-stakes samples graded 19 counterfactual / 8 string pin / 5 conditional / 1 zero-assert (`tests/test_core.py:11214`).
+**(a) SHIPPED under R291, 2026-09-02.** The test was rewritten in place: it runs `_assemble_projection_frame`, drops the `if lineup is not None:` guard, and excludes ONE team rather than two, because on the two-team version the restricted pool's only two arms oppose every remaining hitter, the solve returns None, and the guard was what made it vacuous. Confirmed by measurement, not by reading. Six more tests landed beside it, each running a production function. Original text, kept for the record: `tests/test_core.py:4016-4036` (R289 acceptance) builds `pd.DataFrame(pool["projection_rows"])`, calls `_drop_excluded_rows` directly, and guards the lineup assert with `if lineup is not None:`; it never executes `_assemble_projection_frame`, which is where R291's column is dropped, and is vacuous when the solver returns None. (b) The wall-clock branch of preflight (`parse_as_of` :777-791, `datetime.now` :2096-2098), the path that printed the false PASS on 09-01, is exercised by exactly one test (`tests/test_upload_integrity.py:1703`), which asserts only `feed_autoresolve` fields and not the return code; every other preflight test runs under the injected `FIXTURE_AS_OF_BEFORE_FIRST_PITCH` (:117-138). Fix: one test builds a fixture whose game time is `now + 1h` at test time and runs the real clock path asserting exit 0, and one at `now − 1h` asserting exit 2. (c) String pins on money-adjacent claims: `tests/test_core.py:3921-3941` (R288 export-validator allowance: four `assertIn(…, src)`, nothing runs the validator; its docstring calls this "the one that would have made the control unusable end to end"); `tests/test_upload_integrity.py:5754-5763` (R272 "touches no portfolio control": `assertNotIn` on source with a hand-excised comment, which CLAUDE.md calls the whole of the safety argument); :5796-5798 (`assertIn("REVIEW-GRADE", source)`); :669-683. Fix: each becomes a behaviour test (run the validator against a fixture with the allowance breached; run the repair and diff the controls object). (d) R155 class at HEAD: `tests/test_core.py:13021` copies the live `data/reference/fangraphs_platoon_lineups.json` (ARCHIVE's write set; three sibling files are modified on disk now); :9567 pins the real `dk_contest_paid_places.json`; :15737 runs `sync_check.py` behind an `.env`-exists guard (skipped in every clone). Measured shape of the suite for the record: 1,645 methods; 152 (9.2%) call a solver or pipeline entry; 126 (7.7%) read source or walk an AST; 1,182 of 5,207 assertions (22.7%) are substring checks, 185 of them on ≥3-word English phrases; 33 high-stakes samples graded 19 counterfactual / 8 string pin / 5 conditional / 1 zero-assert (`tests/test_core.py:11214`).
 
 ### R301. The instruction corpus: fifteen quoted contradictions between live files, the same rule in five to eleven places, 46-59k tokens before a BUILD session's first command, and three tests that pin the prose so it cannot shrink (P2, M) | new 2026-09-02, from the greenfield tenth edition §3.1-3.3; every number measured (commands in the edition); absorbs the R183/R184/R185 direction and the R76 doc-truth remainder
 

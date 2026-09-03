@@ -1272,6 +1272,17 @@ def pool_brief_block(report: dict, pool: dict) -> dict:
     it is exactly on a fully covered slate, where DK ships no handedness, that
     the platoon term is expected to be unavailable and the reader most needs
     to see the coverage fact beside the zero.
+
+    R291. Third instance of the same shape, and it cost an in-slate workaround.
+    `excluded_column` is R289's audit surface and this block dropped it, so on
+    the 2026-09-02 2138_2g build the brief carried NO `pool.excluded_column`
+    key at all -- absent rather than zero, which is not the same fact and is
+    the one thing a reader cannot recover. It is present unconditionally now.
+    Two guesses that BUILD filed with that report are ruled out by measurement
+    rather than argument: `parse_dk_salary_csv` does carry an unknown column
+    into `SalaryPlayer.raw` (the R289 fixture reads 20 rows True through the
+    front door), and nothing in this script rewrites the salary CSV (no
+    `to_csv`, no `DictWriter`). This block was the whole of it.
     """
     return {
         "teams": len(report.get("teams") or {}),
@@ -1281,6 +1292,7 @@ def pool_brief_block(report: dict, pool: dict) -> dict:
         "opposing_probables_incomplete": (
             report.get("opposing_probables_incomplete") or {}),
         "dk_batting_order": report.get("dk_batting_order"),
+        "excluded_column": report.get("excluded_column") or {},
     }
 
 
@@ -2550,6 +2562,48 @@ def showdown_relaxation_caution(
     return notes
 
 
+def showdown_excluded_block(df) -> dict:
+    """What the salary file's Excluded column removes from a Showdown pool.
+
+    R291(c). Classic has a pool report and this path has none, so the count that
+    made the 1940_9g instruction auditable at T-5 had nowhere to land. It lands
+    here, on the same footing: the count, the per-team split, the ids, and the
+    legal pool the build actually has.
+
+    The reading is ``optimizer_v3.excluded_flags`` -- the one reader, shared with
+    Classic and with the solve that enforces it -- so this block cannot disagree
+    with what the MILP did.
+    """
+    from mlb_engine.optimize.optimizer_v3 import excluded_flags
+
+    flags, _ = excluded_flags(df)
+    # `column_present` and the unrecognized count are facts about the FILE and
+    # only the melt saw it: the frame carries an Excluded column either way now,
+    # so deriving "the file had one" from the frame would read True for every
+    # build. The melt records them on `attrs`.
+    melt_report = dict(df.attrs.get("excluded_column_report") or {})
+    excluded = df[flags] if len(df) else df
+    keys = [str(k) for k in excluded.get("Player_Key", [])]
+    by_team: dict = {}
+    for team in (str(t) for t in excluded.get("Team", [])):
+        by_team[team] = by_team.get(team, 0) + 1
+    legal = df[~flags] if len(df) else df
+    return {
+        "column_present": bool(melt_report.get("column_present")),
+        "applied": int(len(excluded)),
+        "by_team": dict(sorted(by_team.items())),
+        "player_keys": sorted(keys)[:50],
+        "unrecognized_kept": int(melt_report.get("unrecognized_kept") or 0),
+        "unrecognized_values": list(melt_report.get("unrecognized_values") or []),
+        "legal_players": int(len(legal)),
+        "legal_teams": sorted({str(t) for t in legal.get("Team", [])}),
+        "note": "salary-file Excluded column, OR'd across a player's CPT and "
+                "UTIL rows; only an affirmative token excludes "
+                "(optimizer_v3.read_excluded_cell) and build_showdown_lineup is "
+                "what removes the row, on every rung",
+    }
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
@@ -2557,6 +2611,21 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv, slate_clock
 
     df = sd.melt_showdown_salary_csv(str(salary))
+    # R291(c). Read before anything is built, so a restriction that leaves no
+    # legal lineup refuses HERE with the reason, rather than surfacing as an
+    # empty bank three hundred lines later. The melt's own single-team refusal
+    # cannot see this: it runs on the carried pool, which is the whole point of
+    # carrying rather than dropping.
+    sd_excluded = showdown_excluded_block(df)
+    if sd_excluded["applied"] and len(sd_excluded["legal_teams"]) < 2:
+        print(json.dumps({
+            "status": "showdown_excluded_column_leaves_one_team",
+            "excluded_column": sd_excluded,
+            "remedy": "a DK Showdown lineup must carry both sides of the "
+                      "matchup, so an Excluded column that leaves one team "
+                      "cannot produce a legal entry; narrow the exclusion",
+        }, indent=1))
+        return 4, {}
     clock = slate_clock(players=parse_dk_salary_csv(str(salary)))
     reserved = sd.read_showdown_reserved_rows(str(entries))
     # Only blank reserved rows are fillable; a complete row is immutable, and
@@ -2917,6 +2986,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "basis": (str(df["Pool_Basis"].iloc[0]) if len(df) else "empty"),
             "declared_starters": int(df["Is_Declared_Starter"].sum()) if len(df) else 0,
             "posted_hitters": int(df["Batting_Order"].notna().sum()) if len(df) else 0,
+            # R291(c). Classic's `pool_report.excluded_column`, on the path that
+            # had no pool report. `players` above is the CARRIED pool; read
+            # `legal_players` for what the solve could actually roster.
+            "excluded_column": sd_excluded,
         },
         "slate_clock": {
             "first_lock_utc": clock.get("first_lock_utc"),
@@ -3126,7 +3199,23 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        "evenly between the two sides rather than weighted to the "
                        "market."
                        if use_ladder and ladder_meta.get("win_share_basis")
-                       == "even_split_no_market_input" else "")),
+                       == "even_split_no_market_input" else "")
+                    # R291(c). The instruction, stated where the operator reads
+                    # the build's own caveats. Without it the only trace of an
+                    # accepted exclusion was a smaller pool nobody counted --
+                    # the 1940_9g failure, one contest type over.
+                    + (f" NOTE: the salary file excludes "
+                       f"{sd_excluded['applied']} of {len(df)} melted players "
+                       f"via its Excluded column "
+                       f"({', '.join(f'{t}={n}' for t, n in sd_excluded['by_team'].items())}); "
+                       f"this build's legal pool is "
+                       f"{sd_excluded['legal_players']} and no rung can relax "
+                       f"that."
+                       if sd_excluded["applied"] else "")
+                    + (f" NOTE: {sd_excluded['unrecognized_kept']} Excluded "
+                       f"cell(s) hold values this engine does not recognize; "
+                       f"those players were KEPT in the pool."
+                       if sd_excluded["unrecognized_kept"] else "")),
     }
     return (0 if template.get("passed") else 3), brief
 

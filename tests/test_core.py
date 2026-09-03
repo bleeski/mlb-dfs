@@ -4014,26 +4014,42 @@ class R289SalaryExcludedColumnTests(unittest.TestCase):
             self.assertEqual(sorted(block["by_team"]), ["T3", "T4"])
 
     def test_none_of_the_excluded_players_can_reach_a_lineup(self):
-        """The acceptance criterion. The optimizer still owns the removal -- a
-        drop in intake would put a second pool-reduction site on the front door
-        -- so this asserts the property end to end rather than the mechanism."""
+        """The acceptance criterion, THROUGH the wiring (R300(a), rewritten
+        under R291).
+
+        The version this replaces built ``pd.DataFrame(pool["projection_rows"])``
+        by hand and called ``_drop_excluded_rows`` directly, so it never
+        executed ``_assemble_projection_frame`` -- which is exactly where the
+        column was being dropped -- and it guarded the lineup assert with
+        ``if lineup is not None``. On the T3/T4 fixture the restricted pool is
+        two teams and both remaining arms oppose every remaining hitter, so
+        ``build_single_lineup`` returns None and the guard made the assert
+        vacuous. It passed green for a day over a defect that reached every
+        Classic build. One team is excluded here for that reason: the legal pool
+        has to be able to SOLVE or the test proves nothing.
+        """
         with tempfile.TemporaryDirectory() as tmp:
-            _, pool = self._pool(tmp)
-            frame = pd.DataFrame(pool["projection_rows"])
-            frame["Base"] = frame["AvgPointsPerGame"].fillna(5.0)
-            frame["Floor"] = frame["Base"] * 0.8
-            frame["Ceiling"] = frame["Base"] * 1.3
-            frame["Locked"] = False
+            salary = Path(tmp) / "salary.csv"
+            self._salary_with_excluded(salary, excluded_teams=("T4",))
+            pool = lda.build_slate_pool(
+                salary, pool_lineups_feed(), platoon_json=pool_platoon_json())
             banned = {str(r["Player_ID"]) for r in pool["projection_rows"]
                       if r["Excluded"]}
             self.assertTrue(banned)
-            kept = opt._drop_excluded_rows(frame)
+            projections, _ = epi._assemble_projection_frame(
+                salary, pool["projection_rows"], "emergency_proxy",
+                None, None, None)
+            self.assertEqual(int(projections["Excluded"].sum()), len(banned),
+                             "the salary Excluded column did not reach the frame")
+            kept = opt._drop_excluded_rows(projections)
             self.assertFalse(
                 banned & {str(x) for x in kept["Player_ID"]},
                 "an affirmatively excluded player survived the one removal site")
-            lineup, _ = opt.build_single_lineup(frame, target="ceiling")
-            if lineup is not None:
-                self.assertFalse(banned & {str(x) for x in lineup["Player_ID"]})
+            lineup, _ = opt.build_single_lineup(projections, target="ceiling")
+            self.assertIsNotNone(
+                lineup, "vacuous: the restricted pool produced no lineup, so "
+                        "the exclusion assert below proves nothing")
+            self.assertFalse(banned & {str(x) for x in lineup["Player_ID"]})
 
     def test_a_warning_states_the_legal_pool_the_build_actually_has(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -4106,7 +4122,16 @@ class R289SalaryExcludedColumnTests(unittest.TestCase):
     def test_an_exclusion_re_keys_the_bank_cache(self):
         """Free, and worth pinning: the projection digest already hashes the
         Excluded column, so a bank built without the restriction is not reused
-        for a build with it."""
+        for a build with it.
+
+        This is the MECHANISM, on a hand-built frame. It was true here and false
+        on the production path for a day, because the frame the digest actually
+        hashes came through ``_assemble_projection_frame`` with the column
+        blanked -- measured: the same digest ``9b9577bc53c73866`` for the plain
+        and the restricted salary file. R291's
+        ``test_the_digest_re_keys_the_bank_on_the_production_path`` is the
+        end-to-end half.
+        """
         columns = (REPO / "mlb_engine" / "optimize"
                    / "bank_cache.py").read_text(encoding="utf-8")
         self.assertIn('"Excluded"', columns)
@@ -4118,6 +4143,216 @@ class R289SalaryExcludedColumnTests(unittest.TestCase):
         other.loc[0, "Excluded"] = True
         self.assertNotEqual(bank_cache.projection_digest(frame),
                             bank_cache.projection_digest(other))
+
+
+class R291ExcludedColumnReachesTheOptimizerTests(unittest.TestCase):
+    """R291. The column R289 carried to the pool report, carried the rest of the way.
+
+    R289 shipped `_pool_row` reading the salary file's Excluded column and the
+    pool report counting it. Five sites downstream then dropped, re-stamped,
+    overwrote, never read, or enumerated around it, so one commit after the entry
+    that says the defect is closed the frame, the bank, the digest, the
+    checkpoint and the certified file all still held every excluded player while
+    the pool report told the operator the pool was smaller.
+
+    Measured at `b4ad0f7` on this fixture (Excluded=TRUE on T3/T4): pool rows
+    True 20 / pool_report.applied 20 / frame True 0 / T3+T4 rows still in the
+    frame 20, checkpoint `excluded_true` 0 in the same brief as the report's 20,
+    and `projection_digest` identical (`9b9577bc53c73866`) for the plain and the
+    restricted file.
+
+    Every test here runs the production function. The R289 acceptance test did
+    not, which is how it shipped green (R300(a)).
+    """
+
+    _salary_with_excluded = staticmethod(
+        R289SalaryExcludedColumnTests._salary_with_excluded)
+
+    def _frame(self, tmp, name="salary.csv", **kwargs):
+        """(salary path, assembled frame, banned ids) off the production path."""
+        salary = Path(tmp) / name
+        self._salary_with_excluded(salary, **kwargs)
+        pool = lda.build_slate_pool(
+            salary, pool_lineups_feed(), platoon_json=pool_platoon_json())
+        projections, _ = epi._assemble_projection_frame(
+            salary, pool["projection_rows"], "emergency_proxy", None, None, None)
+        banned = {str(r["Player_ID"]) for r in pool["projection_rows"]
+                  if r["Excluded"]}
+        return salary, pool, projections, banned
+
+    def test_the_frame_carries_the_column_and_the_two_counts_agree(self):
+        """The 1940_9g brief carried two numbers for one fact. The pool report
+        read the salary rows and said 288; the checkpoint read the assembled
+        frame and said 0. Both are in the same artifact."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, pool, projections, banned = self._frame(tmp)
+            self.assertEqual(len(banned), 20)
+            self.assertEqual(int(projections["Excluded"].sum()), len(banned))
+            self.assertEqual(
+                sorted(set(projections.loc[projections["Excluded"], "Team"])),
+                ["T3", "T4"])
+            self.assertEqual(
+                set(projections.loc[projections["Excluded"], "Excluded_Source"]),
+                {"salary_file"})
+            report = pool["pool_report"]["excluded_column"]["applied"]
+            checkpoint = epi._exclusion_block(projections, [])["excluded_column"]
+            self.assertEqual(report, checkpoint["excluded_true"],
+                             "one brief, two numbers for one fact")
+
+    def test_the_digest_re_keys_the_bank_on_the_production_path(self):
+        """The end-to-end half of R289's mechanism test. A restricted build must
+        not be served an unrestricted build's stored candidates."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, restricted, _ = self._frame(tmp, name="excl.csv")
+            plain = Path(tmp) / "plain.csv"
+            pool_salary_csv(plain)
+            pool = lda.build_slate_pool(
+                plain, pool_lineups_feed(), platoon_json=pool_platoon_json())
+            unrestricted, _ = epi._assemble_projection_frame(
+                plain, pool["projection_rows"], "emergency_proxy",
+                None, None, None)
+            self.assertNotEqual(bank_cache.projection_digest(restricted),
+                                bank_cache.projection_digest(unrestricted))
+
+    def test_a_salary_file_with_no_excluded_column_hashes_as_it_always_did(self):
+        """No live bank bucket is orphaned by this change. A file with no
+        Excluded column produces an all-False column -- exactly what
+        `build_projections` stamped before -- and `Excluded_Source`, the one new
+        column, is not in `_PROJECTION_COLUMNS`, so the hashed bytes are
+        unchanged. Measured: `9b9577bc53c73866` before and after."""
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp) / "plain.csv"
+            pool_salary_csv(plain)
+            pool = lda.build_slate_pool(
+                plain, pool_lineups_feed(), platoon_json=pool_platoon_json())
+            frame, _ = epi._assemble_projection_frame(
+                plain, pool["projection_rows"], "emergency_proxy",
+                None, None, None)
+            self.assertFalse(bool(frame["Excluded"].any()))
+            self.assertEqual(set(frame["Excluded_Source"]), {"absent_or_blank"})
+            self.assertNotIn("Excluded_Source", bank_cache._PROJECTION_COLUMNS)
+            pre_fix_shape = frame.drop(columns=["Excluded_Source"])
+            self.assertEqual(bank_cache.projection_digest(frame),
+                             bank_cache.projection_digest(pre_fix_shape))
+
+    def test_the_late_swap_refresh_does_not_revoke_an_operator_exclusion(self):
+        """`refresh_confirmed_lineups` ASSIGNED the starter test, so the one
+        refresh that runs after the operator's instruction reversed it: an
+        excluded player who is in the confirmed lineup came back into the pool.
+        The confirmed lineup answers "is he playing", which is not the question
+        the operator asked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, projections, banned = self._frame(tmp)
+            excluded = projections[projections["Excluded"]
+                                   & ~projections["Position"].str.contains("P")]
+            self.assertTrue(len(excluded))
+            pid = str(excluded["Player_ID"].iloc[0])
+            team = str(excluded["Team"].iloc[0])
+            everyone = {str(x) for x in projections["Player_ID"]}
+            refreshed, _ = refresh_confirmed_lineups(
+                projections, {pid: 3}, starter_player_ids=everyone,
+                confirmed_teams=[team])
+            row = refreshed.set_index("Player_ID").loc[pid]
+            self.assertTrue(bool(row["Excluded"]),
+                            "the confirmed lineup revoked an operator exclusion")
+            self.assertEqual(row["Excluded_Source"], "salary_file")
+
+    def test_the_refresh_still_un_excludes_a_player_it_excluded_itself(self):
+        """The other direction, and the reason the source token is written back:
+        correcting a projected-lineup exclusion when the real lineup posts is
+        this function's JOB. Reading the operator flag off the mutating column
+        alone would have frozen every exclusion the refresh ever imposed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, projections, _ = self._frame(tmp)
+            open_teams = projections[~projections["Excluded"]
+                                     & ~projections["Position"].str.contains("P")]
+            pid = str(open_teams["Player_ID"].iloc[0])
+            team = str(open_teams["Team"].iloc[0])
+            first, _ = refresh_confirmed_lineups(
+                projections, {}, starter_player_ids=set(), confirmed_teams=[team])
+            self.assertTrue(bool(first.set_index("Player_ID").loc[pid, "Excluded"]))
+            self.assertEqual(
+                first.set_index("Player_ID").loc[pid, "Excluded_Source"],
+                "confirmed_lineup")
+            second, _ = refresh_confirmed_lineups(
+                first, {pid: 1}, starter_player_ids={pid}, confirmed_teams=[team])
+            self.assertFalse(
+                bool(second.set_index("Player_ID").loc[pid, "Excluded"]),
+                "an exclusion this function imposed read back as an operator flag")
+
+    def test_extend_bank_enumerates_the_legal_pool_only(self):
+        """R291(d) / R164's third member. `build_single_lineup` drops an excluded
+        row inside `_prepare_single_lineup_df`, so an excluded arm or an
+        all-excluded stack team was never going to produce a candidate; the grid
+        paid a full proven-infeasible solve per job to find that out and then
+        recorded the key, so no later slice could tell "answered" from "never
+        legal".
+
+        Measured on this fixture with T4 excluded: 6 jobs after, 16 before,
+        the same 2 candidates."""
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, projections, banned = self._frame(tmp, excluded_teams=("T4",))
+            arms = {str(p) for p in projections.loc[
+                projections["Excluded"]
+                & projections["Position"].str.contains("P"), "Player_ID"]}
+            self.assertTrue(arms)
+
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            report = bank_cache.extend_bank(
+                cache, projections, time_budget_s=20, stack_min=2, stack_max=5)
+            dropped = report["excluded_column_dropped"]
+            self.assertEqual(dropped["rows"], len(banned))
+            self.assertEqual(dropped["arms"], len(arms))
+            self.assertEqual(dropped["stack_teams"], ["T4"])
+            for key in cache.attempted:
+                pair, team = key.split("|")[0], key.split("|")[1]
+                self.assertNotEqual(team, "T4", key)
+                self.assertFalse(arms & set(pair.split("+")), key)
+            self.assertTrue(cache.candidates, "vacuous: the bank built nothing")
+            rostered = {str(p) for c in cache.candidates for p in c["roster"]}
+            self.assertFalse(banned & rostered)
+
+            # The counterfactual, which is what makes the numbers above mean
+            # something: with the drop removed the grid is strictly larger and
+            # the extra jobs are the ones that name the excluded team and arm.
+            # time_budget_s=0 answers no job, so this costs no solver time.
+            blind = bank_cache.BankCache(Path(tmp) / "blind.json")
+            with unittest.mock.patch.object(
+                    bank_cache, "_drop_excluded_rows", lambda df: df):
+                blind_report = bank_cache.extend_bank(
+                    blind, projections, time_budget_s=0.0,
+                    stack_min=2, stack_max=5)
+            self.assertGreater(blind_report["jobs_total"], report["jobs_total"])
+            self.assertEqual(blind_report["excluded_column_dropped"]["rows"], 0)
+
+    def test_the_classic_brief_carries_the_count_zero_or_not(self):
+        """The BUILD fragment's own bar, and the reason it exists: on the
+        2026-09-02 2138_2g build the brief carried NO `pool.excluded_column`
+        key, so its absence was indistinguishable from its being zero and the
+        operator fell back to editing the salary file's `Starting` column --
+        the exact edit the `Excluded` column exists to make unnecessary.
+        `pool_brief_block` dropped it, which is R190's shape a third time."""
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("bs_r291", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            _, pool, _, banned = self._frame(tmp)
+            block = module.pool_brief_block(pool["pool_report"], pool)
+            self.assertIn("excluded_column", block)
+            self.assertEqual(block["excluded_column"]["applied"], len(banned))
+            self.assertTrue(block["excluded_column"]["column_present"])
+            plain = Path(tmp) / "plain.csv"
+            pool_salary_csv(plain)
+            unrestricted = lda.build_slate_pool(
+                plain, pool_lineups_feed(), platoon_json=pool_platoon_json())
+            zero = module.pool_brief_block(
+                unrestricted["pool_report"], unrestricted)["excluded_column"]
+            self.assertIn("applied", zero, "absent is not the same fact as zero")
+            self.assertEqual(zero["applied"], 0)
+            self.assertFalse(zero["column_present"])
 
 
 class BuildSlatePoolTests(unittest.TestCase):

@@ -123,6 +123,11 @@ def build_projections(
             f"Ceiling below Floor for Player_ID(s) {offenders}; "
             "the projection contract requires Ceiling >= Floor and bad rows are not silently repaired"
         )
+    # R291. A DEFAULT, not an eraser. Until 2026-09-02 the frame reaching here
+    # never carried the column -- `_assemble_projection_frame` dropped it -- so
+    # this line was what turned every operator exclusion into False. It is
+    # correct as written now that the column arrives, and it stays because a
+    # caller may hand in a frame that genuinely has no Excluded column.
     if "Excluded" not in frame.columns:
         frame["Excluded"] = False
     if "Locked" not in frame.columns:
@@ -163,6 +168,11 @@ def refresh_confirmed_lineups(
     actually confirmed. Hitters on teams not listed keep their current exclusion
     state, so TBD teams may continue using projected lineups (spec section 4).
     When ``confirmed_teams`` is None the legacy global behavior is preserved.
+
+    An exclusion carried from the salary file (``Excluded_Source ==
+    'salary_file'``) is preserved rather than recomputed: the confirmed lineup
+    answers "is he playing", which is a different question from "did the
+    operator take him out of this build" (R291).
     """
     frame = projections.copy()
     required = {"Player_ID", "Base", *FACTOR_COLUMNS, "Floor", "Ceiling"}
@@ -187,10 +197,28 @@ def refresh_confirmed_lineups(
             changed = abs(new_f2 - old_f2) > 1e-12 or old_order != new_order
         team_is_confirmed = confirmed_team_set is None or str(row.get("Team", "")).strip().upper() in confirmed_team_set
         if starter_set is not None and team_is_confirmed and "P" not in str(row.get("Position", "")).split("/"):
-            excluded = pid not in starter_set
+            # R291, 2026-09-02. An operator exclusion is not this function's to
+            # revoke. The old line ASSIGNED the starter test, so a salary-file
+            # `Excluded=TRUE` on a player who is in the confirmed lineup was
+            # silently un-excluded on the late-swap path -- the operator's
+            # instruction reversed by the one refresh that runs after it.
+            #
+            # `Excluded_Source` is the provenance of the live `Excluded` value,
+            # so it is what distinguishes an operator flag from one this
+            # function imposed on an earlier pass. It is written below whenever
+            # this branch imposes an exclusion, which is what keeps the read
+            # idempotent: without it, a row whose salary cell said FALSE
+            # (source `salary_file`, flag False) would be excluded once as a
+            # non-starter and then read as an operator flag forever.
+            operator_flag = (bool(row.get("Excluded"))
+                             and str(row.get("Excluded_Source") or "") == "salary_file")
+            excluded = operator_flag or (pid not in starter_set)
             if bool(frame.at[index, "Excluded"]) != excluded:
                 changed = True
             frame.at[index, "Excluded"] = excluded
+            if "Excluded_Source" in frame.columns and not operator_flag:
+                frame.at[index, "Excluded_Source"] = (
+                    "confirmed_lineup" if excluded else "confirmed_starter")
         resolved = float(frame.at[index, "Base"])
         for factor in FACTOR_COLUMNS:
             resolved *= float(frame.at[index, factor])

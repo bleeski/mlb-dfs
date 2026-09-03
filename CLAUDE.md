@@ -411,7 +411,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1645 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1659 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -516,12 +516,25 @@ inventory checks fail while the suite passes in full, build and flag it.
   mirror image — an explicit, visible, instructed restriction silently ignored
   while the build certified. Same shape, pool membership not represented in the
   artifact. `pool_report.excluded_column` names the count, the teams and the
-  ids, a warning states the legal pool the build actually has, and the
-  projection digest already keys the bank cache on the column so a restricted
-  build cannot reuse an unrestricted bank. `optimizer_shell_preflight`'s
-  hardcode is KEPT on purpose: it is a neutral feasibility test of the salary
-  file's shape and honouring an operator exclusion there would make a narrowed
-  pool read as a broken file.
+  ids, and a warning states the legal pool the build actually has.
+  `optimizer_shell_preflight`'s hardcode is KEPT on purpose: it is a neutral
+  feasibility test of the salary file's shape and honouring an operator
+  exclusion there would make a narrowed pool read as a broken file.
+  **Two sentences this paragraph carried until 2026-09-02 were FALSE, and R291
+  is why they are gone: the column reached the POOL REPORT and stopped there,
+  and the digest re-key was true only of a hand-built frame.** R289 named two
+  stamp sites and the class had five. `_assemble_projection_frame` built a new
+  dict per row with a fixed key set that omitted the column, so every Classic
+  build got an all-False frame; `build_projections` then stamped the default
+  over it; `refresh_confirmed_lineups` ASSIGNED the starter test on the swap
+  path, revoking an operator flag; the Showdown melt did not read the token at
+  all; and `extend_bank` enumerated excluded arms and teams into the job grid.
+  Measured on the R289 fixture at `b4ad0f7`: pool report 20, frame 0,
+  checkpoint 0, and the SAME projection digest for the plain and the restricted
+  salary file, so a restricted build was served an unrestricted bank's bucket.
+  All five now carry it, the pool report and the checkpoint print the same
+  number, and each claim above has a test that runs the production function --
+  the R289 acceptance test did not, which is how it shipped green (R300(a)).
 - Determinism: every set reaching the solver is sorted first
   (`mlb_engine.determinism.stable_union`) and entry points pin
   `PYTHONHASHSEED=0`. Never write `list(set(player_ids))`.

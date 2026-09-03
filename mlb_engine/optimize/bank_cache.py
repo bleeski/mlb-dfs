@@ -59,7 +59,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import (
     ANTI_CORRELATION_DEFAULT_MAX, build_single_lineup, _new_solver_status,
-    resolve_solver_time_limit,
+    _drop_excluded_rows, resolve_solver_time_limit,
 )
 
 VERSION = "v1.3"
@@ -728,13 +728,33 @@ def extend_bank(
     cache.register_conditions(conditions_sig, pool_digest)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
 
-    pitchers = projections_df[projections_df["Position"] == "P"]
+    # R291(d) / R164's third member. The job grid is enumerated from the LEGAL
+    # pool, not from every salary row. `build_single_lineup` drops an excluded
+    # row inside `_prepare_single_lineup_df`, so an excluded arm or an
+    # all-excluded stack team was never going to produce a candidate -- the grid
+    # simply paid a full `proven_infeasible` solve per job to find that out, and
+    # then recorded the key as attempted so no later slice could tell the
+    # difference between "answered" and "never legal".
+    #
+    # `projections_df` itself is deliberately NOT narrowed: the signature and
+    # the digest above hash the whole frame including the Excluded column (which
+    # is what keeps a restricted build off an unrestricted bank's bucket), and
+    # every solve below is handed the full frame so the ONE removal site stays
+    # `optimizer_v3._drop_excluded_rows`.
+    eligible = _drop_excluded_rows(projections_df)
+    excluded_dropped = int(len(projections_df) - len(eligible))
+    pitchers = eligible[eligible["Position"] == "P"]
     if "Ceiling" in pitchers.columns:
         pitchers = pitchers.sort_values("Ceiling", ascending=False)
     sp_ids = [str(p) for p in pitchers["Player_ID"] if str(p) not in set(excl)]
-    game_of = {str(r.Player_ID): str(r.Game_ID) for r in projections_df.itertuples()}
-    hitters = projections_df[projections_df["Position"] != "P"]
+    game_of = {str(r.Player_ID): str(r.Game_ID) for r in eligible.itertuples()}
+    hitters = eligible[eligible["Position"] != "P"]
     teams = sorted({str(t) for t in hitters["Team"]})
+    all_pitchers = projections_df[projections_df["Position"] == "P"]
+    excluded_arms_dropped = int(len(all_pitchers) - len(pitchers))
+    all_hitters = projections_df[projections_df["Position"] != "P"]
+    excluded_teams_dropped = sorted(
+        {str(t) for t in all_hitters["Team"]} - set(teams))
 
     # A pinned pitcher slot makes every SP pair that excludes it infeasible, so
     # enumerating them burns the budget on guaranteed failures. Constrain the pair
@@ -970,6 +990,21 @@ def extend_bank(
         "superseded_jobs_dropped": superseded,
         "cache_was_corrupt_on_load": bool(getattr(cache, "corrupt_on_load", False)),
         "unknown_game_pairs_kept": unknown_game_pairs,
+        # R291(d). What the operator's Excluded column removed from the JOB GRID,
+        # named so a thin job list reads as the restriction it is rather than as
+        # a dry pool -- the F13 misdiagnosis one door over. `rows` is every
+        # excluded row, `arms` the pitchers that left the pair space, and
+        # `stack_teams` the teams that lost every hitter and so cannot be a
+        # stack target at all.
+        "excluded_column_dropped": {
+            "rows": excluded_dropped,
+            "arms": excluded_arms_dropped,
+            "stack_teams": excluded_teams_dropped,
+            "note": "operator Excluded rows are removed from the pitcher/team "
+                    "enumeration only; the frame handed to every solve is "
+                    "unchanged and optimizer_v3._drop_excluded_rows is still "
+                    "the one site that removes a player from a lineup",
+        },
         # R103. Named so a +0-candidate slice on a fully-pinned entry reads as
         # the pin it is, not as a dry pool: True means both P slots were
         # pinned to a same-game pair and the same-game filter was bypassed to

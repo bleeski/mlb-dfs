@@ -204,6 +204,12 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     treating a build as starter-restricted.
     """
     by_key: Dict[tuple, Dict[str, Any]] = {}
+    # R291(c). Whether the FILE carried the column is a different fact from
+    # whether the frame has one -- the frame always does now -- and the pool
+    # report Classic prints keeps the two apart. Tracked here so the Showdown
+    # brief can say the same thing truthfully.
+    excluded_column_present = False
+    unrecognized_cells: List[str] = []
     with Path(path).open(newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             name = str(r.get("Name") or "").strip()
@@ -223,12 +229,32 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
             base = _num(r.get("AvgPointsPerGame") or r.get("Avg Points Per Game")) or 0.0
             key = (name, team)
             starting = str(r.get("Starting") or "").strip().upper()
+            # R291(c). The salary file's own Excluded column, read here for the
+            # same reason Classic reads it at its front door: it is the only
+            # instruction the operator can give a build through the file DK
+            # gave him, and until 2026-09-02 this module did not read the token
+            # at all (grep of showdown*.py: zero hits). A Showdown file has TWO
+            # rows per person, so the flag is OR'd across the roles -- an
+            # operator who marks the CPT row and not the UTIL row has said
+            # "not this player", not "not as captain".
+            #
+            # The token rule is `optimizer_v3.read_excluded_cell`'s, imported
+            # lazily for the reason the SCIPY_MILP_STATUS import below is: this
+            # module must not pull the Classic solver in at load time.
+            from mlb_engine.optimize.optimizer_v3 import read_excluded_cell
+            row_excluded, row_kind = read_excluded_cell(r.get("Excluded"))
+            if row_kind != "blank":
+                excluded_column_present = True
+            if row_kind == "unrecognized":
+                unrecognized_cells.append(str(r.get("Excluded")))
             rec = by_key.setdefault(key, {
                 "Player_Key": f"{name}|{team}", "Name": name, "Team": team,
                 "Opponent": opponent, "Position": str(r.get("Position") or "").strip(),
                 "Game_ID": matchup, "Base": base, "Starting": starting,
+                "Excluded": False,
                 "CPT_ID": None, "CPT_Salary": None, "UTIL_ID": None, "UTIL_Salary": None,
             })
+            rec["Excluded"] = bool(rec.get("Excluded")) or bool(row_excluded)
             if starting and not rec.get("Starting"):
                 rec["Starting"] = starting
             if role == "CPT":
@@ -294,6 +320,19 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
             f"both-teams certification. Check the Status and Starting columns for "
             f"the missing side."
         )
+    # R291(c). The report half, on `attrs` because that is how this module
+    # already carries a per-frame provenance record (`supplied_base_report`).
+    # A count that reaches the brief is what makes the operator's instruction
+    # auditable at T-5; on 1940_9g the instruction was accepted, discarded, and
+    # nothing said so.
+    df.attrs["excluded_column_report"] = {
+        "column_present": bool(excluded_column_present),
+        "unrecognized_kept": len(unrecognized_cells),
+        "unrecognized_values": sorted(set(unrecognized_cells))[:10],
+        "note": "only an affirmative token excludes (optimizer_v3."
+                "read_excluded_cell); blank and unrecognized cells KEEP the "
+                "player, and a player's CPT and UTIL cells are OR'd",
+    }
     return df
 
 
@@ -391,10 +430,36 @@ def build_showdown_lineup(
     from mlb_engine.optimize.optimizer_v3 import SCIPY_MILP_STATUS
 
     excl = {str(x) for x in (excludes or [])}
-    work = df[~df["Player_Key"].isin(excl)].reset_index(drop=True) if excl else df.reset_index(drop=True)
+    # R291(c). The operator's Excluded column binds HERE, at the single solve
+    # every Showdown path funnels through -- `build_showdown_bank`'s loop and
+    # `showdown_theses.solve_ladder`'s every rung both arrive at this function.
+    # That placement is the whole point: a rung may relax the overlap bound, the
+    # player cap, the captain lock and finally the thesis itself, and none of
+    # those relaxations can put an excluded player back in the pool.
+    #
+    # The reading is `optimizer_v3.excluded_flags`, the same one function
+    # Classic uses, so there is no second token rule in this module.
+    from mlb_engine.optimize.optimizer_v3 import excluded_flags
+    column_flags, _ = excluded_flags(df)
+    banned = (df["Player_Key"].isin(excl) if excl
+              else pd.Series(False, index=df.index, dtype=bool))
+    work = df[~(banned | column_flags)].reset_index(drop=True)
     n = len(work)
     if n < contract.roster_size:
         return None
+    # R291(c). The both-teams rows below are built from `work`, so a pool
+    # narrowed to one side makes that rule VACUOUSLY true and the solve returns
+    # a six-man one-team lineup DK rejects outright. That is the same vacuity
+    # the melt refuses a single-team file for, and until an Excluded column
+    # existed the only way to reach it was the `excludes` kwarg. Refused here
+    # rather than left to `certify_showdown_lineup` (which reads the matchup off
+    # Game_ID and would fail it) because a solver should not return a lineup it
+    # can already tell is illegal.
+    if contract.min_players_per_team > 0:
+        required = required_teams_from_pool(df)
+        have = {str(t).strip().upper() for t in work["Team"].dropna().unique()}
+        if len(required) >= 2 and not required.issubset(have):
+            return None
     n_util = contract.roster_size - 1  # UTIL count (5)
     cpt_mult = contract.multiplier_for(contract.captain_slot or "CPT")
 

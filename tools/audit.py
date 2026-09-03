@@ -484,7 +484,25 @@ EXPECTED_SUITE_COUNTS = {
     # re-key). The sharpest is the byte-identical one: without it the golden
     # replay is the only thing standing between this change and a silently
     # reworded refusal on every path that supplies no feasibility inputs.
-    "tests.test_core": 1040,
+    # R291, 2026-09-02: 1040 -> 1047. The R289 acceptance test above was
+    # REWRITTEN rather than added to, so its count is unchanged and its meaning
+    # is not: it built the frame by hand, called `_drop_excluded_rows` directly,
+    # and guarded the lineup assert with `if lineup is not None` -- on the
+    # T3/T4 fixture the restricted pool is two teams whose only two arms oppose
+    # every remaining hitter, so the solve returns None and the assert was
+    # vacuous. It now runs `_assemble_projection_frame` and excludes one team so
+    # the legal pool can solve. Six new: the frame carrying the column with the
+    # pool report and the checkpoint agreeing, the digest re-keying on the
+    # PRODUCTION path (the R289 test proved that on a hand-built frame while it
+    # was false end to end), a file with no column hashing exactly as it did,
+    # the swap refusing to revoke an operator exclusion, the swap still
+    # un-excluding one it imposed itself, `extend_bank` enumerating the legal
+    # pool only -- that one with the drop patched out as its own counterfactual,
+    # because a job-count assertion means nothing without the number it is
+    # smaller than -- and the Classic brief carrying the count zero or not,
+    # which is the 09-02 BUILD fragment's own bar: on the 2138_2g build the
+    # brief had NO `pool.excluded_column` key, so absent read as zero.
+    "tests.test_core": 1047,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -628,7 +646,19 @@ EXPECTED_SUITE_COUNTS = {
     # first cut had none and a mutation moving the insertion point survived the
     # whole suite -- every other test called the engine function directly on an
     # already-priced frame, so nothing executed the decision.
-    "tests.test_showdown": 166,
+    # R291(c), 2026-09-02: 166 -> 173, the seven that pin the Excluded column on
+    # a path where `grep Excluded showdown*.py` used to return nothing. The
+    # no-column fixture unchanged, the flag OR'd across the CPT and UTIL rows,
+    # an excluded declared SP reaching no lineup in a five-deep bank, a lock and
+    # a cpt_lock naming him landing in `ignored_locks` instead of overriding the
+    # pool, the brief block's count and legal pool, an unrecognized token
+    # keeping the player (counted per CELL, since a Showdown file has two rows
+    # per person), and the one-team refusal. That last one is the test that
+    # earns its place: the both-teams MILP rows are built from the LEGAL pool,
+    # so an exclusion covering one side made that rule vacuously true and
+    # returned a six-man one-team lineup -- the exact vacuity the melt refuses a
+    # single-team FILE for, reachable through a new door.
+    "tests.test_showdown": 173,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

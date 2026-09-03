@@ -3819,6 +3819,28 @@ def _assemble_projection_frame(
             "Ownership_Tier": r.get("Ownership_Tier") or "Mid",
             "AvgPointsPerGame": r.get("AvgPointsPerGame"),
             "Notes": notes,
+            # R291, 2026-09-02. The operator exclusion, CARRIED into the frame
+            # the optimizer actually solves. R289 made `_pool_row` read the
+            # salary file's Excluded column and made the pool report count it,
+            # and this dict -- a fixed key set built fresh per row -- then
+            # dropped the column on the way out. Every Classic build passes
+            # through here (`run_slate`; both `build_slate.py` routes), so a
+            # frame with an all-False column is what the bank, the digest, the
+            # checkpoint and the certified file all saw, while the pool report
+            # and its warning told the operator the pool was smaller.
+            #
+            # Measured at b4ad0f7 on the R289 fixture (Excluded=TRUE on T3/T4):
+            # pool rows True 20 / pool_report.applied 20 / frame True 0 / T3+T4
+            # rows still in the frame 20, and the checkpoint's
+            # `exclusions.excluded_column.excluded_true` read 0 in the same
+            # brief as the report's 20.
+            #
+            # No token rule is re-derived here. `_pool_row` already applied
+            # `optimizer_v3.read_excluded_cell`, which is the one reading, and
+            # `optimizer_v3._drop_excluded_rows` is still the one site that
+            # removes a row from the pool.
+            "Excluded": bool(r.get("Excluded", False)),
+            "Excluded_Source": r.get("Excluded_Source") or "absent_or_blank",
         })
 
     frame = pd.DataFrame(assembled)
