@@ -26,8 +26,12 @@ file. Six constraints, all mechanical:
      `verify_export.derive_locked_teams_from_feed` (the same derivation the
      verifier uses, so the tool that repairs and the tool that checks read one
      fact rather than two);
-  4. confirmed starter -- the OBSERVED tier (R270(b)) once the candidate's
-     game is underway, the feed's confirmed set before that;
+  4. confirmed starter -- the feed's confirmed set, AND his game has not yet
+     begun. The OBSERVED tier (R270(b)) only ever REMOVES a candidate here: it
+     bars a player it says `did_not_start`, and it bars one it says `started`,
+     because `started` means that game is already underway (R292(b)). It never
+     confirms one. Before first pitch every candidate is `unobserved` and the
+     feed answers, which is the ranking CLAUDE.md's build contract states;
   5. not already in the entry, by `person_key` (a person, not a draftable id);
   6. NOT on a team opposing any SP rostered in that entry -- `verify_export`
      caught exactly this bug in the hand-built `1305_12g` repair, so the
@@ -58,7 +62,7 @@ Usage:
         --salary data/slates/<date>/DKSalaries.csv \\
         [--feed data/slates/<date>/lineups_feed.json] \\
         [--boxscores data/slates/<date>/boxscores.json] \\
-        [--dead "Feltner" --dead 12345678] \\
+        [--dead "Feltner" --dead 12345678] [--dead-from-feed] \\
         [--entry-ids 5234627043,5234627044] \\
         [--as-of 2026-08-29T19:40:00Z] \\
         [--mode auto|repair|defer] [--out <path>] [--json]
@@ -95,7 +99,7 @@ if str(REPO_ROOT) not in sys.path:
 # rule, and `verify_export` owns the lock derivation.
 from preflight_upload import (  # noqa: E402
     CLASSIC_SLOTS, SALARY_CAP, EntryRow, load_entries, load_salary,
-    person_key, slot_admits, _digits, _int_or_none, _norm_name,
+    parse_as_of, person_key, slot_admits, _digits, _int_or_none, _norm_name,
 )
 from verify_export import derive_locked_teams_from_feed  # noqa: E402
 
@@ -184,6 +188,55 @@ def derive_dead_from_observed(entries: Sequence[EntryRow],
     return [dead[k] for k in sorted(dead)]
 
 
+def derive_dead_from_feed(entries: Sequence[EntryRow],
+                          slots: Sequence[str],
+                          salary: Mapping[str, Mapping[str, str]],
+                          status: Mapping[str, Any]) -> List[Dict[str, str]]:
+    """Rostered HITTERS whose team has posted and who are not in the posted nine.
+
+    R292(e), the composition seam the 2026-09-02 1940_6g BUILD session filed.
+    `preflight_upload` HARD-FAILS this exact condition ("rostered player absent
+    from a confirmed posted lineup"; on that slate, Jimmy Crooks with Ivan
+    Herrera catching instead) and this tool could not consume it: the dead set
+    came from `--dead` or from `--boxscores`, and `--feed` was read only for the
+    lock clock and the confirmed-starter filter on REPLACEMENTS. So the operator
+    read a player id out of one tool's output and retyped it into the other,
+    under a lock clock, which is where a transcription mistake goes.
+
+    HITTERS ONLY, and that bound is the whole reason this is not a second copy
+    of `check_feed`'s rule. A posted batting lineup is evidence about BATS
+    (R67): a confirmed nine can sit beside a null probable in a bullpen game,
+    and a legally rostered arm can be a DECLARED one (R114) that no feed carries.
+    Both of those are ARM cases, and both are why `check_feed` needs its
+    bats-only and declared-pitcher tiers. Restricting to non-pitcher slots
+    sidesteps every one of them: a hitter absent from his own team's confirmed
+    nine is not playing, with no tier to get wrong. An arm stays the operator's
+    call through `--dead`.
+
+    The evidence is the engine's own status map -- the same object this tool
+    already reads for the replacement filter -- not a fresh parse of the feed.
+    """
+    confirmed_teams = {str(t).strip().upper()
+                       for t in (status.get("confirmed_teams") or [])}
+    confirmed = {str(p) for p in (status.get("confirmed_hitter_ids") or [])}
+    dead: Dict[str, Dict[str, str]] = {}
+    for entry in entries:
+        for i, pid in enumerate(entry.cells):
+            if not pid or pid in dead:
+                continue
+            if i < len(slots) and slots[i].upper() in PITCHER_SLOTS:
+                continue
+            row = salary.get(pid)
+            if row is None:
+                continue
+            team = str(row.get("TeamAbbrev") or "").strip().upper()
+            if team not in confirmed_teams or pid in confirmed:
+                continue
+            dead[pid] = {"player_id": pid, "name": str(row.get("Name") or ""),
+                         "team": team, "source": "absent_from_confirmed_lineup"}
+    return [dead[k] for k in sorted(dead)]
+
+
 # --------------------------------------------------------------------------- #
 # the filter
 # --------------------------------------------------------------------------- #
@@ -269,8 +322,8 @@ def candidates_for_slot(
         entry, slots, salary, game_ids, exclude_index=slot_index)
 
     census = {"slot_ineligible": 0, "over_headroom": 0, "team_locked": 0,
-              "not_confirmed": 0, "did_not_start": 0, "already_in_entry": 0,
-              "opposes_rostered_sp": 0, "eligible": 0}
+              "did_not_start": 0, "game_underway": 0, "not_confirmed": 0,
+              "already_in_entry": 0, "opposes_rostered_sp": 0, "eligible": 0}
     out: List[Dict[str, Any]] = []
     for pid, row in salary.items():
         if pid == dead_pid:
@@ -293,10 +346,26 @@ def candidates_for_slot(
             # started cannot be repaired INTO an entry, whatever the feed says.
             census["did_not_start"] += 1
             continue
-        if state != "started" and pid not in confirmed:
-            # `unobserved` falls through to the feed, which is the ranking
-            # CLAUDE.md's build contract item 1 states. `started` needs no feed
-            # corroboration -- it is the record.
+        if state == "started":
+            # R292(b). `started` means the game is UNDERWAY -- that is the tier's
+            # own contract -- so DK will not take this player in a NEW slot at
+            # all. He used to pass here, stamped `confirmed_source: "observed"`,
+            # which read the record exactly backwards: the boxscore proves he is
+            # playing, not that he is available. The only guard was `team in
+            # locked` five lines up, and that set is feed-derived, so it is EMPTY
+            # whenever --feed is omitted, which the CLI allows.
+            #
+            # Deliberately not written as `state == "started" or team in
+            # observed_teams`: `observed_starter_state` returns "unobserved"
+            # exactly when the team is absent from `observed_teams`
+            # (live_data_adapters.py:1330), so that second disjunct is the tier's
+            # internal rule copied to a call site, and the `did_not_start` branch
+            # above already holds the other half of it. One rule, one owner.
+            census["game_underway"] += 1
+            continue
+        if pid not in confirmed:
+            # Only `unobserved` reaches here, and it falls through to the feed,
+            # which is the ranking CLAUDE.md's build contract item 1 states.
             census["not_confirmed"] += 1
             continue
         if person_key(row) in incumbent_people:
@@ -310,7 +379,10 @@ def candidates_for_slot(
             "player_id": pid, "name": str(row.get("Name") or ""), "team": team,
             "salary": cost, "projection": round(projection_of(row), 4),
             "roster_position": str(row.get("Roster Position") or ""),
-            "confirmed_source": "observed" if state == "started" else "feed",
+            # Always the feed now: `started` is refused above and
+            # `did_not_start` before it, so the only state that reaches here is
+            # `unobserved`, and the observed tier confirms nobody (R292(b)).
+            "confirmed_source": "feed",
         })
     # Deterministic: projection desc, then salary desc, then player_id, so two
     # runs over one file can never disagree (CLAUDE.md's determinism rule).
@@ -425,6 +497,15 @@ def repair_entries(
 
 def write_entries(path: Path, header: Sequence[str], entries: Sequence[EntryRow],
                   trailing: Sequence[Sequence[str]]) -> None:
+    """Header, then every repaired entry row, then the file's NON-ENTRY remainder.
+
+    ``trailing`` is the remainder and nothing else: the embedded player pool and
+    any other row ``load_entries`` did not parse into an ``EntryRow``. Handing it
+    the whole table is R292(a) -- the block written just above arrives a second
+    time, carrying its own header and every dead player intact, and DK rejects
+    the file while this tool prints ``wrote <path>`` and exits 0. The caller
+    computes the remainder off ``EntryRow.line_no``; see ``main``.
+    """
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
         writer.writerow(header)
@@ -451,9 +532,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--dead", action="append", default=[],
                     help="a DK player id or a name; repeatable. Omit to derive "
                          "from the observed tier, which needs --boxscores.")
+    ap.add_argument("--dead-from-feed", action="store_true",
+                    help="also treat every rostered HITTER absent from his "
+                         "team's CONFIRMED posted lineup as dead (R292(e)); "
+                         "needs --feed. Unions with --dead. Arms are never "
+                         "derived this way -- a posted lineup evidences bats.")
     ap.add_argument("--entry-ids", default="",
                     help="comma-separated authorized Entry IDs; default all")
-    ap.add_argument("--as-of", default="")
+    ap.add_argument("--as-of", default="", metavar="ISO|HH:MM",
+                    help="wall clock for the lock derivation; read by "
+                         "preflight_upload.parse_as_of, so a stamp with no "
+                         "offset is EASTERN (R292(c))")
     ap.add_argument("--mode", choices=("auto", "repair", "defer"), default="auto")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--dry-run", action="store_true")
@@ -461,19 +550,42 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(argv)
 
     try:
-        contest, slots, entries, trailing, _ = load_entries(args.entries)
+        contest, slots, entries, all_rows, _ = load_entries(args.entries)
         with args.entries.open(encoding="utf-8-sig", newline="") as fh:
             header = next(csv.reader(fh))
         salary = load_salary(args.salary)
+        # R292(c). ONE reader for --as-of, and it is preflight's, because the
+        # salary file's Game Info carries ET and nothing else. This tool used to
+        # leave a naive stamp NAIVE and TypeError four frames down inside the
+        # lock derivation; `verify_export` read the same stamp as UTC, four hours
+        # early, which is how a game that started at 19:40 reads as still open.
+        # Three sibling tools, one operator, three answers. Bare `HH:MM` -- what
+        # an operator actually types at T-5 -- comes free with the shared owner.
+        now = parse_as_of(args.as_of) if args.as_of else datetime.now(timezone.utc)
     except (OSError, ValueError) as exc:
         print(f"repair_entry: {exc}", file=sys.stderr)
         return 3
 
-    now = (datetime.fromisoformat(args.as_of.replace("Z", "+00:00"))
-           if args.as_of else datetime.now(timezone.utc))
+    # R292(a). `load_entries` returns EVERY row of the file as its fourth value,
+    # header and entry rows included, and its docstring says that is deliberate:
+    # the whole-file list is what lets row accounting catch what parsing
+    # tolerates (R51). This tool unpacked it as `trailing` and handed it to
+    # `write_entries` AFTER the repaired entries, so every `--out` it ever wrote
+    # carried two header rows, both copies of every entry, and every dead player
+    # intact -- while printing `wrote <path>` and exiting 0.
+    #
+    # The remainder is read off `EntryRow.line_no`, which `load_entries` already
+    # stamped, rather than re-derived from the Entry ID cell. Re-deriving it
+    # would put a second copy of that function's own membership rule at this
+    # call site, and the defect being fixed here IS a call site disagreeing with
+    # a shared function about what it returns.
+    entry_lines = {e.line_no for e in entries}
+    trailing = [row for line_no, row in enumerate(all_rows[1:], start=2)
+                if line_no not in entry_lines]
 
     locked: set[str] = set()
     confirmed: List[str] = []
+    status: Dict[str, Any] = {}
     lock_note = "no feed supplied; no team treated as locked"
     if args.feed:
         derived = derive_locked_teams_from_feed(args.feed, args.salary, now)
@@ -498,7 +610,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         payload = _load_json(args.boxscores)
         raw = payload.get("games") if isinstance(payload, Mapping) else payload
         boxes = [b if "sides" in b else parse_boxscore_feed(b) for b in (raw or [])]
-        observed = build_observed_starters(boxes, salary)
+        # The salary PATH, not the parsed dict. R292(b), second half, and it is
+        # why the `started` branch above was unreachable in practice rather than
+        # merely wrong. `build_observed_starters` crosswalks on
+        # `_record_get(record, "name")` / `"team"`; `preflight_upload.load_salary`
+        # returns raw DK rows keyed `Name` / `TeamAbbrev`, so every lookup
+        # returned "" and NOBODY resolved: `observed_hitter_ids` and
+        # `observed_pitcher_ids` came back empty on every real input and every
+        # rostered player on an underway team read `did_not_start`. That is not a
+        # missed detection, it is a mass FALSE one -- `--boxscores` without
+        # `--dead` would have declared an entire live team scratched. Handing it
+        # the path routes through `parse_dk_salary_csv`, which is the documented
+        # contract and what the feed call twenty lines up already passes.
+        observed = build_observed_starters(boxes, str(args.salary))
 
     dead_ids, unresolved = resolve_dead_players(args.dead, salary)
     derived_dead: List[Dict[str, str]] = []
@@ -510,6 +634,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               file=sys.stderr)
         return 3
 
+    # R292(e). Unions rather than replaces: --dead is the operator's statement
+    # and this is the feed's, and a run that has both has two dead slots, not a
+    # contest between them. It is an explicit flag rather than a widening of
+    # --feed, which is already load-bearing for the lock clock and the
+    # replacement filter; silently making a flag do a second thing is how a T-5
+    # operator gets behaviour nobody asked for.
+    feed_dead: List[Dict[str, str]] = []
+    if args.dead_from_feed:
+        if not args.feed:
+            print("repair_entry: REFUSING, --dead-from-feed needs --feed",
+                  file=sys.stderr)
+            return 3
+        if not status:
+            print("repair_entry: REFUSING, --dead-from-feed was asked for but "
+                  "the feed produced no status map, so 'absent from the posted "
+                  "nine' cannot be told from 'this feed has not posted'",
+                  file=sys.stderr)
+            return 3
+        feed_dead = derive_dead_from_feed(entries, slots, salary, status)
+        dead_ids = sorted(set(dead_ids) | {d["player_id"] for d in feed_dead})
+
     result = repair_entries(entries, slots, salary, dead_ids, locked, confirmed,
                             observed, [e for e in args.entry_ids.split(",") if e],
                             args.mode)
@@ -517,6 +662,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    "lock_note": lock_note, "locked_teams": sorted(locked),
                    "dead_player_ids": dead_ids,
                    "dead_derived_from_observed": derived_dead,
+                   "dead_derived_from_feed": feed_dead,
                    "observed_supplied": observed is not None})
 
     out_path = args.out or args.entries.with_name(
@@ -530,6 +676,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
+        for d in feed_dead:
+            print(f"DEAD (feed): {d['name']} ({d['player_id']}, {d['team']}) is "
+                  f"not in {d['team']}'s confirmed posted lineup")
         for r in result["repairs"]:
             print(f"{r['entry_id']} {r['slot']}: OUT {r['out_name']} "
                   f"(${r['out_salary']}) -> IN {r['in_name']} (${r['in_salary']}, "

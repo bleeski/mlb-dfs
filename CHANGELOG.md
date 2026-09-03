@@ -25,6 +25,272 @@ performance claim.
 
 ---
 
+## 2026-09-02 — R292: the repair tool writes a DK-valid file, refuses a player whose game is underway, and one `--as-of` reader serves three sibling tools; `verify_export` runs the started-game check
+
+**What moved.**
+
+- `tools/repair_entry.py`. `main` unpacks `load_entries`'s fourth value as
+  `all_rows` and derives the real non-entry remainder from `EntryRow.line_no`
+  before `write_entries` (a); `candidates_for_slot` refuses `state == "started"`
+  under a new `game_underway` census key and `confirmed_source` is now always
+  `"feed"` (b); `build_observed_starters` is handed the salary PATH instead of
+  preflight's parsed rows (b, second half); `--as-of` is read by
+  `preflight_upload.parse_as_of` inside the block that returns 3, and gained a
+  `metavar`/`help` (c); new `derive_dead_from_feed` plus a `--dead-from-feed`
+  flag, a `dead_derived_from_feed` payload key and a stdout line (e);
+  `write_entries` gained a docstring saying what `trailing` is; the module
+  header's constraint 4 and usage line corrected.
+- `tools/verify_export.py`. `check_started_games` imported and called on the
+  NO-PARENT branch, with `lock_clock` hoisted so the two readings cannot
+  diverge (d); the local `--as-of` reading deleted in favour of
+  `parse_as_of` (c); module header and usage block corrected.
+- `tools/preflight_upload.py`. `parse_as_of` accepts a trailing `Z` (c). Nothing
+  else in this file changed.
+- `tests/test_upload_integrity.py` (+16, 332 -> 348). Eleven in
+  `SingleSlotRepairTests`, three in `VerifyExportLockDerivationTests`, and a new
+  `PreflightWallClockTests` (2, R300(b)). Two existing tests were adjusted and
+  neither was weakened: `run_verify` now pins the fixture clock the way
+  `run_preflight` has since R287 (the pair had been comparing two tools on two
+  different clocks), and
+  `test_the_feed_is_auto_resolved_from_beside_the_salary_file` passes `--parent`
+  because its subject is feed resolution and its clock has AAA locked.
+- `tools/audit.py`: the `tests.test_upload_integrity` pin, with its comment.
+- `skills/generate-lineups/SKILL.md`: the repair-vs-late-swap boundary next to
+  the "no compatible candidate" guidance (f); the `--as-of` paragraph; the gate
+  line. `CLAUDE.md`: the R272 two-referee sentence, and the gate line.
+- `docs/backlog.md`: R292 closed and migrated, riders on R300, R268+R204, R175,
+  and the queue note. `docs/backlog_inbox/2026-09-02_BUILD_repair-entry-out-writes-the-entry-block-twice.md`
+  consumed into `_to_delete/`. `ledger/inbox/2026-09-02_DEV_gate-pin-1675.md`
+  for ARCHIVE.
+
+**Byte changes to delivered artifacts.** `repair_entry.py --out` produces a
+DIFFERENT file than before, and that is the point: the old one was DK-invalid on
+every input. Nothing on the certified build path moved -- `repair_entry`,
+`verify_export` and `preflight_upload` are all post-delivery tools, and the
+golden replay is unmoved. The other three changes are a referee gaining a check
+(d), a filter gaining a refusal (b), and three tools agreeing on a clock (c);
+each can turn a previous exit 0 into an exit 2, which is the intent.
+
+**Why.** The 09-02 1940_6g BUILD session tried to repair one dead catcher inside
+a lock window and the tool CLAUDE.md's R272 clause names could not write the
+file: 570 lines in, 589 out, 18 entry rows in, 36 out, headers at lines 1 and 20,
+and 13 `FAIL duplicate Entry ID` from the preflight. What shipped that night was
+hand-patched (3 bytes, one cell), as it was on 1305_12g before it
+(CHANGELOG:1313). The mechanism is a NAME: `load_entries` returns the whole table
+as its fourth value and says so in its docstring; this one call site of five
+called it `trailing` and wrote it back after the rows it had just written. It
+opened `"w"`, so this was never an append bug and never depended on a repair
+being found. Meanwhile the R272 clause rests on "both `verify_export.py` and
+`preflight_upload.py` exit 0", and `verify_export` could not see the condition
+that cost the 09-01 slate at all.
+
+**Repro, before.** `repair_entry --out` on a 4-line fixture (header, one entry,
+two pool-only rows), the artifact re-parsed with the same `load_entries` that
+produced the bug, run twice -- once with a `--dead` that resolves to nobody in
+the entry, once with one that repairs:
+
+```
+REPRO 1 -- repair_entry --out round trip through preflight_upload.load_entries
+  nothing-detected       repairs=0 exit=0 parent_lines=4 out_lines=6 entry_rows=3 parsed_entries=2 header_rows=2 dead_9100_present=True
+  dead-resolved          repairs=1 exit=0 parent_lines=4 out_lines=6 entry_rows=3 parsed_entries=2 header_rows=2 dead_9100_present=True
+  preflight(out_nothing-detected.csv) exit=2 FAILs=4
+      FAIL  row accounting: 3 Entry ID rows on disk, 2 parsed
+      FAIL  duplicate Entry ID 5234627043 (lines 2 and 4); a duplicate silently overwrites the first
+  preflight(out_dead-resolved.csv) exit=2 FAILs=4
+      FAIL  row accounting: 3 Entry ID rows on disk, 2 parsed
+      FAIL  duplicate Entry ID 5234627043 (lines 2 and 4); a duplicate silently overwrites the first
+```
+
+Note `exit=0` in both broken cases: the tool reporting success is half the
+defect.
+
+**Repro, after.**
+
+```
+REPRO 1 (AFTER) -- repair_entry --out round trip through load_entries
+  nothing-detected       repairs=0 exit=0 parent_lines=4 out_lines=4 entry_rows=1 parsed_entries=1 header_rows=1 dead_9100_present=True
+  dead-resolved          repairs=1 exit=0 parent_lines=4 out_lines=4 entry_rows=1 parsed_entries=1 header_rows=1 dead_9100_present=False
+  preflight(out_nothing-detected.csv) exit=2 FAILs=1
+  preflight(out_dead-resolved.csv) exit=2 FAILs=1
+  pool-only rows preserved in out_dead-resolved: 2
+```
+
+One row in, one row out; one header; the dead id gone when a repair landed and
+present when none was asked for; the pool rows intact. The remaining single FAIL
+is the fixture's own synthetic feed (most sides post an empty confirmed lineup),
+not row accounting and not a duplicate id.
+
+**Repro, the three clocks.** One naive stamp, each site's reading transcribed
+exactly from its source at this head:
+
+```
+REPRO 2 -- one naive --as-of, three sibling tools
+  input: '2026-09-01T19:40:00'  (a bare ET wall time, what an operator types at T-5)
+
+  preflight_upload.parse_as_of  -> 2026-09-01T19:40:00-04:00   utc=2026-09-01T23:40:00+00:00
+  verify_export.main :479-483    -> 2026-09-01T19:40:00+00:00   utc=2026-09-01T19:40:00+00:00
+  repair_entry.main  :472-473    -> 2026-09-01T19:40:00   tzinfo=None
+  delta preflight vs verify_export: -4.0 h
+
+  parse_as_of('19:40')          -> 2026-09-02T19:40:00-04:00
+  verify_export  on '19:40'      -> ValueError: Invalid isoformat string: '19:40'
+  repair_entry   on '19:40'      -> ValueError: Invalid isoformat string: '19:40'
+```
+
+And the consequence, on the real 09-01 salary file, at a stamp four hours from
+the boundary:
+
+```
+REPRO 2b -- consequence of the two readings on DKSalaries_1940_9g.csv, --as-of '2026-09-01T20:15:00'
+  preflight_upload (ET)      = 20:15 ET  locked=10 ['ATH', 'CHC', 'CWS', 'DET', 'HOU', 'KC', 'MIA', 'MIL', 'MIN', 'TEX']
+                             note: next lock 2026-09-01 20:40 ET
+  verify_export (UTC)        = 16:15 ET  locked= 0 []
+                             note: next lock 2026-09-01 19:40 ET
+```
+
+Ten locked teams or none, off one flag, on the file that cost the slate.
+
+**What the fix made false, and what it made newly true.**
+
+- `repair_entry`'s module header, constraint 4, said the observed tier is the
+  confirmed-starter source "once the candidate's game is underway". FALSE now and
+  backwards then: the tier only ever REMOVES a candidate here. Corrected in
+  place.
+- `verify_export`'s header claimed everything both tools check "is implemented
+  there once and imported here". It was false about `check_started_games` and is
+  now true; the header names the no-parent condition and why the branch is
+  narrow.
+- `CLAUDE.md`'s R272 clause: **"Shipping a hand-corrected file is autonomous
+  when the engine cannot produce one and both `verify_export.py` and
+  `preflight_upload.py` exit 0."** That sentence is unchanged and it is now
+  worth what it reads. A dated paragraph under it says what it was worth before:
+  one referee could not write a valid file, the other could not see a started
+  player without a parent, and the candidate filter admitted a player already
+  playing.
+- `SKILL.md`'s "a bare `HH:MM` is read as **Eastern**" was true of preflight
+  only. Now true of all three tools, and the paragraph says what each one used
+  to do instead.
+- `parse_as_of`'s own docstring did not mention the `Z` form it now accepts.
+
+**R233 enumeration.** Four classes, AST walk (`ast.parse` over 74 files in
+`mlb_engine/ tools/ tests/ skills/`) plus a token grep, hit lists below.
+
+1. **`load_entries`: one definition (`preflight_upload.py:361`), fourteen call
+   sites.** Production: `preflight_upload.py:1403` (`_`), `:2052` (`raw_rows`),
+   `verify_export.py:467` (`raw_rows`), `:580` (`_`), `repair_entry.py:550`
+   (`all_rows`, was `trailing`). Tests: `:379 _`, `:569 raw_rows`, `:1736 _`,
+   `:2580 _`, `:3425 _`, `:3435 _`, `:4463 _raw`, `:4679 _raw`, `:5975 rows`
+   (mine). Exactly ONE ever wrote the value back and it was the broken one. The
+   BUILD fragment measured this table on 2026-09-02 and it re-derives identically
+   at this head, which is the first time in seven greenfield editions that a
+   filed class size has been right; said plainly because R289 named two sites and
+   had five, and R291 named five and had seven.
+2. **`--as-of`: four flag definitions, one reader.**
+   `preflight_upload.py:2218`, `repair_entry.py:542`, `verify_export.py:448` plus
+   `:451`'s deprecated `--now` alias. All three now call
+   `preflight_upload.parse_as_of` (`:2106`, `repair_entry:561`,
+   `verify_export:498`), and after this change ZERO production
+   `datetime.fromisoformat` calls read operator input. The eleven that remain
+   read MACHINE-written stamps and are deliberately different:
+   `live_data_adapters:167`, `slate_intake_manager:553` and `:1786`,
+   `build_state_manager:533` and `:541`, `build_slate:305` and `:3945`,
+   `audit:1606`, `late_swap:421`, `preflight_upload:1393` (a manifest stamp),
+   `refresh_reference_data:252`, `stage_slate:625`, `verify_export:222` (a feed
+   lock time). `late_swap:421` carries its own `Z` handling with a comment naming
+   the same 3.10 limitation this entry hit; kept, because it reads a feed field
+   and not a flag.
+3. **"this game has already started": one blanket rule, four deliberately
+   different readers.** `check_started_games` (`preflight_upload.py:818`) is the
+   owner and now has two callers (`:2105`, `verify_export.py:608`) where it had
+   one. Kept separate, each with its reason: `derive_locked_teams`
+   (`verify_export.py:114`) and `derive_locked_teams_from_feed` (`:177`), unioned
+   by `resolve_locked_teams` (`:240`), are TEAM-level lock state answering what
+   may CHANGE, and the feed variant can see a postponement, which
+   `check_started_games` deliberately cannot; `check_parent_slots` (`:361`) asks
+   the sharper INTRODUCED-slot question and is why (d) is not unconditional;
+   `observed_starter_state` (`live_data_adapters.py:1315`) is a boxscore RECORD
+   rather than a schedule prediction, a different tier by R270(b). One
+   deliberately-kept copy of a helper:
+   `preflight_upload.parse_game_info_datetime` (`:260`) mirrors
+   `slate_intake_manager`'s (`:1738`) because this tool imports nothing from the
+   engine, so it still runs when the engine does not.
+4. **`write_entries`: one production definition and one production call**
+   (`repair_entry.py:498`, `:670`). The other two definitions are test helpers
+   with different signatures (`test_core.py:121` (path, rosters, contest_ids),
+   `test_upload_integrity.py:103` (path, header, rows)) and ~90 calls between
+   them; none touches the production function.
+
+**Which grep form, and what each misses.** Here the AST pass is the WIDER net,
+and it is the reverse of R291, where a token grep caught
+`frame.loc[mask, "Excluded"]` that an AST walk keyed on `Constant` subscripts
+could not see. `load_entries`' fourth value is named by POSITION, so a token grep
+for `trailing` finds 23 hits of which exactly one is this call site and none are
+the other four; the AST pass reads every unpacking target and reports the name at
+each. Same for class 4: `write_entries` is 94 token hits across three unrelated
+functions with the same name, and the AST pass separates them by definition.
+What the AST pass misses, and the token grep covers: a call reached through
+`getattr`, a name re-exported under an alias, and every mention in prose --
+`docs/`, `CLAUDE.md`, `SKILL.md` -- which is where the false sentences above
+lived and where no AST can look. Both were run for all four classes.
+
+**Found and fixed inside the batch, not in the filed entry.** The observed tier
+in `repair_entry` was INERT: `build_observed_starters(boxes, salary)` was handed
+`preflight_upload.load_salary`'s raw DK rows (keyed `Name`, `TeamAbbrev`) while
+the function crosswalks on `_record_get(record, "name")`/`"team"`, so every
+lookup returned `""` and nobody resolved. Measured on the fixture: with the
+parsed dict, `observed_pitcher_ids == []` and Zac Gallen lands in
+`unrostered_observed` as "observed starter absent from the DK pool"; with the
+path, `observed_pitcher_ids == ["9102"]` and `unrostered_observed == []`. Two
+consequences, and the second is worse than R292(b) as filed: `state == "started"`
+could never fire, so (b) was unreachable rather than merely wrong; and
+`derive_dead_from_observed` marked EVERY rostered player on an underway team
+`did_not_start`, so `--boxscores` without `--dead` would have declared a whole
+live team scratched. It is the only production caller of
+`build_observed_starters`, and the feed call twenty lines above it already passed
+a path. `parse_as_of` also had to learn the `Z` form, which `repair_entry` handled
+locally and its own usage line and every test in its class use: folding three
+readers into one has to carry every form the callers accepted, or consolidation
+silently drops one at T-5.
+
+**Filed, not fixed.** `check_started_games` has no postponed-game exemption: a
+postponed game's scheduled start has passed, its players are still swappable, and
+the salary file cannot know. Now that `verify_export` runs the same rule, the
+false positive is in both referees rather than one -- which is the consistent
+state, and fixing it in one tool only would be worse. It belongs to R287 and its
+input is the feed's affirmative `not_locked` set, which `resolve_locked_teams`
+already computes and discards. Fragment:
+`docs/backlog_inbox/2026-09-02_DEV_started-games-has-no-postponed-exemption.md`.
+
+**Gate.** `PASS  v2.26.0  27 modules  1659 tests` -> `PASS  v2.26.0  27 modules
+1675 tests`, five `--gate-run` calls from a `--gate-reset`. The gated-unit line
+moves with it, `test_upload_integrity` 42/42 -> 43/43, because
+`PreflightWallClockTests` is a new class. Per suite: 332 -> 348 (`grew`, pin raised);
+`test_core` 1047, `test_showdown` 173, `test_golden_replay` 9,
+`test_paste_lineups` 98, all unchanged and all `ok`. No suite reported
+`shortfall`, `skipped_in_place` or `absent`.
+
+**Golden replay: unmoved.** `python -m unittest tests.test_golden_replay` ran 9
+tests, OK, and nothing in this batch is on the build path.
+
+**Migrated R292 entry.** *The repair path cannot write a clean file and admits a
+started player; `--as-of` means three things in three sibling tools;
+`verify_export` never runs the started-game check (P0, S).* Filed 2026-09-02 from
+the greenfield tenth edition (GF10-T1..T4), VERIFIED-read. (a) `main` named
+`load_entries`'s fourth return `trailing`; that value is the full table, and
+`write_entries` re-emitted it after the repaired rows, so every `--out` carried
+two headers, both copies of every entry and every dead player, and exited 0.
+Every existing test drove `--dry-run` or never read the output. (b) A candidate
+the observed tier marked `started` passed the filter and was stamped
+`confirmed_source: "observed"`; the only guard was the feed-derived `locked` set,
+empty whenever `--feed` was omitted. (c) The same naive `--as-of` was ET in
+preflight, UTC in `verify_export` and naive in `repair_entry`. (d)
+`verify_export` never called `check_started_games` while its header claimed
+parity. Why P0: the R272 autonomous-repair clause is the project's answer to a
+dead arm inside a lock window, and its tool could not write the file, could
+insert a player already playing, and its second referee passed a post-lock file.
+All four shipped, plus both seams the BUILD fragment filed with it (e, f) and
+R300(b).
+
 ## 2026-09-02 — R291: the salary file's `Excluded` column reaches the frame, the bank grid, the Showdown melt and the late swap, and the two counts in one brief agree
 
 **What moved.** `mlb_engine/pipeline/execution_pipeline.py` (`_assemble_projection_frame`

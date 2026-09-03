@@ -804,7 +804,26 @@ EXPECTED_SUITE_COUNTS = {
     # check exists to stop). Four on the anti-correlation demotion (warning and
     # exiting 0, the count as one portfolio-level fact, a clean file carrying no
     # block at all, and --force no longer being the price of a legal roster).
-    "tests.test_upload_integrity": 332,
+    # R292 + R300(b), 2026-09-02: 332 -> 348, the sixteen that pin the repair
+    # path and its clocks. Eleven on `repair_entry` -- the `--out` artifact
+    # round-tripping through the loader that wrote it (one header, one entry row,
+    # the dead id gone, the non-entry remainder intact) and clearing the preflight
+    # it tells you to run, a candidate whose own game is UNDERWAY being refused
+    # while an `unobserved` one still falls through to the feed, the observed
+    # crosswalk being handed the salary PATH rather than parsed rows (the half
+    # that made the `started` branch unreachable and every rostered player on a
+    # live team a false scratch), one naive `--as-of` reading identically in all
+    # three sibling tools, a bare HH:MM and a Zulu stamp both surviving the
+    # consolidation, and `--dead-from-feed` consuming the condition the preflight
+    # hard-fails while never deriving an ARM from a posted lineup (R67's bound)
+    # and refusing without a feed. Three on `verify_export` -- a started player
+    # being a hard failure and not a warning when NO parent resolves, the same
+    # file passing before first pitch, and a legal late swap after first pitch
+    # still passing WITH a parent, which is why the check sits on that branch
+    # rather than running unconditionally. Two on preflight's wall-clock branch
+    # (R300(b)): the real `datetime.now` path exiting 0 at now+1h and 2 at now-1h,
+    # both derived at test time so neither can rot into a fixture-clock test.
+    "tests.test_upload_integrity": 348,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

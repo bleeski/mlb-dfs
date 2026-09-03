@@ -16,6 +16,14 @@ against the file it refines:
     set derived from the salary file's Game Info rather than a hand-passed flag
   - per-entry slot-change counts
 
+R292(d): when NO parent resolves, the check above has nothing to diff against --
+an unchanged locked slot and a roster built after first pitch are the same bytes
+-- so that branch runs preflight's blanket rule instead (``check_started_games``,
+R287: no roster slot at all holds a started player, salary file only, no feed and
+no parent needed). It used to WARN there and move on, which left a freshly built
+post-lock file checked by nobody, and CLAUDE.md's repair clause requires both
+this tool and the preflight to exit 0 before a hand-corrected file ships.
+
 The parent is resolved from the manifest's supersession chain when --parent is
 omitted, and the manifest is found next to the entries file when --manifest is
 omitted (R72(ii)). Both were opt-in, and the two checks above are exactly the
@@ -53,6 +61,8 @@ Usage:
         [--feed-lenient]                   # confirmed-lineup contradiction warns
         [--locked-teams PIT,NYY]           # ADDS to the derived set, never shrinks it
         [--as-of 2026-07-25T18:40:00-04:00]  # wall clock used for the lock derivation
+                                             # (or 18:40; a stamp with no offset
+                                             #  is ET, per preflight's parse_as_of)
         [--json]
 
 Exit 0 clean, 2 on any failure, 3 on a usage or IO error, 4 acknowledged
@@ -91,10 +101,11 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
 
 from preflight_upload import (  # noqa: E402
     EntryRow, Report, advisory, check_feed, check_legality, check_manifest,
-    check_pool_membership, check_row_shape, check_status, load_entries,
-    load_salary, parse_declared_pitcher_args, parse_embedded_pool,
-    parse_game_info_datetime, resolve_declared_pitchers, resolve_feed_for_slate,
-    resolve_salary_from_promoted_run, sha256_of, verdict_exit_code,
+    check_pool_membership, check_row_shape, check_started_games, check_status,
+    load_entries, load_salary, parse_as_of, parse_declared_pitcher_args,
+    parse_embedded_pool, parse_game_info_datetime, resolve_declared_pitchers,
+    resolve_feed_for_slate, resolve_salary_from_promoted_run, sha256_of,
+    verdict_exit_code,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -476,11 +487,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             rep.info["salary_source"] = "promoted run snapshot"
         salary = load_salary(salary_path)
 
-        now = None
-        if args.as_of:
-            now = datetime.fromisoformat(args.as_of)
-            if now.tzinfo is None:
-                now = now.replace(tzinfo=timezone.utc)
+        # R292(c). One reader for --as-of, and it is preflight's, imported like
+        # every other shared rule in this file. This block read a naive stamp as
+        # UTC while preflight read the same characters as ET: a bare `19:40`
+        # became 15:40 ET here, so every game that started between 16:05 and
+        # 19:40 read as still open and the introduced-from-a-started-game check
+        # went quiet on exactly the files this tool exists for. Game Info carries
+        # ET and nothing else, so ET is the right reading; and `parse_as_of` also
+        # accepts a bare `HH:MM`, which this block raised on.
+        now = parse_as_of(args.as_of) if args.as_of else None
         feed_path = resolve_lineups_feed(
             args.lineups, salary_path, entries, salary, rep)
         if args.lineups and not feed_path.exists():
@@ -523,7 +538,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     rep.info["locked_teams"] = sorted(locked)
     rep.info["lock_note"] = lock_note
     rep.info["lock_source"] = lock_source
-    rep.info["lock_as_of"] = (now or datetime.now(timezone.utc)).isoformat()
+    lock_clock = now or datetime.now(timezone.utc)
+    rep.info["lock_as_of"] = lock_clock.isoformat()
     rep.info["lineups_feed"] = str(feed_path) if feed_path else None
     if lock_source == "none":
         rep.warn("no lineups feed and no parsable Game Info: lock state is "
@@ -558,6 +574,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     rep.info["parent_file"] = str(parent_path) if parent_path else None
 
     parent_detail: Dict[str, Dict[str, object]] = {}
+    parent_checked = False
     if parent_path is not None:
         try:
             _, _, parent_entries, _, _ = load_entries(parent_path)
@@ -567,10 +584,33 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if parent_entries:
             parent_detail = check_parent_slots(entries, parent_entries, salary,
                                                locked, rep)
-    elif locked:
-        rep.warn(f"{len(locked)} team(s) have already started and no --parent was "
-                 f"given or resolvable from the manifest; locked-slot preservation "
-                 f"is unverified")
+            parent_checked = True
+    if not parent_checked:
+        # R292(d), extending R175 and R287, and it is deliberately on THIS branch
+        # rather than unconditional.
+        #
+        # With a parent, `check_parent_slots` asks the sharper question -- did a
+        # CHANGED slot introduce a player from a started game -- and the started
+        # players sitting in UNCHANGED slots are the normal, legal content of a
+        # late-swap file. A blanket refusal here would fail every legal swap
+        # after first pitch, which is the case this tool's own tests pin ("the
+        # swap is legal and this must pass").
+        #
+        # With no parent -- none passed, none in the manifest chain, or one that
+        # would not load -- nothing distinguishes "an unchanged locked slot" from
+        # "a roster built after the game started", and this branch used to say so
+        # in a WARNING and move on. That is the file R287's docstring names:
+        # freshly built, post-lock, "checked by nobody". Its rule needs only the
+        # salary file's Game Info, so it runs with no feed and no parent, which
+        # is exactly the state a repair inside a lock window is in. CLAUDE.md's
+        # R272 clause requires BOTH referees to exit 0 before a hand-corrected
+        # file ships; until now the second one could not see this condition.
+        check_started_games(entries, salary, lock_clock, rep)
+        if locked:
+            rep.warn(f"{len(locked)} team(s) have already started and no --parent "
+                     f"was given or resolvable from the manifest; locked-slot "
+                     f"preservation is unverified (every started slot is a hard "
+                     f"failure above, so a passing file has none to preserve)")
 
     for d in details:
         d.update(parent_detail.get(str(d.get("entry_id")), {}))

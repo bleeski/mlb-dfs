@@ -152,6 +152,19 @@ additions, all autonomous:
   review-grade, never certified; full diff against the parent reported; sha256
   stated. A preflight-clean repair beats an engine-certified file carrying ten
   dead slots.
+  **That two-referee sentence was worth less than it read until R292
+  (2026-09-02), and it is worth more now.** `verify_export.py` never called
+  `check_started_games` — R287's blanket "no roster slot holds a player whose
+  game has begun" — so on a file with no parent to diff against it WARNED and
+  exited 0 on exactly the condition that cost the 09-01 slate. It runs that check
+  now, on the no-parent branch only, because a late swap legitimately retains
+  started players in its frozen slots and only a CHANGED slot is the question
+  when a parent exists. Two further R292 corrections to what this clause assumed
+  about its own tool: `repair_entry.py --out` could not write a DK-valid file at
+  all (it re-emitted the whole source table after the repaired rows, two headers
+  and every dead player intact, and exited 0 saying `wrote <path>`), and its
+  candidate filter ADMITTED a player whose game was already underway. Both are
+  fixed; the clause now rests on tools that do what it says they do.
 
 **The no-hitter-versus-rostered-SP rule is a GUIDELINE, not a wall, and
 overriding it is autonomous (R288, Ben 2026-09-01).** His instruction, verbatim:
@@ -411,7 +424,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  27 modules  1659 tests`. The module count comes off the
+   `PASS  v2.26.0  27 modules  1675 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

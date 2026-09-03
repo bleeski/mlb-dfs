@@ -777,16 +777,26 @@ def check_status(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
 def parse_as_of(value: Any) -> datetime:
     """``--as-of`` -> aware datetime. Bare local times are read as ET.
 
-    Accepts a full ISO timestamp (``2026-09-01T19:56:00-04:00``), an ISO
-    timestamp with no offset, or ``HH:MM``/``HH:MM:SS`` alone, which takes
-    today's date. A naive value is stamped Eastern, because every other clock in
-    this file is: the salary file's ``Game Info`` carries ET and nothing else,
-    and guessing UTC for a bare "19:56" would move the comparison four hours and
-    silently pass exactly the file this check exists to stop.
+    Accepts a full ISO timestamp (``2026-09-01T19:56:00-04:00``), a Zulu stamp
+    (``2026-09-01T23:56:00Z``), an ISO timestamp with no offset, or
+    ``HH:MM``/``HH:MM:SS`` alone, which takes today's date. A naive value is
+    stamped Eastern, because every other clock in this file is: the salary
+    file's ``Game Info`` carries ET and nothing else, and guessing UTC for a
+    bare "19:56" would move the comparison four hours and silently pass exactly
+    the file this check exists to stop.
+
+    R292(c). The ``Z`` form is handled here rather than left to
+    ``fromisoformat``, which only learned it in 3.11 while this repo runs 3.10 --
+    and it is not hypothetical: ``repair_entry`` did its own
+    ``.replace("Z", "+00:00")`` and its usage line and its tests both use Zulu.
+    Making this the one owner of ``--as-of`` means it has to accept every form
+    its callers already did, or consolidation silently drops one at T-5.
     """
     text = str(value or "").strip()
     if not text:
         raise ValueError("--as-of given with no value")
+    if text[-1:] in ("Z", "z"):
+        text = text[:-1] + "+00:00"
     if re.fullmatch(r"\d{1,2}:\d{2}(:\d{2})?", text):
         today = datetime.now(tz=_eastern_tz(datetime.now().month, datetime.now().day))
         parts = [int(p) for p in text.split(":")]

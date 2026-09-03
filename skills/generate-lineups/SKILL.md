@@ -783,7 +783,11 @@ games that had already started; a second file that night carried 78 and also
 cleared. DK would have rejected both. It is a hard failure and not a warning,
 because a warning at the money boundary is one the clock talks someone past.
 `--as-of "19:56"` pins the clock to replay a check against a past moment, and a
-bare `HH:MM` is read as **Eastern**.
+bare `HH:MM` is read as **Eastern**. R292(c): `preflight_upload.parse_as_of` is
+now the ONE reader of that flag, so `verify_export.py` and `tools/repair_entry.py`
+answer identically — until 2026-09-02 the same characters meant ET here, UTC in
+`verify_export` (four hours early, which reads a 19:40 first pitch as still open)
+and a naive `TypeError` in the repair tool, and only this tool took `HH:MM`.
 
 Four inputs resolve themselves, because a check that runs only when you remember
 a flag is a check that does not run at T-5:
@@ -1033,6 +1037,17 @@ for that entry's pins and exclusions. Run the command again to add another slice
 If it persists, the entry may pin so many hitter slots that a 4-man stack cannot
 fit; the bank relaxes that automatically, but say so in the brief.
 
+**Which tool owns the entry: `late_swap.py` while it is mostly OPEN,
+`tools/repair_entry.py` once it is mostly LOCKED, and the boundary is
+`open <= pinned`.** The repair tool prints that boundary in its own refusal
+("more open slots than pins: the whole-lineup solve optimises jointly and owns
+this entry"), so a `deferred` record means you reached for the tail tool at the
+head of the slate — which is what happened on 2026-09-02 1940_6g, with 3 of 6
+games locked and 8 slots still live. Going the other way, growing the bank
+against a 9-pin prefix cannot work and is not a search-effort problem: on
+1305_12g it went 566 → 1425 candidates across six invocations and the message
+never changed.
+
 **Certification fails.** Do not hand over the file. Report which gate failed and
 what the errors say. A file that does not certify is not a deliverable.
 
@@ -1051,7 +1066,7 @@ Before a build, when there is time:
 ```bash
 cd <repo> && git status --short
 python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165  # repeat to GATE COMPLETE
-python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 27 modules, 1659 tests
+python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 27 modules, 1675 tests
 ```
 
 **`--run-tests` in one call is not the supported path here and CLAUDE.md says

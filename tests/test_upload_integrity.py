@@ -20,6 +20,7 @@ import sys
 import tempfile
 import unittest
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -132,8 +133,14 @@ def run_preflight(*args) -> subprocess.CompletedProcess:
     argv = list(args)
     if "--as-of" not in argv:
         argv += ["--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH]
+    return _run_preflight_argv(argv)
+
+
+def _run_preflight_argv(args) -> subprocess.CompletedProcess:
+    """No clock injected. R300(b): the wall-clock branch needs a caller that
+    passes no --as-of at all, and the pinning runner above can never be one."""
     return subprocess.run(
-        [sys.executable, str(REPO / "tools" / "preflight_upload.py"), *argv],
+        [sys.executable, str(REPO / "tools" / "preflight_upload.py"), *args],
         capture_output=True, text=True)
 
 
@@ -2496,6 +2503,19 @@ def write_three_game_feed(path: Path, postponed=(), confirmed=None,
 
 
 def run_verify(*args) -> subprocess.CompletedProcess:
+    # R292(d). Same reason the preflight runner above pins a clock, and now the
+    # same need: with no parent to diff against, verify_export runs R287's
+    # blanket started-game check, and every fixture game is dated 07/25/2026 and
+    # therefore permanently in the past. A caller that IS about the clock passes
+    # its own --as-of and this steps aside. It also makes the two-tool exit
+    # comparison honest -- before this, the pair ran on two different clocks.
+    argv = list(args)
+    if "--as-of" not in argv:
+        argv += ["--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH]
+    return _run_verify_argv(argv)
+
+
+def _run_verify_argv(args) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(REPO / "tools" / "verify_export.py"), *args],
         capture_output=True, text=True)
@@ -2701,12 +2721,61 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         self.assertTrue(str(info["lineups_feed"]).endswith("lineups_feed.json"))
 
     def test_the_feed_is_auto_resolved_from_beside_the_salary_file(self):
+        # --parent, added under R292(d): this test is about feed resolution at a
+        # clock where AAA@BBB has locked, and with no parent that file now meets
+        # R287's blanket started-game rule and exits 2. The file IS its own
+        # parent here, so the diff is trivially clean and the subject is
+        # untouched. The no-parent branch has its own test below.
         result = run_verify("--entries", str(self.parent), "--salary", str(self.salary),
+                            "--parent", str(self.parent),
                             "--as-of", self.EARLY, "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         info = json.loads(result.stdout)["info"]
         self.assertIn("lineups feed", info["lock_source"])
         self.assertIn("staged beside the salary file", info["feed_autoresolve"])
+
+    def test_with_no_parent_a_started_player_is_a_hard_failure_not_a_warning(self):
+        """R292(d). `check_parent_slots` catches an INTRODUCED player from a
+        started game, and only when a parent resolves. With none -- none passed,
+        none in a manifest chain -- this tool WARNED that preservation was
+        unverified and exited 0, so a freshly built or hand-repaired post-lock
+        file was checked by nobody. That is the file R287 exists for, and
+        CLAUDE.md's repair clause requires this tool to exit 0 before one ships.
+        """
+        result = run_verify("--entries", str(self.parent), "--salary", str(self.salary),
+                            "--lineups", str(self.feed), "--as-of", self.LATE, "--json")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(any("ALREADY STARTED" in f for f in payload["failures"]),
+                        payload["failures"])
+        self.assertGreater(payload["info"]["started_slots"], 0)
+
+    def test_the_same_no_parent_file_passes_before_first_pitch(self):
+        """The other side of it, so the test above cannot be passing on an
+        unrelated failure: same file, same absent parent, a clock before every
+        game, and the blanket check has nothing to say."""
+        result = run_verify("--entries", str(self.parent), "--salary", str(self.salary),
+                            "--lineups", str(self.feed),
+                            "--as-of", "2026-07-25T22:00:00+00:00", "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["info"]["started_slots"], 0)
+
+    def test_a_legal_late_swap_after_first_pitch_still_passes_with_a_parent(self):
+        """The reason R292(d) sits on the no-parent branch rather than running
+        unconditionally. A swap file legitimately RETAINS players from games that
+        have already started -- those slots are frozen, not chosen -- and the
+        question that matters is whether a CHANGED slot introduced one. Running
+        R287's blanket rule here would refuse every legal late swap."""
+        child = self._child_swapping_in_fff()
+        result = run_verify("--entries", str(child), "--salary", str(self.salary),
+                            "--parent", str(self.parent), "--lineups", str(self.feed),
+                            "--as-of", self.PREGAME, "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("AAA", payload["info"]["locked_teams"])
+        self.assertNotIn("started_slots", payload["info"],
+                         "the blanket check must not run when a parent answered "
+                         "the sharper question")
 
     def test_locked_teams_no_longer_documented_as_an_override_of_the_derivation(self):
         """The docstring is the contract an operator reads under deadline."""
@@ -5854,3 +5923,363 @@ class SingleSlotRepairTests(unittest.TestCase):
         by_id, _ = self.re.resolve_dead_players(["9100"], salary)
         self.assertEqual(by_name, ["9100"])
         self.assertEqual(by_id, ["9100"])
+
+    # -- R292 ----------------------------------------------------------------
+
+    POOL_MARK = "POOL ROW, NOT AN ENTRY"
+
+    def _append_pool_row(self):
+        """A row that is neither the header nor an entry: no Entry ID, nothing
+        inside the roster window. A real DK export is mostly these, and they are
+        the only thing `write_entries`'s fourth argument is for."""
+        with self.entries_path.open("a", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerow([""] * 14 + [self.POOL_MARK])
+
+    def _write_out(self, *extra, dead=("Ryan Feltner",), name="out.csv"):
+        out = self.dir / name
+        args = ["--entries", str(self.entries_path), "--salary", str(self.salary_path),
+                "--feed", str(self.feed_path), "--as-of", "2026-08-29T23:40:00Z",
+                "--out", str(out), "--json"]
+        for d in dead:
+            args += ["--dead", d]
+        args += list(extra)
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = self.re.main(args)
+        return code, json.loads(buf.getvalue()), out
+
+    def test_the_out_file_round_trips_through_the_loader_that_wrote_it(self):
+        """R292(a). Every `--out` this tool ever wrote was DK-invalid: `main`
+        unpacked `load_entries`'s fourth value -- the WHOLE table, header
+        included, and its docstring says so -- as `trailing` and handed it to
+        `write_entries` after the repaired rows. Two headers, 2N entry rows,
+        every dead player still there, `wrote <path>` on stdout and exit 0.
+
+        Measured on the 2026-09-02 1940_6g delivery before the fix: parent 570
+        lines / 18 entry rows, artifact 589 lines / 36 entry rows / headers at
+        lines 1 and 20, and 13 `FAIL duplicate Entry ID` from the preflight.
+
+        Every test in this class predating it drove `--dry-run` or never read the
+        output, which is exactly why it survived. This one writes the file and
+        re-parses it with the same function that produced the bug."""
+        import preflight_upload
+        self._append_pool_row()
+        parent_lines = len(self.entries_path.read_text(encoding="utf-8").splitlines())
+        code, out, path = self._write_out()
+        self.assertEqual(code, 0)
+        self.assertEqual(len(out["repairs"]), 1)
+
+        text = path.read_text(encoding="utf-8")
+        _c, _s, entries, rows, entry_id_rows = preflight_upload.load_entries(path)
+        self.assertEqual(entry_id_rows, len(entries), "row accounting")
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(sum(1 for r in rows if (r[:1] or [""])[0] == "Entry ID"), 1,
+                         "exactly one header row")
+        self.assertEqual(len(text.splitlines()), parent_lines,
+                         "one row in, one row out")
+        self.assertNotIn("(9100)", text, "the dead player is gone from the artifact")
+        self.assertIn("(9102)", text, "and his replacement is in it")
+        self.assertIn(self.POOL_MARK, text, "the non-entry remainder survives")
+
+    def test_the_artifact_passes_the_referee_the_tool_tells_you_to_run(self):
+        """The whole contract of a repair is that its output clears the
+        preflight; before R292(a) it could not, on any input. Asserted on the
+        two failures the double-write produced, so this cannot go green on a
+        fixture quirk."""
+        self._append_pool_row()
+        _code, _out, path = self._write_out()
+        proc = run_preflight("--entries", str(path), "--salary", str(self.salary_path),
+                             "--no-manifest", "--feed-lenient",
+                             "--as-of", "2026-08-29T15:00:00-04:00", "--json")
+        failures = json.loads(proc.stdout)["failures"]
+        self.assertEqual([f for f in failures if "row accounting" in f], [], failures)
+        self.assertEqual([f for f in failures if "duplicate Entry ID" in f], [], failures)
+
+    def _boxscore_with_ari_underway(self) -> Path:
+        """ARI's game is in progress with Gallen on the mound. COL's side of the
+        same game comes back EMPTY, which is an unread block and NOT nine
+        scratches (R270(b)), so COL stays `unobserved` and falls to the feed."""
+        box = {"games": [{
+            "gameData": {"game": {"pk": 1},
+                         "status": {"abstractGameState": "Live",
+                                    "detailedState": "In Progress"},
+                         "teams": {"away": {"abbreviation": "COL"},
+                                   "home": {"abbreviation": "ARI"}},
+                         "players": {"ID11": {"person": {"id": 11,
+                                                         "fullName": "Zac Gallen"}}}},
+            "liveData": {"boxscore": {"teams": {
+                "away": {"battingOrder": [], "pitchers": []},
+                "home": {"battingOrder": [], "pitchers": [11]}}}}}]}
+        path = self.dir / "boxscores_ari_live.json"
+        path.write_text(json.dumps(box), encoding="utf-8")
+        return path
+
+    def test_a_candidate_whose_own_game_is_underway_is_refused(self):
+        """R292(b). `started` used to PASS this filter and be stamped
+        `confirmed_source: "observed"`, which reads the record backwards: the
+        boxscore proves he is PLAYING, not that he is available. DK will not take
+        him in a new slot. The only guard was `team in locked`, which is
+        feed-derived and empty whenever --feed is omitted.
+
+        Gallen outprojects Lynch IV 14.0 to 12.5, so before the fix he is the
+        pick; the fix has to change the answer, not just the census."""
+        _, out = self._run("--boxscores", str(self._boxscore_with_ari_underway()))
+        r = out["repairs"][0]
+        self.assertEqual(r["rejection_census"]["game_underway"], 1,
+                         "Gallen is observed starting: his game is in progress")
+        self.assertEqual(r["in_name"], "Daniel Lynch IV")
+        self.assertEqual(r["eligible_count"], 1)
+        self.assertIsNone(r["runner_up"])
+        self.assertEqual(r["confirmed_source"], "feed",
+                         "the observed tier only ever removes a candidate now")
+
+    def test_an_unobserved_candidate_still_falls_through_to_the_feed(self):
+        """The safety half of R292(b), and it is the argument rather than
+        decoration: `unobserved` means the game has not begun and the tier has
+        nothing to say, so collapsing it into a refusal is R237's conflation
+        arriving through a new door. COL's block is unread in the same underway
+        game and Lynch IV is still rosterable off the feed."""
+        box = self._boxscore_with_ari_underway()
+        _, out = self._run("--boxscores", str(box))
+        self.assertEqual(out["repairs"][0]["in_team"], "COL")
+        from mlb_engine.intake.live_data_adapters import (
+            build_observed_starters, observed_starter_state, parse_boxscore_feed)
+        observed = build_observed_starters(
+            [parse_boxscore_feed(g) for g in json.loads(
+                box.read_text(encoding="utf-8"))["games"]], str(self.salary_path))
+        self.assertEqual(observed_starter_state(observed, "9101", "COL"), "unobserved")
+        self.assertEqual(observed_starter_state(observed, "9102", "ARI"), "started")
+
+    def test_the_observed_crosswalk_is_handed_the_salary_file_not_parsed_rows(self):
+        """R292(b), second half, and it is the reason the branch above was
+        unreachable rather than merely wrong. `build_observed_starters`
+        crosswalks on `_record_get(record, "name")`/`"team"`;
+        `preflight_upload.load_salary` returns raw DK rows keyed `Name` and
+        `TeamAbbrev`. Handed the parsed dict, every lookup returns "" and NOBODY
+        resolves -- so every rostered player on an underway team reads
+        `did_not_start`, which is a mass FALSE scratch, not a missed one.
+
+        Asserted both ways so a regression cannot hide: the wrong shape produces
+        an empty observed set and an `unrostered_observed` entry, the right one
+        resolves the arm."""
+        from mlb_engine.intake.live_data_adapters import (
+            build_observed_starters, parse_boxscore_feed)
+        boxes = [parse_boxscore_feed(g) for g in json.loads(
+            self._boxscore_with_ari_underway().read_text(encoding="utf-8"))["games"]]
+        wrong = build_observed_starters(boxes, self.re.load_salary(self.salary_path))
+        self.assertEqual(wrong["observed_pitcher_ids"], [])
+        self.assertEqual([u["name"] for u in wrong["unrostered_observed"]],
+                         ["Zac Gallen"])
+        right = build_observed_starters(boxes, str(self.salary_path))
+        self.assertEqual(right["observed_pitcher_ids"], ["9102"])
+        self.assertEqual(right["unrostered_observed"], [])
+
+    def test_one_naive_as_of_reads_the_same_in_all_three_sibling_tools(self):
+        """R292(c). `preflight_upload` read a bare stamp as ET (documented, with
+        the reason: Game Info carries ET and nothing else), `verify_export` read
+        the same characters as UTC, and this tool left them naive and TypeError'd
+        four frames later. A verify run at a bare 19:40 saw 15:40 ET, so every
+        game that started between 16:05 and 19:40 read as still open.
+
+        Asserted by calling the production functions and by running the two CLIs,
+        not by reading source."""
+        import preflight_upload
+        import verify_export
+        self.assertIs(self.re.parse_as_of, preflight_upload.parse_as_of)
+        self.assertIs(verify_export.parse_as_of, preflight_upload.parse_as_of)
+
+        naive = "2026-08-29T19:40:00"
+        expected = preflight_upload.parse_as_of(naive)
+        self.assertEqual(expected.utcoffset().total_seconds() / 3600, -4.0,
+                         "a bare stamp is Eastern")
+
+        _code, out, _path = self._write_out("--as-of", naive, name="clock.csv")
+        self.assertEqual(datetime.fromisoformat(out["as_of"]), expected)
+
+        proc = run_verify("--entries", str(self.entries_path),
+                          "--salary", str(self.salary_path),
+                          "--as-of", naive, "--json")
+        self.assertEqual(
+            datetime.fromisoformat(json.loads(proc.stdout)["info"]["lock_as_of"]),
+            expected)
+
+    def test_a_bare_hh_mm_as_of_is_accepted_by_the_repair_tool(self):
+        """What an operator actually types at T-5. Both siblings raised
+        `ValueError` on it (exit 3, "not an ISO timestamp"); the shared owner has
+        always taken it and reads it as today at that ET wall time.
+
+        The exit code here is 2, not 0, and that is the right answer rather than
+        a wrinkle: today is well past this fixture's 08/29 slate, so every game
+        has locked and no replacement is legal. What is asserted is that the
+        stamp PARSED -- 3 would mean it did not."""
+        import preflight_upload
+        code, out, _path = self._write_out("--as-of", "19:40", name="hhmm.csv")
+        self.assertNotEqual(code, 3, "the stamp parsed")
+        self.assertEqual(datetime.fromisoformat(out["as_of"]),
+                         preflight_upload.parse_as_of("19:40"))
+
+    def test_a_zulu_as_of_survived_the_consolidation(self):
+        """The form this tool's own usage line and every test in this class use.
+        `datetime.fromisoformat` did not learn `Z` until 3.11 and this repo runs
+        3.10, so folding three readers into one had to carry it or drop it."""
+        import preflight_upload
+        self.assertEqual(
+            preflight_upload.parse_as_of("2026-08-29T23:40:00Z"),
+            datetime(2026, 8, 29, 23, 40, tzinfo=timezone.utc))
+
+    def _post_full_nines(self, chc_omits=None, stl_omits=None):
+        """Give both sides of the locked game a posted nine.
+
+        A side the feed calls `confirmed` is confirmed whatever its lineup
+        length, so a one-name fixture would make every other rostered bat on
+        that team read as contradicted. Posting real nines keeps the assertion
+        about the one player the test is for."""
+        stl = ["Willson Contreras", "Nolan Gorman", "Nolan Arenado", "Masyn Winn",
+               "Lars Nootbaar", "STL Sixth", "STL Seventh", "STL Eighth", "STL Ninth"]
+        chc = ["Michael Busch", "Ian Happ", "Seiya Suzuki", "CHC Fourth", "CHC Fifth",
+               "CHC Sixth", "CHC Seventh", "CHC Eighth", "CHC Ninth"]
+        stl = [n for n in stl if n != stl_omits]
+        chc = [n for n in chc if n != chc_omits]
+        feed = json.loads(self.feed_path.read_text(encoding="utf-8"))
+        feed["games"][1]["away"]["lineup"] = [{"name": n, "order": i + 1}
+                                              for i, n in enumerate(stl)]
+        feed["games"][1]["home"]["lineup"] = [{"name": n, "order": i + 1}
+                                              for i, n in enumerate(chc)]
+        feed["games"][1]["home"]["lineup_status"] = "confirmed"
+        self.feed_path.write_text(json.dumps(feed), encoding="utf-8")
+
+    def test_dead_from_feed_consumes_the_condition_the_preflight_hard_fails(self):
+        """R292(e). `preflight_upload` hard-fails "rostered player absent from a
+        confirmed posted lineup" (on 1940_6g: Jimmy Crooks, with Ivan Herrera
+        catching instead) and this tool could not read it: the dead set came from
+        --dead or from --boxscores, never from the feed. So the operator
+        transcribed a player id between two tools under a lock clock.
+
+        Both sides post a full nine. STL's holds every rostered STL bat, and
+        CHC's holds Busch and Suzuki but NOT Ian Happ, so exactly one rostered
+        hitter is contradicted."""
+        self._post_full_nines(chc_omits="Ian Happ")
+
+        _code, without, _p = self._write_out(dead=("Ryan Feltner",), name="nofeeddead.csv")
+        self.assertNotIn("9007", without["dead_player_ids"])
+
+        _code, with_feed, _p2 = self._write_out(
+            "--dead-from-feed", dead=("Ryan Feltner",), name="feeddead.csv")
+        self.assertIn("9007", with_feed["dead_player_ids"],
+                      "Ian Happ is not in CHC's posted nine")
+        self.assertIn("9100", with_feed["dead_player_ids"],
+                      "--dead-from-feed unions with --dead, it does not replace it")
+        self.assertEqual([d["source"] for d in with_feed["dead_derived_from_feed"]],
+                         ["absent_from_confirmed_lineup"])
+
+    def test_dead_from_feed_never_derives_an_ARM_from_a_posted_lineup(self):
+        """The bound that keeps this from being a second copy of `check_feed`'s
+        rule. A posted batting lineup evidences BATS (R67): a confirmed nine can
+        sit beside a null probable in a bullpen game, and a legally rostered arm
+        can be a DECLARED one (R114) no feed carries. Both are arm cases and both
+        are why check_feed needs tiers. Hitters only has no tier to get wrong.
+
+        Both sides post a full nine and STL's probable is pulled entirely, the
+        bullpen-game shape. The rostered STL arm is on a confirmed team and is in
+        nobody's batting order, and he must still not be derived dead."""
+        self._post_full_nines()
+        feed = json.loads(self.feed_path.read_text(encoding="utf-8"))
+        feed["games"][1]["away"]["probable_pitcher"] = None
+        self.feed_path.write_text(json.dumps(feed), encoding="utf-8")
+        _code, out, _p = self._write_out(
+            "--dead-from-feed", dead=("Ryan Feltner",), name="armsafe.csv")
+        self.assertNotIn("9001", out["dead_player_ids"],
+                         "Sonny Gray occupies a P slot; a posted nine says "
+                         "nothing about him")
+        self.assertEqual([d["player_id"] for d in out["dead_derived_from_feed"]
+                          if d["player_id"] == "9001"], [])
+
+    def test_dead_from_feed_refuses_rather_than_deriving_nothing_without_a_feed(self):
+        """A flag that silently finds no dead players is indistinguishable from a
+        slate where nobody is dead, which is the worst possible answer under a
+        clock."""
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = self.re.main(
+                ["--entries", str(self.entries_path), "--salary", str(self.salary_path),
+                 "--dead-from-feed", "--dry-run", "--json"])
+        self.assertEqual(code, 3)
+
+
+class PreflightWallClockTests(unittest.TestCase):
+    """R300(b). The branch that printed the false PASS on 2026-09-01, tested.
+
+    R287's started-game check has two clocks: `--as-of` for replay, and
+    `datetime.now()` for the question it actually asks, which is about the moment
+    of upload. Every preflight test in this file runs under the injected
+    `FIXTURE_AS_OF_BEFORE_FIRST_PITCH`, because the fixture slate is dated
+    07/25/2026 and is permanently in the past -- so the wall-clock path had
+    exactly one caller (`test_the_feed_is_auto_resolved_from_the_slate_date`),
+    and that one asserts feed fields and never the return code. The path the
+    defect lived on was covered by nothing.
+
+    Both tests below derive their game time from `datetime.now` AT TEST TIME. A
+    pinned timestamp would rot into another fixture-clock test the moment it
+    passed, which is the failure this class exists to stop repeating.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+        write_entries(self.entries, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _restamp(self, delta: timedelta) -> datetime:
+        """Move every game in the salary file to now + delta, in ET."""
+        import preflight_upload
+        now_utc = datetime.now(timezone.utc)
+        when = (now_utc + delta).astimezone(
+            preflight_upload._eastern_tz(now_utc.month, now_utc.day))
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        col = rows[0].index("Game Info")
+        for row in rows[1:]:
+            matchup = str(row[col]).split()[0]
+            row[col] = f"{matchup} {when.strftime('%m/%d/%Y %I:%M%p')} ET"
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return when
+
+    def _run_no_clock(self):
+        return _run_preflight_argv(
+            ["--entries", str(self.entries), "--salary", str(self.salary),
+             "--no-manifest", "--json"])
+
+    def test_the_real_clock_passes_a_file_whose_games_have_not_started(self):
+        when = self._restamp(timedelta(hours=1))
+        proc = self._run_no_clock()
+        payload = json.loads(proc.stdout)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(payload["info"]["started_slots"], 0)
+        self.assertNotIn("--as-of", proc.args, "this run must use datetime.now")
+        self.assertGreater(when, datetime.now(timezone.utc))
+
+    def test_the_real_clock_fails_a_file_whose_games_have_started(self):
+        """The 09-01 file, in miniature: 10 roster slots from games that began an
+        hour ago, no `--as-of`, and the tool used to print PASS and exit 0."""
+        self._restamp(timedelta(hours=-1))
+        proc = self._run_no_clock()
+        payload = json.loads(proc.stdout)
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+        self.assertEqual(payload["info"]["started_slots"], 10)
+        self.assertTrue(any("ALREADY STARTED" in f for f in payload["failures"]),
+                        payload["failures"])
+
+
+if __name__ == "__main__":
+    unittest.main()
