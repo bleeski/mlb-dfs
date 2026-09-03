@@ -73,6 +73,27 @@ reserved entries in the same or adjacent contests is a normal, legal
 multi-entry strategy, not a shortcut; this is a documented, exposed
 run_slate parameter, not an undocumented workaround.
 
+Baseline history. A frozen baseline is re-frozen only on evidence, and this
+one has moved once:
+
+  2026-09-03, R293(a). `build_diverse_candidate_bank`'s augmentation skip was
+  reversed -- it excluded the SP pair's OWN teams, so it attempted the opponent
+  stacks the anti-correlation rows bar and never attempted the legal own-team
+  stack. Fixing the direction changes which (pair, team) jobs the pass spends
+  its budget on, so the order candidates are appended in changes, so the
+  candidate_id numbering changes. Isolated by reverting that ONE edit with the
+  rest of R293 in place: the baseline came back GREEN, so nothing else in the
+  item moves a k=0 build. Measured before re-freezing, and it is why the
+  re-freeze is a numbering change and not a portfolio change: the DELIVERED
+  PORTFOLIO is identical -- the same 8 distinct lineups, the same multiset of
+  18 rosters, byte-identical `exposure_summary`, byte-identical
+  `sp_pair_distribution`, and the same entry-to-contest mapping. What moved is
+  which entry holds which of the same lineups (14 of 18 permuted, all within
+  their own contest). `golden_replay_production_2026-06-03.json` did not move
+  at all. All three gates pass on the new run, and legality needs no separate
+  check: an identical roster multiset cannot contain a construction the frozen
+  one did not.
+
 Every diagnostic this test touches is a deterministic review proxy or an
 observed outcome -- never a win-rate, ROI, or probability claim.
 """

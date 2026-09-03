@@ -39,6 +39,46 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-03 (fourth note this date), DEV, claim `engine` (`engine_2026-09-03`,
+re-taken): **R293 CLOSED, both halves shipped and migrated to CHANGELOG.md.
+Gate `PASS v2.26.0 28 modules 1755 tests` -> `PASS v2.26.0 28 modules 1768
+tests` (`test_core` 1127 -> 1140, `grew`; the other four unchanged and all
+`ok`). 14 mutations written, 14 killed, none survived, no anchor missing.**
+
+**The list is RENUMBERED to TWELVE slots, counted rather than inherited: the
+numbered list runs 1 through 12.** R293 held slot 1 and closed, so the old slot
+2 (R294) is now slot 1 and everything below moved up one, per the 2026-08-27,
+2026-09-02 and 2026-09-03 precedents. Slot numbers in every note below this one
+read one higher than the current list.
+
+**The golden replay baseline MOVED, once, deliberately, and the measurement is
+why it was re-frozen rather than worked around.** R293(a) changes which
+(pair, team) jobs the augmentation pass spends its budget on, so the order
+candidates are appended in changes and the candidate_id numbering with it.
+Isolated by reverting that ONE edit with the rest of R293 in place: the frozen
+baseline came back GREEN, so nothing else in the item moves a k=0 build. Then
+measured before re-freezing: the DELIVERED PORTFOLIO is identical — the same 8
+distinct lineups, the same multiset of 18 rosters, byte-identical
+`exposure_summary` and `sp_pair_distribution`, the same entry-to-contest map.
+What moved is which entry holds which of the same lineups, 14 of 18, all inside
+their own contest. `golden_replay_production_2026-06-03.json` did not move at
+all, and green twice in a row per the module's own rule. The reasoning is
+recorded in `tests/test_golden_replay.py`'s docstring, where the next reader of
+that file will find it rather than in this note alone.
+
+**The R233 enumeration found N+2, not the N the entry named**, and the reason
+the usual grep would not have: an omission is invisible to a key-name grep
+precisely because the string is absent. Asked as an AST question instead — which
+call sites of a function that can reach the anti-correlation rows forward the
+control — the answer is 20 production sites, of which 5 forward it and 12
+neither forward nor splat. Two were the entry's; one more (the plan leg's
+`extend_bank`) shipped with them; nine are classified correct-to-omit or filed,
+each with its reason, and the census is now a TEST rather than a sentence.
+**One trap worth naming: a `**kwargs` splat is not evidence of forwarding.**
+Both of this item's defects sit at call sites that splat, and the splat is real
+— `passthrough_keys` one line above empties it, and `_leverage_kwargs` carries
+only leverage keys.*
+
 *2026-09-03 (third note this date), DEV, claim `engine` (`engine_2026-09-03`,
 re-taken): **R290(c) CLOSED, step 2 shipped and migrated to CHANGELOG.md. Gate
 `PASS v2.26.0 27 modules 1723 tests` -> `PASS v2.26.0 28 modules 1755 tests`
@@ -1310,43 +1350,33 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R293 — the bank on every rung** (P1, XS-S). **R290(c) CLOSED 2026-09-03**,
-   both commits, and migrated; the queue is RENUMBERED to thirteen slots rather
-   than annotated, per the 2026-08-27 and 2026-09-02 precedents, because nothing
-   about closing it changes any other item's rank. Impact on winning: the
-   SP-plus-own-offense stack is the highest-correlation legal construction and
-   the augmentation pass cannot reach it (it attempts the barred opponent stack
-   instead, paying for infeasible solves); `--max-opposing-hitters-per-sp`, the
-   control Ben asked for on 09-01, is silently off on the direct path while the
-   brief says it is on. Lift XS. Re-scopes R164(b). **One rider from R290(c):**
-   that item replaced this control's source-string pin with an AST question and
-   an executed test, so the claim "the flag reaches the controls the export
-   validator grades" is now behaviour rather than punctuation. R290(c)'s named
-   remainder — rung 2 on Classic, which needs
-   `require_all_reserved_filled=False` in `execute_portfolio` — is filed on the
-   R290 stub and holds no slot.
-2. **R294 — allocator truth** (P1, S). Impact: the primary-stack floor, the
+1. **R294 — allocator truth** (P1, S). **R293 CLOSED 2026-09-03**, both halves,
+   and migrated; the queue is RENUMBERED to twelve slots rather than annotated,
+   per the 2026-08-27, 2026-09-02 and 2026-09-03 precedents, because nothing
+   about closing it changes any other item's rank. R293's surviving riders (the
+   late-swap and probe rungs the control still does not reach) hold no slot and
+   live on its stub. Impact: the primary-stack floor, the
    GPP construction lever, is relaxed by a search-effort prefilter and the
    record blames the bank; refusals of the 1940_9g shape pay up to seven
    30-second solves before saying no; status 4 is called "proven". Lift S.
-3. **R118 — the replay tool** (P1, M; Tier 2 head, PROMOTED). Impact: the only
+2. **R118 — the replay tool** (P1, M; Tier 2 head, PROMOTED). Impact: the only
    instrument that says which construction finishes where against the fields
    we actually enter, conditioned on archetype and field size; `player_table`
    with per-player FPTS already survives in every `mined_*.json`, so no miner
    change and no re-mine (ed7 §3.1, re-confirmed). Everything strategic below
    is gated on it, and so is the R302 start condition. Then, unchanged in
    order: R48 + R83 → R10 (gated on R225) → R140, R13 the funding gate.
-4. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S). Reason
+3. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S). Reason
    unchanged from the 08-31 note (measured cost on 1305_12g). **Its dependency
    is DISCHARGED (2026-09-02): R292 shipped, so the tool R268's remedies run
    through now writes a DK-valid file, refuses a player whose game is underway,
    and reads one clock.** Nothing else about its rank changed.
-5. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Impact:
+4. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Impact:
    single-game and small-field prizes ride on the three caps holding and on
    the degraded flag being true; measured realized exposure 58% under a 50%
    cap, and duel/blowout rosters flagged degraded by construction. R247(b)'s
    premise must be re-read against R295(b) first (rider on the entry).
-6. **R174 + R175 + R248 + R242 + R279 + R297** — the money boundary (P1, S).
+5. **R174 + R175 + R248 + R242 + R279 + R297** — the money boundary (P1, S).
    Impact: prevents a bad upload; R279 has a field sighting, R297(a)(d)(e)
    are fail-opens ON the referee, the rest are prospective. Lift S. R297(b)
    (the `workflow_gates` door) also closes the last unrestricted path around
@@ -1355,36 +1385,37 @@ R292 rather than leads it.*
    branch, so the weaker checker can finally see a post-lock file with nothing
    to diff against. What is left in R175 is the contest-identity check and the
    downgraded delivered-manifest failures.
-7. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2,
+6. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2,
    S-M). Impact: Showdown entries dealt to contests without shape; medium.
    Dependency: R238 before R239(a). Tail unchanged: R122-rider, R123,
    R189(3), R210 (+R303's three unread-flag siblings), R211; R240 decision-first.
-8. **R298 + R300's remainder** — evidence and tests (P2 + P1, S). Impact: the
+7. **R298 + R300's remainder** — evidence and tests (P2 + P1, S). Impact: the
    T-5 read (`manifest_strategy_state`, the Classic brief's mirror status) is
    wrong today. **R300(a) SHIPPED under R291 and R300(b) SHIPPED under R292,
    both 2026-09-02**, so what remains is (c), the string pins standing in for
    behaviour on money-adjacent claims, and (d), the R155 fixture class. Lift S.
-9. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
+8. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
     hardening (was slots 6-8). No member changes a delivered byte; R216 still
     lands alone at a session boundary. Then **R207 + R244 → R203**, **R164**
     (re-scoped by R293, and its `Excluded` third SHIPPED under R291),
-    **R284**, **R276**, **R225 + R226 + R227** (R225 gates R10's Showdown
-    cells, so it must land before slot 3's R10 leg — slot 3 after the
-    2026-09-03 renumbering, and the reference is to R118's tail, not to a
+    **R284** (which R293's late-swap rider joins: same shape, a different
+    control), **R276**, **R225 + R226 + R227** (R225 gates R10's Showdown
+    cells, so it must land before slot 2's R10 leg — slot 2 after the
+    2026-09-03 R293 renumbering, and the reference is to R118's tail, not to a
     number).
-10. **R301 — the instruction corpus** (P2, M). The four money-boundary
+9. **R301 — the instruction corpus** (P2, M). The four money-boundary
     contradictions first (showdown.md caps, late_swap.md `--locked-teams`,
     the ledger pin, `timeout 33`); then CLAUDE.md to ≤ 6 KB and SKILL.md to
     ≤ 150 lines with the incident narrative moved to the CHANGELOG entries it
     cites; then the prose-pinning tests removed so the files can shrink.
-11. **R302 — the strangler engine** (Tier 3, L). START CONDITION: R118 built
+10. **R302 — the strangler engine** (Tier 3, L). START CONDITION: R118 built
     and ten deliveries graded. Ben may pull it forward or strike it; either is
     a one-line edit here.
-12. **Smalls, batched opportunistically:** R299 (six intake seams), R303's
+11. **Smalls, batched opportunistically:** R299 (six intake seams), R303's
     non-demoted members, and the standing set: R264 + R265, R236(b), R221 +
     R280, R222, R229, R230 (+(d)), R231, R232, R241, R243, R269 (with R245),
     R271's two-line remainder.
-13. **The pre-existing Tier 1 remainder from R121**, standing order,
+12. **The pre-existing Tier 1 remainder from R121**, standing order,
     unchanged, except that its clock half is now inside R290(c)'s scope.
 
 *(The previous fourteen-slot list, with its 08-30/08-31/09-01 slot reasoning
@@ -5075,13 +5106,72 @@ for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
-### R293. The bank is not on every rung: the augmentation skip excludes the pitcher's OWN team instead of the opponent, and `max_opposing_hitters_per_sp` reaches neither the auto-bank nor the augmentation pass while the brief reports it applied (P1, XS-S) | new 2026-09-02, from the greenfield tenth edition (GF10-S1, GF10-S2); VERIFIED-repro, coordinator re-read at `optimizer_v3.py:4071-4087, :4163-4174, :4289-4293` and `execution_pipeline.py:4813-4822`; R288's class has seven members, not five; R164(b)'s premise is reversed
+### R293. CLOSED 2026-09-03 -- (a) and (b) both SHIPPED, entry migrated to CHANGELOG.md. The rungs the control still does not reach SURVIVE below and hold no slot
 
-**What.** (a) `_teams_of_pair` (`optimizer_v3.py:4163-4174`) returns the arms' `Team`; `build_diverse_candidate_bank` uses it as `excluded_teams` for the forced stack (:4289-4293, :4308-4313). Under `k=0` the anti-correlation rows bar a stack of an arm's OPPONENT, so the skip is backwards: every attempt against an opponent is a paid, guaranteed-infeasible solve, and every SP-plus-own-offense stack (legal, positively correlated) is unreachable through augmentation. Repro (synthetic 3-game, `requested_n=6, bank=12`): 13 augmentation attempts, 6 stacked an arm's opponent and returned infeasible, 0 stacked an arm's own team. R164(b) and the R165 mutation notes say the skip targets opposing teams; `tests/test_core.py:19843-19848` asserts dtype invariance only. (b) `passthrough_keys` (:4071-4086) carries the three R246 leverage keys and not the R288 key, so augmented candidates solve at the default; `run_slate`'s auto-bank call (`execution_pipeline.py:4813-4822`) passes no `max_opposing_hitters_per_sp` at all although `controls` carries it, so on the DIRECT strategy the whole bank solves at k=0. The export validator grades against `controls.max_opposing_hitters_per_sp` (`dk_entries_manager.py:988`) and passes; `build_slate.py:2211-2215` writes `anti_correlation.applied` from `args`, not from the solve. Repro (k=3): `{'base_with': 6, 'base_without': 2, 'aug_with': 0, 'aug_without': 18}`.
+**Both halves shipped in one commit.** The augmentation skip now names the
+arms' OPPONENTS and lifts entirely once the allowance covers the stack floor;
+`max_opposing_hitters_per_sp` reaches the augmentation whitelist, the auto-bank
+call and the plan leg; and the brief's `anti_correlation.applied` is READ OFF
+THE SOLVES through a status key the constraint builder stamps, so it can
+contradict the flag that requested it. Gate 1755 -> 1768. Full hit list, the
+before/after repro, the golden-replay isolation and re-freeze measurement, and
+the fourteen mutations are in CHANGELOG.md.
 
-**Why P1.** This is the construction lever Ben asked for on 2026-09-01 (R288) and the highest-correlation legal stack, both silently off on the path the clock happens to choose, with the brief asserting the opposite. Truthful-labels defect and a wasted-budget defect in one.
+**Every premise in this entry held, which is unusual here; four line numbers
+did not.** `build_slate.py:2211-2215` was :2736 (R290(c) added ~450 lines to
+that file), `execution_pipeline.py:4813-4822` was :4835-4844,
+`tests/test_core.py:19843-19848` was :20091. The three `optimizer_v3.py`
+references were exact. The entry's own repro numbers reproduced in shape on a
+smaller fixture: 5 augmentation solves, 0 on an arm's own team, 4 on an
+opponent, all 4 infeasible, `appended` 0; after, 7 solves, 0 opponent,
+`appended` 4. At k=3, `aug_with` 0 -> 4.
 
-**Fix.** (a) `_teams_of_pair` returns `Opponent` when the effective `k < bank_stack_min_size`, else the empty set; pin `excluded_teams == {opp(a), opp(b)}` on a fixture that reaches Phase 1 (`requested_n=1, coverage_target=12`). (b) add `'max_opposing_hitters_per_sp'` to `passthrough_keys`; add `max_opposing_hitters_per_sp=controls.get("max_opposing_hitters_per_sp")` at `execution_pipeline.py:4813`; `applied` comes from the bank report. R233 enumeration: `grep -rn "max_opposing_hitters_per_sp" mlb_engine tools skills` with the hit list (seven files at HEAD; the two missing sites are these). Re-scope R164(b) to both files and the corrected direction.
+**The R233 class was N+2, and one member shipped with the item.** The two the
+entry named plus the plan leg's `extend_bank`
+(`execution_pipeline._plan_joint_allocation`), whose whole job is to solve the
+SAME MILP the build will solve (R28, R63) and which was producing a
+`would_certify` verdict from a different constraint matrix.
+
+#### SURVIVING RIDERS (no slot; each is a call site the control still does not reach)
+
+**(i) The late-swap bank, two sites (`tools/late_swap.py`, the general slice
+and the per-entry pinned slice).** A portfolio delivered at k=3 is refined by a
+bank built at k=0, which is R284's shape for a different control. NOT built
+here, and the reason is mechanical rather than a judgment call: `late_swap.py`
+reads the parent ENTRIES CSV and never the parent brief, and there is no flag,
+so forwarding needs a parent-brief read or a new argument. **One difference
+from R284 worth recording, because it changes the risk argument:** R284 is
+filed P2 partly because a leverage cap could make a swap refuse inside a lock
+window, and `max_opposing_hitters_per_sp` is monotone in the other direction —
+a higher k only ever WIDENS the legal set — so that objection does not apply
+here. Rides slot 8's R284.
+
+**(ii) Three timing and diagnostic probes** (`tools/solver_probe.py` x2,
+`tools/stack_shape_probe.py` x2, and `build_slate.py`'s single-lineup
+calibration solve that picks direct vs sliced). They TIME a MILP; timing one
+matrix while the build solves another is a measurement-fidelity gap, not a
+delivered-file defect, and `build_slate.py`'s is the one that matters most
+because `single_s` drives the strategy choice. XS each.
+
+**(iii) Classified correct-to-omit, listed so a later session does not re-open
+them as defects.** `slate_intake_manager.optimizer_shell_preflight` is a
+NEUTRAL feasibility test of the salary file's shape — honouring an operator
+control there would make a restricted build read as a broken file, which is the
+reading CLAUDE.md already records for its `Excluded` hardcode.
+`optimizer_v3.run_meta_lineup` and the coverage diagnostic are a consensus
+reference and a review proxy, neither a delivered candidate.
+`deepen_bank.py` is an untracked workspace script (R246 named it the same way).
+All of the above are pinned in `R293BankOnEveryRungTests.EXPECTED_CENSUS`, so
+a new call site fails the suite until someone wires it or names it.
+
+**(iv) Found, not filed as a number, with the reason.**
+`optimizer_v3._classify_chalk_one_off` raises `KeyError` on a frame without
+`Ownership_Tier` or `Notes`, reached only when a one-off candidate survives.
+Every production frame carries both (`_assemble_projection_frame`), so this is
+a property of test fixtures rather than of any build; it cost this session one
+diagnostic cycle and is recorded here so the next reader does not pay it again.
+`diverse_projection_frame()` is the fixture in question, and R293's tests add
+the two columns locally rather than changing the shared one.
 
 ### R294. Allocator truth: the prefilter ignores compatibility so the stack floor and reuse ladders relax against a bank that could satisfy them; the re-entry ladders re-solve after a slate-level check failed; scipy status 3/4 is labelled "proven infeasible" (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P1, GF10-P5, GF10-P6); (a) VERIFIED-repro, (b)(c) VERIFIED-read, coordinator re-read at `contest_allocator.py:1074-1149, :2897-2956`; root of (a) is R36 F10
 
@@ -5624,6 +5714,8 @@ the single assignment site is pinned by source inspection.
 ### R164. The bank job grid wastes solves two ways, hardest on the pinned late-swap path (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro, (b)(c) VERIFIED-read (`bank_cache.py` unchanged since the review)
 
 **Rider 2026-09-02 (ed10, GF10-S1 and GF10-S5): (b)'s premise is REVERSED in the sibling grid, and the class has a third member.** The diverse bank's `_teams_of_pair` (`optimizer_v3.py:4163-4174`) returns the arms' OWN teams and skips those, so it attempts the opponent stacks the anti-correlation rows bar and never attempts the legal own-team stack (repro: 6 of 13 augmentation attempts infeasible, 0 own-team). Re-scope (b) to BOTH grids with the direction stated: skip `team ∈ {Opponent(a), Opponent(b)}` when the effective `max_opposing_hitters_per_sp < stack_min`. The R293 entry carries the optimizer-side fix; this item keeps the `extend_bank` side. Third member: `extend_bank` (:731-737) read `excl` but never the `Excluded` column, so an all-excluded team or a shelved arm cost a full `proven_infeasible` solve per job (R291(d)).
+
+**The optimizer half SHIPPED under R293, 2026-09-03, and (b)'s own bullet below is now CORRECT ONLY AS RE-SCOPED — read this paragraph before it.** `_teams_of_pair` returns `Opponent` and the skip is CONDITIONAL on the allowance, which is what the bullet's "provably infeasible before the solve" needs in order to stay true after R288 made `k` a control: at `k >= stack_min` an opponent stack is feasible and skipping it would be a wall, not an optimization. Measured on the diverse fixture: 4 infeasible opponent attempts and 0 appended candidates before, 0 opponent attempts and 4 appended after. So two sentences in the bullet below are now FALSE about HEAD and are left in place only as the record of what was believed: "`build_diverse_candidate_bank` already skips these via `_teams_of_pair`, so the two subsystems disagree" described a skip pointing the other way, and the R165 mutation notes repeat the same reversed reading. **What REMAINS on this item is (a), (c), and the `extend_bank` half of (b) — with the direction and the condition taken from R293's `_teams_of_pair`, never re-derived**, and per the R291 landing note above it belongs beside the `eligible` frame rather than in a second place. A session that re-derives the direction here will re-introduce R293(a) one file over, which is the specific thing this paragraph exists to prevent.
 
 **The `Excluded` third SHIPPED under R291, 2026-09-02.** `extend_bank` applies `_drop_excluded_rows` before the pitcher and team enumeration and reports `excluded_column_dropped: {rows, arms, stack_teams}`. Measured on the R289 fixture with one team excluded, against the exact counterfactual (same frame, the drop patched out): 16 jobs -> 6, same 2 candidates. What REMAINS on this item is (a), (c) and the opponent-direction half of (b) -- and note the interaction the R291 landing makes concrete: the two are the same shape (a job the solve can never answer) reached from two different facts, so (b)'s fix belongs beside the `eligible` frame this landing added rather than in a second place.
 

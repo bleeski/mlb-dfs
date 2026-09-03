@@ -555,7 +555,22 @@ EXPECTED_SUITE_COUNTS = {
     # on the classification defect this item's own acceptance test found: POST-
     # export gate names never reached the classifier, so four DK-rule gates
     # took the no-gate-named default.
-    "tests.test_core": 1127,
+    # R293, 2026-09-03: 1127 -> 1140, the thirteen that pin the bank's own
+    # anti-correlation rung. Three on the reversed augmentation skip (no solve
+    # spent on the opponent stack the rows bar, the SP-plus-own-offense stack
+    # actually reached with `appended` non-zero where it was 0, and the skip
+    # LIFTING when the allowance covers the stack floor so it stays a waste
+    # optimization and not a wall). Four on the control reaching every rung
+    # (the augmentation whitelist, the solver stamping the k it built its rows
+    # under, a fresh status carrying None rather than a fabricated 0, and the
+    # auto-bank reading it off portfolio_controls through run_slate itself).
+    # Three on the reports (all three bank producers EXECUTED and asserted to
+    # carry what their own solves ran under, the no-augmentation return still
+    # carrying the key, and the call-site census that fails on an N+1 member).
+    # Three on the truthful-labels half: `applied` read from the bank and
+    # disagreeing with the flag, null when the rungs disagree, and an
+    # unobserved build saying so instead of restating the engine default.
+    "tests.test_core": 1140,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

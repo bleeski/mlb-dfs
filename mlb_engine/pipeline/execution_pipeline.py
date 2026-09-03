@@ -3452,6 +3452,14 @@ def _plan_joint_allocation(
                 report = extend_bank(
                     cache, bank_projections, time_budget_s=float(budget_s),
                     excludes=excl or None, solver_time_limit_s=solver_time_limit_s,
+                    # R293, found by this item's own AST enumeration rather than
+                    # named in the entry. The plan leg's whole job is to solve
+                    # THE SAME MILP the build will solve (R28, R63): a verdict
+                    # produced under a different constraint matrix is a verdict
+                    # about a different question, and `would_certify` is exactly
+                    # the kind of label CLAUDE.md's truthful-labels rule covers.
+                    max_opposing_hitters_per_sp=controls.get(
+                        "max_opposing_hitters_per_sp"),
                 )
                 if not report.get("job_list_exhausted"):
                     built = len(cache.candidates)
@@ -4840,6 +4848,14 @@ def run_slate(
             time_budget_s=bank_time_budget_s,
             solver_time_limit_s=solver_time_limit_s,
             excludes=bank_excludes or None,
+            # R293. R288's sixth member. `controls` has carried this key since
+            # R288 wired it through portfolio_controls, and this call -- the
+            # ONLY bank the direct strategy builds -- never read it, so a build
+            # at `--max-opposing-hitters-per-sp 3` solved its entire bank at 0
+            # whenever the clock chose direct over sliced. The sliced path was
+            # wired at `build_slate.py`'s `extend_bank` call and the auto path
+            # was not, which is R153's "on every rung" one rung short again.
+            max_opposing_hitters_per_sp=controls.get("max_opposing_hitters_per_sp"),
             **_leverage_kwargs(leverage),
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
@@ -4851,6 +4867,10 @@ def run_slate(
             "waterfall_coverage_target": wf_coverage_target,
             "contest_shape_profile": bank.get("contest_shape_profile"),
             "diversity_augmentation": bank.get("diversity_augmentation"),
+            # R293. Carried to the boundary so `build_slate.py` can write the
+            # brief's `anti_correlation.applied` from the SOLVES rather than
+            # from the flag that requested them.
+            "anti_correlation": bank.get("anti_correlation"),
             # F11: the facts post-slate review needs, carried from the solver
             # rather than discarded at this boundary.
             "relaxations": bank.get("relaxations"),

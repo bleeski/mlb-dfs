@@ -25,6 +25,158 @@ performance claim.
 
 ---
 
+## 2026-09-03 — R293: the augmentation skip was pointing at the wrong team, the anti-correlation control reached neither bank, and the brief's `applied` was reading the flag that requested it
+
+Three things move: the skip's DIRECTION, the control's REACH, and where
+`applied` is READ FROM. The third is the one the item exists for.
+
+**(a) `_teams_of_pair` returns `Opponent`, and the skip is conditional on the
+allowance.** It returned the arms' own `Team` and `build_diverse_candidate_bank`
+used that as the set of stack teams to skip, so the skip was backwards in both
+directions at once: at the default k=0 the anti-correlation rows bar a stack of
+an arm's OPPONENT, so every attempt the pass made was provably infeasible before
+it started, and the SP-plus-own-offense stack — legal, positively correlated,
+and the highest-correlation Classic construction — was unreachable through
+augmentation entirely. Measured on the diverse fixture through the production
+call path, before and after: **5 augmentation solves, 0 on an arm's own team, 4
+on an opponent, all 4 infeasible, `appended` 0 → 7 solves, 0 on an opponent, 4
+appended.** The budget stops buying answers it already has.
+
+Conditional, not a wall: R288 made `k` a control, so at `k >= bank_stack_min_size`
+an opponent stack is feasible and skipping it would put back the wall CLAUDE.md
+spends a section saying is a guideline. The condition is read from
+`single_lineup_kwargs` — what actually reaches the solves — and not from
+`bank_kwargs`, so the skip and the solve cannot disagree.
+
+**(b) The control reaches every rung, and `applied` is measured.**
+`'max_opposing_hitters_per_sp'` joins `passthrough_keys`; `run_slate`'s
+auto-bank call passes `controls.get("max_opposing_hitters_per_sp")`; and
+`_plan_joint_allocation`'s plan bank does too. Before: at k=3 the base bank
+solved 8 of 9 with the control and every augmented candidate solved at 0, in one
+bank, with the brief reporting 3. On the DIRECT strategy the whole bank solved
+at 0, because `controls` had carried the key since R288 and the only bank that
+path builds never read it.
+
+`applied` no longer comes from `args`. `_build_single_lineup_scipy` stamps
+`status_out['anti_correlation_max_opposing']` with the k it resolved, at the one
+site that resolves it; all three bank producers (`build_multi_lineup`,
+`build_diverse_candidate_bank`, `extend_bank`) collect that per solve and report
+it through one shared shape, `anti_correlation_report`; and
+`anti_correlation_brief_block` reads whichever bank the build actually used.
+**A field derived from the request agrees with the request by construction and
+can never report that the request was dropped, which is the only thing it was
+there to do.** `applied` is `null` when the observed values DISAGREE (with the
+list), and `null` with `applied_source: "unobserved"` when no solve was seen —
+not the engine default restated, because "no solve observed" and "every solve
+ran at 0" are different facts and collapsing them is R237's class. `None` in the
+status means the solve returned before the rows were reached, never 0.
+
+**R233 enumeration: the class is N+2, and the key-name grep is the wrong
+question.** The entry's `grep -rn "max_opposing_hitters_per_sp"` cannot see an
+omission, because an omission is the string being absent. Asked as an AST
+question instead — *which call sites of a function that can reach the
+anti-correlation rows forward the control* — the census is 20 production sites
+(77 with tests), 5 forwarding. The two the entry named, plus the plan leg, which
+shipped with them because its whole job is to solve the SAME MILP the build will
+(R28, R63) and it was returning `would_certify` from a different matrix. Full
+hit list, with the verdict on each:
+
+    forwards  mlb_engine/optimize/bank_cache.py            build_single_lineup
+    forwards  mlb_engine/optimize/optimizer_v3.py          _build_single_lineup_scipy
+    forwards  mlb_engine/pipeline/execution_pipeline.py    build_diverse_candidate_bank  [FIXED]
+    forwards  mlb_engine/pipeline/execution_pipeline.py    extend_bank                   [FIXED]
+    forwards  skills/generate-lineups/scripts/build_slate.py  extend_bank
+    splat     mlb_engine/optimize/optimizer_v3.py          build_multi_lineup       (**bank_kwargs)
+    splat     mlb_engine/optimize/optimizer_v3.py          build_candidate_lineup_bank (**bank_kwargs)
+    splat     mlb_engine/optimize/optimizer_v3.py          build_single_lineup      (_solve, **solve_kwargs)
+    splat*    mlb_engine/optimize/optimizer_v3.py          build_single_lineup      (_try_accept)  [FIXED]
+    filed     tools/late_swap.py x2                        extend_bank
+    filed     tools/solver_probe.py x2, stack_shape_probe.py x2, build_slate.py:2225
+    correct   slate_intake_manager.optimizer_shell_preflight, run_meta_lineup,
+              the coverage diagnostic, deepen_bank.py (untracked)
+
+**`splat*` is the trap and it is worth stating on its own: a `**kwargs` splat is
+not evidence of forwarding.** Both of this item's defects sit at call sites that
+splat. `_try_accept`'s splat is real and `passthrough_keys` one line above
+empties it; the auto-bank's splat is real and `_leverage_kwargs` carries only
+leverage keys. A sweep that scores "has a splat" as "forwards" scores both
+defects as clean. The census is now a TEST — `EXPECTED_CENSUS`, keyed by (file,
+callee) and deliberately WITHOUT line numbers — so a new site fails the suite
+until someone wires it or names it with a reason.
+
+**Premises.** Every claim in the entry held, which is unusual here. Four line
+references had moved: `build_slate.py:2211-2215` was :2736 (R290(c) added ~450
+lines to that file), `execution_pipeline.py:4813-4822` was :4835-4844,
+`tests/test_core.py:19843-19848` was :20091; the three `optimizer_v3.py`
+references were exact. The entry's repro numbers reproduced in shape rather than
+in magnitude, on a smaller fixture, and the verdicts matched.
+
+**The golden replay baseline moved, and the measurement is the reason it was
+re-frozen rather than worked around.** `test_front_door_certifies_and_matches_
+golden_baseline` went red: (a) changes which (pair, team) jobs the pass spends
+its budget on, so candidates append in a different order and the `candidate_id`
+numbering shifts. Isolated by reverting that ONE edit with the rest of R293 in
+place — the frozen baseline came back **GREEN**, so nothing else in the item
+moves a k=0 build. Then measured before touching the file: **the delivered
+portfolio is identical.** Same 8 distinct lineups, same multiset of 18 rosters,
+byte-identical `exposure_summary`, byte-identical `sp_pair_distribution`, same
+entry-to-contest map; what moved is which entry holds which of the same lineups,
+14 of 18, every one inside its own contest.
+`golden_replay_production_2026-06-03.json` did not move at all. Legality needed
+no separate check: an identical roster multiset cannot contain a construction
+the frozen one did not. Green twice in a row per the module's own rule, and the
+reasoning is written into `tests/test_golden_replay.py`'s docstring under a new
+"Baseline history" section, where the owner of that file will find it.
+
+**Mutations: 14 written, 14 killed, 0 survived, 0 anchors missing.** Each run
+against the ONE guard written for it, alone; `optimizer_v3.py`,
+`bank_cache.py`, `execution_pipeline.py` and `build_slate.py` restored
+byte-identical with the sha256 asserted after every run. The reversed skip is
+run twice against two different tests deliberately, because it has two distinct
+costs — solves spent, and candidates never reached — and a test that trips on
+both names neither (R267's lesson).
+
+**What did NOT ship, and why.** The late-swap bank (two sites): a portfolio
+delivered at k=3 refined by a bank built at k=0, which is R284's shape for a
+different control. `late_swap.py` reads the parent ENTRIES CSV and never the
+parent brief, and there is no flag, so forwarding needs a parent-brief read or a
+new argument — real work, not a line. One difference from R284 recorded on the
+stub because it changes the risk argument: R284 is P2 partly because a leverage
+cap can make a swap REFUSE inside a lock window, and this control is monotone in
+the other direction (a higher k only widens the legal set), so that objection
+does not apply. The four probe sites and `build_slate.py`'s calibration solve
+time a MILP the build may not solve — a fidelity gap, not a delivered-file
+defect. The plan leg's forward is pinned by the census test and not by an
+executed one; `_plan_joint_allocation` needs a full slate fixture to drive, and
+saying so is better than implying the pin is behaviour.
+
+**Found, not filed as a number.** `_classify_chalk_one_off` raises `KeyError` on
+a frame lacking `Ownership_Tier` or `Notes`, reached only when a one-off
+candidate survives — so a k>0 build on the shared `diverse_projection_frame()`
+fixture raises where a k=0 build does not. Every production frame carries both
+(`_assemble_projection_frame`), which makes it a property of test fixtures and
+not of any build. R293's tests add the two columns locally rather than changing
+the shared fixture, so no other test's counts move on a change this item does
+not own.
+
+**Files.** `mlb_engine/optimize/optimizer_v3.py` (the status key and its default,
+the stamp, `anti_correlation_report`, the whitelist, `_teams_of_pair` and its
+condition, the augmentation and multi-lineup collectors, both bank return points,
+and the R165 normalization comment corrected in place because that is where the
+next reader will be). `mlb_engine/optimize/bank_cache.py` (collector and report
+key). `mlb_engine/pipeline/execution_pipeline.py` (auto-bank forward, plan-leg
+forward, `bank_diagnostics` carrier). `skills/generate-lineups/scripts/
+build_slate.py` (`anti_correlation_brief_block`, and the R288 import moved to its
+one reader). `tests/test_core.py` (+13). `tests/test_golden_replay.py`
+(docstring) and `tests/golden/golden_replay_2026-06-03.json` (re-frozen).
+`tools/audit.py` (pin, with what the thirteen pin). `CLAUDE.md` (step 2's quoted
+line). `docs/backlog.md` (dated note, twelve-slot renumber, R293 stub with its
+riders, R164(b) re-scoped with its now-false sentences named rather than
+deleted).
+
+**Gate.** `PASS v2.26.0 28 modules 1755 tests` → `PASS v2.26.0 28 modules 1768
+tests`; `test_core` 1127 → 1140 (`grew`), the other four unchanged and `ok`.
+
 ## 2026-09-03 — R290(c) commit 2: a clock inside the build, and its own acceptance test found that four DK-rule gates were classified as preference misses
 
 `--deliver-by`. From T-6 a `badly_shaped` refusal stops being a refusal: the

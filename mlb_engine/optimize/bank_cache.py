@@ -58,7 +58,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import (
-    ANTI_CORRELATION_DEFAULT_MAX, build_single_lineup, _new_solver_status,
+    ANTI_CORRELATION_DEFAULT_MAX, ANTI_CORRELATION_STATUS_KEY,
+    anti_correlation_report, build_single_lineup, _new_solver_status,
     _drop_excluded_rows, resolve_solver_time_limit,
 )
 
@@ -844,6 +845,8 @@ def extend_bank(
     worst = 0.0
     timed_out_jobs = 0
     time_limited_accepted = 0
+    # R293. One entry per completed solve, read out of that solve's status.
+    anti_corr_observed: List[Optional[int]] = []
     # R55(b). `attempted` means "this job has been ANSWERED", and only two
     # answers qualify: a lineup came back, or the solver PROVED infeasibility
     # under these conditions. Everything else is unanswered and retryable, and
@@ -891,6 +894,11 @@ def extend_bank(
                 # no-op on most builds.
                 max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
             )
+            # R293. Recorded from the SOLVE, on the same "on every rung"
+            # reasoning as the two lines above: this path was already wired, and
+            # the report is what lets a reader tell a wired rung from an unwired
+            # one without reading the source.
+            anti_corr_observed.append(status.get(ANTI_CORRELATION_STATUS_KEY))
         except Exception as exc:  # noqa: BLE001
             worst = max(worst, time.monotonic() - attempt_started)
             # An exception is NEVER data (R55b). This handler's old comment said
@@ -1005,6 +1013,11 @@ def extend_bank(
                     "unchanged and optimizer_v3._drop_excluded_rows is still "
                     "the one site that removes a player from a lineup",
         },
+        # R293. The sliced path's rung of "what did these solves actually run
+        # under". `requested` is this call's argument, `observed` comes off the
+        # solves; the two agreeing is a measurement, not a restatement.
+        "anti_correlation": anti_correlation_report(
+            anti_corr_observed, requested=max_opposing_hitters_per_sp),
         # R103. Named so a +0-candidate slice on a fully-pinned entry reads as
         # the pin it is, not as a dry pool: True means both P slots were
         # pinned to a same-game pair and the same-game filter was bypassed to

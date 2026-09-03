@@ -1963,6 +1963,64 @@ def salary_cross_check_note(clock: dict) -> str | None:
     )
 
 
+def anti_correlation_brief_block(requested, bank_report, result) -> dict:
+    """The brief's `anti_correlation`, with `applied` READ OFF THE SOLVES.
+
+    R293. This block used to write `applied` from `args.max_opposing_hitters_per_sp`
+    -- the same flag `requested` already reports. A field derived from the
+    request can only ever agree with the request, so on 2026-09-02 the brief
+    said `applied: 3` for a build whose augmented candidates every one solved at
+    0 and, on the direct strategy, whose entire bank did. `applied` now comes
+    from whichever bank this build actually used, which is the one field that
+    can contradict the flag.
+
+    Three sources, in the order the two strategies produce them:
+      sliced  -- `bank_report["anti_correlation"]` from `extend_bank`
+      direct  -- `result["bank_diagnostics"]["anti_correlation"]` from
+                 `build_diverse_candidate_bank`
+      neither -- `applied: null` with `source: "unobserved"`. Not the engine
+                 default restated: "no solve was observed" and "every solve ran
+                 at 0" are different facts and R237 is the rule against
+                 collapsing them.
+
+    `applied` is also null when the observed values DISAGREE, with the values
+    listed. That is the R293 condition itself, and a brief that averaged it or
+    picked one would be the same lie in a new place.
+    """
+    from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
+
+    measured, source = None, "unobserved"
+    if isinstance(bank_report, dict) and bank_report.get("anti_correlation"):
+        measured, source = bank_report["anti_correlation"], "sliced_bank"
+    else:
+        diag = (result or {}).get("bank_diagnostics") or {}
+        if isinstance(diag, dict) and diag.get("anti_correlation"):
+            measured, source = diag["anti_correlation"], "auto_bank"
+
+    block = {
+        "requested": requested,
+        "applied": (measured or {}).get("applied"),
+        "applied_source": source,
+        "observed": list((measured or {}).get("observed") or []),
+        "solves_observed": int((measured or {}).get("solves_observed") or 0),
+        "engine_default": ANTI_CORRELATION_DEFAULT_MAX,
+        "unit": "hitters facing ONE rostered SP; per-lineup worst case is "
+                "twice this on Classic",
+        "note": "a CONVENTION about negative correlation, not a DK rule; "
+                "`applied` is measured from the bank's own solves (R293), "
+                "never restated from the flag that requested it",
+    }
+    effective = ANTI_CORRELATION_DEFAULT_MAX if requested is None else int(requested)
+    block["agrees_with_request"] = bool(
+        block["applied"] is not None and block["applied"] == effective)
+    if block["solves_observed"] and not block["agrees_with_request"]:
+        block["disagreement"] = (
+            f"the build requested k={effective} and its bank's solves ran at "
+            f"{block['observed']}; the delivered candidates are NOT all built "
+            f"under the requested allowance")
+    return block
+
+
 # --------------------------------------------------------------------------- #
 # Classic
 # --------------------------------------------------------------------------- #
@@ -1970,9 +2028,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 feed: dict, deadline: float) -> tuple[int, dict]:
     from mlb_engine.intake.live_data_adapters import build_slate_pool
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
-    # R288: the engine's own default, read rather than restated, so the brief's
-    # `applied` cannot disagree with what the solver did.
-    from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
+    # R293 moved this import into `anti_correlation_brief_block`, which is now
+    # the one reader: R288 put it here to keep the brief's `applied` from
+    # disagreeing with the solver, and agreement enforced by construction is
+    # what the item found to be worthless.
     from mlb_engine.pipeline.execution_pipeline import (
         _assemble_projection_frame, apply_leverage_ownership, run_slate,
     )
@@ -2733,15 +2792,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # artifact rather than from the absence of a key -- R237's rule, and the
         # reason R238 has three sightings. `requested: null` means the flag was
         # not passed and `applied` is the engine default the build actually ran.
-        "anti_correlation": {
-            "requested": getattr(args, "max_opposing_hitters_per_sp", None),
-            "applied": (getattr(args, "max_opposing_hitters_per_sp", None)
-                        if getattr(args, "max_opposing_hitters_per_sp", None)
-                        is not None else ANTI_CORRELATION_DEFAULT_MAX),
-            "unit": "hitters facing ONE rostered SP; per-lineup worst case is "
-                    "twice this on Classic",
-            "note": "a CONVENTION about negative correlation, not a DK rule",
-        },
+        "anti_correlation": anti_correlation_brief_block(
+            getattr(args, "max_opposing_hitters_per_sp", None),
+            bank_report, result),
         "enrichment": summarize_enrichment(
             reference["status"], enrichment, f4_report, degraded_reason,
             f1_report, f5_report, projections=projections),

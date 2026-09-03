@@ -3981,6 +3981,335 @@ class R288OpposingHitterControlTests(unittest.TestCase):
                 frame, [], 4, 5, max_opposing_hitters_per_sp=2))
 
 
+class R293BankOnEveryRungTests(unittest.TestCase):
+    """R293. Two defects that the same enumeration found, both about the bank.
+
+    (a) `_teams_of_pair` returned the arms' OWN `Team` and the augmentation pass
+    used it as the set of stack teams to SKIP, so the skip was backwards in both
+    directions at once: every attempt against an arm's opponent was a paid,
+    guaranteed-infeasible solve, and the SP-plus-own-offense stack -- legal,
+    positively correlated, and the reason the pass exists -- was unreachable.
+    Measured on the fixture below at the pre-fix head: 5 augmentation solves, 0
+    on an arm's own team, 4 on an opponent, all 4 infeasible, 0 appended.
+
+    (b) `max_opposing_hitters_per_sp` reached neither the augmentation whitelist
+    nor the auto-bank call, and the brief reported it applied anyway because
+    `applied` was written from the flag that requested it. A field derived from
+    the request agrees with the request by construction and can never report
+    that the request was dropped, which is what it was there to do.
+    """
+
+    ARGS = dict(requested_n=1, mode="gpp", target="ceiling",
+                contest_shapes=["large_field_gpp"], coverage_target=12)
+
+    #: R233's census, in code rather than in a sentence a later reader has to
+    #: re-derive. Every call site of a function that can reach the
+    #: anti-correlation rows, keyed by (file, callee) -> (forwarding, total).
+    #: Line numbers are deliberately absent: this item's own entry cited four
+    #: that had moved by ~525 lines, and a pin that rots is a pin nobody trusts.
+    #: A new site fails this test until it is wired or listed with its reason.
+    #:
+    #: Exempt sites and why each one is correct to omit the control:
+    #:   slate_intake_manager.optimizer_shell_preflight  a NEUTRAL feasibility
+    #:     test of the salary file's shape. Honouring an operator control there
+    #:     would make a restricted build read as a broken file -- the same
+    #:     reading CLAUDE.md already records for its `Excluded` hardcode.
+    #:   optimizer_v3.run_meta_lineup and the coverage diagnostic  a consensus
+    #:     reference and a review proxy, neither a delivered candidate.
+    #:   late_swap.py (x2)  a genuine class member, NOT built here: the swap
+    #:     would have to read the parent brief and there is no flag, which is
+    #:     R284's shape for a different control. Recorded on R293's stub with
+    #:     the direction argument (k only ever WIDENS the legal set, so R284's
+    #:     refusal-inside-a-lock-window reason does not apply here).
+    #:   solver_probe, stack_shape_probe, build_slate's calibration solve  they
+    #:     TIME a MILP; timing one matrix and solving another is a fidelity gap,
+    #:     not a delivered-file defect. Filed on the stub.
+    #:   deepen_bank.py  untracked workspace script (R246 named it the same way).
+    SOLVE_PRODUCERS = frozenset({
+        "build_single_lineup", "_build_single_lineup_scipy", "build_multi_lineup",
+        "build_candidate_lineup_bank", "build_diverse_candidate_bank", "extend_bank",
+    })
+    EXPECTED_CENSUS = {
+        ("mlb_engine/intake/slate_intake_manager.py", "build_single_lineup"): (0, 1),
+        ("mlb_engine/optimize/bank_cache.py", "build_single_lineup"): (1, 1),
+        ("mlb_engine/optimize/optimizer_v3.py", "_build_single_lineup_scipy"): (1, 1),
+        ("mlb_engine/optimize/optimizer_v3.py", "build_multi_lineup"): (0, 1),
+        ("mlb_engine/optimize/optimizer_v3.py", "build_candidate_lineup_bank"): (0, 1),
+        ("mlb_engine/optimize/optimizer_v3.py", "build_single_lineup"): (0, 4),
+        ("mlb_engine/pipeline/execution_pipeline.py", "build_diverse_candidate_bank"): (1, 1),
+        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (1, 1),
+        ("tools/late_swap.py", "extend_bank"): (0, 2),
+        ("tools/solver_probe.py", "build_single_lineup"): (0, 1),
+        ("tools/solver_probe.py", "build_multi_lineup"): (0, 1),
+        ("tools/stack_shape_probe.py", "build_single_lineup"): (0, 2),
+        ("skills/generate-lineups/scripts/build_slate.py", "build_single_lineup"): (0, 1),
+        ("skills/generate-lineups/scripts/build_slate.py", "extend_bank"): (1, 1),
+        ("skills/generate-lineups-workspace/deepen_bank.py", "extend_bank"): (0, 1),
+    }
+
+    @staticmethod
+    def _frame():
+        """The shared diverse fixture plus the two columns a k>0 build needs.
+
+        `_classify_chalk_one_off` reads `Ownership_Tier` and `Notes` and raises
+        KeyError without them. The shared fixture never reaches that branch at
+        k=0 because no one-off candidate survives, and does reach it at k>0.
+        Added here rather than to `diverse_projection_frame` so no other test's
+        counts move on a change this item does not own.
+        """
+        frame = diverse_projection_frame()
+        frame["Ownership_Tier"] = "Mid"
+        frame["Notes"] = ""
+        return frame
+
+    def _augmentation_solves(self, **kwargs):
+        """Every solve the AUGMENTATION pass pays for, with the stack team it
+        forced and the allowance it carried.
+
+        The base bank's solves are excluded by flipping a flag when
+        `build_candidate_lineup_bank` returns, and `run_meta_lineup` -- which
+        also runs after that point -- by requiring a forced stack team, which it
+        does not pass. Without both filters the counts here mix three callers.
+        """
+        frame = self._frame()
+        team_of = {str(r.Player_ID): str(r.Team) for r in frame.itertuples()}
+        opp_of = {str(r.Player_ID): str(r.Opponent) for r in frame.itertuples()}
+        phase, seen = {"aug": False}, []
+        real_single = opt.build_single_lineup
+        real_base = opt.build_candidate_lineup_bank
+
+        def base_spy(*a, **kw):
+            out = real_base(*a, **kw)
+            phase["aug"] = True
+            return out
+
+        def single_spy(projections_df, **kw):
+            ldf, obj = real_single(projections_df, **kw)
+            team = (kw.get("stack_constraints") or {}).get("team")
+            if phase["aug"] and team:
+                locks = [str(x) for x in (kw.get("locks") or [])]
+                seen.append({
+                    "team": str(team),
+                    "own": {team_of[p] for p in locks if p in team_of},
+                    "opp": {opp_of[p] for p in locks if p in opp_of},
+                    "k": kw.get("max_opposing_hitters_per_sp"),
+                    "feasible": ldf is not None,
+                })
+            return ldf, obj
+
+        with unittest.mock.patch.object(opt, "build_candidate_lineup_bank", base_spy), \
+                unittest.mock.patch.object(opt, "build_single_lineup", single_spy):
+            bank = opt.build_diverse_candidate_bank(frame, **{**self.ARGS, **kwargs})
+        return bank, seen
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("bs_r293", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    # --- (a) the skip, and the direction it points -------------------------- #
+
+    def test_no_augmentation_solve_is_spent_on_the_barred_opponent_stack(self):
+        """Half of R293(a): the wasted-budget half. At the default k=0 the
+        anti-correlation rows make a forced stack of an arm's opponent provably
+        infeasible, so every such attempt is a solve paid for a known answer."""
+        _bank, seen = self._augmentation_solves()
+        self.assertTrue(seen, "the fixture never reached the augmentation loop")
+        self.assertEqual(
+            [s["team"] for s in seen if s["team"] in s["opp"]], [],
+            "an augmentation solve was spent on a stack the anti-correlation "
+            "rows bar at k=0")
+
+    def test_the_augmentation_pass_reaches_an_sp_plus_own_offense_stack(self):
+        """The other half, and the one that costs candidates rather than
+        seconds: the arms' own offense is the legal, positively-correlated
+        stack, and the reversed skip made it unreachable through this pass."""
+        bank, seen = self._augmentation_solves()
+        self.assertTrue(any(s["team"] in s["own"] for s in seen),
+                        "no augmentation attempt reached an arm's own offense")
+        self.assertGreater(
+            bank["diversity_augmentation"]["appended"], 0,
+            "the pass appended nothing; before the fix this fixture appended 0 "
+            "because every attempt it could make was infeasible by construction")
+
+    def test_the_skip_lifts_when_the_allowance_covers_the_stack_floor(self):
+        """It is a WASTE optimization keyed on the control, never a wall. R288
+        made k a control precisely so the opposing construction is reachable,
+        and a skip that ignored k would put the wall back one file over."""
+        _bank, seen = self._augmentation_solves(max_opposing_hitters_per_sp=4)
+        self.assertTrue(any(s["team"] in s["opp"] for s in seen),
+                        "an allowance at the stack floor still could not reach "
+                        "an opponent stack: the skip is unconditional again")
+
+    # --- (b) the control on every rung -------------------------------------- #
+
+    def test_the_control_reaches_every_augmentation_solve(self):
+        """`passthrough_keys` is what decides this. Left off, the base bank
+        honours k and every augmented candidate ignores it, in ONE bank."""
+        _bank, seen = self._augmentation_solves(max_opposing_hitters_per_sp=3)
+        self.assertTrue(seen)
+        self.assertEqual({s["k"] for s in seen}, {3},
+                         "an augmented candidate solved at a different "
+                         "allowance than the bank was asked for")
+
+    def test_the_solver_stamps_the_allowance_it_built_its_rows_under(self):
+        """The measurement point is the solve, not any caller: a caller can only
+        report what it MEANT to pass, and a value that never arrived is the
+        defect."""
+        status = opt._new_solver_status()
+        opt.build_single_lineup(R288OpposingHitterControlTests._frame(),
+                                target="ceiling", status_out=status,
+                                max_opposing_hitters_per_sp=3)
+        self.assertEqual(status[opt.ANTI_CORRELATION_STATUS_KEY], 3)
+
+    def test_an_omitted_allowance_stamps_the_engine_default_not_none(self):
+        """`None` is reserved for "this solve returned before the rows were
+        reached". Collapsing it with an observed 0 is R237's class."""
+        status = opt._new_solver_status()
+        self.assertIsNone(status[opt.ANTI_CORRELATION_STATUS_KEY],
+                          "a fresh status must not claim an observation")
+        # R288's frame is INFEASIBLE at k=0 by construction, which is the point:
+        # the stamp records the matrix that was built, not whether it solved.
+        lineup, _obj = opt.build_single_lineup(
+            R288OpposingHitterControlTests._frame(), target="ceiling",
+            status_out=status)
+        self.assertIsNone(lineup)
+        self.assertEqual(status[opt.ANTI_CORRELATION_STATUS_KEY],
+                         opt.ANTI_CORRELATION_DEFAULT_MAX)
+
+    def test_every_bank_producer_reports_what_its_own_solves_ran_under(self):
+        """R233, asked by EXECUTION rather than by reading the source. The
+        R290(c) lesson is the reason: its completeness test measured the file's
+        syntax where the class was its semantics and had to be rewritten one
+        commit later."""
+        frame = self._frame()
+        multi = opt.build_multi_lineup(frame, 2, mode="gpp", target="ceiling",
+                                       max_opposing_hitters_per_sp=3)
+        diverse, _seen = self._augmentation_solves(max_opposing_hitters_per_sp=3)
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            sliced = bank_cache.extend_bank(
+                cache, frame, time_budget_s=12.0, max_candidates=6,
+                max_opposing_hitters_per_sp=3)
+        for name, report in (
+                ("build_multi_lineup", multi["solver_report"]["anti_correlation"]),
+                ("build_diverse_candidate_bank", diverse["anti_correlation"]),
+                ("extend_bank", sliced["anti_correlation"])):
+            self.assertEqual(report["requested"], 3, name)
+            self.assertGreater(report["solves_observed"], 0, name)
+            self.assertEqual(report["observed"], [3], name)
+            self.assertEqual(report["applied"], 3, name)
+
+    def test_the_bank_report_carries_the_key_even_when_no_augmentation_ran(self):
+        """An absent key is not an answer (R237), and the no-augmentation return
+        is the shape most likely to be read under a clock."""
+        with unittest.mock.patch.object(opt, "enumerate_sp_pairs", lambda *a, **k: []):
+            bank = opt.build_diverse_candidate_bank(self._frame(), **self.ARGS)
+        self.assertIn("no augmentation",
+                      bank["diversity_augmentation"]["note"])
+        self.assertIn("anti_correlation", bank)
+        self.assertEqual(bank["anti_correlation"]["augmentation"]["solves_observed"], 0)
+
+    def test_every_solve_producer_call_site_is_classified(self):
+        """The N+1 guard. Eleven consecutive editions have found a class with
+        one more member than the fix named; this asserts the census instead of
+        asserting the two sites the entry happened to list."""
+        roots = ("mlb_engine", "tools", "skills")
+        census = defaultdict(list)
+        for root in roots:
+            for path in sorted((REPO / root).rglob("*.py")):
+                rel = path.relative_to(REPO).as_posix()
+                if "__pycache__" in rel or "/_scratch_" in rel or "/tests/" in rel:
+                    continue
+                for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    func = node.func
+                    name = getattr(func, "id", None) or getattr(func, "attr", None)
+                    if name in self.SOLVE_PRODUCERS:
+                        census[(rel, name)].append(
+                            "max_opposing_hitters_per_sp"
+                            in {kw.arg for kw in node.keywords if kw.arg})
+        actual = {k: (sum(v), len(v)) for k, v in census.items()}
+        self.assertEqual(
+            actual, self.EXPECTED_CENSUS,
+            "a call site that can reach the anti-correlation rows appeared, "
+            "moved, or changed whether it forwards the control. Wire it or add "
+            "it to EXPECTED_CENSUS with the reason it is correct to omit.")
+
+    # --- the truthful-labels half ------------------------------------------- #
+
+    def test_the_brief_reads_applied_from_the_bank_not_from_the_flag(self):
+        """The point of the item. A build that asked for 3 and whose bank solved
+        at 0 must SAY 0, which the old block structurally could not."""
+        bs = self._build_slate()
+        block = bs.anti_correlation_brief_block(
+            3, {"anti_correlation": opt.anti_correlation_report([0, 0], requested=3)},
+            None)
+        self.assertEqual(block["requested"], 3)
+        self.assertEqual(block["applied"], 0)
+        self.assertEqual(block["applied_source"], "sliced_bank")
+        self.assertFalse(block["agrees_with_request"])
+        self.assertIn("disagreement", block)
+
+    def test_applied_is_null_when_the_rungs_disagree(self):
+        """Two distinct observed values means one rung of this bank solved a
+        different MILP than another. Picking one, or averaging, would be the
+        same lie in a new place."""
+        bs = self._build_slate()
+        block = bs.anti_correlation_brief_block(
+            3, {"anti_correlation": opt.anti_correlation_report([0, 3], requested=3)},
+            None)
+        self.assertIsNone(block["applied"])
+        self.assertEqual(block["observed"], [0, 3])
+
+    def test_an_unobserved_build_says_so_rather_than_restating_the_default(self):
+        """"No solve was observed" and "every solve ran at 0" are different
+        facts. The engine default is reported beside `applied`, never as it."""
+        bs = self._build_slate()
+        block = bs.anti_correlation_brief_block(None, None, {})
+        self.assertIsNone(block["applied"])
+        self.assertEqual(block["applied_source"], "unobserved")
+        self.assertEqual(block["solves_observed"], 0)
+        self.assertEqual(block["engine_default"], opt.ANTI_CORRELATION_DEFAULT_MAX)
+
+    def test_the_auto_bank_path_reads_the_control_off_the_portfolio_controls(self):
+        """R288's sixth member. `controls` has carried the key since R288 and
+        the only bank the DIRECT strategy builds never read it, so the whole
+        bank solved at 0 on whichever path the clock happened to choose."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"
+            ids = write_salary(salary)
+            entries = root / "DKEntries.csv"
+            write_entries(entries, rosters=[None, None, None],
+                          contest_ids=["900", "901", "902"])
+
+            class _Stop(Exception):
+                pass
+
+            captured = {}
+
+            def _spy(*args, **kwargs):
+                captured["kwargs"] = kwargs
+                raise _Stop()
+
+            with unittest.mock.patch.object(opt, "build_diverse_candidate_bank", _spy):
+                with self.assertRaises(_Stop):
+                    epi.run_slate(
+                        runs_root=root / "runs", salary_csv=salary,
+                        entries_csv=entries, projections_override=projection_frame(ids),
+                        requested_n=3, approve=True,
+                        portfolio_controls_override={
+                            "max_opposing_hitters_per_sp": 2},
+                    )
+        self.assertEqual(captured["kwargs"].get("max_opposing_hitters_per_sp"), 2)
+
+
 class R289SalaryExcludedColumnTests(unittest.TestCase):
     """The salary file's Excluded column reaches the frame, or nothing does.
 

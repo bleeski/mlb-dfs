@@ -202,6 +202,9 @@ def _new_solver_status() -> dict:
         'time_limit_s': None,
         'elapsed_s': None,
         'incumbent_rejected': False,
+        # R293. None means the solve returned before the anti-correlation rows
+        # were reached (a locked-slot refusal, say), not that it ran at 0.
+        ANTI_CORRELATION_STATUS_KEY: None,
     }
 
 
@@ -269,6 +272,49 @@ MAX_OVERLAP_CEILING = ROSTER_SIZE - 2
 # row per-lineup is the mislabel this project's truthful-labels rule exists to
 # stop, so the name moved rather than the semantics being fudged.
 ANTI_CORRELATION_DEFAULT_MAX = 0
+
+#: R293. The solver status key `_build_single_lineup_scipy` stamps with the k it
+#: ACTUALLY built its anti-correlation rows under. It exists because the brief
+#: used to answer "was this control applied" from the flag that requested it,
+#: which is a field that can only ever agree with itself: on 2026-09-02 the flag
+#: said 3, `passthrough_keys` dropped the key, and every augmented candidate
+#: solved at 0 with nothing on the record saying so. A value read out of the
+#: solve can disagree with the request, and that disagreement is the whole
+#: point -- see `anti_correlation_report`.
+ANTI_CORRELATION_STATUS_KEY = 'anti_correlation_max_opposing'
+
+
+def anti_correlation_report(observed_values, requested=None):
+    """One shape for "what k did these solves actually run under", shared by
+    every bank producer so the three rungs cannot describe it three ways.
+
+    ``observed_values`` is one entry per COMPLETED solve, taken from that
+    solve's ``status_out[ANTI_CORRELATION_STATUS_KEY]``; ``None`` entries (a
+    solve that returned before the rows were built) are dropped rather than
+    counted as zero, because "not observed" and "observed to be 0" are
+    different facts and collapsing them is R237's class.
+
+    ``applied`` is a number ONLY when every observed solve agrees. Two distinct
+    values means some rung of this bank solved a different MILP than another,
+    which is exactly R293's defect, and the honest answer there is ``None``
+    plus the list -- never the request restated as though it had been measured.
+    """
+    vals = [int(v) for v in (observed_values or []) if v is not None]
+    distinct = sorted(set(vals))
+    req = None if requested is None else int(requested)
+    effective = ANTI_CORRELATION_DEFAULT_MAX if req is None else req
+    return {
+        'requested': req,
+        'observed': distinct,
+        'solves_observed': len(vals),
+        'applied': distinct[0] if len(distinct) == 1 else None,
+        'agrees_with_request': bool(len(distinct) == 1 and distinct[0] == effective),
+        'unit': 'hitters facing ONE rostered SP; per-lineup worst case is twice '
+                'this on Classic',
+        'note': 'read from the solves, never from the flag that requested it '
+                '(R293); a CONVENTION about negative correlation, not a DK rule',
+    }
+
 
 SUPPRESSION_TIEBREAKER_WEIGHT = 0.0003
 SUPPRESSION_PER_PLAYER_CAP = 0.25
@@ -1045,6 +1091,11 @@ def _build_single_lineup_scipy(
                 f"{max_opposing_hitters_per_sp}. There is no such thing as a "
                 f"negative allowance; a value below zero is a units slip, and "
                 f"clamping one would silently build a portfolio nobody asked for")
+    # R293. Stamped HERE, at the one site that resolves the effective value,
+    # rather than at any caller: a caller can only report what it meant to pass,
+    # and the defect this closes is a caller whose value never arrived.
+    if status_out is not None:
+        status_out[ANTI_CORRELATION_STATUS_KEY] = int(max_opposing)
     sp_pids = df[df['_pos_set'].apply(lambda pos: 'P' in pos)]['Player_ID'].tolist()
     for sp_pid in sp_pids:
         sp_row = df[df['Player_ID'] == sp_pid].iloc[0]
@@ -2487,6 +2538,9 @@ def build_multi_lineup(
     time_limited_accepted = 0
     proven_infeasible_indices = []
     solver_timeouts = 0
+    # R293. One entry per completed solve, filled from `status_out` rather than
+    # from `single_lineup_kwargs`, so the report can contradict the request.
+    anti_corr_observed = []
 
     def _solve(**solve_kwargs):
         """One solve, bounded by what is left of the budget, with its status.
@@ -2506,6 +2560,8 @@ def build_multi_lineup(
         df_out, obj_out = build_single_lineup(
             projections_df, target=target, **solve_kwargs
         )
+        # R293. Every solve this bank pays for, recorded from the solve itself.
+        anti_corr_observed.append(status.get(ANTI_CORRELATION_STATUS_KEY))
         return df_out, obj_out, status
 
     for i in range(n_lineups):
@@ -2949,6 +3005,12 @@ def build_multi_lineup(
         'time_limited_accepted': time_limited_accepted,
         'proven_infeasible_lineup_indices': list(proven_infeasible_indices),
         'relaxation_on_timeout': False,
+        # R293. The base bank's own rung of "on every rung": measured, not
+        # restated. `requested` is what this call was handed; `observed` is what
+        # its solves built.
+        'anti_correlation': anti_correlation_report(
+            anti_corr_observed,
+            requested=single_lineup_kwargs.get('max_opposing_hitters_per_sp')),
         'note': 'a solver time limit never steps the overlap ladder or the DU '
                 'relaxation order; deterministic bookkeeping, never a claim',
     }
@@ -4083,8 +4145,29 @@ def build_diverse_candidate_bank(
         # about ownership solves exactly the MILP it solved before.
         'max_cumulative_ownership_pct', 'min_low_owned_hitters',
         'low_owned_threshold_pct',
+        # R293. R288's members six and seven, and the whitelist above already
+        # states the rule this key was left out of. `**bank_kwargs` carries it to
+        # the BASE bank, so a build at k=3 produced base candidates under k=3 and
+        # augmented candidates under k=0, in one bank, with the brief reporting 3.
+        # Measured on the diverse fixture before the fix: base_with 8, aug_with 0.
+        # Note what hid it -- the augmentation call site is
+        # `build_single_lineup(..., **kwargs)`, so a structural sweep looking for
+        # a `**` splat scores it as forwarding; the splat is real and this
+        # whitelist one line above is what empties it.
+        'max_opposing_hitters_per_sp',
     }
     single_lineup_kwargs = {k: v for k, v in bank_kwargs.items() if k in passthrough_keys}
+    # R293(a). The effective allowance the augmentation solves will run under,
+    # resolved once from what actually reaches them rather than from what the
+    # caller meant to pass. It decides the skip below, so reading it from
+    # `bank_kwargs` instead would let the skip and the solve disagree.
+    _aug_max_opposing_req = single_lineup_kwargs.get('max_opposing_hitters_per_sp')
+    _aug_max_opposing = (ANTI_CORRELATION_DEFAULT_MAX if _aug_max_opposing_req is None
+                         else int(_aug_max_opposing_req))
+    # One entry per completed augmentation solve, read out of that solve's own
+    # status. Declared here rather than beside the loop because both return
+    # points stamp from it, including the one that never enters the loop.
+    aug_anti_corr = []
 
     eligible_sps = _eligible_sp_ids_for_anchor_caps(
         projections_df, excludes=single_lineup_kwargs.get('excludes')
@@ -4113,9 +4196,30 @@ def build_diverse_candidate_bank(
         'note': '',
     }
 
+    # R293. Written at BOTH return points, so "what k did this bank run under"
+    # has an answer even when the augmentation pass never ran. An absent key is
+    # not an answer (R237), and the no-augmentation return is the shape most
+    # likely to be read under a clock.
+    def _stamp_anti_correlation():
+        base_ac = ((bank.get('solver_report') or {}).get('anti_correlation') or {})
+        aug_ac = anti_correlation_report(aug_anti_corr, requested=_aug_max_opposing_req)
+        augmentation['anti_correlation'] = aug_ac
+        combined = anti_correlation_report(
+            list(base_ac.get('observed') or []) + list(aug_ac['observed']),
+            requested=_aug_max_opposing_req)
+        # Each rung reports its DISTINCT values, so the helper's own per-solve
+        # count would undercount the union; the rungs' counts are summed and both
+        # sub-reports are kept, so a disagreement names which rung dissented.
+        combined['solves_observed'] = (int(base_ac.get('solves_observed') or 0)
+                                       + aug_ac['solves_observed'])
+        combined['base_bank'] = base_ac or None
+        combined['augmentation'] = aug_ac
+        bank['anti_correlation'] = combined
+
     if n_pairs < 1 or not stack_teams:
         augmentation['note'] = 'no augmentation: insufficient viable SP pairs or stackable teams'
         bank['diversity_augmentation'] = augmentation
+        _stamp_anti_correlation()
         return bank
 
     augmentation['attempted'] = True
@@ -4155,21 +4259,44 @@ def build_diverse_candidate_bank(
     # provably-infeasible skip silently ceasing to skip. Normalized once here
     # rather than per call: `_teams_of_pair` runs over every viable pair in both
     # bank phases.
+    #
+    # R293, 2026-09-03: R164(b) and the R165 mutation notes both describe that
+    # skip as targeting the OPPOSING teams and it targeted the arms' own. The
+    # direction is fixed below and the correction is repeated here because this
+    # comment is where a session normalizing ids next will be reading.
     _bank_pid_col = (
         normalize_id_series(projections_df['Player_ID'])
         if 'Player_ID' in getattr(projections_df, 'columns', []) else None
     )
 
     def _teams_of_pair(pair):
+        """The stack teams this pair cannot legally reach: the arms' OPPONENTS.
+
+        R293(a). This returned the arms' OWN `Team` and the skip below was
+        therefore backwards in both directions at once. The anti-correlation
+        rows bar hitters facing a rostered SP, so at the default k=0 a forced
+        stack of an arm's OPPONENT is provably infeasible before the solve, and
+        a stack of an arm's OWN offense is legal AND positively correlated --
+        exactly the construction the augmentation pass exists to reach.
+        Measured on the diverse fixture at HEAD: 5 augmentation solves, 0 on an
+        arm's own team, 4 on an opponent, all 4 infeasible.
+
+        Conditional on the allowance, because R288 made k a control: the
+        opponent stack becomes reachable the moment k covers the stack floor, so
+        a build at `--max-opposing-hitters-per-sp 4` skips nothing here. That is
+        the same "guideline, not a wall" reading CLAUDE.md states at length; the
+        skip is a WASTE optimization and never a legality gate, and it removes
+        no player from any pool.
+        """
         key = tuple(pair)
         if key in team_of_cache:
             return team_of_cache[key]
         teams = set()
-        if _bank_pid_col is not None:
+        if _bank_pid_col is not None and _aug_max_opposing < int(bank_stack_min_size):
             for pid in pair:
                 row = projections_df[_bank_pid_col == normalize_id(pid)]
                 if len(row):
-                    teams.add(str(row.iloc[0].get('Team')))
+                    teams.add(str(row.iloc[0].get('Opponent')))
         team_of_cache[key] = teams
         return teams
 
@@ -4228,6 +4355,7 @@ def build_diverse_candidate_bank(
         except Exception:
             aug_cost['max'] = max(aug_cost['max'], _time.monotonic() - _attempt_started)
             return False
+        aug_anti_corr.append(status.get(ANTI_CORRELATION_STATUS_KEY))  # R293
         if status.get('timed_out'):
             aug_timeouts['n'] += 1
         else:
@@ -4362,6 +4490,7 @@ def build_diverse_candidate_bank(
                if augmentation['budget_exhausted'] else ".")
         )
     bank['diversity_augmentation'] = augmentation
+    _stamp_anti_correlation()  # R293
     return bank
 
 
