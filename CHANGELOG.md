@@ -79,9 +79,28 @@ committing, not fixing. And `ledger/inbox/` holds 114 untracked fragments of
 which 111 are dead: `_CONSUMED_2026-08-22_DO_NOT_REMERGE.md` records that every
 fragment as of 2026-08-22 was already merged and only the deletion is
 outstanding, blocked because a Cowork shell died mid-close-out and this mount
-refuses `rm`. 110 are dated 2026-08-08 to -13; the 2026-09-03 BUILD captain
-fragment is consumed too, since R306 shipped off it. The sweep is `mv` into
-`_to_delete/` per R109 and needs an ARCHIVE session holding the `inbox` claim.
+refuses `rm`. All 110 of those are dated 2026-08-08 to -13. The sweep is `mv`
+into `_to_delete/` per R109 and needs an ARCHIVE session holding the `inbox`
+claim.
+
+**Amended the same day, because the first cut of the paragraph above said the
+2026-09-03 BUILD captain fragment was "consumed too, since R306 shipped off
+it", and both halves of that are false.** Ben asked whether a fragment moved to
+the backlog gets deleted; checking the answer is what surfaced it. Two
+fragments, two inboxes, two owners.
+`docs/backlog_inbox/2026-09-03_BUILD_captain-ownership-is-its-own-market.md` is
+what R306 was filed from, it was DEV's, and the board session that filed R306
+had already swept it to `_to_delete/backlog_inbox_2026-09-03/`.
+`ledger/inbox/2026-09-03_BUILD_showdown-captain-market-measured-on-ten-contests.md`
+is a 126-line measurement destined for the ledger, so it is ARCHIVE's and R306
+never touched it. It is **SUPERSEDED, not consumed**, and the difference is an
+instruction rather than a label: consumed means already in the ledger and safe
+to delete, superseded means DO NOT MERGE IT. It measures captain share,
+distinct captains and person-vs-captain Spearman on ten contests, and the five
+`2026-09-03_DEV_*` grade fragments measure the same statistics on 41 by
+archetype and field band. Merging both would put two different numbers for one
+statistic in the ledger, which is the R128/R150 disagreement class. Merge the
+41, delete the 10, and say in the ledger which superseded which.
 
 **Landing.** No test count change; `.gitignore` carries no guard a test can
 break, and the check that matters (`git ls-files -i -c --exclude-standard`

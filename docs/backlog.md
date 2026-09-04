@@ -4166,13 +4166,35 @@ not fixing. And `ledger/inbox/` holds **114 untracked fragments of which 111
 are dead**: `_CONSUMED_2026-08-22_DO_NOT_REMERGE.md` records that every
 fragment as of 2026-08-22 was already merged and only the DELETION is
 outstanding, blocked because a Cowork shell died mid-close-out and this mount
-refuses `rm`. 110 are dated 2026-08-08 to -13 and the 2026-09-03 BUILD captain
-fragment is now consumed too (R306 shipped off it). The three that must stay:
-`2026-08-28_DEV_3-21-five-stack-line-now-stale.md`,
-`2026-09-03_BUILD_rotowire-rst-vs-structural-prior.md` (R308's source), and the
-five `2026-09-03_DEV_*` grade fragments R306 just filed. The sweep is `mv` into
-`_to_delete/` per R109, and it needs an ARCHIVE session holding the `inbox`
-claim.
+refuses `rm`. All 110 of those are dated 2026-08-08 to -13.
+
+**The remaining four are NOT one class, and the first draft of this paragraph
+got one of them wrong in the direction that would cost ARCHIVE something.** It
+said the 2026-09-03 BUILD captain fragment was "consumed too, since R306
+shipped off it". It is not consumed, and R306 did not ship off it. Two
+different fragments, two different inboxes, two different owners:
+
+- `docs/backlog_inbox/2026-09-03_BUILD_captain-ownership-is-its-own-market.md`
+  is the one R306 was FILED from. It was DEV's, and the board session that
+  filed R306 already swept it correctly: it sits in
+  `_to_delete/backlog_inbox_2026-09-03/`. Nothing outstanding.
+- `ledger/inbox/2026-09-03_BUILD_showdown-captain-market-measured-on-ten-contests.md`
+  (126 lines) is a MEASUREMENT destined for the ledger, so it is ARCHIVE's and
+  R306 never touched it. It is **SUPERSEDED, not consumed**, and the difference
+  is the instruction: consumed means already in the ledger and safe to delete,
+  superseded means **do not merge it at all**. It measures captain share,
+  distinct captains and person-vs-captain Spearman on TEN contests; the five
+  `2026-09-03_DEV_*` grade fragments measure the same statistics on 41, by
+  archetype and field band. Merging both would put two different numbers for
+  one statistic in the ledger, which is the R128/R150 disagreement class this
+  project keeps paying for. Merge the 41; delete the 10 with a line in the
+  ledger saying which superseded it.
+- `2026-08-28_DEV_3-21-five-stack-line-now-stale.md` and
+  `2026-09-03_BUILD_rotowire-rst-vs-structural-prior.md` (R308's source) are
+  genuinely unconsumed and stay.
+
+The sweep is `mv` into `_to_delete/` per R109, and it needs an ARCHIVE session
+holding the `inbox` claim.
 
 ### R306. Steps 1-3 SHIPPED 2026-09-03 and their text MIGRATED to CHANGELOG.md. Open remainder: step 5, the standing portfolio-shape claim about bat captains (P2, XS) | filed 2026-09-03 from BUILD fragment `2026-09-03_BUILD_captain-ownership-is-its-own-market.md`; the shipped three-quarters and both riders live in the changelog entry
 
