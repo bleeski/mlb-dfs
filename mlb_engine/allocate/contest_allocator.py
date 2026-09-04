@@ -579,6 +579,10 @@ def _candidate_primary_stack_size(candidate: Dict[str, Any]) -> int:
 # where the allocator's own time limit comes from.
 DEFAULT_CANDIDATE_PREFILTER_MULTIPLE = 6
 MIN_CANDIDATE_PREFILTER_FLOOR = 40
+# R294(a). How many compatible candidates the prefilter reserves per entry
+# before it spends anything on coverage or score. The reasoning for 2 lives in
+# `_prefilter_candidates`' own comment, beside the loop that applies it.
+PREFILTER_PER_ENTRY_RESERVE = 2
 
 
 def _diagnose_binding_constraints(
@@ -1079,28 +1083,77 @@ def _prefilter_candidates(
 ) -> Tuple[List[int], Dict[str, Any]]:
     """Choose which candidate indices enter the joint MILP.
 
-    Forced coverage first: any candidate that is the only compatible option for
-    some entry is kept unconditionally, because dropping it makes the problem
-    infeasible outright. Then one representative per primary stack and per SP
-    pair, so no exposure cap loses its bucket and starts reporting a phantom
-    infeasibility. Then the best remaining by shape score until the target.
-    Ordering is deterministic: score descending, candidate id ascending.
+    Only SELECTABLE candidates are eligible for a keep slot: a candidate no
+    entry is compatible with cannot be assigned to anything, so spending a slot
+    on it reduces what the MILP may choose from without reducing anything the
+    MILP could have used. Forced coverage first: any candidate that is the only
+    compatible option for some entry is kept unconditionally, because dropping
+    it makes the problem infeasible outright. Then a per-entry reservation, so
+    no entry can leave this function with an empty option set. Then one
+    representative per primary stack and per SP pair, so no exposure cap loses
+    its bucket and starts reporting a phantom infeasibility. Then the best
+    remaining by shape score until the target. Ordering is deterministic: score
+    descending, candidate id ascending, and every list is built by ascending
+    index rather than from a set.
+
+    R294(a), 2026-09-04. The three loops below used to iterate ``range(K)`` and
+    ``order`` over ALL candidates with no compatibility test, and the primary-
+    stack floor at the call site marks its excluded candidates incompatible for
+    every entry BEFORE this runs. So on a bank whose ineligible candidates score
+    highest -- exactly what a floor of 4 against a bank of high-scoring 3-stacks
+    produces -- the score-ordered fill spent the entire keep target on
+    candidates the MILP was forbidden to select, handed it no eligible option,
+    and the infeasibility that followed was attributed to the bank by the reuse
+    and floor ladders, each step counted as a relaxation. That is a SEARCH-EFFORT
+    filter moving ``primary_stack_min_size``, a strategy control, invisibly:
+    the shape CLAUDE.md's pool rule forbids. Measured at HEAD on the 60-candidate
+    fixture in ``PrefilterCompatibilityTests``: 3 MILP calls, floor relaxed 4->3,
+    assigned stack sizes [3, 3], with 10 eligible size-4 candidates sitting in
+    the full bank untouched.
     """
     K = len(candidates)
+    E = len(entries)
     if K <= keep_target:
         return list(range(K)), {
             "applied": False, "candidates_in": K, "candidates_kept": K,
-            "keep_target": keep_target,
+            "keep_target": keep_target, "entries_emptied_by_prefilter": 0,
+            "entries_emptied_ids": [],
         }
 
-    best_score: Dict[int, float] = {}
-    for k in range(K):
-        scores = [
-            _candidate_shape_score(candidates[k], str(e.get("contest_shape") or "large_wta"))
-            for e in entries
-        ]
-        best_score[k] = max(scores) if scores else 0.0
-    order = sorted(range(K), key=lambda k: (-best_score[k], _candidate_id(candidates[k], k)))
+    # Ascending k and no set, so this is deterministic by construction
+    # (`stable_union` is for merging sets; there is no set here to merge).
+    selectable = [k for k in range(K) if any(compatible[e][k] for e in range(E))]
+
+    def _score_order(indices: Sequence[int]) -> List[int]:
+        best: Dict[int, float] = {}
+        for k in indices:
+            scores = [
+                _candidate_shape_score(
+                    candidates[k], str(e.get("contest_shape") or "large_wta"))
+                for e in entries
+            ]
+            best[k] = max(scores) if scores else 0.0
+        return sorted(indices, key=lambda k: (-best[k], _candidate_id(candidates[k], k)))
+
+    if not selectable:
+        # Every entry was already starved before this function ran, which is a
+        # fact about the compatibility matrix and not something a keep-slot
+        # choice can repair. Preserve the old score-ordered behaviour so the
+        # caller's own diagnosis sees the bank it used to see, and report zero
+        # emptied entries, because this function emptied none of them.
+        order = _score_order(list(range(K)))
+        keep = sorted(order[:keep_target])
+        return keep, {
+            "applied": True, "candidates_in": K, "candidates_kept": len(keep),
+            "keep_target": keep_target, "forced_coverage_kept": 0,
+            "selectable_in": 0,
+            "distinct_stacks_represented": 0, "distinct_sp_pairs_represented": 0,
+            "entries_emptied_by_prefilter": 0, "entries_emptied_ids": [],
+            "rule": "no candidate is compatible with any entry; the keep set is "
+                    "score-ordered and the starvation predates this filter",
+        }
+
+    order = _score_order(selectable)
 
     keep: List[int] = []
     seen = set()
@@ -1111,11 +1164,32 @@ def _prefilter_candidates(
             keep.append(k)
 
     forced = 0
-    for e in range(len(entries)):
+    for e in range(E):
         options = [k for k in range(K) if compatible[e][k]]
         if len(options) == 1:
             forced += 1
             _take(options[0])
+
+    # The anti-starvation floor. Two is the reservation and the reason it is not
+    # larger: once the coverage and fill loops below iterate `order` -- which is
+    # now selectable-only -- the whole keep target is spent on candidates the
+    # MILP may actually select, so VOLUME is already guaranteed and a bigger N
+    # would only displace higher-scored eligible candidates with lower-scored
+    # ones. What N=2 buys that the fill cannot is the guarantee itself: an entry
+    # whose compatible set is small and low-scored keeps an option even when
+    # every slot would otherwise go to another entry's better ones, and a second
+    # option so the same-contest duplicate rule has somewhere to go. It may push
+    # `keep` past `keep_target` on a wide entry list; keeping MORE candidates
+    # never starves an entry and never reduces the legal set, so that direction
+    # is the safe one and `candidates_kept` reports it honestly.
+    for e in range(E):
+        taken_for_entry = 0
+        for k in order:
+            if taken_for_entry >= PREFILTER_PER_ENTRY_RESERVE:
+                break
+            if compatible[e][k]:
+                _take(k)
+                taken_for_entry += 1
 
     covered_stacks = set()
     covered_pairs = set()
@@ -1135,16 +1209,33 @@ def _prefilter_candidates(
         _take(k)
 
     keep.sort()
+    # An entry that HAD a compatible option in the full bank and has none in the
+    # keep set was emptied by this function. After the reservation above that
+    # should be unreachable; it is reported rather than asserted because a
+    # pool-membership fact that is invisible in the artifact is the failure mode
+    # CLAUDE.md's guardrail is written against, and the next reader can check the
+    # count instead of re-deriving it.
+    emptied = [
+        str(entries[e].get("entry_id") or e)
+        for e in range(E)
+        if any(compatible[e][k] for k in range(K))
+        and not any(compatible[e][k] for k in keep)
+    ]
     return keep, {
         "applied": True,
         "candidates_in": K,
         "candidates_kept": len(keep),
         "keep_target": keep_target,
         "forced_coverage_kept": forced,
+        "selectable_in": len(selectable),
+        "per_entry_reserve": PREFILTER_PER_ENTRY_RESERVE,
         "distinct_stacks_represented": len(covered_stacks),
         "distinct_sp_pairs_represented": len(covered_pairs),
-        "rule": "forced-coverage candidates, then one representative per primary "
-                "stack and SP pair, then best shape score; deterministic, never a "
+        "entries_emptied_by_prefilter": len(emptied),
+        "entries_emptied_ids": emptied,
+        "rule": "selectable candidates only, then forced coverage, then the "
+                "per-entry reserve, then one representative per primary stack "
+                "and SP pair, then best shape score; deterministic, never a "
                 "win-rate or probability claim",
     }
 
@@ -2459,6 +2550,20 @@ def select_and_assign_entries(
     if any(not x for x in entry_ids) or len(set(entry_ids)) != len(entry_ids):
         raise ValueError("entry requirements must have unique nonblank entry_id values")
 
+    # R294(b), 2026-09-04. A slate-level check that has already FAILED cannot be
+    # cleared by any rung the three ladders below climb. R286 established that
+    # `CHECKED_CONTROLS` and `LADDER_RELAXED_CONTROLS` are disjoint and asserts
+    # it in a test, so the controls those ladders relax are, by construction,
+    # not the controls a failing check is about. Re-entering therefore re-solves
+    # the same slate impossibility and arrives at the same refusal, having spent
+    # the operator's window: measured 5 solves on a 9-entry fixture with a
+    # failing `shared_players_floor`, against 1 with this guard, and the
+    # arithmetic ceiling is 8 (1 initial + reuse 2 + quota 2 + floor 3 rungs).
+    # The refusal itself is unchanged -- `compose_infeasibility_errors` already
+    # leads with the failing check and its remedy; what changes is that it
+    # arrives at the first solve instead of the fifth.
+    slate_blocked = bool(failing_feasibility_checks(feasibility_checks))
+
     try:
         import numpy as np
         from scipy.optimize import Bounds, LinearConstraint, milp
@@ -2657,6 +2762,23 @@ def select_and_assign_entries(
     if prefilter_report["applied"]:
         candidates = [candidates[k] for k in kept_idx]
         all_rosters = [all_rosters[k] for k in kept_idx]
+    # R294(a). The sentence above this call ("spends its keep-target on
+    # candidates that can actually be selected") described an intent the code
+    # did not implement until 2026-09-04; it is now true, and this warning is
+    # what says so when it is not. An emptied entry is a pool reduction in
+    # effect, so it is surfaced rather than left inside a report field -- but it
+    # WARNS and does not refuse, because a starved entry makes a badly shaped
+    # file and not an illegal one, and CLAUDE.md reserves refusal for illegal.
+    prefilter_warnings: List[str] = []
+    if prefilter_report.get("entries_emptied_by_prefilter"):
+        prefilter_warnings.append(
+            f"candidate prefilter left "
+            f"{prefilter_report['entries_emptied_by_prefilter']} entry(ies) with "
+            f"no compatible candidate that had one in the full bank "
+            f"({', '.join(prefilter_report.get('entries_emptied_ids') or [])}); "
+            f"any infeasibility below is this filter's, NOT the bank's and NOT "
+            f"a strategy control's. Raise controls['candidate_prefilter_target']"
+        )
 
     K = len(candidates)
     rosters = all_rosters
@@ -2905,6 +3027,24 @@ def select_and_assign_entries(
     solver_status = str(getattr(result, "message", getattr(result, "status", "unknown")))
     scipy_status = getattr(result, "status", None)
     timed_out = scipy_status == 1
+    # R294(c), 2026-09-04. "Proven infeasible" is the label CLAUDE.md reserves
+    # and it means scipy status 2, nothing else. This used to be the `else` of
+    # `if timed_out`, so EVERY no-incumbent outcome that was not the clock got
+    # the reserved word: status 3 (unbounded), status 4 (numerical trouble), and
+    # -- the reachable one -- status 0 with an `x` that fails the integrality,
+    # bounds or constraint verification twenty lines below, which is a solution
+    # this module declined to trust rather than a proof that none exists. Two
+    # readings measured 2026-09-04 rather than assumed, because a read has been
+    # wrong on this board repeatedly. Status 3 is UNREACHABLE through this call
+    # site: `Bounds(lower, upper)` is built from zeros and ones with the
+    # incompatible entries clamped to 0.0, so every variable is bounded and a
+    # bounded MILP cannot be unbounded (scipy 1.15.3 returns 3 only for a
+    # genuinely unbounded variable, confirmed directly). Status 4 was NOT
+    # produced in a probe of degenerate coefficient ranges, NaN in the matrix
+    # and a zero time limit, so it is not claimed as a field sighting here. The
+    # label is corrected anyway: the third state is the one status 0 reaches,
+    # and it is exactly as cheap to be right about all three.
+    proven_infeasible = scipy_status == 2
     mip_gap = getattr(result, "mip_gap", None)
     largest_contest = max(
         (len(v) for v in by_contest_entries.values()), default=0
@@ -2912,7 +3052,7 @@ def select_and_assign_entries(
     solver_report = {
         "scipy_status": scipy_status,
         "status": {0: "optimal", 1: "time_limit", 2: "infeasible",
-                   3: "unbounded"}.get(scipy_status, "other"),
+                   3: "unbounded", 4: "numerical_or_other"}.get(scipy_status, "other"),
         "message": solver_status,
         "time_limit_s": time_limit_s,
         "mip_gap": mip_gap,
@@ -2942,6 +3082,24 @@ def select_and_assign_entries(
                 f"controls['candidate_prefilter_target'] "
                 f"({prefilter_report['candidates_in']} candidates in, "
                 f"{prefilter_report['candidates_kept']} solved)"
+            ]
+        elif not proven_infeasible:
+            # R294(c). The third state, which had no words of its own and took
+            # the reserved ones. Nothing is diagnosed, no control is named, and
+            # no ladder steps: naming a binding constraint here would assert a
+            # diagnosis this solve did not make, and stepping a ladder would
+            # relax a strategy control against a non-proof -- the same shape as
+            # relaxing one against an unexhausted bank, which R98(2) already
+            # forbids one branch over.
+            errors = [
+                f"entry-level joint MILP returned solver status {scipy_status} "
+                f"({solver_report['status']}) with no verifiable incumbent. This "
+                f"is NEITHER an infeasibility proof NOR the clock: nothing about "
+                f"this slate, this bank or any control has been established, so "
+                f"no relaxation ladder steps and no control is named as binding. "
+                f"Solver message: {solver_status}. Re-run; if it repeats, the "
+                f"model or the solver build is the subject, not a portfolio "
+                f"control."
             ]
         else:
             binding = _diagnose_binding_constraints(
@@ -2986,8 +3144,12 @@ def select_and_assign_entries(
         # engine's guess before anyone's decision is the only order that keeps
         # "the default de-concentrates" from turning into "the default cost you
         # the delivery". The same two rules the floor ladder follows apply: never
-        # on a timeout, and the step is COUNTED, never silent.
-        if (not timed_out) and reuse_cap_source == "engine_default":
+        # on a proven infeasibility only, and the step is COUNTED, never silent.
+        # R294(b)(c). `proven_infeasible` replaces `not timed_out` on all three
+        # guards: the ladders exist for a PROVEN infeasibility, and status 3, 4
+        # and the unverifiable-incumbent case are none of the three. `not
+        # slate_blocked` is (b): see the computation at the top of this function.
+        if proven_infeasible and (not slate_blocked) and reuse_cap_source == "engine_default":
             next_rung = (reuse_rungs[reuse_rung_index + 1]
                          if reuse_rung_index + 1 < len(reuse_rungs) else None)
             return select_and_assign_entries(
@@ -3026,9 +3188,10 @@ def select_and_assign_entries(
         # every time. The quota is one dated decision old, sized off a field
         # share whose LIFT has moved in three directions across three tranches,
         # which is the reason the item made it read the share instead. Relax the
-        # newer, thinner-evidenced control first. Never on a timeout, for the
+        # newer, thinner-evidenced control first. Only on a PROVEN infeasibility
+        # (R294(c) widened this from "never on a timeout"), for the
         # reason the floor's own comment gives.
-        if (not timed_out) and quota_report.get("applied_need"):
+        if proven_infeasible and (not slate_blocked) and quota_report.get("applied_need"):
             q_ladder = five_stack_quota_rungs(quota_report["requested_share"])
             q_idx = int(quota_report.get("rung_index") or 0)
             if q_idx + 1 < len(q_ladder):
@@ -3061,11 +3224,12 @@ def select_and_assign_entries(
 
         # R37. The one re-entry. A PROVEN infeasibility with the floor active is
         # the case the ladder exists for, and relaxing beats refusing because a
-        # refusal here leaves every reserved row blank. Never on a timeout: the
+        # refusal here leaves every reserved row blank. Only on a PROVEN
+        # infeasibility (R294(c) widened this from "never on a timeout"): the
         # rule that a compute limit may not move a strategy control is the same
         # rule that stops a slow solve from quietly buying a looser portfolio,
         # and it is the rule the DU ladder already follows two modules over.
-        if (not timed_out) and floor_report.get("applied") is not None:
+        if proven_infeasible and (not slate_blocked) and floor_report.get("applied") is not None:
             ladder = primary_stack_floor_rungs(int(floor_report["requested"]))
             rung_idx = int(floor_report.get("rung_index") or 0)
             if rung_idx + 1 < len(ladder):
@@ -3099,10 +3263,15 @@ def select_and_assign_entries(
                     },
                 )
 
+        # R294(c). Only a PROVEN infeasibility has binding constraints to name.
+        # This read `[] if timed_out else ...`, so a status-3/4 or unverifiable
+        # result published a binding-constraint list -- a diagnosis of a solve
+        # that diagnosed nothing, in the field an operator reads first.
         solver_report["binding_constraints"] = (
-            [] if timed_out else _diagnose_binding_constraints(
+            _diagnose_binding_constraints(
                 E, stacks, sp_pairs, signatures, largest_contest, controls,
                 feasibility_inputs=feasibility_inputs)
+            if proven_infeasible else []
         )
         return {
             "passed": False, "assignments": [], "selection_certified": False,
@@ -3111,6 +3280,12 @@ def select_and_assign_entries(
             "allocation_solver_report": solver_report,
             "errors": errors,
             "candidate_reuse": dict(reuse_state_report),
+            # R294(a). The refusal path is where an emptied entry matters most,
+            # and it is the one path that carried no `warnings` key at all, so
+            # the count lived only inside `solver_report.candidate_prefilter`
+            # where a reader under a clock does not go. Emitted only when there
+            # is something to say, so every other refusal is byte-identical.
+            **({"warnings": list(prefilter_warnings)} if prefilter_warnings else {}),
             **({"primary_stack_floor": floor_report}
                if floor_report.get("status") != "not_requested" else {}),
             **({"five_stack_quota": quota_report}
@@ -3120,7 +3295,17 @@ def select_and_assign_entries(
     # A time-limited incumbent satisfies every constraint in the matrix; it is
     # simply not proven optimal. Verified above, accepted here, and named in the
     # result so "time_limited" is never inferred from silence.
-    solver_report["optimality"] = "time_limited" if timed_out else "optimal"
+    # R294(c). The success path had the same two words for three states. An
+    # incumbent that verified against the constraint matrix under a status this
+    # module cannot interpret is accepted -- the verification is what makes it
+    # safe, and refusing a verified roster would be the blank-reserved-row
+    # outcome CLAUDE.md calls the maximum washout -- but it is not "optimal",
+    # which is a claim about the solve and not about the roster.
+    solver_report["optimality"] = (
+        "time_limited" if timed_out
+        else "optimal" if scipy_status == 0
+        else "accepted_unproven_status"
+    )
 
     assignments: List[Dict[str, Any]] = []
     for e, entry in enumerate(entries):
@@ -3299,11 +3484,18 @@ def select_and_assign_entries(
         "allocation_solver_status": solver_status,
         "allocation_solver_report": solver_report,
         "allocation_optimality": solver_report["optimality"],
-        "warnings": control_warnings + floor_warnings + reuse_warnings + (
+        "warnings": control_warnings + floor_warnings + reuse_warnings
+        + prefilter_warnings + (
             [f"allocation accepted from a time-limited incumbent at gap "
              f"{'unknown' if mip_gap is None else format(float(mip_gap), '.4f')}; "
              f"every constraint verified, optimality not proven"]
             if timed_out else []
+        ) + (
+            [f"allocation accepted from an incumbent returned under solver "
+             f"status {scipy_status} ({solver_report['status']}), which is "
+             f"neither optimal nor the clock; every constraint in the matrix was "
+             f"verified against this roster, and nothing beyond that is claimed"]
+            if solver_report["optimality"] == "accepted_unproven_status" else []
         ) + (
             [f"candidate prefilter kept {prefilter_report['candidates_kept']} of "
              f"{prefilter_report['candidates_in']} candidates before the joint MILP"]

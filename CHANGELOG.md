@@ -25,6 +25,166 @@ performance claim.
 
 ---
 
+## 2026-09-04 — R294 (a)(b)(c): a search-effort prefilter moved the GPP stack floor invisibly and the ladders billed the bank for it; the re-entry ladders re-solved after a slate check had already failed; and "proven infeasible" was the label on every no-incumbent outcome that was not the clock
+
+**Scope: `mlb_engine/allocate/contest_allocator.py`, `tests/test_core.py`,
+`tools/audit.py`, `CLAUDE.md`, `docs/backlog.md`.** R294 closes completely; its
+entry migrates here and the queue renumbers 16 -> 15.
+
+**What (a) was.** `_prefilter_candidates` scored every candidate, sorted, and
+then filled its keep target from `range(K)` and from `order` with no
+compatibility test in any of the three loops. The primary-stack floor at the
+call site marks its excluded candidates incompatible for every entry BEFORE the
+prefilter runs, so on a bank whose ineligible candidates score highest the
+filter spent the whole keep target on candidates the MILP was forbidden to
+select. The MILP then proved infeasible, and the reuse and floor ladders
+stepped, each step counted as a relaxation and each WARN line attributing it to
+the bank. That is a compute-driven filter moving `primary_stack_min_size` --
+a strategy control, and the GPP construction lever -- invisibly, which is the
+shape CLAUDE.md's pool guardrail is written against, arriving one layer up.
+
+Reproduced at `67bfbf3` before anything was touched, on the fixture the filing
+named (60 candidates: 50 at stack 3 scored high, 10 at stack 4 scored low; E=2;
+`primary_stack_min_size=4`), and it matched the filing exactly:
+`passed: True | milp calls: 3 | floor: applied_relaxed 4->3 | assigned sizes
+[3, 3] | eligible size>=4 in full bank: 10`. After: `milp calls: 1 | floor:
+applied 4->4 | relaxations: 0 | assigned sizes [4, 4]`.
+
+**What the filing did not say about (a), and it is the more expensive half.**
+The floor was not the only control the starvation moved. The same run relaxed
+the engine-defaulted `max_candidate_reuse` to NO CAP and delivered **one
+distinct lineup across both entries** -- maximum concentration, on the exact
+portfolio-level washout axis CLAUDE.md's dual objective names, produced by a
+filter nobody was reading as a strategy control. A prefilter that starves the
+MILP does not degrade one control; it degrades whichever controls the ladders
+reach for first.
+
+**Fix (a).** Only SELECTABLE candidates (compatible with at least one entry) are
+eligible for a keep slot, and the score order is built over that set. A
+per-entry reserve of `PREFILTER_PER_ENTRY_RESERVE = 2` compatible candidates
+runs before coverage and fill. `entries_emptied_by_prefilter` and
+`entries_emptied_ids` are reported on every path, and a nonzero count WARNS --
+on the refusal payload too, which carried no `warnings` key at all and is the
+one path an operator reads under a clock. It warns rather than refuses because a
+starved entry makes a badly shaped file and not an illegal one, and CLAUDE.md
+reserves refusal for illegal. Determinism: `selectable` is a list comprehension
+over ascending `range(K)`, no set is formed, and `keep.sort()` still closes it.
+
+**Two decisions inside (a), stated because the filing's Fix line proposed one
+and ruled on neither.** The reserve is 2 rather than an N derived from the entry
+count: once the coverage and fill loops iterate a selectable-only order, the
+whole keep target already goes to candidates the MILP may select, so VOLUME is
+guaranteed and a larger N would only displace higher-scored eligible candidates
+with lower-scored ones. What 2 buys that the fill cannot is the guarantee
+itself, plus a second option so the same-contest duplicate rule has somewhere to
+go. And the reserve may push `keep` past `keep_target` on a wide entry list;
+keeping MORE candidates never starves an entry and never reduces the legal set,
+so that is the safe direction and `candidates_kept` reports it honestly.
+
+**The comment that said the opposite.** The sentence at the call site --
+the prefilter "spends its keep-target on candidates that can actually be
+selected rather than discarding eligible ones in favour of ineligible ones" --
+described an intent the code never implemented. It is true now, and the new
+warning is what says so when it stops being true.
+
+**What (b) was.** None of the three re-entry guards consulted
+`failing_feasibility_checks`, though R286 established that `CHECKED_CONTROLS`
+and `LADDER_RELAXED_CONTROLS` are disjoint and asserts it in a test. So a
+slate-level check that had already failed -- arithmetic no rung the ladders
+climb can touch -- did not stop the ladders climbing, and each re-entry
+re-solved the same impossibility to arrive at the same refusal. On a refusal of
+the 1940_9g shape that is a lost-window multiplier.
+
+**Fix (b).** One computation at the top of `select_and_assign_entries`
+(`slate_blocked = bool(failing_feasibility_checks(feasibility_checks))`) and a
+`not slate_blocked` conjunct on each of the three guards. Nothing threaded
+through a call chain; the function already received `feasibility_checks` and
+never read it. The refusal text is unchanged -- `compose_infeasibility_errors`
+already leads with the failing check and its remedy -- and what changes is that
+it arrives at the first solve.
+
+**The filing's arithmetic on (b) was close and not right, and it is corrected
+rather than repeated.** It claimed "worst case seven solves at ~30 s". Measured:
+4 solves on a 3-entry fixture with a failing `shared_players_floor` and 1 after
+the fix; 5 on a 9-entry fixture at `primary_stack_min_size=5`. Read from the
+rung functions, the arithmetic ceiling is EIGHT, not seven -- 1 initial solve
+plus `candidate_reuse_cap_rungs` (at most 2 rungs, but the reuse ladder takes
+one further step to "no cap" past the end of its list, so 2 steps), plus
+`five_stack_quota_rungs` (2 steps), plus `primary_stack_floor_rungs(5)` = `[5,
+4, 3, None]` (3 steps). The conclusion is unchanged and the number is now
+checkable.
+
+**What (c) was.** `timed_out = scipy_status == 1`, and every other no-incumbent
+outcome fell to an `else` that said "proven infeasible" -- the phrase CLAUDE.md
+reserves -- and then let the ladders step on it.
+
+**Fix (c).** `proven_infeasible = scipy_status == 2` and nothing else. Statuses
+3 and 4, and the unverifiable-incumbent case, take a third branch that names
+itself "NEITHER an infeasibility proof NOR the clock", publishes an empty
+`binding_constraints` (a diagnosis of a solve that diagnosed nothing), and steps
+no ladder. On the SUCCESS path the same two words covered three states, so
+`optimality` gains `accepted_unproven_status` with a warning saying the
+constraint matrix was verified against the roster and nothing beyond that is
+claimed. Statuses 3 and 4 fall through with the third label rather than
+refusing: a refusal here leaves blank reserved rows, which CLAUDE.md calls the
+maximum washout, and the incumbent verification is what makes acceptance safe.
+
+**Both of (c)'s premises were checked as behaviour and both came back
+different from the filing, which called status 4 the subject.** Status 3
+(unbounded) is UNREACHABLE through this call site: the allocator builds
+`Bounds(zeros, ones)` with incompatible entries clamped to 0.0, so every
+variable is bounded and a bounded MILP cannot be unbounded (confirmed against
+scipy 1.15.3, which returns 3 only for a genuinely unbounded variable). Status 4
+was NOT produced in a probe of degenerate coefficient ranges, a NaN in the
+constraint matrix, and a zero time limit, so no field sighting is claimed for
+it. The label is corrected anyway, and the reachable member of the class is one
+the filing did not name: **status 0 with an `x` that fails the integrality,
+bounds or constraint verification**. That is a solution this module declined to
+trust, and it read as a proof that none exists. It has a test of its own.
+
+**R233 enumeration.** The class is every reader of the solve's outcome in this
+file. `grep -n "timed_out\|scipy_status" mlb_engine/allocate/contest_allocator.py`
+returned 11 at `67bfbf3` (`:2906 :2907 :2913 :2915 :2936 :2990 :3031 :3068
+:3103 :3123 :3306`) and returns 14 at this head (`:3028 :3029 :3032 :3047 :3053
+:3055 :3076 :3095 :3148 :3267 :3305 :3306 :3492 :3495`). Three of the original
+eleven (`:2990 :3031 :3068`, the guards) now read `proven_infeasible`; the
+widened grep
+`grep -n "timed_out\|scipy_status\|proven_infeasible\|slate_blocked"` returns
+25. Three of those 25 are DELIBERATELY KEPT string literals -- the
+`"trigger": "proven_infeasible_with_*"` values at `:3172 :3209 :3245` -- which
+name a relaxation step's cause and are accurate for the first time, since a
+ladder now steps only on a proven infeasibility. `_plan_joint_allocation`
+(`:1283`, `:1417`) is a SEPARATE solve site with no ladders and no re-entry, so
+it is out of this class and untouched; the golden replay pins it. The
+enumeration is asserted rather than described:
+`test_the_three_guards_all_read_proven_infeasible_and_slate_blocked` walks the
+AST of `select_and_assign_entries`, counts exactly three re-entries, and fails
+if any one of them is missing either conjunct -- so a fourth ladder added later
+fails a test instead of stepping on a non-proof.
+
+**What was refused.** No refusal class was added for statuses 3 and 4 (see the
+washout reasoning above). `entries_emptied_by_prefilter` was not made a blocker,
+for the same reason. `optimizer_v3.py` was not touched; R294 is allocation, not
+lineup construction. And the reserve was not made adaptive: an N derived from
+the entry count is a control with no evidence behind it, and this item had none
+to offer.
+
+**Verification.** `tests/test_golden_replay.py` passes unchanged (9 tests, 43 s)
+-- no delivered byte moved. The fourteen new tests were run against the pre-fix
+allocator at `67bfbf3` and produced 6 failures and 3 errors, restored by sha256
+match. **18 mutations written, 18 killed, 0 survivors, 0 bad mutations.** The
+first mutation round found THREE real survivors (`a3`, `a4`, `a5`), all of them
+the same fault in the test rather than in the code: the fixture gave entry 1
+exactly one compatible candidate, so the forced-coverage branch protected it and
+the per-entry reserve was never the reason the test passed. The fixture now
+gives entry 1 two options and asserts `forced_coverage_kept == 0`, so it cannot
+pass by the wrong mechanism. Gate `PASS v2.26.0 28 modules 1796 tests` ->
+`PASS v2.26.0 28 modules 1810 tests`, all five suites clean, no state word
+appended. The mutation harness uses literal string replacement rather than
+`sed`, because a `sed` expression containing `\n` never applies and then reports
+as a survivor, and it verifies each mutation CHANGED the file before running the
+suite so a no-op is reported as a bad mutation rather than as a survivor.
+
 ## 2026-09-04 — R315(a): the gitignore comment said "a timestamped .bak beside a reference file" and the pattern under it only covered `.bak.json`, so ARCHIVE's CSV safety copy read as dirt for five days; and the pattern that would have hidden SEVEN TRACKED files was not added
 
 **Scope: `.gitignore` and `docs/backlog.md`.** Ben asked what to do about the

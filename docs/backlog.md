@@ -39,6 +39,45 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-04, DEV, claim `engine` (`engine_2026-09-04b`): **R294 SHIPPED
+COMPLETE, all three parts, and migrated to CHANGELOG.md; slot 1 closes, so the
+list below runs 1 through 15, counted rather than inherited** (it was 16). Gate
+`PASS v2.26.0 28 modules 1796 tests` -> `PASS v2.26.0 28 modules 1810 tests`,
+`tests.test_core` 1140 -> 1154, all five suites `clean`. **18 mutations written,
+18 killed, 0 survivors** -- the first round produced three genuine survivors and
+all three were the SAME fault in the test rather than in the code, so they are
+recorded here as well as in the changelog: the fixture gave the protected entry
+exactly one compatible candidate, which means the forced-coverage branch was
+what passed the test and the per-entry reserve was never exercised. The fixture
+now gives it two and asserts `forced_coverage_kept == 0`. A test that passes by
+the wrong mechanism is the R300(a) shape.
+
+***What the closing found that the filing did not.*** Three things, and the
+first is why (a) was worth its slot. The prefilter starvation did not only relax
+the stack floor: on the same repro it ALSO relaxed the engine-defaulted
+`max_candidate_reuse` to no cap and delivered **one distinct lineup across both
+entries**, which is maximum concentration on the portfolio-level washout axis
+the dual objective names. A starved MILP degrades whichever control the ladders
+reach for first, not the one the filing happened to name. Second, (b)'s "seven
+solves" was close and not right: measured 4 on a 3-entry fixture and 5 on a
+9-entry one, and the ceiling read off the rung functions is EIGHT, because the
+reuse ladder takes one further step past the end of its own list. Third, (c)'s
+subject was misidentified. Status 3 is UNREACHABLE through this call site (every
+variable is bounded in [0,1]) and status 4 was not producible in a probe, so
+neither is a field sighting -- but **status 0 with an `x` that fails the
+incumbent verification** is reachable, was labelled "proven infeasible", and is
+the member that matters. The label is fixed for all three.
+
+***One rank change and two entries touched.*** **R36's Finding 10 (prefilter
+starvation) is the root of (a) and is now FIXED at the mechanism**, so its owed
+re-measure on the next live pinned-entry swap changes from "does this happen" to
+"confirm it no longer does"; F10's line inside the R36 entry in Workstream 5 is
+annotated rather than left describing a live defect. **R298(a) is unaffected in
+substance and its read is now smaller**: it reads the three ladder relaxation
+blocks that (a) used to mis-attribute, and those blocks are unchanged -- what
+changed is that a relaxation appearing there is now genuinely the bank's or the
+control's, so R298(a) becomes MORE worth doing, not less. Its entry says so.*
+
 *2026-09-03 (sixth note this date), DEV, claim `engine` (`engine_2026-09-04`):
 **R306 steps 1-3 SHIPPED and migrated to CHANGELOG.md; slots 1 and 2 both
 close, so the list below runs 1 through 16, counted rather than inherited** (it
@@ -1475,12 +1514,7 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R294 — allocator truth** (P1, S). Unchanged in substance from the 09-02
-   filing and it keeps a head slot on criterion (1): the primary-stack floor is
-   the GPP construction lever and a search-effort prefilter relaxes it while
-   the record blames the bank; refusals of the 1940_9g shape pay up to seven
-   30-second solves before saying no; scipy status 4 is called "proven".
-2. **R297(d) + R304 + R305 — the referees read the wrong geometry and the wrong
+1. **R297(d) + R304 + R305 — the referees read the wrong geometry and the wrong
    file** (P1, XS-S). Impact: both cost calls inside lock windows on 2026-09-03,
    both make a referee assert something false, and R304's measured cost is a
    LEGAL-POOL REDUCTION taken because a referee could not read a declaration.
@@ -1489,7 +1523,7 @@ R292 rather than leads it.*
    disagreeing counters, and the Showdown brief that writes no
    `declared_pitchers`; R305 is the mtime feed resolver. Per R233 the fix
    carries the grep enumerating every `Roster Position` Classic-token test.
-3. **R315(c) — the tracked manifest that points at an untracked file** (P1,
+2. **R315(c) — the tracked manifest that points at an untracked file** (P1,
    XS, ARCHIVE's one-line fix). `reference_manifest.json` registers
    `statsapi_season_pitching.csv`; the CSV is untracked and not ignored, and
    `stage_slate.py:494` reads it in production as the F4 prior's K-rate input.
@@ -1507,7 +1541,7 @@ R292 rather than leads it.*
    `Σ x ≤ 0` over the lone survivor and EXCLUDES a legal player, which is the
    move the hard guardrails forbid. Take R312 first; it is the smallest thing
    on this board and it is the project's own stated rule.
-4. **R308 — an external field estimate in the build loop** (P1, S-M; one Ben
+3. **R308 — an external field estimate in the build loop** (P1, S-M; one Ben
    fact required). Impact: the first field number the project can get that is
    not its own. On 2140_2g it named a `-27 pp` hole (Kyle Tucker, 26.57% RST%,
    our exposure 0%, best points-per-dollar LAD bat in the frame) that no
@@ -1519,14 +1553,14 @@ R292 rather than leads it.*
    pattern, blend through `ownership_pred emit` rather than minting a second
    accepted schema, print the delta beside the chalk-sum columns, and record
    the `all_games` scope, which is not recoverable later.
-5. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Unchanged:
+4. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Unchanged:
    single-game and small-field prizes ride on the three caps holding and on the
    degraded flag being true; measured realized exposure 58% under a 50% cap,
    and duel/blowout rosters flagged degraded by construction. R247(b)'s premise
    is re-read against R295(b) first.
-6. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S).
+5. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S).
    Unchanged; dependency discharged by R292.
-7. **R285 (+ its 09-03 rider) + R311 + R207 + R204's naming half** — refusals
+6. **R285 (+ its 09-03 rider) + R311 + R207 + R204's naming half** — refusals
    that cost a lock window (P1, S). One subject, four filings: the supervisor
    stops on a remedy it is licensed to take, the interaction-bind refusal names
    no floor to set, the infeasibility hint names a SET and makes the operator
@@ -1536,7 +1570,7 @@ R292 rather than leads it.*
    remedy CLAUDE.md lists first as unattended. ed11's D13 remedy is the shape:
    a typed `refusal.class` / `refusal.remedy` on the payload, and no regular
    expression over `errors[]` in the final fix. **R203** rides the tail.
-8. **R118 — the replay tool** (P1, M; Tier 2 head). DEMOTED from the head on
+7. **R118 — the replay tool** (P1, M; Tier 2 head). DEMOTED from the head on
     criterion (2); nothing in slots 1-7 depends on it and it gates everything
     below. Then, unchanged in order: R48 + R83 → R10 (still gated on R225; its
     other gate, **R306's step 2, is DISCHARGED as of 2026-09-03** — the
@@ -1547,7 +1581,7 @@ R292 rather than leads it.*
     payout curve with the tie group splitting the prizes spanning the ranks it
     occupies, `Payout = (1/d) Σ prize[a..a+d-1]`, and duplicates as separate
     entries. Accounting against an observed field, not simulation.
-9. **R307 — the captain leverage sleeve** (P1, M). **ITS GATE IS DISCHARGED as
+8. **R307 — the captain leverage sleeve** (P1, M). **ITS GATE IS DISCHARGED as
     of 2026-09-03: R306 step 2 shipped**, so the sight exists and the sleeve
     can be aimed at captain ownership rather than at roster ownership. It keeps
     this slot rather than jumping the queue because criterion (2) is about
@@ -1571,7 +1605,7 @@ R292 rather than leads it.*
     +0.10 while the roster tilt is -0.10, so "low-owned captain" and
     "low-owned player" are different sets by construction, which is the whole
     reason the sleeve needed the gate.
-10. **R174 + R175 + R248 + R242 + R279 + R314 + R297(a)(b)(c)(e)** — the
+9. **R174 + R175 + R248 + R242 + R279 + R314 + R297(a)(b)(c)(e)** — the
     money boundary (P1, S). Unchanged except that (d) moved up to slot 2 with
     its siblings, and R314 is NEW here: `check_started_games` has no postponed
     exemption and R292(d) put it in BOTH referees, so on a postponed-game slate
@@ -1579,29 +1613,29 @@ R292 rather than leads it.*
     moves are the two the contract forbids. R279 has a field sighting; (a)(e)
     are fail-opens ON the referee; the rest are prospective, which is why they
     sit here and not higher.
-11. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2, S-M),
+10. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2, S-M),
     dependency R238 before R239(a); then **R298 + R300's remainder** (the T-5
     read is wrong today; (a) and (b) shipped, (c) and (d) remain); then
     **R309** (the evidence file and QA proposing swaps). Tail unchanged:
     R122-rider, R123, R189(3), R210 (+R303's unread-flag siblings), R211;
     R240 decision-first.
-12. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
+11. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
     hardening. No member changes a delivered byte; R216 still lands alone at a
     session boundary; R217 gains ed11 D34's runtime-identity sliver. Then
     **R164** (re-scoped by R293), **R284** (which R293's late-swap rider
     joins), **R276**, **R225 + R226 + R227** (R225 gates R10's Showdown cells,
     so it lands before slot 8's R10 leg).
-13. **R301 — the instruction corpus** (P2, M). The four money-boundary
+12. **R301 — the instruction corpus** (P2, M). The four money-boundary
     contradictions first (showdown.md caps, late_swap.md `--locked-teams`, the
     ledger pin, `timeout 33`); they are XS each and may be taken in any slot.
     Then CLAUDE.md to ≤ 6 KB and SKILL.md to ≤ 150 lines with the narrative
     moved to the CHANGELOG entries it cites; then the prose-pinning tests.
-14. **R302 — the strangler engine** (Tier 3, L). START CONDITION unchanged:
+13. **R302 — the strangler engine** (Tier 3, L). START CONDITION unchanged:
     R118 built and ten deliveries graded. ed11 §4 corroborates the design and
     §4.10 is recorded on the entry as acceptance criteria. Criterion (2) is the
     instruction to leave it here; Ben may pull it forward or strike it, either
     a one-line edit.
-15. **Smalls, batched opportunistically:** **R315(b)** (the standings_pulls
+14. **Smalls, batched opportunistically:** **R315(b)** (the standings_pulls
     series is half tracked and half dirt; one decision, and do not ignore the
     pattern without untracking the seven in the same commit), **R306's
     remainder** (step 5, the
@@ -1612,7 +1646,7 @@ R292 rather than leads it.*
     (+ its 09-03 rung-3 rider), R303's non-demoted members, and the standing
     set: R264 + R265, R221 + R280, R222, R229, R230 (+(d)), R231, R232, R241,
     R243, R269 (with R245), R271's two-line remainder.
-16. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged,
+15. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged,
     except that its clock half is inside R290(c)'s shipped scope.
 
 *(The previous twelve-slot list, with its 09-02 and 09-03 slot reasoning
@@ -6010,15 +6044,30 @@ diagnostic cycle and is recorded here so the next reader does not pay it again.
 `diverse_projection_frame()` is the fixture in question, and R293's tests add
 the two columns locally rather than changing the shared one.
 
-### R294. Allocator truth: the prefilter ignores compatibility so the stack floor and reuse ladders relax against a bank that could satisfy them; the re-entry ladders re-solve after a slate-level check failed; scipy status 3/4 is labelled "proven infeasible" (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P1, GF10-P5, GF10-P6); (a) VERIFIED-repro, (b)(c) VERIFIED-read, coordinator re-read at `contest_allocator.py:1074-1149, :2897-2956`; root of (a) is R36 F10
+### R294. CLOSED 2026-09-04 -- SHIPPED, entry migrated to CHANGELOG.md
 
-**What.** (a) `_prefilter_candidates`'s score-ordered fill (`contest_allocator.py:1132-1135`) keeps candidates every entry has already been marked incompatible with (the floor at :2637-2643 marks them), so the MILP has ≤1 eligible candidate, proves infeasible, and the reuse (:2990) and floor (:3068) ladders step, each counted as a relaxation attributed to the bank. Repro (60 candidates: 50 at stack 3 high-scored, 10 at stack 4 low-scored; E=2; `primary_stack_min_size=4`): `passed: True | milp calls: 3 | floor: applied_relaxed 4→3 | assigned sizes [3, 3] | eligible size>=4 in full bank: 10`, with WARN lines blaming the bank. The comment at :2632-2636 claims the opposite of what the code does. (b) None of the three re-entry guards (:2990, :3031, :3068) consults `failing_feasibility_checks(feasibility_checks)`, though R286 established that `CHECKED_CONTROLS` and `LADDER_RELAXED_CONTROLS` are disjoint; worst case seven solves × 30 s before one refusal, inside the 130 s ceiling. (c) `timed_out = scipy_status == 1` and everything else with no incumbent is diagnosed as proven (:2907, :2935-2950); HiGHS status 4 (numerical trouble) gets the reserved label and the ladders step on a non-proof.
-
-**Why P1.** (a) is a search-effort limit moving a STRATEGY control invisibly (CLAUDE.md's forbidden shape), and it degrades exactly the GPP construction lever (primary stack size). (b) is a lost-window multiplier on refusals of the 1940_9g shape. (c) is a truthful-labels defect on the word CLAUDE.md reserves.
-
-**Fix.** (a) iterate only `selectable = [k for k if any(compatible[e][k] for e)]`; keep the top-2 compatible per entry before the fill; report `entries_emptied_by_prefilter`. (b) guard each re-entry on `not slate_blocked`. (c) `proven = scipy_status == 2`; name 3/4 as neither a proof nor a clock and skip the ladders. Tests: the repro fixture asserting `assigned sizes == [4, 4]` and zero relaxations; a mocked status-4 result asserting no "proven" text and no re-entry.
+All three parts (a)(b)(c) landed in one commit. Three premises came back
+different from the filing and the corrections are in the changelog entry:
+(a) also relaxed `max_candidate_reuse` to no cap and delivered one distinct
+lineup across two entries, so the starvation cost portfolio diversity as well
+as the stack floor; (b)'s worst case is EIGHT solves and not seven, measured
+at 4 and 5 on two fixtures; (c)'s reachable member is status 0 with an
+unverifiable incumbent, while statuses 3 and 4 are respectively unreachable
+through this call site and not producible in a probe. Gate 1796 -> 1810,
+18 mutations, 18 killed.
 
 ### R298. Three evidence readers that lie at T-5: `manifest_strategy_state` never reads the allocator ladders, the certified Classic brief carries no `mirror_error`/`manifest_recorded`, and `find_prior_file` can feed another draftgroup's ownership prior into `--leverage` (P2, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P2, GF10-T10, GF10-T16); (a) VERIFIED-repro, (b)(c) VERIFIED-read
+
+**Rider 2026-09-04, R294(a) shipped: (a)'s READ is unchanged and its VALUE went
+up.** R294(a) fixed the prefilter that used to mis-attribute relaxations in the
+three ladder blocks (a) has to read (`contest_allocator.py:3162-3250`, unchanged
+by R294 -- the guards moved, the relaxation records did not). Nothing about what
+(a) must parse changes. What changes is what a relaxation appearing there MEANS:
+before R294 a `primary_stack_floor` or `candidate_reuse` relaxation could be an
+artifact of a starving prefilter, so surfacing it in `manifest_strategy_state`
+would have propagated a false attribution into the field CLAUDE.md's "clean when
+the relaxation counts are zero" is read off. It is now genuinely the bank's or
+the control's. Build (a) on that basis; no premise of it needs re-reading.
 
 (a) `execution_pipeline.py:5087-5118` reads only the `bank_diagnostics`/`candidate_bank` holders; the three allocator ladders (`candidate_reuse`, `primary_stack_floor`, `five_stack_quota` relaxations at `contest_allocator.py:3162-3250`) are never read, and on the production `candidates_override` path `candidate_bank` is `{source, candidate_count}`, so a Classic row reads `state: unknown, evidence: absent` even when reuse, quota and floor all relaxed. Repro: result with `candidate_reuse.relaxations=2`, floor 4→3, quota relaxed_off → `{'state': 'unknown', 'counts': {}, 'evidence': 'absent'}`. CLAUDE.md's "clean when the relaxation counts are zero" is read off this field. Fix: read the three blocks; `execute_portfolio` returns `primary_stack_floor`/`five_stack_quota` beside `candidate_reuse` (:569-570, :594-595). R64(a) covered bank holders only. (b) `build_slate.py:2140-2223`: the Classic brief omits `mirror_error`, `delivered_sha256_error`, `manifest_recorded`; when the mirror fails `delivered_path` falls back to `runs/<id>/final/DKEntries.csv` and `status` stays `certified`; the Showdown brief (:2902-2903) carries both. CHANGELOG (R176(d)) says the brief records `mirror_error`; the brief does not. Fix: add the three keys; `status: certified_unmirrored` when `mirror_error` is set. (c) `qa_portfolio.py:637-644` falls back to "the one prediction file in outputs/<date>/" even when the brief's tag is known and does not match; `resolve_leverage` forwards that file's `own_pct_by_player_id` into MILP constraints (`build_slate.py:2386-2389, :1822, :1981`). Fix: AMBIGUOUS refusal when the single hit's tag differs.
 
@@ -6057,8 +6106,9 @@ standing answer. Start condition unchanged: R118 built and ten deliveries graded
 The R51/R92 family lives here: reports that are honest line by line while
 the composite steers wrong. R98's remainder is the P1. R36's Finding 10
 (prefilter starvation) belongs to this stream and lives inside the R36
-entry in Workstream 5; its re-measure is owed on the next live pinned-entry
-swap.
+entry in Workstream 5; **its MECHANISM was fixed by R294(a) on 2026-09-04**
+and its re-measure is still owed on the next live pinned-entry swap, now as a
+confirmation rather than a diagnosis. See the STATUS note on the F10 line.
 
 ### R207. The infeasibility hint names the active SET and makes the operator binary-search it, four builds at a time (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-20_BUILD_infeasibility-hint-does-not-name-the-minimum-cap.md`; measured on 1240_6g
 
@@ -7139,6 +7189,26 @@ Every line-number claim was verified against the tree before ruling, because thi
 
 **ACCEPTED, filed, NOT built:**
 - **Finding 10 (P1, M).** The candidate prefilter keeps one representative per primary stack and per SP pair up to `max(6*E, 40)`, and there is NO retry on the full bank: the single `milp()` call is the only one, and both production callers return on first failure. Worse than the critique states: on `scipy_status == 2` the error reads `"entry-level joint MILP proven infeasible"` and the binding-constraint diagnosis is computed from the FILTERED sets, so "N distinct lineups x cap < entries" can be a fact about the reduced problem only. That is CLAUDE.md's reserved "proven infeasible: <constraint>" label attached to a proof about a problem nobody asked to solve. The time-limit branch already names the prefilter; the infeasible branch must too. Fix: one bounded expansion pass on the full bank before the word "infeasible" is used, and never diagnose from post-filter sets. **Reconfirmed 2026-08-04 (audit) with a live reproduction of the starvation itself:** coverage is guaranteed ONLY for single-option entries (`contest_allocator.py:680`, `if len(options) == 1`) — a 60-candidate bank where an entry's only 2 compatible candidates score below the keep line drops both and reports "proven infeasible … Active:" with an empty controls list, on a problem that is feasible unfiltered. That 2+-options-but-all-filtered shape is exactly the late-swap pinned-entry case (targeted candidates built around locked players score below the general bank). The fix gains a floor: keep the top-K (K>=2) compatible candidates per entry, and name any entry whose compatible set the prefilter emptied. R84's per-entry compatible-in/kept counts are the visibility half. **Premise note, 2026-08-09 (R47), updated 2026-08-10:** the late-swap half of the reasoning above is measured against a bank the solve never saw. The swap's targeted candidates were mostly being DISCARDED before the prefilter ran (`drop_stale_jobs`), so "targeted candidates score below the general bank and get filtered" describes a starvation that had a second, larger cause upstream. **R101 landed 2026-08-10 and the upstream cause is gone; the re-measure is still owed.** It was not done in that commit and could not have been: the 2026-08-03 inputs no longer rebuild that run's projections frame (`data/reference/` has moved since), so the shape has to be measured on the next live swap that produces a pinned entry with 2+ compatible candidates, against the union bank the solve now actually receives. Until that measurement exists, treat this item's late-swap justification as UNSIZED rather than as reproduced. The single-entry coverage floor it proposes is unaffected either way.
+  **STATUS 2026-09-04, R294(a) SHIPPED: the mechanism this finding describes is
+  FIXED and the fix is the floor this finding asked for.** `_prefilter_candidates`
+  now iterates SELECTABLE candidates only, reserves `PREFILTER_PER_ENTRY_RESERVE
+  = 2` compatible candidates per entry before any coverage or score fill, and
+  reports `entries_emptied_by_prefilter` / `entries_emptied_ids` on every path
+  with a WARN on the refusal payload. The three ladders no longer step on a
+  non-proof (`proven_infeasible = scipy_status == 2`) and
+  `binding_constraints` is empty unless the solve actually proved infeasible, so
+  the "diagnosis computed from the FILTERED sets" half is narrowed too: the
+  diagnosis still reads post-filter sets, but the filter can no longer empty an
+  entry that had an option, which is the condition that made the reading false.
+  The 60-candidate 2+-options-all-filtered shape is now a test
+  (`AllocatorTruthTests`, `tests/test_core.py`), reproduced at `67bfbf3` and
+  asserted fixed. **What is NOT discharged and stays open in slot 14's R36
+  Finding 10 line:** the "one bounded expansion pass on the full bank before the
+  word infeasible is used" remedy was not built -- with the starvation gone it is
+  a different and smaller item -- and the owed LATE-SWAP re-measure is still
+  owed. Its question changes from "does the pinned-entry starvation happen" to
+  "confirm it no longer does", on the next live swap producing a pinned entry
+  with 2+ compatible candidates.
 - **Finding 8 (P1, S).** `melt_showdown_salary_csv` flips the whole pool to `declared_starters` on ANY declared row, with no per-team completeness test. A one-sided partial does hard-error on the `len(teams) < 2` guard, so the critique slightly overstates the worst case, but a partial covering both sides yields a tiny biased pool and `build_slate.py` then falls back to the generic bank on that pool rather than refusing. Per-team completeness, projected candidates labelled for incomplete teams, block promotion not generation.
 - **Finding 7 (P1, S).** The supplied-feed acceptance threshold is `covered * 2 < len(slate_teams)` — strictly under half rejects, so exactly 50% is ACCEPTED and overwrites the shared `data/slates/<date>/lineups_feed.json`, and the write is a bare `write_text`, not atomic, unlike every other durable write in the repo. Both true. R32 removes the need for this path whenever Ben pastes, and R29(4) added `--salary`; what remains is keying the staged feed by pool signature and snapshotting it into the run. **Addition (2026-08-01, GF spec A-29):** the fix ships with the boundary test the suite lacks — a feed covering exactly half the slate's teams, which today is ACCEPTED by `covered * 2 < len(slate_teams)`.
 - **Finding 12 (P1, S).** `wheel_fetch.py` reads no lock file, resolves the latest release for a bare name, has no `hashlib` at all, decides completion from `os.path.getsize`, and never checks for `206`/`Content-Range`. A server ignoring `Range` returns 200, the full body is APPENDED to the partial, size then exceeds the target, and it prints `done` and exits 0 on a corrupt wheel. The critique's doc quote is slightly off (SKILL.md attributes hash verification to `env_probe --install`, which really does pass `--require-hashes`) but it introduces the fallback in the same breath and never says the fallback drops both the pin and the hash.

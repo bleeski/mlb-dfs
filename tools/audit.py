@@ -570,7 +570,25 @@ EXPECTED_SUITE_COUNTS = {
     # Three on the truthful-labels half: `applied` read from the bank and
     # disagreeing with the flag, null when the rungs disagree, and an
     # unobserved build saying so instead of restating the engine default.
-    "tests.test_core": 1140,
+    # R294, 2026-09-04: 1140 -> 1154, the fourteen that pin allocator truth.
+    # Six on the prefilter (the acceptance fixture asserting stack sizes
+    # [4, 4] with zero relaxations and one solve, the selectable-only mechanism
+    # underneath it, the per-entry reserve protecting an entry the score fill
+    # would drop -- on a fixture that asserts forced_coverage_kept == 0, so it
+    # cannot pass by the wrong mechanism, which is what the first cut did and
+    # what three surviving mutations caught -- the emptied count firing with
+    # the reserve switched off, the field present on the not-applied path, and
+    # a pre-starved matrix NOT being counted against the filter). Three on the
+    # slate-blocked guard (one solve
+    # when a check failed, the ladders still climbing when none did, and
+    # `passed is None` not being a failure -- R237's rule arriving through a new
+    # door). Four on the labels (status 4 and status 3 carrying no "proven"
+    # anywhere in the payload and stepping no ladder, the REACHABLE member of
+    # that class -- status 0 with an unverifiable `x` -- getting the same, and
+    # status 2 still saying the reserved words and still climbing). One R233
+    # census: an AST walk asserting all three re-entries read both conjuncts, so
+    # a fourth ladder fails here instead of stepping on a non-proof.
+    "tests.test_core": 1154,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

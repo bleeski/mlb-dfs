@@ -22503,5 +22503,363 @@ class DeadlineGovernorCliTests(unittest.TestCase):
         self.assertIn('("--deliver-by", getattr(a, "deliver_by", None))', source)
 
 
+class AllocatorTruthTests(unittest.TestCase):
+    """R294. Three ways the allocator's record of WHY it relaxed was wrong.
+
+    (a) a search-effort prefilter moved a strategy control invisibly and the
+    ladders billed the bank for it; (b) the re-entry ladders re-solved after a
+    slate-level check had already failed, which no rung they climb can fix;
+    (c) "proven infeasible" -- the phrase CLAUDE.md reserves -- was applied to
+    every no-incumbent outcome that was not the clock.
+    """
+
+    N_HIGH_S3 = 50
+    N_LOW_S4 = 10
+    N_SP_PAIRS = 5
+
+    # -- (a) ------------------------------------------------------------
+    @classmethod
+    def _starvation_bank(cls):
+        """The R294(a) fixture: 50 size-3 candidates scored ABOVE 10 size-4
+        candidates, so a `primary_stack_min_size` of 4 marks the whole
+        high-scoring half incompatible before the prefilter runs."""
+        bank = []
+        for i in range(cls.N_HIGH_S3):
+            pair = [f"SP{i % cls.N_SP_PAIRS}a", f"SP{i % cls.N_SP_PAIRS}b"]
+            roster = pair + [f"h{i}_{j}" for j in range(8)]
+            bank.append({
+                "candidate_id": f"S3_{i:02d}", "lineup_ids": roster,
+                "player_ids": roster, "sp_ids": pair, "primary_stack": "AAA",
+                "primary_stack_size": 3,
+                "objective": 1000.0 - i, "contest_fit_score": 1000.0 - i,
+            })
+        for i in range(cls.N_LOW_S4):
+            pair = [f"SP{i % cls.N_SP_PAIRS}a", f"SP{i % cls.N_SP_PAIRS}b"]
+            roster = pair + [f"l{i}_{j}" for j in range(8)]
+            bank.append({
+                "candidate_id": f"S4_{i:02d}", "lineup_ids": roster,
+                "player_ids": roster, "sp_ids": pair, "primary_stack": "AAA",
+                "primary_stack_size": 4,
+                "objective": 10.0 - i, "contest_fit_score": 10.0 - i,
+            })
+        return bank
+
+    STARVATION_ENTRIES = [
+        {"entry_id": "1", "contest_id": "c1", "contest_shape": "large_wta"},
+        {"entry_id": "2", "contest_id": "c2", "contest_shape": "large_wta"},
+    ]
+
+    @staticmethod
+    def _counting_solve(bank, entries, controls, **kwargs):
+        """Run the allocator, counting MILP calls. `milp` is imported inside
+        `select_and_assign_entries`, so the patch goes on scipy itself."""
+        import scipy.optimize as sopt
+        calls = {"n": 0}
+        real = sopt.milp
+
+        def counting(*a, **kw):
+            calls["n"] += 1
+            return real(*a, **kw)
+
+        sopt.milp = counting
+        try:
+            result = select_and_assign_entries(bank, entries, dict(controls), **kwargs)
+        finally:
+            sopt.milp = real
+        return calls["n"], result
+
+    def test_the_prefilter_keeps_what_the_milp_may_actually_select(self):
+        """The acceptance criterion: sizes [4, 4] and zero relaxations.
+
+        At HEAD before this fix the same fixture gave 3 MILP calls, the floor
+        relaxed 4->3, assigned sizes [3, 3], and WARN lines blaming the bank --
+        with 10 eligible size-4 candidates untouched in the full bank.
+        """
+        bank = self._starvation_bank()
+        calls, result = self._counting_solve(
+            bank, self.STARVATION_ENTRIES,
+            {"primary_stack_min_size": 4, "max_sp_pair_repetition": 99})
+        self.assertTrue(result["passed"], result.get("errors"))
+        by_id = {c["candidate_id"]: c for c in bank}
+        sizes = [by_id[row["candidate_id"]]["primary_stack_size"]
+                 for row in result["assignments"]]
+        self.assertEqual(sizes, [4, 4],
+                         "the stack floor was satisfiable and the build did not satisfy it")
+        floor = result["primary_stack_floor"]
+        self.assertEqual(floor["applied"], 4)
+        self.assertEqual(floor["relaxations"], 0)
+        self.assertEqual(int(result["candidate_reuse"].get("relaxations") or 0), 0)
+        self.assertEqual(calls, 1, "the ladders stepped against a satisfiable bank")
+
+    def test_the_prefilter_never_spends_a_slot_on_an_unselectable_candidate(self):
+        """The mechanism, separately from the outcome above: every kept index
+        is compatible with at least one entry."""
+        bank = self._starvation_bank()
+        _, result = self._counting_solve(
+            bank, self.STARVATION_ENTRIES,
+            {"primary_stack_min_size": 4, "max_sp_pair_repetition": 99})
+        report = result["allocation_solver_report"]["candidate_prefilter"]
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["selectable_in"], self.N_LOW_S4)
+        self.assertLessEqual(report["candidates_kept"], self.N_LOW_S4)
+        self.assertEqual(report["entries_emptied_by_prefilter"], 0)
+        self.assertEqual(report["entries_emptied_ids"], [])
+
+    @classmethod
+    def _reserve_fixture(cls):
+        """Entry 0 owns the 30 highest-scored candidates; entry 1 owns the two
+        LOWEST-scored and nothing else. Two options, not one, so the
+        forced-coverage branch above does NOT fire -- only the per-entry
+        reserve can protect entry 1 here, which is what makes this fixture
+        able to tell the two mechanisms apart."""
+        bank = cls._starvation_bank()
+        K = len(bank)
+        compat = [[False] * K for _ in range(2)]
+        for k in range(K):
+            compat[0][k] = k < 30
+        compat[1][K - 2] = True
+        compat[1][K - 1] = True
+        return bank, compat, K
+
+    def test_the_per_entry_reserve_protects_an_entry_the_score_fill_would_drop(self):
+        """With `keep_target=2` a pure score fill spends both slots on entry 0's
+        best and leaves entry 1 with nothing. The reserve is what stops that,
+        and it must consult compatibility to do it."""
+        from mlb_engine.allocate.contest_allocator import _prefilter_candidates
+        bank, compat, K = self._reserve_fixture()
+        keep, report = _prefilter_candidates(
+            bank, self.STARVATION_ENTRIES, compat, keep_target=2)
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["forced_coverage_kept"], 0,
+                         "the fixture leaked into the forced-coverage branch, so "
+                         "it can no longer tell the reserve from forced coverage")
+        self.assertTrue(set(keep) & {K - 2, K - 1},
+                        "the per-entry reserve did not protect entry 1")
+        self.assertEqual(report["entries_emptied_by_prefilter"], 0)
+
+    def test_an_emptied_entry_is_counted_and_named_when_the_reserve_fails(self):
+        """`entries_emptied_by_prefilter` is a REPORT plus a WARNING, not a
+        refusal: a starved entry makes a badly shaped file, not an illegal one,
+        and CLAUDE.md reserves refusal for illegal. With the reserve in place
+        the count should be structurally unreachable, so it is exercised with
+        the reserve switched OFF -- that is the condition the field exists to
+        catch, and a field nothing can make fire is a field nobody can trust."""
+        from mlb_engine.allocate import contest_allocator as ca
+        bank, compat, K = self._reserve_fixture()
+        original = ca.PREFILTER_PER_ENTRY_RESERVE
+        try:
+            ca.PREFILTER_PER_ENTRY_RESERVE = 0
+            keep, report = ca._prefilter_candidates(
+                bank, self.STARVATION_ENTRIES, compat, keep_target=2)
+        finally:
+            ca.PREFILTER_PER_ENTRY_RESERVE = original
+        self.assertEqual(report["entries_emptied_by_prefilter"], 1)
+        self.assertEqual(report["entries_emptied_ids"], ["2"])
+        self.assertFalse(set(keep) & {K - 2, K - 1})
+
+    def test_the_report_carries_the_field_on_the_not_applied_path_too(self):
+        """A reader must not have to know which branch ran to find the count."""
+        from mlb_engine.allocate.contest_allocator import _prefilter_candidates
+        small = self._starvation_bank()[:3]
+        keep, report = _prefilter_candidates(
+            small, self.STARVATION_ENTRIES, [[True] * 3, [True] * 3], keep_target=40)
+        self.assertFalse(report["applied"])
+        self.assertEqual(report["entries_emptied_by_prefilter"], 0)
+        self.assertEqual(report["entries_emptied_ids"], [])
+        self.assertEqual(keep, [0, 1, 2])
+
+    def test_the_prefilter_leaves_a_pre_starved_matrix_alone(self):
+        """No entry compatible with anything is a fact about the compatibility
+        matrix, not something a keep-slot choice made. It must not be counted
+        against the prefilter, and the old score-ordered keep set is preserved
+        so the caller's own diagnosis sees what it used to see."""
+        from mlb_engine.allocate.contest_allocator import _prefilter_candidates
+        bank = self._starvation_bank()
+        K = len(bank)
+        keep, report = _prefilter_candidates(
+            bank, self.STARVATION_ENTRIES, [[False] * K, [False] * K], keep_target=40)
+        self.assertEqual(report["entries_emptied_by_prefilter"], 0)
+        self.assertEqual(report["selectable_in"], 0)
+        self.assertEqual(len(keep), 40)
+
+    # -- (b) ------------------------------------------------------------
+    @staticmethod
+    def _unsatisfiable_bank():
+        """Infeasible at EVERY rung: the same-contest duplicate rule needs one
+        distinct signature per entry and this bank holds two."""
+        out = []
+        for i in range(6):
+            roster = [f"P{i % 2}_{j}" for j in range(10)]
+            out.append({
+                "candidate_id": f"C{i}", "lineup_ids": roster,
+                "player_ids": roster, "sp_ids": roster[:2],
+                "primary_stack": "AAA", "primary_stack_size": 5,
+                "objective": 100.0 - i, "contest_fit_score": 100.0 - i,
+            })
+        return out
+
+    FAILING_CHECK = [{
+        "name": "shared_players_floor", "passed": False,
+        "detail": "9 entries need max_shared_players >= 7; 5 is active",
+        "remedy": "raise max_shared_players to 7",
+    }]
+
+    def test_a_failed_slate_check_stops_the_ladders_at_one_solve(self):
+        """R286 made `CHECKED_CONTROLS` and `LADDER_RELAXED_CONTROLS` disjoint,
+        which is exactly why a re-entry cannot help here: no rung the ladders
+        climb touches the control a failing check names. Measured at HEAD before
+        this fix: 4 solves on this fixture."""
+        entries = [{"entry_id": str(i), "contest_id": "c1",
+                    "contest_shape": "large_wta"} for i in (1, 2, 3)]
+        controls = {"primary_stack_min_size": 4, "five_stack_share_quota": 0.5,
+                    "max_shared_players": 9}
+        blocked_calls, blocked = self._counting_solve(
+            self._unsatisfiable_bank(), entries, controls,
+            feasibility_checks=self.FAILING_CHECK)
+        self.assertFalse(blocked["passed"])
+        self.assertEqual(blocked_calls, 1)
+        self.assertEqual((blocked["primary_stack_floor"] or {})["relaxations"], 0)
+        # The refusal itself is unchanged: the failing check still leads it.
+        self.assertIn("shared_players_floor", blocked["errors"][0])
+
+    def test_the_ladders_still_climb_when_no_slate_check_failed(self):
+        """The guard must be about the FAILING check and nothing else, or (b)
+        would have quietly disabled the ladders R37 and R116 exist for."""
+        entries = [{"entry_id": str(i), "contest_id": "c1",
+                    "contest_shape": "large_wta"} for i in (1, 2, 3)]
+        controls = {"primary_stack_min_size": 4, "five_stack_share_quota": 0.5,
+                    "max_shared_players": 9}
+        passing = [{"name": "shared_players_floor", "passed": True,
+                    "detail": "", "remedy": ""}]
+        for checks in (None, [], passing):
+            calls, result = self._counting_solve(
+                self._unsatisfiable_bank(), entries, controls,
+                feasibility_checks=checks)
+            self.assertFalse(result["passed"])
+            self.assertGreater(calls, 1, f"the ladders stopped climbing for {checks!r}")
+
+    def test_a_check_that_was_not_run_is_not_a_failed_check(self):
+        """R237's rule, arriving through this guard: `passed is None` means the
+        structural inputs were unavailable, and treating that as a failure would
+        disable the ladders on a missing input."""
+        entries = [{"entry_id": str(i), "contest_id": "c1",
+                    "contest_shape": "large_wta"} for i in (1, 2, 3)]
+        unchecked = [{"name": "shared_players_floor", "passed": None,
+                      "detail": "", "remedy": ""}]
+        calls, result = self._counting_solve(
+            self._unsatisfiable_bank(), entries,
+            {"primary_stack_min_size": 4, "five_stack_share_quota": 0.5,
+             "max_shared_players": 9},
+            feasibility_checks=unchecked)
+        self.assertFalse(result["passed"])
+        self.assertGreater(calls, 1)
+
+    # -- (c) ------------------------------------------------------------
+    class _FakeResult:
+        def __init__(self, status, x=None, message="fake", mip_gap=None):
+            self.status = status
+            self.x = x
+            self.message = message
+            self.mip_gap = mip_gap
+
+    def _solve_with_forced_status(self, status, x=None):
+        import scipy.optimize as sopt
+        calls = {"n": 0}
+        real = sopt.milp
+
+        def forced(*a, **kw):
+            calls["n"] += 1
+            return AllocatorTruthTests._FakeResult(status, x=x)
+
+        sopt.milp = forced
+        try:
+            result = select_and_assign_entries(
+                self._unsatisfiable_bank(),
+                [{"entry_id": str(i), "contest_id": "c1",
+                  "contest_shape": "large_wta"} for i in (1, 2, 3)],
+                {"primary_stack_min_size": 4, "five_stack_share_quota": 0.5,
+                 "max_shared_players": 9})
+        finally:
+            sopt.milp = real
+        return calls["n"], result
+
+    def test_status_four_is_neither_a_proof_nor_the_clock(self):
+        """The acceptance criterion for (c): no "proven" anywhere in the
+        payload, and no re-entry. HiGHS status 4 is numerical trouble."""
+        calls, result = self._solve_with_forced_status(4)
+        self.assertFalse(result["passed"])
+        self.assertEqual(calls, 1, "a ladder stepped on a non-proof")
+        self.assertNotIn("proven", json.dumps(result).lower())
+        self.assertEqual(result["allocation_solver_report"]["status"],
+                         "numerical_or_other")
+        self.assertEqual(result["allocation_solver_report"]["binding_constraints"], [])
+        self.assertEqual((result["primary_stack_floor"] or {})["relaxations"], 0)
+
+    def test_status_three_gets_the_same_treatment(self):
+        """Unbounded. Unreachable through this call site -- every variable is
+        bounded in [0, 1] -- so this pins the LABEL rather than a sighting."""
+        calls, result = self._solve_with_forced_status(3)
+        self.assertEqual(calls, 1)
+        self.assertNotIn("proven", json.dumps(result).lower())
+
+    def test_an_unverifiable_incumbent_is_not_a_proof_of_infeasibility(self):
+        """The reachable member of the class, and the reason (c) is worth more
+        than statuses 3 and 4: status 0 with an `x` that fails the integrality
+        check leaves no incumbent, and that used to read as a proof that none
+        exists. It is a solution this module declined to trust."""
+        import numpy as np
+        calls, result = self._solve_with_forced_status(0, x=np.full(64, 0.5))
+        self.assertFalse(result["passed"])
+        self.assertEqual(calls, 1)
+        self.assertNotIn("proven", json.dumps(result).lower())
+
+    def test_a_genuine_infeasibility_still_says_proven_and_still_climbs(self):
+        """(c) must not have turned every refusal into the third label. Status
+        2 is the one case that keeps the reserved word and the ladders."""
+        entries = [{"entry_id": str(i), "contest_id": "c1",
+                    "contest_shape": "large_wta"} for i in (1, 2, 3)]
+        calls, result = self._counting_solve(
+            self._unsatisfiable_bank(), entries,
+            {"primary_stack_min_size": 4, "five_stack_share_quota": 0.5,
+             "max_shared_players": 9})
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["allocation_solver_report"]["scipy_status"], 2)
+        self.assertIn("proven infeasible", result["errors"][0])
+        self.assertGreater(calls, 1)
+
+    def test_the_three_guards_all_read_proven_infeasible_and_slate_blocked(self):
+        """R233. The enumeration, asserted rather than described: every re-entry
+        inside `select_and_assign_entries` is guarded on BOTH conjuncts, so a
+        fourth ladder added later fails here instead of stepping on a non-proof
+        or on an already-failed slate."""
+        source = (REPO / "mlb_engine" / "allocate" / "contest_allocator.py").read_text(
+            encoding="utf-8")
+        tree = ast.parse(source)
+        func = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef)
+                    and n.name == "select_and_assign_entries")
+        reentries = [n for n in ast.walk(func)
+                     if isinstance(n, ast.Return) and isinstance(n.value, ast.Call)
+                     and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
+        self.assertEqual(len(reentries), 3,
+                         f"expected three re-entry ladders, found {len(reentries)}")
+        guards = [n for n in ast.walk(func)
+                  if isinstance(n, ast.If)
+                  and any(isinstance(b, ast.Return) and isinstance(b.value, ast.Call)
+                          and getattr(b.value.func, "id", "") == "select_and_assign_entries"
+                          for b in ast.walk(n))]
+        guarded = 0
+        for node in guards:
+            test = ast.unparse(node.test)
+            if "proven_infeasible" in test and "not slate_blocked" in test:
+                guarded += 1
+        self.assertEqual(guarded, 3,
+                         "a re-entry ladder is not guarded on both conjuncts")
+        # And the verdict it reads is computed from the failing checks, not
+        # inlined per guard, so the three cannot disagree.
+        self.assertIn("slate_blocked = bool(failing_feasibility_checks(feasibility_checks))",
+                      source)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
