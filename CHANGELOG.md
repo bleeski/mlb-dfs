@@ -25,6 +25,71 @@ performance claim.
 
 ---
 
+## 2026-09-04 — R315(a): the gitignore comment said "a timestamped .bak beside a reference file" and the pattern under it only covered `.bak.json`, so ARCHIVE's CSV safety copy read as dirt for five days; and the pattern that would have hidden SEVEN TRACKED files was not added
+
+**Scope: `.gitignore` and `docs/backlog.md`.** Ben asked what to do about the
+ARCHIVE-write-set dirt this session reported at its boot scan. Four buckets came
+out of the diagnosis and only one of them was DEV's to touch; the other three
+are filed as R315(b) and (c) and as a recorded not-a-defect, because the
+multi-session contract's foreign-dirt rule is report-and-leave-alone and
+`data/reference/`, `data/standings/` and `ledger/` are ARCHIVE's.
+
+**Shipped: (a).** `data/reference/*.csv.*backup*` and
+`data/reference/*.csv.bak*` join `*.bak.json` under the comment that already
+described them. `fangraphs_season_pitching.csv.qual-y-backup-20260830` had sat
+in `git status` since 2026-08-30 while the sentence three lines above it said a
+timestamped safety copy beside a reference file is not history.
+
+**Refused, and this is the part worth the entry.** The same reasoning applied to
+`data/standings/standings_pulls_<date>.html` — a dated click-through list
+`awaiting_standings.py` generates from the tracked awaiting-standings markdown,
+which reads exactly like the `PENDING_MINE_*.md` class ignored twelve lines
+above. It was about to be ignored on that reading.
+`git ls-files -i -c --exclude-standard` says **seven of them are TRACKED**
+(2026-08-03, -04, -08, -10, -20, -22, -28), so the pattern would have left seven
+files in the index that git no longer watches, which is worse than either state,
+and the project has evidently been treating the series as history. The check ran
+because the tracked-and-ignored count moved 18 -> 25 when the pattern went in;
+it is back to 18, all of them the pre-existing `data/archive/**/*.zip` rule.
+Whether the series should be tracked at all is ARCHIVE's call, filed as
+R315(b) with the instruction not to ignore it without untracking the seven in
+the same commit. **A gitignore addition is verified by what it HIDES, not by
+what it silences**, and the two patterns that shipped hide zero tracked files.
+
+**Filed, not fixed: R315(c), P1, and it is a defect rather than untidiness.**
+`data/reference/reference_manifest.json` is tracked and has registered
+`statsapi_season_pitching.csv` since the 2026-08-31 refresh; that CSV is
+untracked and not ignored; `tools/stage_slate.py:494` reads it in production as
+the K-rate input behind the F4 prior. The committed manifest points at a file no
+clone has. It degrades rather than crashes — there is a missing-reference
+warning path, pinned at `tests/test_core.py:5757` and `:5957` — which is what
+earns the P1: a fresh clone or a container stages every slate with that prior
+absent and says so only in a warning nobody reads under a lock window. This is
+**R155's exact shape** (a file read through production code that only exists on
+Ben's disk) arriving through a reference refresh instead of a test fixture. One
+`git add` in ARCHIVE's write set; slot 3.
+
+**Recorded as NOT a defect, so the next boot scan does not re-diagnose it.**
+The four modified tracked files under `data/` are one completed baseballsavant
+reference refresh from 2026-08-31T11:34Z, verified as real new data rather than
+a re-serialization by sorting both revisions and diffing (Bregman 610 -> 614 PA;
+pitching 832 -> 834 rows), plus the regenerated awaiting-standings checklist,
+which CLAUDE.md says is regenerated and never hand-maintained. They want
+committing, not fixing. And `ledger/inbox/` holds 114 untracked fragments of
+which 111 are dead: `_CONSUMED_2026-08-22_DO_NOT_REMERGE.md` records that every
+fragment as of 2026-08-22 was already merged and only the deletion is
+outstanding, blocked because a Cowork shell died mid-close-out and this mount
+refuses `rm`. 110 are dated 2026-08-08 to -13; the 2026-09-03 BUILD captain
+fragment is consumed too, since R306 shipped off it. The sweep is `mv` into
+`_to_delete/` per R109 and needs an ARCHIVE session holding the `inbox` claim.
+
+**Landing.** No test count change; `.gitignore` carries no guard a test can
+break, and the check that matters (`git ls-files -i -c --exclude-standard`
+returning zero of my patterns) is recorded above with its before and after
+rather than pinned. Gate unchanged at `PASS v2.26.0 28 modules 1796 tests`.
+
+---
+
 ## 2026-09-03 — R306 steps 1-3: the ownership prior is graded on 297 archived contests instead of one, the Showdown captain slot gets its own 100% market beside a 600% roster market, and the Classic 800/200 split it was using sums to 1000% on that geometry
 
 **Shipped: steps 1, 2 and 3. Steps 4 (feed R307's sleeve) and 5 (the standing

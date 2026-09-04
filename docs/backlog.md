@@ -1489,7 +1489,15 @@ R292 rather than leads it.*
    disagreeing counters, and the Showdown brief that writes no
    `declared_pitchers`; R305 is the mtime feed resolver. Per R233 the fix
    carries the grep enumerating every `Roster Position` Classic-token test.
-3. **R310 + R312 + R313 — three falsehoods with XS remedies** (P1, XS each).
+3. **R315(c) — the tracked manifest that points at an untracked file** (P1,
+   XS, ARCHIVE's one-line fix). `reference_manifest.json` registers
+   `statsapi_season_pitching.csv`; the CSV is untracked and not ignored, and
+   `stage_slate.py:494` reads it in production as the F4 prior's K-rate input.
+   A clone stages every slate with that prior absent and says so only in a
+   warning. R155's shape arriving through a reference refresh. It sits at slot
+   3 rather than in the smalls because it is silent, it is already committed
+   wrong, and the remedy is one `git add`. Then, unchanged:
+   **R310 + R312 + R313 — three falsehoods with XS remedies** (P1, XS each).
    R310: a two-game callup carried APPG 12.5, third-highest in the pool, into
    47.4% exposure with every control reading clean and no warning anywhere;
    the warning half needs no feed. R312: `Portfolio_EV_Proxy`
@@ -1593,7 +1601,10 @@ R292 rather than leads it.*
     §4.10 is recorded on the entry as acceptance criteria. Criterion (2) is the
     instruction to leave it here; Ben may pull it forward or strike it, either
     a one-line edit.
-15. **Smalls, batched opportunistically:** **R306's remainder** (step 5, the
+15. **Smalls, batched opportunistically:** **R315(b)** (the standings_pulls
+    series is half tracked and half dirt; one decision, and do not ignore the
+    pattern without untracking the seven in the same commit), **R306's
+    remainder** (step 5, the
     standing bat-captain portfolio-shape claim — a document edit whose
     measurement is already filed, and whose first question is that
     `MLB_Classic.md` has no Showdown equivalent to put it in), R299 (six intake
@@ -4109,6 +4120,59 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
+
+### R315. A TRACKED reference manifest registers an UNTRACKED CSV that production code reads, so a clone stages every slate with one prior silently absent; plus two gitignore gaps that made ARCHIVE's completed work read as dirt for five days (P1 for (c), XS each) | new 2026-09-04, DEV, from Ben's question about the archive dirt at the boot scan
+
+**(a) SHIPPED 2026-09-04, migrated to CHANGELOG.md.** The `.gitignore` gap on
+reference CSV backups.
+
+**(b) OPEN, ARCHIVE's call, XS.** `data/standings/standings_pulls_<date>.html`
+is written by `awaiting_standings.py` (`--html-out`) as a dated click-through
+list derived from the tracked `CONTESTS_AWAITING_STANDINGS.md`. **Seven are
+tracked** (2026-08-03, -04, -08, -10, -20, -22, -28) and the newest is not, so
+the series is half in history and half dirt. Decide one way: either it is a
+generated convenience list and the seven come out of the index and the pattern
+goes in `.gitignore`, or it is evidence of what was pulled when and the eighth
+gets committed like the others. This was ALMOST ignored on the first reading;
+`git ls-files -i -c --exclude-standard` is what caught that the pattern would
+leave seven files in the index that git no longer watches. Do not ignore it
+without untracking the seven in the same commit.
+
+**(c) OPEN, P1, ARCHIVE's, and this is the one that is a defect rather than
+untidiness.** `data/reference/reference_manifest.json` is TRACKED and, since
+the 2026-08-31 refresh, registers `statsapi_season_pitching.csv` (834 rows,
+source `mlb statsapi season pitching 2026 playerPool=All`).
+**That CSV is untracked and is not ignored**, and
+`tools/stage_slate.py:494` reads it in production as the K-rate input the F4
+prior needs (`fangraphs_pitching` is the variable, renamed input per R278). So
+the committed manifest points at a file no clone has. It degrades rather than
+crashes -- `stage_slate` has a missing-reference warning path, pinned by
+`tests/test_core.py:5757` and `:5957` -- which is what makes it worth a P1: a
+container or a fresh clone stages a slate with that prior absent and says so
+only in a warning nobody is reading under a lock window. **This is R155's exact
+shape** (a file read through production code that only exists on Ben's disk),
+arriving through a reference refresh instead of a test fixture. Fix is one line,
+`git add data/reference/statsapi_season_pitching.csv`, and it is in ARCHIVE's
+write set so DEV reported it rather than taking it (the multi-session
+contract's foreign-dirt rule: report and leave alone).
+
+**Also outstanding and NOT a defect, recorded so the next boot scan does not
+re-diagnose it.** The four modified tracked files under `data/` are one
+completed baseballsavant reference refresh from **2026-08-31T11:34Z**, verified
+as real new data rather than a re-serialization (Bregman 610 -> 614 PA, pitching
+832 -> 834 rows) plus the regenerated awaiting-standings checklist, which
+CLAUDE.md says is regenerated and never hand-maintained. They want committing,
+not fixing. And `ledger/inbox/` holds **114 untracked fragments of which 111
+are dead**: `_CONSUMED_2026-08-22_DO_NOT_REMERGE.md` records that every
+fragment as of 2026-08-22 was already merged and only the DELETION is
+outstanding, blocked because a Cowork shell died mid-close-out and this mount
+refuses `rm`. 110 are dated 2026-08-08 to -13 and the 2026-09-03 BUILD captain
+fragment is now consumed too (R306 shipped off it). The three that must stay:
+`2026-08-28_DEV_3-21-five-stack-line-now-stale.md`,
+`2026-09-03_BUILD_rotowire-rst-vs-structural-prior.md` (R308's source), and the
+five `2026-09-03_DEV_*` grade fragments R306 just filed. The sweep is `mv` into
+`_to_delete/` per R109, and it needs an ARCHIVE session holding the `inbox`
+claim.
 
 ### R306. Steps 1-3 SHIPPED 2026-09-03 and their text MIGRATED to CHANGELOG.md. Open remainder: step 5, the standing portfolio-shape claim about bat captains (P2, XS) | filed 2026-09-03 from BUILD fragment `2026-09-03_BUILD_captain-ownership-is-its-own-market.md`; the shipped three-quarters and both riders live in the changelog entry
 

@@ -50,6 +50,17 @@ data/standings/failed_pulls/
 # CONTESTS_AWAITING_STANDINGS.md, which is tracked
 data/standings/PENDING_MINE_*.md
 
+# R315(b), NOT DONE and deliberately so. `standings_pulls_<date>.html` (the
+# dated click-through list `awaiting_standings.py` writes beside the checklist)
+# looks like the PENDING_MINE_* class above and was about to be ignored on that
+# reasoning. It is not that class: SEVEN of them are already TRACKED
+# (2026-08-03, -04, -08, -10, -20, -22, -28), so this project has been treating
+# them as history, and `git ls-files -i -c` is what said so. Ignoring the
+# pattern would have left seven files in the index that git no longer watches,
+# which is worse than either state. Whether the series should be tracked at all
+# is ARCHIVE's call and it is filed as R315(b); until then the newest one is
+# ordinary uncommitted ARCHIVE work, not residue.
+
 # vendored interpreter state: a local scipy install and its wheel cache, plus the
 # scratch dir. Environment, never history. `export PYTHONPATH=$PWD/.pylibs` is what
 # makes scipy.optimize.milp importable without a network install (2026-08-03).
@@ -79,6 +90,18 @@ data/archive/**/*.zip
 # a timestamped .bak beside a reference file is a session's own safety copy; the
 # tracked file is the record.
 data/reference/*.bak.json
+# R315(a). The comment above says "a timestamped .bak beside a reference file",
+# and the pattern under it only covered `.bak.json`. A session's CSV safety
+# copy therefore read as untracked dirt on every scan while the sentence above
+# said it should not: `fangraphs_season_pitching.csv.qual-y-backup-20260830`
+# sat in `git status` for five days for exactly that reason. Two patterns, both
+# narrowed to `data/reference/` and both requiring a suffix AFTER a real
+# extension, so a genuine reference file can never match. Verified with
+# `git ls-files -i -c --exclude-standard` before adding: these two hide ZERO
+# tracked files. The same check is why the standings_pulls note below says NOT
+# DONE -- that pattern hid seven.
+data/reference/*.csv.*backup*
+data/reference/*.csv.bak*
 
 # files a session finished with and could not delete: the sandbox denies rm on the
 # mount. Ben empties this folder; nothing here is history and nothing reads it.
