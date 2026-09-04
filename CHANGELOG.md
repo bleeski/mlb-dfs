@@ -25,6 +25,128 @@ performance claim.
 
 ---
 
+## 2026-09-03 — Board: the eleventh greenfield edition is merged (R304-R314 filed, nine riders, three findings rejected, one severity raised), the eleven-fragment inbox is consumed, and the queue is reordered on Ben's leverage-first instruction (docs only)
+
+**Scope: docs only.** This commit touches `docs/backlog.md` and moves ten
+consumed fragments out of `docs/backlog_inbox/`. No code, no test, no contract
+file. The gate was not run and that is stated rather than skipped quietly, per
+the precedent set by the 2026-08-27 board commit.
+
+**Ben's instruction, 2026-09-03**, which is the ordering rule the new list
+applies: prioritize what helps win a large prize, leverage above all;
+deprioritize large technical lifts; respect technical dependencies; and for
+"impactful but challenging" or "easy but limited", adjudicate rather than hand
+the choice back. That replaces the 09-02 six-clause rule as the TIEBREAKER
+without contradicting it. The list runs 1 through 18, counted rather than
+inherited; it was twelve.
+
+**What the eleventh edition actually was, and this is the useful finding about
+it.** Twenty-two of its thirty-five defects are entries already on this board,
+checked as such rather than re-filed: D01/D02/D03/D17 = R297(a)(b)(c)(e);
+D04/D05/D06 = R294; D07-D10 = R295; D14/D15/D16 = R298; D18 = R290(a); D20 and
+D28 = R303 and R36 Finding 6; D21-D26 = R299; D27 = R216+R217+R218+R180; D30 =
+R225+R226; D32 = R41. It also verified five closures the board had already
+recorded (R291, R292, R296, R290(c), R293). Its genuinely new material is five
+findings, and **four of those five had already been filed the same day as
+fragments by BUILD sessions that hit them in the field**, which is the ratio
+worth recording: an outside audit that mostly reproduces the board is a check on
+the board and is worth exactly that much.
+
+**Three findings REJECTED, with the reason on each.** *D34* (the audited runtime
+lacks numpy/pandas/scipy) measured the auditor's own Windows host, not the
+repository; CLAUDE.md's R271(c) already records that Ben's Windows Python has no
+scipy, that `.pylibs/` is a Linux build, and that the gate is the session's job.
+Its one usable sliver, refusing to print the PASS line across mixed runtime
+identities, rides R217. *D29* (ZIP resource limits) was adjudicated and
+severity-reduced on this board already under the outside spec's own D26; R44
+owns that tool. *§4.10's p95 service levels* are targets for a system that does
+not exist and are recorded on R302 as acceptance criteria, not filed as work.
+
+**Two corrections to the edition, both checked in the tree rather than read.**
+*D11 claims "the Classic and Showdown brief paths now write `declared_pitchers`,
+so the remaining live failure is the geometry test." That is FALSE for
+Showdown*, and it is the point of the finding: an AST-bounded count over
+`run_showdown` (`build_slate.py:3203-3920`) returns ZERO occurrences of either
+`declared_pitchers` or `declare_pitcher`, while the Classic paths write it at
+`:2692` and `:2744` and have since R104 (`7730190`). So both ends of the
+declaration escape hatch are out at once on the one geometry where the flag is
+broken, which is worse than what was filed and is R304(d). *D19's severity is
+RAISED* from R303's hygiene tail to P1 and promoted to R313: the mechanism is a
+reduction of the LEGAL PLAYER POOL, invisible in the certified output, which
+CLAUDE.md's hard guardrails name as the forbidden move. R289 was filed on the
+mirror image (an instructed restriction silently dropped); the board had one
+P0-adjacent and the other in a thirty-item hygiene list.
+
+**Eleven new numbers, R304-R314.** R304 the Showdown declaration hatch out at
+both ends (measured cost on 1235_1g_sd: a legal-pool reduction taken because a
+referee could not read a declaration, 11 of 17 entries with no pitcher,
+pitcher-captain share 23.5% against a 47.1% ceiling). R305 the preflight feed
+resolver picking by mtime (two field sightings on 09-03, one of them a Classic
+six-game file cross-checked against a one-game Showdown feed). R306 the captain
+ownership market, eight archived contests measured individually. R307 the
+captain leverage sleeve, with three measured negative results. R308 external
+field ownership in the build loop. R309 QA as a research arm. R310 APPG as a
+Base prior on a sub-5-game callup. R311 R157's interaction bind with no
+derivable floor. R312 the `Portfolio_EV_Proxy` label. R313 the forbidden-core
+shrink. R314 `check_started_games` with no postponed exemption.
+
+**Nine riders**, each on an existing owner rather than a new number: R285 (the
+09-03 BANK-LIMITED field sighting plus ed11's typed-refusal envelope, which is
+D13's whole content, so D13 gets no number), R236(b) (the measured
+three-rung odds transport ladder and the two Action Network traps, D35), R254
+(the APPG role-collapse mechanism, which is the sharpest thing in the captain
+fragments), R251 (the evidence file), R217 (D34's surviving sliver), R118 (ed11
+§4.7's exact tie-split settlement, sharper than F-48's statement), R302 (ed11 §4
+as independent corroboration plus the p95 acceptance table), R297 ((d) pulled
+forward to slot 4), R303 (R313 promoted out; `coerce_excluded_column` added with
+the decision named as DELETE).
+
+**The three ordering adjudications, so they can be reversed by whoever
+disagrees.** PROMOTED to slots 1-2: R306. Its step 1 is the cheapest leverage
+unlock on the board and needs no new code at all: `ownership_pred.py grade`,
+`actuals_from_standings`, `grade_prediction` and `ledger_block` all exist, 27
+archive dates and 53 Showdown-parsing standings files are on disk, and
+`grep -rn "Ownership prior grade" ledger/` returns ZERO blocks. One grade has
+ever been run and it lives in a module docstring. The constraint was never
+sample count; it is that nothing's loop calls `grade`. DEMOTED: R118 from slot 2
+to slot 10, on criterion (2), because nothing in slots 1-9 depends on it and six
+weeks of not building it is evidence about how a head slot gets spent; it keeps
+its whole Tier 2 tail and still gates R302. DEMOTED and unchanged in substance:
+R302 to slot 16.
+
+**R233 enumeration, because this entry claims a class was swept.** The class is
+"unconsumed fragments in `docs/backlog_inbox/`". `ls docs/backlog_inbox/*.md`
+returned ELEVEN files; ten are consumed by this commit and moved to
+`_to_delete/backlog_inbox_2026-09-03/` (this mount cannot unlink, R109):
+`2026-09-02_BUILD_r157-interaction-bind-has-no-derivable-floor.md` → R311;
+`2026-09-02_DEV_coerce-excluded-column-has-no-caller.md` → R303 rider;
+`2026-09-02_DEV_started-games-has-no-postponed-exemption.md` → R314;
+`2026-09-03_BUILD_appg-base-is-broken-for-sub-5-game-callups.md` → R310;
+`2026-09-03_BUILD_autobuild-bank-limited-and-stale-preflight-feed.md` → R285
+rider (a) and R305 (b);
+`2026-09-03_BUILD_captain-leverage-and-qa-as-research-arm.md` → R307, R309 and
+the R254 rider;
+`2026-09-03_BUILD_captain-ownership-is-its-own-market.md` → R306;
+`2026-09-03_BUILD_declare-pitcher-inoperable-on-showdown-geometry.md` → R304;
+`2026-09-03_BUILD_external-ownership-pull-is-not-in-the-build-loop.md` → R308;
+`2026-09-03_BUILD_odds-fallback-ladder-action-network.md` → R236(b) rider. **The
+eleventh survives DELIBERATELY and is named with its reason**, per the rule that
+a kept copy is named in the entry:
+`2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md` carries its own
+DO-NOT-DELETE header, is the sole carrier of the nine-family ticket_count table
+and of the four cautions in "Four things to get right on the way in", and is
+exempt until ARCHIVE writes those rows into
+`data/reference/dk_contest_archetypes.csv`. It has now survived four inbox
+passes rather than three.
+
+**Verified after the edit rather than asserted:** the numbered list parses as
+contiguous slots 1 through 18; no `###` R-header is duplicated anywhere in the
+file; R304 through R314 all resolve to an entry; every R-number cited in the
+queue resolves to a `###` entry in this file except R235, which is shipped and
+lives in this changelog (7 hits). One defect was found by that check and fixed:
+the slot-12 rewrite had eaten slot 13's opening line, which the contiguity
+assertion caught and a header read would not have.
+
 ## 2026-09-03 — R293: the augmentation skip was pointing at the wrong team, the anti-correlation control reached neither bank, and the brief's `applied` was reading the flag that requested it
 
 Three things move: the skip's DIRECTION, the control's REACH, and where
