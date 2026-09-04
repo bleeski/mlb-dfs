@@ -4075,6 +4075,58 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ### R306. The captain slot is its own ownership market and the prior has no concept of it: the budgets are 100%/600% and not 200%/800%, the captain market is a different temperature, captains concentrate on ARMS, and person-level ownership correlates with captain ownership between 0.33 and 0.85 (P1; step 1 XS-S, steps 2-3 S-M) | new 2026-09-03, merged from BUILD fragment `2026-09-03_BUILD_captain-ownership-is-its-own-market.md`; eight archived Showdown contests measured individually, never pooled
 
+**Rider 2026-09-03 (DEV, while drafting the next-session prompt): the sample is
+FIVE TIMES what the fragment measured, the actuals need no re-mine, and the
+fragment's own stated caveat is partly relieved. All three change the fix
+estimate, so they are recorded here rather than left for the session to
+rediscover.**
+
+**(i) `entries[]` with `captain_norm` and `players_norm` is STORED in every
+mined file, so step 3 needs no re-mine and no new parsing.** Measured at HEAD
+over `data/archive/*/mined_*.json`: 379 files, `contest_type` 243 classic / 132
+showdown / 4 null, and a Showdown row carries
+`['captain_norm', 'chalk_score', 'entry_id', 'lineup_complete', 'max_stack',
+'n_cheap', 'players_norm', 'points', 'rank', 'salary_left', 'salary_used',
+'sp_pair', 'stack_pattern', 'username']`. Filtering to `lineup_complete` and
+counting `captain_norm` is the whole of the actuals step.
+
+**(ii) But R39's `captain_table` is ABSENT from all 379 files, so do not build on
+it.** `field_miner.py:991-1003` computes `captain_freq` and a `captain_table`
+carrying `captain_share_pct` beside `pct_drafted`, capped at
+`most_common(8)`. Measured: the key is absent (not present-and-empty) in **379
+of 379** mined files, including all 132 Showdown ones. The producer exists and
+has never reached a stored artifact, so a session reading the code would
+reasonably conclude the actuals are already aggregated on disk, and they are
+not. Two consequences: derive from `entries[]` per (i) rather than from
+`captain_table`, and the `most_common(8)` truncation would have capped the
+distribution anyway, which matters because the median contest has 12 distinct
+captains. Whether `captain_table` should be backfilled by a re-mine is ARCHIVE's
+call and is not this item's blocker.
+
+**(iii) 41 archived Showdown contests are usable, not 8, and the field-size range
+relieves part of the fragment's own caveat.** Filtering to Showdown files with at
+least 10 complete entries carrying a captain: **41 contests**, field sizes min 20
+/ median 39 / **max 1177**, with two more at 163 and 169. So the archive is not
+only the 39-to-48-entry satellites the fragment measured, and conditioning on
+field size is now possible rather than aspirational, which is what the ledger's
+conditioning rule wants anyway. The self-inclusion bias still applies to the
+small fields and does not vanish; it is diluted, not removed, and a 1,177-entry
+contest is a different archetype rather than a bigger version of the same one.
+
+**Finding (a) REPLICATED on the larger sample, exactly.** Captain shares sum to
+100.0 and person shares to 600.0 in **all 41 of 41**, one distinct value each,
+which is the accounting identity the fragment asserted from eight. **Finding (b)
+replicated and widened:** distinct captains per contest min 6 / median 12 / max
+21, and top-captain share min 15.7% / median 32.7% / max 52.2%, against the
+fragment's 8-13 and 16-58% from eight contests. Finding (c), the arm
+concentration, is NOT re-measured here because it needs a position join the
+mined row does not carry, and it stays the fragment's eight-contest observation
+until step 1 does it properly.
+
+Every number above is an observed count from an archived DK standings export or
+a deterministic statistic over one. Nothing here is a win rate, a cash rate, an
+edge or a probability, and none of it calibrates anything on its own.
+
 **What already exists, stated first so the gap is not misread as "ownership is
 unbuilt".** `mlb_engine/field/ownership_prior.py` and `tools/ownership_pred.py`
 are a real predict-then-grade loop. `emit` writes a per-player structural prior
