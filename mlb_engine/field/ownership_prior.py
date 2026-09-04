@@ -160,8 +160,297 @@ def _check_shape_projection() -> None:
 
 _check_shape_projection()
 
+def archetype_for_contest_facts(
+    contest_type: object,
+    field_size: object,
+    max_entries: object,
+) -> Optional[Tuple[str, str]]:
+    """(archetype, EXACT|COLLAPSED) from the facts an ARCHIVED contest carries.
+
+    R306 step 1. Grading the archive means answering "which archetype was this
+    contest" for a contest that is over, and the only facts on disk for one are
+    its DK name (which the name-archetype layer turns into a ``contest_type``),
+    its field size, and an inferred max-entries. There is no prize pool and no
+    payout schedule, so there is no ``ContestCard`` to hand
+    ``contest_shape_for_card``.
+
+    The temptation is a second classifier here. That is the exact bug
+    ``ARCHETYPE_BY_CONTEST_SHAPE``'s own comment was written against: ownership
+    is CONDITIONED on archetype, so a second answer to "which archetype is this
+    contest" is a pooling bug waiting to happen. So this does not decide a
+    shape. It CALLS ``contest_shape_for_card`` on a card carrying the three
+    facts, and the import check below proves the fields it had to invent to
+    build that card (buy-in, prize pool, payout rows, ticket count) cannot
+    reach the answer: for every contest type and every field-size band, the
+    archetype is invariant under all of them. If a future edit makes one of
+    them matter, the check fails at import rather than silently pricing an
+    archived contest against the wrong crowd.
+
+    None, never a default, for a contest type this cannot resolve -- same
+    reasoning as ``archetype_for_contest_shape`` above.
+    """
+    from mlb_engine.allocate.contest_allocator import (
+        CONTEST_TYPES, ContestCard, contest_shape_for_card,
+    )
+
+    ctype = str(contest_type or "").strip().lower()
+    if ctype not in CONTEST_TYPES:
+        return None
+    try:
+        size = int(field_size)
+    except (TypeError, ValueError):
+        return None
+    if size <= 0:
+        return None
+    try:
+        entries = int(max_entries)
+    except (TypeError, ValueError):
+        entries = 1
+    card = ContestCard(contest_id="", name="", contest_type=ctype,
+                       field_size=size, max_entries=max(1, entries),
+                       buy_in=0.0, prize_pool=0.0)
+    return archetype_for_contest_shape(contest_shape_for_card(card))
+
+
+# The bands ``contest_shape_for_card`` splits field size on, plus one value
+# either side of each boundary. Used only by the import check below; a band
+# table that drifts from the allocator's thresholds makes the check weaker,
+# never wrong, because the check calls the allocator rather than these numbers.
+_FIELD_SIZE_PROBES: Tuple[int, ...] = (1, 20, 500, 501, 5000, 5001, 100000)
+
+
+def _check_contest_fact_projection() -> None:
+    """The invented card fields cannot reach the archetype. Checked at import.
+
+    ``archetype_for_contest_facts`` builds a ``ContestCard`` with a zero buy-in,
+    a zero prize pool, no payout rows and no ticket count, because an archived
+    contest carries none of them. That is only safe while the archetype does
+    not depend on them. This asserts it by construction rather than by reading
+    the allocator's branches: for every contest type and field-size probe, vary
+    each invented field and require one distinct archetype.
+    """
+    from mlb_engine.allocate.contest_allocator import (
+        CONTEST_TYPES, ContestCard, PayoutRow, contest_shape_for_card,
+    )
+
+    variants = (
+        {},
+        {"buy_in": 25.0, "prize_pool": 100000.0},
+        {"satellite_tickets": 1},
+        {"satellite_tickets": 40},
+        {"payout_rows": [PayoutRow(1, 1, 100.0)]},
+        {"payout_rows": [PayoutRow(1, 50, 5.0)]},
+    )
+    for ctype in sorted(CONTEST_TYPES):
+        for size in _FIELD_SIZE_PROBES:
+            for entries in (1, 20, 150):
+                seen = set()
+                for extra in variants:
+                    kwargs = {"contest_id": "", "name": "",
+                              "contest_type": ctype, "field_size": size,
+                              "max_entries": entries, "buy_in": 0.0,
+                              "prize_pool": 0.0}
+                    kwargs.update(extra)
+                    seen.add(archetype_for_contest_shape(
+                        contest_shape_for_card(ContestCard(**kwargs))))
+                if len(seen) != 1:
+                    raise ImportError(
+                        "archetype_for_contest_facts invents buy-in, prize pool, "
+                        "payout rows and ticket count, and one of them now "
+                        f"reaches the archetype: contest_type={ctype!r} "
+                        f"field_size={size} max_entries={entries} yields "
+                        f"{sorted(str(s) for s in seen)}. Resolve the archived "
+                        "contest's real value or refuse; do not default it.")
+
+
 HITTER_BUDGET_PCT = 800.0   # 8 hitter slots per roster
 PITCHER_BUDGET_PCT = 200.0  # 2 P slots per roster
+
+# R306. A DK SHOWDOWN roster is one CPT plus five UTIL, so across a contest the
+# captain slot's shares sum to 100% and the six-slot person market's to 600%.
+# Measured at exactly those two values in all 41 of 41 archived Showdown
+# contests carrying at least 10 complete entries with a captain -- one distinct
+# value each, which is an accounting identity and not an estimate. The Classic
+# 800/200 pair above has no Showdown analogue and this module carried only it.
+CAPTAIN_BUDGET_PCT = 100.0          # 1 CPT slot per Showdown roster
+SHOWDOWN_ROSTER_BUDGET_PCT = 600.0  # 6 roster slots per Showdown roster
+
+# R306. The captain slot's own concentration and pitcher tilt, per archetype.
+# LABELED PRIORS, exactly like ARCHETYPE_PARAMS above, and read only by
+# ``predict_captain_ownership``.
+#
+# HOW THESE WERE SET, because "fit per archetype" would overstate it. The
+# archive's usable Showdown contests are 37 of 41 `wta_satellite` and the
+# remaining four resolve to no archetype at all, so ONE archetype has evidence
+# and five do not. Pretending to six fits would be six numbers with one
+# measurement behind them. Instead: `wta_satellite` carries values jointly fit
+# against the 41 archived contests, and every other archetype carries its
+# ROSTER temperature scaled by CAPTAIN_TEMPERATURE_RATIO -- one relationship,
+# stated once, that says the captain market is more concentrated than the
+# roster market by the factor the fitted archetype shows. A five-archetype
+# table of independently invented numbers would read as five measurements.
+#
+# THE FIT, and what it can and cannot claim. Two parameters against two
+# measured medians over the 41 contests: realized top-captain share 32.7% and
+# realized arm share of the captain slot 52.2%. A joint grid settles at
+# temperature 0.13 and pitcher weight 0.10, reproducing 32.5% and 51.9%, both
+# gaps under half a point. Three properties of that fit are worth stating
+# because each one bounds what the number means.
+#
+#   Temperature buys NO ordering, and that is analytic rather than lucky. A
+#   softmax is monotone in the score and Spearman is computed on ranks, so
+#   every temperature yields the identical ordering: median Spearman sits at
+#   0.746-0.750 across the whole swept range. Temperature is therefore fit to
+#   CONCENTRATION only, and no setting of it can spend magnitude the project
+#   does not have.
+#
+#   The pitcher tilt is small but it is NOT decoration. Pinned at zero,
+#   temperature alone cannot reach both targets: the best achievable worst-gap
+#   is 7.3 points, with the arm share stuck at 44.9% against a realized 52.2%.
+#   It is also nearly ordering-neutral (median Spearman 0.747 at zero against
+#   0.746-0.750 fitted, and the WORST contest gets slightly worse, 0.311 ->
+#   0.286), which corrects the naive reading of the archive's arm skew: arms
+#   are the most expensive players on a Showdown slate, so a salary percentile
+#   over one pool already ranks them at the top and the tilt is doing
+#   concentration work, not ranking work.
+#
+#   The fit was made with the implied-total and value tilts INERT, because an
+#   archived slate carries no odds packet joined to the contest and no Base
+#   map. A live emit supplies both, so a live captain distribution is shaped by
+#   inputs the fit never saw. Treat the fitted concentration as a floor on how
+#   sharp this market is, not as a setting validated end to end.
+#
+# THE ZERO TAIL BELONGS IN THE GRADE, and leaving it out is not conservative.
+# On a Showdown slate the salary file IS the contest's player pool, so a player
+# nobody captained has an OBSERVED captain share of 0.0 -- an observed count,
+# not a missing value, and a different fact from the Classic case
+# ``own_by_player_norm`` is careful about, where DK simply lists no share.
+# Grading only the players who WERE captained truncates the sample at the end
+# the prior is most likely to get wrong, and it does not bias in a predictable
+# direction: on the same 41 contests, dropping the tail moves median Spearman
+# from 0.547 to 0.746 on the captain market and from 0.618 to 0.499 on the
+# roster market. Up on one, down on the other. Both grade paths zero-fill the
+# pool.
+#
+# Neither parameter is calibrated and neither may reach the optimizer. R154's
+# ruling holds here and is if anything sharper: spend the ORDERING, spend none
+# of the magnitude.
+CAPTAIN_TEMPERATURE_RATIO = 0.1733
+CAPTAIN_PITCHER_WEIGHT = 0.10
+
+CAPTAIN_ARCHETYPE_PARAMS: Dict[str, Dict[str, float]] = {
+    name: {
+        "temperature": round(params["temperature"] * CAPTAIN_TEMPERATURE_RATIO, 4),
+        "captain_pitcher_weight": CAPTAIN_PITCHER_WEIGHT,
+        "value_weight": params["value_weight"],
+        "fitted": 0.0,
+    }
+    for name, params in ARCHETYPE_PARAMS.items()
+}
+CAPTAIN_ARCHETYPE_PARAMS["wta_satellite"].update(
+    {"temperature": 0.13, "captain_pitcher_weight": 0.10, "fitted": 1.0})
+
+# R306. The six-slot Showdown ROSTER market's own parameters. Same structure,
+# same one fitted archetype, same joint grid, against its own two measured
+# medians over the same 41 contests: realized top-PERSON share 69.8% and
+# realized arm share of the six-slot market 114.3%. Settles at temperature 0.17
+# and pitcher weight -0.10, reproducing 69.4% and 115.1%.
+#
+# THE PITCHER WEIGHT IS NEGATIVE HERE AND POSITIVE ON THE CAPTAIN SLOT, and
+# that sign flip is the R306 finding stated in one parameter each. Relative to
+# where salary rank alone puts them, the field UP-weights arms for the captain
+# slot and DOWN-weights them across the six roster slots: a zero weight
+# predicts 156.5% arm share against a realized 114.3%, because two arms sit at
+# the top of a Showdown salary file and a lineup can only usefully hold so many
+# of them. A single ownership number cannot carry both signs, which is the
+# mechanism behind a 60%-rostered player landing at 6% captain.
+#
+# This table exists because the Classic 800/200 split is not the Showdown
+# geometry, not because the roster market needed re-modelling.
+SHOWDOWN_ROSTER_TEMPERATURE_RATIO = 0.2267
+SHOWDOWN_ROSTER_PITCHER_WEIGHT = -0.10
+
+SHOWDOWN_ROSTER_ARCHETYPE_PARAMS: Dict[str, Dict[str, float]] = {
+    name: {
+        "temperature": round(params["temperature"]
+                             * SHOWDOWN_ROSTER_TEMPERATURE_RATIO, 4),
+        "roster_pitcher_weight": SHOWDOWN_ROSTER_PITCHER_WEIGHT,
+        "value_weight": params["value_weight"],
+        "fitted": 0.0,
+    }
+    for name, params in ARCHETYPE_PARAMS.items()
+}
+SHOWDOWN_ROSTER_ARCHETYPE_PARAMS["wta_satellite"].update(
+    {"temperature": 0.17, "roster_pitcher_weight": -0.10, "fitted": 1.0})
+
+SHOWDOWN_ROSTER_NOTE = (
+    "UNCALIBRATED STRUCTURAL PRIOR over the six-slot SHOWDOWN ROSTER market, "
+    "budget 600%. `predict_ownership`'s 800/200 split is the CLASSIC roster "
+    "and sums to 1000% on a Showdown file, which is no contest's accounting. "
+    "Fit only on `wta_satellite`, the one archetype the archive covers. Never "
+    "a win rate, an ROI figure, a cash rate, or a probability claim; never fed "
+    "to the optimizer, to projections, or to Ownership_Tier."
+)
+
+CAPTAIN_NOTE = (
+    "UNCALIBRATED STRUCTURAL PRIOR over the SHOWDOWN CAPTAIN SLOT, a separate "
+    "100% budget from the 600% six-slot roster prior beside it. Fit only on "
+    "`wta_satellite`, the one archetype the archive covers; every other "
+    "archetype carries its roster temperature scaled by one stated ratio. "
+    "Never a win rate, an ROI figure, a cash rate, or a probability claim; "
+    "never fed to the optimizer, to projections, or to Ownership_Tier. The "
+    "archive it was swept against is small-field satellites in which Ben's own "
+    "entries sit in the denominator, so the concentration it reproduces "
+    "carries a self-inclusion bias that a larger sample dilutes and does not "
+    "remove."
+)
+
+
+def _check_captain_params() -> None:
+    """Every params table covers the same archetypes. Checked at import.
+
+    An archetype in one table and not another is a caller getting a captain
+    distribution for a contest whose roster distribution came from a different
+    archetype, or a KeyError at emit time on a live slate. Cheap to assert
+    here, expensive to find there.
+    """
+    for label, table, weight_key in (
+        ("CAPTAIN_ARCHETYPE_PARAMS", CAPTAIN_ARCHETYPE_PARAMS,
+         "captain_pitcher_weight"),
+        ("SHOWDOWN_ROSTER_ARCHETYPE_PARAMS", SHOWDOWN_ROSTER_ARCHETYPE_PARAMS,
+         "roster_pitcher_weight"),
+    ):
+        missing = sorted(set(ARCHETYPE_PARAMS) - set(table))
+        extra = sorted(set(table) - set(ARCHETYPE_PARAMS))
+        if missing or extra:
+            raise ImportError(
+                f"{label} must cover ARCHETYPE_PARAMS exactly; "
+                f"missing {missing}, unknown {extra}")
+        for name, params in sorted(table.items()):
+            for key in ("temperature", weight_key, "value_weight"):
+                if key not in params:
+                    raise ImportError(f"{label}[{name!r}] is missing {key!r}")
+            if float(params["temperature"]) <= 0.0:
+                raise ImportError(
+                    f"{label}[{name!r}] temperature must be positive; a "
+                    "non-positive temperature makes the softmax a point mass "
+                    "and the whole budget lands on one player")
+    # The two Showdown budgets are the DK roster: one captain plus five UTIL.
+    # A drift in either constant silently rebases every share this module
+    # emits for a Showdown slate, and the 100/600 pair is an accounting
+    # identity measured at exactly those values in 41 of 41 archived contests.
+    if CAPTAIN_BUDGET_PCT <= 0 or SHOWDOWN_ROSTER_BUDGET_PCT <= 0:
+        raise ImportError("Showdown budgets must be positive")
+    if round(SHOWDOWN_ROSTER_BUDGET_PCT / CAPTAIN_BUDGET_PCT, 6) != 6.0:
+        raise ImportError(
+            "the Showdown roster budget must be six times the captain budget: "
+            "a DK Showdown roster is one CPT plus five UTIL, so the person "
+            f"market sums to 600% and the captain slot to 100%, not "
+            f"{SHOWDOWN_ROSTER_BUDGET_PCT}/{CAPTAIN_BUDGET_PCT}")
+
+
+_check_contest_fact_projection()
+_check_captain_params()
 
 # Batting-order attention prior: earlier slots draw more ownership. Distinct
 # from the engine's F2 (a scoring factor); this is a field-behavior prior.
@@ -315,6 +604,218 @@ def predict_ownership(
             "ledger; the fitted replacement takes a tracked project slot."
         ),
     }
+
+
+def _single_pool_shares(
+    records: List[Dict[str, Any]],
+    temperature: float,
+    pitcher_weight: float,
+    value_weight: float,
+    implied: Mapping[str, float],
+    orders: Mapping[str, int],
+    sp_set: Iterable[str],
+    bases: Mapping[str, float],
+) -> Dict[str, float]:
+    """Softmax shares (summing to 1.0) over ONE pool of PEOPLE.
+
+    The Showdown core, shared by both distributions below. The roster prior
+    above scores hitters and pitchers in separate pools because a Classic
+    roster fills 8 and 2 slots from separate menus; a Showdown roster fills six
+    interchangeable slots and a captain fills one, both from the whole field,
+    so the salary percentile is taken over every player rather than within a
+    position pool.
+
+    One function rather than two near-copies: the two Showdown distributions
+    differ only in their temperature, their pitcher weight and their budget,
+    and a second copy of this scoring is how the captain and roster halves
+    would end up disagreeing about what a player's structural score is.
+    """
+    if not records:
+        return {}
+    sp = {str(x) for x in sp_set}
+    salaries = sorted(r["salary"] for r in records)
+
+    def pct_of(value: float, ordered: List[float]) -> float:
+        below = sum(1 for s in ordered if s < value)
+        equal = sum(1 for s in ordered if s == value)
+        return (below + 0.5 * equal) / max(len(ordered), 1)
+
+    value_pool: List[Tuple[str, float]] = []
+    for r in records:
+        base = bases.get(r["id"])
+        if base is not None and r["salary"] > 0:
+            value_pool.append((r["id"], base / (r["salary"] / 1000.0)))
+    value_sorted = sorted(v for _, v in value_pool)
+    value_pct = {pid: pct_of(v, value_sorted) for pid, v in value_pool}
+
+    scores: Dict[str, float] = {}
+    for r in records:
+        score = pct_of(r["salary"], salaries)
+        if _is_pitcher(r["positions"]):
+            if r["id"] in sp:
+                score += float(pitcher_weight)
+            else:
+                # A Showdown salary file lists the day's relievers too and the
+                # field does not roster them. Same discount the Classic prior
+                # applies to a non-probable arm.
+                score -= 0.80
+        else:
+            team_implied = implied.get(r["team"], LEAGUE_MEAN_IMPLIED)
+            score += 0.35 * (team_implied - LEAGUE_MEAN_IMPLIED)
+            slot = orders.get(r["id"])
+            if slot is not None:
+                score += ORDER_ATTENTION.get(int(slot), 0.90) - 1.0
+            else:
+                score -= 0.15
+        if r["id"] in value_pct:
+            score += float(value_weight) * (value_pct[r["id"]] - 0.5)
+        scores[r["id"]] = score
+    return _softmax_shares(scores, temperature)
+
+
+def _showdown_prediction(
+    salary_players: Iterable[Any],
+    archetype: str,
+    params_table: Mapping[str, Mapping[str, float]],
+    budget_pct: float,
+    pitcher_weight_key: str,
+    note: str,
+    implied_total_by_team: Optional[Mapping[str, float]],
+    batting_order_by_player_id: Optional[Mapping[str, int]],
+    probable_sp_ids: Optional[Iterable[str]],
+    base_projection_by_player_id: Optional[Mapping[str, float]],
+    archetype_params: Optional[Mapping[str, Mapping[str, float]]],
+) -> Dict[str, Any]:
+    """One Showdown distribution: shares over one pool, scaled to one budget."""
+    table = {k: dict(v) for k, v in params_table.items()}
+    if archetype_params:
+        table.update({k: dict(v) for k, v in archetype_params.items()})
+    params = table.get(str(archetype), table[DEFAULT_ARCHETYPE])
+
+    implied = {str(k).strip().upper(): float(v)
+               for k, v in (implied_total_by_team or {}).items()}
+    orders = {str(k): int(v) for k, v in (batting_order_by_player_id or {}).items()}
+    bases = {str(k): float(v)
+             for k, v in (base_projection_by_player_id or {}).items()}
+
+    records = [_player_record(p) for p in salary_players]
+    shares = _single_pool_shares(
+        records,
+        temperature=float(params["temperature"]),
+        pitcher_weight=float(params[pitcher_weight_key]),
+        value_weight=float(params["value_weight"]),
+        implied=implied, orders=orders,
+        sp_set=probable_sp_ids or [], bases=bases,
+    )
+    own = {pid: round(share * float(budget_pct), 2)
+           for pid, share in shares.items()}
+
+    ordered = sorted(shares.items(), key=lambda kv: (-kv[1], kv[0]))
+    tiers: Dict[str, str] = {}
+    for rank, (pid, _) in enumerate(ordered):
+        frac = rank / max(len(ordered) - 1, 1)
+        tiers[pid] = "High" if frac <= 0.15 else ("Low" if frac >= 0.60 else "Mid")
+
+    return {
+        "own_pct_by_player_id": own,
+        "tier_by_player_id": tiers,
+        "archetype": str(archetype),
+        "params": dict(params),
+        "prior_version": VERSION,
+        "budget_pct": float(budget_pct),
+        "note": note,
+    }
+
+
+def predict_showdown_roster_ownership(
+    salary_players: Iterable[Any],
+    archetype: str = DEFAULT_ARCHETYPE,
+    implied_total_by_team: Optional[Mapping[str, float]] = None,
+    batting_order_by_player_id: Optional[Mapping[str, int]] = None,
+    probable_sp_ids: Optional[Iterable[str]] = None,
+    base_projection_by_player_id: Optional[Mapping[str, float]] = None,
+    archetype_params: Optional[Mapping[str, Mapping[str, float]]] = None,
+) -> Dict[str, Any]:
+    """The six-slot SHOWDOWN ROSTER prior, budget 600%. R306 step 2.
+
+    ``predict_ownership`` above allocates 800% to hitters and 200% to pitchers
+    because that is the Classic roster. Handed a Showdown salary file it does
+    the same thing and the shares sum to 1000%, which is not any contest's
+    accounting: a Showdown roster is six people, so the person market sums to
+    600% -- measured at exactly 600.0 in all 41 of 41 archived Showdown
+    contests. The Classic function is left alone rather than taught a second
+    geometry, because every one of its callers is a Classic caller and a
+    geometry flag on it is the shape of defect this project keeps paying for.
+
+    This does NOT undo R235's CPT/UTIL person collapse. The collapse produces
+    one row per PERSON, which is exactly the grain a 600% person market wants;
+    this allocates the six-slot budget over those people, and
+    ``predict_captain_ownership`` allocates the one-slot budget over the same
+    people. Two allocations, one collapsed pool.
+    """
+    return _showdown_prediction(
+        salary_players, archetype, SHOWDOWN_ROSTER_ARCHETYPE_PARAMS,
+        SHOWDOWN_ROSTER_BUDGET_PCT, "roster_pitcher_weight",
+        SHOWDOWN_ROSTER_NOTE, implied_total_by_team,
+        batting_order_by_player_id, probable_sp_ids,
+        base_projection_by_player_id, archetype_params)
+
+
+def predict_captain_ownership(
+    salary_players: Iterable[Any],
+    archetype: str = DEFAULT_ARCHETYPE,
+    implied_total_by_team: Optional[Mapping[str, float]] = None,
+    batting_order_by_player_id: Optional[Mapping[str, int]] = None,
+    probable_sp_ids: Optional[Iterable[str]] = None,
+    base_projection_by_player_id: Optional[Mapping[str, float]] = None,
+    archetype_params: Optional[Mapping[str, Mapping[str, float]]] = None,
+) -> Dict[str, Any]:
+    """The structural prior for the SHOWDOWN CAPTAIN SLOT. R306 step 2.
+
+    A second distribution over the same people, with its own 100% budget and
+    its own temperature, to sit BESIDE ``predict_ownership``'s 600% roster
+    prior rather than replace it. It is not a re-expansion of R235's CPT/UTIL
+    person collapse: the collapse gives one row per PERSON, which is what both
+    distributions want, and this allocates a different slot over those same
+    people.
+
+    Why it is a separate distribution and not a rescaling of the roster one:
+    on 41 archived Showdown contests the captain market is measurably a
+    different market. Person-level and captain-level ownership correlate
+    between 0.33 and 0.85, a 60%-rostered player has landed at 6% captain, and
+    the captain slot is held by an ARM in a median 52.2% of entries against
+    arms taking a median 19.0% of all six roster slots. So the captain slot
+    gets its own concentration and its own pitcher tilt, both LABELED PRIORS.
+
+    Three ways this differs from the roster prior, each deliberate:
+
+      ONE POOL. The roster prior scores hitters and pitchers separately
+      because a Classic roster fills 8 and 2 slots from separate menus. A
+      captain is chosen across the whole field for one slot, so the salary
+      percentile is taken over every player rather than within a pool.
+
+      ITS OWN TEMPERATURE. Concentration is the parameter the module already
+      models per archetype, and Showdown CPT is a different temperature from
+      Showdown UTIL inside the same contest: 6 to 21 distinct captains appear
+      per contest against roughly 20 rostered people, with the top captain
+      taking a median 32.7%.
+
+      AN EXPLICIT PITCHER TILT. In one pool a hitter collects the implied-total
+      and batting-order tilts and an arm collects neither, so without a tilt
+      the arm skew the archive shows could only appear through salary. The
+      measured skew is not a constant -- it ranges 21.5% to 73.9% across the
+      41 -- so the tilt is applied to PROBABLE starters only and the rest of
+      the shape is left to the structural score, rather than pinning a rate.
+
+    Output mirrors ``predict_ownership``: ``own_pct_by_player_id`` (summing to
+    CAPTAIN_BUDGET_PCT), ``tier_by_player_id``, provenance and the label.
+    UNCALIBRATED, like everything else here; nothing auto-applies.
+    """
+    return _showdown_prediction(
+        salary_players, archetype, CAPTAIN_ARCHETYPE_PARAMS,
+        CAPTAIN_BUDGET_PCT, "captain_pitcher_weight", CAPTAIN_NOTE,
+        implied_total_by_team, batting_order_by_player_id, probable_sp_ids,
+        base_projection_by_player_id, archetype_params)
 
 
 PROJECTED_OWNERSHIP_COLUMN = "Projected_Ownership_Pct"

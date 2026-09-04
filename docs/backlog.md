@@ -39,6 +39,45 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
+*2026-09-03 (sixth note this date), DEV, claim `engine` (`engine_2026-09-04`):
+**R306 steps 1-3 SHIPPED and migrated to CHANGELOG.md; slots 1 and 2 both
+close, so the list below runs 1 through 16, counted rather than inherited** (it
+was 18). Gate `PASS v2.26.0 28 modules 1768 tests` -> `PASS v2.26.0 28 modules
+1796 tests`, `tests.test_showdown` 173 -> 201, all five suites `clean`. **28
+mutations written, 28 killed, 0 survivors.** R306's entry is rewritten in place
+to hold step 5 only and drops to the smalls at slot 15; step 4 was always
+R307's sleeve.
+
+***What closed, in one line each.*** The ownership prior is graded on **297
+archived contests across four archetypes** instead of the one grade that lived
+in a module docstring, per contest and never pooled, by a TOOL rather than a
+runbook step — because a runbook step is a thing a session must remember, which
+is exactly what the last six weeks measured. And the Showdown captain slot has
+its own 100% market beside a 600% roster market, both fit to measured medians
+on the 41 usable archived Showdown contests, because the Classic 800/200 split
+the prior was using **sums to 1000% on a Showdown file**.
+
+***Two rank changes this produced.*** **R307 (slot 9) is UNGATED** — its whole
+reason for sitting below R118 was that the sleeve would be aimed with a sight
+the measurement says can be inverted, and the sight now exists. It keeps slot 9
+on criterion (2) rather than jumping, and a session that wants it earlier
+should say so rather than infer it. **R10's Showdown leg (inside slot 8) loses
+one of its two gates**; R225 still gates it.
+
+***What the closing found that the filing did not, since that is the part worth
+carrying.*** Three premises came back different. DK's `%Drafted` is NOT
+person-level on 22 of the 41 exports (346 CPT rows beside 934 UTIL); the
+filing's conclusion — count entries, not DK's column — survives, but for
+TRUNCATION rather than for grain. Dropping the zero tail from a grade is not
+conservative: it moves median Spearman 0.547 -> 0.746 on the captain market and
+0.618 -> 0.499 on the roster market, up on one and down on the other. And
+finding (c) replicates far harder on 41 contests than on eight (captain slot is
+an arm in a median 52.2% of entries against 19.0% of all six slots) while its
+obvious consequence is false — the arm tilt buys almost no ordering, because
+arms are the most expensive players and salary rank already puts them on top.
+That last one is why step 5 is a WRITING act now: the measurement is done and
+the caveat is the interesting half.*
+
 *2026-09-03 (fifth note this date), DEV, claim `engine` (`engine_2026-09-03b`):
 **the eleventh greenfield edition adjudicated, the eleven-fragment inbox merged,
 and the queue REORDERED on Ben's three criteria rather than on the 09-02
@@ -1436,34 +1475,12 @@ member changes a delivered byte. **R268 + R204** (old slot 1) moves to 7: its
 measured $ cost stands, but R292 fixes the tool it depends on, so it follows
 R292 rather than leads it.*
 
-1. **R306 step 1 — grade the ownership prior on what is already on disk**
-   (P1, XS-S; the cheapest leverage unlock on this board). Impact: every
-   leverage decision the project makes today, Classic `--leverage` included,
-   rides a prior labelled `v0.1-prior / UNCALIBRATED` whose single recorded
-   grade lives in a module docstring. `grade`, `actuals_from_standings`,
-   `grade_prediction` and `ledger_block` all EXIST; 27 archive dates and 53
-   Showdown-parsing standings files are on disk; `grep -rn "Ownership prior
-   grade" ledger/` returns zero blocks. Lift is running a loop over what is
-   already built and filing per-contest blocks conditioned on archetype and
-   field size, never pooled. Role note: the run is DEV's, the ledger write is
-   ARCHIVE's, so this lands as inbox fragments unless a session holds both
-   claims. Done when every archetype has a Spearman and a signed level error
-   on the record and "uncalibrated" is a number instead of a label.
-2. **R306 steps 2-3 — the captain-conditioned prior, graded against
-   `captain_norm`** (P1, S-M; depends on step 1 only for calibration, not for
-   the emit). Impact: the Showdown captain slot is a separate market with a
-   100% budget, a tighter temperature and an arm-heavy shape, and the prior has
-   no concept of it (`grep -in 'cpt\|captain\|showdown' ownership_prior.py`
-   returns nothing). A 60%-rostered player can be a 6% captain, so today's
-   captain-leverage reads can be inverted. `parse_standings_export` already
-   returns `captain_norm` per entry, so the actuals need aggregation, not new
-   parsing. Keep R235's person collapse for the roster half.
-3. **R294 — allocator truth** (P1, S). Unchanged in substance from the 09-02
+1. **R294 — allocator truth** (P1, S). Unchanged in substance from the 09-02
    filing and it keeps a head slot on criterion (1): the primary-stack floor is
    the GPP construction lever and a search-effort prefilter relaxes it while
    the record blames the bank; refusals of the 1940_9g shape pay up to seven
    30-second solves before saying no; scipy status 4 is called "proven".
-4. **R297(d) + R304 + R305 — the referees read the wrong geometry and the wrong
+2. **R297(d) + R304 + R305 — the referees read the wrong geometry and the wrong
    file** (P1, XS-S). Impact: both cost calls inside lock windows on 2026-09-03,
    both make a referee assert something false, and R304's measured cost is a
    LEGAL-POOL REDUCTION taken because a referee could not read a declaration.
@@ -1472,7 +1489,7 @@ R292 rather than leads it.*
    disagreeing counters, and the Showdown brief that writes no
    `declared_pitchers`; R305 is the mtime feed resolver. Per R233 the fix
    carries the grep enumerating every `Roster Position` Classic-token test.
-5. **R310 + R312 + R313 — three falsehoods with XS remedies** (P1, XS each).
+3. **R310 + R312 + R313 — three falsehoods with XS remedies** (P1, XS each).
    R310: a two-game callup carried APPG 12.5, third-highest in the pool, into
    47.4% exposure with every control reading clean and no warning anywhere;
    the warning half needs no feed. R312: `Portfolio_EV_Proxy`
@@ -1482,7 +1499,7 @@ R292 rather than leads it.*
    `Σ x ≤ 0` over the lone survivor and EXCLUDES a legal player, which is the
    move the hard guardrails forbid. Take R312 first; it is the smallest thing
    on this board and it is the project's own stated rule.
-6. **R308 — an external field estimate in the build loop** (P1, S-M; one Ben
+4. **R308 — an external field estimate in the build loop** (P1, S-M; one Ben
    fact required). Impact: the first field number the project can get that is
    not its own. On 2140_2g it named a `-27 pp` hole (Kyle Tucker, 26.57% RST%,
    our exposure 0%, best points-per-dollar LAD bat in the frame) that no
@@ -1494,14 +1511,14 @@ R292 rather than leads it.*
    pattern, blend through `ownership_pred emit` rather than minting a second
    accepted schema, print the delta beside the chalk-sum columns, and record
    the `all_games` scope, which is not recoverable later.
-7. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Unchanged:
+5. **R295 + R237 + R224 + R247(b)** — Showdown ladder truth (P1, S). Unchanged:
    single-game and small-field prizes ride on the three caps holding and on the
    degraded flag being true; measured realized exposure 58% under a 50% cap,
    and duel/blowout rosters flagged degraded by construction. R247(b)'s premise
    is re-read against R295(b) first.
-8. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S).
+6. **R268 + R204's ceiling half** — the swap-path workarounds (P1, S).
    Unchanged; dependency discharged by R292.
-9. **R285 (+ its 09-03 rider) + R311 + R207 + R204's naming half** — refusals
+7. **R285 (+ its 09-03 rider) + R311 + R207 + R204's naming half** — refusals
    that cost a lock window (P1, S). One subject, four filings: the supervisor
    stops on a remedy it is licensed to take, the interaction-bind refusal names
    no floor to set, the infeasibility hint names a SET and makes the operator
@@ -1511,60 +1528,80 @@ R292 rather than leads it.*
    remedy CLAUDE.md lists first as unattended. ed11's D13 remedy is the shape:
    a typed `refusal.class` / `refusal.remedy` on the payload, and no regular
    expression over `errors[]` in the final fix. **R203** rides the tail.
-10. **R118 — the replay tool** (P1, M; Tier 2 head). DEMOTED from slot 2 on
-    criterion (2); nothing in slots 1-9 depends on it and it gates everything
-    below. Then, unchanged in order: R48 + R83 → R10 (gated on R225 and now on
-    R306's step 2 for its Showdown cells) → R140, R13 the funding gate. Rider
+8. **R118 — the replay tool** (P1, M; Tier 2 head). DEMOTED from the head on
+    criterion (2); nothing in slots 1-7 depends on it and it gates everything
+    below. Then, unchanged in order: R48 + R83 → R10 (still gated on R225; its
+    other gate, **R306's step 2, is DISCHARGED as of 2026-09-03** — the
+    Showdown cells now have a captain prior at a 100% budget and a roster prior
+    at 600% to read, rather than one number that is the wrong accounting for
+    the geometry) → R140, R13 the funding gate. Rider
     from ed11 §4.7, sharper than F-48's: settle at the archived contest's own
     payout curve with the tie group splitting the prizes spanning the ranks it
     occupies, `Payout = (1/d) Σ prize[a..a+d-1]`, and duplicates as separate
     entries. Accounting against an observed field, not simulation.
-11. **R307 — the captain leverage sleeve** (P1, M; GATED on slot 2). Ben's
-    design ruling, 2026-09-03: "we dont need to artificially zero out players,
-    but we should figure out how we can find leverage in the captain ranks and
-    devote a few lineups to those picks." Nothing in the build path can say
-    "these 4 entries take their captain from this list, the other 12 build
-    honestly", and all three indirect proxies were measured and failed:
-    tightening `max_cpt_exposure_pct` buys diversity and RAISES mean captain
-    ownership, a CPT-row-only tilt scores WORSE than no tilt at all, and a hard
-    global tilt reaches its number by zeroing a leadoff bat across every entry.
-    Gated because building the sleeve before slot 2 aims it with a sight the
-    measurement says can be inverted.
-12. **R174 + R175 + R248 + R242 + R279 + R314 + R297(a)(b)(c)(e)** — the
-    money boundary (P1, S). Unchanged except that (d) moved up to slot 4 with
+9. **R307 — the captain leverage sleeve** (P1, M). **ITS GATE IS DISCHARGED as
+    of 2026-09-03: R306 step 2 shipped**, so the sight exists and the sleeve
+    can be aimed at captain ownership rather than at roster ownership. It keeps
+    this slot rather than jumping the queue because criterion (2) is about
+    lift and it is the only M above slot 12; a session that wants it earlier
+    should say so rather than infer it from the discharge. Ben's design ruling,
+    2026-09-03: "we dont need to artificially zero out players, but we should
+    figure out how we can find leverage in the captain ranks and devote a few
+    lineups to those picks." Nothing in the build path can say "these 4 entries
+    take their captain from this list, the other 12 build honestly", and all
+    three indirect proxies were measured and failed: tightening
+    `max_cpt_exposure_pct` buys diversity and RAISES mean captain ownership, a
+    CPT-row-only tilt scores WORSE than no tilt at all, and a hard global tilt
+    reaches its number by zeroing a leadoff bat across every entry.
+    **What R306 hands it, and this IS step 4 of R306's own fix order:**
+    `ownership_pred emit` writes `archetypes[<archetype>].captain` on any
+    Showdown salary file — a 100%-budget distribution over the R235-collapsed
+    people, beside a 600% roster one. Two cautions the sleeve must carry
+    rather than rediscover. The ORDERING is what may be spent and the LEVEL is
+    not (median per-contest captain Spearman 0.456 / 0.615 / 0.641 across the
+    three field bands, on 41 archived contests); and the prior's arm tilt is
+    +0.10 while the roster tilt is -0.10, so "low-owned captain" and
+    "low-owned player" are different sets by construction, which is the whole
+    reason the sleeve needed the gate.
+10. **R174 + R175 + R248 + R242 + R279 + R314 + R297(a)(b)(c)(e)** — the
+    money boundary (P1, S). Unchanged except that (d) moved up to slot 2 with
     its siblings, and R314 is NEW here: `check_started_games` has no postponed
     exemption and R292(d) put it in BOTH referees, so on a postponed-game slate
     CLAUDE.md's own two-referee clause is unsatisfiable and the operator's only
     moves are the two the contract forbids. R279 has a field sighting; (a)(e)
     are fail-opens ON the referee; the rest are prospective, which is why they
     sit here and not higher.
-13. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2, S-M),
+11. **R208 + R238 → R239(a) + R245** — Showdown contest awareness (P1/P2, S-M),
     dependency R238 before R239(a); then **R298 + R300's remainder** (the T-5
     read is wrong today; (a) and (b) shipped, (c) and (d) remain); then
     **R309** (the evidence file and QA proposing swaps). Tail unchanged:
     R122-rider, R123, R189(3), R210 (+R303's unread-flag siblings), R211;
     R240 decision-first.
-14. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
+12. **R216 + R217 + R218 + R180 + R195 + R181 + R179** — audit and gate
     hardening. No member changes a delivered byte; R216 still lands alone at a
     session boundary; R217 gains ed11 D34's runtime-identity sliver. Then
     **R164** (re-scoped by R293), **R284** (which R293's late-swap rider
     joins), **R276**, **R225 + R226 + R227** (R225 gates R10's Showdown cells,
-    so it lands before slot 10's R10 leg).
-15. **R301 — the instruction corpus** (P2, M). The four money-boundary
+    so it lands before slot 8's R10 leg).
+13. **R301 — the instruction corpus** (P2, M). The four money-boundary
     contradictions first (showdown.md caps, late_swap.md `--locked-teams`, the
     ledger pin, `timeout 33`); they are XS each and may be taken in any slot.
     Then CLAUDE.md to ≤ 6 KB and SKILL.md to ≤ 150 lines with the narrative
     moved to the CHANGELOG entries it cites; then the prose-pinning tests.
-16. **R302 — the strangler engine** (Tier 3, L). START CONDITION unchanged:
+14. **R302 — the strangler engine** (Tier 3, L). START CONDITION unchanged:
     R118 built and ten deliveries graded. ed11 §4 corroborates the design and
     §4.10 is recorded on the entry as acceptance criteria. Criterion (2) is the
     instruction to leave it here; Ben may pull it forward or strike it, either
     a one-line edit.
-17. **Smalls, batched opportunistically:** R299 (six intake seams), R236(b)
+15. **Smalls, batched opportunistically:** **R306's remainder** (step 5, the
+    standing bat-captain portfolio-shape claim — a document edit whose
+    measurement is already filed, and whose first question is that
+    `MLB_Classic.md` has no Showdown equivalent to put it in), R299 (six intake
+    seams), R236(b)
     (+ its 09-03 rung-3 rider), R303's non-demoted members, and the standing
     set: R264 + R265, R221 + R280, R222, R229, R230 (+(d)), R231, R232, R241,
     R243, R269 (with R245), R271's two-line remainder.
-18. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged,
+16. **The pre-existing Tier 1 remainder from R121**, standing order, unchanged,
     except that its clock half is inside R290(c)'s shipped scope.
 
 *(The previous twelve-slot list, with its 09-02 and 09-03 slot reasoning
@@ -4073,169 +4110,64 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
-### R306. The captain slot is its own ownership market and the prior has no concept of it: the budgets are 100%/600% and not 200%/800%, the captain market is a different temperature, captains concentrate on ARMS, and person-level ownership correlates with captain ownership between 0.33 and 0.85 (P1; step 1 XS-S, steps 2-3 S-M) | new 2026-09-03, merged from BUILD fragment `2026-09-03_BUILD_captain-ownership-is-its-own-market.md`; eight archived Showdown contests measured individually, never pooled
+### R306. Steps 1-3 SHIPPED 2026-09-03 and their text MIGRATED to CHANGELOG.md. Open remainder: step 5, the standing portfolio-shape claim about bat captains (P2, XS) | filed 2026-09-03 from BUILD fragment `2026-09-03_BUILD_captain-ownership-is-its-own-market.md`; the shipped three-quarters and both riders live in the changelog entry
 
-**Rider 2026-09-03 (DEV, while drafting the next-session prompt): the sample is
-FIVE TIMES what the fragment measured, the actuals need no re-mine, and the
-fragment's own stated caveat is partly relieved. All three change the fix
-estimate, so they are recorded here rather than left for the session to
-rediscover.**
+**Do not re-litigate steps 1, 2 or 3 from here.** The reasoning, the measured
+numbers, the three premises that came back different from the filing, the two
+defects the item introduced and caught, and the R233 enumerations are all in
+the CHANGELOG entry dated 2026-09-03. In brief so this entry is readable
+without leaving it: the prior is graded on **297 archived contests across four
+archetypes** instead of one (`tools/ownership_grade_archive.py`, per contest,
+conditioned, never pooled, filing `ledger/inbox/` fragments); the Showdown
+geometry has its own **100% captain** and **600% roster** distributions beside
+the Classic 800/200 split, which sums to 1000% on a Showdown file; and both are
+graded against realized shares on all 41 usable archived Showdown contests.
+**Step 4 lives on R307** (slot 9), whose gate this discharged.
 
-**(i) `entries[]` with `captain_norm` and `players_norm` is STORED in every
-mined file, so step 3 needs no re-mine and no new parsing.** Measured at HEAD
-over `data/archive/*/mined_*.json`: 379 files, `contest_type` 243 classic / 132
-showdown / 4 null, and a Showdown row carries
-`['captain_norm', 'chalk_score', 'entry_id', 'lineup_complete', 'max_stack',
-'n_cheap', 'players_norm', 'points', 'rank', 'salary_left', 'salary_used',
-'sp_pair', 'stack_pattern', 'username']`. Filtering to `lineup_complete` and
-counting `captain_norm` is the whole of the actuals step.
-
-**(ii) But R39's `captain_table` is ABSENT from all 379 files, so do not build on
-it.** `field_miner.py:991-1003` computes `captain_freq` and a `captain_table`
-carrying `captain_share_pct` beside `pct_drafted`, capped at
-`most_common(8)`. Measured: the key is absent (not present-and-empty) in **379
-of 379** mined files, including all 132 Showdown ones. The producer exists and
-has never reached a stored artifact, so a session reading the code would
-reasonably conclude the actuals are already aggregated on disk, and they are
-not. Two consequences: derive from `entries[]` per (i) rather than from
-`captain_table`, and the `most_common(8)` truncation would have capped the
-distribution anyway, which matters because the median contest has 12 distinct
-captains. Whether `captain_table` should be backfilled by a re-mine is ARCHIVE's
-call and is not this item's blocker.
-
-**(iii) 41 archived Showdown contests are usable, not 8, and the field-size range
-relieves part of the fragment's own caveat.** Filtering to Showdown files with at
-least 10 complete entries carrying a captain: **41 contests**, field sizes min 20
-/ median 39 / **max 1177**, with two more at 163 and 169. So the archive is not
-only the 39-to-48-entry satellites the fragment measured, and conditioning on
-field size is now possible rather than aspirational, which is what the ledger's
-conditioning rule wants anyway. The self-inclusion bias still applies to the
-small fields and does not vanish; it is diluted, not removed, and a 1,177-entry
-contest is a different archetype rather than a bigger version of the same one.
-
-**Finding (a) REPLICATED on the larger sample, exactly.** Captain shares sum to
-100.0 and person shares to 600.0 in **all 41 of 41**, one distinct value each,
-which is the accounting identity the fragment asserted from eight. **Finding (b)
-replicated and widened:** distinct captains per contest min 6 / median 12 / max
-21, and top-captain share min 15.7% / median 32.7% / max 52.2%, against the
-fragment's 8-13 and 16-58% from eight contests. Finding (c), the arm
-concentration, is NOT re-measured here because it needs a position join the
-mined row does not carry, and it stays the fragment's eight-contest observation
-until step 1 does it properly.
-
-Every number above is an observed count from an archived DK standings export or
-a deterministic statistic over one. Nothing here is a win rate, a cash rate, an
-edge or a probability, and none of it calibrates anything on its own.
-
-**What already exists, stated first so the gap is not misread as "ownership is
-unbuilt".** `mlb_engine/field/ownership_prior.py` and `tools/ownership_pred.py`
-are a real predict-then-grade loop. `emit` writes a per-player structural prior
-per archetype from features public before lock (salary, position scarcity,
-implied total, batting order, probable-SP status, optional Base).
-`actuals_from_standings` reads realized `%Drafted` off a DK export;
-`grade_prediction` measures MAE, mean signed error and Spearman against flat-12
-and flat-budget baselines; `ledger_block` formats it for ARCHIVE. The one
-recorded grade is contest 194022265, 7,833 entries, 2026-08-19: Spearman +0.581
-on `large_field_gpp` and +0.66 on `cash`, level under-predicted by about a third
-and not fixable by rescaling. R154's ruling follows from it and is right: spend
-the ordering, spend none of the magnitude. The Classic accounting is explicit,
-2 P + 8 hitters, so pitcher ownership sums to 200% and hitter ownership to 800%.
-
-**Gap 1: there is no captain prior, by construction.**
-`grep -in 'cpt\|captain\|showdown' mlb_engine/field/ownership_prior.py` returns
-NOTHING. Upstream, R235 makes `ownership_pred.py` collapse CPT and UTIL to one
-row per PERSON before anything counts a row, because a Showdown export prices
-everybody twice and double-counting would corrupt the budget. **That collapse is
-correct for its stated purpose and stays.** The consequence nothing names is
-that after it there is exactly one ownership number per person, and the build
-path then uses it to choose captains.
-
-**The measurement.** Eight archived Showdown contests, each on its own, per the
-ledger's conditioning rule. `captain%` counts entries whose CPT slot holds the
-player, `person%` counts entries rostering them in any slot, complete lineups
-only, `rho` is Spearman between the two over players in at least 2 entries.
-
-| contest | N | rho | largest divergences, person% → captain% |
-|---|---|---|---|
-| 193708607 | 48 | 0.516 | Betts 60→6, Ohtani 56→10, Hernandez 48→4 |
-| 194282826 | 48 | 0.845 | Pederson 62→12, Seager 48→10, Vargas 40→6 |
-| 194225137 | 47 | 0.648 | Chourio 45→2, Turang 43→0, Vaughn 38→2 |
-| 194182642 | 43 | 0.462 | Cameron 53→0, Weathers 60→19, Bateman 44→5 |
-| 194370267 | 43 | 0.451 | Stewart 58→14, Cruz 56→12, Devers 56→14 |
-| 194017526 | 40 | 0.750 | Sogard 48→2, Vargas 40→2, Gasper 40→2 |
-| 194068551 | 40 | 0.390 | Cowser 52→0, Wells 45→5, Bradish 48→12 |
-| 194485718 | 39 | 0.325 | Varsho 49→3, Wells 44→0, Jones 44→3 |
-
-**Three structural facts, consistent across all eight.** (a) **The budgets are
-100% and 600%.** One captain per entry, six roster slots; verified at exactly
-those values in every contest. The Classic accounting has no Showdown analogue
-and the prior carries only the Classic one. (b) **The captain market is far more
-concentrated than the roster market**, 8 to 13 distinct captains per contest
-with the top captain taking 16% to 58%, against roughly 20 eligible players on
-the roster side. Concentration is the temperature parameter the prior already
-models per archetype, and Showdown CPT is a different temperature from Showdown
-UTIL inside the same contest. (c) **Captains concentrate on starting pitchers**,
-six of eight top captains being arms, and in two contests the most-captained
-player is not the most-rostered player at all.
-
-**Caveat, and it is load-bearing.** The 53 parsing files are small satellite
-fields, 39 to 48 entries, and Ben's own entries sit in the denominator, so both
-the concentration and the pitcher-captain finding carry a self-inclusion bias
-and a small-field archetype bias. These are eight repeated per-contest
-observations, not a population estimate, and a large-field Showdown GPP may
-behave differently. Nothing here is a win rate, a cash rate, an edge or a
-probability; every number is an observed count from an archived DK export or a
-deterministic statistic over one.
-
-**Gap 2, and it is the cheap unblock.** `ownership_prior.py` says the fitted
-model lands "once 8-15 archetype-conditioned slates of archived DK standings
-exist", which reads as waiting on data. On disk: `data/archive/` 27 slate dates,
-`data/standings/inbox/` 248 files of which **53 parse as Showdown**, and
-`grep -rn "Ownership prior grade" ledger/` **zero blocks**. One grade has ever
-been run and its result lives in a module docstring rather than the ledger. The
-constraint is not sample count; it is that `grade` is a manual step nobody's
-loop calls.
-
-**Fix, in dependency order.** (1) **Grade what is on disk.** Drive
-`ownership_pred.py grade` over the archive, file `ledger_block` per contest
-conditioned on archetype and field size, report Spearman and signed level error
-per archetype. No new modelling; turns "uncalibrated" into a number per
-archetype and is the precondition for everything below. (2) **Emit a
-captain-conditioned prior for Showdown**: a second distribution over the same
-players with its own 100% budget and its own temperature, alongside the existing
-600% roster prior. Keep R235's person collapse for the roster half; the captain
-half is a separate allocation, not a re-expansion of it. (3) **Grade it against
-`captain_norm`**, which `parse_standings_export` already returns per entry, so
-the actuals need aggregation and no new parsing. Note that DK's own
-`player_table.pct_drafted` appears to be person-level (`roster_position` reads
-`UTIL` on the rows sampled), so captain actuals must come from the entries, not
-from DK's `%Drafted` column; confirm against a larger export before building on
-it. (4) **Feed it to R307's sleeve**, so "a few lineups on low-owned captains"
-aims at captain ownership rather than at roster ownership. (5) **Test finding
-(c) directly.** If Showdown captains really concentrate on arms, then bat
+**What is left is step 5, and its hard half is already done.** The fix order's
+last item was: *if Showdown captains really concentrate on arms, then bat
 captains are structurally the leverage position, and that is a standing
 portfolio-shape claim for `MLB_Classic.md` or its Showdown equivalent rather
-than something rediscovered per slate.
+than something rediscovered per slate.* The measurement now exists and is much
+stronger than the eight-contest version it was filed on. On the 41:
 
-**Reproduce.** `parse_standings_export(path)` returns `entries[]` with
-`captain_norm` and `players_norm`, and `contest_type` off the miner's own parse.
-Filter to `lineup_complete`, count `captain_norm` for the 100% budget and the
-set of `players_norm` for the 600% budget, per contest, no pooling.
+- the captain slot is held by an ARM in a **median 52.2% of entries** (min
+  21.5, max 73.9), against arms taking a **median 19.0% of all six roster
+  slots**;
+- the most-captained player is an arm in **32 of 41** contests;
+- the rate is strongly slate-dependent rather than constant — the 2026-08-09
+  contests sit at 21-30% and the 08-11/12/13 contests at 48-74% — so the claim
+  is about a STRUCTURAL tendency and its variance, never a fixed number.
 
-**Interaction with R225.** R225 (Showdown duplication counting is captain-blind
-at all three miner sites) is the same blind spot one layer down, in the grading
-substrate rather than the prior. They are separate fixes and R225 stays a
-precondition on R10; a session taking either should read the other first.
+**And one finding that must travel with the claim, because it inverts the
+obvious reading.** Captains concentrating on arms does NOT mean the prior needed
+an arm tilt to rank them: arms are the most expensive players on a Showdown
+slate, so a salary percentile over one pool already ranks them top, and the
+fitted tilt is +0.10 rather than the 0.60 a reading of finding (c) would have
+set. The tilt does concentration work, not ranking work. A strategy doc that
+says "captain bats for leverage" without that sentence will read as "the model
+under-rates bats", which is not what the archive says.
 
-Measurement-gated by design: nothing here moves a control without a graded
-tranche behind it. R37(2) waits on ARCHIVE and slates, not a DEV slot; R10
-is the funded modeling item; R48 is its grading substrate (an archival
-emission, kept here because its purpose is this stream); R13 is the umbrella
-decision the do-not-build list keys on. R126, R135, R136 and R137 joined
-2026-08-16 as the review-and-evidence layer: none of them moves a control,
-and each makes the next control decision gradeable instead of argued. **R126
-CLOSED 2026-08-17** and migrated; R150 was filed off its landing and is Ben's
-decision, not a control move either.
+**What remains is therefore a WRITING act, not a measuring one**: decide where
+the Showdown portfolio-shape claim lives (`MLB_Classic.md` has no Showdown
+equivalent today, which is itself the first question), state it with its
+variance and the caveat above, and cite the fragments. Sized XS and dropped to
+the smalls batch (slot 15) accordingly, not because it is unimportant but
+because it is one document edit whose evidence is already filed.
+
+**Caveats that travel with any use of this.** The archive is small-field
+satellites in which Ben's own entries sit in the denominator; a larger sample
+dilutes that bias and does not remove it, and a four-figure field is a
+different archetype rather than a bigger version of a small one. Every number
+here is an observed count from an archived DK standings export or a
+deterministic statistic over one. Nothing is a win rate, a cash rate, an ROI
+figure, an edge, or a probability claim.
+
+**Interaction with R225, unchanged.** R225 (Showdown duplication counting is
+captain-blind at all three miner sites) is the same blind spot one layer down,
+in the grading substrate rather than the prior. Separate fixes; R225 stays a
+precondition on R10, and a session taking either should read the other first.
+
 
 ### R37(2)(c). The five-stack half, remainder: the 4-2-x secondary cap (P1, M) | stages 1, (a) and (b) all landed; (c) is the whole of what is left
 

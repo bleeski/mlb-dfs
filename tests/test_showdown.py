@@ -3117,5 +3117,388 @@ class R291ShowdownExcludedColumnTests(unittest.TestCase):
             self.assertEqual(brief, {})
 
 
+class R306CaptainOwnershipMarketTests(unittest.TestCase):
+    """R306. The Showdown captain slot is its own ownership market.
+
+    Every guard here is written against the PRODUCTION function, not against a
+    re-implementation of it (R300(a)): the acceptance test that does not call
+    what ships is how a green suite covers nothing.
+    """
+
+    def _players(self, n_bats=8, n_arms=2):
+        """A minimal Showdown-shaped pool: arms priced at the top, like DK's."""
+        out = []
+        for i in range(n_arms):
+            out.append({"player_id": f"P{i}", "name": f"Arm {i}", "team": "AA",
+                        "positions": ["P"], "salary": 11000 - 500 * i})
+        for i in range(n_bats):
+            out.append({"player_id": f"B{i}", "name": f"Bat {i}",
+                        "team": "AA" if i % 2 else "BB", "positions": ["OF"],
+                        "salary": 9000 - 400 * i})
+        return out
+
+    # --- the budgets ----------------------------------------------------
+    def test_captain_shares_sum_to_the_100_pct_budget(self):
+        from mlb_engine.field import ownership_prior as op
+        pred = op.predict_captain_ownership(
+            self._players(), archetype="wta_satellite",
+            probable_sp_ids=["P0", "P1"])
+        total = sum(pred["own_pct_by_player_id"].values())
+        self.assertAlmostEqual(total, op.CAPTAIN_BUDGET_PCT, delta=0.05)
+        self.assertEqual(pred["budget_pct"], 100.0)
+
+    def test_showdown_roster_shares_sum_to_the_600_pct_budget(self):
+        from mlb_engine.field import ownership_prior as op
+        pred = op.predict_showdown_roster_ownership(
+            self._players(), archetype="wta_satellite",
+            probable_sp_ids=["P0", "P1"])
+        total = sum(pred["own_pct_by_player_id"].values())
+        self.assertAlmostEqual(total, op.SHOWDOWN_ROSTER_BUDGET_PCT, delta=0.05)
+
+    def test_the_classic_split_is_left_alone(self):
+        """R306 adds a geometry, it does not teach the Classic one a flag."""
+        from mlb_engine.field import ownership_prior as op
+        pred = op.predict_ownership(self._players(), archetype="wta_satellite",
+                                    probable_sp_ids=["P0", "P1"])
+        own = pred["own_pct_by_player_id"]
+        arms = sum(own[k] for k in own if k.startswith("P"))
+        bats = sum(own[k] for k in own if k.startswith("B"))
+        self.assertAlmostEqual(arms, op.PITCHER_BUDGET_PCT, delta=0.05)
+        self.assertAlmostEqual(bats, op.HITTER_BUDGET_PCT, delta=0.05)
+
+    def test_the_two_showdown_budgets_are_one_dk_roster(self):
+        """The 100/600 pair is an accounting identity, guarded as one."""
+        from mlb_engine.field import ownership_prior as op
+        self.assertEqual(
+            op.SHOWDOWN_ROSTER_BUDGET_PCT / op.CAPTAIN_BUDGET_PCT, 6.0,
+            "a DK Showdown roster is one CPT plus five UTIL")
+
+    # --- the two markets are actually different -------------------------
+    def test_the_pitcher_weights_carry_opposite_SIGNS(self):
+        """The whole finding in one assertion.
+
+        Arms are UP-weighted for the captain slot and DOWN-weighted across the
+        six roster slots, relative to where salary rank alone puts them. A
+        single ownership number cannot carry both signs, which is the mechanism
+        behind a heavily-rostered player being a rare captain.
+        """
+        from mlb_engine.field import ownership_prior as op
+        cap = op.CAPTAIN_ARCHETYPE_PARAMS["wta_satellite"]["captain_pitcher_weight"]
+        ros = op.SHOWDOWN_ROSTER_ARCHETYPE_PARAMS["wta_satellite"]["roster_pitcher_weight"]
+        self.assertGreater(cap, 0.0)
+        self.assertLess(ros, 0.0)
+
+    def test_the_captain_market_is_the_more_concentrated_one(self):
+        """Fitted from the archive: the captain slot piles up harder.
+
+        Compared as SHARES of their own budgets, so the 100/600 difference
+        cannot make this pass on its own.
+        """
+        from mlb_engine.field import ownership_prior as op
+        players = self._players()
+        cap = op.predict_captain_ownership(
+            players, archetype="wta_satellite", probable_sp_ids=["P0", "P1"])
+        ros = op.predict_showdown_roster_ownership(
+            players, archetype="wta_satellite", probable_sp_ids=["P0", "P1"])
+        cap_top = max(cap["own_pct_by_player_id"].values()) / op.CAPTAIN_BUDGET_PCT
+        ros_top = (max(ros["own_pct_by_player_id"].values())
+                   / op.SHOWDOWN_ROSTER_BUDGET_PCT)
+        self.assertGreater(cap_top, ros_top)
+
+    def test_temperature_moves_concentration_and_never_the_ordering(self):
+        """A softmax is monotone, so no temperature can buy ranking."""
+        from mlb_engine.field import ownership_prior as op
+        players = self._players()
+        order = []
+        for temp in (0.10, 0.50, 2.00):
+            own = op.predict_captain_ownership(
+                players, archetype="wta_satellite", probable_sp_ids=["P0", "P1"],
+                archetype_params={"wta_satellite": {
+                    "temperature": temp, "captain_pitcher_weight": 0.10,
+                    "value_weight": 1.10}})["own_pct_by_player_id"]
+            order.append([k for k, _ in sorted(own.items(),
+                                               key=lambda kv: (-kv[1], kv[0]))])
+        self.assertEqual(order[0], order[1])
+        self.assertEqual(order[1], order[2])
+
+    # --- the params tables ----------------------------------------------
+    def test_both_params_tables_cover_every_archetype(self):
+        from mlb_engine.field import ownership_prior as op
+        self.assertEqual(set(op.CAPTAIN_ARCHETYPE_PARAMS), set(op.ARCHETYPE_PARAMS))
+        self.assertEqual(set(op.SHOWDOWN_ROSTER_ARCHETYPE_PARAMS),
+                         set(op.ARCHETYPE_PARAMS))
+
+    def test_only_the_archetype_the_archive_covers_is_marked_fitted(self):
+        """Five of six carry a scaled roster temperature, and say so."""
+        from mlb_engine.field import ownership_prior as op
+        fitted = sorted(k for k, v in op.CAPTAIN_ARCHETYPE_PARAMS.items()
+                        if v.get("fitted"))
+        self.assertEqual(fitted, ["wta_satellite"])
+
+    def test_the_import_check_rejects_a_half_populated_params_table(self):
+        from mlb_engine.field import ownership_prior as op
+        original = dict(op.CAPTAIN_ARCHETYPE_PARAMS)
+        try:
+            op.CAPTAIN_ARCHETYPE_PARAMS.pop("mme")
+            with self.assertRaises(ImportError):
+                op._check_captain_params()
+        finally:
+            op.CAPTAIN_ARCHETYPE_PARAMS.clear()
+            op.CAPTAIN_ARCHETYPE_PARAMS.update(original)
+
+    def test_the_import_check_rejects_a_non_positive_temperature(self):
+        from mlb_engine.field import ownership_prior as op
+        original = dict(op.CAPTAIN_ARCHETYPE_PARAMS["cash"])
+        try:
+            op.CAPTAIN_ARCHETYPE_PARAMS["cash"]["temperature"] = 0.0
+            with self.assertRaises(ImportError):
+                op._check_captain_params()
+        finally:
+            op.CAPTAIN_ARCHETYPE_PARAMS["cash"] = original
+
+    # --- the archetype resolver -----------------------------------------
+    def test_archetype_for_contest_facts_matches_the_allocator(self):
+        """It calls contest_shape_for_card; it does not re-decide a shape."""
+        from mlb_engine.allocate.contest_allocator import (
+            ContestCard, contest_shape_for_card,
+        )
+        from mlb_engine.field.ownership_prior import (
+            archetype_for_contest_facts, archetype_for_contest_shape,
+        )
+        for ctype, size, entries in (("satellite", 40, 1), ("wta", 300, 1),
+                                     ("se_gpp", 1000, 1), ("cash", 50, 1),
+                                     ("portfolio_gpp", 200, 150),
+                                     ("portfolio_gpp", 50000, 150)):
+            card = ContestCard(contest_id="", name="", contest_type=ctype,
+                               field_size=size, max_entries=entries,
+                               buy_in=0.0, prize_pool=0.0)
+            self.assertEqual(
+                archetype_for_contest_facts(ctype, size, entries),
+                archetype_for_contest_shape(contest_shape_for_card(card)))
+
+    def test_archetype_for_contest_facts_refuses_rather_than_defaults(self):
+        from mlb_engine.field.ownership_prior import archetype_for_contest_facts
+        self.assertIsNone(archetype_for_contest_facts("not_a_type", 40, 1))
+        self.assertIsNone(archetype_for_contest_facts("satellite", 0, 1))
+        self.assertIsNone(archetype_for_contest_facts("satellite", None, 1))
+
+    def test_the_invented_card_fields_cannot_reach_the_archetype(self):
+        """The import check is the guard; this proves it fails when it should."""
+        from mlb_engine.field import ownership_prior as op
+        original = dict(op.ARCHETYPE_BY_CONTEST_SHAPE)
+        try:
+            op.ARCHETYPE_BY_CONTEST_SHAPE["wta_ticket_satellite"] = ("mme", "EXACT")
+            with self.assertRaises(ImportError):
+                op._check_contest_fact_projection()
+        finally:
+            op.ARCHETYPE_BY_CONTEST_SHAPE.clear()
+            op.ARCHETYPE_BY_CONTEST_SHAPE.update(original)
+
+    # --- the emit --------------------------------------------------------
+    def _emit(self, salary_path):
+        spec = importlib.util.spec_from_file_location(
+            "ownership_pred_r306", REPO / "tools" / "ownership_pred.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod, mod.build_prediction(salary_path, archetypes=["wta_satellite"])
+
+    def test_emit_carries_both_showdown_markets_on_a_showdown_file(self):
+        _mod, pred = self._emit(SAL)
+        self.assertTrue(pred["showdown_markets"]["applied"])
+        block = pred["archetypes"]["wta_satellite"]
+        self.assertIn("captain", block)
+        self.assertIn("showdown_roster", block)
+        self.assertAlmostEqual(block["captain"]["budget_check"]["pct_sum"],
+                               100.0, delta=0.2)
+        self.assertAlmostEqual(block["showdown_roster"]["budget_check"]["pct_sum"],
+                               600.0, delta=0.2)
+
+    def test_emit_keeps_R235s_person_collapse_under_the_new_markets(self):
+        """One row per PERSON, and both distributions over those same people."""
+        _mod, pred = self._emit(SAL)
+        roles = pred["salary_file"]["showdown_roles"]
+        self.assertTrue(roles["applied"])
+        self.assertLess(roles["rows_out"], roles["rows_in"])
+        block = pred["archetypes"]["wta_satellite"]
+        people = {r["Player_ID"] for r in pred["players"]}
+        self.assertEqual(set(block["captain"]["own_pct_by_player_id"]), people)
+        self.assertEqual(set(block["showdown_roster"]["own_pct_by_player_id"]),
+                         people)
+
+    def test_a_classic_file_gets_no_showdown_market(self):
+        salary = REPO / "tests" / "fixtures" / "showdown" / "DKSalaries_showdown_MIN_CHC.csv"
+        _mod, pred = self._emit(salary)
+        # control: the same emit on a Classic salary file emits neither block
+        classic = sorted(REPO.glob("data/slates/*/DKSalaries.csv"))
+        if not classic:
+            self.skipTest("no Classic salary file on disk")
+        _mod2, cpred = self._emit(classic[0])
+        self.assertFalse(cpred["showdown_markets"]["applied"])
+        block = cpred["archetypes"]["wta_satellite"]
+        self.assertNotIn("captain", block)
+        self.assertNotIn("showdown_roster", block)
+        self.assertTrue(pred["showdown_markets"]["applied"])
+
+    def test_a_cpt_token_alone_does_not_earn_a_person_market(self):
+        """The detector needs BOTH halves, and this is the case that proves it.
+
+        A file whose Roster Position column carries CPT and something outside
+        CPT/UTIL takes `collapse_showdown_roles`' early return: `applied` is
+        False and the rows come back one per ROLE, not one per PERSON. A
+        token-only detector emits a 600% PERSON market over role rows, which
+        double-counts everybody -- R235's own bug through a door R235 does not
+        watch. Behavioural, not a source-string pin: the first cut of this test
+        asserted the detector's TEXT and a mutation reading the wrong flag
+        survived it, because the string was still in the file.
+        """
+        rows = [r for r in csv.reader(
+            SAL.read_text(encoding="utf-8-sig").splitlines()) if any(r)]
+        header = rows[0]
+        pos_col = header.index("Roster Position")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries_mixed_tokens.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(header)
+                for index, row in enumerate(rows[1:]):
+                    row = list(row)
+                    if index == 0:
+                        row[pos_col] = "OF"   # one token outside CPT/UTIL
+                    writer.writerow(row)
+            _mod, pred = self._emit(path)
+        roles = pred["salary_file"]["showdown_roles"]
+        self.assertIn("CPT", roles["roles_seen"])
+        self.assertFalse(roles["applied"],
+                         "the fixture is meant to take the early return")
+        self.assertFalse(
+            pred["showdown_markets"]["applied"],
+            "a 600% PERSON market over rows that are still one-per-role "
+            "double-counts every player")
+        self.assertNotIn("captain", pred["archetypes"]["wta_satellite"])
+        self.assertNotIn("showdown_roster", pred["archetypes"]["wta_satellite"])
+
+    # --- the captain actuals --------------------------------------------
+    def test_captain_actuals_zero_fill_the_whole_pool(self):
+        mod, _pred = self._emit(SAL)
+        entries = [{"lineup_complete": True, "captain_norm": "aa",
+                    "players_norm": ("aa", "bb")},
+                   {"lineup_complete": True, "captain_norm": "bb",
+                    "players_norm": ("aa", "bb")},
+                   {"lineup_complete": True, "captain_norm": "aa",
+                    "players_norm": ("aa", "bb")},
+                   {"lineup_complete": False, "captain_norm": "cc",
+                    "players_norm": ("cc",)}]
+        actual, meta = mod.captain_actuals_from_entries(
+            entries, {"aa": "1", "bb": "2", "cc": "3"}, ["1", "2", "9"])
+        self.assertEqual(meta["complete_entries"], 3)
+        self.assertEqual(actual["9"], 0.0, "an uncaptained pool player is a "
+                                          "measured zero, not a missing value")
+        self.assertAlmostEqual(actual["1"], 66.6667, places=3)
+        self.assertAlmostEqual(actual["2"], 33.3333, places=3)
+        self.assertAlmostEqual(meta["share_sum_pct"], 100.0, delta=0.1)
+        self.assertEqual(meta["zero_captain_players"], 1)
+
+    def test_an_incomplete_lineup_is_not_counted(self):
+        mod, _pred = self._emit(SAL)
+        actual, meta = mod.captain_actuals_from_entries(
+            [{"lineup_complete": False, "captain_norm": "aa",
+              "players_norm": ("aa",)}], {"aa": "1"}, ["1"])
+        self.assertEqual(meta["complete_entries"], 0)
+        self.assertEqual(actual["1"], 0.0)
+
+    def test_a_captain_outside_the_pool_is_named_and_not_dropped(self):
+        mod, _pred = self._emit(SAL)
+        _actual, meta = mod.captain_actuals_from_entries(
+            [{"lineup_complete": True, "captain_norm": "zz",
+              "players_norm": ("zz",)}] * 10, {}, ["1"])
+        self.assertEqual(meta["captain_names_reaching_no_pool_id"], ["zz"])
+
+    def test_grading_a_market_the_prediction_lacks_refuses_by_name(self):
+        mod, pred = self._emit(SAL)
+        stripped = json.loads(json.dumps(pred))
+        stripped["archetypes"]["wta_satellite"].pop("captain")
+        with self.assertRaises(ValueError) as ctx:
+            mod.grade_captain_prediction(stripped, {"1": 1.0}, "wta_satellite")
+        self.assertIn("captain", str(ctx.exception))
+
+    def test_the_captain_grade_baseline_spends_the_captain_budget(self):
+        """Not flat-12: a Classic constant against a 100% budget is nonsense."""
+        mod, pred = self._emit(SAL)
+        pool = [r["Player_ID"] for r in pred["players"]]
+        actual = {pid: 0.0 for pid in pool}
+        actual[pool[0]] = 100.0
+        grade = mod.grade_captain_prediction(pred, actual, "wta_satellite",
+                                             market="captain")
+        self.assertEqual(grade["budget_pct"], 100.0)
+        self.assertEqual(grade["join"]["actual_nonzero"], 1)
+        self.assertIsNotNone(grade["baseline_flat_budget"]["mae_pct_points"])
+        self.assertIn("not a win rate", grade["label"].lower().replace(
+            "not a win rate, an roi figure", "not a win rate"))
+
+    # --- the archive driver ---------------------------------------------
+    def _driver(self):
+        spec = importlib.util.spec_from_file_location(
+            "ownership_grade_archive_r306",
+            REPO / "tools" / "ownership_grade_archive.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_the_field_size_fallback_names_which_fact_answered(self):
+        mod = self._driver()
+        self.assertEqual(mod._field_size({"own_results": {"field_size": 40}}),
+                         (40, "own_results.field_size"))
+        self.assertEqual(
+            mod._field_size({"coverage": "full", "meta": {"entries_total": 23}}),
+            (23, "meta.entries_total (coverage=full)"))
+        self.assertEqual(
+            mod._field_size({"coverage": "partial", "meta": {"entries_total": 23}}),
+            (None, "unavailable"))
+
+    def test_a_missing_field_size_refusal_does_not_blame_the_shape_map(self):
+        """R290(c)'s rule applied to this tool: name the fact that is missing."""
+        mod = self._driver()
+        _a, _e, why = mod.resolve_archetype(
+            "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier", None)
+        self.assertIn("no usable field size", why)
+        self.assertIn("shape map is not the problem", why)
+
+    def test_the_field_bands_sit_on_the_allocators_own_boundaries(self):
+        from mlb_engine.allocate.contest_allocator import (
+            MID_FIELD_MAX_ENTRANTS, SMALL_FIELD_MAX_ENTRANTS,
+        )
+        mod = self._driver()
+        self.assertNotEqual(mod.field_band(SMALL_FIELD_MAX_ENTRANTS),
+                            mod.field_band(SMALL_FIELD_MAX_ENTRANTS + 1))
+        self.assertNotEqual(mod.field_band(MID_FIELD_MAX_ENTRANTS),
+                            mod.field_band(MID_FIELD_MAX_ENTRANTS + 1))
+        self.assertEqual(mod.field_band(None), "f_unknown")
+
+    def test_the_fragment_never_claims_a_pooled_statistic(self):
+        mod = self._driver()
+        rows = [{"contest_id": "1", "slate_date": "2026-08-08", "field_size": 40,
+                 "field_band": "f_0001_0100", "inputs_inert": [],
+                 "roster_grade": {"overall": {"spearman_rank_corr": 0.5,
+                                              "mean_signed_error_pct_points": -1.0,
+                                              "mae_pct_points": 3.0},
+                                  "join": {"joined_players": 10},
+                                  "verdict": {"beats_flat_budget": True}}}]
+        text = mod.archetype_fragment("wta_satellite", rows, "2026-09-03")
+        self.assertIn("MEDIANS OF PER-CONTEST STATISTICS", text)
+        self.assertIn("never a statistic recomputed over a merged player set", text)
+        self.assertIn("self-inclusion", text.lower())
+        for banned in ("win rate", "cash rate", "ROI"):
+            self.assertIn(banned.lower(),
+                          text.lower(),
+                          "the fragment must DISCLAIM these, not omit them")
+
+    def test_the_driver_writes_no_ledger_path(self):
+        """Only ARCHIVE edits ledger/; this drops fragments in the inbox."""
+        source = (REPO / "tools" / "ownership_grade_archive.py").read_text(
+            encoding="utf-8")
+        self.assertIn('default="ledger/inbox"', source)
+        self.assertNotIn('"ledger/MLB', source)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -401,6 +401,32 @@ def build_prediction(
             },
         })
 
+    # R306. A Showdown salary file gets TWO extra distributions beside the
+    # Classic one, because the Classic geometry is not this contest's: a
+    # Showdown roster is six people plus a captain, so the person market sums
+    # to 600% and the captain slot to 100%, both measured at exactly those
+    # values in 41 of 41 archived Showdown contests. ``predict_ownership``'s
+    # 800/200 split sums to 1000% on the same file.
+    #
+    # THE DETECTOR IS BOTH HALVES, and the first cut of it was one half and
+    # wrong. It read the roster tokens alone, on the stated reasoning that
+    # ``showdown_report['applied']`` is False on a Showdown file whose every
+    # key is an unpaired CPT/UTIL pair. That reasoning is FALSE: `applied` is
+    # set for every file that reaches the collapse, pairing or not. What is
+    # actually true is the case it misses in the other direction. A file whose
+    # Roster Position column carries a CPT token AND something outside
+    # CPT/UTIL takes ``collapse_showdown_roles``' early return -- `applied`
+    # False, rows returned per ROLE rather than per PERSON -- while "CPT" is
+    # still in `roles_seen`. A token-only detector emits a 600% PERSON market
+    # over rows that are still one-per-role, which double-counts everybody:
+    # R235's own bug, re-entered through a door R235 does not watch. So both
+    # halves are required, and the geometry question and the "is this pool
+    # per-person yet" question are asked separately because they are separate.
+    is_showdown = (
+        bool(showdown_report.get("applied"))
+        and "CPT" in {str(r).strip().upper()
+                      for r in (showdown_report.get("roles_seen") or [])})
+
     per_archetype: Dict[str, Any] = {}
     for archetype in sorted(wanted):
         prediction = ownership_prior.predict_ownership(
@@ -415,7 +441,7 @@ def build_prediction(
         pools = {"hitter": 0.0, "pitcher": 0.0}
         for row in rows:
             pools[row["pool"]] += float(own.get(row["Player_ID"], 0.0))
-        per_archetype[archetype] = {
+        block: Dict[str, Any] = {
             "own_pct_by_player_id": {k: own[k] for k in sorted(own)},
             "tier_by_player_id": {k: prediction["tier_by_player_id"][k]
                                   for k in sorted(prediction["tier_by_player_id"])},
@@ -430,6 +456,40 @@ def build_prediction(
                         "means a player left the pool between the softmax and here",
             },
         }
+        if is_showdown:
+            for key, predict, budget in (
+                ("showdown_roster",
+                 ownership_prior.predict_showdown_roster_ownership,
+                 ownership_prior.SHOWDOWN_ROSTER_BUDGET_PCT),
+                ("captain",
+                 ownership_prior.predict_captain_ownership,
+                 ownership_prior.CAPTAIN_BUDGET_PCT),
+            ):
+                sd = predict(
+                    players,
+                    archetype=archetype,
+                    implied_total_by_team=totals,
+                    batting_order_by_player_id=orders,
+                    probable_sp_ids=probables,
+                    base_projection_by_player_id=bases or None,
+                )
+                sd_own = sd["own_pct_by_player_id"]
+                block[key] = {
+                    "own_pct_by_player_id": {k: sd_own[k] for k in sorted(sd_own)},
+                    "tier_by_player_id": {k: sd["tier_by_player_id"][k]
+                                          for k in sorted(sd["tier_by_player_id"])},
+                    "params": sd["params"],
+                    "budget_check": {
+                        "pct_sum": round(sum(sd_own.values()), 1),
+                        "budget_pct": budget,
+                        "note": "the softmax allocates exactly this budget, so a "
+                                "sum off it by more than per-player rounding "
+                                "means a player left the pool between the "
+                                "softmax and here",
+                    },
+                    "note": sd["note"],
+                }
+        per_archetype[archetype] = block
 
     return {
         "schema": SCHEMA,
@@ -441,6 +501,24 @@ def build_prediction(
         "salary_file": {"path": str(salary_csv), "sha256": _sha256(salary_csv),
                         "players": len(players),
                         "showdown_roles": showdown_report},
+        "showdown_markets": {
+            "applied": bool(is_showdown),
+            "detector": "a CPT token in the salary file's Roster Position "
+                        "column, read off collapse_showdown_roles' roles_seen",
+            "captain_budget_pct": ownership_prior.CAPTAIN_BUDGET_PCT,
+            "roster_budget_pct": ownership_prior.SHOWDOWN_ROSTER_BUDGET_PCT,
+            "note": "R306. On a Showdown file each archetype block carries two "
+                    "extra distributions over the SAME collapsed people: "
+                    "`showdown_roster` at 600% and `captain` at 100%. The "
+                    "Classic `own_pct_by_player_id` beside them is the 800/200 "
+                    "split and sums to 1000% on this geometry; it is kept "
+                    "because every existing reader reads it, and it is the "
+                    "wrong accounting for a Showdown contest. Absent on a "
+                    "Classic file, where the Classic split is correct."
+                    if is_showdown else
+                    "Classic salary file: the 800/200 split is this contest's "
+                    "accounting and no Showdown distribution is emitted.",
+        },
         "label": "UNCALIBRATED STRUCTURAL PRIOR. Predicted %Drafted per contest "
                  "archetype from features public before lock. Never a win rate, "
                  "an ROI figure, a cash rate, or a probability claim; never fed "
@@ -721,6 +799,143 @@ def actuals_from_standings(standings_csv: str | Path) -> Tuple[Dict[str, float],
     return own, meta
 
 
+def captain_actuals_from_entries(
+    entries: Sequence[Mapping[str, Any]],
+    crosswalk: Mapping[str, str],
+    pool_player_ids: Sequence[str],
+) -> Tuple[Dict[str, float], Dict[str, Any]]:
+    """{Player_ID: realized captain %} over the WHOLE Showdown pool. R306 step 3.
+
+    Counts ``captain_norm`` across complete entries, which
+    ``parse_standings_export`` has stored on every mined file since R39, so
+    this needs no re-mine and no new parsing. Two decisions worth stating:
+
+    NOT ``field_miner``'s ``captain_table``. R39's producer computes one, but
+    the key is absent -- not present-and-empty -- in 379 of 379 mined files on
+    disk, so a code read suggests the aggregate is already stored and it is
+    not. It is also truncated to ``most_common(8)`` and the median contest has
+    12 distinct captains, so it would cap the distribution even once
+    backfilled.
+
+    NOT DK's ``%Drafted`` column either, though the reason on disk is not the
+    one the filing gave. The filing says DK's ``player_table`` is person-level
+    because ``roster_position`` reads ``UTIL`` on sampled rows. A census over
+    all 41 usable archived Showdown exports finds 346 CPT rows beside 934 UTIL
+    rows: 22 of the 41 ARE role-grained, and where they are, DK's CPT
+    ``%Drafted`` agrees with the share counted here to a mean of 0.4 points.
+    The real reason to count entries is that DK's right-hand table is
+    TRUNCATED -- 19 of 41 exports carry no CPT row at all, and three that do
+    carry exactly one against 8 to 10 distinct captains in their entries.
+    ``entries[]`` is complete; the player table is not.
+
+    THE ZERO TAIL IS INCLUDED, and that is why the pool is a parameter. On a
+    Showdown slate the salary file IS the contest's player pool, so a player
+    nobody captained has an observed captain share of 0.0. Dropping those
+    truncates the sample at the end the prior is most likely to get wrong.
+    """
+    complete = [e for e in entries
+                if e.get("lineup_complete") and e.get("captain_norm")]
+    counts: Dict[str, int] = {}
+    for entry in complete:
+        norm = str(entry["captain_norm"])
+        counts[norm] = counts.get(norm, 0) + 1
+    n = len(complete)
+    actual = {str(pid): 0.0 for pid in sorted({str(p) for p in pool_player_ids})}
+    unmatched: List[str] = []
+    for norm in sorted(counts):
+        pid = crosswalk.get(norm)
+        if pid is None or str(pid) not in actual:
+            unmatched.append(norm)
+            continue
+        actual[str(pid)] = round(100.0 * counts[norm] / n, 4) if n else 0.0
+    meta = {
+        "complete_entries": n,
+        "distinct_captains": len(counts),
+        "pool_players": len(actual),
+        "zero_captain_players": sum(1 for v in actual.values() if v == 0.0),
+        "captain_names_reaching_no_pool_id": unmatched,
+        "share_sum_pct": round(sum(actual.values()), 1),
+        "source": "mined entries[].captain_norm, complete lineups only",
+    }
+    return actual, meta
+
+
+def grade_captain_prediction(
+    prediction: Mapping[str, Any],
+    actual_by_id: Mapping[str, float],
+    archetype: str,
+    contest_id: str = "",
+    field_size: Optional[int] = None,
+    market: str = "captain",
+) -> Dict[str, Any]:
+    """Grade one Showdown market against its realized shares. R306 step 3.
+
+    ``market`` selects the distribution: ``captain`` (100% budget) or
+    ``showdown_roster`` (600%). The baseline is a FLAT allocation of that
+    market's own budget over the pool, which is the honest null here: the
+    flat-12 constant ``grade_prediction`` uses is a Classic artifact and means
+    nothing against a 100% budget spread over twenty-odd people.
+    """
+    from mlb_engine.field.ownership_prior import grade_against_actuals
+
+    archetypes = prediction.get("archetypes") or {}
+    if archetype not in archetypes:
+        raise ValueError(
+            f"the prediction file carries no archetype {archetype!r}; it has "
+            + (", ".join(sorted(archetypes)) or "none"))
+    block = archetypes[archetype].get(market)
+    if not block:
+        raise ValueError(
+            f"the prediction file carries no {market!r} distribution for "
+            f"{archetype!r}; emit it from a Showdown salary file (see "
+            "`showdown_markets` in the prediction)")
+    predicted = block["own_pct_by_player_id"]
+    budget = float((block.get("budget_check") or {}).get("budget_pct") or 0.0)
+
+    overall = grade_against_actuals(predicted, actual_by_id)
+    joined = sorted(set(map(str, predicted)) & set(map(str, actual_by_id)))
+    pairs = [(float(predicted[pid]), float(actual_by_id[pid])) for pid in joined]
+    flat = budget / len(joined) if joined else 0.0
+    baseline = _bucket_metrics([(flat, a) for _, a in pairs])
+    prior_mae = _bucket_metrics(pairs).get("mae_pct_points")
+
+    return {
+        "schema": "ownership_captain_grade/v1",
+        "tool_version": VERSION,
+        "prior_version": prediction.get("prior_version"),
+        "graded_utc": _now_utc(),
+        "market": str(market),
+        "budget_pct": budget,
+        "slate_date": prediction.get("slate_date"),
+        "slate_tag": prediction.get("slate_tag"),
+        "archetype": archetype,
+        "contest_id": str(contest_id or ""),
+        "field_size": field_size,
+        "params": block.get("params"),
+        "overall": overall,
+        "join": {
+            "joined_players": len(joined),
+            "predicted_players": len(predicted),
+            "actual_players": len(actual_by_id),
+            "actual_nonzero": sum(1 for v in actual_by_id.values() if float(v) > 0),
+        },
+        "baseline_flat_budget": baseline,
+        "verdict": {
+            "prior_mae_pct_points": prior_mae,
+            "beats_flat_budget": (
+                None if prior_mae is None or baseline.get("mae_pct_points") is None
+                else prior_mae < baseline["mae_pct_points"]),
+        },
+        "label": "DETERMINISTIC ERROR MEASUREMENT of an uncalibrated structural "
+                 "prior over ONE contest's Showdown "
+                 + str(market) + " market. The Spearman is a rank correlation "
+                 "between two measured shares, not a prediction of anything. "
+                 "Not a win rate, an ROI figure, a cash rate, or a probability "
+                 "claim. Condition on contest archetype and field size; never "
+                 "pool across them.",
+    }
+
+
 def ledger_block(grade: Mapping[str, Any]) -> str:
     """The block ARCHIVE files. One contest, labeled, conditioned, never pooled."""
     overall = grade.get("overall") or {}
@@ -823,6 +1038,17 @@ def _emit_cli(args: argparse.Namespace) -> int:
                      f"left whole: "
                      + ", ".join(u["person_key"] for u in unpaired))
         print(line)
+    markets = prediction.get("showdown_markets") or {}
+    if markets.get("applied"):
+        first = sorted(prediction["archetypes"])[0]
+        block = prediction["archetypes"][first]
+        cap = (block.get("captain") or {}).get("budget_check") or {}
+        ros = (block.get("showdown_roster") or {}).get("budget_check") or {}
+        print(f"  showdown_markets APPLIED: captain {cap.get('pct_sum')}% of "
+              f"{cap.get('budget_pct')}%, roster {ros.get('pct_sum')}% of "
+              f"{ros.get('budget_pct')}% (archetype {first})")
+        print("                   the Classic 800/200 column beside them sums "
+              "to 1000% on this geometry and is NOT this contest's accounting")
     ambiguous = prediction["crosswalk"]["ambiguous_names"]
     if ambiguous:
         print(f"  crosswalk        {len(ambiguous)} ambiguous name(s), excluded "

@@ -25,6 +25,204 @@ performance claim.
 
 ---
 
+## 2026-09-03 — R306 steps 1-3: the ownership prior is graded on 297 archived contests instead of one, the Showdown captain slot gets its own 100% market beside a 600% roster market, and the Classic 800/200 split it was using sums to 1000% on that geometry
+
+**Shipped: steps 1, 2 and 3. Steps 4 (feed R307's sleeve) and 5 (the standing
+portfolio-shape claim) were out of scope and stay open**; R306's entry is
+rewritten in `docs/backlog.md` to hold step 5 only, and step 4 is noted on
+R307, whose gate this discharges.
+
+**Step 1 — the constraint was never sample count.** `ownership_pred.py grade`,
+`actuals_from_standings`, `grade_prediction` and `ledger_block` have all
+existed since R135. One grade had ever been run, its result lived in a module
+docstring, and `grep -rn "Ownership prior grade" ledger/` returned zero blocks.
+`tools/ownership_grade_archive.py` is the loop nothing had: it resolves its own
+inputs and grades the archive per contest, conditioned on archetype and field
+size, never pooled. **297 of 379 archived contests graded**, in four archetypes,
+with median per-contest Spearman `cash` 0.026 (n=1), `large_field_gpp` 0.629
+(n=8), `single_entry_gpp` 0.619 (n=42), `wta_satellite` 0.430 (n=246), and
+median per-contest signed level error -3.86 / -2.70 / -2.30 / -4.16 points.
+Negative is UNDER-prediction, which replicates R154's single-slate finding on
+297 contests and does not repair it: spend the ordering, spend none of the
+magnitude, unchanged. The 82 refusals are named by cause, not counted (54 no
+salary file joined at 95%, 14 no DKEntries row carries the Contest ID so the
+contest has no name, 12 no usable field size, 1 no archetype pattern).
+
+**A tool and not a runbook step, deliberately.** A runbook step would have the
+property a runbook step already had for six weeks: it is a thing a session must
+remember. The role boundary is kept — it writes `ledger/inbox/` fragments and
+never `ledger/`, which a test pins.
+
+**Step 2 — and the headline defect was real and unmeasured.** `predict_ownership`
+allocates 800% to hitters and 200% to pitchers because that is the Classic
+roster. Handed a Showdown salary file it does the same thing: measured on
+`data/slates/2026-07-23/DKSalaries_showdown.csv`, hitters 800.0% + pitchers
+200.0% = **999.9%**, on a contest whose person market sums to 600%. So the
+Showdown geometry gets two distributions of its own —
+`predict_showdown_roster_ownership` at 600% and `predict_captain_ownership` at
+100% — over the same R235-collapsed people. The Classic function is untouched
+rather than taught a geometry flag; a test pins its 800/200 split.
+
+**R235's person collapse is intact and is the reason both work.** The collapse
+yields one row per PERSON, which is the grain BOTH Showdown budgets want. The
+captain half is a second allocation over those people, not a re-expansion of
+the collapse. A test asserts both distributions are keyed on exactly the
+collapsed person set.
+
+**The parameters are fit, and the fit says something the filing did not.** Two
+parameters per market against two measured medians over the 41 usable archived
+Showdown contests. Captain: realized top-captain share 32.7% and realized arm
+share of the captain slot 52.2%; a joint grid settles at temperature 0.13 and
+pitcher weight +0.10, reproducing 32.5% and 51.9%. Roster: realized top-person
+share 69.8% and arm share 114.3%; settles at temperature 0.17 and pitcher
+weight **-0.10**. Reproduce by sweeping those two scalars per market against
+those two medians. Four things the fit established:
+
+  **The two pitcher weights carry OPPOSITE SIGNS**, and that is the finding in
+  one parameter each. Relative to where salary rank alone puts them, the field
+  up-weights arms for the captain slot and down-weights them across the six
+  roster slots; a zero weight predicts 156.5% roster arm share against a
+  realized 114.3%. One ownership number cannot carry both signs, which is the
+  mechanism behind a 60%-rostered player landing at 6% captain.
+
+  **Temperature buys no ordering, analytically.** A softmax is monotone and
+  Spearman is rank-based, so every temperature yields the identical ordering:
+  median Spearman 0.746-0.750 across the whole swept range. Temperature is fit
+  to concentration only and cannot spend magnitude the project does not have.
+
+  **Finding (c) replicates on 41 contests and far harder than on eight.** The
+  filing had "six of eight top captains are arms", not re-measured on the 41
+  because it needs a position join the mined row lacks; the salary file has it.
+  The captain slot is held by an arm in a median 52.2% of entries (min 21.5,
+  max 73.9) against arms taking a median 19.0% of all six roster slots, and the
+  most-captained player is an arm in 32 of 41 contests. But the naive
+  consequence is FALSE: the tilt buys almost no ordering (median Spearman 0.747
+  at zero against 0.749 fitted, and the worst contest gets worse, 0.311 ->
+  0.286), because arms are the most expensive players on a Showdown slate and a
+  salary percentile over one pool already ranks them top. The tilt is doing
+  concentration work, not ranking work, and it is +0.10 rather than the 0.60 a
+  reading of finding (c) would have set.
+
+  **Only `wta_satellite` is marked fitted.** 37 of the 41 usable contests are
+  that archetype and the other four resolve to none, so one archetype has
+  evidence and five do not. The five carry their roster temperature scaled by
+  one stated ratio rather than five independently invented numbers that would
+  read as five measurements.
+
+**Step 3 — and three premises came back different from the filing.**
+
+  **(a) DK's `%Drafted` is NOT person-level, and the filing's reason for
+  avoiding it was wrong even though its conclusion was right.** The filing says
+  `roster_position` reads `UTIL` on sampled rows. A census over all 41 usable
+  archived Showdown exports finds **346 CPT rows beside 934 UTIL rows**: 22 of
+  the 41 ARE role-grained, and where they are, DK's CPT `%Drafted` agrees with
+  the share counted off `entries[]` to a mean of 0.4 points and a max of 2.01.
+  The real reason to count entries is TRUNCATION: 19 of 41 exports carry no CPT
+  row at all, and three that do carry exactly one against 8 to 10 distinct
+  captains in their entries. `entries[]` is complete; the player table is not.
+  (`own_by_player_norm` is unaffected and correct either way — it SUMS the
+  rows, so a role-grained table collapses to person-level, which is why both
+  kinds total 600%.)
+
+  **(b) The zero tail belongs in the grade, and leaving it out is not
+  conservative.** On a Showdown slate the salary file IS the contest's player
+  pool, so a player nobody captained has an OBSERVED captain share of 0.0 — an
+  observed count, not a missing value. Grading only the players who WERE
+  captained truncates the sample at the end the prior is most likely to get
+  wrong, and it does not bias in a predictable direction: on the same 41
+  contests, dropping the tail moves median Spearman from **0.547 to 0.746** on
+  the captain market and from **0.618 to 0.499** on the roster market. Up on
+  one, down on the other.
+
+  **(c) The signed level error on these markets is ~0 BY CONSTRUCTION and is
+  not evidence.** Prior and realized shares allocate the same budget over the
+  same zero-filled pool, so their means are equal. It is reported because its
+  absence would mean a player left the pool between the softmax and the join;
+  the fragment says so rather than letting a reader take it for calibration.
+
+  All 41 graded, per contest, banded by field size: median per-contest captain
+  Spearman 0.456 (23 contests, fields 1-100), 0.615 (16, 101-500), 0.641 (2,
+  501-2000); roster 0.620 / 0.609 / 0.591. The captain prior is weakest in the
+  smallest fields, which is also where the self-inclusion bias is worst.
+
+**Two defects this item introduced and its own tests caught, reported because
+a mutation check that only confirms what you meant is worth nothing.**
+(1) The first cut of the archive driver HARDCODED the allocator's field-size
+boundaries and got `MID_FIELD_MAX_ENTRANTS` wrong (2000, written as 5000); the
+bands are imported now. (2) The first cut of the Showdown detector read the
+salary file's roster tokens ALONE, on a stated reasoning that turned out to be
+false — `showdown_report['applied']` is set for every file that reaches the
+collapse, not cleared by unpaired keys. The case it actually missed runs the
+other way: a file carrying a CPT token AND a token outside CPT/UTIL takes
+`collapse_showdown_roles`' early return, so its rows are still one-per-ROLE,
+and a 600% PERSON market over them **double-counts everybody — R235's own bug,
+re-entered through a door R235 does not watch**. The detector requires both
+halves now and a test builds that exact file.
+
+**Two refusals fixed to name the fact that is missing** (R290(c)'s rule applied
+to a new tool): 19 contests were refused with a message blaming the CONTEST
+TYPE when the type resolved fine and the FIELD SIZE was absent — a reader would
+have gone and edited the shape map. Twelve of the 19 are now graded, off
+`meta.entries_total` on a `coverage: full` record (a full export lists every
+entry, so its entry count is the field size), with the source named on every
+row; the remaining seven say which fact is missing.
+
+**Per R233, the enumerations, with their hit lists.**
+
+  *Nothing decides a contest shape but `contest_shape_for_card`.*
+  `grep -rn "contest_shape_for_card" --include=*.py mlb_engine/ tools/` — one
+  definition (`contest_allocator.py:208`), six allocator call sites (`:254`,
+  `:483`, `:1302`, `:1340`, `:1438`, `:3343`), and one new caller,
+  `ownership_prior.archetype_for_contest_facts:212`, which CALLS it rather than
+  re-deciding. No second decider, and the new function's import check
+  (`_check_contest_fact_projection`) proves the card fields it must invent
+  (buy-in, prize pool, payout rows, ticket count) cannot reach the archetype,
+  by construction over every contest type and field-size band.
+
+  *One shape-to-archetype projection, three consumers.* `ARCHETYPE_BY_CONTEST_SHAPE`
+  (`ownership_prior.py:103`) is read only through `archetype_for_contest_shape`,
+  whose consumers are `archetype_for_contest_facts:212`, `ownership_prior.py:951`
+  and `qa_portfolio.py:769`. No private copy anywhere.
+
+  *One Showdown scoring core.* `grep -rn "_single_pool_shares\|_showdown_prediction"`
+  — `_single_pool_shares` (`:609`) has exactly one caller, `_showdown_prediction`
+  (`:676`, calling at `:702`), which has exactly two, the two public predict
+  functions (`:756`, `:814`). The two markets cannot disagree about a player's
+  structural score.
+
+  *The schema stays `ownership_pred/v1` because the change is additive and no
+  reader iterates the block.* Every production reader of an archetype block
+  names `own_pct_by_player_id`: `qa_portfolio.py:872`, `:958`, `:989`, `:1011`,
+  `:1013`, and `execution_pipeline.py:4374`, `:4378`. `grep -rn "for .* in .*archetypes\["`
+  returns nothing, so no reader enumerates keys and the new `captain` /
+  `showdown_roster` keys are invisible to all seven.
+
+**What was refused.** No control moved, no posture changed, nothing reached
+`mlb_engine/optimize/` or the certification path — this item emits and grades,
+and R307 is where it steers. The captain prior is not wired into any build. No
+ledger file was edited (fragments only). And the level is still not spendable:
+R154's ruling stands on 297 contests instead of one.
+
+**Truthful labels.** Every number above is an observed count from an archived
+DK standings export or a deterministic statistic over one. A Spearman is a rank
+correlation between two measured shares, not a prediction. Nothing is a win
+rate, a cash rate, an ROI figure, an edge, or a probability claim. The archive
+is small-field satellites in which Ben's own entries sit in the denominator; a
+larger sample dilutes that bias and does not remove it, and a four-figure field
+is a different archetype rather than a bigger version of a small one — which is
+what the field-size banding is for.
+
+**Landing.** 28 mutations written, 28 killed, 0 survivors, each against the
+single guard written for it. Gate `PASS v2.26.0 28 modules 1768 tests` ->
+`PASS v2.26.0 28 modules 1796 tests`, all five suites `clean` (`ran == pinned`,
+zero skipped; the audit reports by exception and printed no state word).
+`tests.test_showdown` 173 -> 201. Files: `mlb_engine/field/ownership_prior.py`,
+`tools/ownership_pred.py`, `tools/ownership_grade_archive.py` (new),
+`tests/test_showdown.py`, `tools/audit.py`, `CLAUDE.md`, `docs/backlog.md`, and
+five `ledger/inbox/` fragments for ARCHIVE.
+
+---
+
 ## 2026-09-03 — Board: the eleventh greenfield edition is merged (R304-R314 filed, nine riders, three findings rejected, one severity raised), the eleven-fragment inbox is consumed, and the queue is reordered on Ben's leverage-first instruction (docs only)
 
 **Scope: docs only.** This commit touches `docs/backlog.md` and moves ten

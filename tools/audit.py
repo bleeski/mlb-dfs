@@ -726,7 +726,22 @@ EXPECTED_SUITE_COUNTS = {
     # so an exclusion covering one side made that rule vacuously true and
     # returned a six-man one-team lineup -- the exact vacuity the melt refuses a
     # single-team FILE for, reachable through a new door.
-    "tests.test_showdown": 173,
+    # R306, 2026-09-03: 173 -> 201, the twenty-eight that pin the Showdown
+    # captain market. Four budgets (captain 100%, roster 600%, the Classic
+    # 800/200 left alone, and the 6:1 identity between the two Showdown ones),
+    # the OPPOSITE SIGNS on the two pitcher weights and the concentration
+    # ordering that make the captain slot a different market rather than a
+    # rescaling, the analytic fact that temperature cannot move the ordering,
+    # three on the params tables and their import checks, four on the archetype
+    # resolver (including that it CALLS contest_shape_for_card rather than
+    # re-deciding a shape, and that the card fields it has to invent cannot
+    # reach the answer), five on the emit -- one of which is the detector case
+    # that found a defect in this item's own first cut: a CPT token beside a
+    # non-CPT/UTIL token takes the collapse's early return, so the rows are
+    # still one-per-ROLE and a 600% PERSON market over them re-enters R235's
+    # double-count through a door R235 does not watch. Five on the captain
+    # actuals and their grade, and five on the archive driver.
+    "tests.test_showdown": 201,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
