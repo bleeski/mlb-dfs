@@ -66,6 +66,15 @@ minutes away. It was 19:28. Twelve minutes were left, one of them went to writin
 a failure narrative, and the slate delivered nothing. A reading printed by the
 same call as the build cannot be stale by more than that call.
 
+**Two more doors, R318, 2026-09-04.** A clock figure you QUOTE to Ben is a
+separate act from the clock inside a build call and drifts on its own: quote
+only a `date` printed in that same turn. And enrichment, research and QA phases
+run no build call and still burn the slate clock, so print
+`TZ=America/New_York date` entering one and again before deciding what to do
+with what you found. One instance each, both on 2026-09-04: a handoff that read
+"T-6" at T-18, and a 24-minute enrichment sweep that measured nothing and
+surfaced at T-9 believing T-30.
+
 **On a refusal, read `feasibility.checks` where `passed=False` FIRST, before
 `errors[]`.** `build_slate.py` prints them to stderr on every refusal now, ahead
 of the hint and the clock, so this needs no discipline — but read them there
@@ -417,7 +426,7 @@ flag now rather than an engine edit the contract forbids mid-slate.
 
 ```bash
 python skills/generate-lineups/scripts/build_slate.py ... \
-    --leverage '{"max_cumulative_ownership_pct": 90, "min_low_owned_hitters": 2}'
+    --leverage '{"archetype": "large_field_gpp", "max_cumulative_ownership_pct": 90, "min_low_owned_hitters": 2}'
 ```
 
 It reads the slate's own `outputs/<date>/ownership_pred_<tag>.json` (the file the
@@ -430,10 +439,23 @@ Five things to know before you use it:
 - **Emit the prediction file FIRST.** With no file it REFUSES and names the path
   rather than building unconstrained. That refusal is the feature: a leverage
   build that silently ignored the flag is the failure this item exists to end.
+- **`archetype` is REQUIRED whenever the prediction file carries more than
+  one, which is every file in practice.** The example above carried no
+  `archetype` key until 2026-09-06 and did not run: on 2210_2g the prior file
+  held six (`cash`, `large_field_gpp`, `mme`, `single_entry_gpp`, `small_gpp`,
+  `wta_satellite`) and the build exited `leverage_unresolved` with no brief
+  written, which also means the JSON explaining it is in
+  `outputs/<date>/_<tag>.out` and not at the brief path you passed. The refusal
+  names the valid set and the exact syntax; it cost a call to see it.
 - **`max_cumulative_ownership_pct` is the sum over ten slots**, so an
   unconstrained lineup lands near 100-105 and a cap of 90 is a real bind.
   Measured on 1605_2g: cap 90 cost **-7.72%** of the single-lineup objective, cap
   80 cost **-32.50%**, cap 75 was INFEASIBLE. Start at 90-95, not at 80.
+  **That -7.72% is a 1605_2g reading and not a budget: re-measure per slate,
+  because the cost scales with slate thinness.** On the 2026-09-04 2210_2g
+  2-gamer, where the prior spreads over ~40 rosterable bats so the cumulative
+  cap binds far earlier, cap 95 with `min_low_owned_hitters: 1` certified at
+  apex 883.84 -> 688.27, **-22.1%**, and cap 90 with a floor of 2 REFUSED.
 - **`min_low_owned_hitters` has a hard infeasibility edge**, at 6 on that same
   pool. If the build refuses, lower the floor before you touch the cap; they are
   independently settable for exactly this reason.

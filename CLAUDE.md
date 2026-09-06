@@ -708,7 +708,20 @@ Two readings that are not optional. **Read the clock from the clock**: print
 `TZ=America/New_York date` in the same bash call as every build, and never infer
 elapsed time from turn count — on 1940_9g a session believed it was 19:38 with
 lock two minutes away, it was 19:28, and it spent one of its twelve remaining
-minutes writing a post-mortem. **Read `feasibility.checks` where `passed=False`
+minutes writing a post-mortem. **R318 widens that to the two doors the
+build-call wording does not reach, both measured on 2026-09-04.** Every clock
+figure you STATE -- a handoff, a status line, a verdict -- comes from a `date`
+printed in that same turn: 2210_1g_sd opened its handoff with "T-6 min" at T-18
+and stopped working with 18 minutes live. And any phase that runs NO build call
+still burns the slate clock -- web research, a data hunt, reading an artifact, a
+QA pass, a discussion with Ben -- so print the date when you enter one and again
+before you decide what to do with what you found: 2140_3g spent ~24 unmeasured
+minutes on an enrichment sweep, read T-9 where it had been working as though
+T-30, and did not attempt a rebuild it could have afforded at T-30. Two of the
+three recorded instances OVERSTATED elapsed time and one UNDERSTATED it, so
+there is no safe direction to lean; an overstated clock ends a session that
+still had time and an understated one spends time it does not have.
+**Read `feasibility.checks` where `passed=False`
 BEFORE `errors[]`**; `build_slate.py` prints both on every refusal now, so this
 costs nothing.
 

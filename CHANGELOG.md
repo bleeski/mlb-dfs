@@ -25,6 +25,69 @@ performance claim.
 
 ---
 
+## 2026-09-06 — R318 and the board merge: the clock rule's two unreached doors, three instruction-corpus corrections fixed rather than queued, and the fourteen-fragment inbox consumed
+
+**Scope: `CLAUDE.md`, `skills/generate-lineups/SKILL.md`,
+`docs/cowork_sync_protocol.md`, `docs/backlog.md`, `docs/backlog_inbox/`.** No
+code, no tests, no delivered byte. The gate was not run and this entry says so
+rather than implying otherwise; the two prose-pinning tests that read `CLAUDE.md`
+assert the PRESENCE of strings (`"CHANGELOG.md carries its entry"`,
+`"changelog_debt"`, the audit's clean line) and this edit removes none of them.
+
+**R318. The T-schedule's "Read the clock from the clock" scoped itself to build
+calls, and three slates broke it through two doors that wording does not reach.**
+The rule as written covers `TZ=America/New_York date` in the same bash call as
+every build. Two failure shapes sit outside it, both measured 2026-09-04. A clock
+figure you STATE is a separate act: 2210_1g_sd printed `NOW 21:43 ET, T-27`, ran
+three commands, and opened its handoff with **"T-6 min"** at 21:52, which was
+T-18 -- it presented a final deliverable and stopped with eighteen minutes live,
+and everything of value found afterwards (a 2.29x APPG error on the top-ranked
+hitter, the `--projections` workaround, a rebuild that cleared an exposure
+breach) came out of minutes reopened only because Ben asked a follow-up. And a
+PHASE that runs no build call still burns the clock: 2140_3g delivered at 21:06
+with a printed `T-34`, spent ~24 minutes on an enrichment sweep that read no
+clock at all, and surfaced at 21:30 to find `T-9` where it had been working as
+though T-30 -- the rebuild it could have afforded was not attempted. **Both
+directions are live and the wording says so**, which corrects the filing
+fragment: 1940_9g and 2210_1g_sd OVERSTATED elapsed time, 2140_3g UNDERSTATED
+it, and the first fragment's proposed "the overstating direction is the dangerous
+one" was written before the third instance existed. An overstated clock ends a
+session that still had time; an understated one spends time it does not have.
+Both files carry the same two sentences, CLAUDE.md's in the T-schedule and
+SKILL.md's beside the paragraph the 1940_9g session had already read and broken.
+
+**R301 riders, fixed rather than queued, on the R316 precedent.** (1)
+`docs/cowork_sync_protocol.md` documented two transfer directions and the
+commonest input on this project is a third: DK exports Ben attaches to the chat
+land in the container's own uploads path, which is neither the mount nor
+`/mnt/user-data/`, so `device_bash` cannot see them and neither documented
+direction applies. The move is a copy to `/mnt/user-data/outputs/` and
+`device_commit_files` with **`stagedPath`** rather than `fileUuid` -- `fileUuid`
+would require pushing a raw DK input back into Ben's chat as a delivery card
+first -- and the alternative is reproducing ~42KB of CSV through a `cat >`
+heredoc under a lock clock, which is both the slowest option and the one that can
+silently corrupt a player ID. Verified byte-exact on both DK files of the
+2026-09-04 2210_1g_sd slate. (2) SKILL.md's `--leverage` example **did not run**:
+the prediction file is per-archetype and an `archetype` key is required whenever
+it carries more than one, which is every file in practice, so the documented
+command exits `leverage_unresolved` with no brief written (and therefore with the
+explaining JSON in `outputs/<date>/_<tag>.out`, not at the brief path passed).
+The example gains the key and the section gains both facts. (3) The same section's
+`-7.72%` cap-90 figure reads as a budget and is a 1605_2g reading: on the 2-game
+2210_2g, where the prior spreads over ~40 rosterable bats so the cumulative cap
+binds far earlier, cap 95 with a floor of 1 certified at **-22.1%** of apex and
+cap 90 with a floor of 2 REFUSED. The caveat now says re-measure per slate.
+
+**The board.** Fourteen inbox fragments merged: five new numbers (R317 the
+platoon-reference refresh and its silent staleness, R319 the paste tool's two
+name-form defects, R320 resolved-reported-as-applied on both build paths, R321
+the bank stage's serial solves, plus this entry's R318), seven riders, **R125(a)
+falsified by the falsifier it named for itself** and rewritten to "declare the
+dearer arm", four fragment claims corrected on merge, and the queue rebuilt to 17
+slots with a fourth ordering term that moves R118 from slot 7 to slot 5. Twelve
+fragments consumed and deleted; two retained with headers saying why. The
+reasoning is in `docs/backlog.md`'s 2026-09-06 note and is not duplicated here.
+
 ## 2026-09-06 — R316 rider: three of R301's four money-boundary contradictions, fixed rather than left queued — the Showdown captain cap a doc read 0.33 while the solver holds 0.25, a verify_export example instructing the one flag SKILL.md forbids, and a 14-second solver budget left over from the retired 45s ceiling
 
 **Scope: `skills/generate-lineups/references/showdown.md`,

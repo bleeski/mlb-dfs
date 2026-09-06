@@ -107,7 +107,16 @@ committing in the container, or commit on the mount instead, where Ben's
 `runs/`, `outputs/`, `data/slates/<date>/`, `ledger/inbox/` fragments and raw
 DK exports are gitignored runtime data. They move disk-to-container by
 `device_stage_files` and container-to-disk by `SendUserFile` +
-`device_commit_files`. Note that `tar -x` FAILS over the mount ("Cannot open:
+`device_commit_files`. **A THIRD direction exists and is the commonest input on
+this project: DK exports Ben attaches to the chat.** Those land in the
+container's own uploads path (`/root/.claude/uploads/...`), which is neither the
+mount nor `/mnt/user-data/`, so `device_bash` cannot see them and neither
+documented direction applies. Copy the file to `/mnt/user-data/outputs/...` and
+call `device_commit_files` with **`stagedPath`** (not `fileUuid`) pointing at
+that path -- `fileUuid` would require pushing a raw DK input back into Ben's
+chat as a delivery card first. Verified both DK files byte-exact in one call on
+the 2026-09-04 2210_1g_sd slate; the alternative is reproducing ~42KB of CSV
+through a `cat >` heredoc under a lock clock. Note that `tar -x` FAILS over the mount ("Cannot open:
 File exists", because the mount cannot unlink), so the write-back is: extract
 to a directory ON THE MOUNT, then `cat $STAGE/$f > $REPO/$f` per file, because
 `cat >` truncates in place and needs no unlink.
