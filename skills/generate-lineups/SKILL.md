@@ -340,10 +340,14 @@ before lock, run them first and pass the results in:
   game-environment factor. When `--odds` is omitted the script fetches totals
   and moneylines itself if `THE_ODDS_API_KEY` is set, and leaves F1 at 1.0 for
   everyone if it is not.
-  **`api.the-odds-api.com` is proxy-gated in cloud sessions**, exactly as
-  `statsapi.mlb.com` is: the fetch dies with a 403 tunnel error, the build
-  says `F1 stays neutral` in one stderr line, and everything downstream
-  certifies. `enrichment.signal_applied: true` does NOT mean F1 ran -- five
+  **`api.the-odds-api.com` is proxy-gated in SOME cloud sessions and not
+  others, so check rather than assume (R316, 2026-09-06).** This line read
+  "proxy-gated in cloud sessions, exactly as `statsapi.mlb.com` is"; measured
+  on the device VM 2026-09-06, both answer normally (the odds API 200 with the
+  repo key, statsapi 200 to plain `urllib`). Where it IS gated the fetch dies
+  with a 403 tunnel error, the build says `F1 stays neutral` in one stderr
+  line, and everything downstream certifies -- which is why the read below is
+  the check either way. `enrichment.signal_applied: true` does NOT mean F1 ran -- five
   other factors moving rows set it -- so read `enrichment.counts.f1_games_priced`
   directly, and treat a 0 there as a build to fix rather than to present.
   The fallback when the API is unreachable is a paste, same as for lineups:
@@ -1171,7 +1175,7 @@ Before a build, when there is time:
 ```bash
 cd <repo> && git status --short
 python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165  # repeat to GATE COMPLETE
-python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 27 modules, 1675 tests
+python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 28 modules, 1810 tests
 ```
 
 **`--run-tests` in one call is not the supported path here and CLAUDE.md says

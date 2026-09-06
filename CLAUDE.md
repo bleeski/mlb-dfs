@@ -392,11 +392,26 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    a rejected credential, or unknown.** It read "check the token scope or
    expiry" for every failure until 2026-08-17, which sent a session at a
    working PAT while the real cause was a sandbox with no outbound network at
-   all. Read the reason before touching the token. A cloud Cowork session's
-   device VM is that sandbox: DNS resolves, TCP to GitHub does not, and the
-   proxy answers CONNECT with 403 even for a public repo, so the fetch there
-   never succeeds and `behind` stays a fallback reading. The container reaches
-   GitHub normally.
+   all. Read the reason before touching the token.
+   **The device VM's egress is not a constant, and this paragraph asserted that
+   it was (R316, 2026-09-06).** It read: "a cloud Cowork session's device VM is
+   that sandbox: DNS resolves, TCP to GitHub does not, and the proxy answers
+   CONNECT with 403 even for a public repo, so the fetch there never succeeds
+   and `behind` stays a fallback reading." Measured on the device VM this date,
+   every clause of that is false. `tools/audit.py` reported `fetched: true`,
+   `fetch_age_hours: 0.0`, `default_branch_source: remote`; `.git/FETCH_HEAD`
+   was written by that call; `tools/sync_check.py` printed
+   `GitHub main c6dd17c (measured via GH_PAT)` and `disk and GitHub agree`; and
+   `curl` returned 200 from api.github.com, statsapi.mlb.com,
+   baseballsavant.mlb.com, fangraphs.com and pypi.org, with
+   api.the-odds-api.com at 401 unkeyed and 200 with the repo key. The container
+   still reaches GitHub too.
+   So MEASURE the egress rather than reading it off this file, in EITHER
+   direction: a session that assumes network is as wrong as one that assumes
+   none, and both errors are silent. This is the same shape as the
+   `master`-versus-`main` paragraph below -- a value nothing on this disk can
+   re-read, written down as permanent -- and R147 is what makes the measurement
+   free, because the audit already NAMES which of the three stopped a fetch.
    What no fetch can fix: sessions COMMIT and Ben PUSHES
    (docs/cowork_sync_protocol.md), so disk routinely runs ahead of GitHub and
    the audit names that too. `default_branch_mismatch` USED to read this clone's

@@ -25,6 +25,82 @@ performance claim.
 
 ---
 
+## 2026-09-06 — R316: three live documents asserted that this mount has no network, and the device VM answered 200 from every host they named
+
+**Scope: `CLAUDE.md`, `docs/cowork_sync_protocol.md`,
+`skills/generate-lineups/SKILL.md`.** Documentation only. No engine, tool or
+test file moved, so the gate is unchanged at `PASS v2.26.0 28 modules 1810
+tests`; `tests.test_core` and `tests.test_upload_integrity` were re-run because
+three of their tests read these two files (R216: SKILL.md and CLAUDE.md sit
+outside the gate's tree fingerprint).
+
+**What.** Four corrections, three of them one class.
+
+1. `CLAUDE.md` session-start step 0 said "a cloud Cowork session's device VM is
+   that sandbox: DNS resolves, TCP to GitHub does not, and the proxy answers
+   CONNECT with 403 even for a public repo, so the fetch there never succeeds
+   and `behind` stays a fallback reading."
+2. `docs/cowork_sync_protocol.md` said "the mount has no network.
+   `.git/FETCH_HEAD` has never existed."
+3. `skills/generate-lineups/SKILL.md` said "`api.the-odds-api.com` is
+   proxy-gated in cloud sessions, exactly as `statsapi.mlb.com` is."
+4. Unrelated and found on the way: SKILL.md's session-hygiene block still told
+   an operator to expect `PASS v2.26.0, 27 modules, 1675 tests`, a pin two
+   module counts and 135 tests stale, against `CLAUDE.md`'s correct 28/1810.
+
+**The measurement, on the device VM, 2026-09-06.** `tools/audit.py` returned
+`git_freshness.fetched: true`, `fetch_age_hours: 0.0`,
+`default_branch_source: remote`, `ahead: 0`, `behind: 0`, and wrote
+`.git/FETCH_HEAD`. `tools/sync_check.py` printed
+`GitHub    main c6dd17c  (measured via GH_PAT)` and `ok  disk and GitHub agree`.
+`curl` returned 200 from `api.github.com`, `statsapi.mlb.com`,
+`baseballsavant.mlb.com`, `www.fangraphs.com` and `pypi.org`;
+`api.the-odds-api.com` returned 401 unkeyed and 200 with the repo key. Plain
+`urllib` reached statsapi and Savant too, which is what the engine's own
+fetch path uses.
+
+**Why it is written as "measure", not as "there is network".** The reading that
+was wrong here was not wrong when it was taken: R147 measured a 403 on CONNECT
+and the 2026-09-04 BUILD fragment measured the same thing against fangraphs.com.
+Egress is a property of the session's environment and it changed under a
+document that stated it as permanent, which is exactly the failure the
+`master`-versus-`main` paragraph in the same section is filed on. Replacing
+"there is no network" with "there is network" would re-arm the identical trap in
+the other direction, so all three sites now say to measure, name the command
+that measures, and keep the superseded reading with its date. R147's
+classification is what makes that cheap: the audit already reports WHICH of
+three things stopped a fetch.
+
+**One thing deliberately NOT changed.** `sessions COMMIT and Ben PUSHES` stays,
+and the sync-protocol bullet now says in as many words that it is a CONVENTION
+rather than a capability limit, so the correction cannot be read as license to
+push. What the fetch buys is the answer to "has GitHub moved ahead of me",
+which the mount previously could not give.
+
+**One thing NOT in scope and filed instead.** FanGraphs answers `curl` with 200
+and python `urllib` with 403 from this VM, on the same URL in the same second,
+so the 403 is the site fingerprinting the client and not the proxy; a curl'd
+page feeds `tools/fetch_fangraphs_platoon.py --from-dir` unchanged (verified,
+three teams, `parsed 3 team(s), 27 failure(s)`, the 27 being the teams not
+downloaded). That is a candidate `--fetch` change and it is
+`docs/backlog_inbox/2026-09-06_DEV_fangraphs-reachable-by-curl-not-urllib.md`,
+not this entry. The stale pin in the ledger Quick Card (`27 modules 1386 tests`)
+is ARCHIVE's write set and is `ledger/inbox/2026-09-06_DEV_quick-card-pin-stale.md`.
+
+**R233, the class enumerated at this head.** Grep run over the live
+prescriptive documents (`CLAUDE.md`, `MLB_Classic.md`, `docs/cowork_*.md`,
+`skills/`) for `no (outbound )?network|cannot reach|no route to|proxy.*403|
+CONNECT.*403|proxy-gated|Tunnel connection failed`. Live members: three, all
+three fixed above. Deliberately kept: `CLAUDE.md:512` and `SKILL.md:875`
+("no network" as a PROPERTY of `preflight_upload.py`, which imports nothing and
+opens no socket) and `SKILL.md:368` (the same claim about the ownership emit
+step) — those are statements about a tool's behaviour, not about the host, and
+they stay true whatever the egress. `docs/backlog.md` and `CHANGELOG.md` carry
+dated measurements as history and are not amended; `docs/2026-07-*` and
+`docs/*_critique_*` are frozen review documents.
+
+---
+
 ## 2026-09-04 — R294 (a)(b)(c): a search-effort prefilter moved the GPP stack floor invisibly and the ladders billed the bank for it; the re-entry ladders re-solved after a slate check had already failed; and "proven infeasible" was the label on every no-incumbent outcome that was not the clock
 
 **Scope: `mlb_engine/allocate/contest_allocator.py`, `tests/test_core.py`,

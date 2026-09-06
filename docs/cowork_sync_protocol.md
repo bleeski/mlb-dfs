@@ -25,12 +25,20 @@ git different mtimes for identical bytes, so porcelain reports ` M` while
 
 ## What each caller can reach
 
-- **The mount has no network.** `.git/FETCH_HEAD` has never existed. No Cowork
-  session can `git pull` or `git push` against Ben's disk, in either
-  direction. That step is always Ben's, in a Windows terminal. `origin/main`
-  on the mount is a remote-tracking ref that moves only when Ben pushes, so it
-  answers "does my disk carry commits GitHub does not" and cannot answer "has
-  GitHub moved ahead of me".
+- **The mount's network is a MEASUREMENT, not a property (R316, 2026-09-06).**
+  This bullet read "the mount has no network. `.git/FETCH_HEAD` has never
+  existed" and both halves are now false: on the device VM this date the audit
+  fetched (`fetched: true`, `fetch_age_hours: 0.0`), `.git/FETCH_HEAD` exists
+  and carries that call, and `sync_check.py` measured GitHub directly with the
+  `GH_PAT`. Run `python tools/sync_check.py` and read what it says rather than
+  reading this line.
+  **Pushing stays Ben's, and that is a CONVENTION rather than a capability
+  limit -- do not read the correction above as license to push.** The rule
+  ("sessions COMMIT and Ben PUSHES") is unchanged; what changed is that a
+  session can now answer "has GitHub moved ahead of me" instead of only "does
+  my disk carry commits GitHub does not". Where the fetch does fail, the
+  reading falls back to the stale ref and is LABELLED, and R147's classified
+  reason says which of the three stopped it.
 - **The container reaches github.com.** `bleeski/mlb-dfs` is private, so a
   credential is required. Without one, the container cannot clone, and the
   disk-to-container path is the tarball bridge below. **With one it clones, and
