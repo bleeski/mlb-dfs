@@ -7,11 +7,44 @@ all of it.
 **Construction changed 2026-07-25.** `run_showdown` now builds from the game-state
 thesis ladder in `mlb_engine/optimize/showdown_theses.py` whenever the pool basis
 is `declared_starters` with both orders posted. `build_showdown_bank`, documented
-below, is the fallback for an unposted slate. Two portfolio controls are enforced
-in the solver on both paths: `max_shared_players=4` (overlap counts the player,
-not the role) and `max_cpt_exposure_pct=0.33`. They relax before they truncate,
-overlap first and the captain cap last, and every relaxation is counted in the
-brief under `diversity` and `captain_exposure`.
+below, is the fallback for an unposted slate.
+
+**THREE portfolio controls are enforced in the solver on both paths, not two,
+and the captain cap is 0.25 and not 0.33 (R153, Ben 2026-08-19).** This section
+said "two portfolio controls ... `max_cpt_exposure_pct=0.33`" until 2026-09-06,
+which is a money-boundary defect: a session reading it would have believed a cap
+50% looser than the one the solver holds, and would not have known the third
+control existed at all. The defaults live in `mlb_engine/optimize/showdown.py`
+and are the citation:
+
+| control | default | counts |
+|---|---|---|
+| `max_shared_players` | `DEFAULT_MAX_SHARED_PLAYERS = 4` (of 6) | the PLAYER, not the role |
+| `max_cpt_exposure_pct` | `DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25` | no captain above a quarter of the entered set |
+| `max_player_exposure_pct` | `DEFAULT_MAX_PLAYER_EXPOSURE_PCT = 0.50` | no PLAYER in ANY role above half of it |
+
+The third one is the portfolio-level washout axis the dual objective names and
+the module did not have: on the 2026-08-19 ARI@BOS build the overlap bound was
+clean, the captain cap was clean, and one cheap leadoff bat was in 12 of 19
+entries.
+
+Every cap count is a `floor()` of pct * entries, so realized exposure lands at
+or below the requested pct at every entry count; the one escape is `pct * n < 1`,
+where the count clamps to 1 rather than forbidding everyone.
+
+**They relax before they truncate, in the order overlap, then player exposure,
+then captain lock, then thesis** — a short bank leaves a blank reserved row and a
+blank row blocks certification. Player exposure sits second because relaxing it
+puts one more entry on a player already at half the set, a washout cost spread
+thin, where relaxing the captain lock concentrates the single highest-leverage
+slot. Both caps bind against the REALIZED set and not against an apportionment.
+A capped player coming off a thesis's captain slot or locks BEFORE the solve is
+not a relaxation and is not counted as one; it is named in
+`player_exposure.cap_reassignments` and `.locks_dropped`. Every relaxation is
+counted in the brief. **A portfolio is not clean because the gates passed; it is
+clean when the relaxation counts are zero.** Override all three through
+`--controls-override`, which reads them from one dict. CLAUDE.md's `## Showdown`
+section is the authority for all of this.
 
 ## Status, stated plainly
 
@@ -53,7 +86,7 @@ df = sd.melt_showdown_salary_csv(salary_csv)      # one row per player-role
 reserved = sd.read_showdown_reserved_rows(entries_csv)
 blank = [r for r in reserved["reserved"] if not r["is_complete"]]
 
-bank = sd.build_showdown_bank(df, n=len(blank))   # caps: 0.33 cpt, 4 shared
+bank = sd.build_showdown_bank(df, n=len(blank))   # caps: 0.25 cpt, 0.50 player, 4 shared
 certs = [sd.certify_showdown(lineup, df) for lineup in bank]
 
 assignments = [

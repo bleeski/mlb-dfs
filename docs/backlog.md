@@ -7640,6 +7640,39 @@ which is R196's. Filed there, not here.
 
 **The fifteen contradictions** (quotes in the edition §3.3): `timeout 33` at SKILL.md:616/:665 vs CLAUDE.md:656; three `test_core` runtimes; the ledger pin; `showdown.md:8-12` "Two portfolio controls … 0.33" vs three at 0.25/0.50; `late_swap.md:146` instructs the `--locked-teams` flag SKILL.md:1111-1118 forbids; MLB_Classic.md:4 v3.18 vs v3.23, :517 v2.24.0, :513 the retired checksum manifest (flagged by three prior reviews); the FanGraphs/StatsAPI K-rate source; the pre-migration archival runbook the standings skill still routes to; "the mount has no network" vs the fetching audit; step 2 mandating a command step 2 says cannot run; R32 and its R143 override in one paragraph; the R157 delegation vs autobuild's "WILL NOT … EVER"; `claim.py` WRITE_SETS vs the contract; the R102/R103 collision; gate-before vs gate-last by role.
 
+***Amended 2026-09-06 (R316 + rider, commit `f942862` and its follow-up): FOUR
+of the fifteen are DISCHARGED, three of them from the money-boundary four, and
+the count here is now ELEVEN.*** Fixed, each with the superseded reading kept
+in place and dated: (1) **`showdown.md` caps** -- the section said "two
+portfolio controls ... `max_cpt_exposure_pct=0.33`" and now carries all three
+with their `DEFAULT_*` constants as the citation (0.25 / 0.50 / 4), the
+`floor()` rounding rule, and R153's relaxation order; the code comment at its
+`build_showdown_bank` example said `# caps: 0.33 cpt, 4 shared` and was the same
+defect in a second place. (2) **`late_swap.md` `--locked-teams`** -- the
+verify_export example passed `PIT,NYY` against SKILL.md's explicit "do not pass
+`--locked-teams` at all"; the flag is gone from the example and the 2026-07-29
+incident (a list passed at 19:23 still in use at 20:02, PASS printed, DK
+rejected 7 of 16) is stated where the command is. (3) **`timeout 33`** --
+SKILL.md:725/:774 plus the sibling `--max-seconds 14` and the bare
+`--max-seconds 30` at :194, all three members of the retired-45s class, now
+`timeout 130` / `--max-seconds 100` with CLAUDE.md's `## Sandbox` named as the
+one owner; the 14-second solver budget was itself the mechanism behind the
+under-explored banks R157 rescues read as tight exposure caps. (4) **"the mount
+has no network" vs the fetching audit** -- measured false on the device VM this
+date and corrected in all three live sites; see the R316 CHANGELOG entry.
+**Still open, and named so the count can be checked rather than re-derived:**
+the ledger pin (ARCHIVE's write set --
+`ledger/inbox/2026-09-06_DEV_quick-card-pin-stale.md` filed, and the same
+fragment names the R147 network reading inside that line); three `test_core`
+runtimes; MLB_Classic.md:4 v3.18 vs v3.23, :517 v2.24.0, :513 the retired
+checksum manifest; the FanGraphs/StatsAPI K-rate source; the pre-migration
+archival runbook the standings skill routes to; step 2 mandating a command step
+2 says cannot run; R32 and its R143 override in one paragraph; the R157
+delegation vs autobuild's "WILL NOT ... EVER"; `claim.py` WRITE_SETS vs the
+contract; the R102/R103 collision; gate-before vs gate-last by role. **Eleven.**
+The rest of R301 -- the size targets, the queue table, the commit-subject cap,
+the prose-pinning tests -- is untouched and keeps its slot.
+
 **Fix.** (1) Fix the fifteen, starting with the four at the money boundary (showdown.md caps, late_swap.md `--locked-teams`, the ledger pin, `timeout 33`). (2) CLAUDE.md to ≤ 6 KB: context wall, truthful labels, the two walls, authority pointers, the one command and its exit contract, where the record lives; every dated paragraph moves to the CHANGELOG entry it cites and leaves a pointer. (3) SKILL.md to ≤ 150 lines + `references/`. (4) The queue as a 14-row table; session notes to the CHANGELOG. (5) Commit subjects ≤ 100 chars, body carries the rest. (6) Remove the prose-pinning tests (`tests/test_core.py:11541-11546, :12664, :17771, :9166-9176, :11625-11628`; `tests/test_upload_integrity.py:2316-2354`); the PASS line is checked by generating it. **Sequencing:** after the P0/P1 code batches; before R302.
 
 ### R303. Hygiene tail from the tenth edition, batched opportunistically, none on the delivery path (P2/P3, XS each; one Security) | new 2026-09-02; VERIFIED-read unless marked

@@ -191,7 +191,7 @@ portfolio to the last thing you looked at.
 python <repo>/skills/generate-lineups/scripts/build_slate.py \
   --salary <uploaded DKSalaries.csv> \
   --entries <uploaded DKEntries.csv> \
-  --max-seconds 30
+  --max-seconds 100
 ```
 
 It detects Classic vs Showdown from the files, stages them into
@@ -722,11 +722,23 @@ on a slate with confirmed lineups means the feed was missing handedness.
 Then build:
 
 ```bash
-timeout 33 python -u <repo>/skills/generate-lineups/scripts/build_slate.py \
+timeout 130 python -u <repo>/skills/generate-lineups/scripts/build_slate.py \
   --salary <DKSalaries.csv> --entries <DKEntries.csv> \
-  --lineups <the feed you just wrote> --no-rotowire --max-seconds 14 \
+  --lineups <the feed you just wrote> --no-rotowire --max-seconds 100 \
   > outputs/<date>/_build.log 2>&1
 ```
+
+**130 is CLAUDE.md's `## Sandbox` number and it is the only one to use.** This
+block read `timeout 33 ... --max-seconds 14` until 2026-09-06, a leftover of the
+45-second call ceiling R271 retired; the real ceiling is ~180s when the call
+passes an explicit timeout and 130 is the safe inner budget (the same number as
+`--gate-budget` and `solver_probe.py --budget`). The old pair was expensive in
+the direction that matters: a 14-second solver budget is what leaves a bank 2%
+explored, and an under-explored bank reads as a tight exposure cap. Leave ~30s
+under the timeout for the ~15s engine import plus certify and write; that is
+where `--max-seconds 100` comes from. Do not re-derive 130 per call, and do not
+reach past it — a session that tried `timeout 168` against a ~164s harness
+ceiling on 2026-09-01 lost the call and its work with it.
 
 On 2026-07-24 that took a 16-entry Classic build to 10.8 seconds elapsed and it
 certified on the first attempt, after three runs with in-build fetching had been
@@ -771,7 +783,7 @@ re-ran the same command with the same budget several times expecting different
 output. So:
 
 ```bash
-timeout 33 python -u <cmd> > outputs/<date>/_x.out 2> outputs/<date>/_x.err
+timeout 130 python -u <cmd> > outputs/<date>/_x.out 2> outputs/<date>/_x.err
 echo "exit=$?"; tail -30 outputs/<date>/_x.err
 ```
 

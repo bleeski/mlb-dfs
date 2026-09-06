@@ -141,8 +141,21 @@ Verify before handing it over:
 
 ```bash
 python tools/verify_export.py --salary <DKSalaries.csv> \
-  --entries <swapped file> --parent <parent file> --locked-teams PIT,NYY
+  --entries <swapped file> --parent <parent file>
 ```
 
 That confirms locked slots held and no new player arrived from a locked game,
 which is precisely what DK will reject if you got it wrong.
+
+**No `--locked-teams`.** This example passed `--locked-teams PIT,NYY` until
+2026-09-06, against SKILL.md's explicit "do not pass `--locked-teams` at all" —
+the two instructions have contradicted each other at the money boundary, and
+this one was wrong. The tool derives locked teams on EVERY invocation from the
+lineups feed's own clock, falling back to the salary file's `Game Info`, and
+prints the clock and the source it used. The flag only ADDS to that set and can
+no longer replace it, so a hand-typed list is a list that goes stale while you
+are still using it: on 2026-07-29 a list passed at 7:23 PM ET was still in use
+at 8:02 with three games locked underneath it, `verify_export.py` printed PASS,
+and DraftKings rejected 7 of 16 entries. If you see `STALE --locked-teams` in
+the output, drop the flag. `--as-of` is the only clock override, and it is for
+replaying a derivation against a fixed time.

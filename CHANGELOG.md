@@ -25,6 +25,77 @@ performance claim.
 
 ---
 
+## 2026-09-06 — R316 rider: three of R301's four money-boundary contradictions, fixed rather than left queued — the Showdown captain cap a doc read 0.33 while the solver holds 0.25, a verify_export example instructing the one flag SKILL.md forbids, and a 14-second solver budget left over from the retired 45s ceiling
+
+**Scope: `skills/generate-lineups/references/showdown.md`,
+`skills/generate-lineups/references/late_swap.md`,
+`skills/generate-lineups/SKILL.md`, `docs/backlog.md`.** Documentation only. Gate
+unchanged at `PASS v2.26.0 28 modules 1810 tests`; `tests.test_core` and
+`tests.test_upload_integrity` re-run because tests in both read `SKILL.md`
+(nothing in `tests/` reads `references/*.md`, grep-checked rather than assumed).
+
+R301 §"the fifteen contradictions" named four at the money boundary and
+sequenced the whole item after the P0/P1 code batches. Three of the four are
+cheap, are documentation, and each one misdirects a session at the moment it is
+deciding what to upload, so they are fixed here and R301's count is amended to
+eleven in the same commit rather than left to a rewrite that has not started.
+
+**(a) `showdown.md` said TWO portfolio controls and a captain cap of 0.33.**
+There are three and it is 0.25: `DEFAULT_MAX_CPT_EXPOSURE_PCT = 0.25`,
+`DEFAULT_MAX_PLAYER_EXPOSURE_PCT = 0.50`, `DEFAULT_MAX_SHARED_PLAYERS = 4`, all
+in `mlb_engine/optimize/showdown.py`, all since R153 (Ben, 2026-08-19). A
+session reading this file would have believed a captain cap 50% looser than the
+one the solver holds and would not have known the player-exposure cap existed —
+which is the control R153 added precisely because the other two measured nothing
+about single-player concentration (ARI@BOS, one cheap leadoff bat in 12 of 19
+entries with every counter clean). The section now carries the three constants
+as a table with the source file named, the `floor()` rounding rule and its
+`pct * n < 1` escape, the relaxation ORDER and why player exposure sits second,
+the realized-set binding, and the `cap_reassignments` / `locks_dropped`
+distinction that is not a relaxation. Second site, same defect: the
+`build_showdown_bank` example's trailing comment read `# caps: 0.33 cpt, 4
+shared` and now reads `# caps: 0.25 cpt, 0.50 player, 4 shared`.
+
+**(b) `late_swap.md`'s post-swap example passed `--locked-teams PIT,NYY`.**
+SKILL.md says, in bold, "do not pass `--locked-teams` at all", and gives the
+reason: the tool derives locked teams on every invocation from the lineups
+feed's own clock (falling back to the salary file's `Game Info`) and prints the
+clock and the source, while the flag only ADDS to that set and can no longer
+replace it. A hand-typed list goes stale while it is still being used — on
+2026-07-29 one passed at 19:23 was still in use at 20:02 with three games locked
+underneath it, `verify_export.py` printed PASS, and DraftKings rejected 7 of 16
+entries. The flag is out of the example and the incident is stated where the
+command is, so the two files now say the same thing in the same words.
+
+**(c) `timeout 33` and `--max-seconds 14`, the retired-45s class, three members
+not two.** R271 swept that ceiling out of five files and R290(c) moved
+`solver_probe.py --budget` 43 -> 130 for the same reason; SKILL.md's own build
+examples still carried the old arithmetic. Members: `timeout 33` at the
+enriched-feed build, `timeout 33` at the stderr-capture recipe, and the bare
+`--max-seconds 30` at "the single build, when you want it directly" — all three
+fixed, none left as a deliberate keep. Now `timeout 130` (CLAUDE.md's
+`## Sandbox` number, the same one `--gate-budget` and `solver_probe --budget`
+use) with `--max-seconds 100`, the ~30s difference stated as the ~15s engine
+import plus certify and write. This one is not cosmetic: a 14-second solver
+budget is how a bank ends up 2% explored, and an under-explored bank presents as
+a tight exposure cap — the exact misdiagnosis behind four recorded joint-MILP
+infeasibility rescues.
+
+**The fourth money-boundary member is NOT fixed here and is not DEV's.** The
+ledger Quick Card's pin reads `27 modules 1386 tests`; `ledger/` is ARCHIVE's
+write set, so it is `ledger/inbox/2026-09-06_DEV_quick-card-pin-stale.md`.
+
+**R301 amended in the same commit**, per the contract that a count in a filed
+item is checkable rather than re-derived: four of fifteen discharged (these
+three plus R316's network claim), eleven named and still open, and the item
+keeps its slot for the parts nobody has touched — the size targets, the queue
+table, the commit-subject cap, the prose-pinning tests.
+
+**Verification.** `tests.test_upload_integrity` Ran 348 OK,
+`tests.test_core` Ran 1154 OK, both at their pins after the edits.
+
+---
+
 ## 2026-09-06 — R316: three live documents asserted that this mount has no network, and the device VM answered 200 from every host they named
 
 **Scope: `CLAUDE.md`, `docs/cowork_sync_protocol.md`,
