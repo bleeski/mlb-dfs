@@ -100,6 +100,29 @@ def write_classic_salary(path: Path, il_ids=(), dtd_ids=()) -> list[str]:
     return lineup
 
 
+def blank_dk_starting(path: Path) -> Path:
+    """The same salary file with an empty ``Starting`` column, written in place.
+
+    R305 fix (2). ``write_classic_salary`` numbers its hitters 1-9 and marks its
+    arms SP, which is a COMPLETE DK posting for every side -- so since R305 the
+    referees read the batting order straight off the salary file and need no
+    external feed at all. Three tests whose subject is the on-disk resolver
+    (`the slate-date glob`, `the sibling beside the salary file`, `a missing
+    feed degrades to one warning`) were passing over a fixture that no longer
+    reaches the code they name. Blanking the column is what makes the fixture
+    declare the condition its test is about; loosening the resolver to keep them
+    green would have been the other way round.
+    """
+    with path.open(encoding="utf-8-sig", newline="") as fh:
+        rows = list(csv.reader(fh))
+    col = rows[0].index("Starting")
+    for row in rows[1:]:
+        row[col] = ""
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    return path
+
+
 def write_entries(path: Path, header, rows) -> None:
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
@@ -1620,11 +1643,24 @@ class PreflightFeedDefaultTests(unittest.TestCase):
                 continue
             by_team.setdefault(team, []).append({"name": name})
         stamp = fetched_at or datetime.now(timezone.utc).isoformat()
+        # R305. This used to emit ONE fabricated game pairing AAA with CCC, which
+        # is not a description of this salary file's slate: GAME_A is AAA@BBB and
+        # GAME_B is CCC@DDD. It held the right team NAMES, so every assertion in
+        # this class passed over a feed that claimed the wrong matchups -- and
+        # the typed compatibility join now refuses exactly that, which is the
+        # point of it. The two real games, with the two unrostered sides present
+        # and unposted (they are not rostered, so nothing here reads them; a game
+        # needs both abbrevs to have an identity at all).
         games = [{"game_pk": 1, "status": "Scheduled",
                   "away": {"team_abbrev": "AAA", "lineup_status": status,
                            "lineup": by_team.get("AAA", []), "probable_pitcher": {}},
-                  "home": {"team_abbrev": "CCC", "lineup_status": status,
-                           "lineup": by_team.get("CCC", []), "probable_pitcher": {}}}]
+                  "home": {"team_abbrev": "BBB", "lineup_status": "unconfirmed",
+                           "lineup": [], "probable_pitcher": {}}},
+                 {"game_pk": 2, "status": "Scheduled",
+                  "away": {"team_abbrev": "CCC", "lineup_status": status,
+                           "lineup": by_team.get("CCC", []), "probable_pitcher": {}},
+                  "home": {"team_abbrev": "DDD", "lineup_status": "unconfirmed",
+                           "lineup": [], "probable_pitcher": {}}}]
         path = self.dir / "lineups_feed.json"
         path.write_text(json.dumps({"date": "2026-06-03", "fetched_at": stamp,
                                     "games": games}), encoding="utf-8")
@@ -1661,9 +1697,19 @@ class PreflightFeedDefaultTests(unittest.TestCase):
         self.assertIn("feed: lineups_feed.json (5.0h old)", result.stdout)
         self.assertIn("old (fetched", result.stdout)
 
-    def _salary_on_date(self, date_mmddyyyy: str) -> Path:
-        """Same fixture, re-dated, so a slate with no feed on disk is reachable."""
-        path = self.dir / f"DKSalaries_{date_mmddyyyy.replace('/', '')}.csv"
+    def _salary_on_date(self, date_mmddyyyy: str, subdir: str = "") -> Path:
+        """Same fixture, re-dated, so a slate with no feed on disk is reachable.
+
+        ``subdir`` puts the copy somewhere with no ``lineups_feed.json`` beside
+        it. R305 gave preflight the sibling preference verify_export already
+        had (a promoted run's ``inputs/`` copy is the build's own feed and the
+        strongest identity there is), and ``_feed()`` writes into ``self.dir``,
+        so a test whose subject is the slate-date GLOB has to stand somewhere
+        the sibling branch does not answer first.
+        """
+        base = self.dir / subdir if subdir else self.dir
+        base.mkdir(parents=True, exist_ok=True)
+        path = base / f"DKSalaries_{date_mmddyyyy.replace('/', '')}.csv"
         with self.salary.open(encoding="utf-8-sig", newline="") as fh:
             rows = list(csv.reader(fh))
         for row in rows[1:]:
@@ -1673,7 +1719,7 @@ class PreflightFeedDefaultTests(unittest.TestCase):
         return path
 
     def test_a_missing_feed_degrades_to_one_warning_and_never_blocks(self):
-        salary = self._salary_on_date("01/02/2099")
+        salary = blank_dk_starting(self._salary_on_date("01/02/2099"))
         result = run_preflight("--entries", str(self.entries), "--salary", str(salary))
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("no lineups feed resolved", result.stdout)
@@ -1713,9 +1759,11 @@ class PreflightFeedDefaultTests(unittest.TestCase):
         and a feed sits under data/slates/2026-07-25/ of the root the tool runs
         from, so the resolver finds it unprompted and says which file it used."""
         root = self._repo_skeleton_with_feed()
+        salary = blank_dk_starting(
+            self._salary_on_date("07/25/2026", subdir="no_sibling"))
         proc = subprocess.run(
             [sys.executable, str(root / "tools" / "preflight_upload.py"),
-             "--entries", str(self.entries), "--salary", str(self.salary),
+             "--entries", str(self.entries), "--salary", str(salary),
              "--json"], capture_output=True, text=True)
         payload = json.loads(proc.stdout)
         self.assertIn("resolved", payload["info"]["feed_autoresolve"])
@@ -2726,6 +2774,12 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         # R287's blanket started-game rule and exits 2. The file IS its own
         # parent here, so the diff is trivially clean and the subject is
         # untouched. The no-parent branch has its own test below.
+        #
+        # R305: and the salary file's own Starting column now outranks the
+        # sibling (CLAUDE.md's build contract ranks DK first, per side), so the
+        # fixture has to actually lack a DK posting for the sibling branch to be
+        # the one under test.
+        blank_dk_starting(self.salary)
         result = run_verify("--entries", str(self.parent), "--salary", str(self.salary),
                             "--parent", str(self.parent),
                             "--as-of", self.EARLY, "--json")
@@ -6279,6 +6333,473 @@ class PreflightWallClockTests(unittest.TestCase):
         self.assertEqual(payload["info"]["started_slots"], 10)
         self.assertTrue(any("ALREADY STARTED" in f for f in payload["failures"]),
                         payload["failures"])
+
+
+SD_ARM_GAME = "PIT@SFG 07/25/2026 12:35PM ET"
+
+
+def write_showdown_salary_with_arm(path: Path) -> dict:
+    """A Showdown export shaped like DK's, including an RP whose Starting is PLR.
+
+    The field case (1235_1g_sd, 2026-09-03): ``Roster Position`` is CPT/UTIL for
+    all 196 rows, ``Position`` is the real baseball position, and the arm this
+    item is about is an ``RP`` DK marks ``PLR``. Returns
+    {name: {"CPT": id, "UTIL": id}}.
+    """
+    rows = [SALARY_HEADER]
+    people: dict = {}
+    pid = 3000
+    for team in ("PIT", "SFG"):
+        for i in range(6):
+            name = f"{team} {SURNAMES[i]}"
+            util_id, cpt_id = pid, pid + 500
+            pid += 1
+            pos = "RP" if i == 0 else "OF"
+            starting = "PLR" if i == 0 else str(i)
+            rows.append(_salary_row(util_id, name, team, SD_ARM_GAME, pos,
+                                    "UTIL", 4000, "", starting))
+            rows.append(_salary_row(cpt_id, name, team, SD_ARM_GAME, pos,
+                                    "CPT", 6000, "", starting))
+            people[name] = {"UTIL": str(util_id), "CPT": str(cpt_id)}
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    return people
+
+
+class R297dPitcherRowPredicateTests(unittest.TestCase):
+    """R297(d) + R304(a)(b)(c). The referee's pitcher test was a Classic token.
+
+    Reproduced against the real 2026-09-03 inputs before the fix: with
+    ``--declare-pitcher`` naming Wilber Dotel's UTIL id, ``check_feed`` printed
+    `1 declared id(s) are not pitcher-position rows ... A declaration names an
+    arm; it cannot clear a hitter` over a row whose ``Position`` is RP, and hard
+    failed him in six entries. The WARN said `in 2 of 17` and the FAIL said 6 --
+    two counters over one fact, disagreeing inside one report.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary_path = self.dir / "DKSalaries.csv"
+        self.people = write_showdown_salary_with_arm(self.salary_path)
+        from tools.preflight_upload import load_salary
+        self.salary = load_salary(self.salary_path)
+        self.arm = self.people["PIT Aster"]
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _feed(self):
+        """Both sides confirmed, nine bats each, no probable named -- and the
+        arm deliberately absent, which is the whole condition."""
+        posted = {}
+        for name, ids in self.people.items():
+            team = name.split(" ")[0]
+            if name == "PIT Aster":
+                continue
+            posted.setdefault(team, []).append({"name": name})
+        path = self.dir / "lineups_feed.json"
+        path.write_text(json.dumps({
+            "date": "2026-07-25",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "games": [{"game_pk": 1, "status": "Scheduled",
+                       "away": {"team_abbrev": "PIT", "lineup_status": "confirmed",
+                                "lineup": posted["PIT"],
+                                "probable_pitcher": {"name": "PIT Zzz"}},
+                       "home": {"team_abbrev": "SFG", "lineup_status": "confirmed",
+                                "lineup": posted["SFG"],
+                                "probable_pitcher": {"name": "SFG Zzz"}}}]},
+        ), encoding="utf-8")
+        return path
+
+    def _entries(self, cpt_entries: int, util_entries: int, name="PIT Aster"):
+        """Entries holding one human under BOTH ids DK prices for him.
+
+        Written as a real DKEntries file and read back through ``load_entries``,
+        so the ids travel the same path they do in the field: the counter split
+        this test is about is only visible when the same person reaches
+        ``check_feed`` under two different draftable ids.
+        """
+        from tools.preflight_upload import load_entries
+        person = self.people[name]
+        bats = [ids["UTIL"] for label, ids in sorted(self.people.items())
+                if label != name][:5]
+        cap = self.people["SFG Boone"]["CPT"]
+        rows = []
+        eid = 5000000
+        for _ in range(util_entries):
+            eid += 1
+            rows.append(showdown_entry(str(eid), "1",
+                                       [cap, person["UTIL"]] + bats[:4]))
+        for _ in range(cpt_entries):
+            eid += 1
+            rows.append(showdown_entry(str(eid), "1", [person["CPT"]] + bats))
+        path = self.dir / f"DKEntries_{cpt_entries}_{util_entries}_{name[-5:]}.csv"
+        write_entries(path, SHOWDOWN_HEADER, rows)
+        return load_entries(path)[2]
+
+    def test_the_predicate_reads_an_arm_off_either_column(self):
+        from tools.preflight_upload import is_pitcher_row
+        self.assertTrue(is_pitcher_row({"Roster Position": "P", "Position": "SP"}),
+                        "the Classic token must keep working")
+        # Both branches agree on a well-formed DK Classic export, so the
+        # Roster-Position branch is only load-bearing where `Position` is absent
+        # -- which is every hand-built salary map in this suite and in
+        # qa_portfolio's fixtures (`{"Roster Position": "P", "Name": "Arm"}`).
+        # Without this case a mutation disabling that branch SURVIVES, which is
+        # how it was found.
+        self.assertTrue(is_pitcher_row({"Roster Position": "P"}),
+                        "a row carrying no Position column at all")
+        self.assertFalse(is_pitcher_row({"Roster Position": "OF"}))
+        self.assertTrue(is_pitcher_row({"Roster Position": "UTIL", "Position": "RP"}))
+        self.assertTrue(is_pitcher_row({"Roster Position": "CPT", "Position": "SP"}))
+        self.assertFalse(is_pitcher_row({"Roster Position": "UTIL", "Position": "OF"}))
+        self.assertFalse(is_pitcher_row({"Roster Position": "1B/OF", "Position": "1B/OF"}),
+                         "a multi-position Classic bat is not an arm")
+        self.assertFalse(is_pitcher_row({}))
+
+    def test_a_classic_salary_agrees_with_the_old_token_on_every_row(self):
+        """The unconditional read must be provably equivalent where the old one
+        was right, which is the whole Classic geometry."""
+        from tools.preflight_upload import is_pitcher_row, load_salary
+        classic = self.dir / "classic.csv"
+        write_classic_salary(classic)
+        rows = list(load_salary(classic).values())
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertEqual(
+                is_pitcher_row(row),
+                str(row.get("Roster Position") or "").upper() == "P",
+                row)
+
+    def test_a_declared_showdown_arm_is_acknowledged_not_failed(self):
+        from tools.preflight_upload import Report, check_feed
+        rep = Report()
+        check_feed(self._entries(4, 2), self.salary, self._feed(), True, rep,
+                   declared_pitchers={self.arm["UTIL"]: "viable_bulk_or_alt_sp"})
+        self.assertEqual(rep.failures, [], "a declared arm is not a contradiction")
+        self.assertFalse([w for w in rep.warnings if "cannot clear a hitter" in w],
+                         "the WARN asserted a FALSE reason over an RP row")
+        self.assertEqual(rep.info["feed_absent"], [])
+
+    def test_the_two_counters_agree_because_they_now_count_the_person(self):
+        """R304(c). One declaration, one human, one number. Before the fix the
+        WARN counted the declared ID (2) and the FAIL counted the person (6),
+        because a DK draftable id is a ROLE and a Showdown export prices every
+        human twice (R234)."""
+        from tools.preflight_upload import Report, check_feed
+        rep = Report()
+        check_feed(self._entries(4, 2), self.salary, self._feed(), True, rep,
+                   declared_pitchers={self.arm["UTIL"]: "viable_bulk_or_alt_sp"})
+        acknowledged = rep.info["feed_acknowledged_pitchers"]
+        self.assertEqual(list(acknowledged), ["PIT Aster (PIT)"])
+        self.assertEqual(acknowledged["PIT Aster (PIT)"]["entries"], 6,
+                         "2 of 17 counted the id; 6 counted the human")
+        self.assertEqual(len(rep.info["feed_absent"]), 0)
+
+    def test_an_undeclared_showdown_arm_still_fails(self):
+        """The exemption is the declaration's, not the geometry's. Nothing here
+        may turn R4 off for a Showdown file."""
+        from tools.preflight_upload import Report, check_feed
+        rep = Report()
+        check_feed(self._entries(4, 2), self.salary, self._feed(), True, rep)
+        self.assertEqual(len(rep.info["feed_absent"]), 6)
+        self.assertTrue(any("absent from a confirmed posted lineup" in f
+                            for f in rep.failures), rep.failures)
+
+    def test_on_a_partial_side_a_showdown_arm_is_an_arm_not_a_hitter_slot(self):
+        """The SECOND dead site (`:1695` at `eb1c8fd`), which the R46-round-2
+        partial-side branch owns. With `is_pitcher` False for every Showdown
+        row, a rostered arm fell through to `drawn[team] += 1` and was measured
+        against the hitter slots the posting left unknown -- so an arm consumed
+        a BAT's worth of the arithmetic, and the check that a probable is a
+        stated fact even on a partial side never ran."""
+        from tools.preflight_upload import Report, check_feed
+        posted = {}
+        for name in sorted(self.people):
+            team = name.split(" ")[0]
+            if name in ("PIT Aster", "PIT Boone", "PIT Crane"):
+                continue
+            posted.setdefault(team, []).append({"name": name})
+        path = self.dir / "partial_feed.json"
+        path.write_text(json.dumps({
+            "date": "2026-07-25",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "games": [{"game_pk": 1, "status": "Scheduled",
+                       "away": {"team_abbrev": "PIT", "lineup_status": "in_progress",
+                                "lineup": posted["PIT"],
+                                "probable_pitcher": {"name": "PIT Zzz"}},
+                       "home": {"team_abbrev": "SFG", "lineup_status": "confirmed",
+                                "lineup": posted["SFG"],
+                                "probable_pitcher": {"name": "SFG Zzz"}}}]},
+        ), encoding="utf-8")
+        rep = Report()
+        check_feed(self._entries(2, 0), self.salary, path, True, rep)
+        self.assertTrue(
+            any("is not PIT's declared probable pitcher" in f
+                for f in rep.failures),
+            f"the arm was measured as a hitter instead: {rep.failures}")
+        self.assertFalse(
+            any("roster more absent players than the posted lineup leaves "
+                "unknown" in f for f in rep.failures),
+            "an arm must never consume one of the unknown HITTER slots")
+
+    def test_a_declaration_still_cannot_clear_a_hitter(self):
+        """The guard's INTENT survives reading both columns: --declare-pitcher
+        must never become an off switch for R4 over a benched bat."""
+        from tools.preflight_upload import Report, check_feed
+        bat = self.people["PIT Boone"]
+        entries = self._entries(0, 1, name="PIT Boone")
+        rep = Report()
+        posted = json.loads(self._feed().read_text(encoding="utf-8"))
+        for game in posted["games"]:
+            game["away"]["lineup"] = [p for p in game["away"]["lineup"]
+                                      if p["name"] != "PIT Boone"]
+        feed_path = self.dir / "benched_feed.json"
+        feed_path.write_text(json.dumps(posted), encoding="utf-8")
+        check_feed(entries, self.salary, feed_path, True, rep,
+                   declared_pitchers={bat["UTIL"]: "viable_bulk_or_alt_sp"})
+        self.assertTrue(any("cannot clear a hitter" in w for w in rep.warnings),
+                        rep.warnings)
+        self.assertTrue(rep.failures, "a benched BAT is still a hard failure")
+
+
+class R305FeedIdentityTests(unittest.TestCase):
+    """R305. The resolver was a filename glob and an mtime.
+
+    Three field sightings across two dates, every warning false: 61 and 73 on
+    2026-09-03 (a Classic file against an earlier Showdown feed) and 28 on
+    2026-09-04, where three Classic draftgroups staged into one date directory
+    and 2210_2g was cross-checked against a feed for a slate sharing NOT ONE
+    GAME with it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary_path = blank_dk_starting(self._salary())
+        from tools.preflight_upload import load_entries, load_salary
+        self.salary = load_salary(self.salary_path)
+        self.entries_path = self.dir / "DKEntries.csv"
+        write_entries(self.entries_path, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.lineup)])
+        _, _, self.entries, _, _ = load_entries(self.entries_path)
+
+    def _salary(self) -> Path:
+        path = self.dir / "DKSalaries.csv"
+        self.lineup = write_classic_salary(path)
+        return path
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write_feed(self, name: str, games) -> Path:
+        path = self.dir / name
+        path.write_text(json.dumps({
+            "date": "2026-07-25",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "games": [{"game_pk": i, "status": "Scheduled",
+                       "away": {"team_abbrev": a, "lineup_status": "confirmed",
+                                "lineup": [], "probable_pitcher": {}},
+                       "home": {"team_abbrev": h, "lineup_status": "confirmed",
+                                "lineup": [], "probable_pitcher": {}}}
+                      for i, (a, h) in enumerate(games)]}), encoding="utf-8")
+        return path
+
+    def test_the_rostered_identity_is_the_game_set_not_the_filename(self):
+        from tools.preflight_upload import rostered_slate_identity
+        dates, games, teams = rostered_slate_identity(self.entries, self.salary)
+        self.assertEqual(dates, {"2026-07-25"})
+        self.assertEqual(games, {"AAA@BBB", "CCC@DDD"})
+        self.assertEqual(teams, {"AAA", "CCC"})
+
+    def test_a_feed_missing_one_of_this_files_games_is_incompatible(self):
+        """The 2026-09-04 sighting in one assertion: same date, same geometry,
+        a disjoint game set."""
+        from tools.preflight_upload import feed_compatibility, read_feed
+        feed, _ = read_feed(self._write_feed("f.json", [("EEE", "FFF")]))
+        rank, why = feed_compatibility(feed, {"AAA@BBB"}, {"AAA"})
+        self.assertIsNone(rank)
+        self.assertIn("missing", why)
+
+    def test_an_exact_match_outranks_a_superset_and_a_superset_is_still_usable(self):
+        from tools.preflight_upload import feed_compatibility, read_feed
+        exact, _ = read_feed(self._write_feed(
+            "exact.json", [("AAA", "BBB"), ("CCC", "DDD")]))
+        wide, _ = read_feed(self._write_feed(
+            "wide.json", [("AAA", "BBB"), ("CCC", "DDD"), ("EEE", "FFF")]))
+        games, teams = {"AAA@BBB", "CCC@DDD"}, {"AAA", "CCC"}
+        self.assertEqual(feed_compatibility(exact, games, teams)[0], 0)
+        self.assertEqual(feed_compatibility(wide, games, teams)[0], 1,
+                         "a whole-day paste is valid evidence for a subset slate")
+
+    def test_two_feeds_of_different_game_sets_resolve_the_compatible_one(self):
+        import tools.preflight_upload as pf
+        from unittest import mock
+        from tools.preflight_upload import Report, resolve_feed_for_slate
+        root = self.dir / "root"
+        slates = root / "data" / "slates" / "2026-07-25"
+        slates.mkdir(parents=True)
+        good = self._write_feed("good.json", [("AAA", "BBB"), ("CCC", "DDD")])
+        bad = self._write_feed("bad.json", [("EEE", "FFF")])
+        (slates / "lineups_feed_ok.json").write_text(good.read_text(), encoding="utf-8")
+        (slates / "lineups_feed_other.json").write_text(bad.read_text(), encoding="utf-8")
+        rep = Report()
+        with mock.patch.object(pf, "REPO_ROOT", root):
+            chosen = resolve_feed_for_slate(self.entries, self.salary, rep)
+        self.assertEqual(Path(chosen).name, "lineups_feed_ok.json")
+        self.assertIn("lineups_feed_other.json",
+                      " ".join(rep.info["feed_candidates_rejected"]))
+
+    def test_a_showdown_feed_for_another_slate_is_REFUSED_not_picked_by_mtime(self):
+        """The R300(b) rider. That test asserted `feed_autoresolve` fields
+        without asserting the return code; the behaviour half it stood in for is
+        that a feed from another contest is refused, and refused LOUDLY."""
+        import tools.preflight_upload as pf
+        from unittest import mock
+        from tools.preflight_upload import Report, resolve_feed_for_slate
+        root = self.dir / "root2"
+        slates = root / "data" / "slates" / "2026-07-25"
+        slates.mkdir(parents=True)
+        other = self._write_feed("sd.json", [("EEE", "FFF")])
+        (slates / "lineups_feed_showdown_1235_1g_sd.json").write_text(
+            other.read_text(), encoding="utf-8")
+        rep = Report()
+        with mock.patch.object(pf, "REPO_ROOT", root):
+            self.assertIsNone(
+                resolve_feed_for_slate(self.entries, self.salary, rep),
+                "a wrong feed asserts; no feed only abstains")
+        self.assertIn("REFUSED", rep.info["feed_autoresolve"])
+        self.assertIn("lineups_feed_showdown_1235_1g_sd.json",
+                      rep.info["feed_autoresolve"])
+
+    def test_two_equally_compatible_feeds_refuse_and_name_both(self):
+        import tools.preflight_upload as pf
+        from unittest import mock
+        from tools.preflight_upload import Report, resolve_feed_for_slate
+        root = self.dir / "root3"
+        slates = root / "data" / "slates" / "2026-07-25"
+        slates.mkdir(parents=True)
+        same = self._write_feed("s.json", [("AAA", "BBB"), ("CCC", "DDD")])
+        for name in ("lineups_feed.json", "lineups_feed_copy.json"):
+            (slates / name).write_text(same.read_text(), encoding="utf-8")
+        rep = Report()
+        with mock.patch.object(pf, "REPO_ROOT", root):
+            self.assertIsNone(resolve_feed_for_slate(self.entries, self.salary, rep))
+        line = rep.info["feed_autoresolve"]
+        self.assertIn("REFUSED", line)
+        self.assertIn("lineups_feed.json", line)
+        self.assertIn("lineups_feed_copy.json", line)
+
+    def test_a_dk_covered_salary_file_needs_no_external_feed(self):
+        """R305 fix (2), and the case that produced all three sightings: since
+        R143 a fully posted slate writes NO feed, so the directory holds only
+        other draftgroups' feeds and the resolver has nothing right to find."""
+        from tools.preflight_upload import (
+            Report, load_salary, resolve_feed_source)
+        covered = self.dir / "DKSalaries_covered.csv"
+        write_classic_salary(covered)
+        rep = Report()
+        feed = resolve_feed_source(self.entries, load_salary(covered), covered,
+                                   None, rep)
+        self.assertIsInstance(feed, dict)
+        self.assertIn("no external feed was needed", rep.info["feed_dk_starting"])
+        self.assertIn("not needed", rep.info["feed_autoresolve"])
+        teams = {side["team_abbrev"] for game in feed["games"]
+                 for side in (game["away"], game["home"])}
+        self.assertEqual(teams, {"AAA", "BBB", "CCC", "DDD"})
+
+    def test_a_sibling_feed_that_does_not_cover_this_file_is_rejected(self):
+        """The sibling used to win unconditionally, which is how a date-keyed
+        shared feed beat a compatibility test nobody ran. It is still preferred
+        -- when it describes this file's games."""
+        from tools.preflight_upload import Report, resolve_feed_source
+        wrong = self._write_feed("wrong.json", [("EEE", "FFF")])
+        (self.salary_path.parent / "lineups_feed.json").write_text(
+            wrong.read_text(), encoding="utf-8")
+        rep = Report()
+        resolve_feed_source(self.entries, self.salary, self.salary_path, None, rep)
+        self.assertIn("rejected", rep.info["feed_sibling"])
+
+    def test_a_sibling_feed_that_covers_this_file_is_preferred(self):
+        from tools.preflight_upload import Report, resolve_feed_source
+        right = self._write_feed("right.json", [("AAA", "BBB"), ("CCC", "DDD")])
+        sibling = self.salary_path.parent / "lineups_feed.json"
+        sibling.write_text(right.read_text(), encoding="utf-8")
+        rep = Report()
+        chosen = resolve_feed_source(self.entries, self.salary, self.salary_path,
+                                     None, rep)
+        self.assertEqual(Path(chosen), sibling)
+        self.assertIn("staged beside the salary file", rep.info["feed_autoresolve"])
+
+    def _salary_partially_posted(self) -> Path:
+        """DK has posted a complete 1-9 for AAA and BBB and nothing for CCC or
+        DDD: the ordinary mid-afternoon state, and the one the "every side"
+        condition is actually about.
+
+        A fixture where NOTHING is posted cannot tell `not covered` from
+        `not covered or not_covered`, which is how the mutation on that
+        condition survived its first test.
+        """
+        path = self.dir / "DKSalaries_half_posted.csv"
+        # From a FRESH fixture, not from `self.salary_path`: setUp blanks that
+        # file's Starting column in place, so building on it yielded a file with
+        # NOTHING posted -- which passes this test's assertion for the wrong
+        # reason and made mutation 12 read as killed when it had not been.
+        write_classic_salary(path)
+        with path.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        team_col = rows[0].index("TeamAbbrev")
+        start_col = rows[0].index("Starting")
+        for row in rows[1:]:
+            if row[team_col] in ("CCC", "DDD"):
+                row[start_col] = ""
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return path
+
+    def test_a_partly_posted_salary_file_does_not_take_the_dk_route(self):
+        """`covered` is non-empty here, so only the `not_covered` half of the
+        condition can refuse -- and it must. A feed built from two posted sides
+        would assert a confirmed all-clear over two teams DK has said nothing
+        about, which is this whole item's failure mode with a new source."""
+        from tools.preflight_upload import (
+            Report, feed_from_dk_starting, load_salary)
+        salary = self._salary_partially_posted()
+        rep = Report()
+        self.assertIsNone(feed_from_dk_starting(
+            salary, self.entries, load_salary(salary), rep))
+        note = rep.info["feed_dk_starting"]
+        self.assertIn("not used", note)
+        self.assertIn("2 side(s)", note)
+        self.assertIn("CCC", note)
+
+    def test_the_dk_route_is_reported_when_dk_has_not_posted(self):
+        from tools.preflight_upload import Report, feed_from_dk_starting
+        rep = Report()
+        self.assertIsNone(feed_from_dk_starting(self.salary_path, self.entries,
+                                                self.salary, rep))
+        self.assertIn("not used", rep.info["feed_dk_starting"])
+
+    def test_a_dk_covered_file_passes_the_posted_lineup_check_end_to_end(self):
+        covered = self.dir / "DKSalaries_e2e.csv"
+        lineup = write_classic_salary(covered)
+        entries = self.dir / "DKEntries_e2e.csv"
+        write_entries(entries, CLASSIC_HEADER, [classic_entry("901", "5", lineup)])
+        result = run_preflight("--entries", str(entries), "--salary", str(covered),
+                               "--json")
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("no external feed was needed",
+                      payload["info"]["feed_dk_starting"])
+        self.assertEqual(payload["info"]["feed_absent"], [])
+        # `feed_absent == []` alone is satisfied by a feed that was never read:
+        # with no games in it nothing is CONFIRMED, so every rostered player
+        # falls through to the soft branches and the file still exits 0. These
+        # two say the synthesized feed was actually consulted -- every rostered
+        # team cross-checked against a posted nine, nobody left projected.
+        self.assertEqual(payload["info"]["feed_unconfirmed_teams"], {})
+        self.assertEqual(payload["info"]["feed_projected_players"], {})
 
 
 if __name__ == "__main__":

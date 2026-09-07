@@ -65,6 +65,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+# R297(d)/R304. Five sites in this file asked `Roster Position == "P"`, the
+# CLASSIC pitcher token, and a Showdown export never carries it: every Showdown
+# portfolio read as holding zero arms, so the SP-repetition census counted arms
+# into their team's stack, the Savant bat table admitted them, the washout axes
+# recorded a stack that was partly a pitcher, and the chalk-carry and legend
+# counts were taken over the wrong row set. Reports rather than gates, so no
+# upload was blocked -- the same falsehood with a smaller blast radius.
+# `preflight_upload` owns the predicate and imports no third-party module, so it
+# is imported rather than restated; `verify_export` already imports from it.
+# Imported by its package path, not off `tools/` on sys.path: run as a
+# script this file already puts REPO_ROOT first, and a bare
+# `import preflight_upload` would bind a SECOND module object under a
+# second name whenever anything else has imported it as
+# `tools.preflight_upload` -- two copies of one predicate, which is the
+# shape the import exists to avoid.
+from tools.preflight_upload import is_pitcher_row  # noqa: E402
+
 
 def norm(s: str) -> str:
     d = unicodedata.normalize("NFKD", s or "")
@@ -233,7 +250,7 @@ def section_adversarial(
             p = sal.get(pid)
             if not p:
                 continue
-            if p.get("Roster Position") == "P":
+            if is_pitcher_row(p):
                 sp_ct[p["Name"]] += 1
             else:
                 tm[p["TeamAbbrev"]] += 1
@@ -291,7 +308,7 @@ def section_adversarial(
         for row in body:
             for pid in lineup_players(hdr, row):
                 p = sal.get(pid)
-                if p and p.get("Roster Position") != "P":
+                if p and not is_pitcher_row(p):
                     exp[p["Name"]] += 1
         for name, c in sorted(exp.items(), key=lambda kv: -kv[1])[:8]:
             r = bat.get(norm(name))
@@ -475,7 +492,7 @@ def section_frontier(
             if not p:
                 continue
             gm[(p.get("Game Info") or "").split(" ")[0]] += 1
-            if p.get("Roster Position") == "P":
+            if is_pitcher_row(p):
                 sps.add(p["Name"])
             else:
                 tm[p["TeamAbbrev"]] += 1
@@ -917,7 +934,7 @@ def section_leverage(
                     missing[pid] = (sal.get(pid) or {}).get("Name") or pid
                     continue
                 total += own[pid]
-                if ((sal.get(pid) or {}).get("Roster Position") != "P"
+                if (not is_pitcher_row(sal.get(pid) or {})
                         and str(tiers.get(pid)) == "Low"):
                     carry += 1
             chalks.append(total)
@@ -983,8 +1000,7 @@ def _leverage_legend(sal: Dict[str, dict], have: Mapping[str, Any],
     this slate's own pool rather than quoted, because the whole point of it is
     that the number depends on how many hitter rows the budget is spread over.
     """
-    rows = [pid for pid, r in sal.items()
-            if (r.get("Roster Position") or "") != "P"]
+    rows = [pid for pid, r in sal.items() if not is_pitcher_row(r)]
     priced = [pid for pid in rows
               if any(pid in (have[a].get("own_pct_by_player_id") or {})
                      for a in used)]

@@ -301,7 +301,13 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    `dk_batting_order.disagreements`, never silently resolved: the CSV is a
    point-in-time download and a paste has no timestamp, so neither can be
    proven fresher and the operator gets the fact instead of a guess.
-   A PARTIAL side is a third case and it is now stated rather than implied
+   **The two REFEREES read this ranking too, since R305.**
+  `preflight_upload.py` and `verify_export.py` prefer the salary file's own
+  `Starting` column over any staged feed, by way of `dk_order_coverage` and
+  `merge_dk_starting_into_feed` rather than a second reading of the column; the
+  import is lazy and guarded, so a copy of the tool run from a bare directory
+  still works and says which fallback it took.
+  A PARTIAL side is a third case and it is now stated rather than implied
    (R60). It is not confirmed, so it routes through the TBD path and its
    posted hitters stay `Projected_Starter` — but a posted slot is OBSERVED and
    the two fills below it are PRIORS, so the order is posted starters, then
@@ -439,7 +445,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  28 modules  1810 tests`. The module count comes off the
+   `PASS  v2.26.0  28 modules  1839 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -529,6 +535,20 @@ inventory checks fail while the suite passes in full, build and flag it.
   Exit 0 clean, 2 hard failure, 3 IO error, 4 acknowledged (`--force` prints
   the failures and exits 4, never 0). This sentence is the pre-upload rule;
   nothing else is.
+  **The feed it cross-checks against is chosen by IDENTITY, not by mtime
+  (R305), and on a DK-covered slate it needs no feed at all.** Both referees
+  resolve through one function: DK's own `Starting` column first (the ranking
+  build contract item 1 already sets, so a fully posted slate that wrote no feed
+  is cross-checked against the salary file itself and the report says no
+  external feed was needed), then a feed staged beside the salary file, then the
+  staged feeds for that date -- and a candidate is usable only if it holds every
+  GAME these entries roster. Two consequences to read rather than rediscover
+  under a clock. `feed_autoresolve` can now say `REFUSED`, which means a wrong
+  feed was declined and the posted-lineup check did not run: that is a stated
+  absence, not a failure, and `--feed <path>` overrides it. And a WARN about
+  absent players is no longer routinely false -- the three sightings that made
+  it so (61, 73 and 28 false warnings across 2026-09-03 and 09-04) were all this
+  resolver handing a referee another slate's feed.
   **It hard-fails a player whose game has already started (R287), and `--as-of`
   pins the clock for a replay.** It did not until 2026-09-01, and the miss is
   the worst kind because the tool reported PASS: a 37-entry file holding 151

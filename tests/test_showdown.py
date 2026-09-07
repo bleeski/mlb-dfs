@@ -15,6 +15,7 @@ import importlib.util
 import io
 import json
 import math
+import sys
 import tempfile
 import types
 import unittest
@@ -3498,6 +3499,146 @@ class R306CaptainOwnershipMarketTests(unittest.TestCase):
             encoding="utf-8")
         self.assertIn('default="ledger/inbox"', source)
         self.assertNotIn('"ledger/MLB', source)
+
+
+class R304dShowdownBriefRecordsDeclarationsTests(unittest.TestCase):
+    """R304(d). `run_showdown` wrote `declared_pitchers` NOWHERE.
+
+    Measured at `eb1c8fd` by an AST-bounded count over the function:
+    `declared_pitchers` 0 occurrences, `declare_pitcher` 0. `run_classic` has
+    written it since R104, at the refusal payload and the certified brief, so
+    `preflight_upload.resolve_declared_pitchers` -- which matches a brief by
+    `delivered_sha256` and reads exactly that key -- found nothing on any
+    Showdown delivery and the flag's own help ("Recorded verbatim in the brief")
+    was false there. With R297(d) killing the referee's pitcher test as well,
+    BOTH ends of R114's escape hatch were out at once on the one geometry where
+    DK's PO/PLR tokens make a declaration necessary.
+
+    Written against the PRODUCTION `run_showdown`, driven end to end (R300(a)):
+    the R289 acceptance test asserted over a hand-built frame and shipped green
+    while five production sites still dropped the column.
+    """
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r304d", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _build(self, tmp: Path, declare):
+        """A real delivered Showdown build, writing NOWHERE outside `tmp`.
+
+        `mod.REPO` is patched because `run_showdown` mirrors into
+        `REPO/outputs/<date>/` and records into that directory's upload
+        manifest. An earlier probe of this same path in this repo appended a
+        live delivery row to `outputs/2026-07-18/upload_manifest.json`; a test
+        that does that is writing outside its own write set every time it runs.
+        """
+        import shutil
+        sal, ent = tmp / "DKSalaries.csv", tmp / "DKEntries.csv"
+        shutil.copy2(SAL, sal)
+        shutil.copy2(ENT, ent)
+        args = types.SimpleNamespace(
+            date="2026-07-18", entries=None, controls_override=None,
+            projections=None, declare_pitcher=list(declare), lineups=None,
+            odds=None, no_odds=True, brief=None)
+        mod = self._module()
+        with unittest.mock.patch.object(mod, "REPO", tmp), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            code, brief = mod.run_showdown(args, tmp, sal, ent)
+        return code, brief, out.getvalue()
+
+    def test_the_delivered_showdown_brief_records_the_declaration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, brief, _ = self._build(
+                Path(tmp), ["44014717=viable_bulk_or_alt_sp", "44014815"])
+        self.assertEqual(code, 0)
+        self.assertEqual(brief["status"], "review_grade_build",
+                         "Showdown ships review-grade, never upload-ready")
+        self.assertEqual(brief["declared_pitchers"],
+                         {"44014717": "viable_bulk_or_alt_sp",
+                          "44014815": "declared_probable_sp"},
+                         "a bare id means declared_probable_sp, as on Classic")
+
+    def test_no_declaration_records_an_empty_map_rather_than_no_key(self):
+        """R249's rule: a fix that is invisible has not closed the hole. An
+        absent key leaves `was a declaration given` unanswerable, which is what
+        sent the 1235_1g_sd session to the Excluded column."""
+        with tempfile.TemporaryDirectory() as tmp:
+            code, brief, _ = self._build(Path(tmp), [])
+        self.assertEqual(code, 0)
+        self.assertIn("declared_pitchers", brief)
+        self.assertEqual(brief["declared_pitchers"], {})
+
+    def test_the_referee_reads_the_declaration_back_off_that_brief(self):
+        """The round trip, both production functions: `run_showdown` writes the
+        key, `preflight_upload.resolve_declared_pitchers` matches the brief by
+        `delivered_sha256` and returns it. This is the whole point of (d)."""
+        sys.path.insert(0, str(REPO / "tools"))
+        from tools.preflight_upload import Report, resolve_declared_pitchers
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            code, brief, _ = self._build(tmp, ["44014717=viable_bulk_or_alt_sp"])
+            self.assertEqual(code, 0)
+            delivered = Path(brief["delivered_path"])
+            (delivered.parent / "build_brief.json").write_text(
+                json.dumps(brief), encoding="utf-8")
+            rep = Report()
+            resolved = resolve_declared_pitchers(
+                delivered, brief["delivered_sha256"], None, rep)
+        self.assertEqual(resolved, {"44014717": "viable_bulk_or_alt_sp"})
+        self.assertIn("build_brief.json", rep.info["declared_pitchers_source"])
+
+    def test_the_refusal_payload_records_it_too_matching_run_classic(self):
+        """`run_classic` writes the key on its refusal payload as well as its
+        certified brief, because a refusal is read harder than a delivery. Same
+        two sites here, and no more: the remaining Showdown refusal dicts report
+        an input that could not be READ (an unreadable projections file, an
+        Excluded column leaving one team), and `run_classic` carries no
+        declaration on its analogues either. Extending both geometries to those
+        is a separate one-line follow-up, named rather than done, so this fix
+        does not mint a new asymmetry between the two paths.
+        """
+        import shutil
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            sal, ent = tmp / "DKSalaries.csv", tmp / "DKEntries.csv"
+            shutil.copy2(SAL, sal)
+            shutil.copy2(ENT, ent)
+            args = types.SimpleNamespace(
+                date="2026-07-18", entries=None, controls_override=None,
+                projections=None, declare_pitcher=["44014717"], lineups=None,
+                odds=None, no_odds=True, brief=None)
+            mod = self._module()
+            with unittest.mock.patch.object(mod, "REPO", tmp), \
+                    unittest.mock.patch.object(
+                        sd, "build_showdown_bank", lambda *a, **k: []), \
+                    unittest.mock.patch.object(
+                        st, "solve_ladder",
+                        lambda priced, theses, **k: [None] * len(theses)), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                code, brief = mod.run_showdown(args, tmp, sal, ent)
+        self.assertEqual(code, 3)
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload["declared_pitchers"],
+                         {"44014717": "declared_probable_sp"})
+
+    def test_the_showdown_pool_still_derives_its_own_declared_starters(self):
+        """The scope this key does NOT claim, pinned so no later session reads
+        it as a pool override. `--declare-pitcher` reaches `build_slate_pool` on
+        the CLASSIC path only; the Showdown melt reads DK's own `Starting`
+        column, which admits PLR and not PO. Wiring the declaration into the
+        melt so a PO arm can be declared into a Showdown pool is the named
+        remainder of this item, not part of it."""
+        import inspect
+        signature = inspect.signature(sd.melt_showdown_salary_csv)
+        self.assertNotIn("declared_pitchers", signature.parameters)
+        self.assertEqual(sd.DK_STARTING_DECLARED_TOKENS,
+                         frozenset({"SP", "P", "PLR"}),
+                         "PO stays barred (R104); that is the remainder")
 
 
 if __name__ == "__main__":

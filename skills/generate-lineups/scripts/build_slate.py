@@ -3370,7 +3370,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                   file=sys.stderr)
             continue
         payload = {"status": refusal_status, **refusal_stamp(refusal_key),
-                   "date": args.date, **refusal_extra}
+                   "date": args.date, **refusal_extra,
+                   # R304(d). Same key on the refusal path as on the delivered
+                   # one, matching `run_classic`: a refusal is read harder than
+                   # a delivery, and the operator's declaration is an input to
+                   # the attempt whether or not it produced a file.
+                   "declared_pitchers": parse_declared_pitchers(
+                       args.declare_pitcher)}
         if governor is not None:
             payload["deadline"] = governor.stamp()
         print(json.dumps(payload, indent=1))
@@ -3649,6 +3655,30 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
+        # R304(d). The other end of R114's escape hatch. `run_classic` has
+        # written this key since R104 (the refusal payload and the certified
+        # brief); `run_showdown` wrote it NOWHERE -- verified by an AST-bounded
+        # count over this function at `eb1c8fd`: `declared_pitchers` 0
+        # occurrences, `declare_pitcher` 0. So `preflight_upload.
+        # resolve_declared_pitchers`, which matches a brief by `delivered_sha256`
+        # and reads this key, found nothing on any Showdown delivery, and the
+        # flag's own help ("Recorded verbatim in the brief") was false here.
+        # With the referee's geometry test dead as well (R297(d)), BOTH ends of
+        # the hatch were out at once on the one geometry where DK's PO/PLR
+        # tokens make a declaration necessary -- and the remaining move on
+        # 1235_1g_sd was to drop the arm through the salary file's `Excluded`
+        # column, which is the legal-pool reduction CLAUDE.md's hard guardrails
+        # forbid.
+        #
+        # What this key does NOT claim, because the flag's help now says so too:
+        # the Showdown POOL never saw it. `melt_showdown_salary_csv` derives
+        # `Is_Declared_Starter` from DK's own `Starting` column
+        # (`DK_STARTING_DECLARED_TOKENS`, which already admits PLR), and
+        # `--declare-pitcher` reaches `build_slate_pool` on the Classic path
+        # only. This is the operator's recorded answer, for the referees to read
+        # back; wiring it into the Showdown melt so a PO arm can be declared in
+        # is a pool change on the build path and is the named remainder.
+        "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
         # R249. The whole point of the item is that the operator's previous
         # workaround -- editing the APPG column of the salary file -- moved
         # captains and was recorded NOWHERE. A fix that is also invisible has
@@ -4472,7 +4502,14 @@ def main() -> int:
                          "is the operator's answer to a PLR (projected long "
                          "reliever) soft blocker, and the documented way past the "
                          "PO (probable opener) bar. Bare ID means "
-                         "declared_probable_sp. Recorded verbatim in the brief.")
+                         "declared_probable_sp. Recorded verbatim in the brief on "
+                         "BOTH geometries (R304(d)), where preflight_upload and "
+                         "verify_export read it back and stop failing the arm as "
+                         "absent. It reaches the POOL on Classic only: the "
+                         "Showdown melt derives declared starters from DK's own "
+                         "Starting column, which already admits PLR but not PO, "
+                         "so --declare-pitcher cannot put a PO arm in a Showdown "
+                         "pool.")
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "

@@ -104,8 +104,8 @@ from preflight_upload import (  # noqa: E402
     check_pool_membership, check_row_shape, check_started_games, check_status,
     load_entries, load_salary, parse_as_of, parse_declared_pitcher_args,
     parse_embedded_pool, parse_game_info_datetime, resolve_declared_pitchers,
-    resolve_feed_for_slate, resolve_salary_from_promoted_run, sha256_of,
-    verdict_exit_code,
+    resolve_feed_for_slate, resolve_feed_source, resolve_salary_from_promoted_run,
+    sha256_of, verdict_exit_code,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -172,6 +172,13 @@ def resolve_lineups_feed(
         rep.info["feed_autoresolve"] = f"staged beside the salary file: {sibling.name}"
         return sibling
     return resolve_feed_for_slate(entries, salary, rep)
+
+
+# R305. The lock derivation above needs a FILE (it reads per-game status for a
+# postponement, which only a fetched feed carries). The posted-lineup check needs
+# EVIDENCE, and on a DK-covered slate the best evidence is the salary file's own
+# Starting column, which is not a file at all. Two resolvers, one for each
+# question, rather than one Path serving both and being wrong for one of them.
 
 
 def derive_locked_teams_from_feed(
@@ -562,11 +569,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     else:
         declared_pitchers = resolve_declared_pitchers(
             entries_path, rep.info["entries_sha256"], args.brief, rep)
-    if feed_path is not None and feed_path.exists():
-        check_feed(entries, salary, feed_path, not args.feed_lenient, rep,
+    # R305. This tool and preflight_upload resolved the SAME wrong feed for the
+    # same file on 2026-09-04 because both already called one function; the
+    # typed compatibility join and the DK-Starting preference land in that same
+    # function so the two referees cannot drift back apart.
+    feed_source = resolve_feed_source(entries, salary, salary_path,
+                                      args.lineups, rep)
+    if feed_source is None:
+        rep.warn("no lineups feed resolved; the posted-lineup cross-check did "
+                 "not run. " + str(rep.info.get("feed_autoresolve") or ""))
+    elif not isinstance(feed_source, (str, Path)):
+        check_feed(entries, salary, feed_source, not args.feed_lenient, rep,
                    declared_pitchers=declared_pitchers)
-    elif feed_path is not None:
-        rep.warn(f"feed {feed_path} does not exist; posted-lineup cross-check skipped")
+    elif Path(feed_source).exists():
+        check_feed(entries, salary, feed_source, not args.feed_lenient, rep,
+                   declared_pitchers=declared_pitchers)
+    else:
+        rep.warn(f"feed {feed_source} does not exist; posted-lineup cross-check "
+                 f"skipped")
 
     parent_path = Path(args.parent) if args.parent else None
     if parent_path is None:

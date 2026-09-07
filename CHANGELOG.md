@@ -25,6 +25,231 @@ performance claim.
 
 ---
 
+## 2026-09-06 — R305 and R304 CLOSED, R297(d) landed out of its batch: the two referees stop asserting a false thing about a Showdown file, and stop reading another slate's feed
+
+**Scope: `tools/preflight_upload.py`, `tools/verify_export.py`,
+`tools/qa_portfolio.py`, `tools/audit.py`,
+`skills/generate-lineups/scripts/build_slate.py`,
+`skills/generate-lineups/SKILL.md`, `CLAUDE.md`, `tests/test_core.py`,
+`tests/test_showdown.py`, `tests/test_upload_integrity.py`, `docs/backlog.md`.**
+Gate `PASS v2.26.0 28 modules 1810 tests` -> `PASS v2.26.0 28 modules 1839
+tests`; `test_core` 1154 -> 1159, `test_showdown` 201 -> 206,
+`test_upload_integrity` 348 -> 367, `test_golden_replay` and
+`test_paste_lineups` unmoved, all five suites `clean`. **20 mutations written,
+20 killed, 0 survivors**, each against the single test written for its guard and
+each with a control run first — which is how two of them were caught reading as
+killed when they were not (below). No delivered byte changes on any Classic
+build.
+
+One subject in three filings: a check that could not run, rendered as an
+affirmative observation about the input. R237's rule on its fourth and fifth
+surfaces. Both cost calls inside lock windows on 2026-09-03, and R304's measured
+cost is a legal-pool reduction, which CLAUDE.md's hard guardrails name as the
+forbidden move.
+
+**R297(d) + R304(a)(b)(c). The referee's pitcher test was a Classic token, so
+the declared-arm hatch was dead on the one geometry that needs it.**
+`preflight_upload.py:1662` asked `Roster Position == "P"`. A Showdown export puts
+`CPT`/`UTIL` in that column and nothing else (196 rows on 1235_1g_sd, 98 and 98,
+zero `P`), so `is_pitcher` was False for every player on every Showdown file: the
+R114 declared-arm and R67 bullpen-game exemptions were dead there, a legally
+rostered arm HARD-FAILED, and `--force` — barred by CLAUDE.md — was the only way
+through. Reproduced against the real 2026-09-03 inputs before a line was touched:
+with `--declare-pitcher` naming Wilber Dotel's UTIL id, the report printed
+`1 declared id(s) are not pitcher-position rows ... A declaration names an arm;
+it cannot clear a hitter` over a row whose `Position` is `RP`, and failed him in
+six entries. `is_pitcher_row` now reads both columns unconditionally
+(`Roster Position` holding `P`, or `Position` in {P, SP, RP}), which needs no
+geometry detection and is provably equivalent on Classic: measured on the two
+2026-09-03 Classic exports, 564 and 279 rows, `Roster Position == "P"` holds for
+exactly the 326 and 150 rows whose `Position` is SP or RP and for no other row.
+
+**(c) The two counters were not disagreeing about one fact; they were counting
+two different objects, and the reconciliation is the fix.** The WARN said Dotel
+was "in 2 of 17" and the FAIL said 6. Neither was wrong. `declared_pitchers` is
+keyed by DK player id, and a DK draftable id is a ROLE, not a person (R234): a
+Showdown export prices every human twice, so the declaration covered the UTIL id
+in two entries while four more rostered the same arm as CAPTAIN under an id
+nobody had declared. Fixing `is_pitcher_row` alone would have acknowledged two
+entries and hard-failed four, which is not a restored hatch. Declarations are now
+person-scoped through `person_key`, the fifth site of R234's class in this file
+and the one that had never had it; on Classic each person owns one id, so nothing
+moves there. After the fix the same repro emits one acknowledgement, `in 6 of
+17`, and zero failures.
+
+**R304(d). The other end of the hatch, and the half the greenfield spec got
+wrong.** Re-verified at this head by an AST-bounded count over `run_showdown`
+(`build_slate.py:3203-3918`): `declared_pitchers` 0 occurrences,
+`declare_pitcher` 0. `run_classic` has written it since R104 at both its refusal
+payload and its certified brief, so `resolve_declared_pitchers` — which matches a
+brief by `delivered_sha256` and reads exactly that key — found nothing on any
+Showdown delivery, and the flag's help ("Recorded verbatim in the brief") was
+false there. **Chosen: write the key, on both the delivered brief and the refusal
+payload, which is exactly Classic's own two sites and no more.** The remaining
+Showdown refusal dicts report an input that could not be READ (an unreadable
+`--projections` file, an `Excluded` column leaving one team) and `run_classic`
+carries no declaration on its analogues either; extending both geometries to
+those is named here rather than done, so this fix does not mint a new asymmetry
+between the two paths. **The flag's help is corrected too, because writing the
+key without it would have replaced one false sentence with another:** the
+declaration reaches the POOL on Classic only. `melt_showdown_salary_csv` derives
+`Is_Declared_Starter` from DK's own `Starting` column
+(`DK_STARTING_DECLARED_TOKENS`, which already admits `PLR` and not `PO`), and
+`--declare-pitcher` reaches `build_slate_pool` on the Classic path alone — so a
+`PO` arm still cannot be declared into a Showdown pool. That wiring is the named
+remainder of this item.
+
+**Measured cost this closes, and why it was P1 rather than a message bug.** On
+1235_1g_sd, with no sanctioned route and `--force` barred, the session's only
+remaining move was to REDUCE THE LEGAL POOL: Dotel was dropped through the salary
+file's `Excluded` column, PIT was left with no rosterable arm at all (Lake Bachar
+is DK's `PO`), 11 of 17 delivered entries carried no pitcher, and pitcher-captain
+share fell to 23.5% against a structural ceiling of 47.1% with ledger 3.21's
+replicated direction at winners 65.5% / field 46.0%.
+
+**The R233 enumeration, and the premise it corrected.** The grep at `eb1c8fd`,
+which belongs in this entry rather than in a session's head:
+
+    $ grep -rn '"Roster Position"' --include=*.py mlb_engine tools skills \
+          | grep '"P"'
+    tools/preflight_upload.py:1662   is_pitcher, the declared-arm exemption
+    tools/preflight_upload.py:1695   the same test, the partial-side branch
+    tools/qa_portfolio.py:236        the SP repetition census
+    tools/qa_portfolio.py:294        bats-vs-Savant exposure
+    tools/qa_portfolio.py:478        the washout axes
+    tools/qa_portfolio.py:920        the chalk-carry count, via the salary map
+    tools/qa_portfolio.py:987        the leverage legend's hitter-row count
+
+Seven, not the two R304 named. All seven now call one predicate.
+`tools/verify_export.py` has no site of its own — checked rather than assumed: it
+imports `check_feed` from `preflight_upload`, so it inherited both preflight
+sites and is fixed by fixing them. The other 85 `Roster Position` reads in the
+tree parse SLOTS (`split("/")`, CPT/UTIL role reads, geometry detection) and are
+not members; the class is over the COMPARISON, not the string.
+
+**And the claim that came with the five `qa_portfolio` members is FALSE, which
+is worth recording because it is the kind of claim that gets inherited.** They do
+NOT "read every Showdown portfolio as holding zero pitchers." None of the five is
+reachable on a Showdown portfolio at all. Sections 2 and 3 read their ids through
+`lineup_players`, which keys on `SLOTS` = P/C/1B/2B/3B/SS/OF, so a Showdown
+header yields no ids — deliberate, and documented at `entry_slot_ids`: "widening
+SLOTS would make them answer for a format they were never written for." The other
+two sit under `if resolved and not showdown` and an `if showdown: ... continue`;
+the leverage panel prints "CHALK-SUM and LOW-OWNED CARRY: ABSENT for Showdown"
+instead of computing either. So the token was right by the accident that no
+caller hands these sites a Showdown row, not by being the right test. They are
+fixed anyway — the predicate is provably equivalent on Classic, so nothing moves
+today, and leaving five known-wrong tests alive behind a guard several layers
+away is how the next widening of `SLOTS` ships five falsehoods at once. The two
+guards that currently make them dead are now pinned, so that widening cannot
+happen silently. `qa_portfolio` imports the predicate by its package path
+(`from tools.preflight_upload import ...`) rather than off `tools/` on
+`sys.path`, because the bare form binds a SECOND module object under a second
+name as soon as anything else has imported it as `tools.preflight_upload` — two
+copies of one predicate, which is the shape the import exists to avoid, and a
+test asserts the two names are one object.
+
+**R305. The feed resolver was a filename glob and an mtime, and it fed both
+referees.** `resolve_feed_for_slate` derived a calendar date from the salary
+file's `Game Info`, globbed `data/slates/<date>/lineups_feed*.json`, and returned
+`max(candidates, key=st_mtime)`. No slate tag, no draftgroup, no game set, no
+team set, no contest geometry took part. `data/slates/<date>/` is shared and
+date-only-keyed, so three Classic draftgroups stage into one directory on an
+ordinary evening. Three field sightings across two dates, every warning in them
+false: 61 and 73 on 2026-09-03 (a Classic file against an earlier Showdown feed,
+6.9h old) and 28 on 2026-09-04, where 2210_2g was cross-checked against a
+4.5h-old 1810_3g feed for a slate sharing NOT ONE GAME with it. Under a lock
+clock those read as real roster risk and cost a verification detour each time.
+
+**Fix (1): a typed compatibility join on the identity the inputs already carry,
+refusing on missing OR ambiguous.** A candidate is usable only when it holds
+every GAME and TEAM these entries roster; an exact game-set match outranks a
+superset, and two candidates tied at the best rank REFUSE and are both named,
+because a wrong feed asserts where no feed only abstains. A superset is kept and
+ranked second rather than refused: a whole-day paste is valid evidence for a
+subset draftgroup, and `check_feed` never consults a team these entries do not
+roster. **Contest geometry is deliberately NOT part of the join, against the
+item's own Fix line.** `lineups_feed_showdown_1235_1g_sd.json` was built by
+remapping the Classic paste's ids onto the Showdown draftgroup, so a geometry
+test would refuse a feed carrying exactly the right facts; the game set is what
+separated all three sightings. The identity is computed over the ROSTERED rows,
+not the whole salary file, so a superset salary snapshot (R242's subject, still
+open) cannot cause a false refusal here.
+
+**Fix (2): on a DK-covered slate no external feed is read at all, and that is the
+case that produced all three sightings.** Since R143 a fully posted slate writes
+NO feed — the build reads the batting order out of the salary file's `Starting`
+column and makes no API call — so `data/slates/<date>/` holds only other
+draftgroups' feeds and the resolver had nothing right to find. The evidence was
+never missing; it was in the same file this tool already treats as authoritative
+for ids, salaries, teams and eligibility. `feed_from_dk_starting` reads it
+through `dk_order_coverage` and `merge_dk_starting_into_feed`, imported rather
+than restated, because CLAUDE.md's build contract makes `dk_order_coverage` the
+ONE definition of "covered". **That import is the one design property this item
+spends, and it is spent deliberately:** `preflight_upload` had no engine import,
+and a comment at `showdown.OUT_STATUSES` cites that as the reason a constant is
+MIRRORED there instead. The mirror precedent was rejected here because a mirror
+is a second definition of exactly the rule CLAUDE.md pins as single, and the
+standalone property survives anyway — the import is lazy, guarded, and its
+failure is REPORTED, with the disk resolver as the fallback, which
+`tests/test_upload_integrity`'s bare-root copy test still exercises. Measured:
+`DKSalaries_1915_6g.csv` reports 12 of 12 sides covered and synthesizes 6 games;
+a Showdown salary file reports 0 covered (both CPT and UTIL rows carry the same
+order slot, so no side is complete) and falls through to fix (1), which is the
+conservative direction.
+
+**Both referees resolve through one function now.** `resolve_feed_source` orders
+it explicit `--feed`, then DK's own column, then a feed staged beside the salary
+file, then the staged-feed join — and the sibling, which `verify_export` used to
+take unconditionally, must now cover this file's games. That ordering is
+CLAUDE.md's build-contract ranking (DK first, per side) reaching the referees;
+`check_feed` accepts a parsed feed as well as a path so this needs no second way
+to read one. The third sighting hit both tools on one file because both already
+called one function; the fix lands in the same place so they cannot drift apart.
+
+**Rider discharged.** The R300(b) test added under R292 asserted `feed_autoresolve`
+fields without asserting the return code. `test_a_showdown_feed_for_another_slate_is_REFUSED_not_picked_by_mtime`
+is the behaviour half that pin was standing in for. The existing boundary test at
+`tests/test_upload_integrity.py` (a file spanning two slate dates resolves None)
+was read before the signature was touched and still holds unchanged.
+
+**Three fixtures were passing over conditions they no longer describe, and
+correcting the FIXTURE rather than the check is the whole of it.**
+`write_classic_salary` numbers its hitters 1-9 and marks its arms SP, which is a
+complete DK posting for every side, so three tests whose subject is the on-disk
+resolver were standing on a file that now takes the DK route. Each is re-pointed
+at the condition its name claims (`blank_dk_starting`, and a salary copy in a
+directory with no sibling feed). One went further: `PreflightFeedDefaultTests`'
+feed helper emitted ONE fabricated game pairing AAA with CCC when the salary file
+says AAA@BBB and CCC@DDD. It held the right team names, so every assertion in
+that class passed over a feed claiming the wrong matchups — which the typed join
+now refuses, correctly. It emits the two real games.
+
+**Two mutations read as killed when they were not, and both were faults in the
+test.** `feed_from_dk_starting`'s "every side must be covered" was exercised
+against a fixture with NOTHING posted, which cannot tell `not covered` from
+`not covered or not_covered`; it now stands on a file where DK has posted AAA and
+BBB and not CCC or DDD, the ordinary mid-afternoon state. And the end-to-end
+DK-route test asserted `feed_absent == []`, which an unread feed also satisfies —
+with no games in it nothing is CONFIRMED, every rostered player falls through to
+the soft branches and the file still exits 0; it now asserts that no rostered team
+was left unconfirmed and no player left projected. A third survivor was real and
+useful: disabling the `Roster Position` branch of `is_pitcher_row` SURVIVED,
+because both branches agree on a well-formed DK export. That branch is
+load-bearing only where `Position` is absent, which is every hand-built salary map
+in this suite and in `qa_portfolio`'s fixtures, and the test now says so.
+
+**Found while verifying, not caused by this change, and filed rather than
+fixed.** `test_core.R293BankOnEveryRungTests.test_every_solve_producer_call_site_is_classified`
+FAILS RED in any fresh clone. Its `EXPECTED_CENSUS` pins
+`skills/generate-lineups-workspace/deepen_bank.py`, which is untracked on the
+mount and therefore in no checkout, so the census under-reports and the pin
+mismatches. Reproduced at pristine `eb1c8fd` in a container clone before any of
+this session's files were copied in, which is what makes it pre-existing rather
+than mine. This is R155's shape on a new surface — a data dependency reached
+through a pinned PATH rather than through production code — and it means a clone
+cannot verify `test_core` at this head. Filed on the board.
+
 ## 2026-09-06 — R318 and the board merge: the clock rule's two unreached doors, three instruction-corpus corrections fixed rather than queued, and the fourteen-fragment inbox consumed
 
 **Scope: `CLAUDE.md`, `skills/generate-lineups/SKILL.md`,

@@ -22861,5 +22861,128 @@ class AllocatorTruthTests(unittest.TestCase):
                       source)
 
 
+class R304QaPortfolioPitcherTokenTests(unittest.TestCase):
+    """R297(d)/R304, the five REPORT-side members of the class, and the premise
+    correction that came with checking them.
+
+    R304 named two sites; the grep at `eb1c8fd` for `Roster Position` compared
+    against the Classic token `"P"` returns seven, five of them here. The claim
+    that came with them -- that they "read every Showdown portfolio as holding
+    zero pitchers" -- is FALSE, and it is worth recording as false because it is
+    the kind of claim that gets inherited.
+
+    NONE of the five is reachable on a Showdown portfolio. Sections 2 and 3
+    (`section_adversarial` x2, `section_frontier`) read their ids through
+    `lineup_players`, which keys on `SLOTS` = P/C/1B/2B/3B/SS/OF, so a Showdown
+    header yields NO ids at all; `entry_slot_ids`' own docstring says this is
+    deliberate ("widening SLOTS would make them answer for a format they were
+    never written for"). `section_leverage`'s carry count and
+    `_leverage_legend`'s denominator sit under `if resolved and not showdown`
+    and an `if showdown: ... continue` -- the panel prints "CHALK-SUM and
+    LOW-OWNED CARRY: ABSENT for Showdown" instead. So the token was right by the
+    accident that no caller ever hands these sites a Showdown row, not by being
+    the right test for "is this an arm".
+
+    They are fixed anyway, and the reason is R233's: the predicate is provably
+    equivalent on Classic (pinned below against the real fixture generator), so
+    nothing moves today, and leaving five known-wrong tests alive behind a guard
+    several layers away is exactly how the next widening of `SLOTS` ships five
+    falsehoods at once. The two guards that currently make them dead are pinned
+    here so that widening cannot happen silently.
+    """
+
+    ARM = "Showdown Arm"
+
+    def _showdown_salary(self):
+        """DK's shape: two priced rows per human, the real position in
+        `Position`, CPT/UTIL in `Roster Position`."""
+        rows = {}
+        for role, sal in (("CPT", "11000"), ("UTIL", "7400")):
+            rows[f"a_{role}"] = {
+                "ID": f"a_{role}", "Name": self.ARM, "Position": "SP",
+                "Roster Position": role, "Salary": sal, "TeamAbbrev": "AAA",
+                "Game Info": "AAA@BBB 07:00PM ET"}
+        for i in range(5):
+            for role, sal in (("CPT", "9000"), ("UTIL", "6000")):
+                rows[f"b{i}_{role}"] = {
+                    "ID": f"b{i}_{role}", "Name": f"Bat{i}", "Position": "OF",
+                    "Roster Position": role, "Salary": sal, "TeamAbbrev": "AAA",
+                    "Game Info": "AAA@BBB 07:00PM ET"}
+        return rows
+
+    SD_HDR = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+              "CPT", "UTIL", "UTIL", "UTIL", "UTIL", "UTIL"]
+
+    def _sd_row(self):
+        return ["1", "c", "9", "$1", "a_CPT", "b0_UTIL", "b1_UTIL",
+                "b2_UTIL", "b3_UTIL", "b4_UTIL"]
+
+    # ---- the two guards that make the five sites dead on Showdown today
+
+    def test_sections_two_and_three_read_no_ids_from_a_showdown_row(self):
+        """If this ever returns ids, `SLOTS` has been widened and sections 2
+        and 3 measure stacks and arms over a roster they were not written for.
+        Their pitcher test is already correct for that day; their arithmetic is
+        not, and that is the review this pin exists to force."""
+        from tools import qa_portfolio
+        self.assertEqual(qa_portfolio.lineup_players(self.SD_HDR, self._sd_row()), [])
+        ids, captain = qa_portfolio.entry_slot_ids(self.SD_HDR, self._sd_row())
+        self.assertEqual(captain, "a_CPT",
+                         "section 4 DOES read a Showdown row, through its own reader")
+        self.assertEqual(len(ids), 6)
+
+    def test_the_leverage_panel_prints_absent_rather_than_a_carry_count(self):
+        """The other guard, in words the panel itself prints: the prior budgets
+        800%/200% over a 2-P-plus-8-hitter Classic roster, so neither chalk-sum
+        nor the low-owned carry is computed for Showdown at all."""
+        source = (Path(__file__).resolve().parents[1] / "tools"
+                  / "qa_portfolio.py").read_text(encoding="utf-8")
+        self.assertIn("if resolved and not showdown:", source)
+        self.assertIn("CHALK-SUM and LOW-OWNED CARRY: ABSENT for Showdown",
+                      source)
+
+    # ---- the predicate at the sites themselves
+
+    def test_the_classic_reading_is_unchanged_at_a_live_site(self):
+        """Behaviour-preservation is the whole licence for touching these five.
+        A real Classic portfolio through the production `section_adversarial`."""
+        from tools import qa_portfolio
+        sal = {"p0": {"ID": "p0", "Name": self.ARM, "Position": "SP",
+                      "Roster Position": "P", "Salary": "9000",
+                      "TeamAbbrev": "AAA", "Game Info": "AAA@BBB 07:00PM ET"}}
+        for i in range(9):
+            sal[f"h{i}"] = {"ID": f"h{i}", "Name": f"Bat{i}", "Position": "OF",
+                            "Roster Position": "OF", "Salary": "4000",
+                            "TeamAbbrev": "AAA", "Game Info": "AAA@BBB 07:00PM ET"}
+        hdr = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+               "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        body = [["1", "c", "9", "$1", "p0"] + [f"h{i}" for i in range(9)]]
+        findings = qa_portfolio.section_adversarial(
+            {}, sal, hdr, body, {},
+            {qa_portfolio.norm(self.ARM): {"era": "2.90", "xera": "3.80"}})
+        self.assertTrue(any("ARM vs SAVANT" in f for f in findings), findings)
+
+    def test_the_legend_would_exclude_the_arms_if_it_ever_saw_a_showdown_pool(self):
+        """`_leverage_legend` called directly, which its production caller never
+        does for Showdown. The sentence it prints divides the prior's hitter
+        budget by "priced hitter rows"; over a Showdown pool the old token put
+        every arm row in that denominator. Dead today, correct now."""
+        from tools import qa_portfolio
+        sal = self._showdown_salary()
+        have = {"wta_satellite": {"own_pct_by_player_id": {p: 5.0 for p in sal}}}
+        text = "\n".join(qa_portfolio._leverage_legend(
+            sal, have, ["wta_satellite"]))
+        self.assertIn("over 10 priced hitter rows", text,
+                      "12 would mean the two arm rows counted as hitters")
+
+    def test_the_predicate_is_the_one_preflight_owns(self):
+        """One definition across the three tools that ask this question. A copy
+        here is the second implementation of one rule, which is this project's
+        named no-op failure class -- the reason `verify_export` imports from
+        `preflight_upload` rather than restating its checks."""
+        from tools import preflight_upload, qa_portfolio
+        self.assertIs(qa_portfolio.is_pitcher_row, preflight_upload.is_pitcher_row)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

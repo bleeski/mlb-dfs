@@ -588,7 +588,15 @@ EXPECTED_SUITE_COUNTS = {
     # status 2 still saying the reserved words and still climbing). One R233
     # census: an AST walk asserting all three re-entries read both conjuncts, so
     # a fourth ladder fails here instead of stepping on a non-proof.
-    "tests.test_core": 1154,
+    # R297(d)+R304+R305, 2026-09-06: 1154 -> 1159, the five that pin
+    # qa_portfolio's five members of the Classic-pitcher-token class AND the
+    # premise correction that came with checking them -- the two guards that
+    # make all five unreachable on a Showdown portfolio today (`lineup_players`
+    # keys on Classic SLOTS; the leverage panel prints ABSENT rather than
+    # computing a carry), the Classic reading unchanged at a live site, the
+    # legend's denominator once the arms come out, and one predicate object
+    # shared with preflight rather than restated.
+    "tests.test_core": 1159,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -759,7 +767,14 @@ EXPECTED_SUITE_COUNTS = {
     # still one-per-ROLE and a 600% PERSON market over them re-enters R235's
     # double-count through a door R235 does not watch. Five on the captain
     # actuals and their grade, and five on the archive driver.
-    "tests.test_showdown": 201,
+    # R304(d), 2026-09-06: 201 -> 206, the five that pin `declared_pitchers`
+    # on the Showdown brief -- the delivered brief and the refusal payload
+    # (Classic's own two sites, no more), an empty map rather than an absent key
+    # when nothing was declared, the round trip back through
+    # `preflight_upload.resolve_declared_pitchers`, and the scope the key does
+    # NOT claim (the Showdown melt still derives its own declared starters).
+    # All five drive the production `run_showdown` end to end.
+    "tests.test_showdown": 206,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -924,7 +939,18 @@ EXPECTED_SUITE_COUNTS = {
     # rather than running unconditionally. Two on preflight's wall-clock branch
     # (R300(b)): the real `datetime.now` path exiting 0 at now+1h and 2 at now-1h,
     # both derived at test time so neither can rot into a fixture-clock test.
-    "tests.test_upload_integrity": 348,
+    # R297(d)+R304+R305, 2026-09-06: 348 -> 367, nineteen. Seven on the
+    # pitcher-row predicate: both columns read, a Classic salary agreeing with
+    # the old token on every row, a declared Showdown arm acknowledged rather
+    # than failed, the two counters reconciled onto the PERSON, an undeclared
+    # arm still failing, a benched BAT still failing, and the partial-side site.
+    # Twelve on feed identity: the rostered game set, a feed missing one of this
+    # file's games, exact-outranks-superset, the compatible feed chosen over the
+    # fresher one, a wrong-contest feed REFUSED (the R300(b) rider's behaviour
+    # half), two equally compatible feeds refused and both named, the sibling
+    # accepted and rejected on the same test, and four on DK's own Starting
+    # column standing in for a feed nobody wrote.
+    "tests.test_upload_integrity": 367,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

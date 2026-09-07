@@ -413,6 +413,57 @@ def load_salary(path: Path) -> Dict[str, Dict[str, str]]:
     return out
 
 
+PITCHER_POSITION_TOKENS = frozenset({"P", "SP", "RP"})
+
+
+def is_pitcher_row(row: Mapping[str, Any]) -> bool:
+    """Does this salary row price an ARM, on either contest geometry?
+
+    R297(d)/R304. ``Roster Position == "P"`` is a CLASSIC token. A Showdown
+    export puts ``CPT``/``UTIL`` in that column and nothing else -- 196 rows on
+    1235_1g_sd, 98 and 98, zero ``P`` -- so every id-by-id "is this a pitcher"
+    test written against it answered False for every player on every Showdown
+    file. That is not a no-op: it killed the R114 declared-arm and R67
+    bullpen-game exemptions on the one geometry where DK's own PO/PLR tokens
+    make a declaration necessary, hard-failed a legally rostered arm, and left
+    ``--force`` (barred by CLAUDE.md) as the only way through. On 1235_1g_sd the
+    remaining move was to drop the arm through the salary file's ``Excluded``
+    column, which is the pool reduction the hard guardrails forbid, arriving
+    through a referee instead of through a compute limit.
+
+    ``Position`` carries the real baseball position on BOTH geometries and DK
+    never lists a hitter as SP/RP, so reading both columns needs no geometry
+    detection and is provably equivalent on Classic. Measured on the two
+    2026-09-03 Classic exports (564 and 279 rows): ``Roster Position == "P"``
+    holds for exactly the 326 and 150 rows whose ``Position`` is SP or RP, and
+    for no other row.
+
+    R233 enumeration, at ``eb1c8fd``::
+
+        $ grep -rn '"Roster Position"' --include=*.py mlb_engine tools skills \
+              | grep '"P"'
+        tools/preflight_upload.py:1662   is_pitcher, the declared-arm exemption
+        tools/preflight_upload.py:1695   the same test on the partial-side branch
+        tools/qa_portfolio.py:236        SP repetition census
+        tools/qa_portfolio.py:294        bats-vs-Savant exposure
+        tools/qa_portfolio.py:478        washout axes
+        tools/qa_portfolio.py:920        chalk-carry count, via the salary map
+        tools/qa_portfolio.py:987        the leverage legend's hitter-row count
+
+    Seven, not the two R304 named. ``tools/verify_export.py`` has no site of its
+    own: it imports ``check_feed`` from this module, so it inherited both
+    preflight sites and is fixed by fixing them. All seven now call this. The
+    other 85 ``Roster Position`` reads in the tree parse SLOTS (``split("/")``,
+    ``CPT``/``UTIL`` role reads, geometry detection) and are not members of this
+    class.
+    """
+    roster = {r.strip().upper() for r in str(row.get("Roster Position") or "").split("/")}
+    if "P" in roster:
+        return True
+    position = {r.strip().upper() for r in str(row.get("Position") or "").split("/")}
+    return bool(position & PITCHER_POSITION_TOKENS)
+
+
 def salary_export_is_showdown(salary: Mapping[str, Mapping[str, str]]) -> bool:
     """DK prices a CPT row per player on a Showdown export, never on a Classic one."""
     for row in salary.values():
@@ -1351,17 +1402,21 @@ def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
                 "reason": f"the manifest write failed ({exc})"}
 
 
-def resolve_feed_for_slate(entries: Sequence[EntryRow],
-                           salary: Dict[str, Dict[str, str]],
-                           rep: Report) -> Optional[Path]:
-    """Find the freshest lineups_feed*.json for this file's slate date.
+def rostered_slate_identity(
+    entries: Sequence[EntryRow],
+    salary: Mapping[str, Mapping[str, str]],
+) -> Tuple[set[str], set[str], set[str]]:
+    """(slate dates, matchups, teams) the ENTRIES actually roster.
 
-    R4. The posted-lineup cross-check was the strongest thing this tool could
-    say and it ran only when --feed was passed, which made the scratch-after-
-    build window opt-in. The feed is already on disk for every slate the engine
-    built; nothing has to be fetched to use it.
+    R305. The identity the inputs already carry, and the one ``check_feed``
+    actually consults: it looks a rostered player up by his team, so a feed is
+    compatible exactly when it holds every game these entries draw from.
+    Reading the whole salary file instead would refuse a good feed whenever the
+    file is a superset snapshot (R242's subject), which is a different item.
     """
-    dates = set()
+    dates: set[str] = set()
+    games: set[str] = set()
+    teams: set[str] = set()
     for entry in entries:
         for pid in entry.cells:
             row = salary.get(pid)
@@ -1370,6 +1425,99 @@ def resolve_feed_for_slate(entries: Sequence[EntryRow],
             parsed = parse_game_info_datetime(row.get("Game Info"))
             if parsed is not None:
                 dates.add(parsed.date().isoformat())
+            matchup = _matchup(row.get("Game Info"))
+            if matchup:
+                games.add(matchup)
+            team = str(row.get("TeamAbbrev") or "").strip().upper()
+            if team:
+                teams.add(team)
+    return dates, games, teams
+
+
+def feed_identity(feed: Mapping[str, Any]) -> Tuple[set[str], set[str]]:
+    """(matchups, teams) a parsed feed carries, in the salary file's vocabulary."""
+    games: set[str] = set()
+    teams: set[str] = set()
+    for game in feed.get("games", []) or []:
+        away = str(((game.get("away") or {}).get("team_abbrev")) or "").strip().upper()
+        home = str(((game.get("home") or {}).get("team_abbrev")) or "").strip().upper()
+        if away:
+            teams.add(away)
+        if home:
+            teams.add(home)
+        if away and home:
+            games.add(f"{away}@{home}")
+    return games, teams
+
+
+def read_feed(path: Path) -> Tuple[Optional[Dict[str, Any]], str]:
+    """(parsed feed, reason it is unusable). Never raises."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, f"unreadable ({type(exc).__name__})"
+    if not isinstance(data, dict) or not isinstance(data.get("games"), list):
+        return None, "not a lineups feed (no games list)"
+    return data, ""
+
+
+def feed_compatibility(feed: Mapping[str, Any], games: set[str],
+                       teams: set[str]) -> Tuple[Optional[int], str]:
+    """(rank, why). Rank 0 is an exact game-set match, 1 a superset, None no.
+
+    A superset feed is compatible and ranked BELOW an exact match rather than
+    refused: a whole-day paste is valid evidence for a subset draftgroup, and
+    ``check_feed`` never consults a team these entries do not roster. What is
+    never compatible is a feed missing a game these entries draw from, which is
+    all three recorded sightings -- two Classic-against-Showdown on 2026-09-03
+    and, the one that will recur, Classic-against-Classic on the 2026-09-04
+    multi-draftgroup night, where nothing but the game set separated the two
+    files.
+    """
+    feed_games, feed_teams = feed_identity(feed)
+    missing_games = sorted(games - feed_games)
+    missing_teams = sorted(teams - feed_teams)
+    if missing_games or missing_teams:
+        return None, (f"holds {len(feed_games)} game(s) "
+                      f"{sorted(feed_games) or '[]'} and is missing "
+                      f"{missing_games or missing_teams}")
+    if feed_games == games:
+        return 0, f"exact game-set match {sorted(games)}"
+    return 1, f"covers {sorted(games)} within {sorted(feed_games)}"
+
+
+def resolve_feed_for_slate(entries: Sequence[EntryRow],
+                           salary: Dict[str, Dict[str, str]],
+                           rep: Report) -> Optional[Path]:
+    """The staged feed whose GAME SET matches this file, or None.
+
+    R4. The posted-lineup cross-check was the strongest thing this tool could
+    say and it ran only when --feed was passed, which made the scratch-after-
+    build window opt-in. The feed is already on disk for every slate the engine
+    built; nothing has to be fetched to use it.
+
+    R305. R4 made the strongest check automatic and left the resolver underneath
+    it a filename glob picking ``max(..., key=st_mtime)``: no slate tag, no
+    draftgroup, no game set, no team set, no contest geometry took part in the
+    choice. ``data/slates/<date>/`` is shared and date-only-keyed, so three
+    Classic draftgroups stage into one directory on an ordinary evening. Three
+    field sightings across two dates, every warning in them false: 61 and 73
+    false roster warnings on 2026-09-03 (a Classic file against an earlier
+    Showdown feed, 6.9h old), and on 2026-09-04 a 4.5h-old 1810_3g feed resolved
+    for 2210_2g, a slate sharing NOT ONE GAME with it, printing 28 absent
+    players and 4 teams with "no confirmed lineup". Under a lock clock those read
+    as real roster risk and cost a verification detour each time.
+
+    So the choice is a typed compatibility join on the game and team sets both
+    inputs already carry, and it REFUSES on missing or ambiguous rather than
+    picking one: a wrong feed is worse than no feed, because no feed is a stated
+    absence and a wrong feed is an assertion. Geometry is deliberately NOT part
+    of the join -- ``lineups_feed_showdown_1235_1g_sd.json`` was built by
+    remapping the Classic paste's ids onto the Showdown draftgroup, so a
+    geometry test would refuse a feed carrying exactly the right facts. The game
+    set is the identity that separated every sighting.
+    """
+    dates, games, teams = rostered_slate_identity(entries, salary)
     if len(dates) != 1:
         if dates:
             rep.info["feed_autoresolve"] = (
@@ -1380,9 +1528,155 @@ def resolve_feed_for_slate(entries: Sequence[EntryRow],
     if not candidates:
         rep.info["feed_autoresolve"] = f"no lineups_feed*.json under data/slates/{slate_date}"
         return None
-    freshest = max(candidates, key=lambda p: p.stat().st_mtime)
-    rep.info["feed_autoresolve"] = f"resolved {freshest.name} for {slate_date}"
-    return freshest
+    ranked: List[Tuple[int, Path]] = []
+    rejected: List[str] = []
+    for path in candidates:
+        feed, why = read_feed(path)
+        if feed is None:
+            rejected.append(f"{path.name}: {why}")
+            continue
+        rank, why = feed_compatibility(feed, games, teams)
+        if rank is None:
+            rejected.append(f"{path.name}: {why}")
+        else:
+            ranked.append((rank, path))
+    rep.info["feed_candidates_rejected"] = rejected
+    if not ranked:
+        rep.info["feed_autoresolve"] = (
+            f"REFUSED: none of the {len(candidates)} staged feed(s) under "
+            f"data/slates/{slate_date} covers this file's game set "
+            f"{sorted(games)}: " + "; ".join(rejected))
+        return None
+    best = min(rank for rank, _ in ranked)
+    winners = [path for rank, path in ranked if rank == best]
+    if len(winners) > 1:
+        rep.info["feed_autoresolve"] = (
+            f"REFUSED: {len(winners)} staged feeds under data/slates/{slate_date} "
+            f"are equally compatible with game set {sorted(games)} "
+            f"({', '.join(p.name for p in winners)}); pass --feed to say which. "
+            f"A wrong feed asserts, where no feed only abstains")
+        return None
+    chosen = winners[0]
+    rep.info["feed_autoresolve"] = (
+        f"resolved {chosen.name} for {slate_date}: "
+        f"{'exact' if best == 0 else 'covering'} game-set match "
+        f"{sorted(games)}"
+        + (f", rejected {len(rejected)}" if rejected else ""))
+    return chosen
+
+
+def feed_from_dk_starting(salary_path: Path, entries: Sequence[EntryRow],
+                          salary: Dict[str, Dict[str, str]],
+                          rep: Report) -> Optional[Dict[str, Any]]:
+    """The posted orders DK published in the salary file itself, as a feed.
+
+    R305 fix (2), and the reason the class exists at all. Since R143 a slate DK
+    has fully posted writes NO feed: the build reads the batting order out of
+    the salary file's ``Starting`` column and makes no API call, so
+    ``data/slates/<date>/`` holds only OTHER draftgroups' feeds and the resolver
+    above has nothing right to find. That is precisely the state all three
+    sightings were in. The evidence was never missing; it was in the operator's
+    hand, in the same file this tool already treats as authoritative for ids,
+    salaries, teams and eligibility.
+
+    ``mlb_engine.intake.live_data_adapters`` owns this reading -- CLAUDE.md's
+    build contract makes ``dk_order_coverage`` the ONE definition of "covered",
+    shared by the pool and by any caller deciding whether a fetch is worth
+    making -- so it is imported rather than restated. The import is LAZY and
+    GUARDED, and its failure is REPORTED rather than silent: this tool must run
+    at T-5 from a copy in a bare directory (``tests/test_upload_integrity``
+    exercises exactly that), and there the fallback is the disk resolver above,
+    which is a weaker answer and not a wrong one. A silent degradation here
+    would be this item's own defect wearing a different hat.
+    """
+    try:
+        sys.path.insert(0, str(REPO_ROOT))
+        from mlb_engine.intake.live_data_adapters import (  # noqa: PLC0415
+            dk_order_coverage, merge_dk_starting_into_feed)
+    except Exception as exc:  # pragma: no cover - exercised by the bare-root test
+        rep.info["feed_dk_starting"] = (
+            f"not attempted: mlb_engine is not importable from {REPO_ROOT} "
+            f"({type(exc).__name__}); falling back to the staged-feed resolver")
+        return None
+    try:
+        covered, not_covered = dk_order_coverage(salary_path)
+    except Exception as exc:
+        rep.info["feed_dk_starting"] = (
+            f"not used: reading DK's Starting column raised "
+            f"{type(exc).__name__}: {exc}")
+        return None
+    if not covered or not_covered:
+        rep.info["feed_dk_starting"] = (
+            f"not used: DK has posted a complete 1-9 for {len(covered)} side(s) "
+            f"and not for {not_covered}")
+        return None
+    _dates, games, teams = rostered_slate_identity(entries, salary)
+    try:
+        feed, report = merge_dk_starting_into_feed(None, str(salary_path))
+    except Exception as exc:
+        rep.info["feed_dk_starting"] = (
+            f"not used: synthesizing the feed raised {type(exc).__name__}: {exc}")
+        return None
+    rank, why = feed_compatibility(feed, games, teams)
+    if rank is None:
+        # The salary file cannot fail to describe its own slate, so this is a
+        # malformed Game Info column rather than a wrong file. Say so and fall
+        # through rather than assert over it.
+        rep.info["feed_dk_starting"] = (
+            f"not used: the synthesized feed {why}, which means the salary "
+            f"file's Game Info column does not describe its own rostered games")
+        return None
+    rep.info["feed_dk_starting"] = (
+        f"used: DK posted a complete 1-9 for all {len(covered)} side(s) in the "
+        f"salary file, so no external feed was needed "
+        f"({len(report.get('games_synthesized') or [])} game(s) read from Game "
+        f"Info; source {report.get('source')})")
+    rep.info["feed_autoresolve"] = (
+        "not needed: the salary file's own Starting column covers every side")
+    return feed
+
+
+def resolve_feed_source(entries: Sequence[EntryRow],
+                        salary: Dict[str, Dict[str, str]],
+                        salary_path: Path,
+                        explicit: Optional[str],
+                        rep: Report) -> Optional[Any]:
+    """The evidence ``check_feed`` should run against: a Path, a feed, or None.
+
+    One resolver for both referees. R305's third sighting hit
+    ``preflight_upload`` and ``verify_export`` on the same file with the same
+    wrong feed, because both were already calling one function; the fix has to
+    land in the same place or the two go back to disagreeing.
+
+    Order, strongest identity first: an explicit ``--feed``; DK's own posted
+    orders in the salary file; a feed staged BESIDE the salary file (a promoted
+    run's ``inputs/`` copy is the build's own feed) provided it covers this
+    file's games; then the staged-feed join above.
+    """
+    if explicit:
+        rep.info["feed_autoresolve"] = f"given by --feed: {Path(explicit).name}"
+        return Path(explicit)
+    dk_feed = feed_from_dk_starting(salary_path, entries, salary, rep)
+    if dk_feed is not None:
+        return dk_feed
+    sibling = salary_path.resolve().parent / "lineups_feed.json"
+    if sibling.exists():
+        _dates, games, teams = rostered_slate_identity(entries, salary)
+        feed, why = read_feed(sibling)
+        if feed is None:
+            rep.info["feed_sibling"] = f"{sibling.name} beside the salary file: {why}"
+        else:
+            rank, why = feed_compatibility(feed, games, teams)
+            if rank is None:
+                # R305. The sibling used to win unconditionally, which is how a
+                # date-keyed shared feed beat a compatibility test nobody ran.
+                rep.info["feed_sibling"] = (
+                    f"rejected {sibling}: it {why}")
+            else:
+                rep.info["feed_autoresolve"] = (
+                    f"staged beside the salary file: {sibling.name} ({why})")
+                return sibling
+    return resolve_feed_for_slate(entries, salary, rep)
 
 
 def _feed_age_minutes(feed: Mapping[str, Any]) -> Optional[float]:
@@ -1525,7 +1819,7 @@ def resolve_declared_pitchers(entries_path: Path, entries_sha256: str,
 
 
 def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
-               feed_path: Path, strict: bool, rep: Report,
+               feed_source: Any, strict: bool, rep: Report,
                declared_pitchers: Optional[Mapping[str, str]] = None) -> None:
     """A rostered player missing from his team's CONFIRMED lineup is a hard fail.
 
@@ -1581,11 +1875,16 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
     check pass on operator-supplied input -- the right fact that night, and
     still not independent confirmation. The warning says which one it has.
     """
-    try:
-        feed = json.loads(feed_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        rep.warn(f"feed unreadable ({exc}); posted-lineup cross-check skipped")
-        return
+    # R305. ``feed_source`` is a Path or an already-parsed feed. The second form
+    # is what lets DK's own Starting column be the evidence on a slate that
+    # wrote no feed at all, without this check learning a second way to read one.
+    if isinstance(feed_source, (str, Path)):
+        feed, why = read_feed(Path(feed_source))
+        if feed is None:
+            rep.warn(f"feed {why}; posted-lineup cross-check skipped")
+            return
+    else:
+        feed = dict(feed_source)
     age = _feed_age_minutes(feed)
     if age is not None:
         rep.info["feed_age_minutes"] = round(age, 1)
@@ -1593,10 +1892,27 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
             rep.warn(f"lineups feed is {age / 60:.1f}h old (fetched "
                      f"{feed.get('fetched_at')}); a confirmed-lineup all-clear "
                      f"from it is that old too")
-    rep.info["feed_file"] = str(feed_path)
+    rep.info["feed_file"] = (
+        str(feed_source) if isinstance(feed_source, (str, Path))
+        else f"(synthesized from the salary file's Starting column, "
+             f"source {feed.get('source')})")
     declared = {_digits(k): str(v) for k, v in (declared_pitchers or {}).items()
                 if _digits(k) and str(v).strip()}
     rep.info["feed_declared_pitchers"] = dict(sorted(declared.items()))
+    # R304(c). A declaration is about a PERSON; a DK draftable id is a ROLE
+    # (R234). On a Showdown export every human owns two ids, so declaring one of
+    # them left the other unacknowledged and the two counters in this report
+    # answered different questions while reading as one fact: the WARN counted
+    # entries holding the DECLARED ID ("in 2 of 17") and the FAIL counted entries
+    # holding the PERSON (6). Neither number was wrong about its own object.
+    # Reconciled onto the person, which is also what makes the flag do on
+    # Showdown what its help says it does -- an operator cannot be asked to know
+    # that one arm needs two declarations.
+    declared_person: Dict[str, str] = {}
+    for pid, role in declared.items():
+        row = salary.get(pid)
+        if row is not None:
+            declared_person.setdefault(person_key(row), role)
     posted: Dict[str, set[str]] = {}
     posted_hitters: Dict[str, int] = {}
     declared_probable: Dict[str, str] = {}
@@ -1659,8 +1975,8 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
             name = str(row.get("Name") or "")
             if _norm_name(name) in posted.get(team, set()):
                 continue                      # observed on the field, any status
-            is_pitcher = str(row.get("Roster Position") or "").upper() == "P"
-            role = declared.get(pid)
+            is_pitcher = is_pitcher_row(row)
+            role = declared.get(pid) or declared_person.get(person_key(row))
             if role and not is_pitcher:
                 # A declaration names an ARM. Applying one to a hitter would
                 # turn --declare-pitcher into an off switch for R4, so it is
@@ -1692,7 +2008,7 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
             # team pre-lock is normal and R27 ships on warn by design.
             projected[(name, team)] = projected.get((name, team), 0) + 1
             if team in partial_teams:
-                if str(row.get("Roster Position") or "").upper() == "P":
+                if is_pitcher_row(row):
                     if team in declared_probable:
                         # The probable is a STATED fact even on a partial side,
                         # so a different arm is a contradiction, not an unknown.
@@ -2151,15 +2467,21 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
             entries_path, rep.info["entries_sha256"],
             getattr(args, "brief", None), rep)
 
-    feed_path = Path(args.feed) if args.feed else resolve_feed_for_slate(entries, salary, rep)
-    if feed_path is not None and feed_path.exists():
-        check_feed(entries, salary, feed_path, not args.feed_lenient, rep,
-                   declared_pitchers=declared_pitchers)
-    elif feed_path is not None:
-        rep.warn(f"feed {feed_path} does not exist; posted-lineup cross-check skipped")
-    else:
+    feed_source = resolve_feed_source(entries, salary, salary_path,
+                                      getattr(args, "feed", None), rep)
+    if feed_source is None:
         rep.warn("no lineups feed resolved; the posted-lineup cross-check did "
-                 "not run and a benched starter would not be caught here")
+                 "not run and a benched starter would not be caught here. "
+                 + str(rep.info.get("feed_autoresolve") or ""))
+    elif not isinstance(feed_source, (str, Path)):
+        check_feed(entries, salary, feed_source, not args.feed_lenient, rep,
+                   declared_pitchers=declared_pitchers)
+    elif Path(feed_source).exists():
+        check_feed(entries, salary, feed_source, not args.feed_lenient, rep,
+                   declared_pitchers=declared_pitchers)
+    else:
+        rep.warn(f"feed {feed_source} does not exist; posted-lineup cross-check "
+                 f"skipped")
 
     # R266. The advisory is computed BEFORE the report dict, not inside it,
     # because the diversity check registers into `rep` and `passed` is evaluated
