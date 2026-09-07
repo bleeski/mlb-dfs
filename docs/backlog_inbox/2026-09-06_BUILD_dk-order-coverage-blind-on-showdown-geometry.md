@@ -90,3 +90,17 @@ posted WSH order at all, so the predicate that entry proposes (highest-APPG
 hitter in the pool AND bottom-quartile salary) had nothing to fire on. Two
 captain LOCK relaxations remain (Wood -> Teoscar, Betts -> Teoscar), which is
 the overlap bound and not a cap.
+
+## The R233 reading, which is why this is worth a slot rather than a footnote
+
+HEAD at the time of this build is `c0ef0ab`, subject *"R305 and R304 CLOSED,
+R297(d) landed out of its batch: the two referees stop asserting a false thing
+about a Showdown file."* That commit is hours old. The very next Showdown build
+run against it hit a referee asserting a false thing about a Showdown file,
+through a site neither R305's nor R304's enumeration named. This is R233's
+finding for the eighth time: a fix closed N named sites and the class had N+1.
+The N+1 here is one function upstream of both referees, which is why fixing each
+referee's own resolver did not reach it -- both now resolve THROUGH
+`dk_order_coverage`, so a single blind spot in it makes both of them blind
+together, and R305's "no external feed was needed" line is unreachable on
+Showdown by construction.
