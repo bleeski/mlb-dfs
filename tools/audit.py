@@ -779,7 +779,17 @@ EXPECTED_SUITE_COUNTS = {
     # `preflight_upload.resolve_declared_pitchers`, and the scope the key does
     # NOT claim (the Showdown melt still derives its own declared starters).
     # All five drive the production `run_showdown` end to end.
-    "tests.test_showdown": 206,
+    # R36 Finding 8, 2026-09-08: 206 -> 215, the nine that pin per-(event, team,
+    # person) participation -- one posted side no longer erasing the other
+    # side's healthy hitters, a pitcher-only declaration erasing nobody, an
+    # incomplete declaration establishing nothing and labelling its side's
+    # candidates, a fully posted slate being the pool it always was, R159(a)'s
+    # degraded nine still deciding its side, a one-sided partial building
+    # instead of hard-erroring on `len(teams) < 2`, the report accounting for
+    # every person in the salary universe, a malformed side deciding nothing,
+    # and the melt reading R323's shared completeness predicate rather than the
+    # column a second time.
+    "tests.test_showdown": 215,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -970,7 +980,19 @@ EXPECTED_SUITE_COUNTS = {
     # reassignment; one asserting the two tools hold the same function object
     # and neither re-implements it; and one independent oracle, written from
     # scratch here, agreeing with both tools at four clocks.
-    "tests.test_upload_integrity": 383,
+    # R323, 2026-09-08: 383 -> 394, the eleven that pin the referee's side of
+    # the row-versus-person count -- a dual-role complete 1-9 covering both
+    # teams, a conflicting CPT/UTIL pair and a duplicate physical-player slot
+    # both refusing (including one person colliding with HIMSELF on a slot,
+    # which is the only fixture that can see a person-merge), a Classic file's
+    # coverage unchanged, R159(a)'s degraded side still uncovered, the caller's
+    # role ids surviving the collapse, the declared probable resolving to the
+    # BASE id whatever order DK numbered the roles in, and three that drive
+    # `preflight_upload.main`: a posted Showdown file needing no external feed
+    # and RUNNING the posted-lineup check, a benched Showdown starter failing
+    # it, and the counterfactual where the row count puts it back on the
+    # "no feed, no check" branch.
+    "tests.test_upload_integrity": 394,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

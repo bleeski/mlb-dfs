@@ -7198,5 +7198,294 @@ class R324ParentTransitionTests(unittest.TestCase):
                 f"at {as_of} the oracle says started={expected} while "
                 f"preflight={pre_rc} and verify_export={ver_rc}\n{pre.stdout}")
 
+# ---------------------------------------------------------------------------
+# R323. `dk_order_coverage` counted role ROWS, so the one check that catches a
+# Showdown late scratch was silently absent on every Showdown slate.
+# ---------------------------------------------------------------------------
+SD_POSTED_GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+SD_POSTED_AS_OF = "2026-09-30T18:00:00-04:00"
+
+
+def write_posted_showdown_salary(path: Path, *, bench: int = 2,
+                                 clash: str = "", twin_slot: int = 0) -> dict:
+    """A complete Showdown posting: nine ordered bats and a declared arm a side,
+    each priced twice, plus a few unposted bench bats.
+
+    Returns ``{name: {"CPT": id, "UTIL": id}}``. ``clash`` gives one person's
+    CPT row a different ``Starting`` cell from his UTIL row; ``twin_slot`` adds a
+    SECOND human claiming that slot on AAA.
+    """
+    rows = [SALARY_HEADER]
+    pid, ids = 2000, {}
+
+    def _pair(name, team, pos, salary, token, cpt_token=None):
+        nonlocal pid
+        ids[name] = {}
+        for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+            cell = token if role == "UTIL" or cpt_token is None else cpt_token
+            rows.append(_salary_row(pid, name, team, SD_POSTED_GAME, pos, role,
+                                    int(salary * mult), "", cell))
+            ids[name][role] = str(pid)
+            pid += 1
+
+    for team in ("AAA", "BBB"):
+        for i in range(9):
+            name = f"{team} {SURNAMES[i]}"
+            _pair(name, team, "OF", 3000, str(i + 1),
+                  cpt_token="7" if name == clash else None)
+        if twin_slot and team == "AAA":
+            _pair("AAA Twin", team, "OF", 3000, str(twin_slot))
+        for j in range(bench):
+            _pair(f"{team} Bench{j + 1}", team, "OF", 2500, "")
+        _pair(f"{team} {SURNAMES[9]}", team, "SP", 9000, "SP")
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    return ids
+
+
+class R323ShowdownCoverageTests(unittest.TestCase):
+    """Reproduced at `f7ef478` on the delivered 2026-09-06 2210_1g_sd file:
+    `dk_order_coverage(...) -> ([], ['LAD', 'WSH'])` over 196 rows, 98 CPT + 98
+    UTIL, 49 persons a side, exactly 9 of them carrying a batting order, a
+    complete 1-9, and 18 row-level order tokens for nine slots.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _coverage(self, **kw):
+        from mlb_engine.intake.live_data_adapters import (
+            dk_order_coverage, dk_order_coverage_report)
+        path = self.root / "DKSalaries.csv"
+        ids = write_posted_showdown_salary(path, **kw)
+        return dk_order_coverage(path), dk_order_coverage_report(path), ids, path
+
+    def test_a_dual_role_complete_1_9_covers_both_teams(self):
+        (covered, not_covered), report, _ids, _path = self._coverage()
+        self.assertEqual((covered, not_covered), (["AAA", "BBB"], []))
+        self.assertEqual(report["degraded"], [])
+        self.assertEqual(report["malformed"], [])
+
+    def test_a_conflicting_cpt_util_pair_is_malformed_and_not_covered(self):
+        """One person, two prices, two different batting slots. Keeping the UTIL
+        row would resolve the file's contradiction by guessing the very field it
+        contradicts itself about."""
+        (covered, not_covered), report, _ids, _path = self._coverage(
+            clash=f"AAA {SURNAMES[0]}")
+        self.assertEqual(covered, ["BBB"])
+        self.assertIn("AAA", not_covered)
+        self.assertEqual(report["malformed"], ["AAA"])
+        self.assertIn("aaa aster|AAA",
+                      report["malformed_detail"][0]["ambiguous"])
+
+    def test_a_genuine_duplicate_physical_player_slot_is_not_covered(self):
+        """The guard this replaces was right about a Classic file and has to stay
+        right: two DIFFERENT humans on slot 3 is a malformed lineup, and the
+        person collapse must not merge them into one claim."""
+        (covered, not_covered), report, _ids, _path = self._coverage(twin_slot=3)
+        self.assertEqual(covered, ["BBB"])
+        self.assertIn("AAA", not_covered)
+        self.assertEqual(report["malformed"], ["AAA"])
+        self.assertEqual(report["malformed_detail"][0]["duplicate_slots"], [3])
+
+    def test_a_classic_files_coverage_is_unchanged(self):
+        from mlb_engine.intake.live_data_adapters import dk_order_coverage
+        path = self.root / "classic.csv"
+        write_classic_salary(path)
+        self.assertEqual(dk_order_coverage(path),
+                         (["AAA", "BBB", "CCC", "DDD"], []))
+
+    def test_an_il_bat_inside_the_posted_nine_is_still_degraded_not_covered(self):
+        """R159(a)'s policy survives the shared predicate: the referee needs a
+        source for the ninth slot, so a degraded side is NOT covered here even
+        though the Showdown pool treats the surviving eight as observed."""
+        from mlb_engine.intake.live_data_adapters import (
+            dk_order_coverage, dk_order_coverage_report)
+        path = self.root / "DKSalaries.csv"
+        write_posted_showdown_salary(path)
+        rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines()))
+        for row in rows[1:]:
+            if row[2] == f"AAA {SURNAMES[3]}":
+                row[9] = "IL"
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        covered, not_covered = dk_order_coverage(path)
+        self.assertEqual((covered, not_covered), (["BBB"], ["AAA"]))
+        self.assertEqual(dk_order_coverage_report(path)["degraded"], ["AAA"])
+
+    def test_two_rows_for_one_name_on_one_slot_is_still_malformed(self):
+        """The collapse is by PERSON, and that is exactly what makes this shape
+        the interesting one: two Classic rows carrying the same name, the same
+        team and the same slot collapse to one person key, so a reader that
+        merged repeated persons would call the side complete. It is a malformed
+        file either way -- one human cannot bat third twice, and if they are two
+        humans the file does not say which one is batting.
+
+        Written because the mutation that merges a repeated person on a slot
+        SURVIVED every other test in this class: the Showdown fixtures cannot
+        see it (the collapse leaves one row per person), and the Classic
+        duplicate fixture used two different names.
+        """
+        from mlb_engine.intake.live_data_adapters import dk_order_coverage_report
+        path = self.root / "classic_twin.csv"
+        write_classic_salary(path)
+        rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines()))
+        original = next(r for r in rows[1:] if r[7] == "AAA" and r[10] == "3")
+        twin = list(original)
+        twin[3] = "99999"
+        twin[1] = f"{twin[2]} (99999)"
+        rows.append(twin)
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        self.assertEqual(
+            [r[2] for r in rows[1:] if r[7] == "AAA" and r[10] == "3"],
+            [original[2], original[2]],
+            "the fixture has to collide ONE person with himself; a second NAME "
+            "on the slot is caught by the different-persons rule and cannot see "
+            "the merge")
+        report = dk_order_coverage_report(path)
+        self.assertIn("AAA", report["malformed"])
+        self.assertNotIn("AAA", report["covered"])
+        self.assertEqual(report["malformed_detail"][0]["duplicate_slots"], [3])
+
+    def test_the_declared_probable_is_the_base_id_whatever_dk_numbered_first(self):
+        """N+1 of R323's own enumeration, and latent on every file measured.
+
+        `dk_declared_probables` took the first id by STRING sort and a Showdown
+        arm owns two, so the id it wrote into the synthesized feed was whichever
+        ROLE sorted first. On the delivered 2026-09-06 file DK numbered all 98
+        UTIL rows below all 98 CPT rows, so it was right by accident; the
+        mutation that removes the collapse survives that allocation and dies
+        here, where the CPT row is numbered first.
+        """
+        from mlb_engine.intake.live_data_adapters import dk_declared_probables
+        path = self.root / "cpt_first.csv"
+        ids = write_posted_showdown_salary(path)
+        rows = list(csv.reader(path.read_text(encoding="utf-8").splitlines()))
+        arm = f"AAA {SURNAMES[9]}"
+        swap = {ids[arm]["UTIL"]: ids[arm]["CPT"], ids[arm]["CPT"]: ids[arm]["UTIL"]}
+        for row in rows[1:]:
+            if row[3] in swap:
+                row[3] = swap[row[3]]
+                row[1] = f"{row[2]} ({row[3]})"
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        reordered = {r[4]: r[3] for r in rows[1:] if r[2] == arm}
+        self.assertLess(int(reordered["CPT"]), int(reordered["UTIL"]),
+                        "the fixture has to put the CPT id first or it cannot "
+                        "see the defect")
+        self.assertEqual(dk_declared_probables(path)["AAA"], reordered["UTIL"],
+                         "the probable is the person's BASE id, which is the id "
+                         "every other reader in the pipeline keys on")
+
+    def test_the_callers_salary_map_keeps_its_distinct_role_ids(self):
+        """The collapse is for the completeness TEST. It must not reach back into
+        the caller's pool, because those two ids are what a DK export is made
+        of."""
+        from mlb_engine.intake.live_data_adapters import dk_side_readings
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        path = self.root / "DKSalaries.csv"
+        ids = write_posted_showdown_salary(path)
+        players = {p.player_id: p for p in parse_dk_salary_csv(str(path))}
+        before = len(players)
+        readings = dk_side_readings(players)
+        self.assertEqual(sorted(readings), ["AAA", "BBB"])
+        self.assertEqual(len(players), before)
+        for roles in ids.values():
+            self.assertNotEqual(roles["CPT"], roles["UTIL"])
+            self.assertIn(roles["CPT"], players)
+            self.assertIn(roles["UTIL"], players)
+        # And the reading names both of a posted person's ids rather than
+        # losing the one it did not keep.
+        slot = readings["AAA"]["order"][0]
+        self.assertEqual(set(slot["dk_ids"]),
+                         set(ids[f"AAA {SURNAMES[0]}"].values()))
+
+
+class R323ShowdownPreflightRunsTheCheckTests(unittest.TestCase):
+    """The cost of the row count, at the money boundary.
+
+    Since R305 both referees resolve their feed through `dk_order_coverage`, so
+    a Showdown file was permanently on the "no feed, no check" branch: preflight
+    printed `WARN no lineups feed resolved; the posted-lineup cross-check did not
+    run` over a file holding the posted orders and exited 0. A benched Showdown
+    starter passed.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.salary = self.root / "DKSalaries.csv"
+        self.ids = write_posted_showdown_salary(self.salary)
+        import preflight_upload
+        self.pf = preflight_upload
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _entries(self, lineup) -> Path:
+        path = self.root / "DKEntries.csv"
+        write_entries(path, SHOWDOWN_HEADER,
+                      [showdown_entry("901", "55", lineup,
+                                      name="MLB Showdown $5 (AAA @ BBB)")])
+        return path
+
+    def _posted_lineup(self):
+        return ([self.ids[f"AAA {SURNAMES[0]}"]["CPT"]]
+                + [self.ids[f"AAA {s}"]["UTIL"] for s in SURNAMES[1:5]]
+                + [self.ids[f"BBB {SURNAMES[0]}"]["UTIL"]])
+
+    def _benched_lineup(self):
+        return ([self.ids[f"AAA {SURNAMES[0]}"]["CPT"]]
+                + [self.ids[f"AAA {s}"]["UTIL"] for s in SURNAMES[1:4]]
+                + [self.ids["AAA Bench1"]["UTIL"],
+                   self.ids[f"BBB {SURNAMES[0]}"]["UTIL"]])
+
+    def _run(self, lineup):
+        import contextlib
+        import io
+        entries = self._entries(lineup)
+        out, err = io.StringIO(), io.StringIO()
+        saved = self.pf.REPO_ROOT
+        self.pf.REPO_ROOT = self.root
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = self.pf.main(["--entries", str(entries), "--salary",
+                                     str(self.salary), "--no-manifest",
+                                     "--as-of", SD_POSTED_AS_OF])
+        finally:
+            self.pf.REPO_ROOT = saved
+        return code, out.getvalue() + err.getvalue()
+
+    def test_a_posted_showdown_file_needs_no_external_feed_and_the_check_runs(self):
+        code, text = self._run(self._posted_lineup())
+        self.assertEqual(code, 0, text)
+        self.assertIn("synthesized from the salary file's Starting column", text)
+        self.assertNotIn("no lineups feed resolved", text)
+
+    def test_a_benched_showdown_starter_now_fails_that_check(self):
+        code, text = self._run(self._benched_lineup())
+        self.assertEqual(code, 2, text)
+        self.assertIn("absent from a confirmed posted lineup", text)
+        self.assertIn("AAA Bench1", text)
+
+    def test_the_row_count_is_what_made_the_check_absent(self):
+        """The counterfactual, and the mutation this fix has to keep dead: feed
+        the resolver HEAD's row-counting answer for this geometry -- the measured
+        `([], ['LAD','WSH'])` shape -- and the benched bat walks."""
+        from unittest import mock
+        import mlb_engine.intake.live_data_adapters as lda
+        with mock.patch.object(lda, "dk_order_coverage",
+                               return_value=([], ["AAA", "BBB"])):
+            code, text = self._run(self._benched_lineup())
+        self.assertEqual(code, 0, text)
+        self.assertIn("no lineups feed resolved", text)
+        self.assertNotIn("AAA Bench1", text.split("WARN")[-1])
+
+
 if __name__ == "__main__":
     unittest.main()

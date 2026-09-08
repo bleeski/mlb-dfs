@@ -3252,7 +3252,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     bat_side, pitcher_hand, feed_note = showdown_handedness(args, slate_dir, df)
     moneyline, odds_note = showdown_moneyline(args, df, salary_csv=salary)
 
-    basis = str(df["Pool_Basis"].iloc[0]) if len(df) else "empty"
+    # R36 F8. `Pool_Basis` is per ROW and carries its own SIDE's basis now, so
+    # `.iloc[0]` reports whichever side sorts first as though it spoke for both
+    # -- exactly the slate-wide reading the finding is about, surviving in the
+    # consumer. The frame-level statement comes off the participation report,
+    # which is `mixed_declared_and_projected` when the sides disagree.
+    participation = df.attrs.get("participation_report") or {}
+    basis = str(participation.get("slate_basis") or "") or (
+        "empty" if not len(df) else "all_healthy")
     posted = int(df["Batting_Order"].notna().sum()) if len(df) else 0
     # The ladder is conditioned on batting order and declared starters. With
     # nothing posted there is no order to condition on, so the templates would be
@@ -3689,7 +3696,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "supplied_base_report") or {"applied": False, "source": None}),
         "pool": {
             "players": int(len(df)),
-            "basis": (str(df["Pool_Basis"].iloc[0]) if len(df) else "empty"),
+            # R36 F8. The frame-level basis, and the PER-SIDE participation it
+            # is derived from. A one-word answer cannot describe a slate where
+            # one side posted its nine and the other has not, and reading row
+            # zero's `Pool_Basis` answered for both sides from one of them.
+            "basis": (str((df.attrs.get("participation_report") or {}).get(
+                "slate_basis") or "all_healthy") if len(df) else "empty"),
+            "participation": (df.attrs.get("participation_report")
+                              or {"slate_basis": "empty", "sides": []}),
+            "projected_candidates": (int(df["Projected_Candidate"].sum())
+                                     if len(df) and "Projected_Candidate" in df
+                                     else 0),
             "declared_starters": int(df["Is_Declared_Starter"].sum()) if len(df) else 0,
             "posted_hitters": int(df["Batting_Order"].notna().sum()) if len(df) else 0,
             # R291(c). Classic's `pool_report.excluded_column`, on the path that

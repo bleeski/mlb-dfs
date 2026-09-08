@@ -16068,9 +16068,18 @@ class ShowdownRoleCollapseTests(unittest.TestCase):
         self.assertEqual(len(players), 41)
         self.assertIn("not a Showdown salary file", report["reason"])
 
-    def test_the_posted_nine_survives_the_collapse_and_is_read_as_confirmed(self):
-        """The batting-order half. Before the collapse both sides are dropped
-        by the duplicate-slot guard; after it both read confirmed."""
+    def test_the_posted_nine_is_read_as_confirmed_collapsed_or_not(self):
+        """The batting-order half, and R323 moved the burden.
+
+        R235 shipped the collapse and pinned this test at
+        ``assertEqual(before, {})``: ``dk_side_readings`` on RAW Showdown rows
+        returned nothing, and every caller was expected to collapse first. Two
+        of them did (``ownership_pred``, and this test); the referee's own
+        resolver did not, and could not -- it hands the function a path. So the
+        collapse moved INSIDE, and the contract is now that both inputs give the
+        same reading. The pin that asserted otherwise was this defect's last
+        live description of itself.
+        """
         from mlb_engine.intake.live_data_adapters import dk_side_readings
         from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
         with tempfile.TemporaryDirectory() as tmp:
@@ -16079,10 +16088,29 @@ class ShowdownRoleCollapseTests(unittest.TestCase):
             collapsed, _ = self._collapse(path)
         before = dk_side_readings({p.player_id: p for p in raw})
         after = dk_side_readings({p.player_id: p for p in collapsed})
-        self.assertEqual(before, {})
-        self.assertEqual(sorted(after), ["AAA", "BBB"])
-        self.assertEqual([r["state"] for r in after.values()],
+        self.assertEqual(sorted(before), ["AAA", "BBB"])
+        self.assertEqual([r["state"] for r in before.values()],
                          ["confirmed", "confirmed"])
+        def _without_role_ids(readings):
+            return {team: [{k: v for k, v in slot.items() if k != "dk_ids"}
+                           for slot in r["order"]] + [r["state"]]
+                    for team, r in readings.items()}
+        self.assertEqual(_without_role_ids(before), _without_role_ids(after),
+                         "the collapse inside the reader has to be idempotent, "
+                         "or a caller that collapses first gets a second answer")
+        # The ids the reading reports are the BASE (UTIL) ids, and it names the
+        # person's other role id rather than losing it -- `dk_ids` is the one
+        # field that legitimately differs between the two calls, because it
+        # reports the ids the INPUT carried and a pre-collapsed caller has
+        # already dropped the CPT row.
+        util_ids = {str(p.player_id) for p in collapsed}
+        for reading in before.values():
+            for slot in reading["order"]:
+                self.assertIn(slot["dk_id"], util_ids)
+                self.assertEqual(len(slot["dk_ids"]), 2, slot)
+        for reading in after.values():
+            for slot in reading["order"]:
+                self.assertEqual(slot["dk_ids"], (slot["dk_id"],), slot)
 
     def test_two_people_sharing_a_name_on_one_team_stay_ambiguous(self):
         """The R75 class must survive the collapse. Two humans whose names

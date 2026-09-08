@@ -61,7 +61,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from mlb_engine.swap.late_swap_manager import (
     CONFIRMED_STARTER, PROJECTED_STARTER, UNKNOWN, PlayerLineupStatus,
 )
-from mlb_engine.intake.slate_intake_manager import normalize_name
+from mlb_engine.intake.slate_intake_manager import (
+    DK_ORDER_SLOTS, normalize_name)
 # R289: the ONE reading of the Excluded column, imported rather than restated.
 # The front door decides pool MEMBERSHIP, so a second token rule here would be
 # the F21 defect in the one place it costs the most.
@@ -366,7 +367,16 @@ def salary_game_times(salary_players: Any) -> Dict[str, datetime]:
 #     replacing it, keeping `bat_side` where the feed has it; a side DK covers
 #     and no feed does is named in `f4_handedness_unavailable`, because F4
 #     platoon silently zeroing is the failure this repo has already paid for.
-DK_ORDER_SLOTS = 9
+#
+# R323, third limit and the one this module got wrong for a month: a DK
+# draftable id is a ROLE, not a person. A Showdown export prices everybody
+# twice, so a complete nine arrives as EIGHTEEN order tokens and the
+# two-people-on-one-slot guard below -- correct on a Classic file -- discarded
+# both sides of a fully posted single game. The rows are collapsed to PERSONS
+# before the completeness test now, through the one collapse
+# (`slate_intake_manager.collapse_showdown_roles`) and the one predicate
+# (`posted_order_completeness`) the Showdown pool also calls. `DK_ORDER_SLOTS`
+# moved to that module for the same reason and is imported above.
 
 
 def dk_side_readings(salary_players: Any) -> Dict[str, Dict[str, Any]]:
@@ -394,37 +404,86 @@ def dk_side_readings(salary_players: Any) -> Dict[str, Dict[str, Any]]:
     the side is incomplete). Passing the RAW rows is what earns the degraded
     reading, which is why the front door now passes them.
     """
-    from mlb_engine.intake.slate_intake_manager import salary_status_tier
+    readings = dk_posted_order_readings(salary_players)
+    out: Dict[str, Dict[str, Any]] = {}
+    for team, reading in readings.items():
+        if reading["state"] not in ("confirmed", "degraded"):
+            continue
+        out[team] = {"order": reading["order"], "shelved": reading["shelved"],
+                     "state": reading["state"], "event": reading["event"]}
+    return out
+
+
+def dk_posted_order_readings(salary_players: Any) -> Dict[str, Dict[str, Any]]:
+    """DK team -> the full per-side reading, malformed and partial sides included.
+
+    R323. The reading itself, before ``dk_side_readings`` throws away the two
+    states it does not use. Three things happen here and nowhere else:
+
+    * roles are collapsed to PERSONS through ``collapse_showdown_roles``, the
+      collapse R235 already shipped -- whose own docstring names this defect --
+      so a Showdown side's eighteen order tokens are nine claims. It no-ops on a
+      Classic file (``applied`` False) and it is idempotent, so a caller that
+      collapsed first pays nothing;
+    * a person whose CPT and UTIL rows DISAGREE about team, position or
+      ``Starting``, and a person whose name is ambiguous on his own team (R75),
+      poisons his side: ``malformed``, never confirmed. He is only counted
+      against the side he actually claims a batting slot on, so a duplicate-named
+      bench bat cannot invalidate a nine that is otherwise clean;
+    * the completeness test itself is ``posted_order_completeness``, the one
+      predicate the Showdown pool's participation reading also calls.
+
+    Keyed by TEAM, because every caller is, and every DK draftgroup ships one leg
+    of a doubleheader (CLAUDE.md's build contract). A team that somehow appears
+    under two DK game ids is therefore not a lineup either, and reads
+    ``malformed`` rather than having one of its two events silently win.
+    """
+    from mlb_engine.intake.slate_intake_manager import (
+        collapse_showdown_roles, posted_order_completeness, salary_status_tier,
+        showdown_person_key)
 
     players = _load_salary_players(salary_players)
-    by_team: Dict[str, Dict[int, Dict[str, Any]]] = {}
+    records = list(players.values())
+    collapsed, collapse_report = collapse_showdown_roles(records)
+    ids_by_person: Dict[str, set] = {}
     for pid, record in players.items():
+        key = showdown_person_key(_record_get(record, "name"),
+                                  _record_get(record, "team"))
+        ids_by_person.setdefault(key, set()).add(str(pid))
+    poisoned = {str(entry.get("person_key") or "")
+                for entry in (collapse_report.get("unpaired") or [])}
+
+    slots: List[Dict[str, Any]] = []
+    for record in collapsed:
         team = str(_record_get(record, "team") or "").strip().upper()
-        token = str(_record_get(record, "starting") or "").strip()
-        if not team or not token.isdigit():
+        if not team:
             continue
-        slot = int(token)
-        if not 1 <= slot <= DK_ORDER_SLOTS:
-            continue
-        slots = by_team.setdefault(team, {})
-        if slot in slots:
-            # Two players on one slot is a malformed file, not a lineup. Drop
-            # the whole side rather than pick one and call it confirmed.
-            slots[slot] = None  # type: ignore[assignment]
-            continue
+        person = showdown_person_key(_record_get(record, "name"), team)
         status = str(_record_get(record, "status") or "").strip().upper()
-        slots[slot] = {"order": slot, "dk_id": str(pid),
-                       "name": str(_record_get(record, "name") or ""),
-                       "status": status,
-                       "shelved": salary_status_tier(status) == "out"}
+        pid = str(_record_get(record, "player_id") or "")
+        slots.append({
+            "event": str(_record_get(record, "game_id") or "").strip().upper(),
+            "team": team, "person_key": person,
+            "order": str(_record_get(record, "starting") or "").strip(),
+            "name": str(_record_get(record, "name") or ""),
+            "dk_id": pid,
+            "dk_ids": tuple(sorted(ids_by_person.get(person) or {pid})),
+            "status": status, "shelved": salary_status_tier(status) == "out",
+            "ambiguous": person in poisoned,
+        })
+    per_side = posted_order_completeness(slots)
+    events_by_team: Dict[str, set] = {}
+    for event, team in per_side:
+        events_by_team.setdefault(team, set()).add(event)
     out: Dict[str, Dict[str, Any]] = {}
-    for team, slots in by_team.items():
-        if len(slots) != DK_ORDER_SLOTS or any(v is None for v in slots.values()):
+    for (event, team), reading in sorted(per_side.items()):
+        if len(events_by_team.get(team) or ()) > 1:
+            reading = dict(reading)
+            reading.update({"state": "malformed", "complete": False,
+                            "order": [], "shelved": []})
+        if team in out and out[team]["state"] in ("confirmed", "degraded"):
             continue
-        order = [slots[i] for i in range(1, DK_ORDER_SLOTS + 1)]
-        shelved = [row for row in order if row["shelved"]]
-        out[team] = {"order": order, "shelved": shelved,
-                     "state": "degraded" if shelved else "confirmed"}
+        out[team] = reading
     return out
 
 
@@ -456,9 +515,19 @@ def dk_declared_probables(salary_players: Any) -> Dict[str, str]:
     the front door hands this function the RAW salary rows, and a rule that
     depends on which map a caller happened to pass is the defect R159(a) is.
     """
-    from mlb_engine.intake.slate_intake_manager import salary_status_tier
+    from mlb_engine.intake.slate_intake_manager import (
+        collapse_showdown_roles, salary_status_tier)
 
     players = _load_salary_players(salary_players)
+    # R323, N+1 of the entry's own enumeration. This loop takes the FIRST id by
+    # sort order, and on a Showdown export the declared arm owns two -- so the
+    # probable it wrote into the feed was whichever ROLE happened to sort first,
+    # usually the CPT row, a draftable nobody else in the pipeline keys on. The
+    # collapse keeps the UTIL row, which is the person's base price and the id
+    # every other reader means. No-op on a Classic file.
+    collapsed, collapse_report = collapse_showdown_roles(list(players.values()))
+    if collapse_report.get("applied"):
+        players = {str(_record_get(r, "player_id")): r for r in collapsed}
     out: Dict[str, str] = {}
     for pid, record in sorted(players.items(), key=lambda kv: str(kv[0])):
         team = str(_record_get(record, "team") or "").strip().upper()
@@ -482,14 +551,27 @@ def dk_order_coverage_report(salary_csv: str | Path) -> Dict[str, Any]:
     """
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
     rows = parse_dk_salary_csv(str(salary_csv))
-    readings = dk_side_readings({p.player_id: p for p in rows})
+    readings = dk_posted_order_readings({p.player_id: p for p in rows})
     covered = {t for t, r in readings.items() if r["state"] == "confirmed"}
     degraded = {t for t, r in readings.items() if r["state"] == "degraded"}
+    malformed = {t for t, r in readings.items() if r["state"] == "malformed"}
     teams = {str(p.team).strip().upper() for p in rows if p.team}
     return {
         "covered": sorted(covered),
         "degraded": sorted(degraded),
         "uncovered": sorted(teams - covered - degraded),
+        # R323. A side whose rows contradict each other is NOT the same fact as
+        # a side DK has not posted, and reporting only the second is how a
+        # malformed Showdown file read as "no lineups feed resolved". It stays
+        # inside `uncovered` so the three lists still partition the slate.
+        "malformed": sorted(malformed),
+        "malformed_detail": [
+            {"team": t, "reason": readings[t]["state"],
+             "duplicate_slots": readings[t]["duplicate_slots"],
+             "ambiguous": readings[t]["ambiguous"],
+             "missing": readings[t]["missing"]}
+            for t in sorted(malformed)
+        ],
         "degraded_detail": [
             {"team": t,
              "shelved": [{"order": s["order"], "name": s["name"],

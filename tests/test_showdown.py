@@ -3641,5 +3641,209 @@ class R304dShowdownBriefRecordsDeclarationsTests(unittest.TestCase):
                          "PO stays barred (R104); that is the remainder")
 
 
+# ---------------------------------------------------------------------------
+# R36 Finding 8 (+ed12 F16). Participation per (event, team, person).
+# ---------------------------------------------------------------------------
+SD_F8_HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+                "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+                "Status", "Starting"]
+SD_F8_GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+
+
+class R36Finding8PerSideParticipationTests(unittest.TestCase):
+    """`rows = declared` fired on ANY one declared row, slate-wide.
+
+    Measured at `f7ef478` on the fixtures below, HEAD against this commit:
+
+      | file                                | HEAD pool  | now        |
+      | nothing posted                      | 34 (17/17) | 34 (17/17) |
+      | pitcher-only declaration both sides |  2 ( 1/ 1) | 34 (17/17) |
+      | one side posted, both arms declared | 11 (10/ 1) | 27 (10/17) |
+      | both sides posted                   | 20 (10/10) | 20 (10/10) |
+      | both posted, one posted bat IL      | 19 ( 9/10) | 19 ( 9/10) |
+
+    The two unchanged rows are the point of keeping them: the fix is per side,
+    so a slate where every side posted is the pool it always was. The two that
+    move are the finding. A two-person pool and an eleven-person pool with one
+    player on a side both PASS the `len(teams) < 2` guard, so nothing refused
+    and `build_slate.py` built a generic bank on them.
+    """
+
+    def _rows(self, post=(), arm=(), out_names=(), bench=6, clash=None,
+              dup_slot=False):
+        rows = [SD_F8_HEADER]
+        pid = 1000
+        for team in ("AAA", "BBB"):
+            for i in range(9):
+                token = str(i + 1) if team in post else ""
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    cell = token
+                    if clash and clash == name and role == "CPT":
+                        cell = "7"
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), SD_F8_GAME, team, "9.0",
+                                 "IL" if name in out_names else "", cell])
+                    pid += 1
+            if dup_slot and team == "AAA":
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"AAA Twin ({pid})", "AAA Twin", str(pid),
+                                 role, str(int(4000 * mult)), SD_F8_GAME, team,
+                                 "9.0", "", "3"])
+                    pid += 1
+            for i in range(bench):
+                name = f"{team} Bench{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(3000 * mult)), SD_F8_GAME, team, "5.0",
+                                 "", ""])
+                    pid += 1
+            for label, pos, salary, token in (("Arm", "SP", 9000,
+                                               "SP" if team in arm else ""),
+                                              ("Reliever", "RP", 5000, "")):
+                name = f"{team} {label}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append([pos, f"{name} ({pid})", name, str(pid), role,
+                                 str(int(salary * mult)), SD_F8_GAME, team,
+                                 "12.0", "", token])
+                    pid += 1
+        return rows
+
+    def _melt(self, **kw):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(self._rows(**kw))
+            return sd.melt_showdown_salary_csv(str(path))
+
+    @staticmethod
+    def _by_team(df):
+        return dict(collections.Counter(df["Team"]))
+
+    def test_one_posted_side_does_not_erase_the_other_sides_healthy_hitters(self):
+        df = self._melt(post=("AAA",), arm=("AAA", "BBB"))
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["slate_basis"], "mixed_declared_and_projected")
+        self.assertEqual(self._by_team(df), {"AAA": 10, "BBB": 17},
+                         "BBB posted nothing, so nothing about BBB is decided; "
+                         "at HEAD this file left BBB with its declared arm and "
+                         "nothing else")
+        self.assertEqual(
+            sorted({r for r in df.loc[df["Team"] == "BBB", "Participation"]}),
+            ["confirmed_starter", "unknown"])
+        self.assertTrue(df.loc[df["Name"] == "BBB Bench1",
+                               "Projected_Candidate"].all())
+        self.assertEqual(
+            sorted(df.loc[df["Team"] == "AAA", "Pool_Basis"].unique()),
+            ["declared_starters"])
+        self.assertEqual(
+            sorted(df.loc[df["Team"] == "BBB", "Pool_Basis"].unique()),
+            ["all_healthy"])
+
+    def test_a_pitcher_only_declaration_erases_nobody(self):
+        df = self._melt(post=(), arm=("AAA", "BBB"))
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["slate_basis"], "all_healthy")
+        self.assertEqual(self._by_team(df), {"AAA": 17, "BBB": 17},
+                         "at HEAD two declared arms filtered the pool to two "
+                         "people, one a side, and nothing refused")
+        self.assertEqual(report["dropped_confirmed_nonstarter"], 0)
+        arms = df.loc[df["Name"].isin(["AAA Arm", "BBB Arm"]), "Participation"]
+        self.assertEqual(sorted(arms), ["confirmed_starter"] * 2,
+                         "a pitcher keeps his own role evidence on an "
+                         "undecided side")
+
+    def test_an_incomplete_declaration_establishes_nothing_and_labels_its_side(self):
+        """Eight of nine is a posting in progress, not a statement about the
+        ninth man or about the bench."""
+        rows = self._rows(post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        for row in rows[1:]:
+            if row[2] == "AAA Bat9":
+                row[10] = ""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(rows)
+            df = sd.melt_showdown_salary_csv(str(path))
+        sides = {s["team"]: s for s in df.attrs["participation_report"]["sides"]}
+        self.assertEqual(sides["AAA"]["state"], "partial")
+        self.assertEqual(sides["AAA"]["missing_slots"], [9])
+        self.assertFalse(sides["AAA"]["decided"])
+        self.assertTrue(sides["BBB"]["decided"])
+        self.assertEqual(self._by_team(df), {"AAA": 17, "BBB": 10})
+        self.assertTrue(df.loc[df["Name"] == "AAA Bat9",
+                               "Projected_Candidate"].all())
+
+    def test_a_fully_posted_slate_is_the_pool_it_always_was(self):
+        df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["slate_basis"], "declared_starters")
+        self.assertEqual(self._by_team(df), {"AAA": 10, "BBB": 10})
+        self.assertEqual(report["projected_candidates"], 0)
+        self.assertEqual(sorted(set(df["Participation"])),
+                         ["confirmed_starter"])
+
+    def test_a_degraded_posted_nine_is_still_a_decided_side(self):
+        """R159(a) reaches the pool. The health filter runs AFTER participation
+        for exactly this reason: dropping the IL bat first turns a nine into an
+        eight and the side stops deciding anything."""
+        df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"),
+                        out_names={"AAA Bat4"})
+        sides = {s["team"]: s for s in df.attrs["participation_report"]["sides"]}
+        self.assertEqual(sides["AAA"]["state"], "degraded")
+        self.assertTrue(sides["AAA"]["decided"])
+        self.assertEqual(sides["AAA"]["shelved_in_posted_nine"], ["AAA Bat4"])
+        self.assertEqual(self._by_team(df), {"AAA": 9, "BBB": 10})
+        self.assertNotIn("AAA Bat4", set(df["Name"]))
+
+    def test_a_one_sided_partial_now_builds_instead_of_hard_erroring(self):
+        """The finding's own note: the `len(teams) < 2` guard sits after the
+        filter, so a posted side with no declared arm anywhere took the whole
+        pool to one team and RAISED. Nothing was wrong with the file."""
+        df = self._melt(post=("AAA",), arm=())
+        self.assertEqual(self._by_team(df), {"AAA": 9, "BBB": 17})
+        self.assertEqual(sorted(set(df.loc[df["Team"] == "AAA",
+                                           "Participation"])),
+                         ["confirmed_starter"])
+
+    def test_the_report_accounts_for_every_person_in_the_salary_universe(self):
+        df = self._melt(post=("AAA",), arm=("AAA", "BBB"),
+                        out_names={"AAA Bench1"})
+        report = df.attrs["participation_report"]
+        self.assertEqual(
+            report["persons_in_salary_universe"],
+            report["persons_in_pool"] + report["dropped_confirmed_nonstarter"]
+            + report["dropped_status_out"])
+        self.assertEqual(report["persons_in_pool"], len(df))
+
+    def test_a_malformed_side_decides_nothing_rather_than_deciding_wrongly(self):
+        """Two humans on slot 3, and a person whose CPT row says slot 7 while
+        his UTIL row says slot 1. Neither file is a lineup, and the honest
+        answer is that the side establishes no nonstarter -- not that it
+        establishes them from whichever row won."""
+        for label, kw in (("duplicate physical slot", {"dup_slot": True}),
+                          ("CPT/UTIL disagreement", {"clash": "AAA Bat1"})):
+            with self.subTest(label):
+                df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"), **kw)
+                sides = {s["team"]: s
+                         for s in df.attrs["participation_report"]["sides"]}
+                self.assertEqual(sides["AAA"]["state"], "malformed", label)
+                self.assertFalse(sides["AAA"]["decided"], label)
+                self.assertTrue(sides["BBB"]["decided"], label)
+                self.assertGreater(self._by_team(df)["AAA"], 10, label)
+                self.assertEqual(self._by_team(df)["BBB"], 10, label)
+
+    def test_participation_reads_the_shared_predicate_not_a_second_column_read(self):
+        """R323 and this finding decide the same fact, and premise correction 2
+        of the session prompt is that they must not decide it twice. Both go
+        through `posted_order_completeness`; this asserts the melt calls it
+        rather than re-deriving completeness from the column."""
+        import inspect
+        source = inspect.getsource(sd.melt_showdown_salary_csv)
+        self.assertIn("posted_order_completeness", source)
+        from mlb_engine.intake import slate_intake_manager as sim
+        self.assertEqual(sim.DK_ORDER_SLOTS, 9)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -648,7 +648,18 @@ def _dk_declared_starters(salary_players: Sequence[Any]) -> Dict[str, List[Any]]
     the CSV was AHEAD of both feeds, and CLAUDE.md already makes it authoritative.
     A build that has the column and still raises "no probable or declared
     starter" is refusing to read a fact it was handed.
+
+    R323, N+1 of the entry's enumeration. This counted salary ROWS, and on a
+    Showdown export one declared arm owns two of them, so ``_apply_dk_starting``
+    read ``len(declared) > 1``, warned that "DK's Starting column flags 2 AAA
+    arms" naming the SAME man twice, and took no probable at all -- a refusal
+    caused entirely by the reader, over a file stating the fact plainly. The
+    collapse is the one in ``slate_intake_manager``, it no-ops on a Classic file,
+    and it is idempotent.
     """
+    from mlb_engine.intake.slate_intake_manager import collapse_showdown_roles
+    salary_players, _collapse_report = collapse_showdown_roles(
+        list(salary_players))
     out: Dict[str, List[Any]] = {}
     for player in salary_players:
         if "P" not in set(getattr(player, "positions", ()) or ()):

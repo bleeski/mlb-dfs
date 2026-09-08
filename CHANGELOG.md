@@ -25,6 +25,295 @@ performance claim.
 
 ---
 
+## 2026-09-08 — R323 + R36 Finding 8: a Showdown side's nine is one reading, and the pool and the referee now take it from the same predicate
+
+Session 2 of the execution roadmap, its two rows as one commit. Gate before:
+`PASS  v2.26.0  28 modules  1856 tests` (the pin at `f7ef478`; per-suite
+baselines measured here: test_core 1160, test_showdown 206,
+test_upload_integrity 383, test_paste_lineups 98). Gate after:
+`PASS  v2.26.0  28 modules  1876 tests`, every suite clean, no skips, no
+shortfall, five `--gate-run` calls plus the report. Hand mutation check: five
+mutants, five killed, each with a control run first; two SURVIVED their first
+pass and both survivals were fixture gaps rather than weak mutants, so the
+fixtures were fixed rather than the mutants weakened (below).
+
+### R323. `dk_order_coverage` counted role ROWS, so a Showdown salary file carrying a complete 1-9 for both teams reported ZERO covered sides, and both referees resolve through it
+
+**What was wrong.** A DK draftable id is a ROLE, not a person (R234). A
+Showdown export prices everybody twice, a `CPT` row and a `UTIL` row with
+different ids and different salaries, so a fully posted side arrives as EIGHTEEN
+batting-order tokens for nine slots. `dk_side_readings` keyed one slot to one
+salary ROW and took its two-players-on-one-slot branch — correct on a Classic
+file, where that really is a malformed lineup — and discarded both sides of a
+well-formed single game. Reproduced again here at `f7ef478` before touching
+anything, on the delivered 2026-09-06 2210_1g_sd file:
+`dk_order_coverage("data/slates/2026-09-06/DKSalaries_showdown.csv") ->
+([], ['LAD', 'WSH'])`, over 196 rows, 98 `CPT` + 98 `UTIL`, 49 persons a side,
+exactly 9 of them carrying a batting order, a complete 1-9.
+
+Since R305 BOTH referees resolve their feed through that one definition of
+"covered", so `feed_from_dk_starting` returned `None` on every Showdown slate,
+`resolve_feed_source` fell through to the staged-feed join, and
+`preflight_upload` printed `WARN no lineups feed resolved; the posted-lineup
+cross-check did not run` over a file that held the posted orders — and exited 0.
+The one check that catches a Showdown late scratch was absent by construction,
+and reported as a missing input rather than as a blind spot. Third member of the
+R297(d)/R304 class.
+
+**What holds now.** Roles are collapsed to PERSONS before the completeness test,
+inside the reader, through the collapse R235 already shipped — whose own
+docstring names this defect by name — and the completeness test itself is a new
+shared predicate, `slate_intake_manager.posted_order_completeness`, keyed per
+`(event, team)` and per person. `dk_posted_order_readings` is the full reading;
+`dk_side_readings` keeps its old shape and drops the two states it does not use.
+A person whose `CPT` and `UTIL` rows disagree about team, position or `Starting`,
+and a person whose name is ambiguous on his own team (R75), make his side
+`malformed` rather than confirmed — and only the side he actually claims a
+batting slot on, so a duplicate-named bench bat cannot invalidate a clean nine.
+`dk_order_coverage_report` names `malformed` separately while keeping it inside
+`uncovered`, so the three lists still partition the slate. `DK_ORDER_SLOTS`
+moved to `slate_intake_manager`, which is the layer both consumers can import
+from; `live_data_adapters` imports it rather than holding a second 9. Measured
+after: `(['LAD', 'WSH'], [])` on the same file, and a preflight run on a posted
+Showdown fixture prints `synthesized from the salary file's Starting column`,
+runs the posted-lineup check, and exits 2 on a benched Showdown starter.
+
+**R233 enumeration. The entry named four members; the class has sixteen sites
+and four independent defects.** Two of the four it named were DERIVED rather than
+independent, and two live defects it did not name were found by grepping
+`"Starting"`/`'Starting'` and `.starting` across `mlb_engine`, `tools` and
+`skills`, plus every caller of the four functions. Hit list, by whether the site
+counts rows or persons:
+
+| site | reads | verdict |
+| :--- | :--- | :--- |
+| `live_data_adapters.dk_side_readings` (:372) | ROWS | **fixed** — collapses to persons, calls the shared predicate |
+| `live_data_adapters.dk_posted_order_readings` (new) | persons | the one reading; `dk_side_readings` derives from it |
+| `live_data_adapters.dk_confirmed_sides` (:431) | derived | fixed upstream |
+| `live_data_adapters.dk_order_coverage_report` (:473) | derived | fixed upstream; also names `malformed` now |
+| `live_data_adapters.dk_order_coverage` (:503) | derived | fixed upstream |
+| `live_data_adapters.merge_dk_starting_into_feed` (:570) | derived | fixed upstream |
+| `live_data_adapters.dk_declared_probables` (:451) | **ROWS** | **fixed, N+1, not named in the entry** |
+| `live_data_adapters` crosswalk backstop (`starting_by_team`, ~:2139) | ROWS | **kept, named** — Classic-only by construction |
+| `slate_intake_manager.validate_salary_schema` (`starting_non_blank`, ~:443) | ROWS | **kept, named** — its only predicate is `== 0` |
+| `paste_lineups._dk_declared_starters` (:642) | **ROWS** | **fixed, N+1, not named in the entry** |
+| `showdown.melt_showdown_salary_csv` (:231-300) | persons, slate-wide filter | **fixed** — R36 Finding 8 below |
+| `preflight_upload.feed_from_dk_starting` / `resolve_feed_source` | imports the above | fixed upstream |
+| `verify_export.py` (:115, :497) | imports preflight's resolver | fixed upstream |
+| `ownership_pred.py` (:151, :156, :365) | collapses first | already correct; the collapse is idempotent, so it pays nothing twice |
+| `qa_portfolio.py` (:596-601) | persons, via `showdown_person_key` | already correct |
+| `skills/generate-lineups-workspace/build_apex.py` (:58) | ROWS | **kept, named** — untracked workspace, outside the DEV write set (`git ls-files skills/generate-lineups-workspace/` returns nothing) |
+
+The two deliberately-kept row counters, with the reason each survives.
+`starting_by_team` sits inside `build_slate_pool`, the CLASSIC front door;
+`run_showdown` melts the salary file and never calls it, so the doubling is
+unreachable there, and moving the count would change a Classic crosswalk
+backstop inside a Showdown fix. `starting_non_blank` feeds one warning whose
+predicate is `starting_non_blank == 0`, and role doubling cannot move a value
+across zero.
+
+**Two N+1 sites, both live, neither in the entry's list.**
+`dk_declared_probables` took the first matching id by STRING sort, and a
+Showdown arm owns two, so the probable it wrote into the synthesized feed was
+whichever ROLE sorted first. On the delivered 2026-09-06 file DK numbered all
+98 `UTIL` rows below all 98 `CPT` rows (measured: `UTIL` lower for 98 of 98
+persons), so it was right by accident of DK's id allocation rather than by a
+rule; the test that pins the fix has to renumber the arm's `CPT` row first
+before it can see the defect at all, and the mutation that removes the collapse
+survives the real allocation and dies on that fixture.
+`paste_lineups._dk_declared_starters` returned a LIST per team, so one declared
+Showdown arm made `_apply_dk_starting` read `len(declared) > 1`, warn that "DK's
+Starting column flags 2 AAA arms" naming the SAME man twice, and take no
+probable at all — a refusal caused entirely by the reader, over a file stating
+the fact plainly. Both now route through the same collapse, which no-ops on a
+Classic file.
+
+**Four premise corrections to the entry, recorded rather than silently fixed.**
+
+1. Its acceptance line reads "preflight on the 2026-09-06 fixture prints the
+   R305 line and runs the posted-lineup check", and `data/slates/*/` is
+   gitignored at `.gitignore:11`. A test reading that path is R155's defect and
+   R322's class exactly: green on the mount, red or invisibly skipped in every
+   clone. The fixtures are built in-test.
+2. Its Fix line says to gate the collapse on
+   `dk_entries_manager.detect_salary_contract` reporting SHOWDOWN. That function
+   takes a PATH, and `dk_side_readings` is handed a `pid -> record` MAPPING by
+   `merge_dk_starting_into_feed` — both live callers pass maps. The gate is
+   therefore the SAME rule read off the rows, which is what
+   `collapse_showdown_roles` already applies internally (`roles <= {CPT, UTIL}`
+   and `CPT` present), so the fix adds no second reader of the contract.
+3. "Keep the CPT and UTIL export ids distinct after coverage is computed" names a
+   risk the collapse does not carry: it returns new lists and the readings are
+   read-only, and a test now pins that the caller's map still holds both ids
+   afterwards. The real interaction runs the other way and is benign —
+   `check_feed` matches a rostered id to the feed through the salary row's NAME
+   (`_norm_name`), not by id, so a rostered `CPT` id resolves to the same person
+   as the feed's `UTIL`-keyed hitter row. Had it matched by id, the synthesized
+   feed would have failed every captain on every Showdown file.
+4. "EIGHTEEN order tokens" is right about the batting order and short of the
+   file: the 2026-09-06 file carries TWENTY `Starting` tokens per team, 18
+   batting-order plus 2 `SP`, over 10 distinct persons.
+
+### R36 Finding 8 (+ed12 F16). `melt_showdown_salary_csv` flipped the WHOLE Showdown pool to `declared_starters` on ANY declared row
+
+**What was wrong.** `rows = declared` under `if starters_only and declared:`,
+with no per-team completeness test anywhere. One posted lineup erased the other
+side's healthy hitters; a slate where only the two starting PITCHERS were
+declared erased the hitters on BOTH sides. The `len(teams) < 2` hard error sits
+AFTER the filter, so a two-sided partial still had two teams, nothing refused,
+and `build_slate.py` built a generic bank on a tiny biased pool. Measured at
+`f7ef478` against this commit, on synthetic two-team fixtures (17 persons a
+side: 9 ordered bats, 6 bench bats, a starter and a reliever):
+
+| fixture | HEAD pool | now |
+| :--- | :--- | :--- |
+| nothing posted | 34 (17/17) | 34 (17/17) |
+| pitcher-only declaration, both sides | **2 (1/1)** | 34 (17/17) |
+| one side posted, both arms declared | **11 (10/1)** | 27 (10/17) |
+| both sides posted | 20 (10/10) | 20 (10/10) |
+| both posted, one posted bat IL | 19 (9/10) | 19 (9/10) |
+
+The two unchanged rows are why they are kept as tests: the fix is per side, so a
+slate where every side posted is the pool it always was. The two that move are
+the finding. An 11-person pool with ONE player on a side forces every legal
+lineup to roster that player, and a 2-person pool cannot fill a 6-slot lineup at
+all — neither refused.
+
+**What holds now.** Participation is a state per `(event, team, person)`,
+computed from R323's `posted_order_completeness` so the pool and the referee
+cannot disagree about whether a side is posted. A side whose 1-9 is COMPLETE is
+DECIDED: its posted nine and its declared arms are `confirmed_starter`, everyone
+else on that side is `confirmed_nonstarter` and leaves the pool. A side whose
+declaration is INCOMPLETE establishes nothing, and every healthy player on it
+stays, labelled `Participation='unknown'` with `Projected_Candidate=True` —
+block promotion, not generation. A pitcher keeps his own role evidence either
+way, so a DK-declared arm on an unposted side is a `confirmed_starter` beside
+unknown team-mates, and R104's opener stays `Is_Declared_Opener`, rosterable and
+not declared. The legal salary universe is untouched: this decides pool
+membership on observed participation and never narrows on a compute or shape
+excuse. `df.attrs["participation_report"]` carries the per-side states, the
+per-person accounting (`persons_in_salary_universe` =
+`persons_in_pool` + `dropped_confirmed_nonstarter` + `dropped_status_out`), and
+the slate-level `slate_basis`.
+
+**Premise correction: the Fix line as written would not have achieved its own
+goal.** "Per-team completeness, projected candidates labelled for incomplete
+teams" applied to the melt as it stood turns every DEGRADED side into an
+undecided one, because the melt dropped `OUT` rows during the parse: a posted
+nine holding an IL bat arrives as eight-of-nine, and eight-of-nine establishes
+nothing. R159(a) says the opposite — the surviving eight are observed fact and
+R60's partial path already knows how to seed them. So the health filter moved
+AFTER participation, `Status_Out` is recorded on the person (OR'd across roles,
+the same treatment R291(c) gave `Excluded`), and the degraded row above stays at
+19 (9/10) rather than reverting to an undecided side keeping 17.
+
+**Second premise correction, found by making the two items agree (the session's
+own premise correction 2).** The melt's `by_key` collapse takes the first
+non-blank `Starting` cell it sees and drops the rest, so a person whose `CPT`
+row said slot 7 and whose `UTIL` row said slot 1 was resolved by ROW ORDER and
+the frame read `confirmed` — while R323's reader refused the same file. Two
+implementations of one rule, and the weaker one reporting success: R324's shape,
+one commit later. The melt now calls
+`slate_intake_manager.showdown_paired_role_disagreement` (the same function the
+collapse uses, made public for it) and a disagreeing person makes his side
+undecided, named in `participation_report["role_disagreements"]`.
+
+**Where the two items legitimately differ, stated rather than unified.** The
+shared predicate decides `complete`; what a consumer does with a
+complete-but-DEGRADED side is its own policy and is deliberately not decided
+there. The referee needs a source for the ninth slot, so a degraded side is NOT
+covered (R159(a), unchanged, and pinned by a test in both suites); the pool has
+R60's partial-seed path, so a degraded side IS decided. One reading, two
+policies, both named at the call site.
+
+**One difference NOT unified, on purpose.** The melt keys a person on the raw
+`(name, team)` while the referee keys on `showdown_person_key`
+(`normalize_name`-based). Unifying them would change WHICH persons the melt
+merges, and R295(d) — "the melt merges same-name same-team persons" — is open and
+owns that decision. Named here so the next session does not read the difference
+as an oversight.
+
+**The consumer the roadmap row named, and the one that mattered.** The row cites
+`run_showdown (:3203-3230)`. The reader that actually carried the slate-wide
+assumption forward is `basis = str(df["Pool_Basis"].iloc[0])` at `:3255`, plus
+the brief's `pool.basis` at `:3692`: `Pool_Basis` is a per-ROW column, so row
+zero answered for both sides from one of them. Both now read
+`participation_report["slate_basis"]`, which is `mixed_declared_and_projected`
+when the sides disagree — a value `.iloc[0]` cannot express — and the brief
+carries the whole per-side `participation` block plus
+`projected_candidates`. `use_ladder` is unmoved on every case that reaches it: a
+fully posted slate still reads `declared_starters` with 18 posted, and a
+one-side-posted slate still falls back (it read `declared_starters` with 9
+posted before, and reads `mixed_declared_and_projected` with 9 posted now).
+
+### Tests
+
+Nineteen new behavioural tests, all driving production entry points, plus one
+pin rewritten. `tests/test_showdown.R36Finding8PerSideParticipationTests` (9)
+and `tests/test_upload_integrity.R323ShowdownCoverageTests` (8) /
+`R323ShowdownPreflightRunsTheCheckTests` (3) — the last three run
+`preflight_upload.main` end to end: a posted Showdown file needs no external
+feed and RUNS the posted-lineup check (exit 0), a benched Showdown starter FAILS
+it (exit 2), and the counterfactual with `dk_order_coverage` returning HEAD's
+row-counting answer puts the file back on the "no feed, no check" branch with
+the benched bat walking at exit 0.
+
+**The rewritten pin, and it was this defect's last live description of itself.**
+`ShowdownRoleCollapseTests.test_the_posted_nine_survives_the_collapse_and_is_read_as_confirmed`
+asserted `assertEqual(before, {})` — `dk_side_readings` on RAW Showdown rows
+returns nothing — and R235 shipped it as the expected contract, putting the
+burden on every caller to collapse first. Two callers did; the referee's own
+resolver did not and could not, because it hands the function a path. The test
+is now
+`test_the_posted_nine_is_read_as_confirmed_collapsed_or_not` and pins the
+opposite: both inputs give the same reading, with `dk_ids` named as the one
+field that legitimately differs (it reports the ids the INPUT carried, and a
+pre-collapsed caller has already dropped the `CPT` row).
+
+**Mutation check: five mutants, five killed, control run before each.**
+(1) skip the person collapse in `dk_posted_order_readings` so coverage counts
+rows again — 8 failures. (2) resolve a paired `CPT`/`UTIL` disagreement by
+keeping the `UTIL` row — 1 failure. (3) make the melt's completeness test
+slate-wide again (`decided` = every side when ANY side is complete) — 3 failures
+and 1 error. (4) merge a repeated PERSON on one slot instead of poisoning the
+side — SURVIVED the first pass. (5) let `dk_declared_probables` take the first
+role id again — SURVIVED the first pass.
+
+Both survivals were fixture gaps, and neither mutant was weakened. (4) is
+invisible to every Showdown fixture, because after the collapse there is one row
+per person and a person cannot claim a slot twice; the Classic duplicate fixture
+used two different NAMES, which the different-persons rule catches whatever the
+merge does. It needed a Classic file where one person collides with HIMSELF on a
+slot, and that test now carries an assertion on the fixture itself so a later
+edit cannot quietly make it a two-name collision again. (5) is invisible to any
+file DK actually shipped, for the id-allocation reason above. With both fixtures
+added: five killed, zero surviving.
+
+### Docs and contracts
+
+The suite pins moved in all THREE places they live -- `tools/audit.py`
+`EXPECTED_SUITE_COUNTS` (test_showdown 206 -> 215, test_upload_integrity
+383 -> 394), CLAUDE.md's session-start line, and
+`skills/generate-lineups/SKILL.md`'s audit line -- and the gate was reset by
+hand afterwards, because `tree_fingerprint` covers only
+`("mlb_engine", "tools", "tests")` and the two document halves fire no reset of
+their own. R216's rider already carries that; not refiled.
+
+R323's backlog entry is migrated to this file and left as a CLOSED stub. R36 is
+NOT moved: it is a twelve-finding adjudication entry, eleven of its findings stay
+open, so Finding 8 keeps its text and gains a STATUS line in place, mirroring
+Finding 10's. The two Session 2 roadmap rows are deleted and the NEXT pointer
+reads Session 3.
+
+One thing removed that was not on the list: Session 1 left a
+`#### Session 1 execution directive` block on the board whose last clause reads
+"the NEXT pointer above reads Session 2". Its work is shipped and the sentence is
+now false, which is the R145-R147 class -- a value nothing on this disk can
+re-read, asserted confidently -- sitting in the one document a session reads to
+learn what to do next. Deleted.
+
+---
+
 ## 2026-09-08 — R324 + R314: one parent-transition contract in both referees, and R322: the container is a verifier again
 
 Session 1 of the execution roadmap, its three rows as one commit. Gate before:

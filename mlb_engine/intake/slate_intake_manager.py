@@ -282,6 +282,30 @@ def parse_dk_salary_csv(path: str) -> List[SalaryPlayer]:
     return players
 
 
+def _row_field(record: Any, attr: str, raw_key: str = "",
+               default: Any = "") -> Any:
+    """One field off a salary record, whatever shape the caller has.
+
+    ``SalaryPlayer`` promotes ``status``/``starting`` to attributes and keeps the
+    DK row in ``raw``; a caller inside ``live_data_adapters`` may instead hold a
+    plain mapping keyed the way ``_record_get`` reads it. The collapse and the
+    completeness predicate below are the two places both shapes arrive, and
+    growing a second reader for each shape is the class R323 is filed on, one
+    layer down. Attribute first, then the record itself as a mapping, then the
+    DK column name inside ``raw``.
+    """
+    value = getattr(record, attr, None)
+    if value is None and isinstance(record, Mapping):
+        value = record.get(attr)
+    if value is None and raw_key:
+        raw = getattr(record, "raw", None)
+        if not isinstance(raw, Mapping) and isinstance(record, Mapping):
+            raw = record.get("raw") if isinstance(record.get("raw"), Mapping) else record
+        if isinstance(raw, Mapping):
+            value = raw.get(raw_key)
+    return default if value is None else value
+
+
 def showdown_person_key(name: Any, team: Any) -> str:
     """One human, whatever role their salary row is priced for.
 
@@ -333,7 +357,8 @@ def collapse_showdown_roles(
     rows = list(players)
     roles = {}
     for p in rows:
-        roles[id(p)] = str((p.raw or {}).get("Roster Position") or "").strip().upper()
+        roles[id(p)] = str(
+            _row_field(p, "roster_position", "Roster Position") or "").strip().upper()
     seen_roles = {r for r in roles.values() if r}
     report: Dict[str, Any] = {
         "applied": False,
@@ -343,6 +368,7 @@ def collapse_showdown_roles(
         "roles_seen": sorted(seen_roles),
         "role_kept": None,
         "unpaired": [],
+        "disagreements": [],
     }
     if not rows or not seen_roles <= SHOWDOWN_ROSTER_SLOTS or "CPT" not in seen_roles:
         report["reason"] = (
@@ -353,21 +379,39 @@ def collapse_showdown_roles(
 
     by_person: Dict[str, List["SalaryPlayer"]] = {}
     for p in rows:
-        by_person.setdefault(showdown_person_key(p.name, p.team), []).append(p)
+        by_person.setdefault(
+            showdown_person_key(_row_field(p, "name", "Name"),
+                                _row_field(p, "team", "TeamAbbrev")), []).append(p)
 
     out: List["SalaryPlayer"] = []
     unpaired: List[Dict[str, Any]] = []
+    disagreements: List[Dict[str, Any]] = []
     for key in sorted(by_person):
         group = by_person[key]
         counts = Counter(roles[id(p)] for p in group)
         if counts == Counter({"CPT": 1, "UTIL": 1}):
-            out.extend(p for p in group if roles[id(p)] == "UTIL")
-            continue
+            clash = showdown_paired_role_disagreement(group)
+            if not clash:
+                out.extend(p for p in group if roles[id(p)] == "UTIL")
+                continue
+            # R323. DK prices ONE person twice, so the two rows must agree about
+            # who he is. A pair that disagrees on team, position or `Starting`
+            # is a malformed file, and keeping the UTIL row would resolve by
+            # guessing exactly the field the disagreement is about -- the same
+            # move R75 forbids one identity earlier. Named, and left whole so
+            # the side reads malformed downstream rather than confirmed.
+            disagreements.append({
+                "person_key": key, "fields": clash,
+                "Player_IDs": sorted(
+                    str(_row_field(p, "player_id", "ID")) for p in group),
+                "names": sorted({str(_row_field(p, "name", "Name")) for p in group}),
+            })
         unpaired.append({
             "person_key": key,
             "roles": dict(sorted(counts.items())),
-            "Player_IDs": sorted(str(p.player_id) for p in group),
-            "names": sorted({str(p.name) for p in group}),
+            "Player_IDs": sorted(
+                str(_row_field(p, "player_id", "ID")) for p in group),
+            "names": sorted({str(_row_field(p, "name", "Name")) for p in group}),
         })
         out.extend(group)
 
@@ -377,11 +421,151 @@ def collapse_showdown_roles(
         "persons": len(by_person),
         "role_kept": "UTIL",
         "unpaired": unpaired,
+        "disagreements": disagreements,
         "note": "DK prices a Showdown player twice, CPT and UTIL; the UTIL row "
                 "is the person's base price and is what survives. An unpaired "
                 "key is left whole and stays ambiguous downstream.",
     })
     return out, report
+
+
+# R323. Nine batting slots, one definition, at the layer BOTH the referee's
+# coverage reading and the Showdown pool's participation reading can import it
+# from. It lived in ``live_data_adapters`` (which imports this module, never the
+# other way round), so the pool could not have shared it without a cycle, and
+# "the pool and the referee each read the Starting column their own way" is how
+# they came to disagree about the same posted side.
+DK_ORDER_SLOTS = 9
+
+# The fields DK must spell the same way on a person's CPT and UTIL rows.
+# ``TeamAbbrev`` is in the person key already, and is checked anyway: the key is
+# built from a normalized name plus the team, so a caller passing a different
+# key builder must not silently lose the team check.
+SHOWDOWN_PAIRED_FIELDS = (("team", "TeamAbbrev"), ("position", "Position"),
+                          ("starting", "Starting"))
+
+
+def showdown_paired_role_disagreement(
+    group: Sequence[Any],
+) -> Dict[str, List[str]]:
+    """{column: the distinct values} for every paired field the rows disagree on.
+
+    Public because the Showdown melt calls it too. Its own ``by_key`` collapse
+    took the first non-blank ``Starting`` it saw and dropped the rest, so a
+    person whose CPT row said slot 7 and whose UTIL row said slot 1 was resolved
+    by row order and the frame read confirmed -- the referee refused that same
+    file and the pool accepted it, which is the disagreement premise correction 2
+    of R323's session exists to stop. One rule, one place, two callers.
+    """
+    clash: Dict[str, List[str]] = {}
+    for attr, column in SHOWDOWN_PAIRED_FIELDS:
+        values = {str(_row_field(p, attr, column) or "").strip().upper()
+                  for p in group}
+        if len(values) > 1:
+            clash[column] = sorted(values)
+    return clash
+
+
+def posted_order_completeness(
+    slots: Iterable[Mapping[str, Any]],
+) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """(event, team) -> ONE reading of whether DK has posted that side's 1-9.
+
+    R323 and R36 Finding 8 decide the same fact for two different consumers --
+    "is this side's batting order completely posted" -- and before this function
+    they decided it twice, from two readings of the same column, at two grains.
+    ``dk_side_readings`` counted salary ROWS, so a Showdown side's nine arrived
+    as eighteen order tokens and read as malformed; ``melt_showdown_salary_csv``
+    never asked the question per side at all and flipped the whole slate's pool
+    on any one declared row. The rule is here once and both call it.
+
+    Each input item describes ONE PERSON's claim on ONE slot::
+
+        {"event": DK game id, "team": DK abbrev, "person_key": one human,
+         "order": 1..9 (anything else is ignored), "name": display name,
+         "dk_id": the base id, "dk_ids": every draftable id this person owns,
+         "status": DK status cell, "shelved": bool, "ambiguous": bool}
+
+    ``person_key`` is what makes the reading row-count-proof: a person holding
+    the same slot on a CPT row and a UTIL row is one claim, and two DIFFERENT
+    people on one slot is the malformed file the Classic guard has always
+    refused. Collapse roles to persons before calling (see
+    ``collapse_showdown_roles``); this function does not re-derive that.
+
+    Per side::
+
+        {"state": "confirmed" | "degraded" | "malformed" | "partial",
+         "complete": bool, "order": [slot rows 1-9] (complete sides only),
+         "slots": {n: row}, "shelved": [rows], "missing": [ints],
+         "duplicate_slots": [ints], "ambiguous": [person keys]}
+
+    ``complete`` is the shared fact: slots 1 through 9, each held by exactly one
+    unambiguous person. What a consumer DOES with a complete-but-degraded side
+    (a shelved player inside the nine) is its own policy and deliberately not
+    decided here -- the referee needs a source for the ninth slot and calls it
+    uncovered (R159(a)), while the pool has R60's partial-seed path and treats
+    the surviving eight as observed.
+    """
+    per_side: Dict[Tuple[str, str], Dict[int, Any]] = {}
+    dupes: Dict[Tuple[str, str], set] = {}
+    ambiguous: Dict[Tuple[str, str], set] = {}
+    for item in slots:
+        team = str(item.get("team") or "").strip().upper()
+        if not team:
+            continue
+        event = str(item.get("event") or "").strip().upper()
+        key = (event, team)
+        per_side.setdefault(key, {})
+        dupes.setdefault(key, set())
+        ambiguous.setdefault(key, set())
+        person = str(item.get("person_key") or "")
+        if item.get("ambiguous"):
+            ambiguous[key].add(person)
+        try:
+            slot = int(str(item.get("order")).strip())
+        except (TypeError, ValueError):
+            continue
+        if not 1 <= slot <= DK_ORDER_SLOTS:
+            continue
+        row = {"order": slot, "person_key": person,
+               "dk_id": str(item.get("dk_id") or ""),
+               "dk_ids": tuple(str(x) for x in (item.get("dk_ids") or ())),
+               "name": str(item.get("name") or ""),
+               "status": str(item.get("status") or "").strip().upper(),
+               "shelved": bool(item.get("shelved"))}
+        if slot in per_side[key]:
+            # Two claims on one slot is a malformed file, not a lineup, and that
+            # rule is unchanged from the guard this replaces. It is a SECOND
+            # claim and not a second row: a Showdown person owns a CPT row and a
+            # UTIL row, and collapsing roles to persons before calling is what
+            # turns his eighteen tokens into nine claims. Merging a repeated
+            # person here instead would have quietly made a genuinely duplicated
+            # Classic slot read as complete, which is the same defect pointing
+            # the other way.
+            dupes[key].add(slot)
+            continue
+        per_side[key][slot] = row
+
+    out: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for key in sorted(per_side):
+        held = per_side[key]
+        missing = [n for n in range(1, DK_ORDER_SLOTS + 1) if n not in held]
+        duplicate = sorted(dupes[key])
+        amb = sorted(a for a in ambiguous[key] if a)
+        complete = not missing and not duplicate and not amb
+        order = [held[n] for n in range(1, DK_ORDER_SLOTS + 1)] if complete else []
+        shelved = [row for row in order if row["shelved"]]
+        if duplicate or amb:
+            state = "malformed"
+        elif not complete:
+            state = "partial"
+        else:
+            state = "degraded" if shelved else "confirmed"
+        out[key] = {"state": state, "complete": complete, "order": order,
+                    "slots": dict(sorted(held.items())), "shelved": shelved,
+                    "missing": missing, "duplicate_slots": duplicate,
+                    "ambiguous": amb, "event": key[0], "team": key[1]}
+    return out
 
 
 # DK's availability vocabulary. OUT statuses are shelved and must never occupy a

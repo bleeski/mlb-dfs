@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 2
+## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 3
 
 **How to use this table.** A session says *"work on the next session in the
 backlog"*, reads the row(s) for the Session ID on the NEXT pointer above, and
@@ -64,8 +64,6 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Session 2** | `Batch (1 of 2)` | **R323 (NEW, Inbox + ed12 F15) -- `dk_order_coverage` counts role rows, not people.** `live_data_adapters.py:503` (`dk_order_coverage`) and `:372` (`dk_side_readings`) see a Showdown side's complete 1-9 as EIGHTEEN order tokens (CPT + UTIL rows) and report both posted sides UNCOVERED. Both referees resolve through it (R305), so the posted-lineup cross-check never runs on any Showdown slate and preflight prints "no lineups feed resolved" over a file holding the orders. Collapse to persons before the completeness test (reuse `slate_intake_manager.collapse_showdown_roles` or key on `Roster Position == UTIL` when `detect_salary_contract` says Showdown), fail on paired-row disagreements, keep CPT/UTIL export ids distinct. R233 enumeration in the entry: every `Starting`-column reader that counts rows (`dk_order_coverage`, `merge_dk_starting_into_feed`, both referees' resolvers). | Inbox / Spec | `mlb_engine/intake/live_data_adapters.py`, `tools/preflight_upload.py` resolver, `tests/test_showdown.py`, `tests/test_upload_integrity.py` | High (the one check that catches a Showdown late scratch is silently absent on every Showdown slate) | Low | None |
-| **Session 2** | `Batch (2 of 2)` | **R36 Finding 8 (+ed12 F16 rider) -- one declaration filters the whole Showdown pool.** `melt_showdown_salary_csv` (`showdown.py:269-295`) sets `rows = declared` on ANY declared row: one posted side erases the other side's healthy hitters; pitcher-only declarations erase hitters on both. Make participation per (event, team, person): a complete nine establishes nonstarters for THAT side only; an incomplete declaration establishes nothing; pitchers keep their own role evidence; the legal salary universe stays whole beside the participation state. | Backlog / Spec | `mlb_engine/optimize/showdown.py`, `skills/generate-lineups/scripts/build_slate.py` `run_showdown` (:3203-3230), `tests/test_showdown.py` | Med | Low | None |
 | **Session 3** | `Batch (1 of 4)` | **R327 (NEW, ed12 F02 + F25) -- the external projection frame boundary.** `validate_projection_schema` (`optimizer_v3.py:456-468`) and `validate_projection_factors` (`projection_builder.py:68-79`) admit NaN, +/-inf, duplicate `Player_ID`, negative and non-integer Salary (reproduced: two same-id rows, salary -1, NaN bounds passed). `refresh_confirmed_lineups` (`projection_builder.py:213-230`) tests `Excluded` by truthiness, so the STRING "False" excludes a confirmed starter on the swap path (R291's fifth site, reproduced at HEAD), and `:230` clips Ceiling<Floor with `max()` where CLAUDE.md says hard error. Add one finite/unique/positive-integer validator at the `--projections` door and before model construction; route the refresh flag through `read_excluded_cell`; raise on inverted bounds. | Spec | `mlb_engine/optimize/optimizer_v3.py`, `mlb_engine/projections/projection_builder.py`, `tests/test_core.py` | High (a pool reduction arriving as a data condition, on the swap path; `--projections` is the Showdown lever) | Low | None |
 | **Session 3** | `Batch (2 of 4)` | **R313 -- a forbidden core shrunk to the pool becomes `sum x <= 0` over the lone survivor** (`optimizer_v3.py:1084-1093`), a legal-pool reduction. Emit the row only when every member is still legal. | Backlog | `mlb_engine/optimize/optimizer_v3.py` | High (legal-pool reduction) | Low | None |
 | **Session 3** | `Batch (3 of 4)` | **R310, warning half -- a sub-5-game callup's APPG Base is unflagged** (12.5 APPG into 47.4% exposure on 2210_1g_sd, every control clean). Warn when games played < 5 and APPG sits in the pool's top quartile; needs no feed. The shrink half stays on the entry. | Backlog | `build_slate.py` pool report, `projection_builder.py` | Med | Low | None |
@@ -236,11 +234,6 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 ### Decisions owed and externally gated -- no session until answered
 
 **[BEN: R308]** the external field estimate in the build loop needs the RotoWire RST% transport settled (signed-in Chrome + subscription is the only one that works); once it is, R308 is a Phase A-grade session (S-M) and slots before Session 7. **R41** (Showdown under the three certification gates, L, decision first). **R206** (controls count entries, not dollars; decision then M). **R262** (scenario-coverage selection's production switch; Tier 4 decision, with **R13** the stakes decision). **R240** (punt-captain template). **R139** (captain-leverage tier targets). **R125** policy half (bullpen-day auto-declaration, posture fallback, counted Classic relaxation ladder). **R40** (one-seat satellite routing). **R150**'s decision half. **R188**'s decision. **R273** (P3 quarantine decision). **R281**, **R282** (P3 spelling-consolidation, S and M). **R9b** (split the corpus; rides R301). **R81** (slate fingerprint contract, M design pass first). **R256** (arsenal-vs-profile layer, L, gated on R255 residuals). **R263** remainder (gated on R238/R239 and R10). **R121** standing order (clock is a measurement), its clock half inside R290(c). **R315(c)** is ARCHIVE's one `git add` (`data/reference/statsapi_season_pitching.csv`) at its next session. Rejected from the twelfth edition and filed nowhere: **F32** (ZIP resource limits; R44 carries the D26 rider, severity-reduced twice), **F36** (the auditor's Windows host lacks scipy; not a repository defect, R271(c) and R78 already say so, R217 keeps the runtime-identity sliver), **stage E** (automated submission/outbox; DK's terms and CLAUDE.md's money-and-entry wall; export-only stays), **stage F** (other sports; other workspaces). Section 1.6's five closures (R291, R294, R304, R305, R306 steps 1-3) match this board and nothing from it is refiled.
-
-#### Session 1 execution directive
-
-Load `tools/preflight_upload.py` (`check_started_games` at :869-946, its call at :2418-2425, `check_parent` at :2455, `--parent` at :2514), `tools/verify_export.py` (`check_parent_slots` at :383-387, the `parent_checked` branch at :597-628), `tests/test_upload_integrity.py`, `tests/test_core.py` (`EXPECTED_CENSUS`), and CLAUDE.md's R287 paragraph under Hard guardrails. Run the new test classes first (`PYTHONPATH=.pylibs TMPDIR=/tmp python -m unittest tests.test_upload_integrity.<NewClass>`), then the gate to completion: `python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165` until `GATE COMPLETE`, then `--gate-report --terse`. Done when: a parent + child fixture retaining started players in unchanged slots passes BOTH referees; a changed slot to or from a started or `TBD` game FAILS both; a postponed game's players are exempt in both; `test_core` is green in a pristine container clone; the gate line reads `PASS v2.26.0 28 modules <N>` with N above 1839 and every suite `clean`; R322, R324 and R314 entries migrated to CHANGELOG.md with the R233 enumeration of every `check_started_games` caller; the NEXT pointer above reads Session 2.
-
 
 *2026-09-08, DEV, claim `engine` (`engine_2026-09-08`): **the greenfield TWELFTH
 edition (`DFS_SYSTEM_GREENFIELD_SPEC_2026-09-08.md`, reviewed at `15f87a2`, this
@@ -3337,42 +3330,37 @@ R-number comes from scanning this file AND CHANGELOG.md.
 
 ## Workstream 1 — Showdown correctness and certification
 
-### R323. `dk_order_coverage` counts role ROWS, so a Showdown salary file carrying a complete 1-9 for both teams reports ZERO covered sides, and both referees resolve through it (P1, XS-S) | new 2026-09-08, merged from BUILD fragment `2026-09-06_BUILD_dk-order-coverage-blind-on-showdown-geometry.md` (consumed) and the greenfield twelfth edition (F15); VERIFIED-repro by the filing BUILD session on the delivered 2210_1g_sd file and independently by the edition
+### R323. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md
 
-- **What.** `live_data_adapters.dk_order_coverage` (`:503`) and `dk_side_readings`
-  (`:372`) treat each salary row as a person. A Showdown file carries a CPT row
-  and a UTIL row per player (different ids, different salaries), so a complete
-  side arrives as EIGHTEEN order tokens for nine slots and fails whatever
-  completeness test is applied: `dk_order_coverage("data/slates/2026-09-06/
-  DKSalaries_showdown.csv") -> ([], ['LAD', 'WSH'])`. The Showdown melt in
-  `showdown.py` collapses roles to persons; this function does not. Since R305
-  BOTH referees resolve their feed through this one definition of "covered", so
-  on every Showdown slate `preflight_upload.py` prints `WARN no lineups feed
-  resolved; the posted-lineup cross-check did not run` over a file that holds
-  the posted orders, exits 0, and CLAUDE.md's "a fully posted slate that wrote no
-  feed is cross-checked against the salary file itself" is unreachable on
-  Showdown by construction. The BUILD is unaffected (`pool.basis =
-  declared_starters`, `posted_hitters = 18`); the cost is the REFEREE's one check
-  that would catch a late scratch, silently absent, reported as a missing input
-  rather than a blind spot. Third member of the R297(d)/R304 class (a referee
-  test that cannot run on Showdown geometry, rendered as a statement about the
-  input); N+1 of the R305 enumeration, one function upstream of both sites it
-  named.
-- **Why P1.** Every Showdown slate is permanently on the "no feed, no check"
-  branch. A benched Showdown starter in a delivered file passes preflight today.
-- **Fix.** Collapse to one row per person BEFORE the completeness test: reuse
-  `slate_intake_manager.collapse_showdown_roles` or key the test on `Roster
-  Position == 'UTIL'` when `detect_salary_contract` reports Showdown; fail on a
-  paired CPT/UTIL disagreement (team, position, `Starting`); keep the CPT and UTIL
-  export ids distinct after coverage is computed. Then R305's "no external feed
-  was needed" line becomes reachable on Showdown. Per R233 the enumeration goes in
-  the closing entry: every reader of the `Starting` column that counts rows
-  rather than people (`dk_order_coverage`, `dk_order_coverage_report`,
-  `merge_dk_starting_into_feed`, both referees' resolvers), with the hit list.
-  Acceptance: dual-role complete orders cover both teams; a conflicting pair
-  fails; a genuine duplicate physical-player slot fails; preflight on the
-  2026-09-06 fixture prints the R305 line and runs the posted-lineup check.
-  Roadmap: Session 2.
+Roles are collapsed to PERSONS inside the reader, through R235's own collapse,
+and the completeness test is now one shared predicate
+(`slate_intake_manager.posted_order_completeness`) keyed per `(event, team)` and
+per person -- the same predicate R36 Finding 8 uses for the Showdown pool, which
+is what stops the referee and the pool deciding "is this side posted" twice.
+`(['LAD','WSH'], [])` on the 2026-09-06 file that returned `([], ['LAD','WSH'])`
+at `f7ef478`; preflight on a posted Showdown file now prints R305's "no external
+feed was needed" line, RUNS the posted-lineup check, and exits 2 on a benched
+Showdown starter. A CPT/UTIL disagreement or an R75 name ambiguity makes the
+side `malformed` rather than confirmed, named beside `uncovered`.
+
+**The R233 enumeration is in the changelog entry, and the entry's own list was
+short: it named four sites, two of them derived, and the class has sixteen with
+four independent defects.** The two it did not name were both live --
+`dk_declared_probables` took the first role id by string sort (right by accident
+of DK's id allocation, wrong by rule) and `paste_lineups._dk_declared_starters`
+read one Showdown arm as two and refused to take a probable at all. Two
+row-counting readers are KEPT with their reasons named (`starting_by_team` is
+Classic-only by construction; `starting_non_blank`'s only predicate is `== 0`),
+and one is untracked workspace.
+
+**Four premise corrections, in the changelog entry:** its acceptance line named
+a gitignored path (R322's class, fixtures built in-test instead); its Fix line
+gated the collapse on `detect_salary_contract`, which takes a PATH while the
+site that needed the gate is handed a mapping; the CPT/UTIL id warning named a
+risk the collapse does not carry, while the real id interaction runs the other
+way and is benign because `check_feed` matches on NAME; and the file carries
+twenty `Starting` tokens per team, not eighteen.
+
 
 ### R304. CLOSED 2026-09-06 -- SHIPPED with R297(d), entry migrated to CHANGELOG.md
 
@@ -8236,6 +8224,32 @@ Every line-number claim was verified against the tree before ruling, because thi
   with 2+ compatible candidates.
 - **Finding 8 (P1, S).** `melt_showdown_salary_csv` flips the whole pool to `declared_starters` on ANY declared row, with no per-team completeness test. A one-sided partial does hard-error on the `len(teams) < 2` guard, so the critique slightly overstates the worst case, but a partial covering both sides yields a tiny biased pool and `build_slate.py` then falls back to the generic bank on that pool rather than refusing. Per-team completeness, projected candidates labelled for incomplete teams, block promotion not generation.
   **Rider 2026-09-08 (ed12, F16): the edition re-derives this finding structurally and sharpens two cases.** If only ONE lineup posts, the other team's healthy players disappear from the modeled pool; if only starting PITCHERS are declared, healthy hitters on both sides disappear; declarations passed later in the CLI do not repair the early melt. Fix shape adopted: participation state per `(event, team, person)` -- a complete unique 1..9 for a side establishes `confirmed_nonstarter` for that side only, an incomplete declaration leaves `unknown`, pitchers keep their own role evidence, and the complete legal salary universe is kept separately from participation. Roadmap: Session 2 with R323.
+  **STATUS 2026-09-08, R36 Finding 8 SHIPPED with R323: this finding is CLOSED
+  and its text is migrated to CHANGELOG.md.** Participation is a state per
+  `(event, team, person)`, computed from R323's shared
+  `posted_order_completeness` so the pool and the referee cannot disagree about
+  whether a side is posted. A complete 1-9 DECIDES its side (posted nine plus
+  declared arms kept, the rest `confirmed_nonstarter`); an incomplete
+  declaration establishes nothing and every healthy player on that side stays,
+  labelled `Participation='unknown'` / `Projected_Candidate=True`; a pitcher
+  keeps his own role evidence; the legal salary universe is untouched. Measured
+  at `f7ef478` against the fix: a pitcher-only declaration took the pool to
+  **2 persons, one a side** and now leaves 34; one posted side took it to
+  **11 (10/1)** and now leaves 27 (10/17); a fully posted slate and a degraded
+  posted nine are both unchanged (20 and 19). **Two premise corrections in the
+  changelog entry:** this Fix line as written would NOT have achieved its own
+  goal, because the melt dropped `OUT` rows during the parse, so per-team
+  completeness alone turns every R159(a) DEGRADED side into an undecided one
+  (the health filter had to move after participation); and making the two items
+  agree exposed a third site, the melt's own `by_key` resolving a CPT/UTIL
+  `Starting` disagreement by ROW ORDER while R323's reader refused the same
+  file. **Not discharged and still open on R295(d):** the melt keys a person on
+  the raw `(name, team)` while the referee keys on `showdown_person_key`, and
+  unifying that changes WHICH persons the melt merges, which is R295(d)'s
+  decision. **Also unchanged, per R304's named remainder:** `--declare-pitcher`
+  still reaches the Classic pool only, so ed12 F16's "declarations passed later
+  in the CLI do not repair the early melt" stands as a separate item.
+  R36 itself stays OPEN; eleven findings remain.
 - **Finding 7 (P1, S).** The supplied-feed acceptance threshold is `covered * 2 < len(slate_teams)` — strictly under half rejects, so exactly 50% is ACCEPTED and overwrites the shared `data/slates/<date>/lineups_feed.json`, and the write is a bare `write_text`, not atomic, unlike every other durable write in the repo. Both true. R32 removes the need for this path whenever Ben pastes, and R29(4) added `--salary`; what remains is keying the staged feed by pool signature and snapshotting it into the run. **Addition (2026-08-01, GF spec A-29):** the fix ships with the boundary test the suite lacks — a feed covering exactly half the slate's teams, which today is ACCEPTED by `covered * 2 < len(slate_teams)`.
 - **Finding 12 (P1, S).** `wheel_fetch.py` reads no lock file, resolves the latest release for a bare name, has no `hashlib` at all, decides completion from `os.path.getsize`, and never checks for `206`/`Content-Range`. A server ignoring `Range` returns 200, the full body is APPENDED to the partial, size then exceeds the target, and it prints `done` and exits 0 on a corrupt wheel. The critique's doc quote is slightly off (SKILL.md attributes hash verification to `env_probe --install`, which really does pass `--require-hashes`) but it introduces the fallback in the same breath and never says the fallback drops both the pin and the hash.
 - **Finding 1 (P1, M) — accepted in MODIFIED form.** The factual claim is true: a missing, unreadable or five-hour-old feed still returns `upload_ready` at exit 0, and two tests pin it by name. **Rejected:** blocking on a missing feed. At T-5 that stops a legal file over an absent input, which is the process preventing the lineup. **Accepted:** an unverified roster must not be LABELLED `upload_ready`. R34 built the mechanism (a distinct verdict at exit 0), so the remaining work is to route missing/stale/unreadable live evidence into it as `UNKNOWN` rather than a warning. That is the honest version and it costs no build. **Addition (2026-08-01, GF spec F-11):** when that routing is built, the staleness constant (`FEED_STALE_MINUTES = 90`, `preflight_upload.py:758`) becomes policy scaled by minutes-to-lock — a 90-minute-old feed is one fact at T-180 and a different one at T-10 — with the constant kept as fallback when no lock time is known.

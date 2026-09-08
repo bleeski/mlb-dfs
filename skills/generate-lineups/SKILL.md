@@ -1209,7 +1209,7 @@ Before a build, when there is time:
 ```bash
 cd <repo> && git status --short
 python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165  # repeat to GATE COMPLETE
-python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 28 modules, 1856 tests
+python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 28 modules, 1876 tests
 ```
 
 **`--run-tests` in one call is not the supported path here and CLAUDE.md says

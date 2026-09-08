@@ -198,10 +198,45 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     unfiltered pool put a non-starting arm in every lineup while the file plainly
     declared someone else.
 
-    The filter applies only when the file actually carries the information. Before
-    lineups post, ``Starting`` is empty for everyone, so the pool falls back to all
-    healthy players and stamps ``Pool_Basis='all_healthy'``. Read that column before
-    treating a build as starter-restricted.
+    R36 Finding 8 (+ed12 F16). That restriction is PER SIDE, and until now it was
+    slate-wide: ``rows = declared`` fired on ANY single declared row, with no
+    per-team completeness test anywhere. One posted lineup therefore erased the
+    other side's healthy hitters, and a slate where only the two starting
+    PITCHERS were declared erased the hitters on BOTH sides -- a tiny biased pool
+    that ``build_slate.py`` then built a generic bank on rather than refusing,
+    because the ``len(teams) < 2`` hard error below sits AFTER the filter and a
+    two-sided partial still has two teams.
+
+    Participation is now a per-``(event, team, person)`` state, computed from
+    ``slate_intake_manager.posted_order_completeness`` -- the same predicate the
+    referee's coverage reading calls, so the pool and the referee cannot disagree
+    about whether a side is posted:
+
+    * a side whose 1-9 is COMPLETE is DECIDED: its posted nine and its declared
+      arms are ``confirmed_starter``, everyone else on that side is
+      ``confirmed_nonstarter`` and leaves the pool;
+    * a side whose declaration is INCOMPLETE establishes nothing. Every healthy
+      player on it stays, labelled ``Participation='unknown'`` with
+      ``Projected_Candidate=True``. Block promotion, not generation;
+    * a pitcher keeps his OWN role evidence either way: a DK-declared arm on an
+      unposted side is a ``confirmed_starter`` while his team-mates are unknown,
+      and R104's opener is neither (``Is_Declared_Opener``, rosterable and not
+      declared);
+    * the legal salary universe is unchanged. This decides POOL MEMBERSHIP on
+      observed participation, and it never narrows on a compute or shape excuse.
+
+    A complete nine holding a shelved player is still DECIDED -- R159(a)'s
+    degraded reading, the surviving eight are observed -- which is why the health
+    filter now runs AFTER participation rather than during the parse: dropping the
+    IL bat first made a nine read as an eight and would have turned every degraded
+    side into an undecided one.
+
+    ``Pool_Basis`` is per row and carries its own side's basis
+    (``declared_starters`` or ``all_healthy``). The frame-level statement is
+    ``df.attrs['participation_report']['slate_basis']``, which is
+    ``mixed_declared_and_projected`` when the sides disagree -- a value
+    ``Pool_Basis.iloc[0]`` cannot express, and reading the first row on a mixed
+    slate is reporting one side's answer for both.
     """
     by_key: Dict[tuple, Dict[str, Any]] = {}
     # R291(c). Whether the FILE carried the column is a different fact from
@@ -220,8 +255,6 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
             if not name or not team or role not in ("CPT", "UTIL") or not pid or salary is None:
                 continue
             status = str(r.get("Status") or "").strip().upper()
-            if exclude_out and status in OUT_STATUSES:
-                continue
             game_info = str(r.get("Game Info") or "")
             matchup = game_info.split(" ", 1)[0] if game_info else ""
             away, home = (matchup.split("@") + ["", ""])[:2] if "@" in matchup else ("", "")
@@ -251,10 +284,21 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
                 "Player_Key": f"{name}|{team}", "Name": name, "Team": team,
                 "Opponent": opponent, "Position": str(r.get("Position") or "").strip(),
                 "Game_ID": matchup, "Base": base, "Starting": starting,
-                "Excluded": False,
+                "Excluded": False, "Status": status, "Status_Out": False,
+                "Role_Disagreement": None, "_role_rows": [],
                 "CPT_ID": None, "CPT_Salary": None, "UTIL_ID": None, "UTIL_Salary": None,
             })
+            rec["_role_rows"].append(dict(r))
             rec["Excluded"] = bool(rec.get("Excluded")) or bool(row_excluded)
+            # R36 F8. The OUT read moved off the parse loop and onto the person,
+            # because participation is decided BEFORE health: a posted nine
+            # holding an IL bat is R159(a)'s degraded side, nine observed slots,
+            # and skipping his rows here made it an eight-of-nine partial that
+            # established nothing about its own side.
+            if status in OUT_STATUSES:
+                rec["Status_Out"] = True
+            if status and not rec.get("Status"):
+                rec["Status"] = status
             if starting and not rec.get("Starting"):
                 rec["Starting"] = starting
             if role == "CPT":
@@ -281,16 +325,51 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         # all_healthy basis nothing about him changes.
         return value in DK_STARTING_DECLARED_TOKENS or value.isdigit()
 
-    declared = [r for r in rows if _is_declared(r)]
-    basis = "all_healthy"
-    if starters_only and declared:
-        # Only restrict when the file has actually posted something. A slate where
-        # nothing has posted yet leaves Starting blank for everyone, and filtering
-        # to an empty pool would be worse than not filtering at all.
-        rows = declared
-        basis = "declared_starters"
+    # R36 F8. ONE reading of "is this side's 1-9 posted", shared with the
+    # referee's `dk_order_coverage` through `posted_order_completeness`. Lazy
+    # import for the reason every other import in this module is: no load-time
+    # dependency on the Classic path.
+    from mlb_engine.intake.slate_intake_manager import (
+        posted_order_completeness, showdown_paired_role_disagreement)
+    # A person's CPT and UTIL rows must agree about who he is. `by_key` above
+    # takes the first non-blank `Starting` and drops the rest, so a pair that
+    # disagreed was resolved by ROW ORDER and this frame read confirmed while
+    # `dk_order_coverage` refused the same file. Same rule, same function, and a
+    # disagreeing person makes his SIDE undecided rather than being quietly
+    # assigned to a slot.
     for rec in rows:
-        rec["Pool_Basis"] = basis
+        clash = showdown_paired_role_disagreement(rec.pop("_role_rows", []))
+        rec["Role_Disagreement"] = ";".join(
+            f"{col}={'/'.join(vals)}" for col, vals in sorted(clash.items())
+        ) or None
+    for rec in by_key.values():
+        rec.pop("_role_rows", None)
+    per_side = posted_order_completeness([
+        {"event": r.get("Game_ID"), "team": r.get("Team"),
+         "person_key": r.get("Player_Key"), "order": r.get("Starting"),
+         "name": r.get("Name"), "status": r.get("Status"),
+         "shelved": bool(r.get("Status_Out")),
+         "ambiguous": bool(r.get("Role_Disagreement"))}
+        for r in rows
+    ])
+    decided = {key for key, reading in per_side.items() if reading["complete"]}
+    decided_teams = {team for _event, team in decided}
+
+    def _side_key(rec: Mapping[str, Any]) -> tuple:
+        return (str(rec.get("Game_ID") or "").strip().upper(),
+                str(rec.get("Team") or "").strip().upper())
+
+    def _participation(rec: Mapping[str, Any]) -> str:
+        value = str(rec.get("Starting") or "").strip().upper()
+        if value.isdigit() or _is_declared(rec):
+            return "confirmed_starter"
+        return "confirmed_nonstarter" if _side_key(rec) in decided else "unknown"
+
+    for rec in rows:
+        rec["Participation"] = _participation(rec)
+        rec["Pool_Basis"] = ("declared_starters" if _side_key(rec) in decided
+                             else "all_healthy")
+        rec["Projected_Candidate"] = rec["Participation"] == "unknown"
         value = str(rec.get("Starting") or "").strip().upper()
         rec["Batting_Order"] = int(value) if value.isdigit() else None
         rec["Is_Declared_Starter"] = value in DK_STARTING_DECLARED_TOKENS
@@ -298,6 +377,47 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         # frame can see WHY he is not a declared starter rather than inferring it
         # from a False. Rosterable, not declared.
         rec["Is_Declared_Opener"] = value in DK_STARTING_OPENER_TOKENS
+
+    universe = len(rows)
+    if starters_only:
+        # Only a side that POSTED a complete nine can name a nonstarter. A side
+        # that posted nothing, or posted eight, establishes nothing and keeps
+        # every healthy player it has, labelled.
+        rows = [r for r in rows if r["Participation"] != "confirmed_nonstarter"]
+    shelved_out = [r for r in rows if r.get("Status_Out")]
+    if exclude_out:
+        rows = [r for r in rows if not r.get("Status_Out")]
+    if decided_teams and len(decided_teams) < len(
+            {team for _event, team in per_side}):
+        basis = "mixed_declared_and_projected"
+    elif decided_teams:
+        basis = "declared_starters"
+    else:
+        basis = "all_healthy"
+    participation_report = {
+        "slate_basis": basis,
+        "sides": [
+            {"event": event, "team": team, "state": reading["state"],
+             "complete": reading["complete"], "decided": reading["complete"],
+             "posted_slots": len(reading["slots"]),
+             "missing_slots": reading["missing"],
+             "duplicate_slots": reading["duplicate_slots"],
+             "shelved_in_posted_nine": [s["name"] for s in reading["shelved"]]}
+            for (event, team), reading in sorted(per_side.items())
+        ],
+        "persons_in_salary_universe": universe,
+        "persons_in_pool": len(rows),
+        "dropped_confirmed_nonstarter": universe - len(rows) - len(shelved_out),
+        "dropped_status_out": len(shelved_out) if exclude_out else 0,
+        "projected_candidates": sum(1 for r in rows if r.get("Projected_Candidate")),
+        "role_disagreements": sorted(
+            f"{r['Player_Key']}: {r['Role_Disagreement']}"
+            for r in rows if r.get("Role_Disagreement")),
+        "note": "participation is per (event, team, person): only a side whose "
+                "1-9 is completely posted can establish a nonstarter, and an "
+                "incomplete declaration establishes nothing. A pitcher keeps his "
+                "own role evidence. The legal salary universe is unchanged.",
+    }
 
     df = pd.DataFrame(rows)
     if not df.empty:
@@ -325,6 +445,7 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     # A count that reaches the brief is what makes the operator's instruction
     # auditable at T-5; on 1940_9g the instruction was accepted, discarded, and
     # nothing said so.
+    df.attrs["participation_report"] = participation_report
     df.attrs["excluded_column_report"] = {
         "column_present": bool(excluded_column_present),
         "unrecognized_kept": len(unrecognized_cells),
