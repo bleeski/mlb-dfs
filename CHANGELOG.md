@@ -25,6 +25,78 @@ performance claim.
 
 ---
 
+## 2026-09-08 — Board: the twelfth greenfield edition is merged (R323-R331 filed, twenty-six riders, two findings rejected), the 09-06 BUILD fragment is consumed, and the queue is rewritten as a 63-session execution roadmap (docs only)
+
+**Scope: docs only.** This commit touches `docs/backlog.md`, this file, and moves
+one consumed fragment out of `docs/backlog_inbox/`. No code, no test, no
+contract file. The gate was not run and that is stated rather than skipped
+quietly, per the 2026-08-27 and 2026-09-03 board commits.
+
+**Ben's instruction, 2026-09-08.** Reconcile the twelfth edition
+(`DFS_SYSTEM_GREENFIELD_SPEC_2026-09-08.md`, reviewed at `15f87a2`, this HEAD)
+and the 09-06 inbox fragment with the backlog, filter what Section 1.6 says is
+already repaired, reprioritize by contest EV (payout equity, late-swap accuracy,
+slate-lock reliability), and assign EVERY open item to a sequential session that
+is either one standalone item (solver, state machine, high blast radius) or a
+batch of two to four sharing a module or contract, so a session can say "work on
+the next session in the backlog" and know which. The "What do we tackle next"
+section now opens with that roadmap (63 sessions: 25 standalone, 38 batches,
+151 item rows, Phases A-E, a NEXT pointer, a decisions-owed block, and the
+Session 1 directive); the sixteen-slot list is at `15f87a2`. The 09-02
+six-clause ordering rule is unchanged and is the table's Impact column.
+
+**What the twelfth edition was.** Forty findings, fifteen reproduced on the
+production functions at this HEAD. Twenty-seven are entries already on the board
+and were checked, not re-filed (F01/F03/F09/F23 = R297; F13/F14/F40 -> R295; F16
+-> R36 F8; F17 -> R166; F18 -> R98(3); F20 -> R175; F24 -> R297; F26 = R75 +
+R222; F28 -> R225; F29 = R118; F30 -> R161; F31 -> R299; F33 -> R80; F34 -> R177;
+F35 = R216; F37/F38 -> R285; F39 -> R267(d); F04 -> R237; F05 -> R83; F08 -> R245;
+F10 -> R290(a)), each carrying a dated rider where the edition sharpened the
+mechanism or the fix. Eleven are new, in nine numbers: **R323** (F15, the inbox
+fragment: `dk_order_coverage` counts CPT+UTIL rows so both posted Showdown sides
+read uncovered and the referees' posted-lineup check never runs on Showdown);
+**R324** (F21 + F19: preflight runs `check_started_games` unconditionally with a
+parent while `verify_export` skips it, so a legal post-first-pitch swap fails THE
+pre-upload rule; an unknown clock warns instead of refusing a changed slot;
+VERIFIED-read in tree at `preflight_upload.py:2421` vs `verify_export.py:608`);
+**R325** (F22: the lock path's own team-set feed resolver can UNLOCK a
+salary-clock lock); **R326** (F12: the post-R294 residual, a per-entry reserve
+of 2 is not Hall's condition and a restricted-bank infeasibility climbs the
+strategy ladder; 49/50 witness); **R327** (F02 + F25: the external projection
+frame admits NaN/duplicate/negative, and the refresh seam excludes on the string
+"False" and clips Ceiling<Floor -- R291's fifth site and a hard-guardrail
+violation, both reproduced at HEAD); **R328** (F27: Showdown ownership marginals
+to 316%); **R329** (F11: the bank cache's union resurrects dropped state);
+**R330** (F06: R228's class in `build_state_manager`, an empty run promotes);
+**R331** (F07, Security: manifest paths unconfined). Two REJECTED: F32 re-files
+R44's D26 rider (severity-reduced a third time, two facts adopted onto it); F36
+is the auditor's Windows host, the ed11 D34 ruling, with the runtime-admission
+sliver on R217. Section 1.6's five closures (R291, R294, R304, R305, R306 steps
+1-3) match this board; nothing from it is refiled. The edition's Section 4
+(module tree, result schema, portfolio formulation, exact settlement, admission
+criteria, sub-second table, zero-touch loop, exact-byte writer, stage table) is
+recorded on R302 as acceptance criteria, not as work; its stage E submission
+adapter is rejected for this repository on DraftKings' terms and the
+money-and-entry wall, and stage F belongs to the golf and soccer workspaces.
+
+**Three placements stated so they can be reversed.** Session 1 is the referee
+pair (R324 + R314, with R322 opening it to restore the container as a verifier)
+rather than the inbox fragment, because a false FAIL on a legal late swap at the
+pre-upload gate loses the slate or teaches `--force` (criterion 1) while the
+Showdown blindness is a check that does not run (criterion 4); the fragment is
+Session 2. R118 holds Session 7, above every Phase B quality batch, for the 09-06
+reason. R283 (a replay destroyed a delivered file) and R290(a) (a reproduced
+widening) held no slot on the sixteen-slot list and hold one now.
+
+**Fragment consumed.** `docs/backlog_inbox/2026-09-06_BUILD_dk-order-coverage-
+blind-on-showdown-geometry.md` -> R323; moved to `docs/backlog_inbox/_to_delete/`
+per the mount's unlink rule (R109). Its two riders were recorded, not filed: the
+R316 egress half-life note (nothing to fix; the paragraph's "measure it" clause is
+what held) and the 2210_1g_sd APPG-ratio table run before the first build, which
+R320's handedness signature reproduced 20 of 20. The 2026-08-09 satellite-
+archetype decision and the 2026-09-04 platoon-refresh procedure stay in the
+inbox, RETAINED by design as their entries say.
+
 ## 2026-09-06 — R305 and R304 CLOSED, R297(d) landed out of its batch: the two referees stop asserting a false thing about a Showdown file, and stop reading another slate's feed
 
 **Scope: `tools/preflight_upload.py`, `tools/verify_export.py`,
