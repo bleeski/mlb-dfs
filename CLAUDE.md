@@ -157,9 +157,14 @@ additions, all autonomous:
   `check_started_games` — R287's blanket "no roster slot holds a player whose
   game has begun" — so on a file with no parent to diff against it WARNED and
   exited 0 on exactly the condition that cost the 09-01 slate. It runs that check
-  now, on the no-parent branch only, because a late swap legitimately retains
-  started players in its frozen slots and only a CHANGED slot is the question
-  when a parent exists. Two further R292 corrections to what this clause assumed
+  now — on the no-parent branch only until R324 (2026-09-08), because a late swap
+  legitimately retains started players in its frozen slots and only a CHANGED
+  slot is the question when a parent exists; both branches now go through the one
+  transition helper under Hard guardrails, so this clause's "both referees exit
+  0" is a single rule rather than two that agreed by inspection. R324 also made
+  that clause SATISFIABLE on a postponed-game slate, where R314 had left it
+  impossible: both tools hard-failed a legal file and the only ways past were
+  `--force` and a false clock, which this section forbids. Two further R292 corrections to what this clause assumed
   about its own tool: `repair_entry.py --out` could not write a DK-valid file at
   all (it re-emitted the whole source table after the repaired rows, two headers
   and every dead player intact, and exited 0 saying `wrote <path>`), and its
@@ -445,7 +450,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  28 modules  1839 tests`. The module count comes off the
+   `PASS  v2.26.0  28 modules  1856 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -559,6 +564,36 @@ inventory checks fail while the suite passes in full, build and flag it.
   from the salary file's `Game Info`, so the check needs no lineups feed —
   `verify_export.py` had the rule and needed both a feed and a `--parent`, which
   meant a freshly built post-lock file was checked by nobody.
+  **R324 (2026-09-08) makes that rule a TRANSITION, and it is the same rule in
+  both referees now.** The blanket form was right about a file built after first
+  pitch and wrong about a late swap, which legitimately RETAINS started players
+  in its frozen slots: preflight ran the blanket form UNCONDITIONALLY, including
+  with `--parent`, so on a staggered slate every legal post-first-pitch swap
+  exited 2 here and 0 in `verify_export`, and the tool this file calls THE
+  pre-upload rule left the operator `--force` or an `--as-of` pinned to a lie.
+  What holds now, in one function
+  (`preflight_upload.check_parent_transition`), called by both tools and
+  implemented by neither:
+  an UNCHANGED slot passes whatever its lock state and is named as carried
+  forward; a CHANGED slot needs both its old and its new player known-not-locked;
+  a `Game Info` of `TBD` or anything unparseable is UNKNOWN and UNKNOWN REFUSES a
+  changed slot (it used to warn, so an edit into a game nobody could time was
+  never refused); a game a lineups source affirmatively reports postponed,
+  cancelled or suspended is EXEMPT (R314) and the exemption is named, never
+  silently applied; the entry-id set and each entry's contest may not change; and
+  an initial build is the all-empty parent, which is where R287's blanket rule
+  now lives, salary file only, no lineups source and no parent needed. An
+  unreadable clock on an initial build stays a named warning rather than a
+  refusal — there is no change to refuse, and refusing the ordinary first
+  delivery at T-5 is the harm R324 exists to remove.
+  **The exemption needs a source, in BOTH tools, or R314's own complaint
+  survives its fix.** `verify_export` takes it from `resolve_locked_teams`,
+  which computed it and threw it away; preflight has no auto-resolved feed at
+  this point in its run (the resolution is later, and R287 put the check early on
+  purpose), so an explicit `--feed` is its door and the absence of one is NAMED
+  in `postponed_source`. Exempting one referee and not the other would have left
+  the R272 two-referee clause exactly as unsatisfiable on a postponed-game slate
+  as it was before.
 - Never trim the player pool to fit a compute limit. An infrastructure limit
   may reduce search effort; it may never reduce the legal player set, because
   that is a strategy change and it is invisible in the certified output. A

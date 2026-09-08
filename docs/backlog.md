@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 1
+## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 2
 
 **How to use this table.** A session says *"work on the next session in the
 backlog"*, reads the row(s) for the Session ID on the NEXT pointer above, and
@@ -64,9 +64,6 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Session 1** | `Batch (1 of 3)` | **R322 -- restore the container as a verifier.** `EXPECTED_CENSUS` in `test_core` pins the untracked path `skills/generate-lineups-workspace/deepen_bank.py`, so the suite is RED in every fresh clone. Derive the census from tracked files or drop the untracked path; suite green in a pristine container clone. | Backlog | `tests/test_core.py` | Med (every later session's fallback verifier) | Low | None; do first |
-| **Session 1** | `Batch (2 of 3)` | **R324 (NEW, ed12 F21 + F19) -- one parent-transition contract in both referees.** `preflight_upload.py:2421` calls `check_started_games` unconditionally even with `--parent` (accepted at :2514), while `verify_export.py:608-628` skips it when a parent parsed, so a legal post-first-pitch swap that RETAINS started players fails THE pre-upload rule (exit 2) or is `--force`d (R268's class). Build one shared helper: unchanged slot passes; a CHANGED slot needs known-not-locked state for both old and new player; `Game Info=TBD`/unparseable is UNKNOWN and FAILS a changed slot (today: ten TBD clocks -> warnings only), carry-forward only on unchanged cells; an initial build is an all-empty parent. Both tools call it; update CLAUDE.md's R287 sentence. | Spec | `tools/preflight_upload.py`, `tools/verify_export.py`, `tests/test_upload_integrity.py`, `CLAUDE.md` | High (late-swap accuracy; a false FAIL at T-5 loses the slate or teaches `--force`) | Low | None |
-| **Session 1** | `Batch (3 of 3)` | **R314 -- postponed-game exemption, in the same helper.** `check_started_games` has no postponed exemption and is in BOTH referees, so on a postponed-game slate the two-referee clause is unsatisfiable. The salary clock already knows the state; pass `exempt_teams` into the shared helper from Batch 2. | Backlog | same files as Batch 2 | High | Low | Lands with R324 (one helper) |
 | **Session 2** | `Batch (1 of 2)` | **R323 (NEW, Inbox + ed12 F15) -- `dk_order_coverage` counts role rows, not people.** `live_data_adapters.py:503` (`dk_order_coverage`) and `:372` (`dk_side_readings`) see a Showdown side's complete 1-9 as EIGHTEEN order tokens (CPT + UTIL rows) and report both posted sides UNCOVERED. Both referees resolve through it (R305), so the posted-lineup cross-check never runs on any Showdown slate and preflight prints "no lineups feed resolved" over a file holding the orders. Collapse to persons before the completeness test (reuse `slate_intake_manager.collapse_showdown_roles` or key on `Roster Position == UTIL` when `detect_salary_contract` says Showdown), fail on paired-row disagreements, keep CPT/UTIL export ids distinct. R233 enumeration in the entry: every `Starting`-column reader that counts rows (`dk_order_coverage`, `merge_dk_starting_into_feed`, both referees' resolvers). | Inbox / Spec | `mlb_engine/intake/live_data_adapters.py`, `tools/preflight_upload.py` resolver, `tests/test_showdown.py`, `tests/test_upload_integrity.py` | High (the one check that catches a Showdown late scratch is silently absent on every Showdown slate) | Low | None |
 | **Session 2** | `Batch (2 of 2)` | **R36 Finding 8 (+ed12 F16 rider) -- one declaration filters the whole Showdown pool.** `melt_showdown_salary_csv` (`showdown.py:269-295`) sets `rows = declared` on ANY declared row: one posted side erases the other side's healthy hitters; pitcher-only declarations erase hitters on both. Make participation per (event, team, person): a complete nine establishes nonstarters for THAT side only; an incomplete declaration establishes nothing; pitchers keep their own role evidence; the legal salary universe stays whole beside the participation state. | Backlog / Spec | `mlb_engine/optimize/showdown.py`, `skills/generate-lineups/scripts/build_slate.py` `run_showdown` (:3203-3230), `tests/test_showdown.py` | Med | Low | None |
 | **Session 3** | `Batch (1 of 4)` | **R327 (NEW, ed12 F02 + F25) -- the external projection frame boundary.** `validate_projection_schema` (`optimizer_v3.py:456-468`) and `validate_projection_factors` (`projection_builder.py:68-79`) admit NaN, +/-inf, duplicate `Player_ID`, negative and non-integer Salary (reproduced: two same-id rows, salary -1, NaN bounds passed). `refresh_confirmed_lineups` (`projection_builder.py:213-230`) tests `Excluded` by truthiness, so the STRING "False" excludes a confirmed starter on the swap path (R291's fifth site, reproduced at HEAD), and `:230` clips Ceiling<Floor with `max()` where CLAUDE.md says hard error. Add one finite/unique/positive-integer validator at the `--projections` door and before model construction; route the refresh flag through `read_excluded_cell`; raise on inverted bounds. | Spec | `mlb_engine/optimize/optimizer_v3.py`, `mlb_engine/projections/projection_builder.py`, `tests/test_core.py` | High (a pool reduction arriving as a data condition, on the swap path; `--projections` is the Showdown lever) | Low | None |
@@ -8004,42 +8001,29 @@ supervisor takes this class; noted on its entry via this number.
 
 ## Workstream 5 — Delivery, manifest, and preflight evidence
 
-### R324. `preflight_upload` runs `check_started_games` UNCONDITIONALLY while `verify_export` skips it when a parent parsed, so a legal post-first-pitch late swap fails THE pre-upload rule; and an unknown lock time passes both (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F21, F19); F21 VERIFIED-read in tree by the filing session (`preflight_upload.py:2421` vs `verify_export.py:608-628`), F19 VERIFIED-repro by the edition (ten `Game Info=TBD` clocks -> warnings, no failures)
+### R324. CLOSED 2026-09-08 -- SHIPPED with R314, entry migrated to CHANGELOG.md
 
-- **What.** R287 put `check_started_games` in preflight before the legality walk
-  (`:2418-2425`), called with `(entries, salary, as_of, rep)` and no parent, even
-  though the tool accepts `--parent` (`:2514`) and runs `check_parent` at `:2455`.
-  R292(d) put the same check in `verify_export` on the NO-PARENT branch only
-  (`:597-628`), because "a late swap legitimately RETAINS started players in its
-  frozen slots" and two existing tests said so. The two referees therefore
-  disagree on exactly the late-swap file: any swap after the first game's first
-  pitch on a staggered slate retains started players in unchanged slots and
-  preflight exits 2 on them. CLAUDE.md's "Before any upload, run the preflight"
-  then leaves the operator `--force` (exit 4, "stays frightening") or `--as-of`
-  pinned to a lie -- R268's class, a fix that teaches the operator to switch a
-  protection off. F19 is the same function's other edge: a rostered player whose
-  `Game Info` is `TBD` or unparseable produces a WARNING, so a CHANGED slot into or
-  out of an unknown-clock game is never refused.
-- **Why P1.** Criterion (1) and (4) at once: a false FAIL at T-5 loses the slate
-  or the habit of running the check, and a true pass on an unknown clock lets an
-  illegal edit through.
-- **Fix.** One shared parent-transition helper used by BOTH tools: an unchanged
-  slot passes regardless of lock state (immutable carry-forward, evidence state
-  visible); a CHANGED slot requires known-not-locked state for both the old and
-  the new player, and `TBD`/unparseable is UNKNOWN and FAILS; an initial build is
-  an all-empty parent; the entry identity set and each entry's contest may not
-  change. R314's postponed exemption lands in the same helper (`exempt_teams` from
-  the salary clock's postponed state), because the two pull opposite directions on
-  the same input and must be designed together: postponed -> exempt, unknown ->
-  refuse the change. Retain independent final-byte validation in each tool; a
-  shared helper removes divergence but is not independent proof, so keep a small
-  independently implemented oracle for the started-game rule. Update CLAUDE.md's
-  R287 sentence. Acceptance: preserved started P/OF/CPT slots pass both; moved or
-  replaced started players fail both; a new started player fails both; a `TBD`
-  clock blocks a changed slot and survives an unchanged one; an empty operator
-  lock list cannot clear an unknown time; both tools agree on every fixture. Per
-  R233 the closing entry enumerates every `check_started_games` caller with the
-  hit list. Roadmap: Session 1 with R322 and R314.
+One `check_parent_transition` in `preflight_upload`, called by both
+referees and implemented by neither: an unchanged slot passes whatever its
+lock state and is named as carried forward, a changed slot needs both its
+old and its new player known-not-locked, an unknown clock refuses a change,
+the entry-id set and each entry's contest are fixed, and an initial build is
+the all-empty parent where R287's blanket rule now lives. The R233
+enumeration is in the changelog entry and the class had SIX production
+members, not the two this entry named: preflight's unconditional call,
+verify_export's no-parent branch, `check_parent_slots`, preflight's own
+`check_parent` (a third implementation of the entry-identity half, unnamed
+here), `derive_locked_teams_from_feed`, and `resolve_locked_teams`.
+
+**Two things this entry's Fix line got wrong, corrected in the shipping
+commit rather than carried.** An unreadable clock on an INITIAL build stays
+a named warning rather than a refusal -- read literally, "an initial build
+is an all-empty parent" plus "UNKNOWN fails a changed slot" hard-fails any
+first delivery rostering a player whose `Game Info` does not parse, which is
+the T-5 false FAIL this item exists to remove. And a parent the operator
+NAMED but the tool cannot read now fails in both tools (preflight warned) --
+with the check still running as an initial build, because refusing to check
+at all is the R292(d) hole.
 
 ### R325. `verify_export` resolves its lock feed by team SET and lets that feed UNLOCK a salary-clock lock; explicit DK ids in a feed are accepted without a team/event check (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F22); VERIFIED-read by the edition; R305's stated remainder ("date/game identity and the separate lock-feed path remain incomplete")
 
@@ -8087,60 +8071,32 @@ supervisor takes this class; noted on its entry via this number.
   deleting a required artifact blocks release even when every remaining hash
   matches; blocked-run integrity still passes. Roadmap: Session 14 with R297.
 
-### R314. `check_started_games` has no postponed-game exemption, it is now in BOTH referees, and on a postponed-game slate CLAUDE.md's own two-referee clause cannot be satisfied at all (P1, S; the input already exists and is thrown away) | new 2026-09-03, merged from DEV fragment `2026-09-02_DEV_started-games-has-no-postponed-exemption.md`, filed deliberately unfixed by the session that shipped R292
+### R314. CLOSED 2026-09-08 -- SHIPPED inside R324's helper, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-08 (ed12): this entry lands INSIDE R324's shared helper, not beside it.** R324 (F21 + F19) files the other two edges of the same function -- preflight runs it unconditionally with a parent while verify_export skips it, and an unknown clock warns instead of refusing a changed slot. Postponed -> exempt, unknown -> refuse the change, unchanged -> carry forward: three rules on one input, designed together or they will disagree. Roadmap: Session 1, with R322 and R324.
+`resolve_locked_teams` returns `not_locked` as a fourth value instead of
+subtracting it and discarding it, and the shared helper takes it as
+`exempt_teams`, checked BEFORE both the caller's locked set and the salary
+clock -- subtracting it was never enough, because the helper re-reads each
+player's own `Game Info` and a postponed game's scheduled start has passed.
+Named in the report and never silently applied. An operator's
+`--locked-teams` outranks the exemption for the teams it names, so R29's
+asymmetry holds in both directions and an EMPTY list cannot clear an unknown
+clock.
 
-**The condition.** `preflight_upload.check_started_games` (`:818`) reads the
-salary file's `Game Info` and nothing else, and R287's docstring gives the
-reason: it must run at 19:56 on a night with no feed, and `Game Info` is in the
-file the operator is already passing. The cost of that choice is that a
-POSTPONED game's scheduled start has passed while its players are still
-swappable, and the salary CSV cannot tell the two apart.
-`verify_export.derive_locked_teams` says so in its own docstring: "It cannot
-tell a postponed game from a game in progress."
+**This entry's Fix line would not have satisfied this entry, and that is the
+correction worth keeping.** It left `preflight_upload`'s exemption empty and
+deferred its access as a separate decision. But the complaint IS that R272's
+two-referee clause is unsatisfiable on a postponed-game slate, and exempting
+one referee while the other hard-fails the same legal file leaves it exactly
+as unsatisfiable. Preflight reads it from an EXPLICIT `--feed`: no
+auto-resolution moved, R287's early placement untouched, the empty default
+unchanged, and the absence NAMED in `postponed_source`.
 
-**Why it is now worse, and why R292 was right to leave it.** R292(d) put the
-same check in `verify_export` on its no-parent branch, so the false positive is
-in BOTH tools rather than one. That is the CONSISTENT state and it is the reason
-not to patch one of them: two implementations of one rule that disagree is this
-repo's named no-op failure class. The rule has one owner and the exemption
-belongs to the owner.
-
-**What it makes unreachable.** A file legitimately holding players from a
-postponed game hard-fails at the money boundary, and the only way past is
-`--force`, which exits 4. CLAUDE.md's R272 clause requires **both referees to
-exit 0** before a hand-corrected file ships. So on a postponed-game slate that
-clause is unsatisfiable, and the operator's only remaining moves are the two the
-contract forbids. This is R27's shape at the money boundary: a protection that,
-in one real condition, becomes the process preventing the lineup.
-
-**The input already exists and is discarded.**
-`derive_locked_teams_from_feed` (`verify_export.py:177`) returns
-`(locked, note, not_locked)`, where `not_locked` is precisely the teams in games
-the feed reports postponed, cancelled or suspended, which is an affirmative "has
-not locked" and not merely an absence. `resolve_locked_teams` (`:240`) consumes
-it, subtracts it, and does not return it.
-
-**Fix.** `check_started_games(entries, salary, as_of, rep, exempt_teams=())`, an
-optional set defaulting empty so `preflight_upload`'s own call (which has no
-feed at that point) behaves exactly as today; `resolve_locked_teams` returns
-`not_locked` as a fourth value (two callers, `verify_export.py:536` and
-`test_upload_integrity.py:2580`'s `_resolve` helper, which unpacks three);
-`verify_export` passes it. **The exemption is NAMED in the report and never
-silently applied**, on R237's rule that an absence and an observation are not the
-same fact. Preflight can reach the same evidence when it resolves a feed
-(`:2144`), but that happens AFTER `check_started_games` at `:2105` and R287 put
-the check early on purpose ("a started game makes every other verdict about that
-entry moot"), so moving it is a separate decision and R305's typed feed
-resolution should land first.
-
-**NOT VERIFIED, and it is the fact worth having before spending the change:**
-whether DK actually keeps a postponed game's slots editable in a bulk CSV
-upload. The engine treats postponed as not-locked throughout
-(`excluded_game_ids`) and the swap path has behaved that way since R29, but
-nobody has watched DK accept a post-scheduled-start upload for a postponed game.
-That is an observation Ben can make at an upload and nobody else can.
+**The NOT VERIFIED fact survives this commit unchanged**, and it is still
+the one worth having: nobody has watched DK accept a post-scheduled-start
+bulk upload for a postponed game. The engine has treated postponed as
+not-locked since R29 and the exemption now rests on that; the observation is
+Ben's to make at an upload and nobody else's.
 
 ### R305. CLOSED 2026-09-06 -- SHIPPED, entry migrated to CHANGELOG.md
 
@@ -9655,47 +9611,42 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   two headers parse and pitchers == 0. Batches with the R122 rider (both are
   handedness reaching the build).
 
-### R322. `test_core`'s solve-producer census pins an UNTRACKED path, so the suite FAILS RED in every fresh clone and passes only on Ben's mount (P1, XS) | new 2026-09-06, DEV; VERIFIED by reproduction at pristine `eb1c8fd` in a container clone, before any of that session's files were copied in
+### R322. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md
 
-- **What:** `R293BankOnEveryRungTests.test_every_solve_producer_call_site_is_classified`
-  compares a census of solve-producer call sites against `EXPECTED_CENSUS`,
-  which pins `("skills/generate-lineups-workspace/deepen_bank.py",
-  "extend_bank"): (0, 1)`. `skills/generate-lineups-workspace/` is UNTRACKED on
-  the mount and therefore in no checkout, so a clone's census under-reports by
-  exactly that member and the `assertEqual` fails with a 1274-character diff
-  whose message ("a call site that can reach the anti-correlation rows appeared,
-  moved, or changed") points a reader at the anti-correlation wiring rather than
-  at a missing file.
-- **Why it matters more than a red test:** the session-start gate prints
-  `test suite FAILED in tests.test_core; do not build` on that failure, so a
-  clone tells a session not to build a slate. It also means the container is not
-  a valid verifier for `test_core` at this head, which is the one environment a
-  session falls back to when the device shell is unavailable — the condition
-  that found this.
-- **This is R155's shape on a new surface, and the difference is the point.**
-  R155 was a data dependency reached through PRODUCTION code
-  (`resolve_feed_for_slate` globbing a gitignored `data/slates/<date>/`), which
-  is why `TestDataDependenciesAreVendoredOrGuardedTests` could not see it. This
-  one is reached through a pinned PATH inside the test's own expectation table,
-  which that guard also cannot see. Both are "a test that passes on one machine";
-  neither is visible to the check written for the class.
-- **Fix, and it is a decision rather than a mechanic.** Either track
-  `skills/generate-lineups-workspace/deepen_bank.py` (it is a solve producer the
-  census already treats as real, which is an argument that it belongs in the
-  repo), or drop it from `EXPECTED_CENSUS` and have the census SKIP members whose
-  path is absent, naming them. Do not simply delete the pin: the file exists on
-  the mount and a census that silently ignores a live producer is the failure
-  this test exists to prevent. Whichever way it goes, extend
-  `TestDataDependenciesAreVendoredOrGuardedTests` to cover paths pinned inside
-  test expectation tables, or the third member of this class arrives the same way.
-- **Audit fields.** Moves: robustness (the gate's own honesty). Evidence: V1
-  (reproduced at pristine HEAD in a clone). Falsifier: if the file turns out to
-  be tracked and merely absent from one checkout, this is a checkout problem and
-  downgrades to a note. FOSS: stdlib. Owner: DEV. Rollback: restore the pin.
+The pin stays and the SKIP is declared: `UNTRACKED_BY_DESIGN` names
+`skills/generate-lineups-workspace/deepen_bank.py` with its reason, and a
+census member is dropped only when it is BOTH declared there AND absent
+from the tree, so an undeclared absent member still fails. The guard the
+entry asked for landed with it: expectation tables in `tests/*.py` may not
+pin an untracked repo code path undeclared. Verified green in a
+tracked-files-only tree, with and without a `.git`.
+
+**One condition filed rather than fixed, deliberately.** In a tree with no
+`.git` at all, R62(a)'s own `test_no_test_reads_gitignored_data_without_a_skip_guard`
+reports five offenders, because its `_tracked` falls back to `data/` prefixes
+when git cannot answer. A real clone has `.git` and it passes; a tarball export
+does not. That is R62(a)'s guard and it was left alone rather than loosened
+while this item's own subject was open. Whoever picks it up: the fix is the
+same shape as R322's -- fall back to presence in the checkout being run, and
+name which reading was taken.
 
 ### R216. The gate's tree fingerprint omits `skills/`, while ~20 gated tests exec `build_slate.py` (P1, XS; lands alone) | new 2026-08-24, from the greenfield seventh edition (GF7-T1) and independently from the outside spec (D01); VERIFIED-read at `tools/audit.py:1016`, coordinator-re-read, re-read here. **Rider 2026-08-27 (ed8 F-01):** while the manifest is open, include `requirements.txt`/`requirements.lock` and `data/reference/reference_manifest.json` in the fingerprint — behavior-changing inputs the same reuse argument covers — and stamp the record with the runtime identity R217(d) defines, so a reused unit is provably same-tree AND same-interpreter.
 
 **Rider 2026-09-08 (ed12, F35): confirmed at `15f87a2` with two mechanics added.** `tree_fingerprint` (`audit.py:1588-1610`) still omits the 5,076-line `build_slate.py` entry point and the configuration/reference dependencies the 08-27 rider named; `env_probe._reprobe_subprocess` (`:135-141`) checks import success only, weaker than the initial version comparison; explicit compile operations can write bytecode even under `-B`. Use `compile(source, path, "exec")` for a write-free syntax check, derive the path list from a reviewed manifest (`skills/generate-lineups/scripts`, requirements, rules, test fixtures, dependency metadata), and bind the record to the runtime identity so a reused unit is same-tree AND same-interpreter. Still lands alone at a session boundary. Roadmap: Session 43.
+
+**Rider 2026-09-08 (R324's commit, Session 1): a SECOND dated sighting, from
+the doc side, and it cost a full re-assembly.** Updating two suite pins in
+`tools/audit.py` reset the gate correctly; the new clean line then failed
+`AuditSkipHonestyTests.test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes`,
+which pins CLAUDE.md's session-start line byte-for-byte against the audit's own
+output. The FIX lives in `CLAUDE.md` and `skills/generate-lineups/SKILL.md`,
+neither of which is in the fingerprint, so no reset fired and `--gate-report`
+went on printing the stale FAIL over a tree that passes. `--gate-reset` plus six
+more `--gate-run` calls. This is the SAFE direction of the same gap -- a stale
+red, not a stale green -- which is exactly why it is cheap evidence for the
+entry: the mechanism is confirmed twice, once in each direction, and the
+`skills` and root-contract paths belong in the manifest the 08-27 rider
+describes.
 
 **What.**
 

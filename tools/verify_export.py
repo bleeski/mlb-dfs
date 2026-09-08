@@ -11,18 +11,24 @@ is this project's named no-op failure class: they diverge, and the weaker one
 reports success. What lives here is only what is specific to verifying a file
 against the file it refines:
 
-  - locked-slot preservation against a parent export
-  - no player introduced from a game that has already started, with the locked
-    set derived from the salary file's Game Info rather than a hand-passed flag
+  - the locked-set derivation itself: which teams have started, and which games
+    a lineups source affirmatively reports postponed
   - per-entry slot-change counts
 
-R292(d): when NO parent resolves, the check above has nothing to diff against --
-an unchanged locked slot and a roster built after first pitch are the same bytes
--- so that branch runs preflight's blanket rule instead (``check_started_games``,
-R287: no roster slot at all holds a started player, salary file only, no feed and
-no parent needed). It used to WARN there and move on, which left a freshly built
-post-lock file checked by nobody, and CLAUDE.md's repair clause requires both
-this tool and the preflight to exit 0 before a hand-corrected file ships.
+R324: the parent-transition rule is NOT one of them any more. It was implemented
+here (`check_parent_slots`: did a CHANGED slot introduce or rewrite a started
+player) and again in `preflight_upload` (`check_started_games`: does ANY slot
+hold one), and the two disagreed on exactly the file this tool exists for. A
+swap after the first game's first pitch retains started players in its frozen
+slots, which is legal and which this tool passed, while preflight -- the tool
+CLAUDE.md names as THE pre-upload rule -- exited 2 on the same bytes. The rule
+now lives once, in `preflight_upload.check_parent_transition`, stated as a
+transition: an unchanged slot passes whatever its lock state, a CHANGED slot
+needs both its old and its new player known-not-locked, an unreadable clock
+refuses a change, a postponed game is exempt (R314), and an initial build is the
+all-empty parent -- which collapses to R287's blanket rule, salary file only, no
+lineups source and no parent needed. Both tools call it and neither implements
+any part of it.
 
 The parent is resolved from the manifest's supersession chain when --parent is
 omitted, and the manifest is found next to the entries file when --manifest is
@@ -93,20 +99,29 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-# The repo root too, so the lazy engine import in derive_locked_teams_from_feed
-# resolves when this tool is run as a script. Without it the feed derivation
-# fails as an ImportError and silently degrades to the Game Info fallback,
-# which is the weaker source and cannot see a postponement.
+# The repo root too. This was added for the lazy engine import in
+# derive_locked_teams_from_feed, which moved to preflight_upload under R324 and
+# resolves the root itself now; the insert stays because the reason still holds
+# for anything else run from here as a script, and because losing it degrades
+# that derivation to the Game Info fallback in SILENCE -- the weaker source,
+# which cannot see a postponement.
 sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
 
 from preflight_upload import (  # noqa: E402
     EntryRow, Report, advisory, check_feed, check_legality, check_manifest,
-    check_pool_membership, check_row_shape, check_started_games, check_status,
-    load_entries, load_salary, parse_as_of, parse_declared_pitcher_args,
-    parse_embedded_pool, parse_game_info_datetime, resolve_declared_pitchers,
-    resolve_feed_for_slate, resolve_feed_source, resolve_salary_from_promoted_run,
-    sha256_of, verdict_exit_code,
+    check_parent_transition, check_pool_membership, check_row_shape, check_status,
+    derive_locked_teams_from_feed, load_entries, load_salary, parse_as_of,
+    parse_declared_pitcher_args, parse_embedded_pool, parse_game_info_datetime,
+    resolve_declared_pitchers, resolve_feed_for_slate, resolve_feed_source,
+    resolve_salary_from_promoted_run, sha256_of, verdict_exit_code,
 )
+
+# R324. `derive_locked_teams_from_feed` moved into `preflight_upload` with the
+# shared helper, because R314's postponed exemption needs its `not_locked` half
+# in BOTH referees and two readers of "which games are postponed" is this
+# project's named no-op failure class. It is imported above rather than
+# re-implemented, so `verify_export.derive_locked_teams_from_feed` still
+# resolves for `repair_entry`, which imports it from here.
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -181,69 +196,6 @@ def resolve_lineups_feed(
 # question, rather than one Path serving both and being wrong for one of them.
 
 
-def derive_locked_teams_from_feed(
-    feed_path: Path,
-    salary_path: Path,
-    now: Optional[datetime] = None,
-) -> Optional[tuple[set[str], str, set[str]]]:
-    """(locked, note, not_locked) from the feed's clock, or None if unusable.
-
-    This is the same source ``late_swap.py`` uses internally
-    (``build_status_map_from_lineups_feed`` + a wall clock), so the tool that
-    performs a swap and the tool that verifies it now read lock state off one
-    fact rather than two.
-
-    ``not_locked`` is the teams in games the feed reports postponed, cancelled or
-    suspended. Their scheduled start has passed but no lineup in them is frozen,
-    so treating them as locked would block a legal swap. It is returned
-    separately rather than just omitted, because the caller unions this result
-    with the salary file's clock and needs to know which absences are an
-    affirmative "not locked" and which are merely games this feed does not cover.
-
-    The engine import is lazy and its failure is not fatal, because this tool
-    must still run when the engine does not.
-    """
-    try:
-        from mlb_engine.intake.live_data_adapters import (  # noqa: E402
-            build_status_map_from_lineups_feed,
-        )
-    except ImportError:
-        return None
-    try:
-        feed = json.loads(feed_path.read_text(encoding="utf-8"))
-        status = build_status_map_from_lineups_feed(feed, str(salary_path))
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-
-    now_dt = now or datetime.now(timezone.utc)
-    excluded = set(status.get("excluded_game_ids") or [])
-    locked: set[str] = set()
-    not_locked: set[str] = set()
-    first_open: Optional[datetime] = None
-    for game_id, lock_iso in (status.get("lock_time_by_game_id") or {}).items():
-        teams = {t for t in str(game_id).split("@") if t}
-        if game_id in excluded:
-            not_locked |= teams
-            continue
-        try:
-            lock_time = datetime.fromisoformat(str(lock_iso))
-        except ValueError:
-            continue
-        if lock_time.tzinfo is None:
-            lock_time = lock_time.replace(tzinfo=timezone.utc)
-        if lock_time <= now_dt:
-            locked |= teams
-        elif first_open is None or lock_time < first_open:
-            first_open = lock_time
-    if not status.get("lock_time_by_game_id"):
-        return None
-    note = (f"next lock {first_open.astimezone(timezone.utc).strftime('%H:%M UTC')}"
-            if first_open else "every game the feed covers has started")
-    if excluded:
-        note += f"; not locked (postponed/suspended): {', '.join(sorted(excluded))}"
-    return locked, note, not_locked
-
-
 def resolve_locked_teams(
     supplied: Optional[str],
     salary: Dict[str, Dict[str, str]],
@@ -251,13 +203,27 @@ def resolve_locked_teams(
     feed_path: Optional[Path],
     now: Optional[datetime],
     rep: Report,
-) -> tuple[set[str], str, str]:
-    """The locked set, its note, and which source produced it.
+) -> tuple[set[str], str, str, set[str]]:
+    """The locked set, its note, which source produced it, and ``not_locked``.
 
     A supplied ``--locked-teams`` is a union, never a substitution. Anything the
     clock says has started stays locked whether the operator remembered it or
     not; that asymmetry is the whole fix, because the failure mode is always a
     list that is missing a team, never one with a team too many.
+
+    R314. ``not_locked`` -- the teams in games a lineups source affirmatively
+    reports postponed, cancelled or suspended -- was computed here, subtracted,
+    and thrown away, so the one fact that distinguishes a postponed game from a
+    game in progress never reached the started-game rule. It is RETURNED now and
+    passed to the shared helper as its exemption set. Subtracting it from the
+    locked set is not enough on its own: the helper re-reads each player's own
+    Game Info clock, and a postponed game's scheduled start has passed, so
+    without the affirmative fact the player reads LOCKED again.
+
+    An operator who names a team in ``--locked-teams`` OUTRANKS the exemption
+    for that team, which keeps R29's asymmetry intact in both directions: the
+    flag may add a lock, and nothing derived may take one the operator asserted
+    away.
     """
     # The salary file is the coverage floor: it lists every player on the slate,
     # so its Game Info column can always answer "has this team's game started".
@@ -274,6 +240,11 @@ def resolve_locked_teams(
     derived = set(from_clock)
     note = clock_note or ""
     source = "salary Game Info"
+    # R314. Empty means "no such observation", which is NOT the same fact as
+    # "no game is postponed" (R237). Only a lineups source can carry it, so with
+    # no feed it stays empty and the salary clock decides alone, exactly as
+    # before this value existed.
+    not_locked_teams: set[str] = set()
     if feed_path is not None:
         from_feed = derive_locked_teams_from_feed(feed_path, salary_path, now)
         if from_feed is None:
@@ -283,6 +254,7 @@ def resolve_locked_teams(
                      f"see a postponement")
         else:
             feed_locked, feed_note, not_locked = from_feed
+            not_locked_teams = set(not_locked)
             missing = sorted(derived - feed_locked - not_locked)
             derived |= feed_locked
             derived -= not_locked
@@ -302,7 +274,7 @@ def resolve_locked_teams(
         source = "none"
 
     if supplied is None:
-        return derived, note, source
+        return derived, note, source, set(not_locked_teams)
 
     operator = {t.strip().upper() for t in supplied.split(",") if t.strip()}
     stale = sorted(derived - operator)
@@ -315,17 +287,20 @@ def resolve_locked_teams(
     extra = sorted(operator - derived)
     if extra:
         rep.info["locked_teams_operator_only"] = extra
-    return operator | derived, f"{source} + operator", source
+    return (operator | derived, f"{source} + operator", source,
+            set(not_locked_teams) - operator)
 
 
 def resolve_parent_from_manifest(entries_path: Path, manifest_path: Optional[Path],
                                  rep: Report) -> Optional[Path]:
     """The delivery this file refines, read off the manifest's supersession chain.
 
-    R72(ii). The locked-game membership check lives inside ``check_parent_slots``,
-    which runs only ``if args.parent`` -- so on a refinement verified without that
-    flag, nothing re-checked whether a changed entry introduced a player from a
-    game that had already started. This tool already refuses to let its two most
+    R72(ii). The locked-game membership check ran only ``if args.parent`` -- so on
+    a refinement verified without that flag, nothing re-checked whether a changed
+    entry introduced a player from a game that had already started. (R324 closed
+    the remaining half of that: with no parent at all, the shared helper now runs
+    the initial-build case rather than nothing.) This tool already refuses to let
+    its two most
     consequential inputs be opt-in (``--locked-teams`` is unioned rather than
     substituted per R29, and the feed auto-resolves) for one reason, stated in the
     module header: a check that runs only when the operator remembers a flag is a
@@ -363,61 +338,6 @@ def resolve_parent_from_manifest(entries_path: Path, manifest_path: Optional[Pat
                  f"locked-slot preservation is unverified")
         return None
     return None
-
-
-def check_parent_slots(
-    entries: Sequence[EntryRow],
-    parent: Sequence[EntryRow],
-    salary: Dict[str, Dict[str, str]],
-    locked_teams: set[str],
-    rep: Report,
-) -> Dict[str, Dict[str, object]]:
-    """Contest identity, slot churn, and no new player from a started game."""
-    parent_by_id = {e.entry_id: e for e in parent}
-    detail: Dict[str, Dict[str, object]] = {}
-
-    missing = sorted(set(parent_by_id) - {e.entry_id for e in entries})
-    if missing:
-        rep.fail(f"entries present in the parent but absent here: {missing[:10]}")
-
-    for e in entries:
-        p = parent_by_id.get(e.entry_id)
-        if p is None:
-            rep.warn(f"{e.entry_id}: no matching entry in the parent; this row is new")
-            continue
-        row: Dict[str, object] = {}
-        # Contest identity. A swap that moves an entry to a different contest has
-        # changed the objective the lineup was built for, and the only prior
-        # signal for it was a slot-change count.
-        if p.contest_id != e.contest_id:
-            rep.fail(f"{e.entry_id}: contest reassigned from {p.contest_id} "
-                     f"({p.contest_name}) to {e.contest_id} ({e.contest_name})")
-        if p.contest_name != e.contest_name and p.contest_id == e.contest_id:
-            rep.warn(f"{e.entry_id}: contest {e.contest_id} name changed from "
-                     f"{p.contest_name!r} to {e.contest_name!r}")
-        changed = sum(1 for a, b in zip(p.cells, e.cells) if a != b)
-        row["slots_changed"] = changed
-
-        before = set(p.cells)
-        added = [pid for pid in e.cells
-                 if pid and pid not in before
-                 and str(salary.get(pid, {}).get("TeamAbbrev") or "").upper() in locked_teams]
-        row["new_from_locked_games"] = len(added)
-        if added:
-            names = [f"{salary[pid].get('Name')} ({salary[pid].get('TeamAbbrev')})"
-                     for pid in added if pid in salary]
-            rep.fail(f"{e.entry_id}: introduced {names} from an already-started game")
-
-        # A slot that changed but whose player was already locked is a rewrite of
-        # a frozen slot, which DK rejects and which the swap contract forbids.
-        relocked = [a for a, b in zip(p.cells, e.cells)
-                    if a and a != b
-                    and str(salary.get(a, {}).get("TeamAbbrev") or "").upper() in locked_teams]
-        if relocked:
-            names = [salary.get(pid, {}).get("Name", pid) for pid in relocked]
-            rep.fail(f"{e.entry_id}: replaced {names}, whose game has already started")
-        detail[e.entry_id] = row
-    return detail
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -540,9 +460,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if manifest_path is not None:
         check_manifest(entries_path, entries, manifest_path, rep)
 
-    locked, lock_note, lock_source = resolve_locked_teams(
+    locked, lock_note, lock_source, not_locked = resolve_locked_teams(
         args.locked_teams, salary, salary_path, feed_path, now, rep)
     rep.info["locked_teams"] = sorted(locked)
+    rep.info["not_locked_teams"] = sorted(not_locked)
     rep.info["lock_note"] = lock_note
     rep.info["lock_source"] = lock_source
     lock_clock = now or datetime.now(timezone.utc)
@@ -593,44 +514,41 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         parent_path = resolve_parent_from_manifest(entries_path, manifest_path, rep)
     rep.info["parent_file"] = str(parent_path) if parent_path else None
 
-    parent_detail: Dict[str, Dict[str, object]] = {}
-    parent_checked = False
+    parent_entries: Optional[Sequence[EntryRow]] = None
     if parent_path is not None:
         try:
-            _, _, parent_entries, _, _ = load_entries(parent_path)
+            _, _, loaded_parent, _, _ = load_entries(parent_path)
         except (OSError, ValueError) as exc:
             rep.fail(f"parent unreadable ({exc}); this file cannot be verified as a swap")
-            parent_entries = []
-        if parent_entries:
-            parent_detail = check_parent_slots(entries, parent_entries, salary,
-                                               locked, rep)
-            parent_checked = True
-    if not parent_checked:
-        # R292(d), extending R175 and R287, and it is deliberately on THIS branch
-        # rather than unconditional.
-        #
-        # With a parent, `check_parent_slots` asks the sharper question -- did a
-        # CHANGED slot introduce a player from a started game -- and the started
-        # players sitting in UNCHANGED slots are the normal, legal content of a
-        # late-swap file. A blanket refusal here would fail every legal swap
-        # after first pitch, which is the case this tool's own tests pin ("the
-        # swap is legal and this must pass").
-        #
-        # With no parent -- none passed, none in the manifest chain, or one that
-        # would not load -- nothing distinguishes "an unchanged locked slot" from
-        # "a roster built after the game started", and this branch used to say so
-        # in a WARNING and move on. That is the file R287's docstring names:
-        # freshly built, post-lock, "checked by nobody". Its rule needs only the
-        # salary file's Game Info, so it runs with no feed and no parent, which
-        # is exactly the state a repair inside a lock window is in. CLAUDE.md's
-        # R272 clause requires BOTH referees to exit 0 before a hand-corrected
-        # file ships; until now the second one could not see this condition.
-        check_started_games(entries, salary, lock_clock, rep)
-        if locked:
-            rep.warn(f"{len(locked)} team(s) have already started and no --parent "
-                     f"was given or resolvable from the manifest; locked-slot "
-                     f"preservation is unverified (every started slot is a hard "
-                     f"failure above, so a passing file has none to preserve)")
+        else:
+            parent_entries = loaded_parent or None
+
+    # R324. ONE call, both cases, and the branch that used to choose between two
+    # rules is gone.
+    #
+    # It used to read: with a parent, `check_parent_slots` asked the sharper
+    # question (did a CHANGED slot introduce or rewrite a started player); with
+    # none, R287's blanket rule ran instead, because started players sitting in
+    # UNCHANGED slots are the normal, legal content of a late-swap file and a
+    # blanket refusal would fail every legal swap after first pitch. Both halves
+    # were right and the pair was the defect: `preflight_upload` ran the blanket
+    # rule UNCONDITIONALLY, including with `--parent`, so the two referees
+    # disagreed on exactly the file this tool exists for, and CLAUDE.md's
+    # "before any upload, run the preflight" left the operator `--force`.
+    #
+    # The transition helper states both halves as one rule -- an initial build is
+    # the all-empty parent, where every filled slot is a placement and a
+    # placement refuses a locked player -- so there is nothing left to keep in
+    # agreement. R314's exemption and F19's unknown-clock refusal live in the
+    # same function for the same reason: three rules on one input.
+    parent_detail = check_parent_transition(
+        entries, parent_entries, salary, lock_clock, rep,
+        exempt_teams=not_locked, locked_teams=locked)
+    if parent_entries is None and locked:
+        rep.warn(f"{len(locked)} team(s) have already started and no --parent "
+                 f"was given or resolvable from the manifest; locked-slot "
+                 f"preservation is unverified (every started slot is a hard "
+                 f"failure above, so a passing file has none to preserve)")
 
     for d in details:
         d.update(parent_detail.get(str(d.get("entry_id")), {}))

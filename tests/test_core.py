@@ -4046,6 +4046,27 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         ("skills/generate-lineups/scripts/build_slate.py", "extend_bank"): (1, 1),
         ("skills/generate-lineups-workspace/deepen_bank.py", "extend_bank"): (0, 1),
     }
+    #: R322. Paths in the census above that git does not track, BY DESIGN, each
+    #: with the reason. `skills/generate-lineups-workspace/` is gitignored
+    #: (.gitignore:20), so its member is in no checkout: the census
+    #: under-reported by exactly it and this test failed RED in every fresh
+    #: clone, with a 1274-character diff whose message sent the reader to the
+    #: anti-correlation wiring instead of to a missing file. The session-start
+    #: gate then printed "test suite FAILED in tests.test_core; do not build",
+    #: so a clone told a session not to build a slate and the container stopped
+    #: being a valid verifier -- the one environment a session falls back to
+    #: when the device shell is unavailable, which is the condition that found
+    #: this.
+    #:
+    #: Deleting the pin is the OTHER failure, not the fix: the file is a live
+    #: solve producer on the mount and a census that silently ignores one is
+    #: what this test exists to prevent. So the pin stays, and a member is
+    #: dropped from the comparison only when its path is BOTH declared here AND
+    #: absent from this tree. An expected member that is absent and NOT declared
+    #: still fails, which is what keeps a deleted tracked producer visible.
+    UNTRACKED_BY_DESIGN = frozenset({
+        "skills/generate-lineups-workspace/deepen_bank.py",
+    })
 
     @staticmethod
     def _frame():
@@ -4235,11 +4256,26 @@ class R293BankOnEveryRungTests(unittest.TestCase):
                             "max_opposing_hitters_per_sp"
                             in {kw.arg for kw in node.keywords if kw.arg})
         actual = {k: (sum(v), len(v)) for k, v in census.items()}
+        # R322. Drop a member only when it is declared untracked-by-design AND
+        # absent from this tree; name what was dropped in the message, because a
+        # census that quietly skips a live producer is the failure this test is
+        # here to prevent.
+        declared = {path for path, _callee in self.EXPECTED_CENSUS.keys()
+                    if path in self.UNTRACKED_BY_DESIGN}
         self.assertEqual(
-            actual, self.EXPECTED_CENSUS,
+            declared, set(self.UNTRACKED_BY_DESIGN),
+            "UNTRACKED_BY_DESIGN names a path the census does not pin, so the "
+            "declaration is stale and exempts nothing")
+        skipped = sorted(path for path in declared if not (REPO / path).exists())
+        expected = {k: v for k, v in self.EXPECTED_CENSUS.items()
+                    if k[0] not in skipped}
+        self.assertEqual(
+            actual, expected,
             "a call site that can reach the anti-correlation rows appeared, "
             "moved, or changed whether it forwards the control. Wire it or add "
-            "it to EXPECTED_CENSUS with the reason it is correct to omit.")
+            "it to EXPECTED_CENSUS with the reason it is correct to omit. "
+            "Untracked-by-design members absent from this tree, and therefore "
+            f"not compared: {skipped or ['none']}")
 
     # --- the truthful-labels half ------------------------------------------- #
 
@@ -13293,6 +13329,14 @@ class TestDataDependenciesAreVendoredOrGuardedTests(unittest.TestCase):
     # Used only when git cannot answer. Mirrors .gitignore's policy: per-slate
     # dirs are ignored, reference and archive are tracked.
     TRACKED_PREFIXES = ("data/reference/", "data/archive/")
+    # R322's half of this class. The two members of the class so far were both
+    # "a test that passes on one machine", and neither was visible to the check
+    # written for the other: R155 was a data dependency reached through
+    # PRODUCTION code (`resolve_feed_for_slate` globbing a gitignored
+    # `data/slates/<date>/`), which the walk above finds; R322 was a repo path
+    # pinned inside a test's own EXPECTATION TABLE, which it cannot. These are
+    # the code roots such a table can name.
+    CODE_ROOTS = ("mlb_engine", "tools", "skills", "tests")
 
     @classmethod
     def _segments(cls, node):
@@ -13401,8 +13445,121 @@ class TestDataDependenciesAreVendoredOrGuardedTests(unittest.TestCase):
             "vacuously; the detector broke, not the tree")
         self.assertEqual(offenders, [], "\n" + "\n".join(offenders))
 
+    # -- R322: the same class, arriving through a test's expectation table ---- #
+
+    @classmethod
+    def _pinned_code_paths(cls, tree):
+        """{path: [(scope, lineno)]} for repo code paths pinned in tables.
+
+        MODULE- and CLASS-level assignments only, deliberately. A path written
+        inside a method body is usually a synthetic fixture name -- `mlb_engine/
+        a.py` and `tools/new.py` both appear in this file, in fixtures that
+        build a census by hand -- and flagging those would make this guard noise
+        that gets deleted. An expectation TABLE is the thing that rots: it is
+        read once at class-definition time, on every machine, whether the path
+        is there or not.
+        """
+        import ast
+        out = {}
+        scopes = [("<module>", tree.body)]
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                scopes.append((node.name, node.body))
+        for scope, body in scopes:
+            for stmt in body:
+                if not isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+                    continue
+                if stmt.value is None:
+                    continue
+                for sub in ast.walk(stmt.value):
+                    if not (isinstance(sub, ast.Constant)
+                            and isinstance(sub.value, str)):
+                        continue
+                    text = sub.value
+                    if ("/" in text and text.endswith(".py")
+                            and text.split("/")[0] in cls.CODE_ROOTS):
+                        out.setdefault(text, []).append((scope, stmt.lineno))
+        return out
+
+    @classmethod
+    def _declared_untracked(cls, tree):
+        """Every string in a module- or class-level `*UNTRACKED*` assignment.
+
+        The declaration is the escape hatch and it has to be findable from
+        here, or this guard becomes the thing that has to be edited whenever a
+        legitimate untracked pin is added -- which is how a guard gets loosened
+        instead of answered.
+        """
+        import ast
+        declared = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            targets = ([node.target] if isinstance(node, ast.AnnAssign)
+                       else list(node.targets))
+            names = [t.id for t in targets if isinstance(t, ast.Name)]
+            if not any("UNTRACKED" in n for n in names):
+                continue
+            for sub in ast.walk(node.value) if node.value is not None else ():
+                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                    declared.add(sub.value)
+        return declared
+
+    def test_no_test_pins_an_untracked_repo_path_inside_an_expectation_table(self):
+        """R322. `EXPECTED_CENSUS` pinned `skills/generate-lineups-workspace/
+        deepen_bank.py`, which .gitignore excludes, so `test_core` was RED in
+        every clone and the session-start gate said "do not build".
+
+        Fixing that one table does not hold -- the third member of this class
+        gets written next month, the same way the sixth unguarded data
+        dependency did. A pinned path must be tracked by git, or declared in an
+        `*UNTRACKED*` constant that the test itself consults before comparing.
+        """
+        import ast
+        repo = Path(__file__).resolve().parent.parent
+        offenders = []
+        inspected = 0
+        git_answers = subprocess.run(
+            ["git", "-C", str(repo), "ls-files", "--error-unmatch",
+             "tests/test_core.py"],
+            capture_output=True, text=True).returncode == 0
+        for path in sorted((repo / "tests").glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            declared = self._declared_untracked(tree)
+            for rel, sites in sorted(self._pinned_code_paths(tree).items()):
+                inspected += 1
+                if rel in declared:
+                    continue
+                # `_tracked` above falls back to data/ prefixes when git cannot
+                # answer, which reads every CODE path as untracked and turns
+                # this guard into a false FAIL in any tree without a .git (a
+                # tarball export, an unpacked archive). The question here is
+                # whether the path is in the checkout being run, so presence on
+                # disk is the honest fallback -- and which reading was taken is
+                # named rather than assumed.
+                if git_answers:
+                    present, how = self._tracked(repo, rel), "git does not track it"
+                else:
+                    present, how = (repo / rel).exists(), "it is not in this checkout"
+                if present:
+                    continue
+                where = ", ".join(f"{scope}:{lineno}" for scope, lineno in sites)
+                offenders.append(
+                    f"{path.name} pins {rel} in an expectation table ({where}): "
+                    f"{how} and no *UNTRACKED* constant in this module declares "
+                    f"it, so this table is RED in every fresh checkout and green "
+                    f"only where the file happens to exist")
+        self.assertEqual(offenders, [], "\n".join(offenders))
+        # R51's class again: a walk that finds nothing passes for the wrong
+        # reason, and the census table alone carries nine of these.
+        self.assertGreater(
+            inspected, 5,
+            "the walk found almost no pinned code paths, so it is passing "
+            "because it inspected nothing")
+
 
 from tools import stage_slate as stage_slate_mod
+
 
 
 class StageSlateRoleResolutionTests(unittest.TestCase):

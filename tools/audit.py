@@ -596,7 +596,12 @@ EXPECTED_SUITE_COUNTS = {
     # computing a carry), the Classic reading unchanged at a live site, the
     # legend's denominator once the arms come out, and one predicate object
     # shared with preflight rather than restated.
-    "tests.test_core": 1159,
+    # R322, 2026-09-08: 1159 -> 1160, the one that pins the OTHER way a repo
+    # path pinned in a test's own expectation table goes stale -- the guard for
+    # the class, since fixing the one table (EXPECTED_CENSUS, whose untracked
+    # member made this suite RED in every fresh clone and told the gate to say
+    # "do not build") does not stop the third member being written next month.
+    "tests.test_core": 1160,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -950,7 +955,22 @@ EXPECTED_SUITE_COUNTS = {
     # half), two equally compatible feeds refused and both named, the sibling
     # accepted and rejected on the same test, and four on DK's own Starting
     # column standing in for a feed nobody wrote.
-    "tests.test_upload_integrity": 367,
+    # R324+R314, 2026-09-08: 367 -> 383, the sixteen that pin ONE parent-
+    # transition rule in both referees, each running both production entry
+    # points on one file and asserting the PAIR (R52's reason: the defect was a
+    # divergence, so a test on one tool cannot see it). Five on the transition
+    # itself -- a swap retaining started players in unchanged slots passing both,
+    # a changed slot into and out of a started game failing both, the initial
+    # build's blanket refusal, and the same build passing before first pitch;
+    # three on F19's unknown clock -- refused on a changed slot, carried on an
+    # unchanged one, named rather than refused on an initial build; one on an
+    # empty operator lock list not clearing an unknown time; two on R314's
+    # postponed exemption applying in BOTH tools and preflight naming the
+    # absence of a source for it; three on the entry-identity set and contest
+    # reassignment; one asserting the two tools hold the same function object
+    # and neither re-implements it; and one independent oracle, written from
+    # scratch here, agreeing with both tools at four clocks.
+    "tests.test_upload_integrity": 383,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

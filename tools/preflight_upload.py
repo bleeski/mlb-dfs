@@ -866,9 +866,372 @@ def parse_as_of(value: Any) -> datetime:
     return parsed
 
 
+def derive_locked_teams_from_feed(
+    feed_path: Path,
+    salary_path: Path,
+    now: Optional[datetime] = None,
+) -> Optional[Tuple[set[str], str, set[str]]]:
+    """(locked, note, not_locked) from a lineups source's clock, or None.
+
+    Moved here from ``verify_export`` by R324, unchanged, because R314's
+    postponed exemption needs the ``not_locked`` half in BOTH referees and two
+    readers of "which games are postponed" is this project's named no-op failure
+    class. ``verify_export`` imports it, so ``verify_export.
+    derive_locked_teams_from_feed`` still resolves for ``repair_entry``.
+
+    This is the same source ``late_swap.py`` uses internally
+    (``build_status_map_from_lineups_feed`` + a wall clock), so the tool that
+    performs a swap and the tools that verify it read lock state off one fact
+    rather than three.
+
+    ``not_locked`` is the teams in games the source reports postponed, cancelled
+    or suspended. Their scheduled start has passed but no lineup in them is
+    frozen, so treating them as locked would block a legal swap. It is returned
+    separately rather than just omitted, because a caller unions this result
+    with the salary file's clock and needs to know which absences are an
+    affirmative "not locked" and which are merely games this source does not
+    cover.
+
+    The engine import is lazy and its failure is not fatal, which is what keeps
+    the promise the module header makes: this tool imports nothing from the
+    engine at module scope and still runs when the engine does not. An
+    unimportable engine returns None here, the exemption set is empty, and every
+    other check behaves exactly as it did before this function arrived.
+    """
+    # The repo root, so the import below resolves when either tool is run as a
+    # SCRIPT. `verify_export` carried this at module scope and said why: without
+    # it the derivation fails as an ImportError and degrades in silence to the
+    # weaker source, which cannot see a postponement. It is done here, inside
+    # the one function that needs it, rather than at module scope: this file is
+    # imported by both referees, `repair_entry` and the suite, and none of them
+    # should have its import resolution changed by a function it never calls.
+    # Measured, not assumed -- preflight's own `--feed` exemption came back
+    # empty on a postponed-game fixture until this landed, while verify_export's
+    # was correct, which is the divergence R324 exists to remove.
+    root = str(Path(__file__).resolve().parents[1])
+    if root not in sys.path:
+        sys.path.insert(1, root)
+    try:
+        from mlb_engine.intake.live_data_adapters import (  # noqa: E402
+            build_status_map_from_lineups_feed,
+        )
+    except ImportError:
+        return None
+    try:
+        parsed = json.loads(Path(feed_path).read_text(encoding="utf-8"))
+        status = build_status_map_from_lineups_feed(parsed, str(salary_path))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+    now_dt = now or datetime.now(timezone.utc)
+    excluded = set(status.get("excluded_game_ids") or [])
+    locked: set[str] = set()
+    not_locked: set[str] = set()
+    first_open: Optional[datetime] = None
+    for game_id, lock_iso in (status.get("lock_time_by_game_id") or {}).items():
+        teams = {t for t in str(game_id).split("@") if t}
+        if game_id in excluded:
+            not_locked |= teams
+            continue
+        try:
+            lock_time = datetime.fromisoformat(str(lock_iso))
+        except ValueError:
+            continue
+        if lock_time.tzinfo is None:
+            lock_time = lock_time.replace(tzinfo=timezone.utc)
+        if lock_time <= now_dt:
+            locked |= teams
+        elif first_open is None or lock_time < first_open:
+            first_open = lock_time
+    if not status.get("lock_time_by_game_id"):
+        return None
+    note = (f"next lock {first_open.astimezone(timezone.utc).strftime('%H:%M UTC')}"
+            if first_open else "every game the source covers has started")
+    if excluded:
+        note += f"; not locked (postponed/suspended): {', '.join(sorted(excluded))}"
+    return locked, note, not_locked
+
+
+def postponed_teams_from_feed(feed_path: Path, salary_path: Path) -> set[str]:
+    """Teams a lineups source affirmatively reports postponed/cancelled/suspended.
+
+    R314. The exemption input, and nothing else: an empty set means "no such
+    observation", which is NOT the same fact as "no game is postponed" (R237).
+    Callers name which of the two they have.
+    """
+    derived = derive_locked_teams_from_feed(Path(feed_path), Path(salary_path))
+    return set(derived[2]) if derived else set()
+
+
+# --------------------------------------------------------------------------
+# R324 + R314. One parent-transition contract, called by BOTH referees.
+# --------------------------------------------------------------------------
+#
+# R287 put a blanket started-game rule in this file and R292(d) put the same
+# rule in ``verify_export`` on its NO-PARENT branch only, because a late swap
+# legitimately RETAINS started players in its frozen slots. The two referees
+# therefore disagreed on exactly the late-swap file: any swap after the first
+# game's first pitch on a staggered slate retains started players in unchanged
+# slots, and preflight -- which CLAUDE.md names as THE pre-upload rule -- exited
+# 2 on them. The operator's remaining moves were ``--force`` (exit 4) or an
+# ``--as-of`` pinned to a lie, which is R268's class: a fix that teaches the
+# operator to switch a protection off.
+#
+# So the rule is stated ONCE, as a TRANSITION rather than as a property of a
+# file, and both tools call it:
+#
+#   unchanged slot  -> passes, whatever the lock state. A frozen slot is carried
+#                      forward, not chosen, and it is NAMED so the evidence
+#                      stays visible.
+#   changed slot    -> both the OLD and the NEW player must be known-not-locked.
+#   unknown clock   -> ``Game Info`` TBD or unparseable is UNKNOWN, and UNKNOWN
+#                      REFUSES a changed slot. F19: ten such clocks produced
+#                      warnings and no failures, so an edit into or out of a
+#                      game nobody could time was never refused.
+#   postponed game  -> EXEMPT (R314), named in the report rather than silently
+#                      applied, on R237's rule that an absence and an
+#                      observation are not the same fact.
+#   no parent       -> an initial build, which is the all-empty parent: every
+#                      filled slot is a PLACEMENT. A placement refuses a LOCKED
+#                      player, which is exactly R287's blanket rule, and leaves
+#                      an UNKNOWN clock a named warning. Refusing an unknown
+#                      clock here would hard-fail the ordinary build at T-5 --
+#                      the harm this item exists to remove -- and F19's defect is
+#                      about a slot the operator CHANGED.
+#
+# The three rules pull on one input and are designed together, per R314's rider:
+# postponed -> exempt, unknown -> refuse the change, unchanged -> carry forward.
+
+LOCK_OPEN = "open"
+LOCK_LOCKED = "locked"
+LOCK_UNKNOWN = "unknown"
+LOCK_EXEMPT = "exempt"
+
+
+def player_lock_state(row: Optional[Mapping[str, Any]],
+                      as_of: datetime,
+                      exempt_teams: Iterable[str] = (),
+                      locked_teams: Iterable[str] = ()) -> str:
+    """One of LOCK_EXEMPT / LOCK_LOCKED / LOCK_UNKNOWN / LOCK_OPEN.
+
+    Four values and never a bool, for the reason CLAUDE.md records for
+    ``observed_starter_state``: collapsing "I could not read the clock" into
+    "the game has not started" is the conflation that ships the bad file, and
+    collapsing it into "the game HAS started" is the false FAIL at T-5. The
+    caller decides what each state costs, per transition.
+
+    The order is deliberate. An affirmative postponement outranks every clock,
+    because a postponed game's scheduled start has passed while its players stay
+    swappable. A caller-supplied locked set outranks the salary clock in the
+    other direction, for the same asymmetry ``--locked-teams`` gets: the failure
+    that ships a bad file is always a locked team MISSING from the set.
+    """
+    fields = row or {}
+    team = str(fields.get("TeamAbbrev") or "").strip().upper()
+    if team and team in {str(t).strip().upper() for t in exempt_teams}:
+        return LOCK_EXEMPT
+    if team and team in {str(t).strip().upper() for t in locked_teams}:
+        return LOCK_LOCKED
+    start = parse_game_info_datetime(fields.get("Game Info"))
+    if start is None:
+        return LOCK_UNKNOWN
+    return LOCK_LOCKED if start <= as_of else LOCK_OPEN
+
+
+def check_parent_transition(entries: Sequence[EntryRow],
+                            parent: Optional[Sequence[EntryRow]],
+                            salary: Dict[str, Dict[str, str]],
+                            as_of: datetime,
+                            rep: Report,
+                            exempt_teams: Iterable[str] = (),
+                            locked_teams: Iterable[str] = ()) -> Dict[str, Dict[str, object]]:
+    """The rule above. ``parent=None`` is an initial build. Returns per-entry detail.
+
+    Both referees call this and neither implements any part of it, which is the
+    whole point: two implementations of one rule diverge and the weaker one
+    reports success. Each tool keeps its own final-byte validation (its own
+    ``load_entries``, geometry, sha256 and manifest reads) because a shared
+    helper removes divergence and is not independent proof.
+    """
+    exempt = {str(t).strip().upper() for t in exempt_teams}
+    locked = {str(t).strip().upper() for t in locked_teams}
+    mode = "initial" if parent is None else "parent"
+    parent_by_id = {e.entry_id: e for e in (parent or ())}
+    detail: Dict[str, Dict[str, object]] = {}
+
+    def _state(pid: str) -> str:
+        return player_lock_state(salary.get(pid), as_of, exempt, locked)
+
+    def _label(pid: str) -> str:
+        row = salary.get(pid) or {}
+        return f"{row.get('Name', pid)} ({row.get('TeamAbbrev', '?')})"
+
+    def _id_label(pid: str) -> str:
+        row = salary.get(pid) or {}
+        return f"{row.get('Name', pid)} ({pid})"
+
+    as_of_et = as_of.astimezone(
+        _eastern_tz(as_of.month, as_of.day)).strftime("%Y-%m-%d %H:%M ET")
+    rep.info["as_of_et"] = as_of_et
+
+    if mode == "parent":
+        # The entry identity set is fixed by the DK template, so it is a
+        # property of the transition rather than of either file alone.
+        child_ids = {e.entry_id for e in entries}
+        missing = sorted(set(parent_by_id) - child_ids)
+        if missing:
+            rep.fail(f"entries present in the parent but absent here: {missing[:10]}")
+        appeared = sorted(child_ids - set(parent_by_id))
+        if appeared:
+            # R324. This WARNED here ("this row is new") and preflight's own
+            # parent diff never asked at all. An Entry ID the parent does not
+            # carry is not a row an operator can add -- the template issues
+            # them -- so a grown set is a wrong-file error, and a warning at the
+            # money boundary is a warning the clock talks someone past.
+            rep.fail(f"entries present here but absent from the parent: "
+                     f"{appeared[:10]}")
+
+    unchanged = changed = placed = 0
+    carried: List[str] = []
+    exempted: List[str] = []
+    unparsed: List[str] = []
+    started_by_game: Dict[str, List[str]] = collections.defaultdict(list)
+    started_entries: set[str] = set()
+    started_slots = 0
+
+    for e in entries:
+        p = parent_by_id.get(e.entry_id)
+        if mode == "parent":
+            if p is None:
+                continue                      # already failed above, by id
+            if len(p.cells) != len(e.cells):
+                rep.fail(f"{e.entry_id}: the parent has {len(p.cells)} roster "
+                         f"slots and this file has {len(e.cells)}; a parent of "
+                         f"another geometry is the wrong file to diff against")
+                continue
+            if p.contest_id != e.contest_id:
+                rep.fail(f"{e.entry_id}: contest reassigned from {p.contest_id} "
+                         f"({p.contest_name}) to {e.contest_id} ({e.contest_name})")
+            if p.contest_name != e.contest_name and p.contest_id == e.contest_id:
+                rep.warn(f"{e.entry_id}: contest {e.contest_id} name changed from "
+                         f"{p.contest_name!r} to {e.contest_name!r}")
+
+        before = tuple(p.cells) if p is not None else tuple("" for _ in e.cells)
+        introduced: List[str] = []
+        rewritten: List[str] = []
+        unreadable: List[str] = []
+        changed_here = 0
+
+        for old_pid, new_pid in zip(before, e.cells):
+            if old_pid == new_pid:
+                unchanged += 1
+                if new_pid and new_pid in salary:
+                    state = _state(new_pid)
+                    if state == LOCK_LOCKED:
+                        carried.append(f"{e.entry_id}: {_label(new_pid)}")
+                    elif state == LOCK_EXEMPT:
+                        exempted.append(f"{e.entry_id}: {_label(new_pid)}")
+                continue
+            if mode == "initial":
+                placed += 1
+            else:
+                changed += 1
+                changed_here += 1
+            for pid, side in ((old_pid, "out"), (new_pid, "in")):
+                if not pid or pid not in salary:
+                    continue
+                state = _state(pid)
+                if state == LOCK_EXEMPT:
+                    exempted.append(f"{e.entry_id}: {_label(pid)}")
+                elif state == LOCK_LOCKED:
+                    if mode == "initial":
+                        started_slots += 1
+                        started_entries.add(e.entry_id)
+                        game = _matchup(salary[pid].get("Game Info")) or "?"
+                        started_by_game[game].append(
+                            f"{e.entry_id}: {_label(pid)}")
+                    elif side == "in":
+                        introduced.append(_label(pid))
+                    else:
+                        rewritten.append(_label(pid))
+                elif state == LOCK_UNKNOWN:
+                    if mode == "initial":
+                        unparsed.append(_id_label(pid))
+                    else:
+                        unreadable.append(f"{_label(pid)} [{side}]")
+
+        if mode == "parent":
+            detail[e.entry_id] = {
+                "slots_changed": changed_here,
+                "new_from_locked_games": len(introduced),
+            }
+            if introduced:
+                rep.fail(f"{e.entry_id}: introduced {introduced} from an "
+                         f"already-started game")
+            if rewritten:
+                rep.fail(f"{e.entry_id}: replaced {rewritten}, whose game has "
+                         f"already started")
+            if unreadable:
+                # F19. The other edge of the same rule: an unreadable start time
+                # is not evidence the game has not begun, so it cannot license a
+                # CHANGE. Unchanged slots holding the same players pass above.
+                rep.fail(f"{e.entry_id}: changed a slot involving {unreadable}, "
+                         f"whose Game Info gives no readable start time, so it "
+                         f"cannot be shown the game has not begun. A changed "
+                         f"slot needs a known clock; an unchanged one does not")
+
+    rep.info["parent_transition"] = {
+        "mode": mode,
+        "as_of_et": as_of_et,
+        "slots_unchanged": unchanged,
+        "slots_changed": changed,
+        "slots_placed": placed,
+        "carried_forward_from_started_games": sorted(set(carried)),
+        "exempt_teams": sorted(exempt),
+        "exempt_slots": sorted(set(exempted)),
+        "locked_teams_in": sorted(locked),
+    }
+    if exempted:
+        # R314: never silently applied.
+        rep.warn(f"{len(set(exempted))} roster slot(s) are EXEMPT from the "
+                 f"started-game rule because a lineups source reports their game "
+                 f"postponed, cancelled or suspended: teams "
+                 f"{sorted(exempt)}. Their scheduled start has passed and they "
+                 f"are still swappable; DK accepting the edit is the assumption "
+                 f"this exemption rests on")
+
+    if mode == "initial":
+        # The keys R287's own acceptance reads, written on the branch they
+        # describe. With a parent the sharper question was asked instead, and an
+        # absent key says so rather than reporting 0 started slots on a file
+        # whose frozen slots legitimately hold them.
+        rep.info["started_slots"] = started_slots
+        rep.info["started_games"] = sorted(started_by_game)
+        rep.info["started_entries"] = len(started_entries)
+        rep.info["started_unparsed"] = sorted(set(unparsed))
+        if unparsed:
+            rep.warn(f"{len(set(unparsed))} rostered player(s) have no parseable "
+                     f"Game Info start time, so the started-game check could not "
+                     f"read them: {sorted(set(unparsed))[:5]}")
+        if started_slots:
+            examples = []
+            for game in sorted(started_by_game):
+                hits = sorted(set(started_by_game[game]))
+                examples.append(f"{game} ({len(hits)}): {'; '.join(hits[:3])}"
+                                + (" ..." if len(hits) > 3 else ""))
+            rep.fail(
+                f"{started_slots} roster slot(s) across {len(started_entries)} "
+                f"entr{'y' if len(started_entries) == 1 else 'ies'} hold a player "
+                f"whose game has ALREADY STARTED as of {as_of_et}; DK rejects "
+                f"these. Games: {', '.join(sorted(started_by_game))}. "
+                + " | ".join(examples))
+    return detail
+
+
 def check_started_games(entries: Sequence[EntryRow],
                         salary: Dict[str, Dict[str, str]],
-                        as_of: datetime, rep: Report) -> None:
+                        as_of: datetime, rep: Report,
+                        exempt_teams: Iterable[str] = ()) -> None:
     """Hard check: no roster slot holds a player whose game has already begun.
 
     R287, 2026-09-01. The defect this closes cost a slate and it is the worst
@@ -881,13 +1244,17 @@ def check_started_games(entries: Sequence[EntryRow],
     lock, displayed it, and never compared it -- or any other game's start -- to
     the clock.
 
-    Three properties, each deliberate:
+    R324 makes this the INITIAL-BUILD case of one transition rule rather than a
+    second implementation beside it: an initial build is the all-empty parent, so
+    every filled slot is a placement and a placement refuses a locked player.
+    That is this rule, unchanged, and it is now the same code the swap path runs.
+    Three properties survive the move, each deliberate:
 
-    - It reads the SALARY FILE only. `verify_export.py` has this rule already and
-      it lives on the swap path behind `--parent`, so a freshly built post-lock
-      file was checked by nobody; and its version needs a lineups feed, which is
-      exactly what is missing at 19:56 on a slate that went sideways. `Game Info`
-      is in the file the operator is already passing.
+    - It reads the SALARY FILE only. Its rule needs no lineups source, which is
+      exactly what is missing at 19:56 on a slate that went sideways, and
+      `Game Info` is in the file the operator is already passing. R314's
+      exemption arrives as a set of team abbreviations the CALLER derived, so
+      this stays true: an empty set behaves exactly as this check always did.
     - It HARD FAILS. A warning at the money boundary is a warning the clock will
       talk someone past. `--force` still exists and still exits 4.
     - `--as-of` exists for replay determinism. Absent, it is now(), because the
@@ -895,52 +1262,11 @@ def check_started_games(entries: Sequence[EntryRow],
 
     A row whose `Game Info` does not parse is named in `started_unparsed` rather
     than passed or failed, on R237's rule: an unreadable start time is not
-    evidence the game has not begun.
+    evidence the game has not begun. On a CHANGED slot the same state refuses
+    the change (R324/F19); here there is no change to refuse.
     """
-    started: Dict[str, List[str]] = collections.defaultdict(list)
-    unparsed: List[str] = []
-    affected_entries: set[str] = set()
-    slots = 0
-    for e in entries:
-        for pid in e.cells:
-            if not pid:
-                continue
-            row = salary.get(pid)
-            if not row:
-                continue
-            start = parse_game_info_datetime(row.get("Game Info"))
-            if start is None:
-                unparsed.append(f"{row.get('Name', pid)} ({pid})")
-                continue
-            if start <= as_of:
-                slots += 1
-                affected_entries.add(e.entry_id)
-                game = _matchup(row.get("Game Info")) or "?"
-                started[game].append(
-                    f"{e.entry_id}: {row.get('Name', pid)} "
-                    f"({row.get('TeamAbbrev', '?')})")
-    rep.info["as_of_et"] = as_of.astimezone(
-        _eastern_tz(as_of.month, as_of.day)).strftime("%Y-%m-%d %H:%M ET")
-    rep.info["started_slots"] = slots
-    rep.info["started_games"] = sorted(started)
-    rep.info["started_entries"] = len(affected_entries)
-    rep.info["started_unparsed"] = sorted(set(unparsed))
-    if unparsed:
-        rep.warn(f"{len(set(unparsed))} rostered player(s) have no parseable "
-                 f"Game Info start time, so the started-game check could not "
-                 f"read them: {sorted(set(unparsed))[:5]}")
-    if slots:
-        examples = []
-        for game in sorted(started):
-            hits = sorted(set(started[game]))
-            examples.append(f"{game} ({len(hits)}): {'; '.join(hits[:3])}"
-                            + (" ..." if len(hits) > 3 else ""))
-        rep.fail(
-            f"{slots} roster slot(s) across {len(affected_entries)} entr"
-            f"{'y' if len(affected_entries) == 1 else 'ies'} hold a player whose "
-            f"game has ALREADY STARTED as of {rep.info['as_of_et']}; DK rejects "
-            f"these. Games: {', '.join(sorted(started))}. "
-            + " | ".join(examples))
+    check_parent_transition(entries, None, salary, as_of, rep,
+                            exempt_teams=exempt_teams)
 
 
 def _classic_legality(entry: EntryRow, players: Sequence[Dict[str, str]],
@@ -1692,23 +2018,6 @@ def _feed_age_minutes(feed: Mapping[str, Any]) -> Optional[float]:
     return (datetime.now(timezone.utc) - fetched).total_seconds() / 60.0
 
 
-def check_parent(entries: Sequence[EntryRow], parent_path: Path, rep: Report) -> None:
-    try:
-        _, _, parent_entries, _, _ = load_entries(parent_path)
-    except (OSError, ValueError) as exc:
-        rep.warn(f"parent unreadable ({exc}); contest-assignment diff skipped")
-        return
-    parent_by_id = {e.entry_id: e for e in parent_entries}
-    missing = sorted(set(parent_by_id) - {e.entry_id for e in entries})
-    if missing:
-        rep.fail(f"entries present in the parent but absent here: {missing[:10]}")
-    for e in entries:
-        p = parent_by_id.get(e.entry_id)
-        if p and p.contest_id != e.contest_id:
-            rep.fail(f"{e.entry_id}: contest reassigned from {p.contest_id} "
-                     f"({p.contest_name}) to {e.contest_id} ({e.contest_name})")
-
-
 FEED_STALE_MINUTES = 90
 
 
@@ -2415,14 +2724,55 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     check_pool_membership(entries, salary, parse_embedded_pool(raw_rows),
                           args.min_pool_overlap, rep)
     check_status(entries, salary, rep)
-    # R287. Before the legality walk, deliberately: a started game makes every
-    # other verdict about that entry moot, and this is the one failure a reader
-    # at T-0 must see first.
-    check_started_games(entries, salary,
-                        parse_as_of(getattr(args, "as_of", None))
-                        if getattr(args, "as_of", None)
-                        else datetime.now(timezone.utc),
-                        rep)
+    # R287, R324. Before the legality walk, deliberately: a started game makes
+    # every other verdict about that entry moot, and this is the one failure a
+    # reader at T-0 must see first. R324 makes it the PARENT-TRANSITION check,
+    # so a swap that RETAINS started players in unchanged slots passes here as
+    # it already passed in verify_export. The two referees disagreed on exactly
+    # that file, and this is the tool CLAUDE.md names as THE pre-upload rule, so
+    # the disagreement's whole cost landed on `--force`.
+    as_of = (parse_as_of(getattr(args, "as_of", None))
+             if getattr(args, "as_of", None) else datetime.now(timezone.utc))
+    parent_entries: Optional[Sequence[EntryRow]] = None
+    if args.parent:
+        try:
+            _, _, loaded_parent, _, _ = load_entries(Path(args.parent))
+        except (OSError, ValueError) as exc:
+            # This WARNED and skipped the diff while verify_export FAILED on the
+            # same condition. One rule, one verdict: a parent the operator named
+            # and this tool cannot read leaves the transition unverified on a
+            # file that is by definition a swap. The check still runs, as an
+            # initial build -- refusing to check at all is the R292(d) hole,
+            # where a post-lock file was checked by nobody.
+            rep.fail(f"parent unreadable ({exc}); this file cannot be verified "
+                     f"as a swap against {args.parent}")
+        else:
+            if loaded_parent:
+                parent_entries = loaded_parent
+            else:
+                rep.fail(f"parent {args.parent} holds no entry rows, so there is "
+                         f"nothing to diff against; this file cannot be verified "
+                         f"as a swap")
+    # R314. The postponed exemption needs an affirmative observation: the salary
+    # CSV records when a game was SCHEDULED, so a postponed game's start has
+    # passed while its players stay swappable, and the CSV cannot tell the two
+    # apart. Only a lineups source can, and this tool has one HERE only when the
+    # operator passed it -- the auto-resolution runs later and R287 put this
+    # check early on purpose. So an explicit --feed supplies the exemption and
+    # its absence is NAMED rather than read as "nothing is postponed". Without
+    # this, R314's own complaint survives its fix: CLAUDE.md's two-referee
+    # clause stays unsatisfiable on a postponed-game slate, because THIS referee
+    # goes on refusing the file whatever verify_export decides.
+    exempt_teams: set[str] = set()
+    if getattr(args, "feed", None):
+        exempt_teams = postponed_teams_from_feed(Path(args.feed), salary_path)
+        rep.info["postponed_source"] = f"--feed {Path(args.feed).name}"
+    else:
+        rep.info["postponed_source"] = (
+            "none read at the started-game check: with no --feed a postponed "
+            "game cannot be told from a game in progress here")
+    check_parent_transition(entries, parent_entries, salary, as_of, rep,
+                            exempt_teams=exempt_teams)
     details = check_legality(contest, slots, entries, salary, rep)
 
     manifest = Path(args.manifest) if args.manifest else None
@@ -2452,8 +2802,6 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
                  f"{entries_path.resolve().parent / 'upload_manifest.json'} states "
                  f"which delivery these bytes are. Re-run the build, or pass "
                  f"--no-manifest to waive it deliberately")
-    if args.parent:
-        check_parent(entries, Path(args.parent), rep)
 
     # R114. Hand-passed declarations win over the recorded ones: --declare-pitcher
     # exists for the file that never had a run, and an operator who passes it

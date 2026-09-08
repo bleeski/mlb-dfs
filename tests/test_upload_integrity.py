@@ -2626,10 +2626,13 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         from tools.preflight_upload import Report, load_entries, load_salary
         rep = Report()
         _, _, entries, _, _ = load_entries(self.parent)
-        locked, note, source = ve.resolve_locked_teams(
+        # R314: four values now. `not_locked` is the teams a feed affirmatively
+        # reports postponed, which this function used to subtract and discard.
+        locked, note, source, not_locked = ve.resolve_locked_teams(
             supplied, load_salary(self.salary), self.salary,
             self.feed if feed else None,
             datetime.fromisoformat(as_of or self.EARLY), rep)
+        self.not_locked = not_locked
         return locked, note, source, rep, entries
 
     # -- the derivation itself ------------------------------------------------
@@ -2789,8 +2792,9 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         self.assertIn("staged beside the salary file", info["feed_autoresolve"])
 
     def test_with_no_parent_a_started_player_is_a_hard_failure_not_a_warning(self):
-        """R292(d). `check_parent_slots` catches an INTRODUCED player from a
-        started game, and only when a parent resolves. With none -- none passed,
+        """R292(d). The parent diff catches an INTRODUCED player from a
+        started game, and only when a parent resolves (R324: it is the shared
+        transition helper's parent mode now, and this is its initial mode). With none -- none passed,
         none in a manifest chain -- this tool WARNED that preservation was
         unverified and exited 0, so a freshly built or hand-repaired post-lock
         file was checked by nobody. That is the file R287 exists for, and
@@ -2854,7 +2858,7 @@ class VerifyExportSlateTruthTests(unittest.TestCase):
     (imported from preflight, not reimplemented), and a team with no confirmed
     lineup is reported by name instead of being skipped in silence.
 
-    R72(ii): the locked-game membership check lived inside check_parent_slots,
+    R72(ii): the locked-game membership check lived behind `--parent`,
     which ran only when --parent was passed. The parent now resolves from the
     manifest's supersession chain, because this tool's own header says a check
     that runs only when the operator remembers a flag is a check that does not run.
@@ -6801,6 +6805,398 @@ class R305FeedIdentityTests(unittest.TestCase):
         self.assertEqual(payload["info"]["feed_unconfirmed_teams"], {})
         self.assertEqual(payload["info"]["feed_projected_players"], {})
 
+
+class R324ParentTransitionTests(unittest.TestCase):
+    """One transition rule, both referees, and the file each of them used to get
+    wrong.
+
+    The defect: `preflight_upload` ran R287's blanket started-game rule
+    UNCONDITIONALLY, including with `--parent`, while `verify_export` ran it only
+    on its NO-PARENT branch, because a late swap legitimately RETAINS started
+    players in its frozen slots. Any swap after the first game's first pitch on a
+    staggered slate is that file, so the two referees disagreed on exactly the
+    case they both exist for, and CLAUDE.md names preflight as THE pre-upload
+    rule -- leaving `--force` (exit 4) or an `--as-of` pinned to a lie, which is
+    R268's class: a fix that teaches the operator to switch a protection off.
+
+    Every test here runs BOTH tools on one file and asserts the pair, for the
+    reason R52 pinned the exit contract as a pair: the defect was a divergence,
+    so a test on one tool cannot see it.
+    """
+
+    PREGAME = "2026-07-25T23:20:00+00:00"   # AAA@BBB, CCC@DDD started; EEE@FFF open
+    LATE = "2026-07-25T23:45:00+00:00"      # all three started
+    EARLY = "2026-07-25T22:00:00+00:00"     # none started
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.feed = write_three_game_feed(self.dir / "lineups_feed.json")
+        self.parent_lineup = [
+            self.ids["AAA Aster"], self.ids["CCC Aster"],
+            self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+            self.ids["AAA Ellis"], self.ids["AAA Frost"],
+            self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"],
+        ]
+        self.parent = self.dir / "parent.csv"
+        write_entries(self.parent, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.parent_lineup)])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    # -- harness -------------------------------------------------------------- #
+
+    def _child(self, lineup, entry_id="900", contest="5", name="child.csv"):
+        path = self.dir / name
+        write_entries(path, CLASSIC_HEADER,
+                      [classic_entry(entry_id, contest, lineup)])
+        return path
+
+    def _swap_in_fff(self):
+        """Replace one EEE outfielder with an FFF outfielder: legal on every
+        Classic rule, and the introduced player's game is the one locking last."""
+        lineup = list(self.parent_lineup)
+        lineup[9] = self.ids["FFF Ives"]
+        return self._child(lineup)
+
+    def _tbd(self, *teams):
+        """Blank the Game Info clock for whole teams, in place.
+
+        This is F19's condition as DK ships it: a rostered player whose start
+        time is not readable at all. `Postponed` in the clock cell parses to
+        nothing, exactly like `TBD`, which is the point -- from the salary file
+        alone the two are the same unknown, and only a lineups source can tell
+        them apart. That is why R314's exemption and F19's refusal had to be
+        designed together.
+        """
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        team_col = rows[0].index("TeamAbbrev")
+        game_col = rows[0].index("Game Info")
+        wanted = {t.upper() for t in teams}
+        for row in rows[1:]:
+            if row[team_col].upper() in wanted:
+                row[game_col] = "TBD"
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+
+    def _both(self, entries, as_of, parent=None, feed=True, extra_verify=()):
+        """Run both production entry points on one file. Returns (pre, ver).
+
+        Subprocesses, deliberately: these are the two commands CLAUDE.md tells
+        an operator to run, and a test that imports a function instead cannot
+        see an arg-parsing or exit-code divergence, which is what R52 was.
+        """
+        pre = ["--entries", str(entries), "--salary", str(self.salary),
+               "--no-manifest", "--as-of", as_of, "--json"]
+        ver = ["--entries", str(entries), "--salary", str(self.salary),
+               "--as-of", as_of, "--json"]
+        if parent is not None:
+            pre += ["--parent", str(parent)]
+            ver += ["--parent", str(parent)]
+        if feed:
+            pre += ["--feed", str(self.feed)]
+            ver += ["--lineups", str(self.feed)]
+        ver += list(extra_verify)
+        return _run_preflight_argv(pre), _run_verify_argv(ver)
+
+    def _codes(self, *args, **kwargs):
+        pre, ver = self._both(*args, **kwargs)
+        return pre.returncode, ver.returncode, pre, ver
+
+    def _payloads(self, pre, ver):
+        return json.loads(pre.stdout), json.loads(ver.stdout)
+
+    # -- the defect ----------------------------------------------------------- #
+
+    def test_a_swap_retaining_started_players_in_unchanged_slots_passes_both(self):
+        """R324's whole subject. Nine slots hold players from games that started
+        15 and 10 minutes ago; the tenth swaps one open-game outfielder for
+        another. Those nine are frozen, not chosen. preflight exited 2 on this
+        file and verify_export exited 0 on the same bytes."""
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self._swap_in_fff(), self.PREGAME, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (0, 0),
+                         f"preflight={pre_rc} verify={ver_rc}\n{pre.stdout}\n{ver.stdout}")
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            block = payload["info"]["parent_transition"]
+            self.assertEqual(block["mode"], "parent", tool)
+            self.assertEqual(block["slots_unchanged"], 9, tool)
+            self.assertEqual(block["slots_changed"], 1, tool)
+            # The evidence stays visible rather than being passed in silence:
+            # these are the started players the file legally carried forward.
+            self.assertTrue(block["carried_forward_from_started_games"], tool)
+
+    def test_a_changed_slot_into_a_started_game_fails_both(self):
+        """The other side, so the test above cannot be passing on a blanket
+        pass. Same file, 25 minutes later: the game it swaps INTO has started."""
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self._swap_in_fff(), self.LATE, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(
+                any("already-started game" in f for f in payload["failures"]),
+                f"{tool}: {payload['failures']}")
+
+    def test_a_changed_slot_out_of_a_started_game_fails_both(self):
+        """Rewriting a FROZEN slot, which DK rejects and the swap contract
+        forbids. The removed player's game has started; the introduced one's has
+        not, so only the OUT side can refuse this and it must."""
+        lineup = list(self.parent_lineup)
+        lineup[6] = self.ids["FFF Gable"]          # EEE Gable (open) -> FFF (open)
+        lineup[2] = self.ids["AAA Gable"]          # AAA Boone (STARTED) -> AAA Gable
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self._child(lineup), self.PREGAME, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(
+                any("whose game has already started" in f
+                    for f in payload["failures"]),
+                f"{tool}: {payload['failures']}")
+
+    def test_a_new_started_player_on_an_initial_build_fails_both(self):
+        """R287's rule, which is now the initial-build case of the same helper
+        rather than a second implementation beside it. No parent at all: every
+        filled slot is a placement, and a placement refuses a locked player."""
+        pre_rc, ver_rc, pre, ver = self._codes(self.parent, self.LATE)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(any("ALREADY STARTED" in f
+                                for f in payload["failures"]), tool)
+            self.assertEqual(payload["info"]["parent_transition"]["mode"],
+                             "initial", tool)
+            self.assertEqual(payload["info"]["started_slots"], 10, tool)
+
+    def test_the_same_initial_build_passes_before_first_pitch_in_both(self):
+        pre_rc, ver_rc, pre, ver = self._codes(self.parent, self.EARLY)
+        self.assertEqual((pre_rc, ver_rc), (0, 0), pre.stdout + ver.stdout)
+
+    # -- F19: an unknown clock cannot license a change ------------------------ #
+
+    def test_a_changed_slot_involving_an_unknown_clock_fails_both(self):
+        """F19. Ten `Game Info=TBD` clocks produced warnings and no failures, so
+        an edit into a game nobody could time was never refused. An unreadable
+        start time is not evidence the game has not begun (R237), and a change
+        needs that evidence."""
+        self._tbd("FFF")
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self._swap_in_fff(), self.PREGAME, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(
+                any("no readable start time" in f for f in payload["failures"]),
+                f"{tool}: {payload['failures']}")
+
+    def test_the_same_unknown_clock_survives_an_unchanged_slot_in_both(self):
+        """The other side of F19, and the reason the rule is a TRANSITION. The
+        same unreadable clock on the same team, in slots nobody touched: a
+        carried-forward slot needs no clock, because the operator is not
+        asserting anything about it. Refusing here would fail every swap on a
+        slate carrying one unreadable cell."""
+        self._tbd("EEE")
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self.parent, self.PREGAME, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (0, 0), pre.stdout + ver.stdout)
+
+    def test_an_unknown_clock_on_an_initial_build_is_named_not_refused(self):
+        """An initial build is the all-empty parent, so structurally every slot
+        is a placement -- but F19's defect is about a slot the operator CHANGED,
+        and refusing an unreadable cell on a first delivery would hard-fail the
+        ordinary case at T-5, which is the harm this item exists to remove. So it
+        is NAMED (R237) and the started-game rule still refuses what it can
+        read."""
+        self._tbd("EEE")
+        pre_rc, ver_rc, pre, ver = self._codes(self.parent, self.EARLY)
+        self.assertEqual((pre_rc, ver_rc), (0, 0), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(payload["info"]["started_unparsed"], tool)
+            self.assertTrue(any("no parseable Game Info" in w
+                                for w in payload["warnings"]), tool)
+
+    def test_an_empty_operator_lock_list_cannot_clear_an_unknown_time(self):
+        """`--locked-teams ''` is not evidence. R29 made a supplied list a union
+        and never a substitution, and the exemption that CAN clear a clock comes
+        only from a lineups source's affirmative postponement -- never from an
+        operator flag, which is the one input an operator can empty at T-5 to
+        make a refusal go away."""
+        self._tbd("FFF")
+        child = self._swap_in_fff()
+        _pre, ver = self._both(child, self.PREGAME, parent=self.parent,
+                               extra_verify=("--locked-teams", ""))
+        self.assertEqual(ver.returncode, 2, ver.stdout)
+        payload = json.loads(ver.stdout)
+        self.assertTrue(any("no readable start time" in f
+                            for f in payload["failures"]), payload["failures"])
+        self.assertEqual(payload["info"]["parent_transition"]["exempt_teams"], [])
+
+    # -- R314: the postponed exemption, in both -------------------------------- #
+
+    def test_a_postponed_games_players_are_exempt_in_both(self):
+        """R314. `check_started_games` had no postponed exemption and R292(d) put
+        it in BOTH referees, so on a postponed-game slate CLAUDE.md's R272 clause
+        -- both tools exit 0 before a hand-corrected file ships -- was
+        unsatisfiable, and the operator's only remaining moves were the two the
+        contract forbids.
+
+        The A/B is the same file at the same clock as
+        `test_a_changed_slot_into_a_started_game_fails_both`: all three games
+        have started, and the only difference is a source reporting EEE@FFF
+        postponed. Exempting one referee would not have fixed this, which is why
+        preflight reads the exemption too."""
+        write_three_game_feed(self.feed, postponed=("EEE@FFF",))
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self._swap_in_fff(), self.LATE, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (0, 0),
+                         f"preflight={pre_rc} verify={ver_rc}\n{pre.stdout}\n{ver.stdout}")
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            block = payload["info"]["parent_transition"]
+            self.assertEqual(block["exempt_teams"], ["EEE", "FFF"], tool)
+            self.assertTrue(block["exempt_slots"], tool)
+            # Named, never silently applied (R237): DK accepting a
+            # post-scheduled-start edit on a postponed game is the assumption the
+            # exemption rests on, and it is stated where the operator reads it.
+            self.assertTrue(any("EXEMPT from the started-game rule" in w
+                                for w in payload["warnings"]), tool)
+
+    def test_preflight_names_the_absence_of_a_postponement_source(self):
+        """An absence and an observation are not the same fact. Preflight's
+        auto-resolution runs AFTER this check and R287 put the check early on
+        purpose, so with no `--feed` the tool cannot tell a postponed game from
+        one in progress -- and says so rather than reading an empty set as
+        'nothing is postponed'."""
+        pre, _ver = self._both(self.parent, self.EARLY, feed=False)
+        payload = json.loads(pre.stdout)
+        self.assertIn("none read at the started-game check",
+                      payload["info"]["postponed_source"])
+        pre, _ver = self._both(self.parent, self.EARLY)
+        self.assertIn("--feed", json.loads(pre.stdout)["info"]["postponed_source"])
+
+    # -- the entry identity set is part of the transition ---------------------- #
+
+    def test_a_child_entry_absent_from_the_parent_fails_both(self):
+        """It WARNED in verify_export ("this row is new") and preflight's own
+        parent diff never asked at all. DK issues Entry IDs in the template, so
+        an id the parent does not carry is not a row an operator can add: it is a
+        wrong-file error, and a warning at the money boundary is a warning the
+        clock talks someone past."""
+        path = self.dir / "grown.csv"
+        write_entries(path, CLASSIC_HEADER, [
+            classic_entry("900", "5", self.parent_lineup),
+            classic_entry("901", "5", self.parent_lineup),
+        ])
+        pre_rc, ver_rc, pre, ver = self._codes(
+            path, self.EARLY, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(
+                any("absent from the parent" in f for f in payload["failures"]),
+                f"{tool}: {payload['failures']}")
+
+    def test_a_parent_entry_absent_from_the_child_fails_both(self):
+        parent = self.dir / "big_parent.csv"
+        write_entries(parent, CLASSIC_HEADER, [
+            classic_entry("900", "5", self.parent_lineup),
+            classic_entry("901", "5", self.parent_lineup),
+        ])
+        pre_rc, ver_rc, pre, ver = self._codes(
+            self.parent, self.EARLY, parent=parent)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(
+                any("present in the parent but absent here" in f
+                    for f in payload["failures"]),
+                f"{tool}: {payload['failures']}")
+
+    def test_a_reassigned_contest_fails_both(self):
+        """A swap that moves an entry to another contest changed the objective
+        the lineup was built for. Both tools had this rule; it now has one
+        implementation."""
+        moved = self._child(self.parent_lineup, contest="6", name="moved.csv")
+        pre_rc, ver_rc, pre, ver = self._codes(
+            moved, self.EARLY, parent=self.parent)
+        self.assertEqual((pre_rc, ver_rc), (2, 2), pre.stdout + ver.stdout)
+        pre_p, ver_p = self._payloads(pre, ver)
+        for tool, payload in (("preflight", pre_p), ("verify_export", ver_p)):
+            self.assertTrue(any("contest reassigned" in f
+                                for f in payload["failures"]),
+                            f"{tool}: {payload['failures']}")
+
+    # -- one implementation, and an independent check on it -------------------- #
+
+    def test_one_shared_implementation_of_the_parent_transition_rule(self):
+        """The fix is a shared function, not a copied branch: two copies of one
+        rule is this project's named no-op class -- they diverge and the weaker
+        one reports success, which is exactly how this item happened."""
+        import preflight_upload
+        import verify_export
+
+        self.assertIs(verify_export.check_parent_transition,
+                      preflight_upload.check_parent_transition)
+        text = (REPO / "tools" / "verify_export.py").read_text(encoding="utf-8")
+        self.assertNotIn("def check_parent_slots", text,
+                         "the local copy of the parent-slot rule is back")
+        self.assertNotIn("def derive_locked_teams_from_feed", text,
+                         "the postponed derivation has a second reader again")
+        pre_src = (REPO / "tools" / "preflight_upload.py").read_text(encoding="utf-8")
+        self.assertEqual(pre_src.count("def check_parent_transition"), 1)
+        # `check_started_games` keeps its name and its contract and delegates:
+        # R287's rule is the initial-build case of the transition, not a second
+        # walk over the same rows.
+        body = pre_src[pre_src.index("def check_started_games"):]
+        body = body[:body.index("\ndef ", 10)]
+        self.assertIn("check_parent_transition(entries, None", body)
+        self.assertNotIn("rep.fail(", body,
+                         "the blanket rule is phrasing its own failures again, "
+                         "which is the second implementation returning")
+
+    def test_an_independent_oracle_agrees_with_both_tools_on_the_started_game_rule(self):
+        """A shared helper removes divergence and is NOT independent proof, so
+        the started-game rule gets a second implementation that exists only here:
+        twelve lines, no import from either tool, parsing the CSVs itself.
+
+        It answers only the blanket question -- does any roster slot hold a player
+        whose scheduled start has passed -- which is the initial-build case, so it
+        is compared against the no-parent runs at four clocks.
+        """
+        def oracle(entries_path, clock_utc):
+            """True if any rostered player's game had started by clock_utc."""
+            with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+                rows = list(csv.DictReader(fh))
+            starts = {}
+            for row in rows:
+                text = str(row["Game Info"]).split(" ", 1)[-1]
+                try:                       # '07/25/2026 07:05PM ET', ET is -04:00 in July
+                    when = datetime.strptime(text.replace(" ET", ""),
+                                             "%m/%d/%Y %I:%M%p")
+                except ValueError:
+                    continue
+                starts[row["ID"]] = when.replace(tzinfo=timezone(timedelta(hours=-4)))
+            with entries_path.open(encoding="utf-8-sig", newline="") as fh:
+                body = list(csv.reader(fh))[1:]
+            cells = [c for row in body for c in row[4:14] if c.strip()]
+            return any(starts[c] <= clock_utc for c in cells if c in starts)
+
+        for as_of in (self.EARLY, "2026-07-25T23:06:00+00:00", self.PREGAME,
+                      self.LATE):
+            clock = datetime.fromisoformat(as_of)
+            expected = oracle(self.parent, clock)
+            pre_rc, ver_rc, pre, ver = self._codes(self.parent, as_of)
+            self.assertEqual(
+                (pre_rc == 2, ver_rc == 2), (expected, expected),
+                f"at {as_of} the oracle says started={expected} while "
+                f"preflight={pre_rc} and verify_export={ver_rc}\n{pre.stdout}")
 
 if __name__ == "__main__":
     unittest.main()
