@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 4
+## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 5
 
 **How to use this table.** A session says *"work on the next session in the
 backlog"*, reads the row(s) for the Session ID on the NEXT pointer above, and
@@ -66,7 +66,6 @@ date (`2140_5g-no-game-level-exposure-control`, `2140_5g-no-reachable-named-book
 
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Session 4** | `Standalone` | **R326 (NEW, ed12 F12) -- the prefilter does not preserve joint feasibility, and its infeasibility is billed as strategy.** Post-R294 residual: the call at `contest_allocator.py:2759` keeps a per-entry reserve of 2, which is not Hall's condition. Witness: 49 entries, 50 distinct compatible rosters, target 48 -> 48 kept, zero "emptied" entries, restricted MILP infeasible while the full bank assigns 49; the ladders at `:3152-3254` then relax STRATEGY on a bank that was feasible. Fix: on restricted-bank infeasibility re-solve on the FULL bank before any relaxation rung; record `search_scope` (restricted/full) on `allocation_solver_report`. Acceptance: the 49/50 witness certifies with zero relaxations; K >= E cases with shared-player caps also covered; golden replay unmoved on currently-feasible fixtures. | Spec | `mlb_engine/allocate/contest_allocator.py`, `tests/test_core.py` | High (a smaller stack or looser cap billed to the bank, invisible in the certified file) | Med (joint MILP path; overlap cost interacts with Session 21) | None |
 | **Session 5** | `Batch (1 of 3)` | **R285 (+ed12 F38, F37 riders) -- the supervisor stops on the one remedy it is licensed to take.** The bank-growth remedy reads `solve.bank.job_list_exhausted`, which the direct path never writes. F38: `extend_bank` (`bank_cache.py:858-946`) leaves `exhausted=True` when every job raised, timed out or returned no proof -- keep `jobs_total / jobs_answered / jobs_pending / search_complete` as distinct fields so an all-timeout sweep never reads as an answered search (the same shape as R326: search effort billed as strategy). F37: `parse_brief` (`autobuild.py:275-287`) infers "certified" from exit 0 and prose -- emit one versioned result JSON beside stdout and classify from its facts. | Backlog / Spec | `tools/autobuild.py`, `mlb_engine/optimize/bank_cache.py`, refusal payload in `execution_pipeline.py` | High (slate-lock reliability; one lost call on 1915_6g) | Low | None |
 | **Session 5** | `Batch (2 of 3)` | **R311 -- R157's interaction-bind refusal names no derivable floor**, so the remedy is a hand bisection (9 minutes of a 66-minute window on 1940_6g). Emit the binding cap and the value that certifies. | Backlog | `mlb_engine/allocate/contest_allocator.py` feasibility report | High | Low | None |
 | **Session 5** | `Batch (3 of 3)` | **R207 (+R204 naming half, +R125(a) refusal text) -- refusals that name a SET, not the move.** The infeasibility hint makes the operator binary-search; a `PO`-only side refuses "no probable or declared starter" where the fact is "opener, use `--declare-pitcher`". Typed `refusal.class` / `refusal.remedy` on the payload; no regex over `errors[]` in the final fix. | Backlog | `execution_pipeline.py`, `contest_allocator.py`, `build_slate.py` | High | Low | None |
@@ -6845,36 +6844,26 @@ cap, is filed as a rider on R197 rather than here:** it is a brief-truth gap
 hand-computed) plus a SKILL.md correction, and R197 already owns the realized
 low-owned count that sits beside it.
 
-### R326. The candidate prefilter does not preserve JOINT feasibility, and a restricted-bank infeasibility still climbs the strategy ladder: R294's residual, with a constructive witness (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F12); VERIFIED-repro by the edition (helper output plus a feasibility witness) at this HEAD, after R294 shipped
+### R326. CLOSED 2026-09-09 -- SHIPPED, entry migrated to CHANGELOG.md
 
-- **What.** R294(a) made `_prefilter_candidates` (`contest_allocator.py:1078-1240`)
-  iterate selectable candidates only and reserve `PREFILTER_PER_ENTRY_RESERVE = 2`
-  compatible candidates per entry, and reports `entries_emptied_by_prefilter`.
-  Every entry having two options is not Hall's condition. Witness: 49 entries in
-  one contest, 50 distinct compatible rosters, open exposures, prefilter target
-  48 -> the helper keeps 48 and reports ZERO emptied entries; the full bank can
-  assign 49 distinct rosters, the retained bank cannot. The call site
-  (`:2754-2764`, `_prefilter_candidates(...)` at `:2759`) then hands the
-  restricted MILP's infeasibility to the recursive relaxations at `:3152-3254`,
-  which relax STRATEGY (caps, reuse, overlap) on a bank that was feasible. The
-  repaired R294 incompatible-candidate starvation is a different case and stays
-  closed; this is the joint-coverage problem the edition's own 1.6 separates from
-  it.
-- **Why P1.** Criterion (2): a certified file that quietly carries a relaxed cap
-  or a smaller stack because search effort was billed as strategy. Invisible in
-  the delivered file; visible only as a relaxation counter the operator has been
-  taught to expect.
-- **Fix.** Before any relaxation rung, on a restricted-bank infeasibility, re-solve
-  on the FULL bank (`keep_target = len(candidates)`) and only then descend;
-  record `search_scope` (`restricted` / `full`) on `allocation_solver_report` so
-  the brief says which bank the certificate covers. Keeping the prefilter on the
-  happy path preserves R294's speed; the full-bank retry pays the quadratic
-  overlap cost only when the restricted solve fails, and R87/R321 (Sessions
-  21-23) own that cost. Acceptance: the 49/50 witness certifies with zero
-  relaxations under the pinned solver; a restricted-bank infeasibility triggers
-  expansion, never a strategic relaxation; shared-player caps and compatibility
-  subsets where `K >= E` still fails joint feasibility are fixtures; golden replay
-  bytes unmoved on currently-feasible fixtures. Roadmap: Session 4, standalone.
+On a PROVEN restricted-bank infeasibility `select_and_assign_entries` now
+re-solves on the FULL bank before any relaxation rung, and
+`allocation_solver_report.search_scope` (`restricted` / `full`) plus
+`full_bank_retry` say which bank the certificate covers. The prefilter stays on
+the happy path, so R294's speed is unchanged and the quadratic overlap cost is
+paid only when the restricted solve fails.
+
+**The filed witness was HELPER-scoped and the entry did not say so; the defect
+is worse than filed.** 49 entries / 50 rosters / target 48 reproduces exactly
+(48 kept, zero emptied, Hall violated), but it needs an explicit
+`controls["candidate_prefilter_target"]`: on the default path
+`keep_target = max(6E, 40) = 294 > K = 50`, so the prefilter early-returns and
+that fixture cannot fire. A DEFAULT-path witness does exist and is the one that
+matters, through a second mechanism the entry did not name -- the stack/SP-pair
+coverage loop keeps ONE representative per bucket, which prevents an EMPTY
+bucket but not an UNDER-FILLED one against a repetition cap. Both are fixtures
+now. Full record, measurements and mutation table in CHANGELOG.md.
+
 
 ### R329. The bank cache's reload-and-union has no tombstones: a dropped candidate and its attempted job come back from disk, and the union is not concurrency-safe (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F11); VERIFIED-repro by the edition on `drop_stale_jobs` + `save` + reload
 

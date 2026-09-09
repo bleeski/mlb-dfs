@@ -20164,9 +20164,17 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
                               "primary-stack floor's")
 
     def test_every_ladder_re_entry_carries_every_sibling_ladder_state(self):
-        """R116's rule, now applied to three ladders instead of two: sibling state
+        """R116's rule, now applied to four re-entries instead of two: sibling state
         rides every re-entry, or a step silently re-adds a control this solve
         already proved infeasible and buys an extra round trip per rung.
+
+        R326, 2026-09-09, grew the class from three to four. The fourth is NOT a
+        ladder -- it relaxes nothing and widens the candidate bank back to the
+        one the caller handed in -- but R116's rule binds it for the same reason
+        it binds the three: it re-enters, so anything it drops is re-derived from
+        scratch on the way down. The count above is the R233 enumeration and the
+        reason this test failed rather than passing quietly when the fourth
+        arrived.
 
         Scoped by AST to RECURSIVE calls inside ``select_and_assign_entries``. A
         substring count over the rest of the file was the first cut and it was
@@ -20185,9 +20193,11 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
         recursive = [n for n in _ast.walk(fn)
                      if isinstance(n, _ast.Call)
                      and getattr(n.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(recursive), 3,
-                         "three ladders, three re-entries: engine-default reuse "
-                         "cap, five-stack quota, primary-stack floor")
+        self.assertEqual(len(recursive), 4,
+                         "three relaxation ladders plus R326's full-bank retry: "
+                         "engine-default reuse cap, five-stack quota, primary-"
+                         "stack floor, and the retry that widens the SEARCH "
+                         "before any of them moves a STRATEGY control")
         for call in recursive:
             passed = {kw.arg for kw in call.keywords}
             for state in ("_floor_state", "_reuse_state", "_quota_state"):
@@ -23015,8 +23025,14 @@ class AllocatorTruthTests(unittest.TestCase):
     def test_the_three_guards_all_read_proven_infeasible_and_slate_blocked(self):
         """R233. The enumeration, asserted rather than described: every re-entry
         inside `select_and_assign_entries` is guarded on BOTH conjuncts, so a
-        fourth ladder added later fails here instead of stepping on a non-proof
-        or on an already-failed slate."""
+        fifth re-entry added later fails here instead of stepping on a non-proof
+        or on an already-failed slate.
+
+        R326 made it four, and the guard matters as much for the retry as for
+        the three rungs, read the other way round: a PROVEN infeasibility is a
+        fact about the bank that a wider bank can answer, while a TIME LIMIT
+        means the model was already too big for the clock and re-solving on more
+        candidates is the wrong direction."""
         source = (REPO / "mlb_engine" / "allocate" / "contest_allocator.py").read_text(
             encoding="utf-8")
         tree = ast.parse(source)
@@ -23026,8 +23042,8 @@ class AllocatorTruthTests(unittest.TestCase):
         reentries = [n for n in ast.walk(func)
                      if isinstance(n, ast.Return) and isinstance(n.value, ast.Call)
                      and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(reentries), 3,
-                         f"expected three re-entry ladders, found {len(reentries)}")
+        self.assertEqual(len(reentries), 4,
+                         f"expected four re-entries, found {len(reentries)}")
         guards = [n for n in ast.walk(func)
                   if isinstance(n, ast.If)
                   and any(isinstance(b, ast.Return) and isinstance(b.value, ast.Call)
@@ -23038,8 +23054,8 @@ class AllocatorTruthTests(unittest.TestCase):
             test = ast.unparse(node.test)
             if "proven_infeasible" in test and "not slate_blocked" in test:
                 guarded += 1
-        self.assertEqual(guarded, 3,
-                         "a re-entry ladder is not guarded on both conjuncts")
+        self.assertEqual(guarded, 4,
+                         "a re-entry is not guarded on both conjuncts")
         # And the verdict it reads is computed from the failing checks, not
         # inlined per guard, so the three cannot disagree.
         self.assertIn("slate_blocked = bool(failing_feasibility_checks(feasibility_checks))",
@@ -23872,6 +23888,326 @@ class AntiCorrelationAgreementIsNullWhenUnmeasuredTests(unittest.TestCase):
         self.assertIsNone(block["applied"])
         self.assertEqual(block["observed"], [0, 3])
         self.assertIn("disagreement", block)
+
+
+class FullBankRetryBeforeStrategyRelaxationTests(unittest.TestCase):
+    """R326, 2026-09-09. The candidate prefilter is a SEARCH-EFFORT filter, and
+    a bank it restricted can be infeasible while the bank the caller handed in
+    is feasible. Every relaxation rung below the solve moves a STRATEGY control,
+    so without a full-bank retry the engine pays for its own filter's omission
+    with a looser cap, a smaller stack, or a refusal -- and says the bank was
+    thin.
+
+    Two independent mechanisms put a feasible bank out of reach, and this class
+    fixes both as separate witnesses because they fail through different loops:
+
+    (a) `PREFILTER_PER_ENTRY_RESERVE = 2` reserves two compatible candidates per
+        entry, which is not Hall's condition. 49 entries in one contest need 49
+        DISTINCT rosters; every entry having two options does not supply them.
+
+    (b) The stack / SP-pair coverage loop keeps ONE representative per bucket.
+        That stops a bucket being EMPTY, which is what it was written for, and
+        not its being UNDER-FILLED against a repetition cap. This is the
+        default-path witness: it needs no `candidate_prefilter_target`, because
+        `keep_target = max(6E, 40)` engages on any bank wider than 6E.
+
+    Measured at the parent commit, witness (b): 3 MILP calls, `candidate_reuse`
+    relaxed twice, `entries_emptied_by_prefilter == 0`, and errors[0] naming no
+    binding control -- the diagnostic CLAUDE.md's R157 clause licenses an
+    operator to answer by opening exposure caps, on a bank that assigned all 49
+    at `keep_target = K`.
+    """
+
+    E_N = 49
+
+    # -- witness (a): Hall's condition, via an explicit target ----------
+    @staticmethod
+    def _uniform_bank(k):
+        """K distinct rosters, one stack, one SP pair, descending score. Every
+        entry is compatible with every candidate, so nothing here is starved and
+        the ONLY scarce resource is distinct rosters for the uniqueness rule."""
+        out = []
+        for i in range(k):
+            pair = ["SPa", "SPb"]
+            roster = pair + ["h%d_%d" % (i, j) for j in range(8)]
+            out.append({
+                "candidate_id": "C%02d" % i, "lineup_ids": roster,
+                "player_ids": roster, "sp_ids": pair, "primary_stack": "AAA",
+                "primary_stack_size": 3,
+                "objective": 1000.0 - i, "contest_fit_score": 1000.0 - i,
+            })
+        return out
+
+    # -- witness (b): an under-filled bucket, on the DEFAULT path -------
+    N_HOT = 380
+    N_PAIRS_COLD = 20
+    N_PER_COLD = 3
+    CAP = 5
+
+    @classmethod
+    def _clustered_bank(cls):
+        """The high scores all share pair P0; twenty other pairs hold three
+        distinct rosters each and score last. Full-bank capacity under
+        `max_sp_pair_repetition=5` is 5 + 20*3 = 65 for 49 entries. Inside the
+        keep set the coverage loop leaves each cold pair exactly ONE member, so
+        capacity collapses to 5 + 20 = 25."""
+        out = []
+        for i in range(cls.N_HOT):
+            pair = ["P0a", "P0b"]
+            roster = pair + ["hot%d_%d" % (i, j) for j in range(8)]
+            out.append({
+                "candidate_id": "HOT%03d" % i, "lineup_ids": roster,
+                "player_ids": roster, "sp_ids": pair, "primary_stack": "AAA",
+                "primary_stack_size": 3,
+                "objective": 10000.0 - i, "contest_fit_score": 10000.0 - i,
+            })
+        for p in range(1, cls.N_PAIRS_COLD + 1):
+            for c in range(cls.N_PER_COLD):
+                pair = ["P%da" % p, "P%db" % p]
+                roster = pair + ["cold%d_%d_%d" % (p, c, j) for j in range(8)]
+                out.append({
+                    "candidate_id": "CLD%02d_%d" % (p, c), "lineup_ids": roster,
+                    "player_ids": roster, "sp_ids": pair, "primary_stack": "AAA",
+                    "primary_stack_size": 3,
+                    "objective": 1.0, "contest_fit_score": 1.0,
+                })
+        return out
+
+    @classmethod
+    def _entries(cls, n=None):
+        """One contest, so the per-contest uniqueness rule forces distinct
+        rosters and the joint problem is a matching problem."""
+        return [{"entry_id": str(e + 1), "contest_id": "c1",
+                 "contest_shape": "large_wta"}
+                for e in range(cls.E_N if n is None else n)]
+
+    OPEN = {"max_pitcher_exposure_pct": 1.0, "max_player_exposure_pct": 1.0,
+            "max_primary_stack_exposure_pct": 1.0}
+
+    @staticmethod
+    def _counting_solve(bank, entries, controls):
+        """`milp` is imported inside `select_and_assign_entries`, so the patch
+        goes on scipy itself -- same technique as PrefilterCompatibilityTests."""
+        import scipy.optimize as sopt
+        calls = {"n": 0}
+        real = sopt.milp
+
+        def counting(*a, **kw):
+            calls["n"] += 1
+            return real(*a, **kw)
+
+        sopt.milp = counting
+        try:
+            result = select_and_assign_entries(bank, entries, dict(controls))
+        finally:
+            sopt.milp = real
+        return calls["n"], result
+
+    @staticmethod
+    def _relaxations(result):
+        """Every rung's counter, summed. A rung that did not run reports None."""
+        total = 0
+        for key in ("candidate_reuse", "primary_stack_floor", "five_stack_quota"):
+            total += int((result.get(key) or {}).get("relaxations") or 0)
+        return total
+
+    # -- acceptance -----------------------------------------------------
+    def test_the_hall_witness_certifies_with_zero_relaxations(self):
+        """Witness (a). 49 entries, 50 distinct rosters, keep target 48: the
+        prefilter retains 48 and reports zero emptied entries, so nothing in the
+        old surfaces said the filter had made the problem unsolvable."""
+        calls, result = self._counting_solve(
+            self._uniform_bank(50), self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=99,
+                 candidate_prefilter_target=48))
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(len(result["assignments"]), self.E_N)
+        self.assertEqual(
+            len({r["candidate_id"] for r in result["assignments"]}), self.E_N,
+            "the per-contest uniqueness rule was satisfied by reuse, not by "
+            "distinct rosters")
+        self.assertEqual(self._relaxations(result), 0,
+                         "a strategy control moved to pay for the prefilter")
+
+    def test_the_default_path_witness_certifies_with_zero_relaxations(self):
+        """Witness (b), and the one that matters most: NO
+        `candidate_prefilter_target` is supplied, so this is the arithmetic
+        every wide slate gets."""
+        bank = self._clustered_bank()
+        calls, result = self._counting_solve(
+            bank, self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=self.CAP))
+        self.assertGreater(
+            len(bank), self.E_N * 6,
+            "the fixture stopped being wider than keep_target = 6E, so the "
+            "prefilter no longer engages and this test proves nothing")
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(len(result["assignments"]), self.E_N)
+        self.assertEqual(self._relaxations(result), 0,
+                         "a strategy control moved to pay for the prefilter")
+
+    def test_the_retry_is_one_extra_milp_call_and_only_one(self):
+        """The cost, stated: the restricted solve, then the full bank. The
+        quadratic overlap cost is paid ONCE and only on a restricted-bank
+        infeasibility, which is what keeps R294's speed on the happy path."""
+        calls, result = self._counting_solve(
+            self._clustered_bank(), self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=self.CAP))
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(calls, 2,
+                         "expected exactly the restricted solve plus one "
+                         "full-bank retry, with no rung in between")
+
+    def test_search_scope_says_which_bank_the_certificate_covers(self):
+        """The record R326 adds. A reader must be able to tell a certificate
+        earned on the whole bank from one earned on a filtered one."""
+        _, retried = self._counting_solve(
+            self._clustered_bank(), self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=self.CAP))
+        report = retried["allocation_solver_report"]
+        self.assertEqual(report["search_scope"], "full")
+        self.assertTrue(report["full_bank_retry"]["triggered"])
+        self.assertEqual(report["full_bank_retry"]["trigger"],
+                         "restricted_bank_proven_infeasible")
+        self.assertEqual(
+            report["full_bank_retry"]["restricted_candidates_in"],
+            len(self._clustered_bank()))
+        self.assertLess(
+            report["full_bank_retry"]["restricted_candidates_kept"],
+            report["full_bank_retry"]["restricted_candidates_in"],
+            "the recorded restricted keep set was not actually restricted")
+
+    def test_a_feasible_restricted_solve_never_retries(self):
+        """The happy path is untouched: one call, and the report says the
+        certificate covers the bank the prefilter chose, not the whole bank.
+        `search_scope` derives from the prefilter's own `applied`, so this is
+        also what stops the two fields disagreeing."""
+        calls, result = self._counting_solve(
+            self._clustered_bank(), self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=99))
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertEqual(calls, 1, "a feasible restricted solve paid for a retry")
+        report = result["allocation_solver_report"]
+        self.assertEqual(report["search_scope"], "restricted")
+        self.assertTrue(report["candidate_prefilter"]["applied"])
+        self.assertFalse(report["full_bank_retry"]["triggered"])
+
+    def test_scope_is_full_when_the_prefilter_never_engaged(self):
+        """A bank narrower than the keep target is a full-bank solve already,
+        and the field must say so rather than defaulting to `restricted`. A
+        reader must not have to know which branch ran.
+
+        20 candidates against MIN_CANDIDATE_PREFILTER_FLOOR = 40 is what makes
+        the prefilter take its `K <= keep_target` early return; the assertion
+        below pins that rather than trusting the arithmetic to stay true."""
+        from mlb_engine.allocate.contest_allocator import (
+            MIN_CANDIDATE_PREFILTER_FLOOR)
+        bank = self._uniform_bank(20)
+        self.assertLessEqual(
+            len(bank), MIN_CANDIDATE_PREFILTER_FLOOR,
+            "the fixture outgrew the prefilter floor, so the prefilter engages "
+            "and this test no longer exercises the not-applied path")
+        _, result = self._counting_solve(
+            bank, self._entries(2),
+            dict(self.OPEN, max_sp_pair_repetition=99))
+        self.assertTrue(result["passed"], result.get("errors"))
+        report = result["allocation_solver_report"]
+        self.assertFalse(report["candidate_prefilter"]["applied"])
+        self.assertEqual(report["search_scope"], "full")
+        self.assertFalse(report["full_bank_retry"]["triggered"])
+
+    def test_a_genuinely_infeasible_full_bank_still_refuses(self):
+        """The retry widens the search; it does not invent feasibility. With
+        K >= E and a shared-player cap that no assignment can satisfy, the full
+        bank fails joint feasibility too, and the refusal must survive -- with
+        the scope recorded as `full`, so the refusal is not read as a filter
+        artifact the way the pre-R326 one could be."""
+        bank = self._uniform_bank(400)
+        # Every roster shares both arms, so a cap of 1 shared player cannot be
+        # met by any two entries at once.
+        _, result = self._counting_solve(
+            bank, self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=99, max_shared_players=1))
+        self.assertFalse(result["passed"],
+                         "an unsatisfiable shared-player cap certified")
+        report = result["allocation_solver_report"]
+        self.assertEqual(report["search_scope"], "full",
+                         "the refusal was reported against a restricted bank "
+                         "even though the full bank was solved")
+        self.assertTrue(report["full_bank_retry"]["triggered"])
+
+    def test_the_retry_fires_once_and_does_not_recurse(self):
+        """`_search_state` is what bounds it. Without that flag an infeasible
+        full bank would re-enter forever, because the condition that triggered
+        the retry is still true on the retried pass."""
+        bank = self._uniform_bank(400)
+        calls, result = self._counting_solve(
+            bank, self._entries(),
+            dict(self.OPEN, max_sp_pair_repetition=99, max_shared_players=1))
+        self.assertFalse(result["passed"])
+        self.assertLessEqual(
+            calls, 6,
+            "the full-bank retry recursed instead of descending the rungs")
+
+    def test_an_unrestricted_bank_does_not_buy_a_pointless_retry(self):
+        """The `applied` half of the guard, on its own. When the prefilter never
+        engaged, the solve ALREADY saw every candidate, so a retry would re-run
+        an identical MILP and reach an identical infeasibility. Without this the
+        retry costs one wasted full solve on every unrestricted refusal, and the
+        report would claim a widened search that never happened."""
+        from mlb_engine.allocate.contest_allocator import (
+            MIN_CANDIDATE_PREFILTER_FLOOR)
+        bank = self._uniform_bank(20)
+        self.assertLessEqual(len(bank), MIN_CANDIDATE_PREFILTER_FLOOR)
+        calls, result = self._counting_solve(
+            bank, self._entries(2),
+            dict(self.OPEN, max_sp_pair_repetition=99, max_shared_players=1))
+        self.assertFalse(result["passed"],
+                         "the fixture stopped being infeasible, so it no longer "
+                         "reaches the retry site at all")
+        report = result["allocation_solver_report"]
+        self.assertFalse(report["candidate_prefilter"]["applied"])
+        self.assertFalse(
+            report["full_bank_retry"]["triggered"],
+            "an unrestricted solve reported a full-bank retry it did not need")
+        self.assertEqual(report["search_scope"], "full")
+        # NOT a call count. This fixture makes two MILP calls and the second is
+        # the engine-default reuse rung stepping, which is R116's behaviour and
+        # nothing to do with R326. `triggered` is the field that separates a
+        # widened search from a rung, which is exactly why it is recorded.
+
+    def test_a_time_limit_never_triggers_the_retry(self):
+        """The guard is `proven_infeasible`, and read the other way it is the
+        rule R294(c) already applies to all three rungs: a compute limit may not
+        move a control, and here it must not widen the bank either. A time limit
+        means the model was ALREADY too big for the clock, so re-solving on a
+        larger bank is the wrong direction."""
+        import scipy.optimize as sopt
+        calls = {"n": 0}
+        real = sopt.milp
+
+        def timing_out(*a, **kw):
+            calls["n"] += 1
+            res = real(*a, **kw)
+            res.status = 1          # time limit
+            res.success = False
+            res.x = None
+            return res
+
+        sopt.milp = timing_out
+        try:
+            result = select_and_assign_entries(
+                self._clustered_bank(), self._entries(),
+                dict(self.OPEN, max_sp_pair_repetition=self.CAP))
+        finally:
+            sopt.milp = real
+        self.assertFalse(result["passed"])
+        self.assertEqual(calls["n"], 1,
+                         "a time limit bought a full-bank retry")
+        report = result["allocation_solver_report"]
+        self.assertEqual(report["status"], "time_limit")
+        self.assertEqual(report["search_scope"], "restricted")
+        self.assertFalse(report["full_bank_retry"]["triggered"])
 
 
 if __name__ == "__main__":

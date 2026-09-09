@@ -25,6 +25,184 @@ performance claim.
 
 ---
 
+## 2026-09-09 — R326: the candidate prefilter is search effort, and a bank it narrowed no longer buys a looser portfolio
+
+Session 4 of the execution roadmap, standalone. Gate before:
+`PASS  v2.26.0  28 modules  1925 tests` (the pin at `9e7b2bf`; per-suite
+test_core 1205, test_showdown 219, test_upload_integrity 394,
+test_golden_replay 9, test_paste_lineups 98). Gate after:
+`PASS  v2.26.0  28 modules  1935 tests`. Golden replay bytes unmoved (9/9).
+Hand mutation check: nine mutants, eight killed, one EQUIVALENT and proved so
+rather than weakened (table below); one survivor on the first pass was a fixture
+gap and the fixture was added.
+
+**Verification ran in the cloud container, not on the mount.** `device_bash`
+was down all session (`no Plan9 drive shares mounted under
+/mnt/.virtiofs-root/shared`), so the suite ran on a GitHub clone overlaid with
+the disk copy of every file that differs. `contest_allocator.py` is
+byte-identical between disk and `origin/main`, so the subject of this change was
+the real one. The clone cannot see Session 3's 45 new `test_core` tests, so the
+container measured `1170 = 1160 + 10` and `1890` total; the pins written here
+are the disk arithmetic, `1205 + 10 = 1215` and `1935`. Five skips, all clone
+artifacts and none in the allocator: two `2026-08-16 salary file not staged`,
+one `no .env on this machine`, one `no vendored .pylibs/scipy in this checkout`,
+one `no Classic salary file on disk`. Per CLAUDE.md that is LOST COVERAGE in the
+container and not a clean line; on the mount those five run.
+
+### R326. `_prefilter_candidates` does not preserve JOINT feasibility, and every relaxation rung below it was paying for that
+
+**What.** The prefilter is a SEARCH-EFFORT filter: it exists because the
+pairwise overlap block is K-squared. R294(a) gave it a per-entry reserve of
+`PREFILTER_PER_ENTRY_RESERVE = 2` and an `entries_emptied_by_prefilter` counter.
+Two options per entry is not Hall's condition, and the counter cannot see a
+violation of it: every entry can hold two options while the retained bank admits
+no system of distinct representatives. On that infeasibility the call site
+handed the failure straight to the three relaxation ladders, which move STRATEGY
+controls (the engine-default reuse cap, the five-stack share quota, the
+primary-stack floor) to pay for a filter's omission, and then reported the bank
+as the cause.
+
+**Why P1.** Criterion (2): a certified file quietly carrying a relaxed cap or a
+smaller stack, invisible in the delivered file and visible only as a relaxation
+counter the operator has been taught to expect. The measurement below makes it
+sharper than the entry did: on the default-path witness `errors[0]` read *"no
+single control is arithmetically binding against this bank, so the interaction
+of the active controls is"*, which is the exact diagnostic CLAUDE.md's R157
+clause licenses an operator to answer by OPENING exposure caps. So the pre-fix
+behaviour did not merely relax a cap silently; it emitted the string that invites
+a human to relax three more, on a bank that assigned all 49 entries untouched.
+
+**Two premise corrections, both against the filed entry.** Recorded because the
+entry would otherwise send its next reader to a fixture that cannot fire.
+
+1. **The 49/50/48 witness is HELPER-scoped, and the entry presents it as the
+   defect's shape without saying so.** It reproduces exactly as filed (50
+   candidates, keep target 48, 48 kept, `entries_emptied_by_prefilter: 0`, Hall
+   violated on the kept set, restricted MILP infeasible, full bank assigns 49)
+   but only with `controls["candidate_prefilter_target"] = 48` supplied. On the
+   default path `keep_target = max(E * 6, 40)`, which for E=49 is 294 against a
+   bank of 50, so `_prefilter_candidates` takes its `K <= keep_target` early
+   return and never runs. The edition measured the helper; the entry reads as a
+   production path.
+2. **A DEFAULT-path witness does exist, through a mechanism the entry never
+   names, and it is the one that matters.** The stack / SP-pair coverage loop
+   keeps ONE representative per bucket. That stops a bucket being EMPTY, which is
+   what it was written for, and says nothing about its being UNDER-FILLED against
+   a repetition cap. Measured at `9e7b2bf`: 440 candidates, 49 entries in one
+   contest, `max_sp_pair_repetition=5`, no `candidate_prefilter_target` set, so
+   `keep_target = 294` and the prefilter engages on its own arithmetic. Full-bank
+   capacity is `min(380, 5) + 20 x min(3, 5) = 65` for 49 entries. Inside the
+   keep set every cold pair is left exactly one member, so capacity collapses to
+   `5 + 20 = 25`. Result: 3 MILP calls, `candidate_reuse` relaxed twice,
+   `entries_emptied_by_prefilter: 0`, refusal. The same bank at
+   `keep_target = K`: 1 call, 49 distinct assignments, zero relaxations.
+
+**Fix.** On a PROVEN restricted-bank infeasibility, before any rung, re-enter on
+the full bank and only then descend. Expressed as `keep_target = len(candidates)`
+rather than by skipping the prefilter call, so the retry's `prefilter_report` is
+a real report from the same helper and `search_scope` derives from that report's
+own `applied` instead of from a second flag that could disagree with it.
+`allocation_solver_report` gains `search_scope` (`restricted` / `full`) and
+`full_bank_retry` (`triggered`, `trigger`, `restricted_candidates_kept`,
+`restricted_candidates_in`); the report is one dict shared by all three return
+paths, so the refusal path carries it too, which is where it matters most: a
+refusal now saying whether it was earned against the whole bank. The prefilter
+stays on the happy path: R294's speed is unchanged and the quadratic overlap cost
+is paid once, only on a restricted-bank infeasibility.
+
+**Guarded on `proven_infeasible and not slate_blocked`, like every rung, and the
+reason inverts.** For a rung, a time limit must not move a strategy control. For
+the retry, a time limit means the model was ALREADY too big for the clock, so
+re-solving on a larger bank is the wrong direction. Same conjunct, opposite
+argument, both correct.
+
+**After: both witnesses certify with zero relaxations, in exactly 2 MILP calls**
+(the restricted attempt, then the retry, with no rung in between).
+
+**R233 enumeration.** The class this touches is re-entries into
+`select_and_assign_entries`, and it grew from three to four. AST-scoped, because
+a substring count also finds `allocate_entries`' top-level call, where a private
+state kwarg would be a defect:
+
+    python - <<'EOF'
+    import ast; from pathlib import Path
+    src = Path('mlb_engine/allocate/contest_allocator.py').read_text()
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == 'select_and_assign_entries')
+    for c in sorted((n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                     and getattr(n.func, 'id', '') == 'select_and_assign_entries'),
+                    key=lambda c: c.lineno):
+        print(c.lineno, sorted(k.arg for k in c.keywords if k.arg.endswith('_state')))
+    EOF
+
+Hit list at this head, all four carrying all four states:
+
+    3197  ['_floor_state', '_quota_state', '_reuse_state', '_search_state']   <- R326 retry (first)
+    3231  ['_floor_state', '_quota_state', '_reuse_state', '_search_state']   <- engine-default reuse cap
+    3289  ['_floor_state', '_quota_state', '_reuse_state', '_search_state']   <- five-stack quota
+    3327  ['_floor_state', '_quota_state', '_reuse_state', '_search_state']   <- primary-stack floor
+
+Two existing AST census tests already enumerated this class at three and both
+went RED on the fourth, which is the enumeration doing its job rather than a
+cascade: `AllocatorTruthTests.test_the_three_guards_all_read_proven_infeasible_and_slate_blocked`
+and `FiveStackQuotaLadderTests.test_every_ladder_re_entry_carries_every_sibling_ladder_state`.
+Both were updated to 4 with the ladder-vs-retry distinction written into the
+docstring, not loosened. The sibling class `keep_target =` has exactly ONE
+assignment site (`:2768`), so the widening has no N+1 site.
+
+**Mutation table.** Control run green before each; every mutant reverted in a
+`finally`.
+
+| # | Mutant | Verdict |
+| :-- | :--- | :--- |
+| M1 | drop the `proven_infeasible` guard (a timeout retries too) | killed |
+| M2 | drop the once-only `not _full_bank_retry` guard | **EQUIVALENT**, see below |
+| M3 | drop the `prefilter_report["applied"]` guard | killed (after a fixture was added) |
+| M4 | `search_scope` hardcoded to `full` | killed |
+| M5 | `search_scope` hardcoded to `restricted` | killed |
+| M6 | `search_scope` polarity inverted | killed |
+| M7 | the retry does not widen the bank (`keep_target` unchanged) | killed |
+| M8 | `full_bank_retry.triggered` always False | killed |
+| M9 | the retry runs after the reuse rung instead of before | killed |
+
+**M2 is an equivalent mutant and the guard is kept anyway.** Instrumented over a
+run that retries and then descends all three rungs, `_prefilter_candidates` is
+entered four times: `K=400 keep_target=294 applied=True`, then three passes at
+`K=400 keep_target=400 applied=False`. Because the retry sets
+`keep_target = len(candidates)`, the helper's `K <= keep_target` early return
+always fires on a retried pass, so `applied` is already False and the
+`not _full_bank_retry` term cannot change the branch. It stays because dropping
+it would make termination depend on the early-return branch of a different
+function; it is named here with the reason rather than left as an unexplained
+survivor.
+
+**M3 survived its first pass and that was a fixture gap, not a weak mutant.**
+Without the `applied` guard, a bank the prefilter never restricted buys one
+wasted identical full solve and reports a widened search that never happened.
+`test_an_unrestricted_bank_does_not_buy_a_pointless_retry` closes it. Its first
+draft also asserted a MILP call count of 1 and that was wrong: the fixture makes
+two calls and the second is R116's engine-default reuse rung, which is correct
+behaviour and nothing to do with R326. The assertion was moved to
+`full_bank_retry.triggered`, which is the field that actually separates a widened
+search from a rung, and is the reason the field is recorded at all.
+
+**Ten tests, `tests/test_core.FullBankRetryBeforeStrategyRelaxationTests`**
+(1205 -> 1215): both feasibility witnesses certifying with zero relaxations, the
+two-call cost, `search_scope` on the retried path, the happy path that must not
+retry, the not-applied path that must report `full` rather than defaulting to
+`restricted`, the unrestricted bank that must not retry, a genuinely infeasible
+full bank that must still refuse with the scope recorded, the once-only bound,
+and the time limit that must not retry. Two of them assert their own fixture
+preconditions (`len(bank) > 6E`, `len(bank) <= MIN_CANDIDATE_PREFILTER_FLOOR`)
+so a later constant change fails loudly instead of quietly proving nothing.
+
+**Not done here, named so it is not assumed.** `search_scope` reaches the brief
+by `execution_pipeline:3492-3493` copying the whole `allocation_solver_report`
+into the verdict; no brief RENDERER was changed, so the field is present in the
+artifact and is not yet a printed line. If a printed line is wanted it is a
+separate XS. The overlap cost of a full-bank solve is R87/R321's subject
+(Sessions 21-23) and is unchanged.
+
 ## 2026-09-09 — Board: the five-fragment inbox reviewed, three 2026-09-08 BUILD fragments consumed into R333 and R334 plus five riders, two fragments retained on re-checked conditions, and SKILL.md's leverage starting cap corrected
 
 **Scope: docs only.** This commit touches `docs/backlog.md`, this file,

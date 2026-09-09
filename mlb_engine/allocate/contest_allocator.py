@@ -2459,6 +2459,7 @@ def select_and_assign_entries(
     _floor_state: Optional[Mapping[str, Any]] = None,
     _reuse_state: Optional[Mapping[str, Any]] = None,
     _quota_state: Optional[Mapping[str, Any]] = None,
+    _search_state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
@@ -2526,6 +2527,12 @@ def select_and_assign_entries(
     position, the relaxation record, and the dropped-default flag across the
     re-entries this function makes into itself after the MILP PROVES the
     corresponding control infeasible. Never pass either from outside.
+
+    ``_search_state`` is private and is R326's. It carries one fact -- that the
+    restricted bank was already proven infeasible and this re-entry is the
+    FULL-bank retry -- so the retry happens once and never recurses. Never
+    pass it from outside. ``allocation_solver_report.search_scope`` says which
+    bank the certificate covers, ``restricted`` or ``full``.
     """
     candidates = list(candidates)
     # Kept whole for the floor re-entry below: `candidates` is rebound by the
@@ -2751,10 +2758,19 @@ def select_and_assign_entries(
     # pushes this solve into its own time limit, and a time limit here used to
     # read as "infeasible". Prefiltering reduces search effort; it never touches
     # the legal player set, and forced-coverage candidates are kept outright.
-    keep_target = max(
-        int(controls.get("candidate_prefilter_target")
-            or E * DEFAULT_CANDIDATE_PREFILTER_MULTIPLE),
-        MIN_CANDIDATE_PREFILTER_FLOOR,
+    # R326. The full-bank retry sets the keep target to the whole bank, so
+    # `_prefilter_candidates` takes its `K <= keep_target` early return and the
+    # MILP sees every candidate. Expressed as a keep target rather than by
+    # skipping the call, so the retry's `prefilter_report` is a real report from
+    # the same helper and `search_scope` below derives from it rather than from
+    # a second flag that could disagree with it.
+    _full_bank_retry = bool((_search_state or {}).get("full_bank"))
+    keep_target = (
+        len(candidates) if _full_bank_retry else max(
+            int(controls.get("candidate_prefilter_target")
+                or E * DEFAULT_CANDIDATE_PREFILTER_MULTIPLE),
+            MIN_CANDIDATE_PREFILTER_FLOOR,
+        )
     )
     kept_idx, prefilter_report = _prefilter_candidates(
         candidates, entries, full_compatible, keep_target
@@ -3058,6 +3074,21 @@ def select_and_assign_entries(
         "mip_gap": mip_gap,
         "optimality": None,
         "candidate_prefilter": prefilter_report,
+        # R326. Which bank this certificate covers. Derived from the
+        # prefilter's own `applied`, so it cannot disagree with it: a
+        # restricted solve is one the prefilter actually restricted.
+        "search_scope": "restricted" if prefilter_report["applied"] else "full",
+        "full_bank_retry": (
+            {
+                "triggered": True,
+                "trigger": "restricted_bank_proven_infeasible",
+                "restricted_candidates_kept": (
+                    (_search_state or {}).get("restricted_candidates_kept")),
+                "restricted_candidates_in": (
+                    (_search_state or {}).get("restricted_candidates_in")),
+            }
+            if _full_bank_retry else {"triggered": False}
+        ),
     }
 
     incumbent = None
@@ -3136,6 +3167,51 @@ def select_and_assign_entries(
             errors = errors + _infeasibility_remedies(
                 bank_report, binding, feasibility_checks=feasibility_checks)
 
+        # R326, 2026-09-09. The full-bank retry goes before EVERY rung below.
+        # The prefilter reserves two compatible candidates per entry, which is
+        # not Hall's condition, and its stack/SP-pair coverage loop keeps ONE
+        # representative per bucket, which stops a bucket being EMPTY but not
+        # its being under-filled against a repetition cap. So a restricted bank
+        # can be infeasible while the bank the caller handed in is feasible, and
+        # every rung below would then relax a STRATEGY control -- the reuse cap,
+        # the five-stack quota, the primary-stack floor -- to pay for a search
+        # filter's omission. Measured at the parent commit on a 440-candidate /
+        # 49-entry default-path witness (no `candidate_prefilter_target` set,
+        # keep_target = max(6E, 40) = 294): 3 MILP calls, candidate_reuse
+        # relaxed twice, zero entries reported emptied, and errors[0] read "no
+        # single control is arithmetically binding against this bank, so the
+        # interaction of the active controls is" -- the exact diagnostic
+        # CLAUDE.md's R157 clause licenses an operator to answer by OPENING
+        # exposure caps. The same bank at keep_target = K: 1 call, 49 distinct
+        # assignments, zero relaxations.
+        #
+        # Guarded on `proven_infeasible` like every rung below, and for the same
+        # reason read the other way: a TIME LIMIT means the model was already too
+        # big for the clock, and re-solving on a larger bank is the wrong
+        # direction. `_search_state` makes this fire once, so a full bank that is
+        # genuinely infeasible descends the rungs on the next pass instead of
+        # recursing.
+        if (proven_infeasible and (not slate_blocked)
+                and prefilter_report["applied"]
+                and not _full_bank_retry):
+            return select_and_assign_entries(
+                _all_candidates, entry_requirements, portfolio_controls,
+                bank_report=bank_report, fixed_exposure=fixed_exposure,
+                feasibility_inputs=feasibility_inputs,
+                feasibility_checks=feasibility_checks,
+                # Every sibling state rides this re-entry, same rule as R116 and
+                # R37(2)(b): the retry widens the SEARCH and must not silently
+                # reset a ladder position the earlier passes paid for.
+                _floor_state=_floor_state,
+                _reuse_state=_reuse_state,
+                _quota_state=_quota_state,
+                _search_state={
+                    "full_bank": True,
+                    "restricted_candidates_kept": prefilter_report["candidates_kept"],
+                    "restricted_candidates_in": prefilter_report["candidates_in"],
+                },
+            )
+
         # R116. The engine's own default goes FIRST, before the floor ladder
         # steps and before the refusal is written. The ordering is the point: a
         # primary-stack floor is a strategy control Ben decided on archive
@@ -3177,6 +3253,8 @@ def select_and_assign_entries(
                 # control this solve already proved infeasible and buys an extra
                 # round trip per rung.
                 _quota_state=_quota_state,
+                # R326: and the search scope's, for the same reason.
+                _search_state=_search_state,
             )
 
         # R37(2)(b), 2026-08-28. The five-stack quota steps BEFORE the
@@ -3220,6 +3298,8 @@ def select_and_assign_entries(
                         "relaxations": int(quota_report.get("relaxations") or 0) + 1,
                         "relaxation_steps": q_stepped,
                     },
+                    # R326: and the search scope's, for the same reason.
+                    _search_state=_search_state,
                 )
 
         # R37. The one re-entry. A PROVEN infeasibility with the floor active is
@@ -3261,6 +3341,8 @@ def select_and_assign_entries(
                         "relaxations": int(floor_report.get("relaxations") or 0) + 1,
                         "relaxation_steps": stepped,
                     },
+                    # R326: and the search scope's, for the same reason.
+                    _search_state=_search_state,
                 )
 
         # R294(c). Only a PROVEN infeasibility has binding constraints to name.

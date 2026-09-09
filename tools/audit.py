@@ -631,7 +631,14 @@ EXPECTED_SUITE_COUNTS = {
     # surviving `mode='portfolio_ev'` token named rather than silently exempt.
     # Six on the fragment's `agrees_with_request`, including the split-bank case
     # that proves the new null did not silence R293's own disagreement.
-    "tests.test_core": 1205,
+    # R326, 2026-09-09: 1205 -> 1215, the ten that pin the full-bank retry
+    # before any strategy relaxation -- both feasibility witnesses (Hall via
+    # the per-entry reserve, and an under-filled SP-pair bucket on the
+    # DEFAULT keep_target), the search_scope record on all three report
+    # paths, the happy path that must not retry, the unrestricted bank that
+    # must not retry, the time limit that must not retry, and the once-only
+    # bound.
+    "tests.test_core": 1215,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
