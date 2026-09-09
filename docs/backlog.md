@@ -58,7 +58,9 @@ catching a bad upload, (5) the record true at T-5, (6) hygiene. Nothing here is
 a win rate or an EV claim. Complexity: Low = XS/S, Med = S-M/M, High = L.
 Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 `docs/backlog_inbox/2026-09-06_BUILD_dk-order-coverage-blind-on-showdown-geometry.md`
-(consumed), Backlog = an entry already on this board.
+(consumed) and, from 2026-09-09, the three 2026-09-08 BUILD fragments consumed that
+date (`2140_5g-no-game-level-exposure-control`, `2140_5g-no-reachable-named-book-odds-source`,
+`2210_1g_sd_appg-is-blind-to-opponent-quality`), Backlog = an entry already on this board.
 
 ### Phase A -- immediate: referee and pool truth, slate-lock reliability
 
@@ -81,9 +83,10 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 | **Session 9** | `Batch (2 of 4)` | **R319 -- two paste name-form defects on the one input that turns on F4.** A shared normalized name mints a false team-disagreement warning (`paste_lineups.py:803`); a DK first-name alias reports a rostered starter as `NOT IN DK POOL`. | Backlog | `mlb_engine/intake/paste_lineups.py`, `tools/lineups_from_paste.py` | Med | Low | None |
 | **Session 9** | `Batch (3 of 4)` | **R320 -- `factors_inert` cannot see a half-inert composite; the Showdown brief emits no platoon counter.** "none inert" printed over `f4_platoon_applied: 0`. | Backlog | `build_slate.py` brief (`:2237`), `run_showdown` | Med | Low | None |
 | **Session 9** | `Batch (4 of 4)` | **R332 (NEW, from the 1835_5g BUILD fragment) -- the handedness backfill that closes `f4_platoon_applied: 0` on a DK-covered slate is a per-slate hand-roll in a gitignored scratch file.** R143's zero-fetch path is the normal state of a fully DK-covered slate and DK ships no handedness, so F4's platoon half goes neutral on exactly those slates. Measured on 1835_5g: 0 -> 90 of 90 applied, and it re-ordered the portfolio (LAA highest mean F4 1.063 at the slate's lowest F1 0.924, 2 of 9 primary stacks; BOS lowest at 0.909, 1), an ordering invisible with the term neutral. Wants `tools/handedness_paste.py` plus a cached `data/reference/handedness.csv` aged PER PLAYER (R317(b) arriving before the file exists). | Inbox | new `tools/handedness_paste.py`, `data/reference/handedness.csv`, `tools/lineups_from_paste.py` | Med (F4 is inert on every DK-covered slate) | Low | None |
-| **Session 10** | `Batch (1 of 3)` | **R237 (+ed12 F04 rider) -- uncomputed and computed-neutral are different facts; and "applied somewhere" is not coverage.** F04: `_applied` (`execution_pipeline.py:1121-1160`) lets ONE applied odds/weather row clear a slate-wide gate. Field-scope the evidence decision per game; fixed-roof games get an explicit `not_applicable`; stale provider timestamps are not renewed by `fetched_at`. | Backlog / Spec | `execution_pipeline.py` gates (`_derive_workflow_gates`), brief surfaces | Med | Low | None |
-| **Session 10** | `Batch (2 of 3)` | **R224 -- two Showdown cap-resolver smalls** on the surfaces R157 sends operators to read. | Backlog | `showdown_theses.py` report, `build_slate.py` | Low | Low | None |
-| **Session 10** | `Batch (3 of 3)` | **R247(b) -- the cap reassignment records a label move, not the proxy delta it cost.** Re-read its premise against R295(b) first. | Backlog | `showdown_theses.py` `player_exposure.cap_reassignments` | Low | Low | Session 8 (R295(b) premise) |
+| **Session 10** | `Batch (1 of 4)` | **R237 (+ed12 F04 rider) -- uncomputed and computed-neutral are different facts; and "applied somewhere" is not coverage.** F04: `_applied` (`execution_pipeline.py:1121-1160`) lets ONE applied odds/weather row clear a slate-wide gate. Field-scope the evidence decision per game; fixed-roof games get an explicit `not_applicable`; stale provider timestamps are not renewed by `fetched_at`. | Backlog / Spec | `execution_pipeline.py` gates (`_derive_workflow_gates`), brief surfaces | Med | Low | None |
+| **Session 10** | `Batch (2 of 4)` | **R224 -- two Showdown cap-resolver smalls** on the surfaces R157 sends operators to read. | Backlog | `showdown_theses.py` report, `build_slate.py` | Low | Low | None |
+| **Session 10** | `Batch (3 of 4)` | **R247(b) -- the cap reassignment records a label move, not the proxy delta it cost.** Re-read its premise against R295(b) first. | Backlog | `showdown_theses.py` `player_exposure.cap_reassignments` | Low | Low | Session 8 (R295(b) premise) |
+| **Session 10** | `Batch (4 of 4)` | **R334(c)(d) (NEW, from the 2210_1g_sd BUILD fragment) -- the Showdown APPG Base is blind to the opposing arm; the warning and sanity-pass halves.** (c) a brief NOTE on any Showdown build whose Base is APPG when the two declared arms' expected stats differ by more than a stated margin, the condition under which the defect is largest and knowable before the first solve; (d) a `--projections` semantic sanity pass naming hitters whose supplied Base rank contradicts their Savant rate-stat rank (it would have caught two holes in the filing session's own v1 prior). R310(b)'s shape: report, never a gate. | Inbox | `build_slate.py` `run_showdown` brief, `showdown.py` beside `small_sample_base_report`, `data/reference/expected_stats_*.csv` | Med (one game, one arm per side; the mis-ranking is systematic by side and no cap touches it) | Low | None |
 | **Session 11** | `Batch (1 of 4)` | **R328 (NEW, ed12 F27) -- Showdown ownership marginals exceed 100% and captain can exceed roster.** `_showdown_prediction` (`ownership_prior.py:676-727`) multiplies an unconstrained softmax by the slot count, enforcing the 600% total and nothing per player (reproduced: six-for-six -> 8% .. 316%). Project onto the capped simplex (all ones when players == slots), enforce `0 <= captain_p <= roster_p <= 1`, reject NaN/inf/out-of-range before any `--leverage` or sleeve use; keep unrounded values internally. This is arithmetic, not calibration. | Spec | `mlb_engine/field/ownership_prior.py`, `tools/ownership_pred.py`, `tests/test_core.py` | Med-High (R307's sleeve and `--leverage` consume these numbers) | Low | None; gates Session 12 |
 | **Session 11** | `Batch (2 of 4)` | **R225 (+ed12 F28 rider) -- Showdown duplication counting is captain-blind**, now at FOUR sites: the three miner sites and preflight's `advisory` (`preflight_upload.py:2330-2345`). One identity function: Showdown keys on `(players_norm, captain_norm)`, Classic on `players_norm`; person-set overlap kept as a separate measure. Re-derivable from archived `mined_*.json`, no re-mine. | Backlog / Spec | `mlb_engine/field/field_miner.py`, `tools/preflight_upload.py` | Med (R10's Showdown cells inherit the count) | Low | None; gates Session 28 |
 | **Session 11** | `Batch (3 of 4)` | **R226 -- the contest "winner" is the max-points complete entry, not the verified rank-1 row.** | Backlog | `field_miner.py` | Low | Low | None |
@@ -108,8 +111,9 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 | **Session 17** | `Batch (4 of 4)` | **R120 -- a delivered upload-ready file names a run directory that does not exist on the mount.** | Backlog | `build_slate.py` brief, `upload_manifest.py` | Low | Low | None |
 | **Session 18** | `Batch (1 of 2)` | **R329 (NEW, ed12 F11) -- the cache union resurrects removed state.** `drop_stale_jobs` (`bank_cache.py:209-256`) removes a candidate and its job in memory; `save` (`:284-340`) union-merges with disk and reload restores both (reproduced). No tombstones; concurrent read/union/replace can also lose additions. Namespace durable state by the problem digest from Batch 2 and insert transactionally; never union distinct epochs; a timeout is never inserted as an answered job. | Spec | `mlb_engine/optimize/bank_cache.py`, `tests/test_core.py` | Med | Low-Med | Land at a slate boundary (re-key orphans live buckets; run `solver_probe` after) |
 | **Session 18** | `Batch (2 of 2)` | **R290(a) (+ed12 F10 rider) -- the bank's identity is not the problem's identity.** `conditions_signature` omits R246's leverage controls (filed); F10 (reproduced) widens it: changing Team, Position, Game_ID or predictive ownership leaves BOTH digests (`_projection_bytes`, `projection_digest`, `:543-621`) unchanged, so an answered job is reused for a different question. Hash the canonical complete problem (players with every consumed field, rules, controls, objective, versions); and every cached candidate passes the current rule/lock/strategy validator before entering allocation, because a key alone cannot stop an old candidate violating a new bound. | Backlog / Spec | `mlb_engine/optimize/bank_cache.py` | Med (a candidate built under relaxed leverage entering a stricter allocation) | Low-Med | Same boundary as Batch 1 |
-| **Session 19** | `Batch (1 of 2)` | **R166 (+ed12 F17 rider) -- the post-R61 controls never got fixed-row denominators**, Classic (reuse default inert on scoped swaps, whole-file reuse cap breachable, five-stack floor counts solve entries only) and now Showdown: `solve_ladder` (`showdown_theses.py:1070-1138`) initializes exposure counts from NEW rows only, so preserved entries consume no captain/player headroom. Seed counts from fixed rows, combined denominator, `floor(alpha*N)` residuals; fixed rows already over a cap are a policy conflict, never a negative bound. | Backlog / Spec | `mlb_engine/allocate/contest_allocator.py`, `showdown_theses.py`, `build_slate.py:3223-3230, 3294-3325` | Med (late-swap caps) | Low-Med | None |
-| **Session 19** | `Batch (2 of 2)` | **R284 -- a leverage cap binds at BUILD and not at REFINE**: `late_swap.py` calls `extend_bank` twice with no `leverage`. | Backlog | `tools/late_swap.py` | Med | Low | None |
+| **Session 19** | `Batch (1 of 3)` | **R166 (+ed12 F17 rider) -- the post-R61 controls never got fixed-row denominators**, Classic (reuse default inert on scoped swaps, whole-file reuse cap breachable, five-stack floor counts solve entries only) and now Showdown: `solve_ladder` (`showdown_theses.py:1070-1138`) initializes exposure counts from NEW rows only, so preserved entries consume no captain/player headroom. Seed counts from fixed rows, combined denominator, `floor(alpha*N)` residuals; fixed rows already over a cap are a policy conflict, never a negative bound. | Backlog / Spec | `mlb_engine/allocate/contest_allocator.py`, `showdown_theses.py`, `build_slate.py:3223-3230, 3294-3325` | Med (late-swap caps) | Low-Med | None |
+| **Session 19** | `Batch (2 of 3)` | **R284 -- a leverage cap binds at BUILD and not at REFINE**: `late_swap.py` calls `extend_bank` twice with no `leverage`. | Backlog | `tools/late_swap.py` | Med | Low | None |
+| **Session 19** | `Batch (3 of 3)` | **R333 (NEW, from the 2140_5g BUILD fragment) -- the game-exposure control is DEAD from every production door.** `max_game_exposure_pct_by_game` builds allocator rows (`contest_allocator.py:2966-2990`) and validator checks, and `late_swap.py:214` steers operators to it as the binding control, but nothing in production writes the `player_game_by_id` map the allocator requires (`:2968-2974`; the only writers are two tests), so an override refuses with `requires controls['player_game_by_id']`. No slate-wide form, no posture default, not in the relaxation order, zero SKILL.md mentions; and the F5 weather cap (`slate_intake_manager.py:1065`, 0.25 on medium postponement risk) is reported at `build_slate.py:1626` and never applied. Populate the map from the frame's `Game_ID` at the control merge; add the scalar `max_game_exposure_pct` expanding to every game, in the fraction gate and the relaxation order after player exposure; wire the weather cap by MIN; name the control in `qa_portfolio.py:531`'s washout line; list it in SKILL.md. The DEFAULT value is Ben's, and R150 decides what the count counts. | Inbox | `execution_pipeline.py` control merge, `contest_allocator.py`, `build_slate.py:527, 1626`, `tools/qa_portfolio.py:531`, `SKILL.md` | Med-High (the washout axis the dual objective names has no live lever; CIN@LAD took 39 of 150 slots on 2140_5g with nothing binding and the person cap at its feasibility edge) | Low | R150's decision for the default; none for the wiring |
 | **Session 20** | `Batch (1 of 4)` | **R298 -- three evidence readers that lie at T-5**: `manifest_strategy_state` never reads the allocator ladders; the certified Classic brief carries no `mirror_error`/`manifest_recorded`; `find_prior_file` can feed another draftgroup's ownership prior into `--leverage`. | Backlog | `upload_manifest.py`, `build_slate.py` brief, `ownership_pred.py` | Med | Low | None |
 | **Session 20** | `Batch (2 of 4)` | **R300 (c)(d) -- behavioural tests replacing string pins on money-adjacent claims**; (a)(b) shipped. | Backlog | `tests/` | Med | Low | None |
 | **Session 20** | `Batch (3 of 4)` | **R309 -- a hand-applied factor's provenance survives only in a chat transcript**; QA describes what shipped. An evidence file beside the delivery; report, never a gate. | Backlog | `tools/qa_portfolio.py`, delivery path | Med | Low | None |
@@ -142,7 +146,8 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 | **Session 36** | `Standalone` | **R261 -- the own-portfolio scenario bank: P(top-1%) and P(washout) pre-lock, graded at archive time, steering nothing until graded.** ed12 4.5-4.6 corroborate the design (joint scenarios, legal opponent portfolios, DESIGN/SELECT/REFEREE splits, common random numbers); recorded as acceptance criteria, not as separate work. | Backlog / Spec | new module | High | Med-High | Sessions 33, 34, 35 |
 | **Session 37** | `Standalone` | **R252 -- the mispricing score, components (a)-(c)**: two anchors, components attributed, reported as a vector. | Backlog | `projection_builder.py`, `qa_portfolio.py` | Med | Med | None |
 | **Session 38** | `Standalone` | **R254 -- the captain mispricing screen.** | Backlog | `showdown_theses.py`, `ownership_pred.py` | Med | Med | Sessions 11, 26, 37 |
-| **Session 39** | `Standalone` | **R253 -- park factor conditioned on handedness and profile (the F5 refinement).** | Backlog | `projection_builder.py`, `data/reference/` | Med | Med | None |
+| **Session 39** | `Batch (1 of 2)` | **R253 -- park factor conditioned on handedness and profile (the F5 refinement).** | Backlog | `projection_builder.py`, `data/reference/` | Med | Med | None |
+| **Session 39** | `Batch (2 of 2)` | **R334(a)(b) -- the Showdown prior gains the opposing-arm terms Classic already carries one of.** (a) apply the existing F1 implied-team-total factor to the Showdown APPG prior: F1 reaches no Showdown hitter today (`build_slate.py:4697`, R249), the moneyline drives only the thesis side mix (`showdown_theses.py:329-333`); re-measure the 1.77x side split with it live. (b) gated on (a)'s residual: a Showdown-only opposing-arm term from the declared arm's `expected_stats_pitching.csv` row, neutral when unpriced, never a season mean. Both labeled priors. | Inbox | `build_slate.py` `run_showdown`, `showdown.py` melt, `projection_builder.build_f1_factors` | Med-High (a side-level mis-ranking that no cap, overlap bound or thesis mix can touch) | Med | An odds packet for (a)'s measurement; Ben may pull (a) forward in one line |
 | **Session 40** | `Standalone` | **R124, S-half -- a legal-but-uncertified file is mirrored and NAMED, never hidden behind `DO_NOT_UPLOAD_`.** (R290(c)'s `--deliver-by` covers part; this is the mirror + rename.) | Backlog | `build_slate.py` delivery, `upload_manifest.py` | Med (criterion 1) | Low | None |
 | **Session 41** | `Standalone` | **R209 -- the objective's leverage proxy measures nothing; ordering is usable while level is not.** Part C plus the calibration reading. | Backlog | `optimizer_v3.py` target score | Med | Med | Sessions 7, 28 |
 | **Session 42** | `Standalone` | **R301 (+ed12 section 3.2 measurements) -- the instruction corpus.** CLAUDE.md 811 lines / 54,829 chars; SKILL.md 1,301 / 74,629; `changelog.md` 15,330 lines; ~32k tokens before a BUILD session's first command. Root contract to ~1,500 tokens; machine-readable runtime manifest; task playbooks; a decision registry; session context replacing "where we left off". Then the prose-pinning tests. Indirect on winning (fewer lost windows from session error); sits after every code batch by criterion (2). | Backlog / Spec | `CLAUDE.md`, `skills/generate-lineups/SKILL.md`, `docs/`, prose-pinning tests | Med (indirect) | Med | None |
@@ -230,7 +235,29 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 
 ### Decisions owed and externally gated -- no session until answered
 
-**[BEN: R308]** the external field estimate in the build loop needs the RotoWire RST% transport settled (signed-in Chrome + subscription is the only one that works); once it is, R308 is a Phase A-grade session (S-M) and slots before Session 7. **R41** (Showdown under the three certification gates, L, decision first). **R206** (controls count entries, not dollars; decision then M). **R262** (scenario-coverage selection's production switch; Tier 4 decision, with **R13** the stakes decision). **R240** (punt-captain template). **R139** (captain-leverage tier targets). **R125** policy half (bullpen-day auto-declaration, posture fallback, counted Classic relaxation ladder). **R40** (one-seat satellite routing). **R150**'s decision half. **R188**'s decision. **R273** (P3 quarantine decision). **R281**, **R282** (P3 spelling-consolidation, S and M). **R9b** (split the corpus; rides R301). **R81** (slate fingerprint contract, M design pass first). **R256** (arsenal-vs-profile layer, L, gated on R255 residuals). **R263** remainder (gated on R238/R239 and R10). **R121** standing order (clock is a measurement), its clock half inside R290(c). **R315(c)** is ARCHIVE's one `git add` (`data/reference/statsapi_season_pitching.csv`) at its next session. Rejected from the twelfth edition and filed nowhere: **F32** (ZIP resource limits; R44 carries the D26 rider, severity-reduced twice), **F36** (the auditor's Windows host lacks scipy; not a repository defect, R271(c) and R78 already say so, R217 keeps the runtime-identity sliver), **stage E** (automated submission/outbox; DK's terms and CLAUDE.md's money-and-entry wall; export-only stays), **stage F** (other sports; other workspaces). Section 1.6's five closures (R291, R294, R304, R305, R306 steps 1-3) match this board and nothing from it is refiled.
+**[BEN: R308]** the external field estimate in the build loop needs the RotoWire RST% transport settled (signed-in Chrome + subscription is the only one that works); once it is, R308 is a Phase A-grade session (S-M) and slots before Session 7. **R41** (Showdown under the three certification gates, L, decision first). **R206** (controls count entries, not dollars; decision then M). **R262** (scenario-coverage selection's production switch; Tier 4 decision, with **R13** the stakes decision). **R240** (punt-captain template). **R139** (captain-leverage tier targets). **R125** policy half (bullpen-day auto-declaration, posture fallback, counted Classic relaxation ladder). **R40** (one-seat satellite routing). **R150**'s decision half, which since 2026-09-09 is also R333's default (what the live game cap counts, arms or bats). **R188**'s decision. **R273** (P3 quarantine decision). **R281**, **R282** (P3 spelling-consolidation, S and M). **R9b** (split the corpus; rides R301). **R81** (slate fingerprint contract, M design pass first). **R256** (arsenal-vs-profile layer, L, gated on R255 residuals). **R263** remainder (gated on R238/R239 and R10). **R121** standing order (clock is a measurement), its clock half inside R290(c). **R315(c)** is ARCHIVE's one `git add` (`data/reference/statsapi_season_pitching.csv`) at its next session. Rejected from the twelfth edition and filed nowhere: **F32** (ZIP resource limits; R44 carries the D26 rider, severity-reduced twice), **F36** (the auditor's Windows host lacks scipy; not a repository defect, R271(c) and R78 already say so, R217 keeps the runtime-identity sliver), **stage E** (automated submission/outbox; DK's terms and CLAUDE.md's money-and-entry wall; export-only stays), **stage F** (other sports; other workspaces). Section 1.6's five closures (R291, R294, R304, R305, R306 steps 1-3) match this board and nothing from it is refiled.
+
+*2026-09-09, DEV, claim `engine` (`engine_2026-09-09`): **the five-fragment inbox
+reviewed. Three 2026-09-08 BUILD fragments consumed into two new numbers (R333,
+R334), five riders (R122, R150, R197, R236(b), R332) and a cross-reference on
+R310; two fragments RETAINED with their conditions re-checked; Sessions 10, 19
+and 39 each grew by one batch member and no session was renumbered.** Two
+fragment premises were corrected against the tree before filing. "No game-level
+control exists" (2140_5g) is false: `max_game_exposure_pct_by_game` exists in the
+allocator, the validator and the fraction gate and is dead for want of a
+`player_game_by_id` map that nothing in production writes, which is R333's actual
+finding. And the 2210_1g_sd side split was measured on a path where F1 never
+reaches a hitter by design (R249, `build_slate.py:4697`), which scopes R334 to
+Showdown and makes its first move a wiring step, not a new factor. Retention
+checks: `data/reference/dk_contest_archetypes.csv` still holds only the generic
+`inferred_low` rows for `Pocket Cup`, `Knuckleball` and `Relay Throw` with
+`ticket_count` blank, so the 2026-08-09 decision fragment stays the sole carrier
+of the nine observed rows; R317(c) is unshipped (Session 9), so the 2026-09-04
+refresh procedure stays. One document corrected rather than queued, on
+`e280586`'s precedent: SKILL.md's leverage paragraph, whose "start at 90-95" was
+measured inert on 2140_5g. This session first closed out Session 3's commit
+(`9d46737`), which its own RESUME prompt had left to the next DEV session: M17
+killed, gate clean at 1925. No engine code changed by the board merge itself.*
 
 *2026-09-08, DEV, claim `engine` (`engine_2026-09-08`): **the greenfield TWELFTH
 edition (`DFS_SYSTEM_GREENFIELD_SPEC_2026-09-08.md`, reviewed at `15f87a2`, this
@@ -3461,6 +3488,38 @@ the batch's named rider and did not get pulled.
 
 ### R122, REWRITTEN 2026-09-01 to its surviving remainder. The platoon factor dies at the HITTER intake, per player and silently, and the field that exists to report it is keyed on the PITCHER (P1, XS-S) | new 2026-08-14; **the ed6 rider and the LHP-only face are both CLOSED**, see below
 
+**Rider 2026-09-09, from BUILD fragment
+`2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` (addendum):
+the fix shape below is right about READING a per-hitter split and wrong about
+how to SHRINK it, measured on 2210_1g_sd (CIN@LAD, 2026-09-08) across three
+hand-built priors.** Three corrections. (1) Shrink toward the LEAGUE PLATOON
+PATTERN, not toward 1.0: the multiplier below pulls a thin sample toward
+no-effect, and the population effect is not zero. The v3 rule that delivered
+clean used one constant (150) for both terms: the batter shrunk toward LHH 0.92
+/ RHH 1.05 / switch 1.02 of his own overall OPS, the arm shrunk toward a LHP
+allowing 0.93 of its own overall OPS to LHB and 1.03 to RHB. (2) The ARM's
+split needs the same treatment as the batter's. v2 shrank the batter by PA and
+read each arm's vs-side OPS off 91-92 BF unshrunk: Hector Rodriguez (99 season
+PA, .600 vs LHP in 25 PA) went 1 -> 4 of 9 and Alex Call reached 5 of 9, a 55.6%
+realized exposure against the 50% cap with one relaxed slot and
+`counted_relaxations.clean: false`. A ranking repair became a cap breach through
+the one term nobody shrank. Under v3 Skubal's L/R edge compressed 1.300 -> 1.074
+and Lodolo's 1.106 -> 0.992, and the file went back to clean. (3) The flat sign
+is not safe even as a fallback for THESE arms: both Skubal (.720 OPS vs LHB /
+.554 vs RHB) and Lodolo (.942 / .852) were WORSE against left-handers in 2026,
+so v1's uniform 0.736 LHH discount penalised exactly the bats the arms were most
+vulnerable to; it cost Max Muncy (.837 vs LHP, pool-leading power) 2 of 9 with
+one captain slot while Will Smith (.409 vs LHP, 62 PA) sat at 4 of 9. The flat
+0.94/1.04 below stays the no-sample fallback; what changes is that the arm's own
+split is read and shrunk beside the hitter's, and a shrunk arm split that
+inverts the flat sign wins. Fetch cost unchanged: `statSplits` with
+`sitCodes=vl,vr` returned 2026 splits for both arms and 18 bats inside the ~20
+seconds this entry already budgets. The rule, stated once: a platoon term read
+off fewer than ~150 observations is shrunk toward the league platoon pattern,
+and the arm's split gets the same rule as the batter's. Cross-ref R334 (the
+opponent-QUALITY half from the same slate) and R320 (the Showdown brief's
+missing platoon counter, which is why none of this is visible in a brief today).
+
 **What survives, and it was MEASURED on a delivered brief rather than read.** On
 `1920_1g_sd` (CIN@CHC, 2026-08-30) the delivered
 `build_brief_showdown_1920_1g_sd.json` carries
@@ -4458,6 +4517,77 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
+### R334. The Showdown Base is blind to the opposing arm: APPG is a season mean over every opponent, one game has one arm per side, and no factor on the Showdown path carries either the implied team total or the declared arm's quality to a hitter's prior (P1; S for the wiring half, M for the factor; Showdown-scoped) | new 2026-09-09, merged from BUILD fragment `2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md`; measured on 2210_1g_sd (CIN@LAD, 2026-09-08) against a supplied external Base; the third APPG failure mode after R310 (small sample) and R122 (handedness)
+
+**What was measured.** 20-man pool, both sides posted, declared arms Skubal
+(LHP, 2.86 ERA) for LAD and Lodolo (LHP, 5.08 ERA) for CIN. Ratio of a supplied
+DK projection (dailyfantasyfuel, 11 of 20 players published at 19:43 ET) to
+APPG, by SIDE: LAD non-LHH hitters facing Lodolo 1.30 / 1.30 / 1.39 / 1.43 /
+1.89, median **1.390**; CIN hitters facing Skubal 0.79 / 0.79, median **0.786**;
+both SP ~1.06. The split is 1.77x wide and monotone by side (every LAD bat above
+APPG, every CIN bat below) with the arms themselves near 1.0, so it is not
+per-player noise. On APPG alone the pool's top four hitters would have been Elly
+(9.8), Stewart (8.9), Bleday (7.3) and H. Rodriguez (7.1), three CIN bats facing
+the 2.86 arm plus a fourth, while Alex Call at $4,400 (APPG 3.6, supplied 6.8)
+would have been near-unrosterable. The CIN side factor rests on n=2, stated as
+the weak joint. Prototype workaround: `outputs/2026-09-08/make_base_2210_1g_sd.py`
+(v1-v3) and `data/slates/2026-09-08/projections_2210_1g_sd.csv`, fed through
+`--projections`; v3 delivered `counted_relaxations.clean: true`, captain max
+22.2% of 9, player max 44.4%, overlap max 4 of 6.
+
+**Why it is Showdown-scoped, read off the tree rather than argued.**
+`build_slate.py:4697-4700` (R249): Classic reaches the whole F1-F5 enrichment
+stack through `_assemble_projection_frame`; Showdown reaches AvgPointsPerGame
+and a salary regression. The melt (`showdown.py:262`) takes APPG as Base and the
+path applies the salary regression, the batting-order PA factor and the platoon
+factor; F1 is not among them. The moneyline the session HAD
+(`data/slates/2026-09-08/odds_2210_1g_sd.json`, `games_with_moneyline: 1`, LAD
+-319) drives only `build_thesis_ladder`'s SIDE mix (`showdown_theses.py:329-333`,
+`_no_vig`), never a hitter's number. So on Showdown neither of the two things
+that encode opposing-arm quality on Classic, F1's implied team total or an
+opposing-arm term, reaches the prior, and the ladder then spends its LAD-leaning
+entries on a LAD pool underpriced against its CIN pool. On Classic F1's implied
+team total already carries the arm at the TEAM level, so this item makes no
+Classic claim; a Classic residual is a different measurement and is not filed.
+
+**One caveat the fragment did not state.** The 1.77x is one external source's
+opinion against APPG on one slate: the SIZE of a disagreement, not a graded
+error. R255 (grade the skill signal) is where "the supplied Base was right" gets
+answered. The first move is therefore the cheap, already-built half.
+
+**Fix.** (a) **Wiring, S.** Apply the existing F1 (de-parked implied team total
+from the odds packet, the `build_f1_factors` Classic runs) to the Showdown
+per-player prior on the APPG path; park stays where it is today (F5 is not on
+the Showdown path either), and a supplied `--projections` Base stays untouched
+per R249's contract (a supplied number is used AS the prior). Re-measure the side
+split against the same external source with F1 live; the residual is what (b)
+is sized on. (b) **Factor, M, gated on (a)'s residual.** A Showdown-only
+opposing-arm term keyed on the DECLARED arm's `expected_stats_pitching.csv` row
+(xwOBA-against or xERA relative to league), degrading to neutral when the arm is
+unpriced, never to a season mean. Both are labeled priors; neither is a
+projection this engine graded. (c) **Warning, XS, Session 10.** A brief NOTE on
+any Showdown build whose Base is APPG (no `--projections`) when the two declared
+arms' expected stats differ by more than a stated margin: the condition under
+which this defect is largest and knowable before the first solve; R310(b)'s
+shape (`pool.small_sample_base`), report never a gate. (d) **Supplied-Base
+sanity pass, XS-S, Session 10.** On a `--projections` build, cross-check the
+supplied Base's within-side ORDERING against on-disk Savant expected stats and
+name each hitter whose Base rank contradicts his rate-stat rank by more than N
+places; on this slate that pass would have caught both holes in the filing
+session's own v1 prior (see the R122 rider filed from the same fragment). R327
+gave the supplied frame a NUMERIC boundary; this is the semantic one beside it,
+and like R309 it reports and never gates.
+
+**Done when.** A Showdown APPG-path build with an odds packet shows
+`non_neutral_f1 > 0` in its brief and the brief names F1 among the factors
+applied to the prior; a frozen 2210_1g_sd fixture (salary + odds + supplied Base,
+committed with (a)) re-solves with the side-split ratio recorded before and after
+(a); (c) fires on the CIN@LAD arms and stays silent on a pair inside the margin;
+(d) names Will Smith and Max Muncy on the v1 prior and nobody on v3. Roadmap:
+(c)+(d) Session 10 Batch (4 of 4) with R237's surfaces; (a)+(b) Session 39
+Batch (2 of 2) beside R253, the other projection-factor refinement, with (a)
+landable earlier if Ben pulls it.
+
 ### R332. The handedness backfill that takes `f4_platoon_applied` from 0 to 90 of 90 on a DK-covered slate is a per-slate hand-roll in a gitignored scratch file (P2, S) | new 2026-09-08, merged from BUILD fragment `2026-09-08_BUILD_1835_5g-anticorrelation-unobserved-and-handedness-backfill.md` (half (b); half (a) shipped in the same commit and is in CHANGELOG.md); measured on 1835_5g with a full rebuild
 
 **What.** R143's zero-fetch path is the NORMAL state of a fully DK-covered
@@ -4500,6 +4630,17 @@ arriving before the file exists rather than after. A tool plus a reference file
 is its own session, which is why this is filed rather than ridden into the
 commit that shipped the fragment's other half. Roadmap: Session 9, with the
 platoon cluster it shares a subject with.
+
+**Rider 2026-09-09, Showdown sighting, from BUILD fragment
+`2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` §2.** On
+2210_1g_sd (CIN@LAD, 2026-09-08, both sides posted by DK)
+`construction.platoon_unresolved_teams` read `["CIN", "LAD"]`: the handedness
+was in neither DK's `Starting` column nor the staged feed, which belonged to the
+day's earlier five-game slates. Honest, and the NORMAL state of a fully
+DK-covered Showdown slate, so F4's platoon half is structurally unavailable
+where one game makes it matter most. Same fix, same session; the Showdown path
+is the second consumer the tool and the reference serve, and the acceptance test
+runs once on each format.
 
 ### R328. The Showdown ownership prior's per-player marginals can exceed 100% and the captain marginal can exceed the roster marginal, because the 600% budget is enforced on the total and nowhere else (P1, XS; gates R307) | new 2026-09-08, from the greenfield twelfth edition (F27); VERIFIED-repro by the edition on the production function
 
@@ -5095,6 +5236,31 @@ entry.
   names one site, count the sites before believing one. Fix scope grows
   accordingly — decide `Ownership_Tier`'s existence FIRST, because three of the
   four reads want deleting rather than repointing.
+
+**Rider 2026-09-09, from BUILD fragment
+`2026-09-08_BUILD_2140_5g-no-game-level-exposure-control.md` (second half): the
+realized leverage numbers are not in the brief either, and the skill's starting
+cap is a constant against a bind point that moves.** On 2140_5g (5 games, 208
+priced hitter rows, top hitter 14.7%) `--leverage` at the skill's recommended
+`max_cumulative_ownership_pct: 95` never bound: the delivered entries' ten-slot
+sums ran 53.5 to 93.9, low-owned carry was 0 of 15 in BOTH builds, and only
+`min_low_owned_hitters: 1` moved anything (entries carrying at most one of the
+top trio 8 -> 10, apex 1975.69 -> 1956.34, -1.0%). The brief's `leverage` block
+(`execution_pipeline.py:4946-4952`) carries `applied` and the three REQUESTED
+values and no realized figure, so the session computed the sums by hand from
+the delivered file; a cap that never bound reads identically to one that did.
+SKILL.md's leverage paragraph said "an unconstrained lineup lands near 100-105
+and a cap of 90 is a real bind ... Start at 90-95", true on 1605_2g (cap 90,
+-7.72%) and 2210_2g (cap 95, -22.1%) and false here: the bind point scales with
+the prior's spread, and on a wide slate 95 sits ABOVE the unconstrained sum.
+Fix, same XS: the `leverage` block gains `realized` (per-entry cumulative
+ownership sum as min/median/max, and per-entry low-owned count, the latter being
+THIS item's count computed the way R154's constraint computes it) plus
+`cap_bound: bool` (max realized sum within 1pp of the cap). SKILL.md's paragraph
+was corrected on 2026-09-09 to carry the third reading and to say the start is
+read off the build's own sums rather than a constant; the brief field is what
+makes that instruction followable, and until it lands the sums come from the
+delivered file.
 
 ### R83. Per-run calibration provenance: persist the factor audit, hash-bind enrichment inputs, golden-replay one real manifest row (S) | audit 2026-08-04
 
@@ -5956,6 +6122,13 @@ touches the money-and-entry wall, the manual-DK rule, or the truthful labels.
 
 ### R310. APPG as the Base prior is broken for a sub-5-game callup and the 0.60 salary shrink does not catch it (P1, S) -- WARNING HALF SHIPPED 2026-09-08, the SHRINK half is what remains open and it holds no slot | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_appg-base-is-broken-for-sub-5-game-callups.md`; measured on 2210_1g_sd with a counterfactual build
 
+**Cross-reference 2026-09-09.** The third APPG failure mode, opposing-arm
+quality, is filed as R334 from the 2026-09-08 2210_1g_sd fragment (CIN@LAD,
+a different slate from this entry's 09-03 STL@LAD and 09-04 WSH@LAD), which measured a 1.77x side
+split against an external Base on a pool where this item's predicate read
+`small_sample_base.applied: false`. The two are independent; (b) here fires on
+neither of that slate's sides, by design.
+
 **STATUS 2026-09-08, the warning half (b) SHIPPED; its text has migrated to
 CHANGELOG.md and only the shrink half (a) is live here.** What landed:
 `showdown.small_sample_base_report`, emitted as `pool.small_sample_base` on
@@ -6421,6 +6594,43 @@ rather than answering with the games it managed to read. (b) lands with R121.
 
 ### R236(b). The odds paste tool reads its own long table, not a raw Action Network capture (P2, S) | REWRITTEN 2026-08-28 to hold only the remainder; the tool, its refusals, and the SKILL.md lines LANDED that date and are migrated to CHANGELOG.md
 
+**Rider 2026-09-09, from BUILD fragment
+`2026-09-08_BUILD_2140_5g-no-reachable-named-book-odds-source.md`: the FIFTH
+sighting of inert F1 on a live slate, and the paste path is stricter than the API
+path on the same fact.** 2140_5g (2026-09-08) shipped F1 NEUTRAL and certified.
+`curl` returned 000 from the device VM AND the container to statsapi,
+baseballsavant, fangraphs and api.the-odds-api.com, four days after R316 measured
+200 from all of them on the same VM, so the egress is not a constant in EITHER
+direction and rung 1 is measured per session, never read. `WebFetch` was the
+only egress the session had, and the odds pages it reaches were inventoried:
+covers.com prints the OPENING total per game and nothing else usable,
+teamrankings 403s, oddsshark 302s to covers, and two reads of covers' per-book
+moneyline grid CONTRADICTED each other (ATH -134 on one read, TOR -120 on the
+other), so a WebFetch grid is extraction noise and never a price to hand-name a
+book from. The refusal that followed was the tool working: `odds_from_paste.py`
+refuses a totals-only paste at TWO layers, the header rule at
+`paste_odds.py:177-184` (`away_ml` and `home_ml` are required columns) and the
+row rule at `:229-231` (a blank moneyline raises, the row is dropped, and
+`:350-355` then refuses the packet as "no priced row"). Both exist to stop an
+even split standing on a game a book DID price. But the API path already
+tolerates this exact fact: R205's parser carries a game no book priced two ways
+with NO moneyline, names it in `moneyline_incomplete`, and `load_odds_packet`
+warns while F1 even-splits the total. So a totals-only SOURCE (not an omitted
+column) loses the cross-game signal that IS real (TOR@ATH 10.0 against WSH@SD
+7.5 on this slate) to a rule written for a different case. **Fix (XS, on the
+entry's own contract):** accept an explicit per-row token (`n/a`) in
+`away_ml`/`home_ml` meaning "this source publishes no moneyline", emit the event
+with the totals market and no `h2h`, and name the game in `moneyline_incomplete`
+exactly as the API path does; a BLANK stays a blocker, because a blank is an
+omission and `n/a` is a statement. The report carries `moneyline_source:
+unavailable` per game so the brief's f1 block can say which arithmetic produced
+the split (R237's class). Do NOT relax the header rule to make a book column
+optional, and never let a session name a book for a consensus line to get past
+the refusal. Sightings of inert F1 on live slates are now five in sixteen days
+(08-24 1940_7g, 09-03 1915_6g, 09-03 1915_1g_sd, 09-03 2210_1g_sd, 09-08
+2140_5g); this XS half is the cheapest of them to close and the count is the
+argument for pulling it ahead of Session 49 **[BEN: one line pulls it forward]**.
+
 **Rider 2026-09-03, from BUILD fragment
 `2026-09-03_BUILD_odds-fallback-ladder-action-network.md`, and independently the
 greenfield eleventh edition (D35). The ladder has THREE rungs and only two are
@@ -6544,6 +6754,96 @@ timestamped, beside the build-time packet; both retained under
 for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
+
+### R333. The game-level exposure control exists in the allocator and the validator and is DEAD from every production door: nothing writes `player_game_by_id`, so the one lever on the washout axis `qa_portfolio` names refuses when it is asked for (P1, S) | new 2026-09-09, merged from BUILD fragment `2026-09-08_BUILD_2140_5g-no-game-level-exposure-control.md`; the fragment's premise ("no available control") corrected against the tree, VERIFIED-read by grep and by the allocator's own error string; the field measurement is the fragment's
+
+**What the fragment measured, which stands.** 2140_5g (2026-09-08, 15 entries,
+5 games): CIN@LAD took 39 of 150 roster slots and `frontier.washout` named it
+binding at 81.3% retained, while none of the three portfolio controls bound,
+because the exposure arrived as individually legal one-offs (Skubal 6/15 under
+the 0.43 pitcher cap, LAD 1/15 as a PRIMARY stack under the 0.35 stack cap, then
+Betts 7, Smith 7, Freeman 5, Teoscar 3, Muncy 2, Edman 1 as ordinary filler).
+`max_player_exposure_pct` at 0.35 and 0.40 both REFUSED (the R157 trigger) and
+0.50 certified with four bats pinned at exactly 7/15, so the person cap has no
+room left and cannot decorrelate this by tightening. `qa_portfolio.py` printed
+`washout axis 'game': most-shared value is CIN@LAD at 7/15 (47%)` and named no
+control.
+
+**What the fragment got wrong, and what is true instead.** It proposed a new
+`max_game_exposure_pct`. A game cap already exists: `max_game_exposure_pct_by_game`
+(game id -> fraction) builds MILP rows in `contest_allocator.py:2966-2990` over
+every candidate touching the game, the post-export validator enforces it through
+`dk_entries_manager._game_cap_count` (`:769`, `:1055-1063`), R215(a) routes each
+value through the fraction gate in `build_slate.py:527` and
+`execution_pipeline.py:2880`, and `late_swap.py:214` names it as THE binding
+control on a `game G exposure N>M` refusal. It is dead in production on one fact:
+the allocator requires `controls['player_game_by_id']` (`:2968-2974`) and NOTHING
+in `mlb_engine/`, `tools/` or `skills/` writes that key. The only writers
+repo-wide are `tests/test_core.py:1302` and `:1473`, which hand the map in by
+hand, which is why the gap never showed. An operator who does what `late_swap.py`
+steers them to and passes `--controls-override
+'{"max_game_exposure_pct_by_game": {...}}'` gets `passed: False` with
+`max_game_exposure_pct_by_game requires controls['player_game_by_id']`. (The
+validator half derives the game from the salary file and works without the map,
+so a hand-corrected file CAN be checked against a game cap; it cannot be built
+under one.) Three further facts follow. (a) No posture default and no slate-wide
+form exist: the only shape is a per-game dict an operator has to type, so the
+R153/CLAUDE.md relaxation order has three members and this is not one of them,
+and `skills/generate-lineups/SKILL.md` does not mention the control at all
+(grep, 0 hits), which is how a BUILD session came to write "no available
+control" in good faith. (b) The one engine path that COMPUTES a game cap,
+`slate_intake_manager.material_weather_adjustments` (`:1054-1071`, 0.25 on
+medium postponement risk, plus the `Game_Exposure_Cap` column read at `:1786`),
+lands in the F5 report only (`build_slate.py:1626`,
+`report["game_exposure_caps"]`) and nothing carries it into the control: a
+writer no reader reads, R197's shape mirrored. (c) The existing rows count an
+ENTRY as exposed to a game if ANY rostered player is in it, arms included, so the
+control has already answered R150's question one way (roster footprint),
+silently, while the run's `compute_portfolio_frontier` counts bats only. Making
+the control live makes that disagreement load-bearing, so R150's decision is
+this item's default, not a side note.
+
+**Why P1.** The dual objective's washout half binds at the portfolio level
+(CLAUDE.md), the tool that reports it names the game axis, and the only control
+on that axis refuses when used: a control the swap tool steers operators toward
+and that cannot be used, on the file's largest correlated exposure. It changes
+no delivered byte until wired, which is why the fix is S and not a strategy
+decision: the DEFAULT value is Ben's, the wiring is not.
+
+**Fix (S).** (1) Populate `player_game_by_id` from the projection frame's
+`Game_ID` at the control merge in `execution_pipeline` (the frame already
+carries it; `:1677`, `:1956`, `:2363` read the same column), so the existing
+control is live from `--controls-override` and from `late_swap.py`'s steer; a
+test that runs the PRODUCTION merge with the cap and no hand-built map. (2) A
+slate-wide scalar `max_game_exposure_pct` that expands to every game id in the
+frame, sitting in the fraction gate beside the other five and in the relaxation
+order at the position R153's argument puts it (after player exposure: it spreads
+a cost thin rather than concentrating one). Default OFF until Ben sets one;
+record the scalar and its expansion in the brief's `merged_controls` on every
+Classic build so the default's absence is visible. (3) Wire the F5 weather cap:
+`game_exposure_caps` merges into the per-game dict by MIN, named in the brief as
+`weather_game_caps_applied`. (4) `qa_portfolio.py:531` names the control beside
+the axis, the way `late_swap.py` does on a refusal. (5) SKILL.md gains the
+control in its portfolio-controls list, with the 2140_5g reading as the reason
+it exists. Decide R150 first (what the count counts); until decided, the count
+stays roster footprint and the brief SAYS `game_exposure_counts: roster_footprint`.
+
+**Done when.** A build with `--controls-override
+'{"max_game_exposure_pct_by_game": {"<gid>": 0.4}}'` and no hand-built map
+certifies with the cap in `merged_controls` and the validator's game check
+passing; the 2140_5g bank re-solved at `max_game_exposure_pct: 0.60` either
+certifies with CIN@LAD in at most floor(0.60 * 15) = 9 entries or refuses naming
+THIS control as binding (R311's discipline), never silently; the F5 report's
+`game_exposure_caps` and `merged_controls.max_game_exposure_pct_by_game` agree
+on a medium-postponement fixture; `grep -rn player_game_by_id mlb_engine/`
+returns a production writer. Roadmap: Session 19, Batch (3 of 3), same file and
+same theme as R166 (caps that do not bind where they should).
+
+**The fragment's second half, `--leverage` near-inert at the skill's recommended
+cap, is filed as a rider on R197 rather than here:** it is a brief-truth gap
+(the realized cumulative sum is not printed, so "the cap never bound" was
+hand-computed) plus a SKILL.md correction, and R197 already owns the realized
+low-owned count that sits beside it.
 
 ### R326. The candidate prefilter does not preserve JOINT feasibility, and a restricted-bank infeasibility still climbs the strategy ladder: R294's residual, with a constructive witness (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F12); VERIFIED-repro by the edition (helper output plus a feasibility witness) at this HEAD, after R294 shipped
 
@@ -9066,6 +9366,15 @@ together.
   2026-08-18 without touching this: it added a THIRD count to the same screen
   (roster footprint, bat exposure, and now field share), so the case for naming
   the two washout numbers apart got stronger, not weaker. Never its own session.
+- **Rider 2026-09-09, from R333's tree check:** a THIRD reader has been counting
+  all along. The allocator's `max_game_exposure_pct_by_game` rows
+  (`contest_allocator.py:2977-2990`) mark a candidate as exposed to a game if ANY
+  rostered player, arm included, is in it, so the engine's only game CONTROL
+  already encodes the roster-footprint reading while the run's
+  `compute_portfolio_frontier` encodes the bats-only one. R333 makes that control
+  reachable, which turns this decision into the control's default rather than a
+  naming question on a screen. Decide it before Session 19 lands R333; until
+  then R333 labels its count `roster_footprint` in the brief.
 
 ### R131. Five smalls, four DEV and one Ben's (P2, XS each) | new 2026-08-16, from BUILD's 2026-08-15 2138_2g fragment; (e) added 2026-08-18 off R117
 

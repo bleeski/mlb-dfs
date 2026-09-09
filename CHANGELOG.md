@@ -25,6 +25,94 @@ performance claim.
 
 ---
 
+## 2026-09-09 — Board: the five-fragment inbox reviewed, three 2026-09-08 BUILD fragments consumed into R333 and R334 plus five riders, two fragments retained on re-checked conditions, and SKILL.md's leverage starting cap corrected
+
+**Scope: docs only.** This commit touches `docs/backlog.md`, this file,
+`skills/generate-lineups/SKILL.md` (one paragraph, below), and moves three
+consumed fragments out of `docs/backlog_inbox/` into its `_to_delete/` (the mount
+refuses `rm`). No engine code, no test, no contract file. The gate was not run
+for this commit and that is stated rather than skipped quietly, per the board
+commits of 2026-08-27, 09-03 and 09-08; the tree it sits on passed the gate at
+1925 one commit earlier (`9d46737`, this session).
+
+**What was in the inbox, and where each went.**
+
+- `2026-09-08_BUILD_2140_5g-no-game-level-exposure-control.md` -> **R333**
+  (Workstream 4, P1, S; Session 19 Batch 3 of 3) and a rider on **R197**. The
+  fragment's premise was checked against the tree and corrected before filing:
+  it says no game-level control exists and proposes one; the control
+  `max_game_exposure_pct_by_game` exists in the allocator (`contest_allocator.py:
+  2966-2990`), the validator (`dk_entries_manager.py:769, 1055-1063`), the
+  fraction gate (R215(a)) and `late_swap.py`'s binding-control map (`:214`), and
+  is dead because the allocator requires `controls['player_game_by_id']` and the
+  only writers of that key repo-wide are two tests (`grep -rn player_game_by_id`
+  over `mlb_engine/ tools/ skills/ tests/`: `tests/test_core.py:1302`, `:1473`,
+  nothing else). Three consequences filed with it: no slate-wide form or default
+  and zero SKILL.md mentions; the F5 weather cap computed at
+  `slate_intake_manager.py:1065` is reported (`build_slate.py:1626`) and never
+  applied; and the existing rows count arms, so R150's question already has a
+  silent answer, which is why R150 also carries a rider and is now R333's default.
+  The fragment's measurement (CIN@LAD 39 of 150 slots on 2140_5g with nothing
+  binding and the person cap at its feasibility edge) stands as filed. Its second
+  half, `--leverage` near-inert at cap 95 on a wide slate, is the R197 rider (the
+  brief prints requested leverage values and no realized sums, so "the cap never
+  bound" was hand-computed).
+- `2026-09-08_BUILD_2140_5g-no-reachable-named-book-odds-source.md` -> rider on
+  **R236(b)**: the fifth sighting of inert F1 on a live slate in sixteen days; the
+  device VM measured NO egress four days after R316 measured full egress, so the
+  odds ladder's rung 1 is measured per session in either direction; the WebFetch
+  odds-page inventory (covers.com opening totals only; contradictory per-book
+  grids across two reads); and the mechanism of the totals-only refusal at two
+  layers (`paste_odds.py:177-184`, `:229-231` -> `:350-355`), against which the
+  API path already tolerates a game with no two-sided moneyline (R205's
+  `moneyline_incomplete`). Fix filed as an explicit `n/a` moneyline token, XS.
+  Flagged for Ben as the cheapest of the five to close.
+- `2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` -> **R334**
+  (Workstream 2, P1; wiring S, factor M; Showdown-scoped; (c)(d) Session 10
+  Batch 4 of 4, (a)(b) Session 39 Batch 2 of 2), riders on **R122** (the
+  addendum's shrinkage corrections: toward the league platoon pattern not 1.0, the
+  ARM's split shrunk like the batter's, the measured 55.6%-under-a-50%-cap breach
+  an unshrunk 91-BF arm split caused) and **R332** (the Showdown sighting of
+  `platoon_unresolved_teams` on a DK-covered slate), and a cross-reference on
+  **R310**. One scoping fact the fragment did not state, read off
+  `build_slate.py:4697` (R249): F1 reaches no Showdown hitter by design and the
+  moneyline drives only the thesis side mix, so the 1.77x side split was measured
+  on a path where the implied team total never entered; R334's first move is to
+  apply the existing F1 there and re-measure, before any new factor is sized.
+- `2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md` -> RETAINED,
+  condition re-checked: `data/reference/dk_contest_archetypes.csv` holds only the
+  generic `inferred_low` rows for `Pocket Cup`, `Knuckleball` and `Relay Throw`
+  with `ticket_count` blank (last touched `c3f9cc0`), so the nine observed rows
+  are unwritten and the fragment stays the sole carrier per its banner.
+- `2026-09-04_BUILD_fangraphs-platoon-refresh-procedure.md` -> RETAINED,
+  condition re-checked: R317(c) is unshipped (Session 9 Batch 1 of 4), so the
+  procedure stays per its banner.
+
+**Roadmap.** Sessions 10, 19 and 39 each gained one batch member; no session was
+renumbered and the NEXT pointer (Session 4) is unchanged. The Sources line names
+the three consumed fragments. The decisions-owed block notes that R150's answer is
+now R333's default.
+
+**SKILL.md, corrected rather than queued (`e280586`'s precedent).** The leverage
+paragraph said an unconstrained lineup lands near 100-105 and to start the
+cumulative cap at 90-95. On 2140_5g the delivered ten-slot sums under cap 95 ran
+53.5 to 93.9, so the cap bound nothing and the instruction was wrong in the
+direction of being inert on a wide slate. The paragraph now carries the third
+reading beside the two it had (1605_2g, 2210_2g), scopes the 100-105 claim to a
+thin slate, and says the start is read off the unconstrained build's own maximum
+sum, with the hand computation to use until the R197 rider prints it. No test
+pins the paragraph (`grep -n "90-95" tests/` returns nothing).
+
+**Session 3 closed out first, same session, separate commit (`9d46737`).** Its
+RESUME prompt left three mechanical steps to the next DEV session: the M17 mutant
+re-run (killed: the fourth `ShowdownBriefCarriesTheSmallSampleCautionTests` test
+went RED under it), a gate reset and run to completion at the moved pin (`PASS
+v2.26.0  28 modules  1925 tests`, no skips, seven `--gate-run` calls including one
+lost to a device-VM restart that left no poisoned record), and the commit by
+explicit path. The two R310 fixture CSVs were already in HEAD, swept into
+`2989727` from Session 3's staged index by the 2140_5g BUILD commit; that is the
+one-commit changelog_debt the gate report named, and `9d46737`'s entry covers it.
+
 ## 2026-09-08 — R327 + R313 + R310(b) + R312: the projection frame gets a numeric boundary, a forbidden combination stops shrinking into a pool reduction, a callup's APPG gets a caution, and the portfolio metric stops claiming EV
 
 Session 3 of the execution roadmap, its four rows plus the 1835_5g inbox

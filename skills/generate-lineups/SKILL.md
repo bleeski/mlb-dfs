@@ -447,15 +447,27 @@ Five things to know before you use it:
   written, which also means the JSON explaining it is in
   `outputs/<date>/_<tag>.out` and not at the brief path you passed. The refusal
   names the valid set and the exact syntax; it cost a call to see it.
-- **`max_cumulative_ownership_pct` is the sum over ten slots**, so an
-  unconstrained lineup lands near 100-105 and a cap of 90 is a real bind.
+- **`max_cumulative_ownership_pct` is the sum over ten slots**, so on a thin
+  slate an unconstrained lineup lands near 100-105 and a cap of 90 is a real
+  bind.
   Measured on 1605_2g: cap 90 cost **-7.72%** of the single-lineup objective, cap
-  80 cost **-32.50%**, cap 75 was INFEASIBLE. Start at 90-95, not at 80.
+  80 cost **-32.50%**, cap 75 was INFEASIBLE. Start at 90-95 on a slate shaped
+  like that one, not at 80; the third reading below is why that is not a rule.
   **That -7.72% is a 1605_2g reading and not a budget: re-measure per slate,
   because the cost scales with slate thinness.** On the 2026-09-04 2210_2g
   2-gamer, where the prior spreads over ~40 rosterable bats so the cumulative
   cap binds far earlier, cap 95 with `min_low_owned_hitters: 1` certified at
   apex 883.84 -> 688.27, **-22.1%**, and cap 90 with a floor of 2 REFUSED.
+  **And it scales the other way on a wide slate: the cap can sit ABOVE the
+  unconstrained sum and bind nothing.** On the 2026-09-08 2140_5g 5-gamer (208
+  priced hitter rows, top hitter 14.7%) the delivered ten-slot sums ran 53.5 to
+  93.9 under cap 95, low-owned carry stayed 0 of 15 in both builds, and only
+  `min_low_owned_hitters: 1` moved the file. So the start is a little under the
+  UNCONSTRAINED build's own maximum ten-slot sum, not a constant. The brief does
+  not print that sum yet (R197 rider, 2026-09-09): until it does, sum
+  `Projected_Ownership_Pct` over each delivered lineup before choosing a cap,
+  and if the cap sits above that maximum say so in the handoff rather than
+  reporting a leverage build.
 - **`min_low_owned_hitters` has a hard infeasibility edge**, at 6 on that same
   pool. If the build refuses, lower the floor before you touch the cap; they are
   independently settable for exactly this reason.
