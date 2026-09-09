@@ -601,7 +601,37 @@ EXPECTED_SUITE_COUNTS = {
     # the class, since fixing the one table (EXPECTED_CENSUS, whose untracked
     # member made this suite RED in every fresh clone and told the gate to say
     # "do not build") does not stop the third member being written next month.
-    "tests.test_core": 1160,
+    # R327+R313+R310(b)+R312 + the 1835_5g fragment, 2026-09-08: 1160 -> 1205,
+    # the forty-five that pin Session 3 here; three more are in test_showdown
+    # below, because R310's REPORTING end has to be driven through the
+    # production `run_showdown` and a source read of build_slate.py goes green
+    # on a disabled branch (R249 M1, R300(a)). Twenty-one on R327's boundary: the two
+    # doors refusing duplicate ids, negative/zero/non-integer/NaN salary,
+    # NaN/+-inf bounds, an inverted bound and an EMPTY frame before SciPy sees
+    # any of it; `build_projections` raising on the same frames, so the rule
+    # binds on the production builder and not only on a validator a caller may
+    # skip; the refresh reading `Excluded` through the canonical parser for
+    # every non-affirmative token INCLUDING the float NaN a CSV round trip with
+    # one blank cell produces, an explicit TRUE surviving, idempotence, and the
+    # inverted refreshed bound RAISING instead of being clipped to
+    # Floor == Ceiling; and the `--projections` door itself refusing nan/inf/
+    # negative/duplicate, which is the N+1 site the entry did not name and the
+    # one door it did. Eight on R313: the blocklist survivor selectable and the
+    # objective back at the unconstrained value, a full core still binding, a
+    # three-member combo shrunk to two survivors no longer forbidding that
+    # pair, a genuine pair still forbidden, `overlap_reference` unchanged (the
+    # third `_known_pids` caller, CORRECT, tested so its omission cannot read
+    # as an oversight), and the legal-player count unmoved by a core's
+    # presence. Eight on R310's warning half, the two archived callups vendored
+    # under tests/fixtures/showdown/ rather than read out of the gitignored
+    # data/slates/ (R155's defect, R322's guard), plus the flat-pool and
+    # expensive-star silences that make it a caution and not decoration. Four
+    # on R312: no name `score_lineup_candidate` can emit carries the forbidden
+    # vocabulary, across the closed shape set times every mode, with the
+    # surviving `mode='portfolio_ev'` token named rather than silently exempt.
+    # Six on the fragment's `agrees_with_request`, including the split-bank case
+    # that proves the new null did not silence R293's own disagreement.
+    "tests.test_core": 1205,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -789,7 +819,19 @@ EXPECTED_SUITE_COUNTS = {
     # every person in the salary universe, a malformed side deciding nothing,
     # and the melt reading R323's shared completeness predicate rather than the
     # column a second time.
-    "tests.test_showdown": 215,
+    # R310 warning half, 2026-09-08: 215 -> 219, the four that drive the
+    # caution through the PRODUCTION `run_showdown` -- the field present with
+    # `applied: false` on a pool that does not fire (`supplied_base`'s "absent
+    # is not an answer"), the caution string RENDERING off a real report with
+    # only the salary-threshold constant patched (the branch never evaluates
+    # otherwise, so a NOTE that raised on a None salary would fail nowhere
+    # else), and a flagged pool changing no delivered byte, which is what makes
+    # it a caution and not a gate. The fourth is the one a SURVIVING mutant
+    # asked for: the NOTE is suppressed when `--projections` supplied the
+    # Base (the operator already replaced the prior it warns about) and the
+    # FIELD is not, and that rule was correct and untested until the mutant
+    # that deleted it lived. A fixture gap, not a weak mutant.
+    "tests.test_showdown": 219,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

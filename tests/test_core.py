@@ -23169,5 +23169,710 @@ class R304QaPortfolioPitcherTokenTests(unittest.TestCase):
         self.assertIs(qa_portfolio.is_pitcher_row, preflight_upload.is_pitcher_row)
 
 
+# =========================================================================== #
+# Session 3, 2026-09-08: R327 + R313 + R310(b) + R312, and the 1835_5g
+# fragment's reporting half.
+#
+# Every test below runs a PRODUCTION entry point. The one shape this project
+# keeps re-learning is that a test which reads source, or rebuilds a
+# function's logic beside it, goes green on a disabled branch (R249 M1,
+# R300(a), R246's own mutation survivor), so nothing here parses and nothing
+# here re-implements.
+# =========================================================================== #
+
+SHOWDOWN_FIXTURES = REPO / "tests" / "fixtures" / "showdown"
+SD_WSH_LAD_2026_09_04 = SHOWDOWN_FIXTURES / "DKSalaries_showdown_WSH_LAD_frozen_2026-09-04.csv"
+SD_STL_LAD_2026_09_03 = SHOWDOWN_FIXTURES / "DKSalaries_showdown_STL_LAD_frozen_2026-09-03.csv"
+
+
+class ProjectionFrameBoundaryTests(unittest.TestCase):
+    """R327(a). The external projection frame had no numeric boundary, and the
+    ONE check that existed was blind to the case it guarded.
+
+    Measured at `e3757ca` on the production functions: a two-row frame with the
+    same `Player_ID`, `Salary=-1` and NaN Floor/Ceiling returned
+    `passed: True, ceiling_below_floor_rows: 0`, because a NaN comparison is
+    false; `+inf` bounds passed; an EMPTY frame with every core column passed;
+    and on the factor side `Salary=-1`, `Salary=4000.5`, `Salary=NaN`,
+    `Base=+inf`, `F1=+inf` and a duplicate id all passed. `Salary` sat in both
+    functions' `required` set for PRESENCE and was never VALUED by either.
+    """
+
+    CORE = {
+        "Player_ID": "1", "Name": "A", "Team": "AAA", "Opponent": "BBB",
+        "Position": "OF", "Salary": 5000, "Game_ID": "G1",
+        "Floor": 5.8, "Ceiling": 14.2, "Excluded": False, "Locked": False,
+    }
+    FACTORS = {
+        "Player_ID": "1", "Name": "A", "Team": "AAA", "Opponent": "BBB",
+        "Position": "OF", "Salary": 5000, "Game_ID": "G1", "Base": 10.0,
+        "F1": 1.0, "F2": 1.0, "F3": 1.0, "F4": 1.0, "F5": 1.0,
+    }
+
+    def _core(self, **over):
+        row = dict(self.CORE)
+        row.update(over)
+        return row
+
+    def _factors(self, **over):
+        row = dict(self.FACTORS)
+        row.update(over)
+        return row
+
+    def test_a_clean_frame_still_passes_both_doors(self):
+        """The control. A boundary that refuses everything is not a boundary."""
+        self.assertTrue(opt.validate_projection_schema(
+            pd.DataFrame([self._core()]))["passed"])
+        from mlb_engine.projections.projection_builder import validate_projection_factors
+        self.assertTrue(validate_projection_factors(
+            pd.DataFrame([self._factors()]))["passed"])
+
+    def test_the_schema_door_refuses_every_measured_escape(self):
+        cases = {
+            "duplicate id": [self._core(), self._core()],
+            "negative salary": [self._core(Salary=-1)],
+            "zero salary": [self._core(Salary=0)],
+            "non-integer salary": [self._core(Salary=4000.5)],
+            "NaN bounds": [self._core(Floor=float("nan"), Ceiling=float("nan"))],
+            "+inf bounds": [self._core(Floor=float("inf"), Ceiling=float("inf"))],
+            "-inf floor": [self._core(Floor=float("-inf"))],
+            "inverted bounds": [self._core(Floor=14.0, Ceiling=6.0)],
+            "blank id": [self._core(Player_ID="   ")],
+        }
+        for label, rows in cases.items():
+            with self.subTest(case=label):
+                report = opt.validate_projection_schema(pd.DataFrame(rows))
+                self.assertFalse(report["passed"], f"{label} passed the schema door")
+                self.assertTrue(report["boundary_errors"],
+                                f"{label} failed with no reason stated")
+
+    def test_the_schema_door_refuses_an_empty_frame(self):
+        """An empty frame is not a passing schema. Nothing downstream can build
+        a lineup out of it, and `passed: True` sends it to the solver."""
+        report = opt.validate_projection_schema(
+            pd.DataFrame(columns=list(opt.CORE_PROJECTION_FIELDS)))
+        self.assertFalse(report["passed"])
+        self.assertTrue(any("empty" in e for e in report["boundary_errors"]))
+
+    def test_the_nan_row_is_counted_by_the_boundary_not_by_the_comparison(self):
+        """`ceiling_below_floor_rows` stays the count of rows that are genuinely
+        inverted -- a NaN row is not "not inverted", it is not comparable -- and
+        the frame still fails, through the finiteness error rather than through
+        a comparison NaN wins."""
+        report = opt.validate_projection_schema(
+            pd.DataFrame([self._core(Floor=float("nan"), Ceiling=float("nan"))]))
+        self.assertEqual(report["ceiling_below_floor_rows"], 0)
+        self.assertFalse(report["passed"])
+
+    def test_the_factor_door_refuses_every_measured_escape(self):
+        from mlb_engine.projections.projection_builder import validate_projection_factors
+        cases = {
+            "duplicate id": [self._factors(), self._factors()],
+            "negative salary": [self._factors(Salary=-1)],
+            "non-integer salary": [self._factors(Salary=4000.5)],
+            "NaN salary": [self._factors(Salary=float("nan"))],
+            "+inf Base": [self._factors(Base=float("inf"))],
+            "+inf F1": [self._factors(F1=float("inf"))],
+            "-inf Base": [self._factors(Base=float("-inf"))],
+            "NaN Base": [self._factors(Base=float("nan"))],
+        }
+        for label, rows in cases.items():
+            with self.subTest(case=label):
+                report = validate_projection_factors(pd.DataFrame(rows))
+                self.assertFalse(report["passed"], f"{label} passed the factor door")
+                self.assertTrue(report["errors"])
+
+    def test_the_factor_door_refuses_an_empty_frame(self):
+        from mlb_engine.projections.projection_builder import validate_projection_factors
+        report = validate_projection_factors(
+            pd.DataFrame(columns=list(self.FACTORS.keys())))
+        self.assertFalse(report["passed"])
+
+    def test_build_projections_refuses_the_bad_frame_before_any_solve(self):
+        """The boundary has to bind on the PRODUCTION builder, not only on the
+        validator a caller may or may not run. `build_projections` raises on an
+        invalid factor frame and that is the door SciPy sits behind."""
+        with self.assertRaises(ValueError):
+            build_projections([self._factors(Salary=-1)], mode="emergency_proxy")
+        with self.assertRaises(ValueError):
+            build_projections([self._factors(Base=float("inf"))], mode="emergency_proxy")
+        with self.assertRaises(ValueError):
+            build_projections([self._factors(), self._factors()], mode="emergency_proxy")
+
+    def test_one_boundary_serves_both_doors(self):
+        """R233. The rule lives once. Both validators call the same function,
+        so a future column added to one door's list cannot mint a second
+        reading of "is this a finite number"."""
+        from mlb_engine.projections import projection_builder as pbmod
+        source = inspect.getsource(pbmod.validate_projection_factors)
+        self.assertIn("validate_projection_numerics", source)
+        self.assertIn("validate_projection_numerics",
+                      inspect.getsource(opt.validate_projection_schema))
+
+
+class ConfirmedRefreshReadsTheCanonicalExcludedTests(unittest.TestCase):
+    """R327(b). `refresh_confirmed_lineups` tested `Excluded` by Python
+    truthiness, which is the comparison CLAUDE.md's hard guardrail forbids.
+
+    Measured at `e3757ca` on a CONFIRMED starter with
+    `Excluded_Source == "salary_file"`: `"False"`, `"FALSE"`, `"nan"` and a
+    float NaN ALL excluded him, and repeated refresh was idempotent at True, so
+    the wrong answer was sticky. The realistic producer is not a hand-typed
+    "False" -- it is a CSV round trip with ONE blank `Excluded` cell, which
+    turns the column to object dtype and the blank to float NaN, and
+    `bool(nan)` is True.
+    """
+
+    def _row(self, excluded, source, **over):
+        row = {
+            "Player_ID": "1", "Name": "A", "Team": "AAA", "Opponent": "BBB",
+            "Position": "OF", "Salary": 5000, "Game_ID": "G1", "Base": 10.0,
+            "F1": 1.0, "F2": 1.0, "F3": 1.0, "F4": 1.0, "F5": 1.0,
+            "Base_Projection": 10.0, "Floor": 5.8, "Ceiling": 14.2,
+            "Excluded": excluded, "Excluded_Source": source,
+            "Locked": False, "Batting_Order": 3,
+        }
+        row.update(over)
+        return row
+
+    def _refresh(self, rows, order=None, starters=("1",), teams=("AAA",)):
+        return refresh_confirmed_lineups(
+            pd.DataFrame(rows), dict(order or {"1": 3}),
+            starter_player_ids=list(starters), confirmed_teams=list(teams))
+
+    def test_a_confirmed_starter_survives_every_non_affirmative_token(self):
+        """The canonical parser's answer, on the refresh path. Each of these
+        excluded him before."""
+        for token in ("False", "FALSE", "false", "nan", "", "0", float("nan"), False, None):
+            with self.subTest(token=repr(token)):
+                out, _ = self._refresh([self._row(token, "salary_file")])
+                self.assertFalse(bool(out.iloc[0]["Excluded"]),
+                                 f"{token!r} excluded a confirmed starter")
+
+    def test_an_explicit_true_salary_exclusion_survives_the_refresh(self):
+        """R291's guarantee, unchanged. The operator's instruction is not this
+        function's to revoke, and canonicalizing the column must not weaken it."""
+        for token in ("TRUE", "True", "true", "1", "Y", True):
+            with self.subTest(token=repr(token)):
+                out, _ = self._refresh([self._row(token, "salary_file")])
+                self.assertTrue(bool(out.iloc[0]["Excluded"]),
+                                f"{token!r} lost an operator exclusion")
+                self.assertEqual(out.iloc[0]["Excluded_Source"], "salary_file")
+
+    def test_the_string_false_agrees_with_read_excluded_cell(self):
+        """The two readings are one reading. A test on the refresh's ANSWER
+        rather than on its source, so a re-derived token rule that happened to
+        agree today would still have to agree tomorrow."""
+        for token in ("False", "nan", "TRUE", "", "wat"):
+            with self.subTest(token=token):
+                canonical, _kind = opt.read_excluded_cell(token)
+                out, _ = self._refresh([self._row(token, "salary_file")])
+                self.assertEqual(bool(out.iloc[0]["Excluded"]), bool(canonical))
+
+    def test_a_csv_round_trip_with_one_blank_cell_keeps_its_starters(self):
+        """The producer, end to end. Three rows, one blank `Excluded` cell,
+        written and read back through pandas the way any staged frame is:
+        before the fix row 1 came back excluded because the blank became NaN
+        and the column became object dtype."""
+        rows = [self._row(False, "salary_file", Player_ID="1"),
+                self._row(True, "salary_file", Player_ID="2", Name="B"),
+                self._row(False, "absent_or_blank", Player_ID="3", Name="C")]
+        frame = pd.DataFrame(rows)
+        frame.loc[0, "Excluded"] = None
+        buf = io.StringIO()
+        frame.to_csv(buf, index=False)
+        buf.seek(0)
+        out, _ = self._refresh(pd.read_csv(buf).to_dict("records"),
+                               order={"1": 3, "2": 3, "3": 3},
+                               starters=("1", "2", "3"))
+        self.assertEqual([bool(x) for x in out["Excluded"]], [False, True, False])
+
+    def test_repeated_refresh_is_idempotent(self):
+        """The wrong answer used to be sticky: once imposed, `Excluded_Source`
+        read `salary_file` forever after. The right answer has to be stable too."""
+        first, _ = self._refresh([self._row("False", "salary_file")])
+        second, _ = self._refresh(first)
+        third, _ = self._refresh(second)
+        self.assertEqual([bool(x) for x in second["Excluded"]],
+                         [bool(x) for x in first["Excluded"]])
+        self.assertEqual([bool(x) for x in third["Excluded"]],
+                         [bool(x) for x in first["Excluded"]])
+
+    def test_a_non_starter_on_a_confirmed_team_is_still_excluded(self):
+        """The function's actual job, unchanged by the canonicalization."""
+        rows = [self._row(False, "absent_or_blank", Player_ID="1"),
+                self._row(False, "absent_or_blank", Player_ID="9", Name="Bench")]
+        out, _ = self._refresh(rows, order={"1": 3}, starters=("1",))
+        by_id = {str(r["Player_ID"]): bool(r["Excluded"]) for _, r in out.iterrows()}
+        self.assertFalse(by_id["1"])
+        self.assertTrue(by_id["9"])
+
+
+class ConfirmedRefreshRaisesOnInvertedBoundsTests(unittest.TestCase):
+    """R327(b), the guardrail half. CLAUDE.md: "Ceiling below Floor is a hard
+    error, never silently repaired." `build_projections` has raised on it since
+    v1.0; `refresh_confirmed_lineups` CLIPPED it with a `max()`.
+
+    Measured at `e3757ca`: Floor 14.0 / Ceiling 6.0 with Base_Projection 10.0
+    came back Floor 14.0 / Ceiling 14.0 -- the inversion gone, Floor ==
+    Ceiling, and the evidence of the bad upstream input erased.
+    """
+
+    def _row(self, floor, ceiling, base_projection=10.0):
+        return {
+            "Player_ID": "1", "Name": "A", "Team": "AAA", "Opponent": "BBB",
+            "Position": "OF", "Salary": 5000, "Game_ID": "G1", "Base": 10.0,
+            "F1": 1.0, "F2": 1.0, "F3": 1.0, "F4": 1.0, "F5": 1.0,
+            "Base_Projection": base_projection, "Floor": floor,
+            "Ceiling": ceiling, "Excluded": False, "Locked": False,
+            "Batting_Order": 3,
+        }
+
+    def test_an_inverted_pre_refresh_bound_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            refresh_confirmed_lineups(pd.DataFrame([self._row(14.0, 6.0)]), {})
+        self.assertIn("Ceiling below Floor", str(ctx.exception))
+
+    def test_the_refusal_names_the_player_and_both_bounds(self):
+        """A refusal an operator reads at T-5 has to say which row and what the
+        numbers were, or the remedy is a hunt (R290(c), R207)."""
+        with self.assertRaises(ValueError) as ctx:
+            refresh_confirmed_lineups(pd.DataFrame([self._row(14.0, 6.0)]), {})
+        message = str(ctx.exception)
+        self.assertIn("'1'", message)
+        self.assertIn("14.0", message)
+        self.assertIn("6.0", message)
+
+    def test_a_valid_bound_still_refreshes_and_is_not_flattened(self):
+        """The clip did not only hide bad input: on a VALID row it could still
+        collapse Floor and Ceiling together. They must stay apart."""
+        out, _ = refresh_confirmed_lineups(
+            pd.DataFrame([self._row(5.8, 14.2)]), {"1": 1},
+            starter_player_ids=["1"], confirmed_teams=["AAA"])
+        floor = float(out.iloc[0]["Floor"])
+        ceiling = float(out.iloc[0]["Ceiling"])
+        self.assertGreater(ceiling, floor)
+        self.assertAlmostEqual(floor / ceiling, 5.8 / 14.2, places=6)
+
+
+class SuppliedBaseDoorHasANumericBoundaryTests(unittest.TestCase):
+    """R327, the N+1 site. `--projections` is the door the item names and the
+    Showdown lever its "Why P1" paragraph cites, and `read_supplied_base` had
+    no value check at all: `float("nan")` is a SUCCESSFUL parse, so the
+    try/except around it was a syntax check.
+
+    Measured at `e3757ca` on a four-row file: `nan`, `inf`, `-5` and `1e400`
+    were all accepted, `rows_usable: 4`, `rows_skipped: 0`. A supplied Base is
+    used AS the prior and bypasses every derived check, so a NaN there is a NaN
+    objective on the live path.
+    """
+
+    def _write(self, body):
+        tmp = Path(tempfile.mkdtemp()) / "projections.csv"
+        tmp.write_text(body, encoding="utf-8")
+        return tmp
+
+    def test_a_clean_file_is_still_read(self):
+        from mlb_engine.optimize import showdown_theses as st
+        supplied, report = st.read_supplied_base(
+            self._write("Player_ID,Base\n1,5.5\n2,8.0\n"))
+        self.assertEqual(supplied, {"1": 5.5, "2": 8.0})
+        self.assertEqual(report["rows_usable"], 2)
+
+    def test_every_nonfinite_or_negative_value_is_refused(self):
+        from mlb_engine.optimize import showdown_theses as st
+        for token in ("nan", "NaN", "inf", "-inf", "Infinity", "1e400", "-5"):
+            with self.subTest(token=token):
+                with self.assertRaises(ValueError) as ctx:
+                    st.read_supplied_base(self._write(f"Player_ID,Base\n1,{token}\n"))
+                self.assertIn("unusable", str(ctx.exception))
+
+    def test_the_refusal_names_the_offending_rows(self):
+        from mlb_engine.optimize import showdown_theses as st
+        with self.assertRaises(ValueError) as ctx:
+            st.read_supplied_base(self._write("Player_ID,Base\n1,5.0\n7,nan\n"))
+        self.assertIn("7", str(ctx.exception))
+
+    def test_a_duplicate_player_id_is_refused(self):
+        """Two Base values for one player is not a prior, it is a question."""
+        from mlb_engine.optimize import showdown_theses as st
+        with self.assertRaises(ValueError) as ctx:
+            st.read_supplied_base(self._write("Player_ID,Base\n1,5.0\n1,9.0\n"))
+        self.assertIn("duplicate", str(ctx.exception).lower())
+
+
+class ForbiddenCombinationRowsNeedEveryMemberTests(unittest.TestCase):
+    """R313. `_known_pids` drops members absent from the active pool, and the
+    two forbidden-combination rows then meant something nobody asked for.
+
+    Reproduced at `e3757ca` on this frame: a three-member
+    `stack_core_blocklist` core with two members absent became
+    `x_survivor <= 0` and excluded the pool's best catcher from every lineup
+    (objective 195.96 -> 170.40) -- the legal-POOL reduction CLAUDE.md's hard
+    guardrails forbid. The sibling `forbidden_player_combos` did NOT have that
+    defect (`len(pids) >= 2` stopped it there) and had a different one: a
+    three-member combo shrunk to TWO survivors emitted `x_a + x_b <= 1`,
+    forbidding a PAIR nobody forbade -- a legal-SPACE reduction, latent on the
+    production path because its one production caller (`capped_pairs`) always
+    passes exact pairs, and live on the public API.
+    """
+
+    ABSENT = ("9999991", "9999992")
+
+    @classmethod
+    def _frame(cls):
+        rows, pid = [], 1
+        for team, opponent, game in (("T1", "T2", "G1"), ("T2", "T1", "G1"),
+                                     ("T3", "T4", "G2"), ("T4", "T3", "G2")):
+            for position, count in (("P", 2), ("C", 2), ("1B", 2), ("2B", 2),
+                                    ("3B", 2), ("SS", 2), ("OF", 4)):
+                for k in range(count):
+                    salary = 4000 + (pid % 7) * 200
+                    base = 8.0 + (pid % 5)
+                    if team == "T3" and position == "C" and k == 0:
+                        base, salary = 30.0, 3000   # the survivor
+                    rows.append({
+                        "Player_ID": str(900000 + pid), "Name": f"{team}-{position}-{k}",
+                        "Team": team, "Opponent": opponent, "Position": position,
+                        "Salary": salary, "Game_ID": game, "Floor": base * 0.58,
+                        "Ceiling": base * 1.42, "Base_Projection": base,
+                        "Excluded": False, "Locked": False,
+                    })
+                    pid += 1
+        return pd.DataFrame(rows)
+
+    def setUp(self):
+        self.df = self._frame()
+        # k=8 so the frame is feasible without the anti-correlation wall doing
+        # the work this test is measuring.
+        self.kwargs = dict(target="ceiling", max_opposing_hitters_per_sp=8)
+        lineup, objective = opt.build_single_lineup(self.df, **self.kwargs)
+        self.baseline_ids = [str(x) for x in lineup["Player_ID"]]
+        self.baseline_objective = objective
+        self.survivor = str(self.df[(self.df.Team == "T3") & (self.df.Position == "C")]
+                            .sort_values("Base_Projection", ascending=False)
+                            .iloc[0]["Player_ID"])
+
+    def _ids(self, **kwargs):
+        lineup, objective = opt.build_single_lineup(self.df, **self.kwargs, **kwargs)
+        self.assertIsNotNone(lineup, "the solve returned no lineup at all")
+        return {str(x) for x in lineup["Player_ID"]}, objective
+
+    def test_the_survivor_is_in_the_unconstrained_lineup(self):
+        """The premise. Without it the test below proves nothing."""
+        self.assertIn(self.survivor, self.baseline_ids)
+
+    def test_a_blocklist_core_with_two_members_absent_leaves_the_third_selectable(self):
+        ids, objective = self._ids(
+            stack_core_blocklist=[[self.survivor, *self.ABSENT]])
+        self.assertIn(self.survivor, ids)
+        self.assertAlmostEqual(objective, self.baseline_objective, places=6)
+
+    def test_a_blocklist_core_fully_present_still_binds(self):
+        """The control, and the reason this is a guard and not a deletion."""
+        core = self.baseline_ids[:3]
+        ids, _ = self._ids(stack_core_blocklist=[core])
+        self.assertFalse(set(core) <= ids,
+                         "a fully present forbidden core stopped binding")
+
+    def test_a_combo_shrunk_to_two_survivors_does_not_forbid_that_pair(self):
+        a, b = self.baseline_ids[3], self.baseline_ids[5]
+        ids, objective = self._ids(
+            forbidden_player_combos=[[a, b, "9999993"]])
+        self.assertTrue({a, b} <= ids)
+        self.assertAlmostEqual(objective, self.baseline_objective, places=6)
+
+    def test_a_genuine_two_member_forbidden_pair_still_binds(self):
+        """The control for the control. `capped_pairs` -- the one production
+        caller -- passes exactly this shape on every SP-pair cap."""
+        a, b = self.baseline_ids[3], self.baseline_ids[5]
+        ids, _ = self._ids(forbidden_player_combos=[[a, b]])
+        self.assertFalse({a, b} <= ids)
+
+    def test_a_combo_with_one_survivor_leaves_that_player_selectable(self):
+        ids, _ = self._ids(
+            forbidden_player_combos=[[self.survivor, *self.ABSENT]])
+        self.assertIn(self.survivor, ids)
+
+    def test_overlap_reference_behaviour_is_unchanged(self):
+        """R233's third `_known_pids` caller, and it is CORRECT. Shrinking the
+        terms of `sum <= max_overlap` makes the row WEAKER, not stricter, and
+        an absent player cannot be reused anyway -- so it keeps `_known_pids`
+        and this test says so rather than leaving the omission to be read as an
+        oversight."""
+        full = self.baseline_ids
+        partial = [full[0], full[1], *self.ABSENT]
+        strict, _ = self._ids(overlap_reference=[full], max_overlap=3)
+        self.assertLessEqual(len(strict & set(full)), 3)
+        loose, _ = self._ids(overlap_reference=[partial], max_overlap=1)
+        self.assertLessEqual(len({full[0], full[1]} & loose), 1)
+
+    def test_the_core_does_not_change_the_legal_player_count(self):
+        """The acceptance criterion the entry names. A forbidden core is a
+        construction rule; it may never remove a player from the pool."""
+        from mlb_engine.optimize.optimizer_v3 import _drop_excluded_rows
+        before = len(_drop_excluded_rows(self.df))
+        self._ids(stack_core_blocklist=[[self.survivor, *self.ABSENT]])
+        self.assertEqual(len(_drop_excluded_rows(self.df)), before)
+
+
+class ShowdownSmallSampleBaseCautionTests(unittest.TestCase):
+    """R310, warning half. APPG is the Showdown Base prior and carries no
+    games-played denominator, so a callup with one or two MLB games can be the
+    highest-APPG hitter in a twenty-man pool with every control reading clean.
+
+    The fixtures ARE the two recorded incidents, vendored under
+    tests/fixtures/showdown/ rather than read out of the gitignored
+    `data/slates/` (R155's defect, R322's guard).
+    """
+
+    def _report(self, path):
+        from mlb_engine.optimize.showdown import (
+            melt_showdown_salary_csv, small_sample_base_report)
+        return small_sample_base_report(melt_showdown_salary_csv(str(path)))
+
+    def test_it_catches_yohandy_morales(self):
+        """2026-09-04 WSH@LAD: APPG 13.5 off 2 games and 8 PA, the highest of
+        any hitter in the pool, at $3,400. 7 of 12 entries, player cap relaxed."""
+        report = self._report(SD_WSH_LAD_2026_09_04)
+        self.assertTrue(report["applied"])
+        self.assertIn("Yohandy Morales", [p["Name"] for p in report["players"]])
+
+    def test_it_catches_leo_bernal(self):
+        """2026-09-03 STL@LAD: APPG 12.5 off ~1 game at $5,000. 9 of 19 entries.
+        This is the one the entry's own bottom-QUARTILE predicate missed, by
+        $50 -- the conjunct is the median for exactly this reason."""
+        report = self._report(SD_STL_LAD_2026_09_03)
+        self.assertTrue(report["applied"])
+        self.assertIn("Leo Bernal", [p["Name"] for p in report["players"]])
+
+    def test_the_comparison_class_is_hitters_and_the_arms_are_out_of_it(self):
+        """Both pools are 20 persons and 18 hitters. A filter testing DK's
+        `Position` for the single letter `P` keeps all twenty, because DK writes
+        `SP`, and Bernal then reads rank 2 behind Tarik Skubal's 22.3 instead of
+        rank 1 among the bats -- which is the fact the caution is about."""
+        for path in (SD_WSH_LAD_2026_09_04, SD_STL_LAD_2026_09_03):
+            with self.subTest(path=path.name):
+                report = self._report(path)
+                self.assertEqual(report["hitters_considered"], 18)
+                self.assertEqual(report["players"][0]["appg_rank_among_hitters"], 1)
+
+    def test_it_is_silent_on_a_pool_with_no_cheap_outlier(self):
+        """The half that makes it a caution rather than decoration. A flat pool
+        -- every hitter on the same APPG -- has nothing above its own 90th
+        percentile, so nothing fires."""
+        from mlb_engine.optimize.showdown import small_sample_base_report
+        frame = pd.DataFrame([
+            {"Name": f"H{i}", "Team": "AAA", "Position": "OF", "Base": 8.0,
+             "UTIL_Salary": 4000 + 100 * i, "UTIL_ID": str(i)}
+            for i in range(18)])
+        report = small_sample_base_report(frame)
+        self.assertFalse(report["applied"])
+        self.assertEqual(report["players"], [])
+        self.assertEqual(report["hitters_considered"], 18)
+
+    def test_an_expensive_star_is_not_flagged(self):
+        """A high APPG at a high salary is a good player, not a small sample.
+        The salary conjunct is what separates them, and dropping it turns this
+        into a line that fires on every slate."""
+        from mlb_engine.optimize.showdown import small_sample_base_report
+        rows = [{"Name": f"H{i}", "Team": "AAA", "Position": "OF", "Base": 6.0,
+                 "UTIL_Salary": 5000, "UTIL_ID": str(i)} for i in range(17)]
+        rows.append({"Name": "Expensive Star", "Team": "BBB", "Position": "OF",
+                     "Base": 14.0, "UTIL_Salary": 11000, "UTIL_ID": "99"})
+        self.assertFalse(small_sample_base_report(pd.DataFrame(rows))["applied"])
+        rows[-1]["UTIL_Salary"] = 3000
+        report = small_sample_base_report(pd.DataFrame(rows))
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["players"][0]["Name"], "Expensive Star")
+
+    def test_it_reports_a_shape_even_when_nothing_fires(self):
+        """`supplied_base`'s discipline: present on every brief, `applied:
+        false` when there is nothing to say. Absent is not an answer."""
+        from mlb_engine.optimize.showdown import small_sample_base_report
+        report = small_sample_base_report(pd.DataFrame([]))
+        for key in ("applied", "players", "hitters_considered",
+                    "appg_percentile", "salary_percentile", "note"):
+            self.assertIn(key, report)
+        self.assertFalse(report["applied"])
+
+    # The REPORTING end -- the field reaching the delivered brief and the
+    # caution rendering -- is driven end to end through the production
+    # `run_showdown` in
+    # `tests.test_showdown.ShowdownBriefCarriesTheSmallSampleCautionTests`,
+    # not asserted here by reading build_slate.py's source. A source read goes
+    # green on a disabled branch, which is R249 M1's and R300(a)'s failure
+    # mode, and the caution's f-string only evaluates when something fires.
+
+
+class TruthfulMetricNameTests(unittest.TestCase):
+    """R312. `Portfolio_EV_Proxy` asserted that a deterministic composite
+    proxies expected value, which is a probability-weighted payout claim, on
+    the rule CLAUDE.md calls non-negotiable and Ben wrote.
+
+    Nothing pinned the string in either direction: a grep at `e3757ca` found it
+    in `optimizer_v3.py` and in two historical review documents under docs/ and
+    NOWHERE in tests/, tools/ or skills/. So the rename is unprotected on both
+    sides -- nothing would have caught the label and nothing would catch its
+    return. This class is the enforcer the rename needed instead of a second
+    string pin: it enumerates every name the function can EMIT and checks the
+    vocabulary, so a future `Cash_Rate_Proxy` fails here without anyone
+    remembering to add it.
+    """
+
+    def _metric_names(self):
+        """Every name reachable out of `score_lineup_candidate`, taken by
+        RUNNING it across the closed shape set and every scoring mode, not from
+        a list written beside it. `contest_shapes.CONTEST_SHAPES` is the closed
+        set the module asserts against at import, so a shape added there is
+        covered here on the commit that adds it."""
+        from mlb_engine.contest_shapes import CONTEST_SHAPES
+        names = set()
+        lineup = self._lineup()
+        for shape in sorted(CONTEST_SHAPES):
+            for mode in ("wta", "gpp", "cash", "portfolio_ev", "multi_entry_gpp"):
+                record = opt.score_lineup_candidate(
+                    lineup, mode=mode, contest_shape=shape, candidate_id="c1")
+                names.add(record["contest_fit_metric"])
+                self.assertIn(record["contest_fit_metric"], record,
+                              "the metric name is a dict KEY as well as a value")
+        # And with no shape at all, which is the plain `mode` branch.
+        for mode in ("wta", "gpp", "cash", "portfolio_ev", "multi_entry_gpp"):
+            record = opt.score_lineup_candidate(lineup, mode=mode, candidate_id="c1")
+            names.add(record["contest_fit_metric"])
+            self.assertIn(record["contest_fit_metric"], record)
+        return names
+
+    def _lineup(self):
+        return pd.DataFrame([
+            {"Player_ID": str(i), "Name": f"P{i}",
+             "Team": "AAA" if i < 6 else "BBB",
+             "Opponent": "BBB" if i < 6 else "AAA",
+             "Position": "P" if i < 2 else "OF", "Salary": 4000,
+             "Game_ID": "G1", "Floor": 5.0, "Ceiling": 12.0,
+             "Base_Projection": 8.0, "Batting_Order": (i % 9) + 1}
+            for i in range(10)
+        ])
+
+    def test_no_emitted_metric_name_claims_a_payout(self):
+        for name in self._metric_names():
+            upper = name.upper()
+            for token in opt.FORBIDDEN_METRIC_VOCABULARY:
+                with self.subTest(metric=name, token=token):
+                    self.assertNotIn(
+                        token, upper,
+                        f"metric name {name!r} carries the forbidden token "
+                        f"{token!r}; CLAUDE.md's truthful-labels rule is "
+                        "non-negotiable and this is the enforcer R312 added "
+                        "because nothing pinned the old name in either direction")
+
+    def test_the_portfolio_branch_emits_the_renamed_metric(self):
+        names = self._metric_names()
+        self.assertIn("Portfolio_Contest_Fit_Proxy", names)
+        self.assertIn("WTA_First_Place_Fit_Proxy", names)
+        self.assertIn("Ticket_Line_Advance_Proxy", names)
+
+    def test_the_vocabulary_would_have_caught_the_old_names(self):
+        """A guard nobody has watched fail is a guard nobody has tested. Both
+        retired names must trip it."""
+        for retired in ("Portfolio_EV_Proxy", "WTA_First_Place_EV_Proxy",
+                        "Cash_Rate_Proxy", "Lineup_ROI_Score"):
+            with self.subTest(name=retired):
+                self.assertTrue(
+                    any(t in retired.upper() for t in opt.FORBIDDEN_METRIC_VOCABULARY),
+                    f"{retired} would have passed the vocabulary check")
+
+    def test_the_surviving_member_is_named_rather_than_silently_exempt(self):
+        """R233. The class is not empty after this commit: `mode='portfolio_ev'`
+        is a Framework v2.7 SOLVER MODE token, it reaches an emitted payload
+        (`bank_diagnostics.mode`), and renaming it changes a public API value
+        and golden bytes -- a different size of change than R312 was scoped for.
+        It is a filed rider on the closed entry, not an oversight, and this test
+        exists so the exemption cannot quietly become permanent by being
+        forgotten."""
+        self.assertEqual(opt._mode_for_contest_shape("large_field_gpp"), "portfolio_ev")
+        self.assertNotIn("portfolio_ev", self._metric_names())
+
+
+class AntiCorrelationAgreementIsNullWhenUnmeasuredTests(unittest.TestCase):
+    """Merged 2026-09-08 from the 1835_5g BUILD fragment.
+
+    On the direct path (`solve.strategy = direct`, `solve.bank` null) the brief
+    read `requested: null, applied: null, applied_source: "unobserved",
+    solves_observed: 0` and then `agrees_with_request: false` -- which a session
+    reads under a lock clock as "the constraint did not hold". It held: BUILD
+    verified 0 of 9 delivered entries rostered a hitter facing a rostered SP.
+
+    The fragment asked for null whenever `requested` is null. Measured, that is
+    the narrower half: with `observed=[]` and `requested=3` the field ALSO read
+    false, so any build that did pass `--max-opposing-hitters-per-sp` and took
+    the direct path got the same false reading. The predicate is keyed to
+    `applied`, which is the side that can be missing, and the class has TWO
+    members (the shared helper and the brief block), not the one the fragment
+    named.
+    """
+
+    def _bs(self):
+        import importlib.util
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r310", path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["build_slate_r310"] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def test_the_shared_helper_returns_null_when_nothing_was_observed(self):
+        for requested in (None, 0, 3):
+            with self.subTest(requested=requested):
+                report = opt.anti_correlation_report([], requested=requested)
+                self.assertIsNone(report["applied"])
+                self.assertIsNone(report["agrees_with_request"])
+
+    def test_the_direct_path_brief_block_reports_null(self):
+        block = self._bs().anti_correlation_brief_block(None, None, {})
+        self.assertEqual(block["applied_source"], "unobserved")
+        self.assertEqual(block["solves_observed"], 0)
+        self.assertIsNone(block["agrees_with_request"])
+        self.assertNotIn("disagreement", block)
+
+    def test_the_direct_path_reports_null_even_when_a_k_was_requested(self):
+        """The half the fragment's own predicate would have left live."""
+        block = self._bs().anti_correlation_brief_block(3, None, {})
+        self.assertIsNone(block["applied"])
+        self.assertIsNone(block["agrees_with_request"])
+
+    def test_the_bank_path_still_reports_true_and_false(self):
+        """The control. A measured agreement and a measured DISAGREEMENT are
+        both real answers and neither becomes null."""
+        bs = self._bs()
+        agreeing = bs.anti_correlation_brief_block(
+            3, {"anti_correlation": opt.anti_correlation_report([3, 3], requested=3)}, None)
+        self.assertIs(agreeing["agrees_with_request"], True)
+        self.assertNotIn("disagreement", agreeing)
+
+        disagreeing = bs.anti_correlation_brief_block(
+            3, {"anti_correlation": opt.anti_correlation_report([0, 0], requested=3)}, None)
+        self.assertIs(disagreeing["agrees_with_request"], False)
+        self.assertIn("disagreement", disagreeing)
+
+    def test_an_unrequested_build_measured_at_the_default_still_says_true(self):
+        """R237 cuts both ways. "Unobserved" must not swallow "observed to equal
+        the engine default", which is a measurement and is worth keeping."""
+        block = self._bs().anti_correlation_brief_block(
+            None, {"anti_correlation": opt.anti_correlation_report([0, 0], requested=None)},
+            None)
+        self.assertEqual(block["applied"], 0)
+        self.assertIs(block["agrees_with_request"], True)
+
+    def test_a_split_bank_still_raises_the_disagreement(self):
+        """R293's own condition. `applied` is null on a split, so the null above
+        must not silence the string that names it."""
+        block = self._bs().anti_correlation_brief_block(
+            3, {"anti_correlation": opt.anti_correlation_report([0, 3], requested=3)}, None)
+        self.assertIsNone(block["applied"])
+        self.assertEqual(block["observed"], [0, 3])
+        self.assertIn("disagreement", block)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

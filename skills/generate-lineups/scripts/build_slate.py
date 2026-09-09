@@ -2010,10 +2010,23 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
                 "`applied` is measured from the bank's own solves (R293), "
                 "never restated from the flag that requested it",
     }
+    # Merged 2026-09-08 from the 1835_5g BUILD fragment. This read
+    # `bool(applied is not None and applied == effective)`, so an absence of
+    # evidence printed as `false` on a line about anti-correlation -- which on
+    # the direct path (no bank, nothing to measure) is every build. The
+    # comparison has no answer when there is nothing to compare, and `null` is
+    # that answer; `applied_source: "unobserved"` beside it says why. Same
+    # predicate as `optimizer_v3.anti_correlation_report`, which is the shared
+    # helper this block's `applied` already comes from -- both had it, so the
+    # class is two, not the one the fragment named.
     effective = ANTI_CORRELATION_DEFAULT_MAX if requested is None else int(requested)
-    block["agrees_with_request"] = bool(
-        block["applied"] is not None and block["applied"] == effective)
-    if block["solves_observed"] and not block["agrees_with_request"]:
+    block["agrees_with_request"] = (
+        None if block["applied"] is None else bool(block["applied"] == effective))
+    # `is not True`, not `is False`: a SPLIT bank (observed [0, 3]) leaves
+    # `applied` None and therefore `agrees_with_request` None, and that is
+    # exactly R293's condition -- the string has to fire there or the null
+    # above would have silenced the disagreement it was introduced to preserve.
+    if block["solves_observed"] and block["agrees_with_request"] is not True:
         block["disagreement"] = (
             f"the build requested k={effective} and its bank's solves ran at "
             f"{block['observed']}; the delivered candidates are NOT all built "
@@ -3223,6 +3236,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                       "cannot produce a legal entry; narrow the exclusion",
         }, indent=1))
         return 4, {}
+    # R310 warning half. Read off the MELT, before `apply_base_prior` and
+    # before any supplied Base, because the question is about DK's APPG -- the
+    # prior the Showdown path ranks on when nothing replaces it. Computed here
+    # rather than beside the brief so the caution exists even on a path that
+    # refuses later.
+    sd_small_sample = sd.small_sample_base_report(df)
     clock = slate_clock(players=parse_dk_salary_csv(str(salary)))
     reserved = sd.read_showdown_reserved_rows(str(entries))
     # Only blank reserved rows are fillable; a complete row is immutable, and
@@ -3713,6 +3732,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # had no pool report. `players` above is the CARRIED pool; read
             # `legal_players` for what the solve could actually roster.
             "excluded_column": sd_excluded,
+            # R310 warning half. It lands HERE and not in Classic's
+            # `pool_report`, which is what the roadmap row named, for a reason
+            # the row could not have known: `live_data_adapters.build_slate_pool`
+            # produces `pool_report` and the SHOWDOWN path never calls it -- this
+            # `pool` block is Showdown's only pool surface. Both recorded
+            # incidents are Showdown, and they are Showdown because APPG-as-Base
+            # is the Showdown melt's prior, where Classic reaches APPG only
+            # through the TBD `fallback_top9_appg` path. Present on every
+            # Showdown brief with `applied: false` when nothing is flagged, the
+            # same discipline `supplied_base` follows: absent is not an answer.
+            "small_sample_base": sd_small_sample,
         },
         "slate_clock": {
             "first_lock_utc": clock.get("first_lock_utc"),
@@ -3938,7 +3968,29 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                     + (f" NOTE: {sd_excluded['unrecognized_kept']} Excluded "
                        f"cell(s) hold values this engine does not recognize; "
                        f"those players were KEPT in the pool."
-                       if sd_excluded["unrecognized_kept"] else "")),
+                       if sd_excluded["unrecognized_kept"] else "")
+                    # R310 warning half. A QUESTION, not a verdict, and not a
+                    # gate: a genuinely cheap star is a real thing. Suppressed
+                    # when `--projections` supplied the Base, because the
+                    # operator has already replaced the prior this warns about
+                    # -- the FIELD above still carries the flag either way, so
+                    # the record is complete and the caution is not noise.
+                    + ((" NOTE: "
+                        + "; ".join(
+                            f"{x['Name']} ({x['Team']}) carries APPG {x['appg']}, "
+                            f"rank {x['appg_rank_among_hitters']} of "
+                            f"{sd_small_sample['hitters_considered']} hitters, at "
+                            f"${x['salary']:,}"
+                            for x in sd_small_sample["players"])
+                        + f" -- above this pool's APPG 90th percentile "
+                          f"({sd_small_sample['appg_threshold']}) at or below its "
+                          f"median hitter salary "
+                          f"(${sd_small_sample['salary_threshold']:,}). APPG is the "
+                          "Base prior here and carries no games-played "
+                          "denominator, so a recent callup can top the pool off "
+                          "one or two games. Check the prior before uploading; "
+                          "`--projections` is the lever (R310).")
+                       if sd_small_sample["applied"] and not supplied_base else "")),
     }
     # R290(c) step 2. Same shape as the Classic delivered brief: the LABEL is
     # what a rung changes, never the gates.

@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 3
+## Execution roadmap (2026-09-08, twelfth edition landed) -- NEXT: Session 4
 
 **How to use this table.** A session says *"work on the next session in the
 backlog"*, reads the row(s) for the Session ID on the NEXT pointer above, and
@@ -64,10 +64,6 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Session 3** | `Batch (1 of 4)` | **R327 (NEW, ed12 F02 + F25) -- the external projection frame boundary.** `validate_projection_schema` (`optimizer_v3.py:456-468`) and `validate_projection_factors` (`projection_builder.py:68-79`) admit NaN, +/-inf, duplicate `Player_ID`, negative and non-integer Salary (reproduced: two same-id rows, salary -1, NaN bounds passed). `refresh_confirmed_lineups` (`projection_builder.py:213-230`) tests `Excluded` by truthiness, so the STRING "False" excludes a confirmed starter on the swap path (R291's fifth site, reproduced at HEAD), and `:230` clips Ceiling<Floor with `max()` where CLAUDE.md says hard error. Add one finite/unique/positive-integer validator at the `--projections` door and before model construction; route the refresh flag through `read_excluded_cell`; raise on inverted bounds. | Spec | `mlb_engine/optimize/optimizer_v3.py`, `mlb_engine/projections/projection_builder.py`, `tests/test_core.py` | High (a pool reduction arriving as a data condition, on the swap path; `--projections` is the Showdown lever) | Low | None |
-| **Session 3** | `Batch (2 of 4)` | **R313 -- a forbidden core shrunk to the pool becomes `sum x <= 0` over the lone survivor** (`optimizer_v3.py:1084-1093`), a legal-pool reduction. Emit the row only when every member is still legal. | Backlog | `mlb_engine/optimize/optimizer_v3.py` | High (legal-pool reduction) | Low | None |
-| **Session 3** | `Batch (3 of 4)` | **R310, warning half -- a sub-5-game callup's APPG Base is unflagged** (12.5 APPG into 47.4% exposure on 2210_1g_sd, every control clean). Warn when games played < 5 and APPG sits in the pool's top quartile; needs no feed. The shrink half stays on the entry. | Backlog | `build_slate.py` pool report, `projection_builder.py` | Med | Low | None |
-| **Session 3** | `Batch (4 of 4)` | **R312 -- rename `Portfolio_EV_Proxy`** (`optimizer_v3.py:3749`) and its pins; CLAUDE.md's own truthful-labels rule. | Backlog | `mlb_engine/optimize/optimizer_v3.py`, tests | Low | Low | None |
 | **Session 4** | `Standalone` | **R326 (NEW, ed12 F12) -- the prefilter does not preserve joint feasibility, and its infeasibility is billed as strategy.** Post-R294 residual: the call at `contest_allocator.py:2759` keeps a per-entry reserve of 2, which is not Hall's condition. Witness: 49 entries, 50 distinct compatible rosters, target 48 -> 48 kept, zero "emptied" entries, restricted MILP infeasible while the full bank assigns 49; the ladders at `:3152-3254` then relax STRATEGY on a bank that was feasible. Fix: on restricted-bank infeasibility re-solve on the FULL bank before any relaxation rung; record `search_scope` (restricted/full) on `allocation_solver_report`. Acceptance: the 49/50 witness certifies with zero relaxations; K >= E cases with shared-player caps also covered; golden replay unmoved on currently-feasible fixtures. | Spec | `mlb_engine/allocate/contest_allocator.py`, `tests/test_core.py` | High (a smaller stack or looser cap billed to the bank, invisible in the certified file) | Med (joint MILP path; overlap cost interacts with Session 21) | None |
 | **Session 5** | `Batch (1 of 3)` | **R285 (+ed12 F38, F37 riders) -- the supervisor stops on the one remedy it is licensed to take.** The bank-growth remedy reads `solve.bank.job_list_exhausted`, which the direct path never writes. F38: `extend_bank` (`bank_cache.py:858-946`) leaves `exhausted=True` when every job raised, timed out or returned no proof -- keep `jobs_total / jobs_answered / jobs_pending / search_complete` as distinct fields so an all-timeout sweep never reads as an answered search (the same shape as R326: search effort billed as strategy). F37: `parse_brief` (`autobuild.py:275-287`) infers "certified" from exit 0 and prose -- emit one versioned result JSON beside stdout and classify from its facts. | Backlog / Spec | `tools/autobuild.py`, `mlb_engine/optimize/bank_cache.py`, refusal payload in `execution_pipeline.py` | High (slate-lock reliability; one lost call on 1915_6g) | Low | None |
 | **Session 5** | `Batch (2 of 3)` | **R311 -- R157's interaction-bind refusal names no derivable floor**, so the remedy is a hand bisection (9 minutes of a 66-minute window on 1940_6g). Emit the binding cap and the value that certifies. | Backlog | `mlb_engine/allocate/contest_allocator.py` feasibility report | High | Low | None |
@@ -81,9 +77,10 @@ Sources: Spec = greenfield twelfth edition (2026-09-08, F-numbers), Inbox =
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Session 8** | `Standalone` | **R295 (+ed12 F13, F14, F40 riders) -- Showdown ladder truth, now seven parts.** (a) the R250 hold collides with a thesis lock and the ladder drops the player cap (58% realized under 50%); (b) the degraded flag reads a thesis-weighted proxy as one scale; (c) rung 5 re-solves rung 1; (d) the melt merges same-name same-team persons. F13: `_rung` (`showdown_theses.py:1140-1164`) latches TIMEOUTS only, so status 3/4/no-proof results descend the ladder as "infeasible" (fault injection: status 4 -> five calls, `infeasible=1`) and `run_showdown` (`build_slate.py:3322-3371`) hands an incomplete ladder to the governor as a shape refusal -- raise a typed `SolverExecutionFailure` outside the strategic governor, R294's Classic rule propagated. F14: an unresolved hard `locks`/`cpt_lock` key is appended to `ignored_locks` (`showdown.py:502-521`) and a different lineup is solved -- refuse before constraint assembly; soft thesis preferences become a separate field. F40: captain reservations (`showdown_theses.py:1116-1124`, ~`:1280`, `:1474`) are bounded by the captain cap only and spent on the ACTUAL captain -- bound by both caps, release once per requested slot whether it succeeds, substitutes or fails. | Backlog / Spec | `mlb_engine/optimize/showdown_theses.py`, `mlb_engine/optimize/showdown.py`, `build_slate.py` `run_showdown`, `tests/test_showdown.py` | High (single-game and small-field prizes ride on the three caps holding) | Med (ladder state machine) | None |
-| **Session 9** | `Batch (1 of 3)` | **R317 -- the platoon reference's refresh is 403'd by a urllib client fingerprint where `curl` returns 200, and a PARTIAL refresh stamps `collected_date` today for all thirty teams.** Refresh through the working transport; age per TEAM, not per file. | Backlog | `tools/fetch_fangraphs_platoon.py`, staleness check in `slate_intake_manager.py` | Med (a projected nine seeded from month-old data, silently) | Low | None |
-| **Session 9** | `Batch (2 of 3)` | **R319 -- two paste name-form defects on the one input that turns on F4.** A shared normalized name mints a false team-disagreement warning (`paste_lineups.py:803`); a DK first-name alias reports a rostered starter as `NOT IN DK POOL`. | Backlog | `mlb_engine/intake/paste_lineups.py`, `tools/lineups_from_paste.py` | Med | Low | None |
-| **Session 9** | `Batch (3 of 3)` | **R320 -- `factors_inert` cannot see a half-inert composite; the Showdown brief emits no platoon counter.** "none inert" printed over `f4_platoon_applied: 0`. | Backlog | `build_slate.py` brief (`:2237`), `run_showdown` | Med | Low | None |
+| **Session 9** | `Batch (1 of 4)` | **R317 -- the platoon reference's refresh is 403'd by a urllib client fingerprint where `curl` returns 200, and a PARTIAL refresh stamps `collected_date` today for all thirty teams.** Refresh through the working transport; age per TEAM, not per file. | Backlog | `tools/fetch_fangraphs_platoon.py`, staleness check in `slate_intake_manager.py` | Med (a projected nine seeded from month-old data, silently) | Low | None |
+| **Session 9** | `Batch (2 of 4)` | **R319 -- two paste name-form defects on the one input that turns on F4.** A shared normalized name mints a false team-disagreement warning (`paste_lineups.py:803`); a DK first-name alias reports a rostered starter as `NOT IN DK POOL`. | Backlog | `mlb_engine/intake/paste_lineups.py`, `tools/lineups_from_paste.py` | Med | Low | None |
+| **Session 9** | `Batch (3 of 4)` | **R320 -- `factors_inert` cannot see a half-inert composite; the Showdown brief emits no platoon counter.** "none inert" printed over `f4_platoon_applied: 0`. | Backlog | `build_slate.py` brief (`:2237`), `run_showdown` | Med | Low | None |
+| **Session 9** | `Batch (4 of 4)` | **R332 (NEW, from the 1835_5g BUILD fragment) -- the handedness backfill that closes `f4_platoon_applied: 0` on a DK-covered slate is a per-slate hand-roll in a gitignored scratch file.** R143's zero-fetch path is the normal state of a fully DK-covered slate and DK ships no handedness, so F4's platoon half goes neutral on exactly those slates. Measured on 1835_5g: 0 -> 90 of 90 applied, and it re-ordered the portfolio (LAA highest mean F4 1.063 at the slate's lowest F1 0.924, 2 of 9 primary stacks; BOS lowest at 0.909, 1), an ordering invisible with the term neutral. Wants `tools/handedness_paste.py` plus a cached `data/reference/handedness.csv` aged PER PLAYER (R317(b) arriving before the file exists). | Inbox | new `tools/handedness_paste.py`, `data/reference/handedness.csv`, `tools/lineups_from_paste.py` | Med (F4 is inert on every DK-covered slate) | Low | None |
 | **Session 10** | `Batch (1 of 3)` | **R237 (+ed12 F04 rider) -- uncomputed and computed-neutral are different facts; and "applied somewhere" is not coverage.** F04: `_applied` (`execution_pipeline.py:1121-1160`) lets ONE applied odds/weather row clear a slate-wide gate. Field-scope the evidence decision per game; fixed-roof games get an explicit `not_applicable`; stale provider timestamps are not renewed by `fetched_at`. | Backlog / Spec | `execution_pipeline.py` gates (`_derive_workflow_gates`), brief surfaces | Med | Low | None |
 | **Session 10** | `Batch (2 of 3)` | **R224 -- two Showdown cap-resolver smalls** on the surfaces R157 sends operators to read. | Backlog | `showdown_theses.py` report, `build_slate.py` | Low | Low | None |
 | **Session 10** | `Batch (3 of 3)` | **R247(b) -- the cap reassignment records a label move, not the proxy delta it cost.** Re-read its premise against R295(b) first. | Backlog | `showdown_theses.py` `player_exposure.cap_reassignments` | Low | Low | Session 8 (R295(b) premise) |
@@ -4461,6 +4458,49 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
+### R332. The handedness backfill that takes `f4_platoon_applied` from 0 to 90 of 90 on a DK-covered slate is a per-slate hand-roll in a gitignored scratch file (P2, S) | new 2026-09-08, merged from BUILD fragment `2026-09-08_BUILD_1835_5g-anticorrelation-unobserved-and-handedness-backfill.md` (half (b); half (a) shipped in the same commit and is in CHANGELOG.md); measured on 1835_5g with a full rebuild
+
+**What.** R143's zero-fetch path is the NORMAL state of a fully DK-covered
+slate: on 1835_5g `dk_order_coverage` reported 10 of 10 sides, `sides_left_to_feed`
+empty, and nothing wrote a feed. The documented cost is that DK ships no
+handedness, so F4's platoon half goes neutral and `f4_handedness_unavailable`
+names every side. BUILD closed it by hand and the route works; the generator
+lives in `tools/_scratch_1835_5g/gen_paste.py`, which is gitignored, slate-scoped
+and swept at slate close, so the next DK-covered slate hand-rolls the map again.
+
+**The route, which is the thing to make first-class.** (1) `WebFetch` on
+`statsapi.mlb.com/api/v1/teams/<id>/roster?rosterType=40Man&hydrate=person&fields=...batSide,pitchHand...`,
+one call per team -- WebFetch is served Anthropic-side and is not subject to the
+container's egress proxy, which mattered here because `statsapi.mlb.com` and
+`api.the-odds-api.com` were both 403 from the device VM AND the container that
+session (R316's standing instruction: measure the egress, in both directions).
+(2) Generate an mlb.com-shaped paste whose NAMES and BATTING ORDER come from the
+DKSalaries file itself, so DK stays authoritative per R143 and no
+`dk_batting_order.disagreements` entry can be minted, with bat side as the only
+added column. (3) `tools/lineups_from_paste.py` -> ordinary feed ->
+`build_slate.py --lineups`. Result: `f4_platoon_applied` 0 -> **90 of 90**,
+`f4_handedness_unavailable: []`, `disagreements: []`, zero blockers, no
+`--resolve` needed.
+
+**Why it is not decoration, measured rather than argued.** It changed the
+portfolio, not just the report. LAA came back with the slate's HIGHEST mean F4
+(1.063) on eight righty bats against LHP Sandoval while carrying the slate's
+LOWEST F1 (0.924), and took 2 of 9 primary stacks; BOS came back with the LOWEST
+mean F4 (0.909), lefty-leaning into LHP Detmers, and took 1. Neither ordering is
+visible with the platoon term neutral, so on a fully DK-covered slate the
+zero-fetch build is not merely missing half of F4 -- it is blind to the one axis
+that separated the two sides of that slate's only LHP-vs-LHP game pair.
+
+**Fix (S).** `tools/handedness_paste.py --salary <csv>`, taking a bat-side map on
+stdin or from a cached `data/reference/handedness.csv` and emitting the paste.
+Handedness is a stable player attribute, so the cached reference refreshed on the
+same footing as the Savant files removes the per-team fetches entirely; age it
+per player against its own stamp rather than per file, which is R317(b)'s lesson
+arriving before the file exists rather than after. A tool plus a reference file
+is its own session, which is why this is filed rather than ridden into the
+commit that shipped the fragment's other half. Roadmap: Session 9, with the
+platoon cluster it shares a subject with.
+
 ### R328. The Showdown ownership prior's per-player marginals can exceed 100% and the captain marginal can exceed the roster marginal, because the 600% budget is enforced on the total and nowhere else (P1, XS; gates R307) | new 2026-09-08, from the greenfield twelfth edition (F27); VERIFIED-repro by the edition on the production function
 
 - **What.** `ownership_prior._showdown_prediction` (`:676-727`) multiplies an
@@ -5603,43 +5643,42 @@ replaced.
 
 ## Workstream 3 — Intake and pool truth
 
-### R327. The external projection frame has no numeric boundary, and the refresh seam is R291's fifth site plus a guardrail violation: `Excluded="False"` excludes a confirmed starter on the swap path, and Ceiling<Floor is silently clipped (P1, XS-S) | new 2026-09-08, from the greenfield twelfth edition (F02, F25); both VERIFIED-repro by the edition on the production functions at this HEAD
+### R327. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md
 
-- **What, two halves, one boundary.** (a) `optimizer_v3.validate_projection_schema`
-  (`:456-468`) and `projection_builder.validate_projection_factors` (`:68-79`)
-  check column presence and `Ceiling < Floor` only. Two rows with the same
-  `Player_ID`, salary `-1` and NaN Floor/Ceiling PASSED; positive infinity escapes
-  the factor validator's NaN/negative tests. NaN comparisons are false, so the
-  one check that exists is blind to the case it guards; duplicate ids map
-  differently into solver indices and exported records. (b)
-  `refresh_confirmed_lineups` (`projection_builder.py:213-230`) tests
-  `row.get("Excluded")` by Python truthiness, so an externally loaded frame
-  carrying the STRING `"False"` on a confirmed starter refreshed to
-  `Excluded=True` -- the forbidden pool reduction arriving as a data condition,
-  on the SWAP path, through the seam R291 named and claimed closed ("all five now
-  carry it"). The same function repairs inverted bounds with
-  `max(frame.at[index, "Floor"], resolved * ceiling_ratio)` (`:230`): the fixture
-  Floor 14 / Ceiling 6 came back 15.4 / 15.4 with the evidence of a bad upstream
-  input erased, where CLAUDE.md's hard guardrail reads "Ceiling below Floor is a
-  hard error, never silently repaired" and R303 already carried the clip as a
-  PLAUSIBLE small.
-- **Why P1.** `--projections` is the Showdown lever (the APPG prior is the
-  defect, an external frame is the remedy), so this boundary is on the live
-  path; and (b) is a pool reduction on the path with the least time to notice.
-- **Fix.** One shared validator run at the `--projections` door, after
-  enrichment, and before model construction: `Player_ID` nonempty and unique;
-  `Salary`, `Floor`, `Ceiling`, `Base`, `F1..F5` finite; `Salary` a positive
-  integer; `Ceiling >= Floor`; empty frame refused; errors combined with the
-  existing missing-field result. In the refresh: canonicalize `Excluded` through
-  `optimizer_v3.read_excluded_cell` before the loop, test the operator flag
-  through it, and RAISE on a refreshed Ceiling below Floor instead of clipping.
-  Do not impose nonnegative outcomes generically; validate the scoring contract.
-  Acceptance: empty, missing, duplicate, +/-inf, NaN and non-integer salary fail
-  before SciPy; `"False"`/`TRUE`/blank/NaN tokens follow the canonical parser;
-  an explicit true salary exclusion survives refresh; invalid pre-refresh bounds
-  fail; repeated refresh is idempotent. Per R233 the closing entry enumerates
-  every reader of `Excluded` that is not `read_excluded_cell`, with the count.
-  Roadmap: Session 3.
+One shared numeric boundary (`optimizer_v3.validate_projection_numerics`) now
+serves both projection doors and is restated by neither: unique nonempty
+`Player_ID`, positive-integer finite `Salary`, finite `Base`/`F1..F5`/`Floor`/
+`Ceiling`, `Ceiling >= Floor`, empty frame refused. Finiteness is tested
+POSITIVELY, because the defect was a NaN winning a comparison and a boundary
+written as a negation has the same hole. `refresh_confirmed_lineups`
+canonicalizes the whole `Excluded` column through `optimizer_v3.excluded_flags`
+before its loop and RAISES on an inverted refreshed bound instead of clipping it
+to `Floor == Ceiling`.
+
+**The `--projections` door itself was the N+1 site, and it is the one door the
+entry named.** `showdown_theses.read_supplied_base` had no value check at all --
+`float("nan")` is a successful parse, so its `try/except` was a syntax check --
+and accepted `nan`, `inf`, `-5` and `1e400` with `rows_usable: 4,
+rows_skipped: 0`. It refuses them now, by name.
+
+**The affected-frame class is narrower than either the entry OR the session
+prompt's correction said, and the narrowing is the useful part.** The entry said
+"an externally loaded frame carrying the STRING `"False"`"; the correction said
+the ordinary SALARY-door frame is affected because `live_data_adapters.py:1557`
+stamps `salary_file` on any non-blank cell. Measured, the salary door is SAFE:
+`:1546` canonicalizes on the way in and `_assemble_projection_frame` coerces
+again. The affected class is an OBJECT-dtype `Excluded` column on a frame that
+came through neither, and the realistic producer is a CSV round trip with one
+blank cell -- the blank becomes float NaN and `bool(nan)` is True. The token
+class is any non-empty string AND float NaN.
+
+**The R233 enumeration is in the changelog entry and the class is FOURTEEN, not
+the twelve the session's own list named** -- the two additions are
+`showdown.py:292` (a truthiness read, SAFE, with the reason stated) and the
+`optimizer_v3` canonical family itself, `excluded_flags` included, which
+CLAUDE.md names as half of the one reading. Full hit list, the before/after
+repro table, the twelve premise corrections and the fourteen mutations are in
+CHANGELOG.md.
 
 ### R317. The platoon reference's only automated refresh is 403'd by a CLIENT FINGERPRINT rather than by the network, and a PARTIAL refresh silences the 7-day staleness check for all thirty teams (P1 for (b), XS-S each) | new 2026-09-06, merged from BUILD fragment `2026-09-04_BUILD_fangraphs-platoon-refresh-procedure.md` (RETAINED in the inbox, see below) and DEV fragment `2026-09-06_DEV_fangraphs-reachable-by-curl-not-urllib.md`, which supersedes that fragment's caveat 1; (a) and (b) VERIFIED, (c) measured on two live pages
 
@@ -5915,7 +5954,48 @@ and is what says whether the step earns its three minutes.
 pays for in his own signed-in browser is not a scripted DK read. Nothing here
 touches the money-and-entry wall, the manual-DK rule, or the truthful labels.
 
-### R310. APPG as the Base prior is broken for a sub-5-game callup, the 0.60 salary shrink does not catch it, and nothing anywhere warns (P1, XS for the warning half, S for the shrink) | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_appg-base-is-broken-for-sub-5-game-callups.md`; measured on 2210_1g_sd with a counterfactual build
+### R310. APPG as the Base prior is broken for a sub-5-game callup and the 0.60 salary shrink does not catch it (P1, S) -- WARNING HALF SHIPPED 2026-09-08, the SHRINK half is what remains open and it holds no slot | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_appg-base-is-broken-for-sub-5-game-callups.md`; measured on 2210_1g_sd with a counterfactual build
+
+**STATUS 2026-09-08, the warning half (b) SHIPPED; its text has migrated to
+CHANGELOG.md and only the shrink half (a) is live here.** What landed:
+`showdown.small_sample_base_report`, emitted as `pool.small_sample_base` on
+every Showdown brief plus a `caution` NOTE, never a gate.
+
+**The predicate is `APPG > the pool's hitter 90th percentile AND salary <= the
+pool's hitter MEDIAN`, and it was measured before it was written, because the
+roadmap row and this entry each proposed one and both were wrong on the
+incidents they were written from.** The row's ("games played < 5 and APPG in the
+top quartile; needs no feed") cannot be implemented -- DK ships no game count,
+so the first conjunct needs the feed the row says it does not need. This entry's
+replacement (p90 AND salary in the bottom QUARTILE) catches ONE of the two
+callups it claims to catch: Bernal at $5,000 against a $4,850 Q1, missed by $50.
+Re-measured over the WHOLE archive rather than the 22 files the entry's numbers
+came from -- 39 unique Showdown salary files by sha256, every one with exactly
+18 hitters:
+
+    bare p90                     1.95 flags/pool,  76 total, fires on 39 of 39 pools
+    p90 AND salary <= hitter Q1  0.10 flags/pool,   4 total, MISSES Bernal
+    p90 AND salary <= hitter med 0.18 flags/pool,   7 total, catches BOTH callups
+
+The bare percentile is a rank threshold in disguise: with 18 hitters in every
+pool it flags the top two on all 39, which is the referee that warns on
+everything (R292).
+
+**It landed in `run_showdown`'s brief `pool` block, not in the `build_slate.py`
+pool report the roadmap row named**, because Classic's `pool_report` is produced
+by `live_data_adapters.build_slate_pool` and the Showdown path never calls it --
+this block is Showdown's only pool surface, and both incidents are Showdown
+because APPG-as-Base is the Showdown melt's prior while Classic reaches APPG
+only through the TBD `fallback_top9_appg` path.
+
+**One correction to this entry's own numbers:** Bernal is the highest-APPG
+HITTER, rank 1 of 18, not "third-highest in the 20-player pool" -- the two above
+him are the arms, and the arms are not the comparison class the predicate uses.
+DK writes `SP` for a starter, so a hitter filter testing `Position` for the
+single letter `P` keeps all twenty and moves him to rank 2 behind Tarik Skubal.
+
+**What is still open, and it holds no slot:** (a) below, the games-played
+denominator the 0.60 salary shrink is missing.
 
 **What.** On 2210_1g_sd (STL@LAD, 19 entries) Leo Bernal (STL, $5,000 UTIL)
 carried `AvgPointsPerGame = 12.5` in the DK salary file off approximately ONE MLB
@@ -5940,13 +6020,10 @@ missing is a GAMES-PLAYED denominator. The salary file does not carry one, but
 than N games is untrusted" floor needs no feed at all**, which is why the two
 halves are sized separately.
 
-**(b) There is no warning anywhere, and that is the cheap half.** The pool report
-names thin teams and the excluded column; nothing names a Base prior standing on
-one game. An operator who did not happen to research the callup ships 47%
-exposure to it and every artifact says the build is clean. Fix:
-`pool_report.small_sample_base` naming any declared starter whose APPG rests on
-fewer than N games, with the count. XS, no feed, no strategy change, and it turns
-an invisible input into a readable one.
+**(b) SHIPPED 2026-09-08; see the STATUS block at the head of this entry and the
+changelog. Kept here in one line because (a) is argued against it:** nothing
+named a Base prior standing on one game, so an operator who did not happen to
+research the callup shipped 47% exposure to it with every artifact reading clean.
 
 **Not filed as new, recorded because it is the third sighting:**
 `api.the-odds-api.com` 403s on CONNECT from the container, so
@@ -5966,14 +6043,11 @@ games and 8 PA (37.5% K, contract selected 2026-09-01). The default build put hi
 in 7 of 12 entries (58.3%) and relaxed the 0.50 player cap by one slot. Exactly
 this item, exactly R123 finding 2.
 
-***The warn predicate, and it is cheaper than the one this entry proposed.*** DK
-ships no game count, so a PA-keyed guard needs data we do not have. The screen that
-would have caught BOTH callups needs nothing but the pool: **APPG above the pool's
-90th percentile among hitters WHILE salary sits in the pool's bottom quartile.**
-Morales was the highest-APPG hitter in the pool at the cheapest posted salary; Leo
-Bernal was third-highest at $5,000. Make it a `caution` line and a brief field,
-never a gate -- a genuinely cheap star is a real thing and this is a question, not
-a verdict. That is (b) with an implementable predicate attached.
+***The warn predicate this entry proposed was measured and CORRECTED before
+shipping; see the STATUS block at the head.*** It read "APPG above the pool's 90th
+percentile among hitters WHILE salary sits in the pool's bottom quartile", and it
+misses Leo Bernal by $50 while claiming to catch both callups. The shipped
+conjunct is the hitter MEDIAN.
 
 ***The fix that does NOT work, measured, so nobody re-runs it.*** Tightening
 `max_player_exposure_pct` against the bad prior, same odds, same overlap and
@@ -6806,65 +6880,66 @@ R242 (the salary auto-resolve accepts a superset snapshot): a filename or an
 mtime standing in for an identity the inputs already carry.** Fix: `--brief
 <path>` writes one file, and every resolver in that directory keys on `run_id`.
 
-### R312. `Portfolio_EV_Proxy` is an EV claim on a deterministic proxy, on the rule CLAUDE.md calls non-negotiable, and the rename is one line (P1, XS) | new 2026-09-03, from the greenfield eleventh edition (D31); VERIFIED in tree
+### R312. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md. One RIDER survives below and holds no slot
 
-**What.** `mlb_engine/optimize/optimizer_v3.py:3749`:
-`metric_name = 'WTA_First_Place_Proxy' if mode == 'wta' else 'Portfolio_EV_Proxy'`,
-with the name repeated in the module changelog at `:66`. The score combines
-projection, correlation, salary uniqueness and a heuristic field-pressure term.
-No calibrated payout expectation, field distribution, duplicate/tie settlement or
-out-of-sample relationship is computed anywhere in the path.
+`Portfolio_Contest_Fit_Proxy` and `WTA_First_Place_Fit_Proxy`, both taken in the
+same pass. `metric_name` is a dict KEY as well as the value of
+`contest_fit_metric`, so the rename changed an emitted payload key; the module
+changelog line and the R1b comment moved with it. The two historical review
+documents under `docs/` that quote the old name are left alone: they are records
+of the tree at their date.
 
-**Why it is P1 despite being XS.** CLAUDE.md's truthful-labels section is
-explicit and Ben wrote it: "Never call anything ROI, profitability, win rate,
-cash rate, or a probability claim." "EV proxy" asserts that the quantity proxies
-expected value, which is a probability-weighted payout claim. R1b already made
-this exact correction one shape over, renaming the satellite family's metric to
-`Ticket_Line_Advance_Proxy` because labelling a ticket contest `Portfolio_EV_Proxy`
-named something the model does not compute; the general case was left standing.
-The autonomy section says explicitly that autonomy does not license a probability
-claim, so this is the one entry on the board that the project's own contract
-already decides.
+**Nothing pinned the string in either direction, so the rename brought its own
+test rather than a second string pin.** Grep at `e3757ca`: three hits in
+`optimizer_v3.py`, two in historical docs, ZERO in `tests/`, `tools/` or
+`skills/`. `TruthfulMetricNameTests` RUNS `score_lineup_candidate` across the
+closed `CONTEST_SHAPES` set times every scoring mode and checks every name it
+can emit against `optimizer_v3.FORBIDDEN_METRIC_VOCABULARY`, so a future
+`Cash_Rate_Proxy` fails without anyone remembering to add it.
 
-**Fix.** `Portfolio_Contest_Fit_Proxy` for the non-WTA branch (ed11's suggestion,
-and it is the accurate name), `WTA_First_Place_Fit_Proxy` for the WTA branch if
-that rename is taken in the same pass; update the module changelog line, the
-tests that pin the string, and any brief/QA reader. The target EV estimator, if
-it is ever built, is a separate versioned model behind calibration gates and must
-never silently reuse this name.
+#### SURVIVING RIDER (no slot)
 
-### R313. A forbidden core whose members have left the pool becomes a STRICTER constraint and excludes the lone survivor, which is a legal-pool reduction (P1, XS) | promoted 2026-09-03 out of R303's solver list on a severity argument R303's filing missed; VERIFIED-repro there, re-read here as D19
+**`mode='portfolio_ev'` is the same vocabulary in a different field.** It is a
+Framework v2.7 SOLVER MODE token (`optimizer_v3.py:1739`, `:2357`, `:2387`,
+`:2400`, `:3887`, `:3899`) and it REACHES AN EMITTED PAYLOAD --
+`bank_diagnostics.mode` (`execution_pipeline.py:4863`) and the SP-pair coverage
+plan's `'mode'` (`optimizer_v3.py:2062`) -- so a delivered brief still carries an
+"ev" label on a quantity that computes no expectation. It was not renamed here
+because renaming a mode token changes a public API value every caller passes and
+moves golden bytes, which is a different size of change than R312 was scoped and
+sized for. It is named rather than silently exempt, and
+`test_the_surviving_member_is_named_rather_than_silently_exempt` asserts the
+token is still there, so the exemption cannot become permanent by being
+forgotten. Whoever takes it: accept both tokens, emit the new one, re-freeze the
+golden bytes in the same commit.
 
-**What.** `optimizer_v3.py:1129-1144` (R303 filed it at `:1084-1093`; re-read at
-HEAD before fixing). `_known_pids(core)` drops members absent from the active
-pool, then the row's upper bound is set to `len(pids)-1`. A forbidden
-three-player core with only ONE survivor becomes `x_survivor ≤ 0`: the survivor
-is excluded from every lineup, even though the original forbidden combination is
-already impossible and the row should not be emitted at all.
+### R313. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md
 
-**Why the severity moves.** R303 filed it as hygiene among thirty other solver
-smalls. The mechanism is a REDUCTION OF THE LEGAL PLAYER POOL, which CLAUDE.md's
-hard guardrails name as the forbidden move ("Never trim the player pool ... it
-may never reduce the legal player set, because that is a strategy change and it
-is invisible in the certified output"), and it is invisible in the certified
-output in exactly the way that sentence describes. R289 was filed on the mirror
-image of this, an explicit instructed restriction silently dropped; this is an
-un-instructed restriction silently added. Same class, opposite direction, and the
-board had one at P0-adjacent and the other in a hygiene list.
+Both forbidden-combination rows are emitted only when every member of the
+ORIGINAL combination is still in the pool, through one helper
+(`optimizer_v3._whole_combination`). A combination that can no longer be formed
+is already impossible, so the correct row is no row at all; a fully present core
+still binds and the SP-pair cap's exact pairs are untouched.
 
-**Fix.** Emit the row only when every member of the original core is still
-present in the pool:
+**The sibling did NOT have the same defect, and the entry saying it did would
+have hidden the one it has.** `stack_core_blocklist` was a legal-POOL reduction:
+a three-member core with two members absent became `x_survivor <= 0` and
+excluded the pool's best catcher from every lineup, objective 195.96 -> 170.40.
+`forbidden_player_combos` left that survivor SELECTABLE (its `len(pids) >= 2`
+guard stopped it) and had a legal-SPACE defect one step up: a three-member combo
+shrunk to TWO survivors emitted `x_a + x_b <= 1`, forbidding a pair nobody
+forbade, measured at objective 194.54, bit-identical to a genuine two-member
+forbidden pair. That one is LATENT on the production path (`capped_pairs` always
+passes exact pairs) and live on the public API the module changelog advertises.
 
-    original = tuple(dict.fromkeys(normalize_player_id(x) for x in core))
-    present = _known_pids(original)
-    if len(present) == len(original) and present:
-        add_selected_sum_constraint(present, -inf, len(present) - 1)
-
-Acceptance: a three-member forbidden core with two members excluded leaves the
-third selectable, and the pool report's legal-player count is unchanged by the
-core's presence. The sibling `forbidden_player_combos` path takes the same
-treatment in the same commit, and per R233 the entry carries the enumeration of
-every site that shrinks a multi-player row to the surviving subset.
+**The R233 enumeration is in the changelog entry: all three `_known_pids`
+callers and no fourth.** `overlap_reference` is CORRECT and is kept as it is,
+with its direction named -- shrinking the terms of `sum <= max_overlap` makes
+the row WEAKER, and an absent player cannot be reused anyway -- and it has its
+own test so the omission cannot later read as an oversight. The Showdown
+solver's prior-lineup rows were checked for the fourth and are already correct;
+they are the precedent for the fix. `contest_allocator`'s untouchable-overlap
+filter compares whole roster sets and never builds a shrunk row.
 
 ### R293. CLOSED 2026-09-03 -- (a) and (b) both SHIPPED, entry migrated to CHANGELOG.md. The rungs the control still does not reach SURVIVE below and hold no slot
 

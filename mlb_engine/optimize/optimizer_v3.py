@@ -63,7 +63,16 @@ v3.10 additions:
 
 v3.9 additions:
   - Added candidate-bank wrapper via build_candidate_lineup_bank().
-  - Added deterministic WTA_First_Place_Proxy and Portfolio_EV_Proxy scoring.
+  - Added deterministic WTA_First_Place_Fit_Proxy and
+    Portfolio_Contest_Fit_Proxy scoring. RENAMED 2026-09-08 (R312) from
+    WTA_First_Place_Proxy / Portfolio_EV_Proxy: "EV proxy" asserts that
+    the quantity proxies expected value, which is a probability-weighted
+    payout claim, and CLAUDE.md's truthful-labels rule forbids it. The
+    score combines projection, correlation, salary uniqueness and a
+    heuristic field-pressure term; no payout curve, field distribution,
+    tie settlement or out-of-sample relationship is computed anywhere in
+    this path. `metric_name` is both a DICT KEY and the value of
+    `contest_fit_metric`, so this changed an emitted payload key.
   - Added Meta-Lineup field-pressure scoring and portfolio redundancy diagnostics.
   - Added final subset helper select_final_portfolio_from_candidate_bank().
     REMOVED 2026-07-27 (R15): zero callers since it was written, and it was
@@ -298,22 +307,57 @@ def anti_correlation_report(observed_values, requested=None):
     values means some rung of this bank solved a different MILP than another,
     which is exactly R293's defect, and the honest answer there is ``None``
     plus the list -- never the request restated as though it had been measured.
+
+    ``agrees_with_request`` is ``None`` -- not ``False`` -- whenever ``applied``
+    is ``None``, because a comparison with nothing on one side has no answer.
+    Merged 2026-09-08 from the 1835_5g BUILD fragment: on the direct path
+    (``solve.strategy = direct``, no bank) the brief read ``requested: null,
+    applied: null, applied_source: "unobserved", solves_observed: 0`` and then
+    ``agrees_with_request: false``, which a session reads under a lock clock as
+    "the constraint did not hold". It held -- 0 of 9 delivered entries rostered
+    a hitter facing a rostered SP.
+
+    The fragment asked for null whenever ``requested`` is null. Measured here,
+    that is the narrower half of the defect and it leaves the identical false
+    reading live: with ``observed=[]`` and ``requested=3`` this returned
+    ``applied: None, agrees_with_request: False`` too, so any build that DID
+    pass ``--max-opposing-hitters-per-sp`` and took the direct path got the
+    same "the constraint did not hold" on the same absence of evidence. The
+    predicate is therefore keyed to ``applied``, which is the side that can be
+    missing. When ``applied`` IS a number and no k was requested, the
+    comparison against the engine default is a real measurement and is kept as
+    True/False rather than discarded -- R237's rule cuts both ways, and
+    "unobserved" must not swallow "observed to equal the default".
     """
     vals = [int(v) for v in (observed_values or []) if v is not None]
     distinct = sorted(set(vals))
     req = None if requested is None else int(requested)
     effective = ANTI_CORRELATION_DEFAULT_MAX if req is None else req
+    applied = distinct[0] if len(distinct) == 1 else None
     return {
         'requested': req,
         'observed': distinct,
         'solves_observed': len(vals),
-        'applied': distinct[0] if len(distinct) == 1 else None,
-        'agrees_with_request': bool(len(distinct) == 1 and distinct[0] == effective),
+        'applied': applied,
+        'agrees_with_request': (None if applied is None
+                                else bool(applied == effective)),
         'unit': 'hitters facing ONE rostered SP; per-lineup worst case is twice '
                 'this on Classic',
         'note': 'read from the solves, never from the flag that requested it '
                 '(R293); a CONVENTION about negative correlation, not a DK rule',
     }
+
+
+#: R312, 2026-09-08. The vocabulary CLAUDE.md's truthful-labels section calls
+#: non-negotiable, as a constant a test can enumerate rather than as a rule a
+#: reader has to remember. Every metric name `score_lineup_candidate` can emit
+#: is checked against this list. It is deliberately a substring match on the
+#: UPPERCASED name: `Portfolio_EV_Proxy` has to fail on `EV`, and a future
+#: `Cash_Rate_Proxy` has to fail without anyone adding it here first.
+FORBIDDEN_METRIC_VOCABULARY = (
+    'EV', 'ROI', 'WIN_RATE', 'WINRATE', 'CASH_RATE', 'CASHRATE',
+    'PROBABILITY', 'PROFIT', 'EXPECTED_VALUE', 'ODDS',
+)
 
 
 SUPPRESSION_TIEBREAKER_WEIGHT = 0.0003
@@ -453,18 +497,143 @@ OPTIONAL_PROJECTION_FIELDS = (
     'Right_Tail_Volatility_Tier', 'Projected_Ownership_Pct',
 )
 
+# ============================================================================
+# R327. The ONE numeric boundary for a projection frame, shared by both doors.
+#
+# Until 2026-09-08 the two validators checked column PRESENCE and a single
+# `Ceiling < Floor` comparison, and that comparison is false for NaN, so the
+# one check that existed was blind to exactly the case it guards. Measured at
+# `e3757ca` on the production functions: a two-row frame carrying the same
+# `Player_ID`, `Salary=-1` and NaN Floor/Ceiling returned
+# `passed: True, ceiling_below_floor_rows: 0`; `+inf` bounds passed; an EMPTY
+# frame with every core column passed; and on the factor side `Salary=-1`,
+# `Salary=4000.5`, `Base=+inf`, `F1=+inf` and a duplicate `Player_ID` all
+# passed. `Salary` was in `required` for PRESENCE in both functions and was
+# never VALUED by either, so "negative salary" was unchecked on both doors,
+# not merely escaped on one.
+#
+# This function is the boundary itself; the two validators below are its two
+# doors and neither restates a rule. It returns a list of error strings so a
+# caller can combine them with its own missing-field result rather than
+# choosing between the two verdicts.
+#
+# What it deliberately does NOT do: impose nonnegative OUTCOMES. A projection
+# may legitimately be negative (a pitcher's DK score can be), so the contract
+# validated here is the SCORING contract -- finite numbers, a real salary, a
+# unique id, and Ceiling >= Floor -- and nothing about the sign of a score.
+PROJECTION_ID_FIELD = 'Player_ID'
+_POS_INF = float('inf')
+_NEG_INF = float('-inf')
+
+
+def _finite_mask(values):
+    """True where a numeric Series holds a real number.
+
+    Written positively and with pandas only, because the defect being fixed is
+    a NaN slipping through a comparison: `notna()` is the NaN test and the two
+    infinity equalities are exact, so nothing here can pass by comparing false.
+    """
+    return values.notna() & (values != _POS_INF) & (values != _NEG_INF)
+
+
+def validate_projection_numerics(frame,
+                                 numeric_columns=(),
+                                 require_ceiling_ge_floor=False,
+                                 require_nonempty=True,
+                                 require_salary=True):
+    """Return a list of boundary errors for an externally supplied frame.
+
+    Empty list means clean. Every check is written so a NaN can never pass by
+    comparing false: finiteness is tested first and positively.
+    """
+    errors = []
+    columns = list(getattr(frame, 'columns', []))
+
+    if require_nonempty and not len(frame):
+        errors.append('frame is empty; an empty projection frame is refused '
+                      'rather than certified as a passing schema')
+        return errors
+    if not len(frame):
+        return errors
+
+    if PROJECTION_ID_FIELD in columns:
+        ids = frame[PROJECTION_ID_FIELD].astype(str).str.strip()
+        blank = int((ids == '').sum()) + int(frame[PROJECTION_ID_FIELD].isna().sum())
+        if blank:
+            errors.append(f'{PROJECTION_ID_FIELD} is blank on {blank} row(s)')
+        duplicated = sorted(set(ids[ids.duplicated()].tolist()))
+        if duplicated:
+            errors.append(
+                f'{PROJECTION_ID_FIELD} is duplicated: {duplicated[:10]} '
+                '(duplicate ids map to different solver indices and to one '
+                'exported record)')
+
+    if require_salary and 'Salary' in columns:
+        salary = pd.to_numeric(frame['Salary'], errors='coerce')
+        salary_finite = _finite_mask(salary)
+        nonfinite = int((~salary_finite).sum())
+        if nonfinite:
+            errors.append(f'Salary is nonfinite on {nonfinite} row(s)')
+        finite = salary[salary_finite]
+        nonpositive = int((finite <= 0).sum())
+        if nonpositive:
+            errors.append(f'Salary is not positive on {nonpositive} row(s)')
+        noninteger = int((finite != finite.round()).sum())
+        if noninteger:
+            errors.append(f'Salary is not an integer on {noninteger} row(s)')
+
+    for column in numeric_columns:
+        # Salary is valued above with its own positive-integer rule; every
+        # other named column only has to be a finite number.
+        if column == 'Salary' or column not in columns:
+            continue
+        values = pd.to_numeric(frame[column], errors='coerce')
+        nonfinite = int((~_finite_mask(values)).sum())
+        if nonfinite:
+            errors.append(f'{column} is nonfinite (NaN or +/-inf) on {nonfinite} row(s)')
+
+    if require_ceiling_ge_floor and 'Ceiling' in columns and 'Floor' in columns:
+        ceiling = pd.to_numeric(frame['Ceiling'], errors='coerce')
+        floor = pd.to_numeric(frame['Floor'], errors='coerce')
+        comparable = _finite_mask(ceiling) & _finite_mask(floor)
+        inverted = int((comparable & (ceiling < floor - 1e-9)).sum())
+        if inverted:
+            errors.append(f'Ceiling below Floor on {inverted} row(s)')
+    return errors
+
+
 def validate_projection_schema(projections_df):
-    """Validate the lean optimizer contract; optional enrichment never blocks."""
+    """Validate the lean optimizer contract; optional enrichment never blocks.
+
+    R327. The numeric half is `validate_projection_numerics`, shared with
+    `projection_builder.validate_projection_factors`. `ceiling_below_floor_rows`
+    is kept as its own counter because two callers and one test read it, but it
+    is no longer the only numeric check and it is no longer computed with a
+    comparison NaN can slip through.
+    """
     missing = [c for c in CORE_PROJECTION_FIELDS if c not in projections_df.columns]
     ceiling_floor_errors = 0
-    if not missing and len(projections_df):
-        ceiling_floor_errors = int((projections_df['Ceiling'].astype(float) < projections_df['Floor'].astype(float)).sum())
+    errors = []
+    if not missing:
+        errors = validate_projection_numerics(
+            projections_df,
+            numeric_columns=('Salary', 'Floor', 'Ceiling'),
+            require_ceiling_ge_floor=True,
+            require_nonempty=True,
+        )
+        if len(projections_df):
+            ceiling = pd.to_numeric(projections_df['Ceiling'], errors='coerce')
+            floor = pd.to_numeric(projections_df['Floor'], errors='coerce')
+            comparable = _finite_mask(ceiling) & _finite_mask(floor)
+            ceiling_floor_errors = int((comparable & (ceiling < floor - 1e-9)).sum())
+    passed = not missing and not errors
     return {
-        'passed': not missing and ceiling_floor_errors == 0,
+        'passed': passed,
         'missing_core_fields': missing,
         'available_optional_fields': [c for c in OPTIONAL_PROJECTION_FIELDS if c in projections_df.columns],
         'ceiling_below_floor_rows': ceiling_floor_errors,
-        'summary': 'Lean projection schema passed' if not missing and ceiling_floor_errors == 0 else 'Lean projection schema failed',
+        'boundary_errors': errors,
+        'summary': 'Lean projection schema passed' if passed else 'Lean projection schema failed',
     }
 
 
@@ -925,6 +1094,32 @@ def _build_single_lineup_scipy(
         return [pid for pid in (str(x).strip() for x in (candidate_ids or []))
                 if pid in pid_to_var_idxs]
 
+    def _whole_combination(candidate_ids):
+        """(original, present) for a row whose meaning needs EVERY member.
+
+        R313, 2026-09-08. `_known_pids` drops members absent from the active
+        pool, which is exact for an overlap reference (an absent player cannot
+        be reused, so shrinking the terms of `sum <= max_overlap` leaves the
+        row's meaning unchanged and makes it strictly weaker) and WRONG for a
+        forbidden combination, where the row's whole content is "not all of
+        these together". Shrinking it turns a statement about a combination
+        into a statement about a subset, and the bound `len(pids) - 1` shrinks
+        with it. Measured at `e3757ca` on a four-team synthetic frame with
+        `max_opposing_hitters_per_sp=8`: a three-member `stack_core_blocklist`
+        core with two members absent became `x_survivor <= 0` and excluded the
+        best catcher in the pool from every lineup (objective 195.96 ->
+        170.40), which is the legal-pool reduction CLAUDE.md's hard guardrails
+        name as the forbidden move, arriving as a data condition and invisible
+        in the certified output.
+
+        A combination that can no longer be formed is ALREADY impossible, so
+        the correct row is no row at all.
+        """
+        original = list(dict.fromkeys(
+            pid for pid in (str(x).strip() for x in (candidate_ids or [])) if pid))
+        present = [pid for pid in original if pid in pid_to_var_idxs]
+        return original, present
+
     c = np.zeros(n_vars, dtype=float)
     for (pid, slot), idx in assign_index.items():
         row = row_by_pid[pid]
@@ -1134,13 +1329,27 @@ def _build_single_lineup_scipy(
                 add_selected_sum_constraint(pids, -np.inf, max_overlap)
     if stack_core_blocklist:
         for core in stack_core_blocklist:
-            pids = _known_pids(core)
-            if pids:
+            # R313. Emit only when the WHOLE core is still rosterable. The old
+            # guard was `if pids`, so a three-member core with one survivor
+            # emitted `x_survivor <= 0` -- a legal-POOL reduction.
+            original, pids = _whole_combination(core)
+            if pids and len(pids) == len(original):
                 add_selected_sum_constraint(pids, -np.inf, len(pids) - 1)
     if forbidden_player_combos:
         for combo in forbidden_player_combos:
-            pids = _known_pids(combo)
-            if len(pids) >= 2:
+            # R313, second severity. The `>= 2` guard already stopped this path
+            # from reaching a one-survivor pool reduction, so the sibling did
+            # NOT have the blocklist's defect. Its own defect is one step up and
+            # is a legal-SPACE reduction: a three-member combo shrunk to TWO
+            # survivors emitted `x_a + x_b <= 1`, forbidding a PAIR nobody
+            # forbade. Measured at `e3757ca`: the two survivors never appeared
+            # together, at the same objective (194.54) as a genuine two-member
+            # forbidden pair, against 195.96 unconstrained. LATENT on the
+            # production path -- its one production caller, `capped_pairs` at
+            # the SP-pair cap below, always passes exact pairs -- and live on
+            # the public API this module's changelog advertises.
+            original, pids = _whole_combination(combo)
+            if len(original) >= 2 and len(pids) == len(original):
                 add_selected_sum_constraint(pids, -np.inf, len(pids) - 1)
 
     row_idx, col_idx, data = [], [], []
@@ -3743,10 +3952,20 @@ def score_lineup_candidate(
     marginal_portfolio_diversity_component = 0.0  # applied jointly, never guessed per lineup
     contest_fit = projection_component + correlation_component + duplication_component
 
+    # R312, 2026-09-08. Every name this function can emit is checked against
+    # FORBIDDEN_METRIC_VOCABULARY by
+    # `TruthfulMetricNameTests.test_no_emitted_metric_name_claims_a_payout`,
+    # because nothing pinned the old string in either direction: a grep at
+    # `e3757ca` found `Portfolio_EV_Proxy` in this module and in two historical
+    # review documents and NOWHERE in tests/, tools/ or skills/, so nothing
+    # would have caught the label and nothing would catch its return. R1b fixed
+    # this one shape over (`Ticket_Line_Advance_Proxy`, two lines below) and
+    # left the general case standing; the enforcer is what stops a third round.
     if profile['mode_family'] == 'ticket_line':
         metric_name = 'Ticket_Line_Advance_Proxy'
     else:
-        metric_name = 'WTA_First_Place_Proxy' if mode == 'wta' else 'Portfolio_EV_Proxy'
+        metric_name = ('WTA_First_Place_Fit_Proxy' if mode == 'wta'
+                       else 'Portfolio_Contest_Fit_Proxy')
     return {
         'candidate_id': candidate_id,
         'salary_used': salary_used,
@@ -3892,8 +4111,10 @@ def _mode_for_contest_shape(shape, fallback_mode='portfolio_ev'):
         return 'wta'
     if shape == 'cash':
         return 'cash'
-    # R1b: a multi-ticket satellite was labelled Portfolio_EV_Proxy, which named
-    # the wrong objective on the contests most of the portfolio is entered into.
+    # R1b: a multi-ticket satellite was labelled with the portfolio metric, which
+    # named the wrong objective on the contests most of the portfolio is entered
+    # into. (That metric is `Portfolio_Contest_Fit_Proxy` since R312; the name
+    # R1b's comment quoted was itself the EV claim R312 removed.)
     if is_ticket_line(shape):
         return 'ticket_line'
     return fallback_mode if fallback_mode != 'wta' else 'portfolio_ev'

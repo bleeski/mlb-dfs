@@ -150,8 +150,12 @@ def read_supplied_base(path) -> tuple[Dict[str, float], Dict[str, Any]]:
         raise FileNotFoundError(f"projections file not found: {p}")
     raw = p.read_bytes()
     sha = hashlib.sha256(raw).hexdigest()
+    import math
+
     out: Dict[str, float] = {}
     skipped = 0
+    rejected: list[str] = []
+    duplicated: list[str] = []
     text = raw.decode("utf-8-sig", errors="replace").splitlines()
     for row in csv.DictReader(text):
         lower = {(k or "").strip().lower(): v for k, v in row.items()}
@@ -161,9 +165,47 @@ def read_supplied_base(path) -> tuple[Dict[str, float], Dict[str, Any]]:
             skipped += 1
             continue
         try:
-            out[str(pid).strip()] = float(value)
+            parsed = float(value)
         except (TypeError, ValueError):
             skipped += 1
+            continue
+        key = str(pid).strip()
+        # R327, 2026-09-08. THIS is the `--projections` door the item names, and
+        # it had no numeric boundary at all. Measured at `e3757ca` on a
+        # four-row file: `nan`, `inf`, `-5` and `1e400` (which overflows to
+        # +inf) were all ACCEPTED, `rows_usable: 4`, `rows_skipped: 0` --
+        # `float("nan")` is a successful parse, so the try/except above is a
+        # syntax check and never a value check. A supplied Base is the prior
+        # the Showdown solver ranks on and it bypasses every derived check, so
+        # a NaN here is a NaN objective on the one path the item calls the
+        # live one.
+        #
+        # The rule is the scoring contract and not a generic nonnegativity: a
+        # Base is the multiplicand of a factor product, and
+        # `projection_builder.validate_projection_factors` has rejected a
+        # negative Base on the Classic door since v1.0. A REFUSAL, never a
+        # silent skip -- R242's complaint is that a silent fallback looks
+        # identical to a build that was never asked for the input.
+        if not math.isfinite(parsed):
+            rejected.append(f"{key}={value!r} (not a finite number)")
+            continue
+        if parsed < 0:
+            rejected.append(f"{key}={value!r} (negative)")
+            continue
+        if key in out:
+            duplicated.append(key)
+            continue
+        out[key] = parsed
+    if rejected or duplicated:
+        detail = "; ".join(rejected[:10])
+        if duplicated:
+            detail += ((" ; " if detail else "")
+                       + f"duplicate Player_ID: {sorted(set(duplicated))[:10]}")
+        raise ValueError(
+            f"projections file {p} carries {len(rejected) + len(duplicated)} "
+            f"unusable row(s): {detail}. A supplied Base is used AS the prior "
+            "and bypasses every derived check, so it is refused rather than "
+            "carried into the solve (R327)")
     if not out:
         raise ValueError(
             f"projections file {p} carried no usable Player_ID,Base rows "

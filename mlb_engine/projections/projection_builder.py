@@ -66,6 +66,24 @@ def _as_dataframe(rows: Any) -> pd.DataFrame:
 
 
 def validate_projection_factors(frame: pd.DataFrame) -> Dict[str, Any]:
+    """The factor door's half of R327's one numeric boundary.
+
+    Until 2026-09-08 this function tested `Base` and `F1..F5` for NaN and for a
+    negative value and nothing else. Measured at `e3757ca`: `Base=+inf`,
+    `F1=+inf`, `Salary=-1`, `Salary=4000.5`, `Salary=NaN`, a duplicate
+    `Player_ID` and an EMPTY frame all returned `passed: True`. `Salary` was in
+    `required` for PRESENCE and never valued -- the same gap the schema door
+    had, so "negative salary" was unchecked on BOTH doors rather than escaping
+    one of them.
+
+    The boundary itself is `optimizer_v3.validate_projection_numerics`, imported
+    lazily for the reason `showdown.py` imports `read_excluded_cell` lazily: the
+    projection builder must not pull the Classic solver in at module load. The
+    NaN/negative rule below is kept because it is the FACTOR contract (a factor
+    is a multiplier and a negative one flips the sign of a projection), and it
+    says which column failed; the shared call adds finiteness, the id rule and
+    the salary rule, which are properties of the frame rather than of a factor.
+    """
     required = {"Player_ID", "Name", "Team", "Opponent", "Position", "Salary", "Game_ID", "Base", *FACTOR_COLUMNS}
     missing = sorted(required - set(frame.columns))
     errors = []
@@ -76,6 +94,13 @@ def validate_projection_factors(frame: pd.DataFrame) -> Dict[str, Any]:
                 errors.append(f"{column} contains nonnumeric values")
             if (values < 0).any():
                 errors.append(f"{column} contains negative values")
+        from mlb_engine.optimize.optimizer_v3 import validate_projection_numerics
+        errors.extend(validate_projection_numerics(
+            frame,
+            numeric_columns=("Salary", "Base", *FACTOR_COLUMNS),
+            require_ceiling_ge_floor=False,
+            require_nonempty=True,
+        ))
     return {"passed": not missing and not errors, "missing_fields": missing, "errors": errors}
 
 
@@ -181,6 +206,28 @@ def refresh_confirmed_lineups(
         raise ValueError(f"projection frame missing shared-factor fields: {sorted(missing)}")
     starter_set = {str(x) for x in starter_player_ids} if starter_player_ids is not None else None
     confirmed_team_set = {str(t).strip().upper() for t in confirmed_teams} if confirmed_teams is not None else None
+
+    # R327, 2026-09-08. The operator flag below used to be read with
+    # `bool(row.get("Excluded"))`, which is the comparison CLAUDE.md's hard
+    # guardrail forbids ("Never compare the column to False directly, and never
+    # re-derive the token rule"), arriving as a truthiness test rather than as
+    # an equality. Measured at `e3757ca` on a CONFIRMED starter with
+    # `Excluded_Source == "salary_file"`: the strings "False", "FALSE" and
+    # "nan", and a float NaN, ALL read as an operator exclusion and refreshed
+    # the confirmed starter to `Excluded=True`, and repeated refresh was
+    # idempotent at True, so the wrong answer was sticky. The realistic
+    # producer is not a hand-typed "False": it is a CSV round trip with any one
+    # blank `Excluded` cell, which turns the column to object dtype and the
+    # blank to float NaN, and `bool(nan)` is True.
+    #
+    # The column is canonicalized ONCE here, through the one reading, before
+    # any row is examined. `excluded_flags` is that reading's vector half and
+    # it is imported lazily so the projection builder does not pull the Classic
+    # solver in at module load.
+    if "Excluded" in frame.columns and len(frame):
+        from mlb_engine.optimize.optimizer_v3 import excluded_flags
+        canonical_excluded, _excluded_report = excluded_flags(frame)
+        frame["Excluded"] = canonical_excluded.astype(bool)
     rows = []
     for index, row in frame.iterrows():
         pid = str(row["Player_ID"])
@@ -210,7 +257,10 @@ def refresh_confirmed_lineups(
             # idempotent: without it, a row whose salary cell said FALSE
             # (source `salary_file`, flag False) would be excluded once as a
             # non-starter and then read as an operator flag forever.
-            operator_flag = (bool(row.get("Excluded"))
+            # R327: `frame`, not `row`. `row` is the PRE-canonicalization
+            # snapshot taken by `iterrows()` above, so reading the flag off it
+            # would re-introduce the truthiness test this function just removed.
+            operator_flag = (bool(frame.at[index, "Excluded"])
                              and str(row.get("Excluded_Source") or "") == "salary_file")
             excluded = operator_flag or (pid not in starter_set)
             if bool(frame.at[index, "Excluded"]) != excluded:
@@ -226,8 +276,26 @@ def refresh_confirmed_lineups(
         floor_ratio = old_floor / old_base_projection if old_base_projection else 0.58
         ceiling_ratio = old_ceiling / old_base_projection if old_base_projection else 1.42
         frame.at[index, "Base_Projection"] = resolved
-        frame.at[index, "Floor"] = max(0.0, resolved * floor_ratio)
-        frame.at[index, "Ceiling"] = max(frame.at[index, "Floor"], resolved * ceiling_ratio)
+        new_floor = max(0.0, resolved * floor_ratio)
+        new_ceiling = resolved * ceiling_ratio
+        # R327, 2026-09-08. This line was
+        # `max(frame.at[index, "Floor"], resolved * ceiling_ratio)`, which
+        # SILENTLY REPAIRED an inverted bound against CLAUDE.md's hard
+        # guardrail "Ceiling below Floor is a hard error, never silently
+        # repaired". Measured at `e3757ca`: Floor 14.0 / Ceiling 6.0 with
+        # Base_Projection 10.0 came back Floor 14.0 / Ceiling 14.0 -- the
+        # inversion gone, Floor == Ceiling, and the evidence of the bad
+        # upstream input erased. `build_projections` has raised on exactly this
+        # since v1.0; the refresh is the seam that did not.
+        if new_ceiling < new_floor - 1e-9:
+            raise ValueError(
+                f"Ceiling below Floor for Player_ID {pid!r} after the confirmed "
+                f"refresh (Floor {new_floor:.6f}, Ceiling {new_ceiling:.6f}, from "
+                f"pre-refresh Floor {old_floor:.6f} / Ceiling {old_ceiling:.6f}); "
+                "the projection contract requires Ceiling >= Floor and bad rows "
+                "are not silently repaired")
+        frame.at[index, "Floor"] = new_floor
+        frame.at[index, "Ceiling"] = new_ceiling
         if changed:
             rows.append({
                 "Player_ID": pid,

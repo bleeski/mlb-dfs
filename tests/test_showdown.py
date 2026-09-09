@@ -3845,5 +3845,141 @@ class R36Finding8PerSideParticipationTests(unittest.TestCase):
         self.assertEqual(sim.DK_ORDER_SLOTS, 9)
 
 
+class ShowdownBriefCarriesTheSmallSampleCautionTests(unittest.TestCase):
+    """R310, warning half, driven through the PRODUCTION `run_showdown`.
+
+    The wiring is the half a unit test on `small_sample_base_report` cannot
+    reach: the field has to be IN the delivered brief and the caution has to
+    RENDER. R300(a) is the standing reason -- the R289 acceptance test asserted
+    over a hand-built frame and shipped green while five production sites still
+    dropped the column.
+    """
+
+    @staticmethod
+    def _module():
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r310b", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _build(self, tmp: Path, patch_constants=None, projections=None):
+        """A real delivered Showdown build, writing nowhere outside `tmp`.
+
+        `mod.REPO` is patched for the reason the R304(d) driver above patches
+        it: `run_showdown` mirrors into `REPO/outputs/<date>/` and records into
+        that directory's upload manifest.
+        """
+        import shutil
+        sal, ent = tmp / "DKSalaries.csv", tmp / "DKEntries.csv"
+        shutil.copy2(SAL, sal)
+        shutil.copy2(ENT, ent)
+        args = types.SimpleNamespace(
+            date="2026-07-18", entries=None, controls_override=None,
+            projections=(str(projections) if projections else None),
+            declare_pitcher=[], lineups=None,
+            odds=None, no_odds=True, brief=None)
+        mod = self._module()
+        stack = contextlib.ExitStack()
+        with stack:
+            stack.enter_context(unittest.mock.patch.object(mod, "REPO", tmp))
+            for name, value in (patch_constants or {}).items():
+                stack.enter_context(unittest.mock.patch.object(sd, name, value))
+            stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            code, brief = mod.run_showdown(args, tmp, sal, ent)
+        return code, brief
+
+    def test_the_field_is_on_every_showdown_brief_even_when_nothing_fires(self):
+        """`supplied_base`'s discipline. The MIN@CHC pool has no cheap outlier
+        under the shipped predicate, and the answer to "was this checked" must
+        still be readable -- an absent key leaves it unanswerable, which is
+        R249's rule."""
+        with tempfile.TemporaryDirectory() as tmp:
+            code, brief = self._build(Path(tmp))
+        self.assertEqual(code, 0)
+        block = brief["pool"]["small_sample_base"]
+        self.assertIs(block["applied"], False)
+        self.assertEqual(block["hitters_considered"], 18)
+        self.assertEqual(block["appg_percentile"], 90.0)
+        self.assertEqual(block["salary_percentile"], 50.0)
+        self.assertNotIn("APPG is the Base prior here", brief["caution"])
+
+    def test_a_flagged_pool_renders_the_caution_naming_the_player(self):
+        """The caution string itself, rendered by the production builder off a
+        REAL report -- the only thing changed is the salary threshold constant,
+        so the pool, the report and the f-string are all the shipped ones. A
+        NOTE that raises on a None salary or a missing key would fail here and
+        nowhere else, because the branch only evaluates when something fires."""
+        with tempfile.TemporaryDirectory() as tmp:
+            code, brief = self._build(
+                Path(tmp),
+                patch_constants={"SMALL_SAMPLE_BASE_SALARY_PERCENTILE": 100.0})
+        self.assertEqual(code, 0)
+        block = brief["pool"]["small_sample_base"]
+        self.assertTrue(block["applied"])
+        named = block["players"][0]["Name"]
+        self.assertIn(named, brief["caution"])
+        self.assertIn("APPG is the Base prior here", brief["caution"])
+        self.assertIn("`--projections` is the lever", brief["caution"])
+        self.assertIn("hitters", brief["caution"])
+
+    def _supplied_base_csv(self, tmp: Path) -> Path:
+        """A real `Player_ID,Base` file for this pool, generated FROM the salary
+        file by UTIL id -- the discipline R310's own workaround paragraph
+        insists on ("generate the CSV FROM the salary file by name, never by
+        hand-typed id")."""
+        pool = sd.melt_showdown_salary_csv(str(SAL))
+        path = tmp / "projections.csv"
+        rows = ["Player_ID,Base"]
+        for _, row in pool.iterrows():
+            rows.append(f"{row['UTIL_ID']},{float(row['Base']) * 0.9 + 1.0:.2f}")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        return path
+
+    def test_a_supplied_base_suppresses_the_note_and_keeps_the_field(self):
+        """`--projections` replaces the APPG prior the caution warns about, so
+        warning about it is noise. The FIELD stays, because the record of what
+        the pool looked like is still worth having and `applied: false` would be
+        a different claim from "not asked".
+
+        This test exists because the mutant that removed `and not
+        supplied_base` SURVIVED its first pass: the suppression rule was
+        correct and untested, which is a fixture gap and not a weak mutant.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            code, brief = self._build(
+                tmp,
+                patch_constants={"SMALL_SAMPLE_BASE_SALARY_PERCENTILE": 100.0},
+                projections=self._supplied_base_csv(tmp))
+        self.assertEqual(code, 0)
+        self.assertTrue(brief["supplied_base"]["applied"],
+                        "the supplied Base did not actually apply, so this "
+                        "test would pass for the wrong reason")
+        block = brief["pool"]["small_sample_base"]
+        self.assertTrue(block["applied"], "the field must still carry the flag")
+        self.assertNotIn("APPG is the Base prior here", brief["caution"])
+        self.assertNotIn(block["players"][0]["Name"], brief["caution"])
+
+    def test_it_is_still_review_grade_and_not_a_gate(self):
+        """A caution never changes the verdict. Showdown ships review-grade
+        either way, and a flagged pool must not refuse, downgrade or relax
+        anything."""
+        with tempfile.TemporaryDirectory() as tmp:
+            clean_code, clean = self._build(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            flagged_code, flagged = self._build(
+                Path(tmp),
+                patch_constants={"SMALL_SAMPLE_BASE_SALARY_PERCENTILE": 100.0})
+        self.assertEqual(clean_code, 0)
+        self.assertEqual(flagged_code, 0)
+        for brief in (clean, flagged):
+            self.assertEqual(brief["status"], "review_grade_build")
+        self.assertEqual(flagged["pool"]["players"], clean["pool"]["players"],
+                         "the caution changed the pool, which makes it a gate")
+        self.assertEqual(flagged["delivered_sha256"], clean["delivered_sha256"],
+                         "the caution changed a delivered byte")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

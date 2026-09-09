@@ -457,6 +457,117 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     return df
 
 
+#: R310 warning half. The position tokens that make a melted row an ARM. The
+#: melt writes DK's own `Position`, which is `SP`/`RP`/`P` for pitchers, so a
+#: filter testing for the single letter `P` keeps all twenty persons and the
+#: percentile below is then taken over a comparison class that includes the two
+#: starters. Measured: with the wrong filter Leo Bernal reads "rank 2/20"
+#: because Tarik Skubal's 22.3 APPG sits above him; with this one he reads
+#: "rank 1/18", which is the fact the caution is about.
+SHOWDOWN_PITCHER_POSITION_TOKENS = frozenset({"P", "SP", "RP"})
+
+#: The two conjuncts, as constants so a test can state them and a future
+#: re-measurement can move them in one place.
+SMALL_SAMPLE_BASE_APPG_PERCENTILE = 90.0
+SMALL_SAMPLE_BASE_SALARY_PERCENTILE = 50.0
+
+
+def _is_showdown_hitter(position: Any) -> bool:
+    tokens = {t.strip().upper() for t in str(position or "").split("/")}
+    return not (tokens & SHOWDOWN_PITCHER_POSITION_TOKENS)
+
+
+def small_sample_base_report(df: pd.DataFrame) -> Dict[str, Any]:
+    """Name any HITTER whose APPG Base is a top-decile number at a bottom-half
+    salary. A caution and a brief field, never a gate.
+
+    R310 warning half, 2026-09-08. `showdown.py` uses DK's
+    `AvgPointsPerGame` as the Base prior, and APPG carries no denominator, so a
+    callup with one or two MLB games can be the highest-APPG hitter in a
+    twenty-man pool. Two recorded incidents, both Showdown, both with every
+    control reading clean: Leo Bernal (2026-09-03 2210_1g_sd, APPG 12.5 on ~1
+    game, 9 of 19 entries at 47.4%) and Yohandy Morales (2026-09-04
+    2210_1g_sd, APPG 13.5 on 2 games and 8 PA, 7 of 12 entries at 58.3%, the
+    0.50 player cap relaxed by one slot).
+
+    WHY THE SALARY CONJUNCT IS NOT OPTIONAL, and why it is the MEDIAN and not
+    the bottom quartile. Both the roadmap row and the backlog entry proposed a
+    predicate and both were wrong on the incidents they were written from. The
+    row's ("games played < 5 and APPG in the top quartile") cannot be
+    implemented: DK ships no game count. The entry's replacement (top decile
+    AND salary in the bottom QUARTILE) misses Bernal by $50. Measured over
+    every archived Showdown pool on disk -- 39 unique files by sha256, each
+    with exactly 18 hitters:
+
+        bare p90                     1.95 flags/pool, fires on 39 of 39 pools
+        p90 AND salary <= Q1         0.10 flags/pool,  4 total, MISSES Bernal
+        p90 AND salary <= median     0.18 flags/pool,  7 total, catches BOTH
+
+    A caution that fires about twice on every slate is the referee that warns
+    on everything, which is the habit R292 was filed on; the bare percentile is
+    a rank threshold in disguise, because every archived pool has the same 18
+    hitters and "above the 90th percentile" is therefore "the top two" on all
+    39 of them. The median conjunct is what makes it a question worth reading.
+
+    A genuinely cheap star is a real thing. This says "check this prior", never
+    "this prior is wrong".
+    """
+    empty = {
+        "applied": False,
+        "players": [],
+        "hitters_considered": 0,
+        "appg_percentile": SMALL_SAMPLE_BASE_APPG_PERCENTILE,
+        "salary_percentile": SMALL_SAMPLE_BASE_SALARY_PERCENTILE,
+        "appg_threshold": None,
+        "salary_threshold": None,
+        "note": "APPG is the Showdown Base prior and carries no games-played "
+                "denominator; a hitter above the pool's APPG 90th percentile "
+                "at or below its median salary is FLAGGED for review, never "
+                "removed (R310)",
+    }
+    if df is None or not len(df):
+        return empty
+    hitters = df[df["Position"].apply(_is_showdown_hitter)] if "Position" in df.columns else df
+    if len(hitters) < 4:
+        # Below four the percentiles are not a distribution, they are the
+        # sorted list, and a threshold read off three numbers says nothing.
+        empty["hitters_considered"] = int(len(hitters))
+        return empty
+    appg = pd.to_numeric(hitters.get("Base"), errors="coerce").fillna(0.0)
+    salary_column = "UTIL_Salary" if "UTIL_Salary" in hitters.columns else "Salary"
+    salary = pd.to_numeric(hitters.get(salary_column), errors="coerce")
+    if salary.isna().all():
+        empty["hitters_considered"] = int(len(hitters))
+        return empty
+    appg_threshold = float(appg.quantile(SMALL_SAMPLE_BASE_APPG_PERCENTILE / 100.0))
+    salary_threshold = float(salary.dropna().quantile(
+        SMALL_SAMPLE_BASE_SALARY_PERCENTILE / 100.0))
+    flagged = hitters[(appg > appg_threshold) & (salary <= salary_threshold)]
+    players = [
+        {
+            "Name": str(row.get("Name") or ""),
+            "Team": str(row.get("Team") or ""),
+            "Player_ID": str(row.get("UTIL_ID") or row.get("Player_ID") or ""),
+            "appg": float(pd.to_numeric(row.get("Base"), errors="coerce") or 0.0),
+            "salary": (None if pd.isna(pd.to_numeric(row.get(salary_column), errors="coerce"))
+                       else int(pd.to_numeric(row.get(salary_column), errors="coerce"))),
+            "appg_rank_among_hitters": int((appg > float(
+                pd.to_numeric(row.get("Base"), errors="coerce") or 0.0)).sum()) + 1,
+        }
+        for _, row in flagged.iterrows()
+    ]
+    players.sort(key=lambda r: (-r["appg"], r["Name"]))
+    return {
+        **empty,
+        "applied": bool(players),
+        "players": players,
+        "hitters_considered": int(len(hitters)),
+        "appg_threshold": round(appg_threshold, 4),
+        "salary_threshold": (None if salary_threshold != salary_threshold
+                             else int(salary_threshold)),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # MILP: 1 CPT + 5 UTIL, role exclusivity, both teams, salary cap
 # --------------------------------------------------------------------------- #
