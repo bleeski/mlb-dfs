@@ -154,6 +154,7 @@ class BankCache:
         # memory with disk, so without this a clear would be undone by the very
         # next save (R55).
         self._cleared: set[str] = set()
+        self._retired: set[str] = set()
         # R101. conditions signature -> the projection digest it was built
         # under. Persisted, because that is the only record of WHICH kind of
         # difference separates two stored buckets: same pool truth (live, keep)
@@ -180,6 +181,8 @@ class BankCache:
             self.conditions_index = {}
             return
         self.attempted = set(payload.get("attempted") or [])
+        self._retired = set(payload.get("retired_jobs") or [])
+        self.attempted -= self._retired
         self.conditions_index = {
             str(k): str(v) for k, v in (payload.get("conditions_index") or {}).items()
         }
@@ -190,6 +193,8 @@ class BankCache:
         self.candidates = []
         self._seen = set()
         for entry in (payload.get("candidates") or []):
+            if entry.get("job") in self._retired:
+                continue
             key = tuple(str(p) for p in (entry.get("roster") or []))
             if len(key) != 10 or not all(key) or key in self._seen:
                 continue
@@ -230,6 +235,21 @@ class BankCache:
         Omitting ``projection_digest`` keeps the v1.2 behaviour exactly -- only
         ``conditions_sig`` survives -- which is what the maintenance callers and
         the concurrency tests rely on. Returns how many were dropped.
+
+        **Dropping and RETIRING are two different acts (R338 repair (1)).** The
+        F11 tombstone was applied to every dropped job, which made the v1.2
+        memory-only narrowing above erase a sibling session's bucket from the
+        shared file -- the R55/R130 incident arriving through the fix for the
+        opposite one. A job is tombstoned only where this call can PROVE the
+        stored answer answers a different question: ``projection_digest`` is
+        supplied AND ``conditions_index`` places that signature under a
+        different digest. Everything else is dropped from memory and left on
+        disk for its own writer, which is what the union is for. Note the
+        asymmetry with ``_live`` above and it is deliberate: a signature the
+        index cannot place fails CLOSED for the DROP (this caller must not
+        serve it) and OPEN for the tombstone (this caller cannot prove it is
+        dead, and an unregistered signature is what a concurrent writer's
+        bucket looks like before it registers).
         """
         if not conditions_sig:
             return 0
@@ -242,6 +262,15 @@ class BankCache:
                 return False
             return self.conditions_index.get(sig) == projection_digest
 
+        def _provably_dead(job: Any) -> bool:
+            if not projection_digest:
+                return False
+            sig = _key_conditions(job)
+            if sig == conditions_sig:
+                return False
+            placed = self.conditions_index.get(sig)
+            return placed is not None and placed != projection_digest
+
         stale_attempts = {k for k in self.attempted if not _live(k)}
         stale_candidates = [
             c for c in self.candidates if c.get("job") and not _live(c["job"])
@@ -249,6 +278,9 @@ class BankCache:
         if not stale_attempts and not stale_candidates:
             return 0
         self.attempted -= stale_attempts
+        self._retired.update(k for k in stale_attempts if _provably_dead(k))
+        self._retired.update(c["job"] for c in stale_candidates
+                             if _provably_dead(c["job"]))
         stale_ids = {id(c) for c in stale_candidates}
         keep = [c for c in self.candidates if id(c) not in stale_ids]
         self.candidates = keep
@@ -282,6 +314,16 @@ class BankCache:
         return len(doomed)
 
     def save(self) -> None:
+        """Serialize reload/merge/replace and preserve invalidation tombstones."""
+        import sqlite3
+        from contextlib import closing
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(self.path.with_suffix(self.path.suffix + ".lock.sqlite3"), timeout=5)) as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._save_locked()
+            db.commit()
+
+    def _save_locked(self) -> None:
         """Reload-and-union, then tmp + os.replace (R22).
 
         The write was already atomic (a kill mid-save used to poison the file
@@ -314,11 +356,14 @@ class BankCache:
                 disk_attempted = set(payload.get("attempted") or [])
                 disk_index = {str(k): str(v) for k, v
                               in (payload.get("conditions_index") or {}).items()}
+                self._retired.update(payload.get("retired_jobs") or [])
             except (OSError, ValueError):
                 pass  # unreadable disk state is rebuilt, the same policy as _load
-        merged_seen = set(self._seen)
-        merged_candidates = list(self.candidates)
+        merged_candidates = [c for c in self.candidates if c.get("job") not in self._retired]
+        merged_seen = {tuple(str(p) for p in c["roster"]) for c in merged_candidates}
         for cand in disk_candidates:
+            if cand.get("job") in self._retired:
+                continue
             key = tuple(str(p) for p in (cand.get("roster") or []))
             if len(key) == 10 and all(key) and key not in merged_seen:
                 merged_seen.add(key)
@@ -330,7 +375,8 @@ class BankCache:
             # The union keeps concurrent writers' work (see above). Keys an
             # operator deliberately cleared are subtracted once, here, or the
             # union would silently reinstate them (R55).
-            "attempted": sorted((self.attempted | disk_attempted) - self._cleared),
+            "attempted": sorted((self.attempted | disk_attempted) - self._cleared - self._retired),
+            "retired_jobs": sorted(self._retired),
             # Sorted, because this file is read by the next session and an
             # unordered map makes two identical caches look different.
             "conditions_index": dict(sorted({**disk_index,
@@ -553,16 +599,14 @@ def _projection_bytes(projections_df) -> bytes:
     stream it feeds sha256 is a compatibility surface: change the bytes and
     every cache on disk silently invalidates on its next read.
     """
-    chunks: List[bytes] = []
-    for column in _PROJECTION_COLUMNS:
-        if column not in getattr(projections_df, "columns", []):
-            continue
-        try:
-            values = projections_df.sort_values("Player_ID")[column].tolist()
-        except Exception:  # noqa: BLE001 - a signature must not kill a build
-            values = list(projections_df[column])
-        chunks.append((column + ":" + ",".join(f"{v}" for v in values) + "\n").encode())
-    return b"".join(chunks)
+    # Schema/version change intentionally invalidates older caches. Every field
+    # can affect eligibility, shape scoring, ownership or the constraint matrix.
+    columns = sorted(projections_df.columns)
+    ordered = projections_df.sort_values("Player_ID", kind="stable")
+    rows = [[[type(value).__name__, repr(value)] for value in row]
+            for row in ordered[columns].itertuples(index=False, name=None)]
+    return json.dumps({"schema": 2, "columns": columns, "rows": rows},
+                      sort_keys=True, separators=(",", ":")).encode()
 
 
 def projection_digest(projections_df) -> str:
@@ -586,6 +630,7 @@ def conditions_signature(
     stack_min: Optional[int] = None,
     stack_max: Optional[int] = None,
     max_opposing_hitters_per_sp: Optional[int] = None,
+    *, target: str = "ceiling", leverage: Optional[Mapping[str, Any]] = None,
 ) -> str:
     """A short digest of everything outside (pair, team, locks) that moves a solve.
 
@@ -612,6 +657,8 @@ def conditions_signature(
     """
     digest = hashlib.sha256()
     digest.update(b"v2")
+    digest.update(json.dumps({"target": target, "leverage": _leverage_kwargs(leverage)},
+                             sort_keys=True, allow_nan=False).encode())
     digest.update(("|".join(sorted(str(x) for x in (excludes or []))) + "\n").encode())
     digest.update(f"{stack_min}:{stack_max}\n".encode())
     if max_opposing_hitters_per_sp not in (None, ANTI_CORRELATION_DEFAULT_MAX):
@@ -724,7 +771,8 @@ def extend_bank(
     # drop, so the bucket this call is about to fill is placeable by the next one.
     conditions_sig = conditions_signature(
         projections_df, excl, stack_min, stack_max,
-        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp)
+        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+        target=target, leverage=leverage)
     pool_digest = projection_digest(projections_df)
     cache.register_conditions(conditions_sig, pool_digest)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
@@ -980,7 +1028,7 @@ def extend_bank(
         "total_candidates": len(cache),
         "jobs_total": len(jobs),
         "jobs_attempted": done_here,
-        "job_list_exhausted": exhausted,
+        "job_list_exhausted": exhausted and done_here == len(jobs),
         "elapsed_s": round(time.monotonic() - started, 3),
         "time_budget_s": float(time_budget_s),
         "lock_signature": lock_sig,

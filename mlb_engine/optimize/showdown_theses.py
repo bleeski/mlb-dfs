@@ -1111,6 +1111,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     # apart from every relaxation counter for that reason. CLAUDE.md: "A timeout
     # is recorded in solver_report, never climbs the overlap ladder."
     solver_timeouts = 0
+    solver_failures = []
     time_limited_accepted = 0
     timeout_detail: List[Dict[str, str]] = []
     player_counts: Dict[str, int] = {}
@@ -1193,8 +1194,18 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         lets the caller BREAK instead of descending.
         """
         st_out: Dict[str, Any] = {}
-        got = build_showdown_lineup(status_out=st_out, **call_kw)
+        # R338 repair (3). Every `locks`/`cpt_lock` this ladder passes is
+        # THESIS-sourced (`thesis["locks"]` at :1307, `thesis["cpt"]` at :1268),
+        # so F14's hard-lock refusal does not apply to it: a thesis naming a
+        # player absent from `work` is a preference that cannot be honoured, and
+        # it goes to `ignored_locks` as it always did rather than blanking the
+        # reserved row. Set here, once, because nine rung call sites below share
+        # this one door.
+        got = build_showdown_lineup(status_out=st_out, operator_locks=False, **call_kw)
         if got is None:
+            if st_out.get("proven_infeasible") is not True:
+                latch["stopped"] = True
+                latch["failure_status"] = st_out.get("status", "unclassified_solver_failure")
             if st_out.get("timed_out"):
                 latch["timed_out"] = True
                 latch["message"] = str(st_out.get("message") or "")
@@ -1338,12 +1349,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         util_kw = {"util_excludes": util_blocked or None}
         kw = dict(locks=locks or None, time_limit=time_limit)
         # R158. One latch per slot. Every rung below is additionally guarded on
-        # `not latch["timed_out"]`, so the ladder stops descending the moment the
+        # `not latch["stopped"]`, so the ladder stops descending the moment the
         # solver reports a clock expiry rather than an infeasibility. Without that
         # guard a single slow solve walks the whole ladder, re-paying the time
         # limit at each rung, and every control it passed on the way down is
         # recorded as having been relaxed.
-        latch: Dict[str, Any] = {"timed_out": False, "time_limited": False}
+        latch: Dict[str, Any] = {"timed_out": False, "time_limited": False, "stopped": False}
         # R250. The hold rides WITH the player cap: it is applied on every rung
         # that still carries `with_cap`, and dropped the moment the player cap
         # itself is relaxed. Reserving budget is only meaningful while there is a
@@ -1352,21 +1363,21 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         lu = _rung(latch, df=work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
                    forbidden_sets=prior or None, excludes=with_cap,
                    max_shared_players=max_shared_players, **util_kw, **kw)
-        if lu is None and not latch["timed_out"] and max_shared_players is not None:
+        if lu is None and not latch["stopped"] and max_shared_players is not None:
             lu = _rung(latch, df=work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
                        excludes=with_cap, **util_kw, **kw)
             if lu is not None:
                 overlap_relaxed += 1
         # R153. Player cap second, before the captain lock.
-        if lu is None and not latch["timed_out"] and over:
+        if lu is None and not latch["stopped"] and over:
             lu = _rung(latch, df=work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
                        excludes=without_cap,
                        max_shared_players=max_shared_players, **kw)
             if lu is not None:
                 player_relaxed += 1
-        if (lu is None and not latch["timed_out"] and over
+        if (lu is None and not latch["stopped"] and over
                 and max_shared_players is not None):
             lu = _rung(latch, df=work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
@@ -1374,7 +1385,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             if lu is not None:
                 player_relaxed += 1
                 overlap_relaxed += 1
-        if lu is None and not latch["timed_out"]:
+        if lu is None and not latch["stopped"]:
             lu = _rung(latch, df=work, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
                        excludes=with_cap,
@@ -1387,7 +1398,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # path fills. Counted in every place it is true, matching
         # build_showdown_bank: these answer "how many lineups were built without
         # this control", so a clean ladder is all three at zero.
-        if (lu is None and not latch["timed_out"] and cpt_lock
+        if (lu is None and not latch["stopped"] and cpt_lock
                 and max_shared_players is not None):
             lu = _rung(latch, df=work, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
@@ -1403,7 +1414,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # built WITHOUT this control" and the brief's clean verdict rests on that.
         # The captain cap comes off here too: at this rung nothing else has worked
         # and the alternative is a blank reserved row, which blocks certification.
-        if lu is None and not latch["timed_out"] and (
+        if lu is None and not latch["stopped"] and (
                 over or cpt_lock or cpt_excludes
                 or max_shared_players is not None):
             # R223. This rung drops the OVERLAP bound and the player-exposure
@@ -1440,7 +1451,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # cheaper to keep. A blank reserved row blocks certification, so the cap
         # gives way rather than never -- but it gives way on the record.
         portfolio_cpt_excluded = sorted(cpt_full | over_set)
-        if lu is None and not latch["timed_out"] and portfolio_cpt_excluded:
+        if lu is None and not latch["stopped"] and portfolio_cpt_excluded:
             lu = _rung(latch, df=work,
                        cpt_excludes=sorted(contest_full) or None,
                        forbidden_sets=prior or None,
@@ -1460,7 +1471,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # per-contest cap gives way last rather than never -- and it is counted,
         # because a portfolio is clean when the relaxation counts are zero, not
         # when the gates passed.
-        if lu is None and not latch["timed_out"] and contest_full:
+        if lu is None and not latch["stopped"] and contest_full:
             lu = _rung(latch, df=work, forbidden_sets=prior or None,
                        excludes=without_cap, **kw)
             if lu is not None:
@@ -1492,6 +1503,8 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                     "message": str(latch.get("message") or ""),
                     "incumbent_rejected": str(bool(latch.get("incumbent_rejected"))),
                 })
+            elif latch["stopped"]:
+                solver_failures.append({"thesis": tname, "slot": slot, "status": latch.get("failure_status")})
             else:
                 infeasible += 1
         else:
@@ -1562,6 +1575,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "both_relaxed": both_relaxed,
             "ignored_locks": list(ignored_locks),
             "infeasible": infeasible,
+            "solver_failures": solver_failures,
             # R158. Compute facts, reported beside the relaxation counters and
             # never summed into them. `solver_timeouts` counts slots that ended on
             # the clock with no lineup; `time_limited_accepted` counts slots that

@@ -623,6 +623,7 @@ def build_showdown_lineup(
     max_shared_players: Optional[int] = None,
     time_limit: int = 20,
     status_out: Optional[Dict[str, Any]] = None,
+    operator_locks: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Solve one legal Showdown lineup maximizing projected points (CPT at 1.5x).
     Returns None if infeasible. Deterministic scipy.milp; a review proxy.
@@ -676,8 +677,36 @@ def build_showdown_lineup(
     banned = (df["Player_Key"].isin(excl) if excl
               else pd.Series(False, index=df.index, dtype=bool))
     work = df[~(banned | column_flags)].reset_index(drop=True)
+    # F14. An OPERATOR lock naming a player who is not in the pool is a refusal:
+    # the operator asked for a specific roster and silently solving a different
+    # one answers a question nobody asked. It refuses BEFORE constraint assembly,
+    # where the constraint would simply match nothing.
+    #
+    # ``operator_locks=False`` is the thesis door and it is R338 repair (3).
+    # ``solve_ladder`` passes THESIS locks through this same parameter, and a
+    # thesis is a preference, not an instruction: refusing one blanks a reserved
+    # entry row, which blocks certification, on the exact input the R54(c) path
+    # below was written to survive ("a lock that lost its player at T-5 must not
+    # be the reason there is no file"). Landing this refusal on both doors made
+    # `ignored_locks` unreachable and every downstream reader of it -- the ladder
+    # at showdown_theses.py:1534, the bank at :1110, build_slate.py:3945's NOTE --
+    # read a permanently empty field. F14's soft-lock field, where thesis
+    # preferences travel in their own argument, is Session 8 (R295); this flag is
+    # the scoping that makes the refusal true only where it is meant.
+    if operator_locks:
+        available_keys = set(work["Player_Key"])
+        missing_locks = sorted({str(x) for x in (locks or []) if x not in available_keys})
+        if cpt_lock and cpt_lock not in available_keys:
+            missing_locks.append(f"cpt:{cpt_lock}")
+        if missing_locks:
+            _record_showdown_status(status_out, status="invalid_hard_lock", proven_infeasible=False,
+                                    timed_out=False, ignored_locks=missing_locks,
+                                    message="required player absent or excluded")
+            return None
     n = len(work)
     if n < contract.roster_size:
+        _record_showdown_status(status_out, status="infeasible", proven_infeasible=True,
+                                timed_out=False, message="eligible people fewer than required slots")
         return None
     # R291(c). The both-teams rows below are built from `work`, so a pool
     # narrowed to one side makes that rule VACUOUSLY true and the solve returns
@@ -691,6 +720,8 @@ def build_showdown_lineup(
         required = required_teams_from_pool(df)
         have = {str(t).strip().upper() for t in work["Team"].dropna().unique()}
         if len(required) >= 2 and not required.issubset(have):
+            _record_showdown_status(status_out, status="infeasible", proven_infeasible=True,
+                                    timed_out=False, message="a required team has no eligible player")
             return None
     n_util = contract.roster_size - 1  # UTIL count (5)
     cpt_mult = contract.multiplier_for(contract.captain_slot or "CPT")
@@ -827,7 +858,8 @@ def build_showdown_lineup(
         lhs = matrix @ rounded
         feasible = bool(np.all(lhs >= lb_array - 1e-6)
                         and np.all(lhs <= ub_array + 1e-6))
-    if not (res.success or (timed_out and integral and feasible)):
+    bounded = bool(np.all(rounded >= 0) and np.all(rounded <= 1))
+    if not ((res.success or timed_out) and integral and feasible and bounded):
         _record_showdown_status(
             status_out,
             incumbent_rejected=bool(timed_out and not (integral and feasible)),

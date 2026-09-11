@@ -522,19 +522,20 @@ class ShowdownDiversityTests(unittest.TestCase):
         that the engine SAID so.
         """
         df = _synth()
-        lu = sd.build_showdown_lineup(df, locks=["NOT_IN_POOL|ZZ"], time_limit=4)
-        self.assertIsNotNone(lu)
-        self.assertEqual(lu["ignored_locks"], ["NOT_IN_POOL|ZZ"])
+        status = {}
+        lu = sd.build_showdown_lineup(df, locks=["NOT_IN_POOL|ZZ"], time_limit=4, status_out=status)
+        self.assertIsNone(lu)
+        self.assertEqual(status["status"], "invalid_hard_lock")
         clean = sd.build_showdown_lineup(df, locks=["AA_Star|AA"], time_limit=4)
         self.assertEqual(clean["ignored_locks"], [])
         # A captain lock is tagged, so the two kinds are distinguishable.
         cpt = sd.build_showdown_lineup(df, cpt_lock="NOT_IN_POOL|ZZ", time_limit=4)
-        self.assertEqual(cpt["ignored_locks"], ["cpt:NOT_IN_POOL|ZZ"])
+        self.assertIsNone(cpt)
         # And it reaches the bank diagnostics, which is what the brief reads.
         diag = {}
-        sd.build_showdown_bank(df, 2, diagnostics=diag, time_limit=4,
-                               locks=["NOT_IN_POOL|ZZ"])
-        self.assertEqual(diag["ignored_locks"], ["NOT_IN_POOL|ZZ"])
+        bank = sd.build_showdown_bank(df, 2, diagnostics=diag, time_limit=4,
+                                     locks=["NOT_IN_POOL|ZZ"])
+        self.assertEqual(bank, [])
 
     def test_the_out_status_vocabulary_is_shared_with_preflight(self):
         """R54(d). The melt shelved IL/O/OUT/NA while preflight also shelved
@@ -723,12 +724,25 @@ class ShowdownThesisLadderTests(unittest.TestCase):
 
     def test_a_thesis_lock_outside_the_pool_reaches_the_ladder_diagnostics(self):
         """R54(c), the ladder half: the ignored lock has to survive the trip from
-        one solve into the diagnostics dict the brief reads."""
+        one solve into the diagnostics dict the brief reads.
+
+        R338 repair (3) restores this assertion. F14's `invalid_hard_lock`
+        refusal is right for an OPERATOR lock and wrong here: a THESIS naming a
+        player absent from the pool is a preference, and refusing it blanks the
+        reserved entry row that R54(c) exists to keep filled. The refusal is
+        pinned on its own door by `ShowdownDiversityTests` and
+        `R291ShowdownExcludedColumnTests`, both of which call
+        `build_showdown_lineup` directly.
+        """
         df = _synth()
         diag = {}
         st.solve_ladder(df, [{"cpt": "GHOST|ZZ", "name": "t0"}], time_limit=4,
                         diagnostics=diag)
         self.assertEqual(diag["ignored_locks"], ["cpt:GHOST|ZZ"])
+        # F13's counters stay honest either way: nothing was infeasible and no
+        # solver failure was latched, because the ladder never had to descend.
+        self.assertEqual(diag["infeasible"], 0)
+        self.assertEqual(diag.get("solver_failures") or [], [])
 
     def test_ladder_scales_below_and_above_the_template_count(self):
         for n in (1, 3, 25):
@@ -2006,6 +2020,8 @@ class R239PerContestCapBindsTests(unittest.TestCase):
             # Refuse every rung that carries ANY captain exclusion, so the only
             # rung that can succeed is one where the captain cap has come off.
             if kw.get("cpt_excludes"):
+                if status_out is not None:
+                    status_out.update(status=2, proven_infeasible=True)
                 return None
             return real(df, status_out=status_out, **kw)
 
@@ -2389,6 +2405,8 @@ class R223CaptainCapCounterTests(unittest.TestCase):
             # descent is visible in `calls`.
             if len(calls) <= 3:
                 return real(df, status_out=status_out, **kw)
+            if status_out is not None:
+                status_out.update(status=2, proven_infeasible=True)
             return None
 
         diag: dict = {}
@@ -2420,6 +2438,8 @@ class R223CaptainCapCounterTests(unittest.TestCase):
 
         def spy(df=None, status_out=None, **kw):
             if kw.get("cpt_excludes"):
+                if status_out is not None:
+                    status_out.update(status=2, proven_infeasible=True)
                 return None      # refuse every rung that still carries the cap
             return real(df, status_out=status_out, **kw)
 
@@ -2460,6 +2480,8 @@ class R223CaptainCapCounterTests(unittest.TestCase):
 
         def spy(df=None, status_out=None, **kw):
             if kw.get("cpt_excludes"):
+                if status_out is not None:
+                    status_out.update(status=2, proven_infeasible=True)
                 return None
             return real(df, status_out=status_out, **kw)
 
@@ -2619,6 +2641,8 @@ class ShowdownSolverStatusTests(unittest.TestCase):
 
         def spy(df=None, status_out=None, **kw):
             calls.append(kw)
+            if status_out is not None:
+                status_out.update(status=2, proven_infeasible=True)
             return None
 
         diag: dict = {}
@@ -3033,14 +3057,13 @@ class R291ShowdownExcludedColumnTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path, _ = self._staged(tmp, {name})
             df = sd.melt_showdown_salary_csv(str(path))
-            locked = sd.build_showdown_lineup(df, locks=[key])
-            self.assertIsNotNone(locked, "vacuous: nothing solved")
-            self.assertNotIn(key, {p["player_key"] for p in locked["players"]})
-            self.assertIn(key, locked["ignored_locks"])
-            capped = sd.build_showdown_lineup(df, cpt_lock=key)
-            self.assertIsNotNone(capped, "vacuous: nothing solved")
-            self.assertNotIn(key, {p["player_key"] for p in capped["players"]})
-            self.assertIn(f"cpt:{key}", capped["ignored_locks"])
+            status = {}
+            locked = sd.build_showdown_lineup(df, locks=[key], status_out=status)
+            self.assertIsNone(locked)
+            self.assertEqual(status["status"], "invalid_hard_lock")
+            capped = sd.build_showdown_lineup(df, cpt_lock=key, status_out=status)
+            self.assertIsNone(capped)
+            self.assertEqual(status["status"], "invalid_hard_lock")
 
     def test_the_brief_names_the_count_and_the_legal_pool(self):
         """Classic's `pool_report.excluded_column`, on the path that has no pool

@@ -18,8 +18,10 @@ import json
 import py_compile
 import re
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1288,18 +1290,7 @@ def run_audit(root: Path, run_tests: bool = False,
 
     test_result = None
     if run_tests:
-        # F19: the suite includes a determinism gate, and a gate that runs under
-        # a randomized hash seed cannot tell a fixed ordering from a lucky one.
-        test_env = dict(os.environ)
-        test_env["PYTHONHASHSEED"] = "0"
-        # R42(a): sys.path mutations in this process (check_dependencies just
-        # made one, if .pylibs is in play) do not reach a subprocess -- only
-        # env vars do. Without this, --run-tests could fail on import errors
-        # right after --terse alone reported a clean dependency PASS.
-        if deps.get("vendored_pylibs"):
-            existing_pp = test_env.get("PYTHONPATH", "")
-            test_env["PYTHONPATH"] = deps["vendored_pylibs"] + (
-                os.pathsep + existing_pp if existing_pp else "")
+        test_env = suite_subprocess_env(root, deps=deps)
         test_result = run_audited_suites(root, test_env)
         errors.extend(test_result.pop("_errors"))
         warnings.extend(test_result.pop("_warnings"))
@@ -1483,6 +1474,70 @@ def classify_suite(name: str, rec: Dict[str, Any]) -> Dict[str, Any]:
     return verdict
 
 
+def suite_subprocess_env(root: Path, deps: Optional[Dict[str, Any]] = None,
+                         artifact_root: Optional[Path] = None) -> Dict[str, str]:
+    """The environment every suite subprocess this file spawns runs under.
+
+    One function, two callers, implemented by neither -- ``run_audit``'s
+    ``--run-tests`` path and ``run_gate_chunk``'s split-gate child. R233's rule
+    is why it is a function: R338 named ``audit.py:1294`` and the class had TWO
+    members, and the one it did not name is the one sessions actually run.
+
+    Three things go in it:
+
+    * ``PYTHONHASHSEED=0`` (F19). The suite includes a determinism gate, and a
+      gate under a randomized hash seed cannot tell a fixed ordering from a
+      lucky one.
+    * ``PYTHONPATH`` for a vendored ``.pylibs`` (R42(a)). ``sys.path`` mutations
+      in this process do not reach a subprocess; only env vars do. Without it
+      ``--run-tests`` could fail on import errors right after ``--terse`` alone
+      reported a clean dependency PASS.
+    * ``MLB_DFS_ARTIFACT_ROOT``, R338 repair (4), closing R274 on the gate path.
+      ``tests/conftest.py`` redirects publication defaults away from Ben's real
+      ``outputs/`` and ``runs/``, and it is a PYTEST fixture: the audit runs
+      ``python -m unittest``, which never loads a ``conftest.py``, so every gate
+      call wrote to the real manifests. Four archived files were changed by one
+      baseline suite run on 2026-09-09
+      (``docs/greenfield/2026-09-09/test_artifact_incident.json``). Setting the
+      variable here reaches ``upload_manifest.REPO_ROOT`` and ``mirror_to_outputs``
+      in the child under either runner, and it is what makes "a ``--gate-run``
+      changes no byte under ``outputs/``" checkable rather than asserted.
+
+    An ``MLB_DFS_ARTIFACT_ROOT`` already in the environment is respected: an
+    operator pinning one is telling both runners where to write.
+    """
+    env = dict(os.environ)
+    env["PYTHONHASHSEED"] = "0"
+    if deps is None:
+        deps = check_dependencies(root)
+    if deps.get("vendored_pylibs"):
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = deps["vendored_pylibs"] + (
+            os.pathsep + existing if existing else "")
+    if artifact_root is None and not env.get("MLB_DFS_ARTIFACT_ROOT"):
+        artifact_root = Path(tempfile.mkdtemp(prefix="mlb_dfs_audit_artifacts_"))
+    if artifact_root is not None:
+        Path(artifact_root).mkdir(parents=True, exist_ok=True)
+        env["MLB_DFS_ARTIFACT_ROOT"] = str(artifact_root)
+    return env
+
+
+def _isolated_artifact_root(env: Dict[str, str]) -> Optional[Path]:
+    """The throwaway root ``suite_subprocess_env`` minted, or None if it did not.
+
+    Named rather than inlined so the cleanup can never delete an operator's own
+    pinned ``MLB_DFS_ARTIFACT_ROOT``: only a path this module created under the
+    system temp directory carries the prefix.
+    """
+    value = env.get("MLB_DFS_ARTIFACT_ROOT")
+    if not value:
+        return None
+    path = Path(value)
+    if path.name.startswith("mlb_dfs_audit_artifacts_"):
+        return path
+    return None
+
+
 def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
     """Every audited suite in its own subprocess, counted against its own pin.
 
@@ -1497,25 +1552,39 @@ def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
     results: Dict[str, Any] = {}
     stdout_tail = ""
     stderr_tail = ""
+    # R338 repair (4). PER SUITE, matching the isolation the subprocess split
+    # already buys: a suite that publishes must not be able to see, reuse or
+    # clobber what the previous suite published either.
+    base = test_env.get("MLB_DFS_ARTIFACT_ROOT")
 
-    for name in AUDITED_SUITES:
-        path = root / "tests" / f"{name.split('.')[-1]}.py"
-        if not path.exists():
-            results[name] = classify_suite(name, {"present": False, "ran": None})
-            continue
-        proc = subprocess.run(
-            [sys.executable, "-m", "unittest", name],
-            cwd=str(root), text=True, capture_output=True, env=test_env,
-        )
-        combined = proc.stdout + "\n" + proc.stderr
-        rec = parse_unittest_report(combined)
-        rec["present"] = True
-        rec["returncode"] = proc.returncode
-        rec["passed"] = proc.returncode == 0
-        results[name] = classify_suite(name, rec)
-        if proc.returncode != 0:
-            stdout_tail = proc.stdout[-2000:]
-            stderr_tail = proc.stderr[-4000:]
+    try:
+        for name in AUDITED_SUITES:
+            path = root / "tests" / f"{name.split('.')[-1]}.py"
+            if not path.exists():
+                results[name] = classify_suite(name, {"present": False, "ran": None})
+                continue
+            suite_env = dict(test_env)
+            if base:
+                per_suite = Path(base) / name.split(".")[-1]
+                per_suite.mkdir(parents=True, exist_ok=True)
+                suite_env["MLB_DFS_ARTIFACT_ROOT"] = str(per_suite)
+            proc = subprocess.run(
+                [sys.executable, "-m", "unittest", name],
+                cwd=str(root), text=True, capture_output=True, env=suite_env,
+            )
+            combined = proc.stdout + "\n" + proc.stderr
+            rec = parse_unittest_report(combined)
+            rec["present"] = True
+            rec["returncode"] = proc.returncode
+            rec["passed"] = proc.returncode == 0
+            results[name] = classify_suite(name, rec)
+            if proc.returncode != 0:
+                stdout_tail = proc.stdout[-2000:]
+                stderr_tail = proc.stderr[-4000:]
+    finally:
+        throwaway = _isolated_artifact_root(test_env)
+        if throwaway is not None:
+            shutil.rmtree(throwaway, ignore_errors=True)
 
     return summarize_suite_results(results, stdout_tail=stdout_tail,
                                    stderr_tail=stderr_tail)
@@ -1685,7 +1754,7 @@ def tree_fingerprint(root: Path) -> str:
     deleted module moves it even when no surviving file changed.
     """
     parts: List[str] = []
-    for folder in ("mlb_engine", "tools", "tests"):
+    for folder in ("mlb_engine", "tools", "tests", "skills/generate-lineups/scripts"):
         base = root / folder
         if not base.exists():
             continue
@@ -1698,6 +1767,14 @@ def tree_fingerprint(root: Path) -> str:
             except OSError:
                 digest = "unreadable"
             parts.append(f"{path.relative_to(root).as_posix()}:{digest}")
+    configuration = [root / "requirements.lock", root / "requirements-production.lock",
+                     root / "pyproject.toml"]
+    for folder in (root / "config", root / "configs", root / "schemas"):
+        if folder.exists():
+            configuration.extend(p for p in folder.rglob("*") if p.is_file())
+    for path in sorted(configuration):
+        if path.is_file():
+            parts.append(f"{path.relative_to(root).as_posix()}:{hashlib.sha256(path.read_bytes()).hexdigest()}")
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
@@ -2032,13 +2109,10 @@ def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S,
                 "ran_suite": suite, "state": state,
                 "note": f"{suite} is not on disk"}
 
-    env = dict(os.environ)
-    env["PYTHONHASHSEED"] = "0"
-    deps = check_dependencies(root)
-    if deps.get("vendored_pylibs"):
-        existing = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = deps["vendored_pylibs"] + (
-            os.pathsep + existing if existing else "")
+    # R338 repair (4). The same environment `--run-tests` builds, from the same
+    # function -- this is the path that actually runs the gate, so this is the
+    # call that closes R274 on it.
+    env = suite_subprocess_env(root)
     deadline = time.time() + budget
     # Two clocks, and they are different promises. `budget` is when the child
     # stops STARTING units; the ceiling is when the parent gives up on the one
@@ -2060,6 +2134,10 @@ def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S,
             timeout=ceiling)
     except subprocess.TimeoutExpired:
         timed_out = True
+    finally:
+        throwaway = _isolated_artifact_root(env)
+        if throwaway is not None:
+            shutil.rmtree(throwaway, ignore_errors=True)
     state = assemble_gate(root, fingerprint)
     # A child that died for its OWN reason (an import error, a crash) leaves no
     # unit record and no breadcrumb, and would otherwise read as "no progress".

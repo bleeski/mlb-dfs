@@ -4598,12 +4598,9 @@ class R291ExcludedColumnReachesTheOptimizerTests(unittest.TestCase):
             self.assertNotEqual(bank_cache.projection_digest(restricted),
                                 bank_cache.projection_digest(unrestricted))
 
-    def test_a_salary_file_with_no_excluded_column_hashes_as_it_always_did(self):
-        """No live bank bucket is orphaned by this change. A file with no
-        Excluded column produces an all-False column -- exactly what
-        `build_projections` stamped before -- and `Excluded_Source`, the one new
-        column, is not in `_PROJECTION_COLUMNS`, so the hashed bytes are
-        unchanged. Measured: `9b9577bc53c73866` before and after."""
+    def test_salary_provenance_changes_invalidate_the_version_two_cache(self):
+        """The full-row version-two digest intentionally invalidates old buckets.
+        Exclusion provenance is part of the frozen input, even if rows remain eligible."""
         with tempfile.TemporaryDirectory() as tmp:
             plain = Path(tmp) / "plain.csv"
             pool_salary_csv(plain)
@@ -4616,7 +4613,7 @@ class R291ExcludedColumnReachesTheOptimizerTests(unittest.TestCase):
             self.assertEqual(set(frame["Excluded_Source"]), {"absent_or_blank"})
             self.assertNotIn("Excluded_Source", bank_cache._PROJECTION_COLUMNS)
             pre_fix_shape = frame.drop(columns=["Excluded_Source"])
-            self.assertEqual(bank_cache.projection_digest(frame),
+            self.assertNotEqual(bank_cache.projection_digest(frame),
                              bank_cache.projection_digest(pre_fix_shape))
 
     def test_the_late_swap_refresh_does_not_revoke_an_operator_exclusion(self):
@@ -11193,8 +11190,22 @@ class PromotePointerCasTests(unittest.TestCase):
     @staticmethod
     def _certified_run(root):
         from mlb_engine.pipeline.build_state_manager import (
-            create_run, update_run_certification)
+            create_run, update_run_certification, snapshot_run_inputs, register_artifact, sha256_file)
         run = create_run(root, "initial_build")
+        # This isolates pointer ordering. Empty runs no longer qualify as releases.
+        directory = Path(run["run_dir"])
+        source = Path(root) / "pointer_test_input.txt"
+        source.write_text("stable pointer test input", encoding="utf-8")
+        snapshot_run_inputs(directory, [source])
+        exported = directory / "final" / "DKEntries.csv"
+        exported.write_text("pointer test export", encoding="utf-8")
+        assignments = directory / "final" / "assignments.json"
+        assignments.write_text("{}", encoding="utf-8")
+        diagnostics = directory / "final" / "diagnostics.json"
+        diagnostics.write_text(json.dumps({"diagnostic_source_file": "final/DKEntries.csv",
+                                           "diagnostic_source_sha256": sha256_file(exported)}), encoding="utf-8")
+        for path, role in ((exported, "dk_export"), (assignments, "assignments"), (diagnostics, "diagnostics")):
+            register_artifact(directory, path, role)
         update_run_certification(run["run_dir"], {
             "workflow_valid": True, "selection_certified": True,
             "allocation_certified": True})
@@ -11322,7 +11333,7 @@ class DeferredPromotionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             deferred = self._build(root, defer=True)
-            other = create_run(root / "runs", "initial_build")
+            other = PromotePointerCasTests._certified_run(root / "runs")
             update_run_certification(other["run_dir"], {
                 "workflow_valid": True, "selection_certified": True,
                 "allocation_certified": True})
@@ -11776,7 +11787,7 @@ class InputsUnmovedTests(unittest.TestCase):
             create_run, snapshot_run_inputs, update_run_certification)
         source = Path(root) / "DKSalaries.csv"
         source.write_text("v1", encoding="utf-8")
-        run = create_run(Path(root) / "runs", "initial_build")
+        run = PromotePointerCasTests._certified_run(Path(root) / "runs")
         snapshot_run_inputs(run["run_dir"], [source])
         update_run_certification(run["run_dir"], {
             "workflow_valid": True, "selection_certified": True,
@@ -12347,7 +12358,9 @@ class VendoredPylibsTests(unittest.TestCase):
         if not (root / ".pylibs" / "scipy").is_dir():
             self.skipTest("no vendored .pylibs/scipy in this checkout")
         deps = audit.check_dependencies(root)
-        self.assertEqual(deps["vendored_pylibs"], str(root / ".pylibs"))
+        expected = (None if Path(sys.prefix).resolve() == (root / ".venv").resolve()
+                    else str(root / ".pylibs"))
+        self.assertEqual(deps["vendored_pylibs"], expected)
         self.assertTrue(deps["passed"],
                         "a populated .pylibs must be enough to pass with "
                         "zero installs")
@@ -19655,7 +19668,7 @@ class SupervisorHardeningTests(unittest.TestCase):
         code, records, cmds, _logs = self._run(side)
         self.assertEqual(code, 0)
         self.assertEqual([r["action"] for r in records],
-                         ["apply_structural_floor", "certified"])
+                         ["apply_structural_floor", "delivered"])
         self.assertIn("--controls-override", cmds[1])
         applied = json.loads(cmds[1][cmds[1].index("--controls-override") + 1])
         self.assertEqual(applied, {"max_shared_players": 7})
@@ -19693,7 +19706,8 @@ class SupervisorHardeningTests(unittest.TestCase):
     def _refuse_then_certify(self, brief):
         def side(n, cmd, kwargs):
             return self._proc(3, brief) if n == 1 else self._proc(0, {
-                "status": "certified", "date": "2026-07-29"})
+                "status": "certified", "date": "2026-07-29",
+                "delivered_path": "fixture.csv", "delivered_sha256": "a" * 64})
         return side
 
     @staticmethod
@@ -21466,7 +21480,7 @@ class SupervisorLostWindowTests(unittest.TestCase):
 
         def certify(n, cmd, kwargs):
             return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
-                                        "delivered_sha256": "a" * 64})
+                                        "delivered_sha256": "a" * 64, "delivered_path": "fixture.csv"})
         code, records, cmds, _logs = self._run(
             certify, extra_argv=["--max-attempts", "8", "--resume"], root=root)
         self.assertEqual(code, 0)
@@ -21497,9 +21511,9 @@ class SupervisorLostWindowTests(unittest.TestCase):
 
         def certify(n, cmd, kwargs):
             return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
-                                        "delivered_sha256": "b" * 64})
+                                        "delivered_sha256": "b" * 64, "delivered_path": "fixture.csv"})
         _code, records, cmds, _logs = self._run(certify, root=root)
-        self.assertEqual([r["action"] for r in records], ["certified"])
+        self.assertEqual([r["action"] for r in records], ["delivered"])
         self.assertNotIn("max_shared_players", " ".join(cmds[0]))
 
 

@@ -1,5 +1,16 @@
 # CLAUDE.md - MLB DFS Engine (personal project)
 
+## Status note, 2026-09-10: an uncommitted strangler candidate is on this disk
+On 2026-09-09 an outside implementation applied a sixty-file working-tree patch
+here and did not commit it: `mlb_engine/production/` + `tools/dfs.py` (R302's
+strangler, stage 0, offline-verified, verifier `python tools/verify_engine.py`)
+and a 24-file compatibility patch to the live engine. NEITHER is the build path
+and nothing below is superseded: the Authority section governs, builds enter at
+`execution_pipeline.run_slate` through `skills/generate-lineups/SKILL.md`, and the
+patched engine is gate-green. Disposition is R338 (docs/backlog.md, Session 4b,
+NEXT); the adjudication is the 2026-09-10 note in that file. Do not commit engine
+files from a BUILD session.
+
 ## Context wall
 This is Ben's personal DFS project. Never mix in Blue Cypress, Elastik Teams,
 or Izzy context, files, or connectors. If a request seems work-related, stop
@@ -450,7 +461,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  28 modules  1935 tests`. The module count comes off the
+   `PASS  v2.26.0  40 modules  1935 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
