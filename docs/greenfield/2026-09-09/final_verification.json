@@ -1,0 +1,45 @@
+{
+  "passed": true,
+  "stages": [
+    {
+      "name": "full_pytest",
+      "exit_code": 0,
+      "seconds": 328.13150329999917
+    },
+    {
+      "name": "undefined_names",
+      "exit_code": 0,
+      "seconds": 0.11029750000307104
+    },
+    {
+      "name": "production_lint",
+      "exit_code": 0,
+      "seconds": 0.0756346999987727
+    },
+    {
+      "name": "production_format",
+      "exit_code": 0,
+      "seconds": 0.07811650000076042
+    },
+    {
+      "name": "git_diff_check",
+      "exit_code": 2,
+      "seconds": 0.1509267000001273
+    },
+    {
+      "name": "git_diff_check_crlf",
+      "exit_code": 0,
+      "seconds": 0.14513769999757642
+    }
+  ],
+  "compiled_files": 109,
+  "compile_errors": [],
+  "source_before_sha256": "2cdd51f6ed9a81c9bebca54b8a7ae70108200aa8cc428b0dbf7ee29974530c72",
+  "source_after_sha256": "2cdd51f6ed9a81c9bebca54b8a7ae70108200aa8cc428b0dbf7ee29974530c72",
+  "source_unchanged_during_verification": true,
+  "preexisting_crlf_files_preserved": [
+    "data/reference/expected_stats_batting.csv",
+    "data/reference/expected_stats_pitching.csv"
+  ],
+  "output": "C:\\Users\\benja\\Documents\\Claude\\mlb-dfs\\.tmp\\full-verification-20260909-isolated"
+}

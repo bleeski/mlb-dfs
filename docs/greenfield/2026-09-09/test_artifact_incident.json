@@ -1,0 +1,14 @@
+{
+  "restored_exactly": [
+    "outputs/2026-06-03/upload_manifest.json",
+    "outputs/2026-06-11/DKEntries_1300_2g.csv",
+    "outputs/2026-06-11/upload_manifest.json"
+  ],
+  "remaining": "outputs/2026-07-18/upload_manifest.json",
+  "required_sha256": "8aaa4d5c4668d49c6af60f3f8f2ccd5d1520e9c7766ea54e370b65208f0de4bf",
+  "required_bytes": 21918,
+  "current_sha256": "b34e05d03828f54e5f3fb5608acaa21f9d0af71c5582ad5b2dbcdaa3856d0ef4",
+  "cause": "Legacy tests passed temporary run roots while mirror/publication defaults still targeted the repository. Duplicate delivery updates can replace prior path/time metadata.",
+  "remediation": "MLB_DFS_ARTIFACT_ROOT plus session isolation and before/after operator hash guard; latest full suite changed zero operator artifacts.",
+  "backup_search": "No matching original bytes found in workspace or available temporary files. Do not infer lost metadata."
+}

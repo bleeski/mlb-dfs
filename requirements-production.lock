@@ -1,0 +1,21 @@
+# Portable, deterministic production/test environment verified on Windows CPython 3.13.7.
+# Python 3.11-3.13 supported by wheels; other platforms require their own acceptance run.
+annotated-types==0.8.0
+colorama==0.4.6
+iniconfig==2.3.0
+numpy==2.2.6
+packaging==26.3
+pandas==2.3.3
+pluggy==1.6.0
+pydantic==2.12.5
+pydantic-core==2.41.5
+pygments==2.21.0
+pytest==8.4.2
+python-dateutil==2.9.0.post0
+pytz==2026.3.post1
+ruff==0.14.10
+scipy==1.15.3
+six==1.17.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+tzdata==2026.3

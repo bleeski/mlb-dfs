@@ -1,0 +1,23 @@
+{
+  "implementation_status": "OFFLINE_VERIFIED",
+  "final_acceptance": "INCOMPLETE_ARCHIVE_PRESERVATION",
+  "tests_passed": 2065,
+  "test_seconds": 327.33,
+  "compile_files": 109,
+  "raw_inputs_preserved": true,
+  "original_artifacts_matching": 6969,
+  "original_artifacts_checked": 6970,
+  "safe_export_preserved": true,
+  "isolated_suite_operator_artifacts_unchanged": 7001,
+  "platform_actions": 0,
+  "llm_calls_in_pipeline": 0,
+  "paid_dependencies_added": false,
+  "live_connectivity_verified": false,
+  "economic_certification": false,
+  "model_status": "PRIOR_ONLY",
+  "archive_recovery_blocker": "R337",
+  "verified_operator_command": "python tools/dfs.py demo",
+  "patch_reverse_check": "PASS",
+  "git_diff_check": "pre-existing CRLF data warnings only",
+  "git_diff_check_crlf": "PASS"
+}

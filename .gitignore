@@ -123,3 +123,41 @@ _stage_repo*.tar.gz
 # Live session state, never history -- the verdict is the audit's output, and a
 # unit record is only evidence about the tree fingerprint stamped on it.
 .audit_gate/
+
+# Portable verified engine environment and local lint cache.
+.venv/
+.ruff_cache/
+
+# R338 step 7. The thirteenth edition left twenty run artifacts under
+# docs/greenfield/2026-09-09/ and they are EVIDENCE, not source. Two are large
+# enough to change what this repo is (baseline_inventory.json 1.2MB and
+# raw_artifact_hashes.json 1.3MB, each a machine-generated snapshot of a tree
+# git already stores) and the two JUnit XMLs are one run's console output.
+#
+# SEVEN land, by explicit path, because they are what a reader needs to check
+# the edition's claims rather than take them: changed_files.json (what it
+# touched), final_acceptance.json and final_verification.json (what it
+# measured), implementation.patch (the diff itself, which is how the R55 test
+# was restored verbatim), the two fixture CSVs, and test_artifact_incident.json
+# -- the last added to the entry's list on purpose, because R274's rider CITES
+# it as the evidence for the class repair (4) closes, and a citation to an
+# untracked file is a dead citation.
+#
+# The other fifteen are named ONE BY ONE rather than hidden behind a directory
+# glob. A glob would silently swallow the next edition's evidence too; a named
+# list means a new file there reads as untracked dirt and gets a decision.
+docs/greenfield/*/baseline_benchmarks.json
+docs/greenfield/*/baseline_inventory.json
+docs/greenfield/*/baseline_probes.json
+docs/greenfield/*/baseline-static.json
+docs/greenfield/*/baseline-tests.xml
+docs/greenfield/*/final_pytest.log
+docs/greenfield/*/final_pytest.xml
+docs/greenfield/*/implemented_benchmarks.json
+docs/greenfield/*/isolated_test_preservation.json
+docs/greenfield/*/legacy_static_audit.json
+docs/greenfield/*/offline_demo_result.json
+docs/greenfield/*/raw_artifact_hashes.json
+docs/greenfield/*/raw_preservation_verification.json
+docs/greenfield/*/safe_recovery_verification.json
+docs/greenfield/*/schema_inventory.json
