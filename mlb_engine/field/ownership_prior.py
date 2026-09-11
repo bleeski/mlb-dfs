@@ -488,6 +488,32 @@ def _softmax_shares(scores: Dict[str, float], temperature: float) -> Dict[str, f
     return {k: v / total for k, v in exps.items()}
 
 
+def _bounded_marginals(shares: Mapping[str, float], budget: float) -> Dict[str, float]:
+    """Water-fill inclusion marginals onto the capped simplex, in percentage units.
+
+    Tiny/incomplete pools cannot spend the full roster budget. Return their
+    attainable bounded total; never describe an impossible 300% as ownership.
+    """
+    if not shares:
+        return {}
+    if any(not math.isfinite(float(v)) or v < 0 for v in shares.values()):
+        raise ValueError("ownership weights must be finite and nonnegative")
+    remaining = min(float(budget), 100.0 * len(shares))
+    pending, result = dict(shares), {}
+    while pending:
+        total = sum(pending.values())
+        weights = {k: remaining * (v / total if total else 1 / len(pending)) for k, v in pending.items()}
+        capped = [k for k, v in weights.items() if v >= 100.0]
+        if not capped:
+            result.update(weights)
+            break
+        for key in capped:
+            result[key] = 100.0
+            remaining -= 100.0
+            pending.pop(key)
+    return {k: round(v, 2) for k, v in result.items()}
+
+
 def predict_ownership(
     salary_players: Iterable[Any],
     archetype: str = DEFAULT_ARCHETYPE,
@@ -573,8 +599,8 @@ def predict_ownership(
     pitcher_shares = _softmax_shares(_pool_scores(pitchers, True), params["temperature"])
 
     own: Dict[str, float] = {}
-    own.update({pid: round(share * HITTER_BUDGET_PCT, 2) for pid, share in hitter_shares.items()})
-    own.update({pid: round(share * PITCHER_BUDGET_PCT, 2) for pid, share in pitcher_shares.items()})
+    own.update(_bounded_marginals(hitter_shares, HITTER_BUDGET_PCT))
+    own.update(_bounded_marginals(pitcher_shares, PITCHER_BUDGET_PCT))
 
     def _tiers(shares: Mapping[str, float]) -> Dict[str, str]:
         if not shares:
@@ -707,8 +733,7 @@ def _showdown_prediction(
         implied=implied, orders=orders,
         sp_set=probable_sp_ids or [], bases=bases,
     )
-    own = {pid: round(share * float(budget_pct), 2)
-           for pid, share in shares.items()}
+    own = _bounded_marginals(shares, float(budget_pct))
 
     ordered = sorted(shares.items(), key=lambda kv: (-kv[1], kv[0]))
     tiers: Dict[str, str] = {}
@@ -870,6 +895,9 @@ def attach_predicted_ownership(
         report["reason"] = "column_present_and_overwrite_false"
         return frame, report
     supplied = {str(k).strip(): v for k, v in dict(own_pct_by_player_id or {}).items()}
+    for value in supplied.values():
+        if isinstance(value, bool) or not math.isfinite(float(value)) or not 0 <= float(value) <= 100:
+            raise ValueError("predicted ownership must be finite percentages in [0,100]")
     if not supplied:
         report["reason"] = "no_predicted_ownership_supplied"
         return frame, report

@@ -160,7 +160,7 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -1096,6 +1096,13 @@ def resolve_gate_assertions(
                         and gate_defaults.get(n) is False)
     refused = sorted(requested - set(assumed) - set(overridden))
     gates = {**gate_defaults, **dict(supplied or {})}
+    supplied_refusals = []
+    for name, value in (supplied or {}).items():
+        if gate_defaults.get(name) is False and value is not False:
+            gates[name] = False
+            supplied_refusals.append({"gate": name, "derived": False,
+                                      "reason": "supplied value cannot bypass an observed failure",
+                                      "evidence": gate_evidence.get(name, "")})
     for name in assumed + overridden:
         if gates.get(name) is None or name in overridden:
             gates[name] = True
@@ -1115,7 +1122,7 @@ def resolve_gate_assertions(
          "evidence": gate_evidence.get(name, "")}
         for name in refused
     ]
-    return gates, assumed, overridden_records, refused_records
+    return gates, assumed, overridden_records, refused_records + supplied_refusals
 
 
 def _applied(block: Any) -> Optional[bool]:
@@ -5011,7 +5018,8 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         if slate_date is None:
             return None
         source = Path(output_path)
-        dest_dir = Path(__file__).resolve().parents[2] / "outputs" / slate_date
+        from mlb_engine.entries.upload_manifest import REPO_ROOT as artifact_root
+        dest_dir = artifact_root / "outputs" / slate_date
         dest_dir.mkdir(parents=True, exist_ok=True)
         # The delivered name carries the slate tag. DK runs several draftgroups on
         # most dates and this mirror wrote one name per contest type, so the

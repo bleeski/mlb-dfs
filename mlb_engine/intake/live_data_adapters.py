@@ -166,7 +166,9 @@ def _load_salary_players(salary_players: Any) -> Dict[str, Any]:
 def _parse_utc(value: str) -> datetime:
     text = str(value or "").strip().replace("Z", "+00:00")
     parsed = datetime.fromisoformat(text)
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        raise ValueError("provider timestamp lacks a timezone")
+    return parsed.astimezone(timezone.utc)
 
 
 def _salary_game_times(players: Mapping[str, Any]) -> Dict[str, datetime]:

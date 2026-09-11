@@ -58,7 +58,7 @@ def _valid_status(status: object) -> str:
     return text
 
 MANIFEST_NAME = "upload_manifest.json"
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(os.environ.get("MLB_DFS_ARTIFACT_ROOT", Path(__file__).resolve().parents[2])).resolve()
 
 
 class CorruptManifestError(RuntimeError):

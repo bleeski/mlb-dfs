@@ -954,10 +954,14 @@ def mine_contest(
             if smap.get(normalize_name(n), {}).get("salary", 10 ** 9) <= cheap_threshold
         ) if has_salary else None
 
-    # Duplication (exact-lineup, slot-agnostic sorted player set).
+    # Captain is scoring-bearing; interchangeable UTIL order is not.
+    def duplication_key(entry):
+        captain = tuple(normalize_name(name) for slot, name in entry["lineup"] if slot == "CPT")
+        return ("CPT", *captain, "PLAYERS", *entry["players_norm"]) if captain else entry["players_norm"]
+
     dup_groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
     for e in complete:
-        dup_groups[e["players_norm"]].append(e["entry_id"])
+        dup_groups[duplication_key(e)].append(e["entry_id"])
     copies_hist = Counter(len(v) for v in dup_groups.values())
     n_dup_entries = sum(len(v) for v in dup_groups.values() if len(v) > 1)
     max_copies = max((len(v) for v in dup_groups.values()), default=0)
@@ -966,7 +970,7 @@ def mine_contest(
         key=lambda e: (-(e["points"] or 0.0)),
         default=None,
     )
-    winner_copies = len(dup_groups.get(winner["players_norm"], [])) if winner else 0
+    winner_copies = len(dup_groups.get(duplication_key(winner), [])) if winner else 0
 
     # Field-frequency tables.
     sp_pair_freq = Counter(e["sp_pair"] for e in complete if len(e["sp_pair"]) == 2)

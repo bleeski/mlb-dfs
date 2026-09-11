@@ -97,11 +97,14 @@ def _get_json(url: str, secret: Optional[str] = None) -> Any:
     request = urllib.request.Request(url, headers={"User-Agent": "mlb-classic-slate-bundle/1.0"})
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            return json.loads(response.read().decode("utf-8"))
+            raw = response.read(32 * 1024 * 1024 + 1)
+            if len(raw) > 32 * 1024 * 1024:
+                raise ValueError("provider response exceeds 32 MiB")
+            return json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = ""
         try:
-            body = exc.read().decode("utf-8", "replace")[:300]
+            body = exc.read(300).decode("utf-8", "replace")
         except Exception:
             pass
         raise RuntimeError(_scrub(f"HTTP {exc.code} for {url}: {body}", secret)) from None
@@ -369,6 +372,12 @@ def fetch_weather(feed: Optional[Dict[str, Any]], venues: Dict[str, Dict[str, An
             continue
         hourly = payload.get("hourly") or {}
         times = hourly.get("time") or []
+        required_columns = ("temperature_2m", "wind_speed_10m", "wind_direction_10m",
+                            "wind_gusts_10m", "precipitation_probability")
+        if not times or any(not isinstance(hourly.get(key), list) or len(hourly[key]) != len(times)
+                            for key in required_columns):
+            warnings.append(f"weather: incomplete hourly arrays for {venue_name}; skipped")
+            continue
         window = []
         for index, stamp in enumerate(times):
             try:

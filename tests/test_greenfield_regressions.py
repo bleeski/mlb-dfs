@@ -372,3 +372,45 @@ def test_unclassified_showdown_failure_cannot_relax(monkeypatch):
     )
     assert result == [None] and len(calls) == 1
     assert len(diagnostics["solver_failures"]) == 1 and diagnostics["infeasible"] == 0
+
+
+def test_no_legacy_module_imports_the_production_package_or_pydantic():
+    """R338 step 5's grep pin, as a test rather than a line in a changelog.
+
+    R302 stage 0 lands `mlb_engine/production/` as a STRANGLER: it may read the
+    legacy engine's inputs, and nothing in the legacy engine may depend on it.
+    The whole argument for committing an unproven 5,698-line package beside a
+    live build path is that the live path cannot reach it, so the moment one
+    legacy module imports it the package stops being isolated and becomes an
+    undeclared dependency of tonight's build. `pydantic` rides along for the
+    same reason: the backlog accepts it SCOPED to this package, and a scope
+    nothing enforces is a preference.
+
+    A grep in a changelog entry records what was true on the day it was
+    written. This runs on every gate.
+    """
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    # The four tools the edition added are the package's own front door and are
+    # exempt by construction; every other tool is legacy.
+    package_tools = {"dfs.py", "verify_engine.py", "bootstrap_engine.py",
+                     "benchmark_engine.py"}
+    pattern = re.compile(r"^\s*(?:from|import)\s+.*\b(mlb_engine\.production|pydantic)\b",
+                         re.MULTILINE)
+
+    scanned = []
+    offenders = []
+    for path in sorted(root.glob("mlb_engine/**/*.py")) + sorted(root.glob("tools/*.py")):
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith("mlb_engine/production/") or path.name in package_tools:
+            continue
+        scanned.append(rel)
+        text = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
+            line = text[:match.start()].count("\n") + 1
+            offenders.append(f"{rel}:{line} {match.group(0).strip()}")
+
+    assert scanned, "the scan found no legacy modules, so it proved nothing"
+    assert offenders == [], "\n".join(offenders)

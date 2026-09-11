@@ -15,9 +15,11 @@ import hashlib
 import json
 import os
 import shutil
+import sqlite3
 import uuid
+from contextlib import closing
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, Iterable, Optional, Sequence
 
 VERSION = "v1.4"
@@ -239,10 +241,24 @@ def verify_run_bundle(run_dir: str | Path) -> Dict[str, Any]:
     manifest = _load_manifest(run_path)
     errors: list[str] = []
     checked = 0
+    if not manifest.get("inputs") and not manifest.get("artifacts"):
+        errors.append("empty run has no verifiable evidence")
+    def confined(relative):
+        rel = Path(relative)
+        if rel.is_absolute() or ".." in rel.parts or PureWindowsPath(str(relative)).drive:
+            raise ValueError("manifest path escapes run directory")
+        path = (run_path / rel).resolve()
+        if not path.is_relative_to(run_path.resolve()):
+            raise ValueError("manifest path escapes run directory")
+        return path
     for section in ("inputs", "artifacts"):
         for name, record in manifest.get(section, {}).items():
             rel = record.get("relative_path") or name
-            path = run_path / rel
+            try:
+                path = confined(rel)
+            except ValueError as exc:
+                errors.append(str(exc))
+                continue
             checked += 1
             if not path.exists():
                 errors.append(f"missing {section[:-1]}: {rel}")
@@ -254,8 +270,8 @@ def verify_run_bundle(run_dir: str | Path) -> Dict[str, Any]:
         if r.get("role") == "diagnostics"
     ]
     for record in diagnostic_records:
-        path = run_path / record["relative_path"]
         try:
+            path = confined(record["relative_path"])
             diagnostic = json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:  # noqa: BLE001
             errors.append(f"invalid diagnostics JSON: {record['relative_path']}: {exc}")
@@ -272,7 +288,11 @@ def verify_run_bundle(run_dir: str | Path) -> Dict[str, Any]:
                 continue
             errors.append("diagnostics missing export hash binding")
             continue
-        source_path = run_path / source_rel
+        try:
+            source_path = confined(source_rel)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
         if not source_path.exists():
             errors.append(f"diagnostic source missing: {source_rel}")
         elif sha256_file(source_path) != source_hash:
@@ -350,6 +370,19 @@ def promote_run(
     *,
     expected_pointer_sha256: Any = _POINTER_UNCHECKED,
 ) -> Dict[str, Any]:
+    """Serialize the compatibility pointer's compare-and-update transaction."""
+    pointer = Path(latest_pointer_path) if latest_pointer_path else Path(run_dir).parent / LATEST_POINTER
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(pointer.parent / ".publication-lock.sqlite3", timeout=5)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        return _promote_run_serialized(run_dir, latest_pointer_path,
+                                       expected_pointer_sha256=expected_pointer_sha256)
+
+
+def _promote_run_serialized(
+    run_dir: str | Path, latest_pointer_path: Optional[str | Path] = None,
+    *, expected_pointer_sha256: Any = _POINTER_UNCHECKED,
+) -> Dict[str, Any]:
     """Promote a validated run and atomically update the latest-run pointer.
 
     ``expected_pointer_sha256`` is the compare half of a compare-and-swap
@@ -384,13 +417,17 @@ def promote_run(
             }
     cert = manifest.get("certification", {})
     errors: list[str] = []
-    if not cert.get("workflow_valid"):
+    if cert.get("workflow_valid") is not True:
         errors.append("workflow_valid is false")
-    if not cert.get("selection_certified"):
+    if cert.get("selection_certified") is not True:
         errors.append("selection_certified is false")
     allocation = cert.get("allocation_certified")
-    if allocation is False:
+    if allocation is not True:
         errors.append("allocation_certified is false")
+    required_roles = {"dk_export", "diagnostics", "assignments"}
+    if not manifest.get("inputs") or not required_roles <= {
+            record.get("role") for record in manifest.get("artifacts", {}).values()}:
+        errors.append("release requires frozen inputs, final dk_export, diagnostics and assignments")
     verification = verify_run_bundle(run_path)
     errors.extend(verification["errors"])
     # R20(b): the snapshots verified above live inside the run where nothing

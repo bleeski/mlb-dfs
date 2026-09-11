@@ -139,11 +139,8 @@ def _eastern() -> Any:
     try:
         from zoneinfo import ZoneInfo
         return ZoneInfo(_ET)
-    except Exception:  # noqa: BLE001 - a tzdb-less host is not a build failure
-        # Fixed -04:00 is EDT, which is every date the MLB regular season
-        # occupies. Labelled rather than silent: `parse_deliver_by` reports
-        # `tz_source` so a brief says which reading it got.
-        return _dt.timezone(_dt.timedelta(hours=-4), "EDT")
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("Eastern timezone database unavailable; install the pinned tzdata runtime") from exc
 
 
 def parse_deliver_by(text: str, *, now: Optional[_dt.datetime] = None

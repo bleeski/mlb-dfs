@@ -1,15 +1,24 @@
 # CLAUDE.md - MLB DFS Engine (personal project)
 
-## Status note, 2026-09-10: an uncommitted strangler candidate is on this disk
-On 2026-09-09 an outside implementation applied a sixty-file working-tree patch
-here and did not commit it: `mlb_engine/production/` + `tools/dfs.py` (R302's
-strangler, stage 0, offline-verified, verifier `python tools/verify_engine.py`)
-and a 24-file compatibility patch to the live engine. NEITHER is the build path
-and nothing below is superseded: the Authority section governs, builds enter at
-`execution_pipeline.run_slate` through `skills/generate-lineups/SKILL.md`, and the
-patched engine is gate-green. Disposition is R338 (docs/backlog.md, Session 4b,
-NEXT); the adjudication is the 2026-09-10 note in that file. Do not commit engine
-files from a BUILD session.
+## Status note, 2026-09-11: the thirteenth edition's landing is WRITTEN, not COMMITTED
+R338 is done to disk and short of git. The 24-file compatibility patch, its four
+repairs, all four step-5 riders, R302 stage 0 (`mlb_engine/production/` +
+`tools/dfs.py` and its three siblings), CHANGELOG.md's two 2026-09-11 entries and
+docs/backlog.md's migrations are all on this disk and in NO commit: the device
+shell has been unable to mount this folder since 2026-09-09 (a Windows update
+released 2026-09-08), so a session can do the engineering and none of the git.
+Three things are left and all three need Ben's machine: two `git add`-by-path
+commits, the gate, and `solver_probe` (the schema-2 projection digest orphaned
+every bank bucket on disk). The commands are in the R338 rider in docs/backlog.md.
+
+Nothing below is superseded and NEITHER package is the build path: the Authority
+section governs, builds enter at `execution_pipeline.run_slate` through
+`skills/generate-lineups/SKILL.md`, and `mlb_engine/production/` is stage 0 —
+verified offline, not canonical, no projection, ownership, field or archive
+source. Do not commit engine files from a BUILD session. **Until those two
+commits exist, `git status` on this mount shows the whole landing as dirt: it is
+DEV's, it is described here and in the R338 rider, and it is not foreign dirt to
+work around.** Do not revert, restore or clean it.
 
 ## Context wall
 This is Ben's personal DFS project. Never mix in Blue Cypress, Elastik Teams,
@@ -461,7 +470,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  40 modules  1935 tests`. The module count comes off the
+   `PASS  v2.26.0  40 modules  2066 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -473,7 +482,15 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    lowering the pin to meet them is how the golden replay's nine tests would
    leave the gate for good. All four are WARNINGS: proceed, fix after the
    slate. A failing suite blocks. The audit gates test_core, test_showdown,
-   test_upload_integrity, test_golden_replay, and test_paste_lineups.
+   test_upload_integrity, test_golden_replay, test_paste_lineups, and — since
+   R338 closed R180(e) on 2026-09-11 — test_greenfield_regressions and
+   test_production, which are PYTEST suites. `python -m unittest` collects
+   nothing from those two and reports `Ran 0 tests ... OK`, an empty pass, so
+   `PYTEST_SUITES` names them and the gate runs each whole in one pytest
+   subprocess rather than chunking it by class; both together take ~7s. pytest
+   is in `requirements-production.lock`. If it is missing for the interpreter
+   running the audit the suite reports a runner error and FAILS; it never reads
+   as clean.
    **That one command does not fit one Cowork bash call, so the gate has a
    supported split (R152).** Measured 2026-08-18 on the device mount:
    `tests.test_core` alone needs ~89s and one of its tests needs 35.8s by itself.
@@ -487,9 +504,23 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    28/39 defaults force either way. Budget for five, not one — a session that
    has just cleared caches for a mutation check pays the cold price, and quoting
    the warm number as the expectation is how a measurement becomes a promise.
-   Do not ask Ben to run it instead: his Windows Python has no scipy and
-   `.pylibs/` is a Linux build, so `--run-tests` cannot pass on his host
-   (R271(c)). The gate is the session's job.
+   The two pytest suites R338 added are one call each at ~1s and ~6s, so they
+   ride inside that budget rather than extending it.
+   **R271(c)'s REASON for not asking Ben to run it is gone as of 2026-09-11;
+   the instruction is not.** This read "his Windows Python has no scipy and
+   `.pylibs/` is a Linux build, so `--run-tests` cannot pass on his host". The
+   thirteenth edition installed a pinned project `.venv` on that machine
+   (CPython 3.13.7, numpy 2.2.6, pandas 2.3.3, scipy 1.15.3, pydantic 2.12.5,
+   from `requirements-production.lock`) and the baseline suite ran there: 1,935
+   passed in 512s. `tools/env_probe.ensure_vendored_on_path` returns None when
+   `sys.prefix` is that `.venv`, so `.pylibs` cannot shadow it. The gate is
+   still the session's job, by POLICY rather than by impossibility: a gate the
+   operator runs is a gate the session that changed the code did not.
+   The one licensed exception is a session that cannot reach the mount at all,
+   which since 2026-09-09 is the ordinary state (see the sandbox note). A
+   container reproduction is PARTIAL by construction and may never be quoted as
+   the mount's gate, so there the real gate is the one thing only Ben's machine
+   can produce, and asking for exactly that one thing is correct.
    Backgrounding it is the trap and not the workaround —
    `nohup` and `setsid` both die with the call, the log comes back EMPTY, which
    reads exactly like a silent pass, and a killed `audit.py` strands the

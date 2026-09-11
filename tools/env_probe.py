@@ -70,6 +70,10 @@ def ensure_vendored_on_path(root: Path) -> Optional[Path]:
     resolution-authority argument that makes requirements.lock, not PyPI's
     latest, the source of truth for a cold install.
     """
+    # The explicit project runtime owns its ABI and pins. An old Linux .pylibs
+    # directory must not shadow Windows wheels in the verified virtualenv.
+    if Path(sys.prefix).resolve() == (root / ".venv").resolve():
+        return None
     vendored = vendored_pylibs(root)
     if vendored is not None:
         path_str = str(vendored)

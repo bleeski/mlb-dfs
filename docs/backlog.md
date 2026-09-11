@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-10, thirteenth edition adjudicated) -- NEXT: Session 4b
+## Execution roadmap (2026-09-10, thirteenth edition adjudicated; Session 4b landed to disk 2026-09-11) -- NEXT: Session 5
 
 **How to use this table.** A session says *"work on the next session in the
 backlog"*, reads the row(s) for the Session ID on the NEXT pointer above, and
@@ -66,7 +66,7 @@ date (`2140_5g-no-game-level-exposure-control`, `2140_5g-no-reachable-named-book
 
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Session 4b** | `Standalone` | **R338 (NEW, 2026-09-10) -- dispose of the thirteenth edition's UNCOMMITTED sixty-file working tree.** On disk at `7824648`: a 24-file, 334/127-line compatibility patch to the live engine (gate reproduced in the container: `PASS v2.26.0 40 modules 1935 tests 5 skipped`, all five suites at pin), the 5,698-line strangler package `mlb_engine/production/` + `tools/dfs.py` (isolated; its demo reproduces sha `f04f9892...d562f55` on Linux), and three authority banners (reverted 2026-09-10). Four repairs BEFORE the commit, each S: (1) `bank_cache.py` tombstones erase a sibling session's bucket on save (the R55 test was inverted under its own name) -- tombstone only jobs the `conditions_index` places under a DIFFERENT projection digest; (2) restore `AuditSkipHonestyTests`' CLAUDE.md drift assertion (gutted to a substring check) and move CLAUDE.md's audit line to the module count the tree prints; (3) scope `showdown.py`'s new `invalid_hard_lock` refusal to operator locks, since `solve_ladder` passes THESIS locks and a thesis naming an absent player now blanks its slot; (4) `audit.py:1294` sets `MLB_DFS_ARTIFACT_ROOT` per suite subprocess, or R274 stays open on the gate path (the new `conftest.py` is pytest-only). Then two commits: the compatibility patch, migrating every board entry it lands (list in the R338 entry); and the package under R302 stage 0 with `dfs.py`'s POSIX venv guard fixed (`sys.prefix`) and `PRAGMA journal_mode=PERSIST` in `production/state.py`. Land at a slate boundary: digest v2 orphans every live bank bucket. **STATUS: repairs (1)-(4) are APPLIED to the working tree (measured 2026-09-10, written 2026-09-11) and verified in a container; the two commits, the step 5 riders and step 8 remain, and they need the device shell, which a 2026-09-08 Windows update has broken. See the rider on the R338 entry.** | Spec13 | 24 legacy files (list in the entry), `mlb_engine/production/`, `tools/dfs.py`, `tests/`, `CLAUDE.md` | High (criterion 1: a dirty engine tree blocks every later DEV claim; criteria 2/4/5 through ~14 board items landing at once) | Med (review plus four S repairs; the code exists) | None. ALONE, and the device shell must be up (claim, gate, git). |
+| **Session 4b** | `Standalone` | **R338 (NEW, 2026-09-10) -- dispose of the thirteenth edition's UNCOMMITTED sixty-file working tree.** On disk at `7824648`: a 24-file, 334/127-line compatibility patch to the live engine (gate reproduced in the container: `PASS v2.26.0 40 modules 1935 tests 5 skipped`, all five suites at pin), the 5,698-line strangler package `mlb_engine/production/` + `tools/dfs.py` (isolated; its demo reproduces sha `f04f9892...d562f55` on Linux), and three authority banners (reverted 2026-09-10). Four repairs BEFORE the commit, each S: (1) `bank_cache.py` tombstones erase a sibling session's bucket on save (the R55 test was inverted under its own name) -- tombstone only jobs the `conditions_index` places under a DIFFERENT projection digest; (2) restore `AuditSkipHonestyTests`' CLAUDE.md drift assertion (gutted to a substring check) and move CLAUDE.md's audit line to the module count the tree prints; (3) scope `showdown.py`'s new `invalid_hard_lock` refusal to operator locks, since `solve_ladder` passes THESIS locks and a thesis naming an absent player now blanks its slot; (4) `audit.py:1294` sets `MLB_DFS_ARTIFACT_ROOT` per suite subprocess, or R274 stays open on the gate path (the new `conftest.py` is pytest-only). Then two commits: the compatibility patch, migrating every board entry it lands (list in the R338 entry); and the package under R302 stage 0 with `dfs.py`'s POSIX venv guard fixed (`sys.prefix`) and `PRAGMA journal_mode=PERSIST` in `production/state.py`. Land at a slate boundary: digest v2 orphans every live bank bucket. **STATUS 2026-09-11: steps 1-7 are WRITTEN TO DISK -- repairs (1)-(4), all four step-5 riders (including the pytest runner branch that moves the pinned line to `PASS v2.26.0 40 modules 2066 tests`), both commit-two XS fixes, the CHANGELOG entries and this board's migrations. What remains is two `git commit` calls, the gate on the MOUNT and `solver_probe`, all three of which need Ben's machine: the device shell has been down since 2026-09-09 on a 2026-09-08 Windows update. The container gate is PARTIAL (2057/2066, the nine being golden_replay's unstaged fixtures) and is not the mount's gate. See the 2026-09-11 rider on the R338 entry.** | Spec13 | 24 legacy files (list in the entry), `mlb_engine/production/`, `tools/dfs.py`, `tests/`, `CLAUDE.md` | High (criterion 1: a dirty engine tree blocks every later DEV claim; criteria 2/4/5 through ~14 board items landing at once) | Med (review plus four S repairs; the code exists) | None. ALONE, and the device shell must be up (claim, gate, git). |
 | **Session 5** | `Batch (1 of 3)` | **R285 (+ed12 F38, F37 riders) -- the supervisor stops on the one remedy it is licensed to take.** The bank-growth remedy reads `solve.bank.job_list_exhausted`, which the direct path never writes. F38: `extend_bank` (`bank_cache.py:858-946`) leaves `exhausted=True` when every job raised, timed out or returned no proof -- keep `jobs_total / jobs_answered / jobs_pending / search_complete` as distinct fields so an all-timeout sweep never reads as an answered search (the same shape as R326: search effort billed as strategy). F37: `parse_brief` (`autobuild.py:275-287`) infers "certified" from exit 0 and prose -- emit one versioned result JSON beside stdout and classify from its facts. | Backlog / Spec | `tools/autobuild.py`, `mlb_engine/optimize/bank_cache.py`, refusal payload in `execution_pipeline.py` | High (slate-lock reliability; one lost call on 1915_6g) | Low | None |
 | **Session 5** | `Batch (2 of 3)` | **R311 -- R157's interaction-bind refusal names no derivable floor**, so the remedy is a hand bisection (9 minutes of a 66-minute window on 1940_6g). Emit the binding cap and the value that certifies. | Backlog | `mlb_engine/allocate/contest_allocator.py` feasibility report | High | Low | None |
 | **Session 5** | `Batch (3 of 3)` | **R207 (+R204 naming half, +R125(a) refusal text) -- refusals that name a SET, not the move.** The infeasibility hint makes the operator binary-search; a `PO`-only side refuses "no probable or declared starter" where the fact is "opener, use `--declare-pitcher`". Typed `refusal.class` / `refusal.remedy` on the payload; no regex over `errors[]` in the final fix. | Backlog | `execution_pipeline.py`, `contest_allocator.py`, `build_slate.py` | High | Low | None |
@@ -3639,7 +3639,7 @@ it either way. Slot 2 first, then this.
 
 ### R295. Showdown ladder truth, third pass: the R250 hold collides with a thesis lock and the ladder answers by dropping the player cap; the degraded flag reads a thesis-weighted proxy as one scale; rung 5 re-solves rung 1 verbatim; the melt merges two same-name same-team persons (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-D1, D3, D4, D5); (a) VERIFIED-repro and coordinator re-read at `showdown_theses.py:1268-1337`, (b)(c) VERIFIED-read, (d) PLAUSIBLE; R250 and R247(a) CLOSED incomplete
 
-**Rider 2026-09-10 (thirteenth edition, D10/D11): F13 LANDS and F14 HALF-lands in R338, and the half needs scoping before the commit.** F13: `_rung` now latches `stopped` on any None whose `proven_infeasible` is not literally True and reports `solver_failures` beside `infeasible`, which is the typed-failure rule. F14: `build_showdown_lineup` refuses an absent `locks`/`cpt_lock` key as `invalid_hard_lock` BEFORE constraint assembly, but `solve_ladder` passes thesis locks (`:1268`, `:1307`), so a thesis naming an absent player blanks its slot and `build_slate.py:3945`'s NOTE reads a dead field. The soft-lock field was not built. Repair (3) in R338; (a)-(d) and F40 stay here for Session 8.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** F13 shipped (`_rung` latches `stopped` on any None whose `proven_infeasible` is not literally True, and reports `solver_failures` beside `infeasible`), and F14 half-shipped: `build_showdown_lineup` refuses an absent `locks`/`cpt_lock` key as `invalid_hard_lock` before constraint assembly, scoped by R338 repair (3) to the OPERATOR door through an `operator_locks` flag, with `solve_ladder`'s `_rung` passing False once for all nine rung call sites. **What is left is F14's soft-lock field** -- thesis preferences travelling in their own argument, ignored-and-reported -- plus (a)-(d) and F40, all Session 8.
 
 **Rider 2026-09-08 (ed12, F13, F14, F40): three more ladder parts, same file, same session.** *F13 (fault injection):* `_rung` (`showdown_theses.py:1140-1164`, `solve_ladder` `:1440-1454`) latches TIMEOUTS and leaves every other empty result free to descend, so a status-4 solver response with no incumbent and `proven_infeasible=False` produced five calls and `infeasible=1`; `run_showdown` (`build_slate.py:3322-3371`) then classifies the incomplete ladder as a shape refusal that can reach the deadline governor. R294's Classic rule ("proven infeasible" only on status 2) was never propagated across this boundary. Raise a typed `SolverExecutionFailure` on a no-proof empty return and route it to an execution failure at the CLI, outside the strategic governor; a timeout reaches a compute-budget response, never a "constraints infeasible" label. *F14:* an unresolved hard `locks`/`cpt_lock` key is appended to `ignored_locks` (`showdown.py:502-521`) and a different lineup is solved; a hard inclusion cannot share an API with a soft thesis preference. Refuse unresolved hard keys before constraint assembly; soft preferences are a separate field with applied-change records. *F40:* captain reservations (`:1116-1124` init, UTIL blocking near `:1280`, release `:1474-1475`) are bounded by captain demand/cap but not the player cap, and are spent when the ACTUAL captain appears rather than when the requesting slot is processed, so a failed or substituted requested captain leaves a phantom hold and an incidental earlier captain consumes a later one. Bound by both caps; release the current request's hold exactly once at the end of its slot, success, substitution or failure alike; the joint role-aware allocator (Section 4) removes the order dependence entirely. Roadmap: Session 8, standalone, with (a)-(d).
 
@@ -4436,7 +4436,7 @@ Rollback: drop the kwarg.
 
 ### R285. The supervisor's bank-growth remedy reads a key the refusal brief does not write, so on the direct path it can never fire and autobuild stops for a human on the one remedy CLAUDE.md lists FIRST as unattended (P1, S) | new 2026-09-01, merged from BUILD fragment `2026-09-01_BUILD_autobuild_exit3_bank_growth.md`; **the fragment's own mechanism is FALSE and the real one is below**, verified in tree and against the delivered artifacts
 
-**Rider 2026-09-10 (thirteenth edition, D09/D23): the F37 and F38 halves LAND in R338; the mechanism stays for Session 5.** F38: `extend_bank` reports `job_list_exhausted` only when `done_here == len(jobs)`. F37: `autobuild.parse_brief` walks every JSON object in stdout with `raw_decode` and takes the last one carrying a string `status`; exit 0 without `delivered_path` and `delivered_sha256` is a `stop`, and the terminal action is `delivered`, never `certified`. The direct path still never writes the key the remedy reads.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The F37 and F38 halves shipped: `extend_bank` reports `job_list_exhausted` only when `done_here == len(jobs)`, and `autobuild.parse_brief` walks every JSON object in stdout with `raw_decode` and takes the last one carrying a string `status` -- exit 0 without `delivered_path` and `delivered_sha256` is a `stop`, and the terminal action is `delivered`, never `certified`. **The mechanism this entry is actually about is untouched and is what Session 5 keeps**: the direct path still never writes the key the bank-growth remedy reads.
 
 **Rider 2026-09-08 (ed12, F38 and F37): the producer side of the flag, and the success side of the parser.** *F38:* `extend_bank` (`bank_cache.py:858-946, 983`) can leave `exhausted=True` when the loop visited every job but every job raised, timed out or returned no proof; those jobs correctly stay out of `attempted`, yet `job_list_exhausted` then tells the supervisor no useful retry remains -- search effort read as an answered search, the R326 shape on the bank side. Keep `jobs_total`, `jobs_answered` (optimal or proven-infeasible only), `jobs_pending` and `search_complete` as distinct fields computed from exact job ids; an empty job grid is diagnosed separately from a solved slate; a validated limited incumbent stays usable while its job stays pending. *F37:* `parse_brief` (`autobuild.py:275-287`, `:596-600`) depends on JSON whitespace and key order in mixed stdout and logs exit 0 as "certified" although build paths deliberately deliver review-grade artifacts. Emit one versioned result JSON (`build-result-v1`: `FILE_VALID`, `EVIDENCE_VALID`, `SELECTION_VALID`, `ALLOCATION_VALID`, `RELEASE_DECISION`, `delivered_sha256`, `failure_class`) separately from human stdout; classify from its facts and verify the delivered hash independently; missing or reordered JSON is a protocol error, never a promotion. Roadmap: Session 5.
 
@@ -4556,7 +4556,7 @@ brief, and the entry closes smaller. Owner: none. Rollback: revert the extractor
 
 ### R290. CLOSED 2026-09-03 -- (c) the deadline governor, both commits, entry migrated to CHANGELOG.md. (a) and (b) SURVIVE below and hold no slot
 
-**Rider 2026-09-10 (thirteenth edition, D07): (a) LANDS in R338.** `_projection_bytes` is a schema-2 JSON digest of every column and every cell (type name + repr), and `conditions_signature` carries `target` and `leverage`; `extend_bank` passes both. Every bank bucket on disk is orphaned on landing, which is why R338 lands at a slate boundary. The R291 test that pinned the OLD digest as unchanged was rewritten to assert the new one differs, honestly named.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** (a) shipped: `_projection_bytes` is a schema-2 JSON digest of every column and cell (type name + repr) and `conditions_signature` carries `target` and `leverage`. Every bank bucket on disk was orphaned by the landing, which is why it was a slate-boundary commit. The R291 test that pinned the OLD digest as unchanged was rewritten to assert the new one differs, under an honest name. Nothing of R290 remains beyond what this stub already records as closed.
 
 **Rider 2026-09-08 (ed12, F10, VERIFIED-repro by the edition): (a) is wider than leverage controls, and it now HOLDS a slot.** Changing Team, Position, Game_ID or predictive ownership left BOTH digests (`_projection_bytes` / `projection_digest` / `conditions_signature`, `bank_cache.py:543-621`) unchanged, so an answered job is reused for a different problem; and a key alone cannot stop an old candidate that violates a new bound from being SELECTED out of a live bucket. Hash the canonical complete problem (every consumed player field with normalized primitive types, rules, controls, objective, engine/model versions; row order irrelevant; NaN refused), and pass every cached candidate through the current rule/lock/strategy validator before it enters allocation, recording the rejected ones. Roadmap: Session 18 with R329, landed at a slate boundary because a re-key orphans live buckets.
 
@@ -4670,7 +4670,7 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ### R274. The test suite appends to two REAL-dated slate manifests on every run (P1, S) | new 2026-08-30, found by R250's slate-isolation check at `442ed6e`; VERIFIED-read
 
-**Rider 2026-09-10 (thirteenth edition, D29): HALF-lands in R338.** `upload_manifest.REPO_ROOT` and `mirror_to_outputs` now honour `MLB_DFS_ARTIFACT_ROOT`, and a pytest `conftest.py` sets it per session with a before/after operator-artifact hash guard. The gate runs `python -m unittest` (`audit.py:1507`), which never loads `conftest.py`, so the six gate calls still write the real manifests. Repair (4) in R338 sets the variable in `test_env` at `audit.py:1294`; the edition's own evidence for the class is `docs/greenfield/2026-09-09/test_artifact_incident.json` (four archived files changed by one baseline suite run; three restored, one is R337).
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The env hook shipped (`upload_manifest.REPO_ROOT` and `mirror_to_outputs` honour `MLB_DFS_ARTIFACT_ROOT`, plus the pytest `conftest.py`), and R338 repair (4) closed the GATE path that `conftest.py` could not reach: one `suite_subprocess_env` serves both `--run-tests` and the split gate, each suite gets its own subdirectory, and `_isolated_artifact_root` bounds the cleanup to a path the module minted. Verified both directions: unset, one `python -m unittest tests.test_core` overwrote `outputs/2026-06-11/upload_manifest.json` and created two more files; with the fix, a full `--gate-run` to GATE COMPLETE changed zero bytes under `data/`, `outputs/`, `runs/` and `tests/fixtures/`. **What is left of this entry is the accumulated rows**: `outputs/2026-06-03/upload_manifest.json` and `outputs/2026-06-11/upload_manifest.json` still hold ~1400 fixture deliveries in the shape a real delivery takes, and deciding which are fixture and which are history is ARCHIVE's call, not DEV's. The defect is fixed; the symptom is not swept.
 
 - **What:** `outputs/2026-06-03/upload_manifest.json` and
   `outputs/2026-06-11/upload_manifest.json` are written by the test suite on
@@ -4828,7 +4828,7 @@ runs once on each format.
 
 ### R328. The Showdown ownership prior's per-player marginals can exceed 100% and the captain marginal can exceed the roster marginal, because the 600% budget is enforced on the total and nowhere else (P1, XS; gates R307) | new 2026-09-08, from the greenfield twelfth edition (F27); VERIFIED-repro by the edition on the production function
 
-**Rider 2026-09-10 (thirteenth edition, D14): the water-fill half LANDS in R338; the captain bound does not.** `_bounded_marginals` projects softmax shares onto the capped simplex in percentage units for both `predict_ownership` and `_showdown_prediction`, and `attach_predicted_ownership` refuses non-finite or out-of-[0,100] values. `0 <= captain_p <= roster_p <= 1` is enforced only in the package's schemas, so Session 11 still owns it.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The water-fill half shipped: `_bounded_marginals` projects softmax shares onto the capped simplex in percentage units for both `predict_ownership` and `_showdown_prediction`, and `attach_predicted_ownership` refuses non-finite or out-of-[0,100] values. **What is left is the captain bound**: `0 <= captain_p <= roster_p <= 1` is enforced only in the package's schemas, so Session 11 still owns it on the legacy path.
 
 - **What.** `ownership_prior._showdown_prediction` (`:676-727`) multiplies an
   unconstrained softmax by the slot count. That enforces the sum (600% over six
@@ -6471,7 +6471,7 @@ third shipped with it; R164's opponent-direction half is R293 and is untouched.
 
 ### R299. Six intake seams, small and independent: UTC slate date, an `at` inside a team name, two missing team codes, a `1.0` slot token, an escaping read timeout, and one blank APPG killing a build (P2, XS each) | new 2026-09-02, from the greenfield tenth edition (GF10-I2..I7); five VERIFIED-repro, one PLAUSIBLE
 
-**Rider 2026-09-10 (thirteenth edition, D20): the F31 member LANDS in R338.** `fetch_slate_bundle` caps provider bodies at 32 MiB, reads HTTP error bodies to 300 bytes with the configured secret scrubbed, and rejects hourly arrays that do not align with `hourly.time` as unavailable. The other five seams stay.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The F31 member shipped: `fetch_slate_bundle` caps provider bodies at 32 MiB, reads HTTP error bodies to 300 bytes with the configured secret scrubbed, and rejects hourly arrays that do not align with `hourly.time` as unavailable. **The other five seams are what is left of this entry.**
 
 **Rider 2026-09-08 (ed12, F31): a seventh seam, the weather adapter.** `_get_json` / `fetch_weather` (`fetch_slate_bundle.py:96-109, 370-386`) index hourly arrays by the position of `hourly.time` without checking each field's array is the same length (a shorter array raises `IndexError` past the network `try`), and read the whole response body with no byte limit; `live_data_adapters.py:134-148` has the same eager read. Bounded read (`response.read(max_bytes + 1)`), per-field length validation, a typed provider failure wrapped in the existing secret-scrubbing boundary; missing fields stay missing evidence, never a neutral forecast; retries honour the shared deadline. Roadmap: Session 46.
 
@@ -6594,6 +6594,8 @@ dead sites named-but-not-filed: CHANGELOG 2026-08-31.
 
 ### R75. The DK↔Savant crosswalk joins on normalized name only; same-name players collapse to one row (P2, S) | audit 2026-08-04, verified in tree
 
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The no-winner half shipped: `xwoba_base_correction._build_name_to_mlbam` maps only unambiguous names and drops a colliding key rather than giving it to the larger-PA row. **The frozen identity crosswalk this entry asks for is what is left**, Session 47 with [[R222]].
+
 **Rider 2026-09-08 (ed12, F26, VERIFIED-repro by the edition): the collision is resolved by playing time.** `xwoba_base_correction.py:52-89, 139-153, 257-287` strip suffixes and pick the larger-PA row, so "Luis Garcia" and "Luis Garcia Jr." became one key and the bigger sample took the correction, with a diagnostic and no refusal; `field_miner` carries the same name joins. A deterministic wrong join is still wrong and looks complete. Adopt a frozen identity crosswalk bound to the source hash and the salary hash, keyed `(dk_id, provider) -> provider_id` with a `verified` state; an ambiguous name produces a proposal, never a numerical join; verified provider ids from structured data populate it autonomously when uniqueness and team/event agree; an unresolved identity blocks only the dependent claim, with the reason surfaced. Roadmap: Session 47 with R222.
 
 - **What:** `xwoba_base_correction.py:144` resolves mlbam by normalized name — suffixes stripped, highest-PA row wins, team read but never used: both Luis Garcías receive the same correction and ceiling multiplier, and when only one is in the Savant table no collision is even reported. Impact bounded by the clip bands (0.85–1.15 / 1.25–1.60) but systematic and silent.
@@ -6650,7 +6652,7 @@ the blocker names the cause rather than the "no probable" consequence.
 
 ### R161. Two R65-class clock residues: slate_date falls back to the UTC clock, and the bundle's display time hardcodes UTC-4 (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read at ec832cf
 
-**Rider 2026-09-10 (thirteenth edition, D17): the F30 half LANDS in R338.** `deadline_governor._eastern` raises instead of returning a fixed -04:00; `live_data_adapters._parse_utc` and `late_swap_manager.GameLock.normalized_start` / `PlayerLineupStatus.is_locked` refuse naive datetimes. Every live writer of `game_date_utc` emits `Z` (paste `:915`, bundle `:146`), so no production path trips it. The UTC `slate_date` fallback and the bundle's UTC-4 display stay here.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The clock half shipped: `deadline_governor._eastern` raises instead of returning a fixed -04:00, and `live_data_adapters._parse_utc` and `late_swap_manager.GameLock.normalized_start` / `PlayerLineupStatus.is_locked` refuse naive datetimes. Every live writer of `game_date_utc` emits `Z`, so no production path trips it. **What is left is the UTC `slate_date` fallback and the bundle's UTC-4 display.**
 
 **Rider 2026-09-08 (ed12, F30): three more sites and a portability bug.** `deadline_governor._eastern` (`:138-146`) falls back to a FIXED minus-four offset (wrong after the November change and for any non-summer slate); `fetch_slate_bundle.py:150-154` formats with a fixed minus-four hours AND `strftime("%-I")`, which is not portable to the Windows runtime and fails silently there; `late_swap_manager.py:51-55, 71-74` treat naive datetimes as UTC at a lock boundary. Require `zoneinfo` and aware timestamps (`aware_utc` raises on naive input; `eastern_clock` formats without `%-I`); missing tzdata is a deployment failure to resolve before a slate, never a guessed offset at lock. Acceptance covers January and July, both DST transitions, UTC midnight, Windows formatting and naive-input rejection. Roadmap: Session 46.
 
@@ -6748,6 +6750,8 @@ leg; that is stricter than this repo wants at the merge — an ambiguous leg is
 already handled downstream — so take the suppression, not the raise.
 
 ### R222. The Savant name-join discards its collision report, so a colliding probable takes the other pitcher's quality silently (P2, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-E9) and independently from the outside spec (D10); VERIFIED-read at `projection_builder.py:892`
+
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The no-winner half shipped in `xwoba_base_correction._build_name_to_mlbam`, which now maps only UNAMBIGUOUS names: a colliding normalized key is dropped from the map entirely rather than resolved by picking the larger-PA row, because a PA ranking cannot establish identity. **`projection_builder.py:892`, this entry's own site, is untouched**, and the frozen identity crosswalk R75 and this entry both ask for is still Session 47.
 
 **What.** `sp_id_by_name, _ = _build_name_to_mlbam(table, sp_row_by_id)`. The
 helper returns collision counts for exactly this purpose and the caller throws
@@ -7061,29 +7065,6 @@ coverage loop keeps ONE representative per bucket, which prevents an EMPTY
 bucket but not an UNDER-FILLED one against a repetition cap. Both are fixtures
 now. Full record, measurements and mutation table in CHANGELOG.md.
 
-
-### R329. The bank cache's reload-and-union has no tombstones: a dropped candidate and its attempted job come back from disk, and the union is not concurrency-safe (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F11); VERIFIED-repro by the edition on `drop_stale_jobs` + `save` + reload
-
-**Rider 2026-09-10 (thirteenth edition, D08): LANDING in R338 with a correction.** The patch adds `_retired` tombstones, persists them as `retired_jobs`, subtracts them from the union and serializes `save` behind a SQLite `BEGIN IMMEDIATE` lock file, which is F11's fix. It also tombstones every job `drop_stale_jobs` drops, INCLUDING a memory-only narrowing by signature (no digest), and inverted the R55 test in place. Retire only what `conditions_index` places under a different projection digest; both tests pass. Repair (1) in R338.
-
-- **What.** `bank_cache.drop_stale_jobs` (`:209-256`) removes an obsolete candidate
-  and its attempted job in memory; `save` (`:284-340`) does R22's reload-and-union
-  and reload restored both. A union preserves additions and has no invalidation
-  record; concurrent read/union/replace can also lose additions. A later normal
-  `extend_bank` may drop the stale records again, so this does not establish that
-  every production reload selects stale players; it establishes that invalidation
-  is not durable and that any standalone consumer of the file (the probe, QA, a
-  swap) sees restored state. R36 Finding 6 called the bank-cache half of the
-  concurrency critique FALSE because the union exists; the union is the defect.
-- **Fix.** Namespace durable cache state by the full problem digest R290(a)
-  produces once F10's widening lands; store candidates and answered jobs
-  transactionally (`INSERT OR IGNORE` keyed on `(problem, roster)` and
-  `(problem, job)`); never union distinct semantic epochs; retention deletes whole
-  obsolete epochs independently of active writes; a timeout is never inserted as
-  an answered job. Acceptance: deletion never resurrects on reload; concurrent
-  additions survive; the probe and the build read the same bank. Roadmap:
-  Session 18 with R290(a), landed at a slate boundary because a re-key orphans
-  live buckets.
 
 ### R320. Two brief surfaces report a factor RESOLVED and are read as APPLIED: `factors_inert` cannot see a HALF-inert composite on Classic, and the Showdown brief emits no platoon counter at all (P2, XS for the Classic half, S for Showdown) | new 2026-09-06, merged from BUILD fragments `2026-09-04_BUILD_2210_2g-feed-identity-and-half-inert-f4.md` §(b) and `2026-09-04_BUILD_appg-workaround-supplied-base-from-a-slate-source.md`; VERIFIED-read at `build_slate.py:2237` and by AST-bounded absence over `run_showdown`
 
@@ -7561,6 +7542,8 @@ brief, and R118 replays both files. No new factor, no change to either pipeline'
 output, report-only until the replay says otherwise. Roadmap: Session 7b.
 
 ### R302. DECISION FILED (Ben's on the merits; queue placement adjudicated 2026-09-02, see the queue note): a strangler `dfs/` engine beside `mlb_engine/`, one command between the two clicks, graded by R118 on ten archived slates before it replaces anything (Tier 3, L) | new 2026-09-02, from the greenfield tenth edition §4; the 2026-08-01 rejection of "a greenfield parallel package" rested on an EV-core premise this design does not share
+
+**STATUS 2026-09-11: stage 0 is COMMITTED (R338 commit two), with both XS fixes landed.** `dfs.py:environment()` compares `Path(sys.prefix)` to `ROOT/.venv` instead of two resolved interpreter paths -- measured here, the old identity comparison returned False for the SYSTEM interpreter, so the guard never re-execed and ran the workflow unpinned; and `production/state.py:68` is `PRAGMA journal_mode=PERSIST`, because DELETE mode unlinks its journal at commit and this mount refuses unlink (R109). `tools/dfs.py demo` reproduces safe-export sha256 `f04f98926e47107557b1fc832f2f4da216c2ee0be7c012bfcc783abb8d562f55` after both. Isolation is now a TEST, not a claim: 65 legacy modules scanned, zero imports of `mlb_engine.production` or `pydantic`. **Nothing else about this entry moved**: stage 0 is not canonical, not the build path, and no projection/ownership/field/archive source; the START CONDITION for stages A+ is unchanged; and R302's own "Done when" still cannot be measured until R118 exists.
 
 **Rider 2026-09-10, STAGE 0 EXISTS (the thirteenth edition built it), status only, START CONDITION for stages A+ unchanged.** `mlb_engine/production/` (twelve modules, 5,698 lines with its tools and tests) and `tools/dfs.py` are on disk uncommitted; R338 commits them as stage 0 with two XS fixes (POSIX venv guard by `sys.prefix`; `PRAGMA journal_mode=PERSIST`, R109). Offline-verified only: gate-green, demo sha reproduced on Linux, zero legacy imports. NOT canonical, not the build path, no projection/ownership/field/archive source; R339 is the adapter that makes it gradeable and R118 grades it. Design verdicts recorded for the Tier 2 sessions: joint full-universe MILP plausible at 9-37 entries, unproven at 150 x 300 (the edition's benchmark is 3 x 40); the latent-factor simulation MACHINERY is R259-R261's implementation seed and its LOADINGS are not (R260 fits them); the contest-profile quantile table is REJECTED (q50 for "ordinary satellite" is wrong for a one-seat ticket, and needs R106's `ticket_count`); the Pareto acceptance loop is a safety rule, never a frontier position (R13/R262); the Fraction tie oracle is R118's (ed12 F29, same code); `csvio.py`'s lexical writer is stage A material; per-source declared expiry is a rider on R83/R251; pydantic is accepted SCOPED to this package. R336 (the edition's "qualify with live evidence", P1/L) is this paragraph, not a number: live provider, calibrated moments, representative field and prize curve, registered-scale timing on the deployment host, Unix acceptance run. Stage E (submission) stays REJECTED; the edition did not build one.
 
@@ -8641,28 +8624,6 @@ at all is the R292(d) hole.
   selection; no feed unlocks a started slot. Roadmap: Session 13 with R175 and
   R174.
 
-### R330. A run with ZERO checked artifacts verifies and promotes: R228's class at two further sites in `build_state_manager` (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F06); VERIFIED-repro by the edition (`create_run`, set the three certification booleans, `verify_run_bundle` -> `checked_files=0`, `promote_run` -> current)
-
-**Rider 2026-09-10 (thirteenth edition, D05): LANDS in R338.** `verify_run_bundle` errors on a manifest with neither inputs nor artifacts; `promote_run` requires literal True on all three certification booleans, non-empty frozen inputs and the roles `dk_export`, `diagnostics`, `assignments` (the names production writes at `execution_pipeline.py:407, 536-537`), and runs behind a SQLite lock file for the compare-and-update. `PromotePointerCasTests` were extended to build certified runs. An older run lacking an `assignments` artifact can no longer be re-promoted; that is the migration cost the entry anticipated, and `tools/promote_run.py` does not call this function.
-
-- **What.** `verify_run_bundle` (`build_state_manager.py:236-290`) asks whether the
-  files the manifest RECORDS still hash, not whether the files a release REQUIRES
-  exist, so an empty run passes. `promote_run` (`:347-425`) trusts three mutable
-  booleans, needs no selection/allocation evidence and no actual final export.
-  R228 (2026-08-30) closed the same class in `tools/promote_run.py` and
-  `upload_manifest.verify_manifest`; these two sites were not in its enumeration.
-  R303 carries the neighbour ("refused promotion leaves `workflow_valid=True`
-  under `blocked`", `:403-407`).
-- **Fix.** Derive the release decision from required artifacts and trusted
-  validator outputs: exactly one `final_export`, one `diagnostics`, one
-  `allocation` artifact, each with `sha256` and a confined `relative_path`
-  (R331), and a nonempty frozen `inputs` block; keep a separate integrity-only
-  result so a legitimately BLOCKED run still verifies when its own failure
-  record is intact. Migrate artifact role names deliberately; never infer roles
-  from filenames. Acceptance: the reproduced empty run never becomes current;
-  deleting a required artifact blocks release even when every remaining hash
-  matches; blocked-run integrity still passes. Roadmap: Session 14 with R297.
-
 ### R314. CLOSED 2026-09-08 -- SHIPPED inside R324's helper, entry migrated to CHANGELOG.md
 
 `resolve_locked_teams` returns `not_locked` as a fourth value instead of
@@ -8766,7 +8727,7 @@ guess is R273's failure with the roles reversed.
 
 ### R297. Referee fail-opens: the validator certifies any ten ids when the salary pool is empty; `workflow_gates` overrides ANY derived gate; a crash between `create_run` and the first refusal strands a run at `building`; `report["passed"]` is frozen before the R176 read-back (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P3, P4, P7, T6); (a) VERIFIED-repro and coordinator re-read at `dk_entries_manager.py:878-947`, rest VERIFIED-read
 
-**Rider 2026-09-10 (thirteenth edition, D01/D02/D18/D19): (a), (b), (e) and the F24 rider LAND in R338; (c) stays.** `validate_dk_entries_file` refuses empty entries and a missing salary pool; `_gate_bool` is `value is True`; `resolve_gate_assertions` records a `supplied` gate that contradicts a derived False as a refusal instead of taking it (the explicit `--assume-gates` override channel is untouched, so R133's licensed override still lands in `overridden_gates`); `report["passed"]` is re-derived after manifest persistence; the roster window is exempt only on authorized entry rows. One check before trusting (b): `np.True_ is True` is False, so a numpy bool reaching `_gate_bool` now reads as a failure.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** (a), (b), (e) and the F24 rider shipped: `validate_dk_entries_file` refuses empty entries and a missing salary pool, `_gate_bool` is `value is True`, `resolve_gate_assertions` records a supplied gate contradicting a derived False as a refusal, `report["passed"]` is re-derived after manifest persistence, and the roster window is exempt only on authorized entry rows. **(c) is what is left of this entry.** The R338 rider asked one question before trusting (b) and it was MEASURED rather than reasoned about: 193 values reach `_gate_bool` across `test_upload_integrity` and `test_core`, 191 `bool` and 2 `None`, no numpy type at either door, and the three producers write Python literals or `bool()`-wrap. The identity check stands; a future pandas boolean in `workflow_gates` would fail CLOSED. The measurement is in the function's docstring.
 
 **Rider 2026-09-08 (ed12, F01/F03/F23 re-verified; F24 and the F03 sliver NEW here).** The twelfth edition reproduced (a), (b) and (e) again at `15f87a2`, so nothing in the fix shape moves. Two additions to this entry. *F24:* `validate_template_preservation` (`dk_entries_manager.py:680-707`) exempts the roster window on EVERY row, header and embedded pool included, and pads rows to the maximum width, so a changed slot header or embedded-pool cell passes preservation; exempt only actual editable entry rows (`not entry.is_complete or entry.entry_id in mutable`), compare every other cell and every width exactly, and for a swap-only interface require even blank entry rows to be in the authorized set. *F03 sliver:* at post-export certification replace `bool(value)` with `value is True` (R303's `_gate_bool(nan)` is the same seam); a caller assertion that contradicts a derived False is REFUSED and recorded, never merged. F06, the same class in `build_state_manager`, is filed separately as R330 and batched with this entry at roadmap Session 14.
 
@@ -9124,7 +9085,7 @@ candidate set.
 
 ### R245. `upload_manifest.json` is one file per date across concurrent builds, and a whole-file restore is not a merge (P1, S) | new 2026-08-27, merged from BUILD fragment `2026-08-27_BUILD_container-bank-and-r157-single-cap.md` §2 (a live near-miss between two same-date sessions, self-corrected); corroborated by the outside spec ed8 (F-20); cross-ref R36 F6m(2), which keeps the M-lift redesign
 
-**Rider 2026-09-10 (thirteenth edition, D06): the F08 lock half LANDS in R338.** `promote_run` holds a SQLite `BEGIN IMMEDIATE` on a `.publication-lock.sqlite3` beside the pointer across the compare-and-update (no writes, so no journal, so safe on the mount). The delivery manifest's read-modify-write and the date-keyed scope are still this entry's.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The F08 lock half shipped: `promote_run` holds a SQLite `BEGIN IMMEDIATE` on a `.publication-lock.sqlite3` beside the pointer across the compare-and-update (no row writes, so no journal, so safe on this mount -- unlike `production/state.py`, which R302 stage 0 had to move to `journal_mode=PERSIST` for exactly that reason). **What is left is the delivery manifest's read-modify-write and the date-keyed scope.**
 
 **Rider 2026-09-08 (ed12, F08): the pointer has a CAS and the manifest does not, and the scope key is wrong.** `promote_run` already carries `expected_pointer_sha256` (compare-and-swap, landed 07-28); `record_delivery` (`upload_manifest.py:253-310`) and `claim.cmd_take` (`tools/claim.py:193-224`) still do separate compare-then-write steps, and "current" is keyed by date and display tag rather than account namespace + provider draftgroup + sport + format + slate date. The S here is a CAS inside `record_delivery` and the full scope key; the transactional store with delivery history as a derived JSON view stays R36 F6m(2)'s M-lift. Roadmap: Session 17 with R269, R283, R274.
 
@@ -9378,113 +9339,68 @@ pass; a `--gate-run` changes no byte under `outputs/`; every R-number in step 6
 has its board entry migrated or rewritten to its remainder; R302 carries a stage-0
 status line with both XS fixes named as landed.
 
-**Rider: repairs (1)-(4) MEASURED 2026-09-10, WRITTEN to the working tree
-2026-09-11, and NOT committed. The device shell was down across both dates
-(`device_bash` -> `no Plan9 drive shares mounted`), so `claim.py`, `git` and the
-gate on the mount were all unavailable, and step 6 and step 7 stay open.**
-**The shell failure now has a NAMED cause and it is not this repo's:** the
-desktop reports that a Windows update released 2026-09-08 stops the Cowork
-workspace from mounting the folder. `device_list_dir` / `device_stage_files` /
-`device_commit_files` keep working throughout, which is how these files reached
-disk; treat the mount as gone until Ben says the desktop is fixed, and do not
-spend a session rediscovering it. Target mtimes were re-read immediately before
-the write and none had moved since staging; `claims/` held nothing for
-2026-09-10 or 2026-09-11 and no slate beacon was lit. Every claim below is a container measurement on a reproduction of this
-disk's tree (the staged working-tree files under the pinned
-`requirements-production.lock` stack: CPython 3.11, numpy 2.2.6, pandas 2.3.3,
-scipy 1.15.3, pydantic 2.12.5, pytest 8.4.2), not a reading.
+**Rider 2026-09-11: steps 1-7 are WRITTEN TO DISK and NOT COMMITTED. The
+remainder of this item is two `git commit` calls and one gate, all three of
+which need Ben's machine.** The device shell has been down since 2026-09-09
+(`device_bash` -> `no Plan9 drive shares mounted`), the desktop names the cause
+as a Windows update released 2026-09-08, and it does not clear by retrying.
+`device_list_dir` / `device_stage_files` / `device_commit_files` keep working,
+which is how every file below reached disk, so a session in this state can do
+the whole of the engineering and none of the git.
 
-- **(1) bank_cache tombstones, DONE.** `drop_stale_jobs` still DROPS on the v1.2
-  rule; it now RETIRES only where the call can prove the stored answer answers a
-  different question: `projection_digest` supplied AND `conditions_index` places
-  that signature under a different digest. The asymmetry with `_live` is
-  deliberate and stated in the docstring: an unplaceable signature fails CLOSED
-  for the drop (this caller must not serve it) and OPEN for the tombstone (an
-  unregistered signature is what a concurrent writer's bucket looks like before
-  it registers). `test_a_purge_no_longer_erases_the_other_sessions_work_on_disk`
-  is restored to its original assertions verbatim from
-  `implementation.patch`. **The two tests the entry says must both pass were
-  shaped identically apart from the digest, so as written they contradicted each
-  other**: `test_cache_invalidation_survives_a_stale_writer` called
-  `drop_stale_jobs("new")` with no digest and no `conditions_index`, which is the
-  R55/R130 narrowing, not the F11 invalidation. It now registers both digests and
-  passes one, which is the case the entry's own "(the F11 case)" names. Both
-  pass: `BankCacheMergeOnSaveTests` 3/3, `test_greenfield_regressions.py` 29/29.
-- **(2) audit drift assertions, DONE.** Both `assertIn(line, CLAUDE.md)`
-  assertions restored (`AuditSkipHonestyTests`, `SplitGateTests`), and the count
-  moved to what the tree prints: `PASS  v2.26.0  40 modules  1935 tests` in
-  CLAUDE.md's session-start step and `skills/generate-lineups/SKILL.md`'s audit
-  line. 40 counted off the filesystem by `engine_module_count`, not asserted.
-  `AuditSkipHonestyTests` + `SplitGateTests` 22/22.
-- **(3) `invalid_hard_lock` scoped to operator locks, DONE**, by the
-  `operator_locks` flag rather than F14's soft-lock field, which stays Session 8.
-  `build_showdown_lineup(operator_locks: bool = True)`; `solve_ladder`'s `_rung`
-  passes False once, covering all nine rung call sites, because every
-  `locks`/`cpt_lock` it passes is thesis-sourced (`:1268`, `:1307`). The refusal
-  stays live on the operator door, including `build_showdown_bank`'s `**kwargs`
-  passthrough, so the two `build_showdown_lineup`-direct tests the patch
-  rewrote (`ShowdownDiversityTests`, `R291ShowdownExcludedColumnTests`) keep
-  their new form and were NOT reverted. Only the thesis-path test was restored:
-  `ShowdownThesisLadderTests.test_a_thesis_lock_outside_the_pool_reaches_the_ladder_diagnostics`
-  asserts `ignored_locks == ["cpt:GHOST|ZZ"]` again, plus F13's counters clean.
-  `tests.test_showdown` 219/219 OK.
-- **(4) `MLB_DFS_ARTIFACT_ROOT` per suite subprocess, DONE, and the class had TWO
-  members.** The entry named `audit.py:1294`, the `--run-tests` path; the split
-  gate built its own env at `:2043`, and that is the one sessions actually run.
-  One `suite_subprocess_env(root, deps=None, artifact_root=None)` now serves both
-  and neither implements it (R233), setting `PYTHONHASHSEED`, the vendored
-  `PYTHONPATH` and a throwaway artifact root; `run_audited_suites` gives each
-  suite its own subdirectory under it; `_isolated_artifact_root` bounds the
-  cleanup to a path this module minted, so an operator-pinned root is respected
-  and never deleted. **Verified by the evidence the entry asks for, both
-  directions.** Same tree, same seeded `outputs/<date>/upload_manifest.json`
-  sentinels: with the variable unset (the pre-fix gate), one
-  `python -m unittest tests.test_core` overwrote
-  `outputs/2026-06-11/upload_manifest.json` and created
-  `outputs/2026-06-11/DKEntries_1300_2g.csv` and
-  `data/slates/2026-06-11/DKSalaries_1300_2g.csv`; with the fix, a full
-  five-call `--gate-run` to `GATE COMPLETE` (test_core 156/156; test_showdown
-  25/25; test_upload_integrity 48/48; test_golden_replay 2/2; test_paste_lineups
-  14/14) changed **zero bytes** under `data/`, `outputs/`, `runs/` and
-  `tests/fixtures/`. R274 closes on that, on the gate path.
+**Done, on disk.** Repairs (1)-(4), measured 2026-09-10 and written 2026-09-11
+(the detail is in the 2026-09-11 CHANGELOG entry, not repeated here; do NOT
+re-derive them, including the two places this entry's own instructions were
+wrong -- the F11 and R55 tests contradicted each other as written, and the
+repair-(4) class had two members rather than the one named). Step 5's four
+riders: `_gate_bool` measured and left alone with the measurement in its
+docstring; `audit.py`'s `ignored_locks` comment corrected; R180(c) -- this entry
+said (e), see the note on R180 -- cleared for the two pytest suites by a
+`PYTEST_SUITES` runner branch, which moves the pinned line to
+`PASS  v2.26.0  40 modules  2066 tests` in CLAUDE.md and SKILL.md; and the
+production/pydantic grep pin written as a TEST
+(`test_no_legacy_module_imports_the_production_package_or_pydantic`, 65 files
+scanned, zero hits) rather than a line in a changelog. Step 6 and step 7's
+CONTENT: both XS fixes (`dfs.py` compares `Path(sys.prefix)`, `state.py` is
+`journal_mode=PERSIST`), `.gitignore`'s named evidence list, the dated spec
+moved beside its predecessors, the two CHANGELOG entries, and this board's
+migrations -- R330, R331 and R329 deleted as fully landed, thirteen entries
+rewritten to their remainders.
 
-**Suite state in the container, repaired tree:** test_core 1215 run / 1 failure,
-test_showdown 219 OK, test_upload_integrity 394 OK, test_paste_lineups 98 OK,
-test_golden_replay 0 run / 2 skipped, pytest `test_greenfield_regressions.py` +
-`test_production.py` 130 passed. **The one failure and the two skips are the
-container's partial tree, not the repairs, and the check is a baseline
-comparison, not an opinion**: the same tree with only these nine files reverted
-to the outside implementation's versions fails the identical single test
+**Not done, and it is exactly three things.**
+
+1. **Commit ONE.** `git add` by explicit path: the 24 legacy files, plus
+   `tests/conftest.py`, `tests/test_greenfield_regressions.py`, `CLAUDE.md`,
+   `skills/generate-lineups/SKILL.md`, `CHANGELOG.md`, `docs/backlog.md`.
+2. **Commit TWO**, R302 stage 0: `mlb_engine/production/`, the four new tools,
+   `tests/test_production.py`, `requirements-production.lock`,
+   `docs/production_runbook.md`, `.gitignore`, the seven evidence artifacts and
+   the moved spec.
+3. **The gate on the MOUNT, and step 8.** `python tools/audit.py --gate-run
+   --gate-budget 130 --gate-ceiling 165` to GATE COMPLETE, then `--gate-report
+   --terse`, from PowerShell against the project `.venv`; then
+   `python tools/solver_probe.py`, because the schema-2 digest orphaned every
+   bank bucket on disk. `claims/` held no slate beacon when this was written.
+
+**What was run instead, and what it may NOT be quoted as.** A container
+reproduction of this tree under the pinned `requirements-production.lock` stack,
+seven `--gate-run` calls to GATE COMPLETE: test_core 1215/1215 (1 failure),
+test_showdown 219/219, test_upload_integrity 394/394, test_golden_replay 0/9,
+test_paste_lineups 98/98, test_greenfield_regressions 30/30,
+test_production 101/101. **It is PARTIAL and it is not the mount's gate.** The
+one failure and the nine-test shortfall are the staged tree, PROVEN by a
+baseline comparison rather than asserted: a second copy with every file this
+session edited reverted to its pre-edit bytes produced the identical failure set
 (`TestDataDependenciesAreVendoredOrGuardedTests.test_no_test_reads_gitignored_data_without_a_skip_guard`,
-which wants `data/slates`, `data/archive` and `data/standings` tracked by git and
-none of the three was staged). The gate on the MOUNT is unrun and unclaimed, so
-no pinned line from this session may be quoted as the gate's.
+which wants `data/slates`, `data/archive` and `data/standings` tracked, none of
+which was staged; and `test_golden_replay` collecting 0 and skipping 2). 2057 of
+2066 is exactly those nine.
 
-**What is left of this item, unchanged:** step 5's riders, step 6's commit and
-board migration, step 7's commit-two with its two XS fixes, and step 8 (slate
-boundary, `solver_probe` after, and R271(c)'s scipy sentence in CLAUDE.md). Nine
-files carry the repairs: `mlb_engine/optimize/bank_cache.py`,
-`mlb_engine/optimize/showdown.py`, `mlb_engine/optimize/showdown_theses.py`,
-`tools/audit.py`, `tests/test_core.py`, `tests/test_showdown.py`,
-`tests/test_greenfield_regressions.py`, `CLAUDE.md`,
-`skills/generate-lineups/SKILL.md`. CHANGELOG.md is deliberately untouched: a completed entry migrates in the COMMIT, and nothing has shipped. NEXT stays Session 4b.
+**Done when, revised to what is left:** `git status --short` on the mount shows
+no engine dirt; the gate prints `PASS  v2.26.0  40 modules  2066 tests` from
+Ben's `.venv`; a `--gate-run` changes no byte under `outputs/`; `solver_probe`
+has been run after the landing and its result is in the commit body.
 
-### R331. Manifest paths are not confined to their run: an absolute, drive, UNC, `..` or symlink-escaping `relative_path` binds an external file as an artifact (P2, XS) [Security] | new 2026-09-08, from the greenfield twelfth edition (F07); VERIFIED-read; a local untrusted-manifest boundary, not remote exposure
-
-**Rider 2026-09-10 (thirteenth edition, D05): LANDS in R338.** One `confined()` resolver in `verify_run_bundle` rejects absolute, `..`, Windows-drive and symlink-escaping relative paths for inputs, artifacts and diagnostic sources; hash verification still follows.
-
-- **What.** `verify_run_bundle` (`build_state_manager.py:245, 257, 275`) joins the
-  manifest's recorded paths onto `run_dir` without rejecting an absolute path, a
-  drive or UNC prefix, `..` segments, or a symlink that resolves outside the run.
-  A tampered or imported manifest can therefore have an external file accepted as
-  a bound artifact, or reveal an external path's existence and hash.
-- **Fix.** One `confined_run_file(run_dir, relative_path)` resolver used for every
-  recorded input, artifact and diagnostic before it is read: reject absolute,
-  drive and `..` parts, resolve strictly, require the target to be a regular file
-  inside the resolved root. Hash verification stays mandatory after confinement.
-  Acceptance: traversal, absolute Windows paths, UNC paths and escaping symlinks
-  fail; ordinary nested artifacts pass. Roadmap: Session 46, same file as R330 and
-  landed after it.
 
 ### R300. The two tests that would have caught the two worst recent classes, and the string pins standing in for behaviour on money-adjacent claims (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-X1, X2, X3, X5); VERIFIED-read
 
@@ -9858,7 +9774,7 @@ A harness applying single-line mutations — drop preflight's blank-row check, s
 
 ### R271. MOSTLY SHIPPED 2026-09-02. The remainder is ONE decision: whether `audit.py`'s gate defaults move with the text (P3, XS; one file, one line) | new 2026-08-29, from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md`; independently re-measured by the filing DEV session
 
-**Rider 2026-09-10 (thirteenth edition, D28): (c)'s premise is now FALSE.** The edition installed a pinned project `.venv` on Ben's Windows machine (CPython 3.13.7, numpy 2.2.6, pandas 2.3.3, scipy 1.15.3, pydantic 2.12.5; `requirements-production.lock`) and the baseline suite ran there: 1,935 passed in 512s. `tools/env_probe.ensure_vendored_on_path` returns None when `sys.prefix` is that `.venv`, so `.pylibs` cannot shadow it. CLAUDE.md's "his Windows Python has no scipy" moves in R338; the gate is still the session's job by policy, not by impossibility.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** (c)'s PREMISE is retired, not its instruction. CLAUDE.md's "his Windows Python has no scipy and `.pylibs/` is a Linux build" is false: the thirteenth edition installed a pinned project `.venv` (CPython 3.13.7, numpy 2.2.6, pandas 2.3.3, scipy 1.15.3, pydantic 2.12.5) and the baseline suite ran there, 1,935 passed in 512s, with `env_probe.ensure_vendored_on_path` returning None when `sys.prefix` is that `.venv`. The sentence now says the gate is the session's job by POLICY -- a gate the operator runs is a gate the session that changed the code did not -- with one licensed exception for a session that cannot reach the mount at all. **What is left of this entry is the decision it names**, unchanged.
 
 **Rider 2026-09-02 (ed10, §3.2).** The sweep's own count was short by two: `timeout 33 python -u …` survives at `skills/generate-lineups/SKILL.md:616` and `:665`, a 45-second-era budget inside the one file every BUILD session reads, five lines from the paragraph that says "130s. One number." Tenth sighting of the N+1 event, inside the fix that cites R233. Two-line edit; lands with R301(1) or alone.
 
@@ -10287,6 +10203,8 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
 
 ### R180. Audit-hardening batch: the debt check is blind to the highest-authority files, one changelog commit amnesties older debt, and no reconciliation catches an unregistered suite (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a)(b) VERIFIED-repro at ac8ac05, (a)(e)(g) re-confirmed at ec832cf (`audit.py:1378`, `:1917`, `:350`)
 
+**Note 2026-09-11 (R338 step 5), and it corrects this board's own numbering.** The R338 entry cited "R180(e)" for the unregistered-suite gap; the unregistered-suite item is **(c)**, and (e) is the two-warning truncation on the terse line. R338 cleared (c)'s CURRENT INSTANCE by registering `tests.test_greenfield_regressions` and `tests.test_production` in `AUDITED_SUITES` behind a `PYTEST_SUITES` runner branch. It did NOT build (c)'s fix, which is the meta-test globbing `tests/test_*.py` against `AUDITED_SUITES` so the NEXT unregistered suite cannot sit outside the gate. (a), (b), (c)'s reconciliation test, (d), (e), (f) and (g) all remain.
+
 - **What:** (a) `CHANGELOG_TRACKED_PATHS` omits `MLB_Classic.md`,
   `MANIFEST.md`, `requirements.txt`, `requirements.lock`, `.gitignore`,
   `.gitattributes` — a commit changing the strategy authority with no
@@ -10454,7 +10372,7 @@ name which reading was taken.
 
 ### R216. The gate's tree fingerprint omits `skills/`, while ~20 gated tests exec `build_slate.py` (P1, XS; lands alone) | new 2026-08-24, from the greenfield seventh edition (GF7-T1) and independently from the outside spec (D01); VERIFIED-read at `tools/audit.py:1016`, coordinator-re-read, re-read here. **Rider 2026-08-27 (ed8 F-01):** while the manifest is open, include `requirements.txt`/`requirements.lock` and `data/reference/reference_manifest.json` in the fingerprint — behavior-changing inputs the same reuse argument covers — and stamp the record with the runtime identity R217(d) defines, so a reused unit is provably same-tree AND same-interpreter.
 
-**Rider 2026-09-10 (thirteenth edition, D22): LANDS in R338.** `tree_fingerprint` now walks `skills/generate-lineups/scripts` and hashes `requirements.lock`, `requirements-production.lock`, `pyproject.toml` and any `config/ configs/ schemas/` files. Gate state resets on landing; the interpreter stamp (R217) is not in it.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The fingerprint half shipped: `tree_fingerprint` walks `skills/generate-lineups/scripts` and hashes `requirements.lock`, `requirements-production.lock`, `pyproject.toml` and any `config/ configs/ schemas/` files, and the widening reset `.audit_gate/` state on landing as this entry predicted. **What is left**: the runtime-identity stamp R217(d) defines (a reused unit is provably same-tree but not yet same-interpreter), `env_probe._reprobe_subprocess`'s import-only check, and the write-free `compile(source, path, "exec")` syntax check.
 
 **Rider 2026-09-08 (ed12, F35): confirmed at `15f87a2` with two mechanics added.** `tree_fingerprint` (`audit.py:1588-1610`) still omits the 5,076-line `build_slate.py` entry point and the configuration/reference dependencies the 08-27 rider named; `env_probe._reprobe_subprocess` (`:135-141`) checks import success only, weaker than the initial version comparison; explicit compile operations can write bytecode even under `-B`. Use `compile(source, path, "exec")` for a write-free syntax check, derive the path list from a reviewed manifest (`skills/generate-lineups/scripts`, requirements, rules, test fixtures, dependency metadata), and bind the record to the runtime identity so a reused unit is same-tree AND same-interpreter. Still lands alone at a session boundary. Roadmap: Session 43.
 
@@ -10880,7 +10798,7 @@ item's effective priority without changing its label.
 
 ### R44. `extract_inbox_zips.py` re-extracts contests already archived, refilling the inbox forever (P2, S) | new 2026-08-03, filed by ARCHIVE (`docs/backlog_inbox/2026-08-03_ARCHIVE_inbox-refill-and-scan-tooling.md`), item 1 of that fragment (item 2 landed the same day as R43)
 
-**Rider 2026-09-10 (thirteenth edition, D21): the F32 rider LANDS in R338; the idempotence defect this entry is about does not.** Duplicate-basename refusal, explicit overwrite for differing bytes, a 512 MiB total bound, name-length checks and atomic extraction. Archived contests still re-extract.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The F32 rider shipped: duplicate-basename refusal, explicit overwrite for differing bytes, a 512 MiB total bound, name-length checks and atomic extraction. **The idempotence defect this entry is actually about did NOT land**: archived contests still re-extract, and that is the whole of what is left.
 
 **Rider 2026-09-08 (ed12, F32): re-adjudicated a third time, same ruling.** The edition re-files the D26 member/byte/basename limits as Security and adds two facts: a different ZIP member flattening to an EXISTING basename is returned as though it came from the current archive without a content comparison, and `src.read()` decompresses an unbounded member. Both are adopted onto the existing rider (refuse a differing existing CSV, bound the member read, preserve source archive/member hashes); the severity stays prevention, since these are Ben's own DK exports. No re-file.
 
@@ -11287,7 +11205,7 @@ The open tail is **R61-tail** below.
 
 ### R225. Showdown duplication counting is captain-blind at all three miner sites, and Tier 2's grading substrate inherits it (P1, S; PRECONDITION ON R10) | new 2026-08-24, from the greenfield seventh edition (GF7-S1) and independently from the outside spec (D20); VERIFIED-read at all three sites, coordinator-re-read, re-read here
 
-**Rider 2026-09-10 (thirteenth edition, D13): ONE of four sites LANDS in R338.** `mine_contest`'s duplication key is `("CPT", captain, "PLAYERS", *players_norm)` when a CPT slot exists, and `winner_copies` uses it. The other two miner sites and preflight's advisory (`preflight_upload.py:2330-2345`) stay, as does the one-identity-function shape this entry asks for.
+**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** ONE of four sites shipped: `mine_contest`'s duplication key is `("CPT", captain, "PLAYERS", *players_norm)` when a CPT slot exists, and `winner_copies` uses it. **What is left is the other two miner sites, preflight's advisory (`preflight_upload.py:2330-2345`), and the one-identity-function shape this entry asks for.**
 
 **Rider 2026-09-08 (ed12, F28): a FOURTH site, in the referee.** `preflight_upload.advisory` (`:2330-2345`) builds its duplicate signature from the sorted person set exactly as the three miner sites (`field_miner.py:958-969`) do, while `captain_norm` is parsed at `:304` and unused. Same fix: an exact key `(captain, sorted utils)` that refuses a captain inside the utils or a wrong count, beside a person-set overlap measure; archival names without ids are labelled approximate with collisions retained. Roadmap: Session 11.
 

@@ -9,9 +9,11 @@ Extract-only; touches only the inbox folder.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import zipfile
+import uuid
 from pathlib import Path
 from typing import List, Optional
 
@@ -28,17 +30,41 @@ def infer_contest_id(name: str) -> str:
 def extract_zip(zip_path: Path, dest: Optional[Path] = None, overwrite: bool = False) -> List[Path]:
     """Extract every .csv member of one zip into ``dest`` (flattened to basename)."""
     dest = Path(dest or Path(zip_path).parent)
+    dest.mkdir(parents=True, exist_ok=True)
+    dest = dest.resolve()
     out: List[Path] = []
     with zipfile.ZipFile(zip_path) as zf:
-        for member in zf.namelist():
-            if member.endswith("/") or not member.lower().endswith(".csv"):
-                continue
-            target = dest / Path(member).name
+        members = [m for m in zf.infolist() if not m.is_dir() and m.filename.lower().endswith(".csv")]
+        names = [m.filename.replace("\\", "/").rsplit("/", 1)[-1] for m in members]
+        if len(names) != len(set(n.casefold() for n in names)):
+            raise ValueError("ZIP contains colliding CSV basenames")
+        if sum(m.file_size for m in members) > 512 * 1024 * 1024:
+            raise ValueError("ZIP expands beyond the 512 MiB limit")
+        for member, name in zip(members, names):
+            if not name or ":" in name:
+                raise ValueError("invalid CSV basename")
+            target = (dest / name).resolve()
+            if not target.is_relative_to(dest):
+                raise ValueError("ZIP destination escapes inbox")
+            with zf.open(member) as src:
+                raw = src.read(min(member.file_size, 512 * 1024 * 1024) + 1)
+            if len(raw) != member.file_size:
+                raise ValueError("ZIP member size mismatch")
             if target.exists() and not overwrite:
+                if target.read_bytes() != raw:
+                    raise ValueError("existing CSV differs from ZIP; refusing silent collision")
                 out.append(target)
                 continue
-            with zf.open(member) as src, target.open("wb") as fh:
-                fh.write(src.read())  # byte copy preserves the BOM field_miner expects
+            temp = dest / ("." + uuid.uuid4().hex[:12] + ".tmp")
+            try:
+                with temp.open("xb") as fh:
+                    fh.write(raw)
+                    fh.flush()
+                    os.fsync(fh.fileno())
+                os.replace(temp, target)
+            finally:
+                if temp.exists():
+                    temp.unlink()
             out.append(target)
     return out
 
@@ -49,8 +75,8 @@ def extract_inbox(inbox: str = DEFAULT_INBOX, overwrite: bool = False) -> List[d
     for zp in sorted(inbox_dir.glob("*.zip")):
         try:
             csvs = extract_zip(zp, inbox_dir, overwrite=overwrite)
-        except zipfile.BadZipFile:
-            results.append({"zip": zp.name, "error": "not a valid zip"})
+        except (zipfile.BadZipFile, ValueError, OSError) as exc:
+            results.append({"zip": zp.name, "error": str(exc)})
             continue
         for c in csvs:
             results.append({"zip": zp.name, "csv": c.name, "contest_id": infer_contest_id(c.name)})

@@ -2,7 +2,7 @@
   "aggregates": {
     "bank": {
       "candidates": 30,
-      "conditions_signature": "d7869e7fc4941e3d",
+      "conditions_signature": "efeef2104be09c88",
       "jobs_total": 64
     },
     "enrichment": {

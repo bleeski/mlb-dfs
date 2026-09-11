@@ -144,14 +144,38 @@ class ContestGridSummary:
 
 
 def _gate_bool(value: Any) -> bool:
+    """Literal True, or a gate block whose own verdict is literal True.
+
+    R297(b) made the last line an IDENTITY check on purpose: a gate value of
+    1, "yes", "false" or a non-empty dict is a caller who did not answer the
+    question, and truthiness answered it for them.
+
+    R338 step 5 asked the obvious follow-up, because `numpy.bool_` is neither
+    `bool` nor an `int` subclass and `np.True_ is True` is False: does anything
+    that certifies actually hand this a numpy boolean? MEASURED on this tree,
+    not reasoned about. Every value reaching here was traced across
+    `tests.test_upload_integrity` (394 tests) and `tests.test_core` (1215
+    tests): 193 calls, 191 `builtins.bool` and 2 `builtins.NoneType`, no numpy
+    type at either door. The three producers agree with that reading.
+    `contest_allocator` writes Python literals at every `selection_certified` /
+    `allocation_certified` site; `execution_pipeline` wraps its own two derived
+    gates in `bool()` (`:4678-4679`); and `derive_workflow_certification` below
+    -- the POST-export half, which is what `build_state_manager.promote_run`
+    then requires literal True from -- runs every incoming value through
+    `bool()` before it ever compares.
+
+    So the identity check is safe where it stands. What it is NOT safe against
+    is a future caller putting a pandas or numpy boolean into `workflow_gates`
+    itself, and that direction fails CLOSED: the gate reads as failed and the
+    build is refused, never certified on a value nobody checked. Left as is
+    rather than widened, because widening this is how "1 means yes" comes back.
+    """
     if isinstance(value, Mapping):
         for key in ("passed", "selection_certified", "allocation_certified"):
             if key in value:
                 return _gate_bool(value[key])
         return False
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "pass", "passed", "certified"}
-    return bool(value)
+    return value is True
 
 
 def validate_upload_ready_gates(gates: Optional[Dict[str, Any]], allocation_required: Optional[bool] = None) -> Dict[str, Any]:
@@ -701,6 +725,8 @@ def validate_template_preservation(source_path: str | Path, candidate_path: str 
             if s[col] != c[col]:
                 errors.append(f"non-roster cell changed at row {i}, column {col + 1}")
         source_entry = source_entries.get(i)
+        if source_entry is None and s[ROSTER_START_COL:roster_end] != c[ROSTER_START_COL:roster_end]:
+            errors.append(f"header or non-entry roster-window cell changed at row {i}")
         if source_entry and source_entry.is_complete and source_entry.entry_id not in mutable:
             if s[ROSTER_START_COL:roster_end] != c[ROSTER_START_COL:roster_end]:
                 errors.append(f"completed Entry ID {source_entry.entry_id} changed")
@@ -896,6 +922,11 @@ def validate_dk_entries_file(
     invalid_ids: List[Dict[str, Any]] = []
     legal_rosters: List[Tuple[DKEntryRow, Tuple[str, ...]]] = []
     by_contest_sig: Dict[str, Counter] = defaultdict(Counter)
+
+    if not entries:
+        errors.append("entries file contains no reserved Entry IDs")
+    if not players:
+        errors.append("authoritative salary CSV is required for salary and positional legality")
 
     if contract_name != "CLASSIC":
         errors.append(

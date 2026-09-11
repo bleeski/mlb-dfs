@@ -67,8 +67,7 @@ def _savant_name_key(last_comma_first: str) -> str:
 
 
 def _build_name_to_mlbam(table, corrections: Mapping[str, float]) -> Tuple[Dict[str, str], Dict[str, int]]:
-    """Map normalized 'first last' -> MLBAM player_id, keeping the highest-PA row
-    on a name collision. Also returns the collision counts for reporting."""
+    """Map only unambiguous names; a PA ranking cannot establish identity."""
     best_pa: Dict[str, float] = {}
     name_to_id: Dict[str, str] = {}
     collisions: Dict[str, int] = {}
@@ -80,13 +79,13 @@ def _build_name_to_mlbam(table, corrections: Mapping[str, float]) -> Tuple[Dict[
         if not key:
             continue
         pa = float(row.get("pa") or 0.0)
-        if key in name_to_id:
+        if key in name_to_id and name_to_id[key] != pid:
             collisions[key] = collisions.get(key, 1) + 1
             if pa <= best_pa.get(key, -1.0):
                 continue
         best_pa[key] = pa
         name_to_id[key] = pid
-    return name_to_id, collisions
+    return {key: pid for key, pid in name_to_id.items() if key not in collisions}, collisions
 
 
 def _read_salary_pool(salary_csv: str | Path) -> List[Dict[str, str]]:

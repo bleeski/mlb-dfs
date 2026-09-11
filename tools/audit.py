@@ -39,7 +39,25 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
                   # sits on the intake front door and belongs inside the gate.
                   # Its failure mode is a plausible lineup on the wrong team,
                   # which no other suite would catch.
-                  "tests.test_paste_lineups")
+                  "tests.test_paste_lineups",
+                  # R180(e), landed by R338 step 5. The thirteenth edition
+                  # arrived with two suites this gate could not see, and one of
+                  # them is the suite that pins R338's own four repairs. A gate
+                  # blind to the tests that prove the change it is gating is the
+                  # defect R62 is filed on, arriving through a new runner.
+                  "tests.test_greenfield_regressions",
+                  "tests.test_production")
+
+# The suites above that pytest runs and `python -m unittest` cannot. Both use
+# bare `assert` and pytest fixtures (`tmp_path`, `monkeypatch`), so unittest
+# collects ZERO tests from them and reports `Ran 0 tests` -- an empty pass,
+# which is the one shape a gate must never produce. They are run as ONE unit
+# each rather than chunked by class: the split gate exists because
+# `tests.test_core` needs ~89s and cannot fit a call, while these two need 0.8s
+# and 5.8s measured under the pinned stack, so per-class chunking would buy
+# nothing and add a second enumeration path to keep honest.
+PYTEST_SUITES = frozenset({"tests.test_greenfield_regressions",
+                           "tests.test_production"})
 
 # R62: the per-suite pin, not a comment beside a total. The total used to be
 # one int with the breakdown written next to it in prose, which meant the
@@ -788,14 +806,25 @@ EXPECTED_SUITE_COUNTS = {
     # a path where `grep Excluded showdown*.py` used to return nothing. The
     # no-column fixture unchanged, the flag OR'd across the CPT and UTIL rows,
     # an excluded declared SP reaching no lineup in a five-deep bank, a lock and
-    # a cpt_lock naming him landing in `ignored_locks` instead of overriding the
-    # pool, the brief block's count and legal pool, an unrecognized token
+    # a cpt_lock naming him REFUSED rather than overriding the pool, the brief
+    # block's count and legal pool, an unrecognized token
     # keeping the player (counted per CELL, since a Showdown file has two rows
     # per person), and the one-team refusal. That last one is the test that
     # earns its place: the both-teams MILP rows are built from the LEGAL pool,
     # so an exclusion covering one side made that rule vacuously true and
     # returned a six-man one-team lineup -- the exact vacuity the melt refuses a
     # single-team FILE for, reachable through a new door.
+    # R338 step 5, 2026-09-11, count UNCHANGED: the sentence above said those
+    # two tests pinned the lock "landing in `ignored_locks`", and it has been
+    # wrong twice over since the thirteenth edition. F14 made an operator lock
+    # naming an absent player a REFUSAL before constraint assembly
+    # (`showdown.py:696`), so `build_showdown_lineup` returns None with
+    # `status="invalid_hard_lock"` and no lineup is built at all -- which is
+    # what `R291ShowdownExcludedColumnTests.test_no_caller_instruction_can_put_
+    # him_back` asserts now. And R338 repair (3) scoped that refusal to the
+    # OPERATOR door, so `ignored_locks` is live again on the thesis path and is
+    # no longer a field this pair of tests is about. Same seven tests, same
+    # count; only the behaviour they pin moved.
     # R306, 2026-09-03: 173 -> 201, the twenty-eight that pin the Showdown
     # captain market. Four budgets (captain 100%, roster 600%, the Classic
     # 800/200 left alone, and the 6:1 identity between the two Showdown ones),
@@ -1071,6 +1100,16 @@ EXPECTED_SUITE_COUNTS = {
     # that disagree (against an exact repeat, which does not block), a price
     # inside the +/-100 gap, and a header the parser cannot read.
     "tests.test_paste_lineups": 98,
+    # R338 step 5, 2026-09-11. Two pytest suites the thirteenth edition wrote
+    # and this gate could not see (R180(e)). Both pins are counted off a run
+    # under the pinned `requirements-production.lock` stack, not off the
+    # edition's paperwork.
+    # test_greenfield_regressions: 29 as the edition left it, +1 for the R338
+    # step 5 grep pin (no legacy module imports `mlb_engine.production` or
+    # `pydantic`), which belongs in a suite rather than only in a changelog --
+    # a boundary nothing executes is a boundary that rots on the next import.
+    "tests.test_greenfield_regressions": 30,
+    "tests.test_production": 101,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this
@@ -1416,6 +1455,93 @@ def parse_unittest_report(text: str) -> Dict[str, Any]:
     return out
 
 
+def parse_pytest_report(text: str) -> Dict[str, Any]:
+    """The same three numbers off pytest's summary line, for PYTEST_SUITES.
+
+    Deliberately the same shape as parse_unittest_report so classify_suite,
+    summarize_suite_results and assemble_gate need no runner awareness: one
+    verdict vocabulary, two footers.
+
+    pytest's footer is a comma-separated list of `<n> <outcome>` in a banner
+    (`===== 1 failed, 28 passed, 1 skipped in 0.42s =====`), and the outcomes
+    present depend on what happened, so each is read independently rather than
+    against one combined pattern. `ran` is the SUM, because pytest reports no
+    "Ran N" of its own and a pin compared against `passed` alone would read a
+    suite that failed half its tests as a clean shortfall of exactly zero.
+    `errors` are kept separate from `failures` for the same reason unittest
+    does: an error is usually a broken fixture and a failure an assertion, and
+    collapsing them hides which.
+
+    A suite that COLLECTED nothing returns ran=0 rather than None, and
+    classify_suite then calls it a shortfall against its pin. That is the case
+    this function exists for: `python -m unittest tests.test_production` prints
+    `Ran 0 tests ... OK`, and the old gate would have taken that as a pass.
+    """
+    out: Dict[str, Any] = {"ran": None, "skipped": 0, "failures": 0,
+                           "errors_count": 0}
+    counts = {}
+    for word in ("passed", "failed", "skipped", "error", "errors", "xfailed",
+                 "xpassed", "deselected"):
+        found = re.search(rf"(\d+)\s+{word}\b", text)
+        if found:
+            counts[word] = int(found.group(1))
+    if not counts and not re.search(r"no tests ran", text):
+        return out
+    out["skipped"] = counts.get("skipped", 0)
+    out["failures"] = counts.get("failed", 0)
+    out["errors_count"] = counts.get("errors", counts.get("error", 0))
+    # `deselected` tests were never run and must not be counted as coverage.
+    out["ran"] = sum(counts.get(w, 0) for w in
+                     ("passed", "failed", "skipped", "error", "errors",
+                      "xfailed", "xpassed"))
+    return out
+
+
+def run_one_pytest_suite(root: Path, name: str, env: Dict[str, str],
+                         timeout: Optional[float] = None) -> Dict[str, Any]:
+    """One PYTEST_SUITES member, whole, in its own subprocess.
+
+    Returns a record in `parse_unittest_report`'s shape plus `present`,
+    `returncode` and `ok`, so both the single-call path and the split gate can
+    record it exactly as they record a unittest unit.
+
+    pytest's own exit codes are used rather than re-derived from the counts:
+    5 is "no tests collected", which is a SHORTFALL and never a pass, and 4 is
+    a usage error -- most plausibly pytest not being installed at all on a host
+    running from vendored `.pylibs`. Neither may read as green, so `ok` is
+    exit 0 AND a count that reached the pin's shape.
+    """
+    path = root / "tests" / f"{name.split('.')[-1]}.py"
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", str(path), "-q",
+             "-p", "no:cacheprovider"],
+            cwd=str(root), text=True, capture_output=True, env=env,
+            timeout=timeout)
+    except FileNotFoundError:
+        return {"present": True, "ran": None, "skipped": 0, "failures": 0,
+                "errors_count": 0, "returncode": 4, "ok": False,
+                "runner_error": "pytest is not installed for this interpreter"}
+    except subprocess.TimeoutExpired:
+        return {"present": True, "ran": None, "skipped": 0, "failures": 0,
+                "errors_count": 0, "returncode": 124, "ok": False,
+                "runner_error": f"{name} did not finish inside the call"}
+    combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    rec = parse_pytest_report(combined)
+    rec["present"] = True
+    rec["returncode"] = proc.returncode
+    rec["ok"] = proc.returncode == 0 and bool(rec.get("ran"))
+    if proc.returncode == 4:
+        rec["runner_error"] = ("pytest usage error; it is in "
+                               "requirements-production.lock and a host "
+                               "running from vendored .pylibs may not have it")
+    elif proc.returncode == 5:
+        rec["runner_error"] = f"{name} collected no tests"
+    rec["stdout_tail"] = (proc.stdout or "")[-2000:]
+    rec["stderr_tail"] = (proc.stderr or "")[-2000:]
+    return rec
+
+
 def classify_suite(name: str, rec: Dict[str, Any]) -> Dict[str, Any]:
     """One suite's count against its pin, as a verdict rather than a delta.
 
@@ -1568,6 +1694,18 @@ def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
                 per_suite = Path(base) / name.split(".")[-1]
                 per_suite.mkdir(parents=True, exist_ok=True)
                 suite_env["MLB_DFS_ARTIFACT_ROOT"] = str(per_suite)
+            # R338 step 5. The runner is a property of the suite, not of the
+            # path: both callers below pick it the same way, off PYTEST_SUITES.
+            if name in PYTEST_SUITES:
+                rec = run_one_pytest_suite(root, name, suite_env)
+                rec["passed"] = bool(rec.pop("ok", False))
+                out_tail = rec.pop("stdout_tail", "")
+                err_tail = rec.pop("stderr_tail", "")
+                results[name] = classify_suite(name, rec)
+                if not rec["passed"]:
+                    stdout_tail = out_tail
+                    stderr_tail = err_tail
+                continue
             proc = subprocess.run(
                 [sys.executable, "-m", "unittest", name],
                 cwd=str(root), text=True, capture_output=True, env=suite_env,
@@ -2113,6 +2251,42 @@ def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S,
     # function -- this is the path that actually runs the gate, so this is the
     # call that closes R274 on it.
     env = suite_subprocess_env(root)
+
+    # R338 step 5. A PYTEST_SUITES member is one unit and runs here, in the
+    # parent, rather than in `--gate-child`: the child is a unittest loader
+    # (`_unittest.TestSuite(tests)`) and has no way to hold a pytest test. It
+    # still goes through `_gate_append` in the same two record shapes every
+    # other suite uses, so `assemble_gate` needs no special case and
+    # completeness stays class coverage -- the class here being the module, at
+    # the granularity this suite is run.
+    if suite in PYTEST_SUITES:
+        allowed = gate_call_ceiling(ceiling, budget=budget)
+        left = max(5.0, allowed - (time.time() - started_at))
+        rec = run_one_pytest_suite(root, suite, env, timeout=left)
+        stem = suite.split(".")[-1]
+        now = datetime.now(timezone.utc).isoformat()
+        _gate_append(root, {
+            "kind": "enum", "suite": suite, "classes": {stem: []},
+            "tests": rec.get("ran") or 0, "present": True,
+            "fingerprint": fingerprint, "ts": now})
+        _gate_append(root, {
+            "kind": "unit", "suite": suite, "cls": stem,
+            "ran": rec.get("ran") or 0, "skipped": rec.get("skipped", 0),
+            "failures": rec.get("failures", 0),
+            "errors_count": rec.get("errors_count", 0),
+            "ok": bool(rec.get("ok")), "seconds": round(time.time() - started_at, 2),
+            "fingerprint": fingerprint, "ts": now})
+        throwaway = _isolated_artifact_root(env)
+        if throwaway is not None:
+            shutil.rmtree(throwaway, ignore_errors=True)
+        state = assemble_gate(root, fingerprint)
+        return {"complete": state["complete"], "reset": reset,
+                "ran_suite": suite, "state": state,
+                "timed_out": rec.get("returncode") == 124,
+                "child_error": rec.get("runner_error"),
+                "note": "gate complete: run --gate-report" if state["complete"]
+                else "more units remain: run --gate-run again"}
+
     deadline = time.time() + budget
     # Two clocks, and they are different promises. `budget` is when the child
     # stops STARTING units; the ceiling is when the parent gives up on the one

@@ -2989,6 +2989,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 report["verdict"] = verdict
                 code = verdict_exit_code(report["failures"], args.force)
 
+    # Persistence can add a hard failure after the initial report was assembled.
+    report["passed"] = not report["failures"]
     if args.json:
         print(json.dumps(report, indent=1, default=str))
     else:

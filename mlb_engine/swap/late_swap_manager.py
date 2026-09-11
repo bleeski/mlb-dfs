@@ -51,7 +51,7 @@ class GameLock:
     def normalized_start(self) -> datetime:
         value = self.start_time
         if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
+            raise ValueError("game lock time must include a timezone")
         return value.astimezone(timezone.utc)
 
 
@@ -69,8 +69,9 @@ class PlayerLineupStatus:
     risk_tag: str = ""
 
     def is_locked(self, as_of: datetime) -> bool:
-        lock = self.lock_time if self.lock_time.tzinfo else self.lock_time.replace(tzinfo=timezone.utc)
-        current = as_of if as_of.tzinfo else as_of.replace(tzinfo=timezone.utc)
+        if self.lock_time.tzinfo is None or as_of.tzinfo is None:
+            raise ValueError("lock and current time must include timezones")
+        lock, current = self.lock_time, as_of
         return current.astimezone(timezone.utc) >= lock.astimezone(timezone.utc)
 
     def is_tbd(self) -> bool:

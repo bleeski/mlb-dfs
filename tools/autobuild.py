@@ -273,18 +273,22 @@ class Decisions:
 
 
 def parse_brief(stdout: str) -> Dict[str, Any]:
-    i = stdout.find('{\n "status"')
-    if i < 0:
-        i = stdout.find('{"status"')
-    if i < 0:
-        return {}
-    try:
-        return json.loads(stdout[i:])
-    except Exception:  # noqa: BLE001
+    decoder = json.JSONDecoder()
+    found = []
+    offset = 0
+    while offset < len(stdout):
+        start = stdout.find("{", offset)
+        if start < 0:
+            break
         try:
-            return json.loads(stdout[i:stdout.rfind("}") + 1])
-        except Exception:  # noqa: BLE001
-            return {}
+            value, end = decoder.raw_decode(stdout, start)
+        except ValueError:
+            offset = start + 1
+            continue
+        if isinstance(value, dict) and isinstance(value.get("status"), str):
+            found.append(value)
+        offset = end
+    return found[-1] if found else {}
 
 
 def main() -> int:
@@ -594,7 +598,11 @@ def main() -> int:
             return 3
 
         if code == 0:
-            dec.add(attempt, "certified",
+            if not brief or not brief.get("delivered_path") or not brief.get("delivered_sha256"):
+                dec.add(attempt, "stop", "exit zero without a structured, hash-bound delivery is not certification")
+                _write(dec, brief, salary=a.salary)
+                return 3
+            dec.add(attempt, "delivered",
                     f"sha256={brief.get('delivered_sha256', '?')[:12]}",
                     delivered=brief.get("delivered_path"))
             break
@@ -690,7 +698,7 @@ def main() -> int:
         return 3
 
     _write(dec, last_brief, salary=a.salary)
-    return 0 if any(d["action"] == "certified" for d in dec.log) else 3
+    return 0 if bool(dec.log) and dec.log[-1]["action"] == "delivered" else 3
 
 
 def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:

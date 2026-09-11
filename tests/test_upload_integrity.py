@@ -2266,7 +2266,8 @@ class BankCacheCorrectnessTests(unittest.TestCase):
             self.assertTrue(path.exists())
             # no tmp files left behind
             self.assertEqual(
-                [p.name for p in Path(tmp).iterdir() if p.name != "bank.json"], [])
+                [p.name for p in Path(tmp).iterdir()
+                 if p.name not in {"bank.json", "bank.json.lock.sqlite3"}], [])
             self.assertEqual(len(BankCache(path).candidates), 1)
 
 
