@@ -1,17 +1,27 @@
 # CLAUDE.md - MLB DFS Engine (personal project)
 
-## Status note, 2026-09-15: the thirteenth edition's landing is COMMITTED; its gate on the real tree is still owed
+## Status note, 2026-09-15: the thirteenth edition is LANDED AND GATED; the push is Ben's
 R338 commit one (`5b1b574`) and R302 stage 0 (`3fcc161`) landed on `main` on
-2026-09-11; the 09-11 note that read "WRITTEN, not COMMITTED" is history. Still
-owed, and needing Ben's machine: the gate on the real tree (`python
-tools/audit.py --run-tests --terse`, expecting `PASS  v2.26.0  40 modules  2066
-tests`), `solver_probe` (the schema-2 projection digest orphaned every bank
-bucket on disk), and the push. That is roadmap **CC-0** in docs/backlog.md, the
-first act of the next DEV session. Per Ben (2026-09-15) DEV sessions now run in
-**Claude Code on his machine**, not Cowork: the Sandbox section below is
-Cowork's and does not bind a Claude Code session (the full gate runs in one
-call, `rm` works), while the claims protocol, explicit-path `git add`, and the
-CHANGELOG-in-the-same-commit rule bind every session whatever runs it.
+2026-09-11, and on 2026-09-15 a Claude Code DEV session ran what they owed on
+Ben's machine: `python tools/audit.py --run-tests --terse` printed
+`PASS  v2.26.0  40 modules  2072 tests` (the count moved 2066 -> 2072 in that
+session's own R348, below), and `python tools/solver_probe.py --date 2026-09-08`
+FITS at 32s against a 130s budget, which is the schema-2 digest evidence step 8
+asked for. R338 is closed and its board entry is deleted; roadmap **CC-0** is
+done and the NEXT pointer is **CC-1**. What is still owed is not a session's to
+do: **Ben pushes.** The audit says so itself on every run while commits sit
+ahead of `origin/main`.
+
+Read the gate line's bracketed warnings as facts about the HOST, not the tree.
+One of them will persist until Ben removes
+`%TEMP%/pytest-of-benja`, an unreadable directory that R348 works around and
+does not pretend is gone; see session-start step 2.
+
+Per Ben (2026-09-15) DEV sessions now run in **Claude Code on his machine**, not
+Cowork: the Sandbox section below is Cowork's and does not bind a Claude Code
+session (the full gate runs in one call -- measured ~9 min on the pinned
+`.venv` -- and `rm` works), while the claims protocol, explicit-path `git add`,
+and the CHANGELOG-in-the-same-commit rule bind every session whatever runs it.
 
 Nothing below is superseded and NEITHER package is the build path: the Authority
 section governs, builds enter at `execution_pipeline.run_slate` through
@@ -471,7 +481,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  40 modules  2066 tests`. The module count comes off the
+   `PASS  v2.26.0  40 modules  2072 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names
@@ -492,6 +502,24 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    is in `requirements-production.lock`. If it is missing for the interpreter
    running the audit the suite reports a runner error and FAILS; it never reads
    as clean.
+   **A third abnormality the line can append, new 2026-09-15 (R348): the pytest
+   temp root.** Those two suites are the gate's only users of `tmp_path`, which
+   pytest roots at `<system temp>/pytest-of-<user>` -- outside this repo, not
+   this project's to create, and leavable behind by anything on the host. On
+   Ben's machine one was, unreadable by `benja`, and `mktemp` raised
+   `PermissionError` at session-scoped fixture setup: all 131 tests in both
+   suites ERRORED and the gate printed `FAIL  test suite FAILED in
+   tests.test_greenfield_regressions, tests.test_production (ran 2066); do not
+   build`. The tree was green -- re-run against a clean root the same two
+   suites were 131 passed. The audit now PROBES that root and, only when it is
+   unusable, redirects the suites to a throwaway one and appends a warning
+   naming the bad path. Read that warning as a fact about the HOST, never about
+   the tree: every test ran and every test passed, and the directory still
+   wants removing (it may need elevation). An operator's own
+   `PYTEST_DEBUG_TEMPROOT` is never overwritten and never reported. Keep the
+   redirect SHORT if you ever pin one: the first cut of this fix rooted it 120
+   characters deep and turned the PermissionError into a MAX_PATH
+   FileNotFoundError, which reads like a real failure.
    **That one command does not fit one Cowork bash call, so the gate has a
    supported split (R152).** Measured 2026-08-18 on the device mount:
    `tests.test_core` alone needs ~89s and one of its tests needs 35.8s by itself.

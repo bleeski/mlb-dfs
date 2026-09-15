@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; DEV sessions now run in Claude Code) -- NEXT: CC-0, then CC-1
+## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; DEV sessions now run in Claude Code) -- NEXT: CC-1, then CC-2 (CC-0 DONE 2026-09-15)
 
 **What changed in this rewrite and why.** Ben's instruction, 2026-09-15: reprioritize the board for items that change the chance of winning a LARGE prize, honour dependencies, and chunk it for single DEV sessions that run in **Claude Code on his machine** rather than Cowork. Two consequences. First, the ordering rule that ranked criteria (1)-(6) equally is replaced by a prize-first rule: **P (prize)** = changes the construction that reaches a top finish, or grades whether a construction does; **L (lost slate)** = a legal file on every slate, because a slate with no file is a zero; **G (guard)** = the referee and the record; **H** = hygiene. P and L lead; G and H follow. Second, the Cowork sandbox constraints that shaped the old Phase D ordering (the 130s inner budget, the six-call gate, the mount's refused `unlink`) do not apply to a Claude Code DEV session: `python tools/audit.py --run-tests --terse` runs in one call (~9 min on the pinned `.venv`), `rm` works, and an M item fits one session with its gate. BUILD and ARCHIVE sessions may still be Cowork, so the claims protocol, explicit-path `git add`, and the CHANGELOG-in-the-same-commit rule are unchanged, and any control that is only reachable from one door is still a defect.
 
@@ -47,11 +47,11 @@ Ordered, with the reason:
 
 **How to use this table.** A Claude Code session says *"work on the next session in the backlog"*, reads the row(s) for the Session ID on the NEXT pointer, and knows whether it is one standalone item or a pre-packaged batch. `Standalone` = one item alone (solver, state machine or high blast radius). `Batch (k of N)` rows share a Session ID and a module or data contract; implement and test them in one session, land them in one commit with one CHANGELOG entry per R-number. The completing session advances the NEXT pointer, migrates each landed entry to CHANGELOG.md, and leaves this table otherwise alone. `Was` names the row's Session ID in the 2026-09-10 roadmap so every "Roadmap: Session N" reference in the entries below still resolves. Impact is the prize-first rule above; Complexity: Low = XS/S, Med = S-M/M, High = L. Sources: Backlog = an entry already on this board; Inbox = a `docs/backlog_inbox/` fragment consumed on the date named; Mine = the 2026-09-14/15 standings research (both passes and the entry-history update); Spec/Spec13 = the greenfield twelfth/thirteenth editions.
 
-### Phase 0 -- close the thirteenth edition's landing on Ben's machine (one short session)
+### Phase 0 -- DONE 2026-09-15. Closing the thirteenth edition's landing on Ben's machine
 
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **CC-0** (was Session 4b, remainder) | `Standalone` | **R338 close-out.** Both commits EXIST (`5b1b574` R338 commit one, `3fcc161` R302 stage 0, 2026-09-11); what the 09-11 status left open needs Ben's machine and is now a Claude Code session's first act: (1) `python tools/audit.py --run-tests --terse` on the real tree, expecting `PASS  v2.26.0  40 modules  2066 tests`; (2) `python tools/solver_probe.py --date <next slate>` because digest v2 orphaned every bank bucket; (3) migrate the R338 entry (Workstream 6) to CHANGELOG.md under the 09-11 entries if the gate is green, or file what is red; (4) `git push` (four commits were ahead of `origin/main` on 2026-09-15). CLAUDE.md's 09-11 status note was corrected on 2026-09-15 in the board commit; verify it reads true after the gate. | Backlog | `tools/audit.py`, `tools/solver_probe.py`, `CHANGELOG.md`, Workstream 6 R338 entry | L (an ungated tree is what every later session builds on) | Low | None. First. |
+| **CC-0** (was Session 4b, remainder) | `Standalone` | **R338 close-out. DONE 2026-09-15**, first Claude Code DEV session. Gate on the real tree: `PASS  v2.26.0  40 modules  2072 tests` (the count moved 2066 -> 2072 in R348, filed and fixed by the same session after the first run came back FAIL on an unreadable `%TEMP%/pytest-of-benja` that errored all 131 tests in the two pytest suites). `solver_probe --date 2026-09-08`: FITS, 32s against a 130s budget, which is step 8's schema-2 digest evidence. R338's board entry collapsed to a closed stub (its text has been in CHANGELOG.md since 2026-09-11). CLAUDE.md's status note rewritten to landed-and-gated. **The push is Ben's and is still owed**; the audit names it on every run. | Backlog | `tools/audit.py`, `tools/solver_probe.py`, `CHANGELOG.md`, Workstream 6 R338 entry | L (an ungated tree is what every later session builds on) | Low | None. First. |
 
 ### Phase 1 -- construction the archive says wins, made BUILDABLE tonight (P)
 
@@ -9262,166 +9262,16 @@ which is R196's. Filed there, not here.
 - **The two failures, which are the requirements.** (1) A clean bill on a still-posting slate has a shelf life of about two minutes: "Zero dead slots" written at 12:57 was false at 12:58 when MIN posted two dead bats in entry 5251499964, and Ben's question at 12:59 found it, not the pass. **The brief requires the agent to re-pull the lineups feed as its LAST act before writing and to clock-stamp every liveness claim**; an unstamped "checked" is worse than unchecked because it is load-bearing. (2) The agent could not read `outputs/<date>/ownership_pred_<tag>.json` (`Name: None`, predictions nested under `features`) and the leverage axis died; the emit schema gets a flat readable table (R276's batch).
 - **Other requirements.** `TZ=America/New_York date` in every call, no clock figure not printed that turn; report only, never edit the delivered file or write under `runs/`; truthful labels verbatim; never fetch DK, never reduce the pool, the DKSalaries CSV is authoritative, FanGraphs 403s scripted pulls; state gaps rather than fill them (the first run's "I did not verify cap feasibility for any specific swap" was the useful sentence); warm/cold rebuild costs stated so the recommendation is costed (66s warm on 1310_9g against a hand-swap it could not price); a hard wall-clock budget with a partial-in-time-beats-complete-late rule.
 
-### R338. The thirteenth greenfield edition landed as an UNCOMMITTED sixty-file working tree: dispose of it in one DEV session, adopting the 24-file compatibility patch after four named repairs and committing the strangler package under R302 as stage 0 (P1, S-M; lands ALONE, next) | new 2026-09-10, from `DFS_SYSTEM_GREENFIELD_SPEC_2026-09-09.md` and `docs/greenfield/2026-09-09/implementation.patch`, both applied to this disk at `7824648`; gate, demo and both new suites reproduced in the container this date
+### R338. CLOSED 2026-09-15 -- SHIPPED, entry migrated to CHANGELOG.md on 2026-09-11 and CLOSED OUT by roadmap CC-0
 
-**STATUS 2026-09-15: both commits EXIST** -- `5b1b574` (R338, commit one, 2026-09-11) and `3fcc161` (R302 stage 0, commit two, 2026-09-11) are on `main` on disk; four commits were ahead of `origin/main` on 2026-09-15 pending Ben's push. What the 09-11 status left needing Ben's machine is now roadmap **CC-0**, the first Claude Code DEV act: the gate on the real tree (`PASS  v2.26.0  40 modules  2066 tests`), `solver_probe` (digest v2 orphaned every bank bucket), this entry's migration to CHANGELOG.md under the 09-11 entries when the gate is green, and the push. CLAUDE.md's 09-11 status note was corrected 2026-09-15 to say committed-and-ungated rather than uncommitted.
-
-**What.** On 2026-09-09 an outside implementation applied its own patch to this
-disk and stopped short of a commit. Sixty files differ from HEAD. Twenty-four are
-tracked engine, tool and test files carrying 334 insertions and 127 deletions
-that land, wholly or in part, fourteen entries already on this board; thirty-six
-are new (the package, four tools, two pytest suites, a `conftest.py`, a runbook, a
-lock file, twenty evidence artifacts) plus a gitignored Windows `.venv`. The three
-authority banners the author added to CLAUDE.md, MLB_Classic.md and MANIFEST.md
-were reverted on 2026-09-10 (see the queue note); everything else is as the author
-left it. Until this is committed or reverted, every DEV session walks into foreign
-dirt inside its write set, which the multi-session contract says blocks, and the
-engine any BUILD session runs tonight is the patched one.
-
-**Why.** Measured, not asserted. Gate on the patched tree in the container under
-the pinned stack: `PASS  v2.26.0  40 modules  1935 tests  5 skipped`, all five
-suites at pin, five clone skips. `tests/test_greenfield_regressions.py` +
-`tests/test_production.py`: 130 passed, 9.5s. `python tools/dfs.py demo`: `verified`,
-safe export sha256 `f04f98926e47107557b1fc832f2f4da216c2ee0be7c012bfcc783abb8d562f55`,
-identical to the edition's Windows hash. No legacy module imports the package or
-pydantic. The patch is small, surgical and mostly the fixes this board already
-prescribed; the four places it is wrong are listed under Fix and each is S.
-Landing it lands R297(a)(b)(e)+F24, R330, R331, R290(a), R329, R216, R285's F37/F38
-halves, R295's F13 and half of F14, R328's water-fill half, R225 at one of four
-sites, R245/R269's F08 lock half, R299's F31, R44's F32 rider, R161's clock half,
-R75/R222's no-winner half and R274's env hook, which is most of Sessions 14, 18,
-43 and parts of 5, 8, 11, 13, 17, 46, 47 and 61. That is the impact: the sessions
-it frees go to R118 and the Tier 2 chain.
-
-**Fix, in order, one session, the device shell up.** Take `engine`. Then:
-
-1. `mlb_engine/optimize/bank_cache.py`: `drop_stale_jobs` adds EVERY dropped job
-   to `_retired`, and `_save_locked` subtracts `_retired` from the disk union, so
-   a session's memory-only narrowing (`drop_stale_jobs(sig)` with no digest, which
-   R101's docstring says "the maintenance callers and the concurrency tests rely
-   on") now erases the sibling bucket another session wrote (R55, R130). Retire a
-   job only when `projection_digest` is supplied AND `conditions_index` places its
-   signature under a different digest (the F11 case). Restore
-   `test_a_purge_no_longer_erases_the_other_sessions_work_on_disk`'s original
-   assertions (they were inverted in place) and keep the new
-   `test_cache_invalidation_survives_a_stale_writer` beside them; both must pass.
-2. `tests/test_core.py` `AuditSkipHonestyTests`: restore both `assertIn(line,
-   CLAUDE.md)` assertions the patch replaced with a `verify_engine.py` substring
-   check, and set CLAUDE.md's session-start line (and SKILL.md's audit line) to
-   the count the tree prints with the package in `mlb_engine/` (40 modules at
-   this HEAD). The gutted form is why a false "28 modules" survived the suite.
-3. `mlb_engine/optimize/showdown.py` / `showdown_theses.py`: the new
-   `invalid_hard_lock` refusal is right for operator `--locks`/`--cpt-lock` and
-   wrong for thesis-sourced locks, which `solve_ladder` passes at `:1268` and
-   `:1307`; a thesis naming a player absent from `work` blanked no slot before
-   and blanks one now, and `build_slate.py:3945`'s `ignored_locks` NOTE reads a
-   field that is now always empty. Either build F14's soft-lock field (thesis
-   preferences travel separately and are ignored-and-reported) or thread an
-   `operator_locks` flag so only those refuse. Keep the F13 stop latch as is.
-4. `tools/audit.py:1294`: `test_env["MLB_DFS_ARTIFACT_ROOT"] = <tempdir per
-   suite>`, because the gate runs `python -m unittest` and `tests/conftest.py`
-   is pytest-only. Verify by hashing `outputs/*/upload_manifest.json` before and
-   after a `--gate-run`; R274 closes on that evidence and not before.
-5. Riders to carry into the same commit: `dk_entries_manager._gate_bool` is
-   `value is True`, which refuses `numpy.bool_` (check what the post-export
-   certification is handed before trusting it); `audit.py:789`'s comment still
-   describes the pre-refusal `ignored_locks` behaviour; `AUDITED_SUITES` does not
-   know the two pytest suites (R180(e)), so add a pytest runner branch or convert
-   them; a grep pin that `mlb_engine/{allocate,entries,field,intake,optimize,
-   pipeline,projections,swap}` and `tools/` (minus the four new tools) import
-   neither `mlb_engine.production` nor `pydantic`.
-6. Commit ONE: the 24 legacy files + `tests/conftest.py` +
-   `tests/test_greenfield_regressions.py`, subject naming every R-number landed,
-   each landed entry (or the landed part of it) migrated from this board to
-   CHANGELOG.md with the R233 enumeration for the classes it closes (the gate
-   fingerprint widening resets `.audit_gate/` state; reassemble after).
-7. Commit TWO, R302 stage 0: `mlb_engine/production/`, `tools/dfs.py`,
-   `tools/verify_engine.py`, `tools/bootstrap_engine.py`,
-   `tools/benchmark_engine.py`, `tests/test_production.py`,
-   `requirements-production.lock`, `docs/production_runbook.md`, `.gitignore`
-   (`.venv/`, `.ruff_cache/`), with two XS fixes: `dfs.py:environment()` compares
-   resolved interpreter paths and a POSIX venv's `bin/python` is a symlink to the
-   base binary, so compare `Path(sys.prefix)` to `ROOT/.venv` instead; and
-   `production/state.py:68` opens SQLite in DELETE journal mode with real writes,
-   which needs `unlink`, which this mount refuses (R109), so `PRAGMA
-   journal_mode=PERSIST`. `docs/greenfield/2026-09-09/` (1.2MB inventory, 1.3MB
-   hash list, two JUnit XMLs) is evidence, not source: commit
-   `changed_files.json`, `final_acceptance.json`, `final_verification.json`,
-   `implementation.patch` and the two fixture CSVs; leave the rest untracked and
-   name them in `.gitignore`. Move the dated spec beside its predecessors.
-8. Land at a slate boundary. Digest v2 orphans every live bank bucket; run
-   `solver_probe` after and say so in the commit body. R271(c)'s sentence in
-   CLAUDE.md ("his Windows Python has no scipy") moves in this commit, because the
-   `.venv` makes it false.
-
-**Done when.** `git status --short` on the mount shows no engine dirt; the gate
-prints its pinned line with the count CLAUDE.md quotes; the R55 and F11 tests both
-pass; a `--gate-run` changes no byte under `outputs/`; every R-number in step 6
-has its board entry migrated or rewritten to its remainder; R302 carries a stage-0
-status line with both XS fixes named as landed.
-
-**Rider 2026-09-11: steps 1-7 are WRITTEN TO DISK and NOT COMMITTED. The
-remainder of this item is two `git commit` calls and one gate, all three of
-which need Ben's machine.** The device shell has been down since 2026-09-09
-(`device_bash` -> `no Plan9 drive shares mounted`), the desktop names the cause
-as a Windows update released 2026-09-08, and it does not clear by retrying.
-`device_list_dir` / `device_stage_files` / `device_commit_files` keep working,
-which is how every file below reached disk, so a session in this state can do
-the whole of the engineering and none of the git.
-
-**Done, on disk.** Repairs (1)-(4), measured 2026-09-10 and written 2026-09-11
-(the detail is in the 2026-09-11 CHANGELOG entry, not repeated here; do NOT
-re-derive them, including the two places this entry's own instructions were
-wrong -- the F11 and R55 tests contradicted each other as written, and the
-repair-(4) class had two members rather than the one named). Step 5's four
-riders: `_gate_bool` measured and left alone with the measurement in its
-docstring; `audit.py`'s `ignored_locks` comment corrected; R180(c) -- this entry
-said (e), see the note on R180 -- cleared for the two pytest suites by a
-`PYTEST_SUITES` runner branch, which moves the pinned line to
-`PASS  v2.26.0  40 modules  2066 tests` in CLAUDE.md and SKILL.md; and the
-production/pydantic grep pin written as a TEST
-(`test_no_legacy_module_imports_the_production_package_or_pydantic`, 65 files
-scanned, zero hits) rather than a line in a changelog. Step 6 and step 7's
-CONTENT: both XS fixes (`dfs.py` compares `Path(sys.prefix)`, `state.py` is
-`journal_mode=PERSIST`), `.gitignore`'s named evidence list, the dated spec
-moved beside its predecessors, the two CHANGELOG entries, and this board's
-migrations -- R330, R331 and R329 deleted as fully landed, thirteen entries
-rewritten to their remainders.
-
-**Not done, and it is exactly three things.**
-
-1. **Commit ONE.** `git add` by explicit path: the 24 legacy files, plus
-   `tests/conftest.py`, `tests/test_greenfield_regressions.py`, `CLAUDE.md`,
-   `skills/generate-lineups/SKILL.md`, `CHANGELOG.md`, `docs/backlog.md`.
-2. **Commit TWO**, R302 stage 0: `mlb_engine/production/`, the four new tools,
-   `tests/test_production.py`, `requirements-production.lock`,
-   `docs/production_runbook.md`, `.gitignore`, the seven evidence artifacts and
-   the moved spec.
-3. **The gate on the MOUNT, and step 8.** `python tools/audit.py --gate-run
-   --gate-budget 130 --gate-ceiling 165` to GATE COMPLETE, then `--gate-report
-   --terse`, from PowerShell against the project `.venv`; then
-   `python tools/solver_probe.py`, because the schema-2 digest orphaned every
-   bank bucket on disk. `claims/` held no slate beacon when this was written.
-
-**What was run instead, and what it may NOT be quoted as.** A container
-reproduction of this tree under the pinned `requirements-production.lock` stack,
-seven `--gate-run` calls to GATE COMPLETE: test_core 1215/1215 (1 failure),
-test_showdown 219/219, test_upload_integrity 394/394, test_golden_replay 0/9,
-test_paste_lineups 98/98, test_greenfield_regressions 30/30,
-test_production 101/101. **It is PARTIAL and it is not the mount's gate.** The
-one failure and the nine-test shortfall are the staged tree, PROVEN by a
-baseline comparison rather than asserted: a second copy with every file this
-session edited reverted to its pre-edit bytes produced the identical failure set
-(`TestDataDependenciesAreVendoredOrGuardedTests.test_no_test_reads_gitignored_data_without_a_skip_guard`,
-which wants `data/slates`, `data/archive` and `data/standings` tracked, none of
-which was staged; and `test_golden_replay` collecting 0 and skipping 2). 2057 of
-2066 is exactly those nine.
-
-**Done when, revised to what is left:** `git status --short` on the mount shows
-no engine dirt; the gate prints `PASS  v2.26.0  40 modules  2066 tests` from
-Ben's `.venv`; a `--gate-run` changes no byte under `outputs/`; `solver_probe`
-has been run after the landing and its result is in the commit body.
-
+Both commits landed 2026-09-11 (`5b1b574`, `3fcc161`) and their text is the
+2026-09-11 CHANGELOG entry. The two things that entry named as remaining --
+the gate on the real tree and `solver_probe` for step 8's slate-boundary
+evidence -- were run on Ben's machine on 2026-09-15 by the first Claude Code
+DEV session: `PASS  v2.26.0  40 modules  2072 tests` (the count moved in that
+session's own R348) and `solver_probe --date 2026-09-08` FITS at 32s against a
+130s budget. The push is Ben's and the audit names it on every run. See the
+2026-09-15 CHANGELOG entry.
 
 ### R300. The two tests that would have caught the two worst recent classes, and the string pins standing in for behaviour on money-adjacent claims (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-X1, X2, X3, X5); VERIFIED-read
 

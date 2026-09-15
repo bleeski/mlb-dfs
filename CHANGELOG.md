@@ -25,6 +25,142 @@ performance claim.
 
 ---
 
+## 2026-09-15 — CC-0 closes the thirteenth edition on Ben's machine, and R348: the gate could not run on this host, reported that as a failing tree, and deleted its own isolation while doing it
+
+**Scope.** `tools/audit.py`, `tests/test_core.py`, `CLAUDE.md`,
+`skills/generate-lineups/SKILL.md`, `docs/backlog.md`, this file. No engine
+code, no strategy control, no build path. First DEV session run in Claude Code
+on Ben's machine rather than Cowork.
+
+**CC-0, the thing this session was for.** R338's 2026-09-11 entry named exactly
+two pieces of remaining work, both needing this host: the gate on the real tree,
+and `solver_probe` for step 8's slate-boundary evidence. Both are done.
+
+    python tools/audit.py --run-tests --terse
+    PASS  v2.26.0  40 modules  2072 tests  [pytest's own temp root
+    C:\Users\benja\AppData\Local\Temp\pytest-of-benja is not usable by this user, so the two pytest suites
+    ran under C:\Users\benja\AppData\Local\Temp\mlbgate_fikuo01s instead. ...; 1 commit(s) on main are not
+    on origin/main ...]
+
+    python tools/solver_probe.py --date 2026-09-08
+    pool 100 players, 10 SP, 40 cross-game pairs
+    one lineup 0.52s | 5-lineup probe 1.10s (5 built)
+    projected: base bank 11s + augmentation 21s = 32s
+    budget 130s -> FITS
+
+`2026-09-08` is the most recent staged salary file; nothing is staged for
+2026-09-15, and the probe measures the schema-2 digest re-key rather than a
+particular slate, so the date is stated rather than left implied. R338's board
+entry is collapsed to a closed stub — its text has been in this file since
+09-11, so nothing is lost — and CLAUDE.md's status note is rewritten from
+committed-and-ungated to landed-and-gated. **The push is Ben's and is still
+owed.**
+
+**R348, and the reason CC-0 took a session rather than a call. The FIRST gate
+run on the real tree came back RED, and the red was not in the tree.**
+
+    FAIL  test suite FAILED in tests.test_greenfield_regressions,
+    tests.test_production (ran 2066); do not build
+
+`%TEMP%/pytest-of-benja` on this host, created 2026-09-09, is owned by a
+principal `benja` cannot read — `icacls` and `Get-Acl` are both refused, and so
+is `os.listdir`. Those two suites are the gate's ONLY users of pytest's
+`tmp_path`, which pytest roots there, so `tmp_path_factory.mktemp` raised
+`PermissionError: [WinError 5]` at session-scoped fixture setup and **all 131
+tests in both suites ERRORED**. Re-run against a clean temp root, the same two
+suites are **131 passed**. The tree was green the whole time and the gate said
+the opposite — R62's defect (a gate whose verdict is about itself rather than
+about the code) arriving from the HOST rather than from a pin, and it would have
+sent the next session hunting a code defect that does not exist.
+
+Both halves are fixed, because either alone is a defect. `suite_subprocess_env`
+now PROBES that root (`pytest_base_temp_obstruction`, re-deriving pytest's own
+`temproot / pytest-of-<user>` formula rather than importing `_pytest.tmpdir`,
+which would fail on exactly the host where pytest is absent — a real gate state
+this module already reports as exit 4) and redirects the suites to a throwaway
+root ONLY when the default is unusable, never over an operator's
+`PYTEST_DEBUG_TEMPROOT`; and `pytest_temproot_warning` appends a line to the
+terse output naming the bad path, so a broken host cannot hide behind a green
+line. CLAUDE.md's session-start step 2 records it as the third kind of
+abnormality that line can carry, and says to read it as a fact about the host
+rather than the tree. The prefix is short (`mlbgate_`) on purpose: the first cut
+of this fix rooted the redirect 120 characters deep in a session scratchpad and
+turned the PermissionError into a MAX_PATH `FileNotFoundError` on
+`.manifest.json.<uuid>.tmp` — a different failure that reads like a real one.
+
+**The rider, which is older than R348 and is the more serious half.** With the
+redirect in, the two suites still failed: 131 errors in 2.7s, every other suite
+at pin. Measured directly — after `tests.test_core` runs under the gate's
+environment, BOTH of the gate's throwaway roots are gone from disk. Both roots
+reach a child through the ENVIRONMENT, so a child that calls
+`suite_subprocess_env` inherits the parent's values instead of minting its own,
+and `_isolated_artifact_root`'s PREFIX test cannot tell "the root I made" from
+"the root my parent made" — they carry the same prefix by construction.
+`tests/test_core.py::test_run_tests_subprocess_gets_the_vendored_pythonpath`
+calls `run_audit(root, run_tests=True)` IN PROCESS, so **since R338 repair (4)
+landed on 2026-09-11 it has been rmtree-ing the running gate's
+`MLB_DFS_ARTIFACT_ROOT` on every `--run-tests` run**, silently defeating the
+isolation R274 was closed on. It went unseen because `run_audited_suites`
+re-`mkdir`s a per-suite subdirectory each iteration, so the isolation survived by
+accident; pytest's temp root has no such luck. The fix is one rule and one
+registry: `_MINTED_ROOTS` records what THIS PROCESS made, and
+`cleanup_isolated_roots` deletes only those. A root this process did not mint
+belongs to whoever did, and may still be in use by them.
+
+**R233 enumeration for the cleanup class.** `grep -n "cleanup_isolated_roots(" tools/audit.py`
+at this head returns FOUR lines: one definition and three callers —
+`run_audited_suites`'s `finally`, and both arms of `gate_run` (the
+`PYTEST_SUITES` branch and the `--gate-child` subprocess branch). All three
+previously carried their own copy of the same two-line rmtree pair against
+`_isolated_artifact_root`; they now call the one function, which is what let a
+second throwaway root be added without growing the class from three to six.
+`_gate_child` is the fourth site by ABSENCE and deliberately so: it is the
+child, it minted nothing, and under the new rule a cleanup there would be a
+no-op. The readers are enumerated with a pattern that does NOT require a call paren,
+because the live one is a tuple element and the obvious grep misses it:
+`grep -n "_isolated_artifact_root\|_isolated_pytest_temproot" tools/audit.py`
+returns SIX lines — the two definitions (1760, 1816), two prose mentions in
+docstrings (1763, 1778), the tuple inside `cleanup_isolated_roots` that is the
+only place either is applied to an env for deletion (1783), and one direct read
+in `pytest_temproot_warning` (1805), which reads and never deletes. That is the
+whole class; no other caller reaches a reader.
+
+**Tests (six; `tests.test_core` 1215 -> 1221, so the pinned line moves 2066 ->
+2072 in CLAUDE.md and SKILL.md).** An absent or usable root is not an
+obstruction, so an ordinary host mints nothing and its gate environment stays
+byte-identical to R338's. An unusable root is named with its reason, probed
+through the real `OSError` the real code path raises rather than through a
+patched probe. The redirect fires only when obstructed and never over a pin —
+including a pin INHERITED from a parent that already redirected, which is the
+condition that caught the first cut of this very test. The warning names both
+the bad root and the replacement. Cleanup removes only roots this process
+minted, and leaves same-prefixed roots it did not. And a nested in-process
+`run_audit` deletes neither of the outer gate's two roots: the rider's
+regression, pinned against the production function rather than against the rule
+in prose.
+
+**One test-writing rule this session learned the hard way, written into the
+test's own docstring.** The first cut of the pin test used
+`assertNotIn(key, env)` against a real environment. unittest prints the
+container on failure, and this repo's environment carries `THE_ODDS_API_KEY` and
+`GH_PAT`, so when it failed under the gate it echoed both into the suite's
+stderr and into anything the audit stores from it. Every assertion in that class
+now computes a bool first and is never handed an environment as its container;
+the two scratch logs that captured the values were deleted. `grep` over both
+suites finds no other assertion of that shape — the only other hit is a
+source-string check in `test_showdown.py` that never touches a live
+environment. CLAUDE.md's hard guardrail is "never log, echo, or write API keys",
+and a test's failure message is a write.
+
+**What is NOT claimed.** Not that the host directory is repaired: it is not,
+this session can neither read nor delete it, and removing it may need elevation.
+The gate works around it and says so on every run. Not that `--output` works
+alongside `--terse`: it does not, because the terse branch exits before the JSON
+is written, which cost this session a diagnostic round trip. That is recorded as
+an observation, not fixed here, in a commit that was already wide enough.
+
+---
+
 ## 2026-09-15 — Board: the 2026-09-14/15 standings mine adjudicated, thirteen fragments consumed into R340-R347 and twenty riders, the roadmap rewritten prize-first and re-chunked for Claude Code DEV sessions; R315(c) done; CLAUDE.md's stale status note corrected
 
 **Scope: docs, one data file, one contract status note.** This commit touches
@@ -104,7 +240,7 @@ rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
 `--max-opposing-hitters-per-sp` default (the archive supports the default and the
 R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
 control would ratify a mix the engine already builds 95% of the time (R306 step 5
-rider). Next free number: R348.
+rider). Next free number: R349 (R348 is the 2026-09-15 CC-0 entry above).
 
 **Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
 transfer, two new control halves after the bar), R37(2)(c) (the secondary is

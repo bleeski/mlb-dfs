@@ -59,6 +59,52 @@ AUDITED_SUITES = ("tests.test_core", "tests.test_showdown",
 PYTEST_SUITES = frozenset({"tests.test_greenfield_regressions",
                            "tests.test_production"})
 
+# R348. pytest's `tmp_path` / `tmp_path_factory` fixtures are rooted at
+# `<system temp>/pytest-of-<user>`, and that directory is OUTSIDE this repo, is
+# not this project's to create, and can be left behind by any process on the
+# host. On Ben's machine one was, on 2026-09-09, owned by a principal `benja`
+# cannot read: `mktemp` raised `PermissionError: [WinError 5]` at session-scoped
+# fixture setup and all 131 tests in the two PYTEST_SUITES errored out. The gate
+# then printed `FAIL test suite FAILED in tests.test_greenfield_regressions,
+# tests.test_production (ran 2066)` -- a verdict that is correct about the gate
+# and wrong about the tree, and which sends the next session hunting a code
+# defect that does not exist. Both halves matter: the suites must RUN (so the
+# gate is usable at all) and the redirect must be SAID (so a broken host does
+# not hide behind a green line forever).
+PYTEST_TEMPROOT_ENV = "PYTEST_DEBUG_TEMPROOT"
+#: Short on purpose. The redirected root is a PREFIX of every `tmp_path` a test
+#: builds under, and Windows still refuses a path past 260 characters: a first
+#: attempt at this fix rooted the redirect under a session scratchpad 120
+#: characters deep and turned the PermissionError into a FileNotFoundError on
+#: `.manifest.json.<uuid>.tmp` -- a different failure that reads like a real
+#: one. Anything added here is paid for by every test that writes a file.
+PYTEST_TEMPROOT_PREFIX = "mlbgate_"
+
+#: Throwaway roots ``suite_subprocess_env`` minted IN THIS PROCESS, normalised.
+#:
+#: R348 rider, and the defect it closes is older than R348. Both throwaway roots
+#: reach a child through the ENVIRONMENT, so a child that calls
+#: ``suite_subprocess_env`` inherits the parent's values rather than minting its
+#: own -- and a prefix test alone cannot tell "the root I made" from "the root
+#: my parent made", because they carry the same prefix by construction.
+#: ``tests/test_core.py::test_run_tests_subprocess_gets_the_vendored_pythonpath``
+#: is exactly that child: it calls ``run_audit(root, run_tests=True)`` IN
+#: PROCESS, so since R338 repair (4) landed it has been deleting the outer
+#: gate's ``MLB_DFS_ARTIFACT_ROOT`` on every ``--run-tests`` run. That went
+#: unseen because ``run_audited_suites`` re-``mkdir``s a per-suite subdirectory
+#: each iteration, so the isolation survived by accident; pytest's temp root has
+#: no such luck, and the same deletion errored all 131 tests in the two
+#: PYTEST_SUITES. The registry is the fix for both: this process deletes what
+#: this process made, and nothing else.
+_MINTED_ROOTS: set = set()
+
+
+def _register_minted_root(path: Any) -> str:
+    """Record a throwaway root this process just made, normalised for lookup."""
+    key = os.path.normcase(os.path.abspath(str(path)))
+    _MINTED_ROOTS.add(key)
+    return key
+
 # R62: the per-suite pin, not a comment beside a total. The total used to be
 # one int with the breakdown written next to it in prose, which meant the
 # breakdown could not be checked and a shortfall could not be attributed. A
@@ -658,7 +704,13 @@ EXPECTED_SUITE_COUNTS = {
     # paths, the happy path that must not retry, the unrestricted bank that
     # must not retry, the time limit that must not retry, and the once-only
     # bound.
-    "tests.test_core": 1215,
+    # R348, 2026-09-15: 1215 -> 1221, the six that pin the pytest-temp-root
+    # probe, the redirect that never overwrites an operator pin (nor one
+    # inherited from a parent that already redirected), the warning that names
+    # the unusable root, the one cleanup helper that replaced three copies of
+    # the same pair, and -- the rider's regression -- that a nested in-process
+    # `run_audit` deletes neither of the OUTER gate's two throwaway roots.
+    "tests.test_core": 1221,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1330,6 +1382,9 @@ def run_audit(root: Path, run_tests: bool = False,
     test_result = None
     if run_tests:
         test_env = suite_subprocess_env(root, deps=deps)
+        temproot_note = pytest_temproot_warning(test_env)
+        if temproot_note:
+            warnings.append(temproot_note)
         test_result = run_audited_suites(root, test_env)
         errors.extend(test_result.pop("_errors"))
         warnings.extend(test_result.pop("_warnings"))
@@ -1642,10 +1697,120 @@ def suite_subprocess_env(root: Path, deps: Optional[Dict[str, Any]] = None,
             os.pathsep + existing if existing else "")
     if artifact_root is None and not env.get("MLB_DFS_ARTIFACT_ROOT"):
         artifact_root = Path(tempfile.mkdtemp(prefix="mlb_dfs_audit_artifacts_"))
+        _register_minted_root(artifact_root)
     if artifact_root is not None:
         Path(artifact_root).mkdir(parents=True, exist_ok=True)
         env["MLB_DFS_ARTIFACT_ROOT"] = str(artifact_root)
+    # R348. Only when the host's own pytest temp root is unusable, and never
+    # over an operator's pin. The probe is the whole opt-out: an ordinary
+    # machine returns None here and this env is byte-identical to R338's.
+    if not env.get(PYTEST_TEMPROOT_ENV) and pytest_base_temp_obstruction():
+        env[PYTEST_TEMPROOT_ENV] = tempfile.mkdtemp(prefix=PYTEST_TEMPROOT_PREFIX)
+        _register_minted_root(env[PYTEST_TEMPROOT_ENV])
     return env
+
+
+def pytest_base_temp_root() -> Path:
+    """Where pytest will root `tmp_path`, computed the way pytest computes it.
+
+    R348. Deliberately re-derived rather than imported: this module must run its
+    dependency checks on a host where pytest is absent (that is a real gate
+    state -- `run_one_pytest_suite` reports exit 4 for it), so importing
+    `_pytest.tmpdir` to ask would make the probe fail exactly where it is most
+    needed. The formula is pytest's `TempPathFactory.getbasetemp`: the system
+    temp directory, then `pytest-of-<user>` with every non-word character
+    stripped out of the user name, and `unknown` where there is no user at all.
+    """
+    try:
+        import getpass
+        user: Optional[str] = re.sub(r"[^\w]", "", getpass.getuser())
+    except Exception:  # noqa: BLE001 - any failure means pytest's own fallback
+        user = None
+    return Path(tempfile.gettempdir()) / f"pytest-of-{user or 'unknown'}"
+
+
+def pytest_base_temp_obstruction(root: Optional[Path] = None) -> Optional[str]:
+    """One line saying why pytest cannot use its own temp root, or None.
+
+    R348. Probed rather than assumed, and probed the way pytest uses it: an
+    EXISTING directory that cannot be listed or written into is the failure
+    mode, because `make_numbered_dir` both reads the siblings (to pick the next
+    number) and creates a child. A root that does not exist yet is not an
+    obstruction -- pytest creates it, and so would this probe's own mkdir.
+
+    Returns None on the ordinary host, so the redirect below is opt-out by
+    construction: nothing is redirected on a machine that does not need it, and
+    the gate's environment stays byte-identical there.
+    """
+    path = Path(root) if root is not None else pytest_base_temp_root()
+    if not path.exists():
+        return None
+    probe = path / ".mlbgate_probe"
+    try:
+        os.listdir(path)
+        probe.mkdir(exist_ok=True)
+    except OSError as exc:
+        return f"{type(exc).__name__}: {exc.strerror or exc}"
+    finally:
+        with contextlib.suppress(OSError):
+            probe.rmdir()
+    return None
+
+
+def _isolated_pytest_temproot(env: Dict[str, str]) -> Optional[Path]:
+    """The throwaway pytest temp root this module minted, or None.
+
+    R348, and the same rule `_isolated_artifact_root` states for the same
+    reason: only a path this module created carries the prefix, so an operator
+    who pinned their own ``PYTEST_DEBUG_TEMPROOT`` never has it deleted.
+    """
+    value = env.get(PYTEST_TEMPROOT_ENV)
+    if not value:
+        return None
+    path = Path(value)
+    return path if path.name.startswith(PYTEST_TEMPROOT_PREFIX) else None
+
+
+def cleanup_isolated_roots(env: Dict[str, str]) -> None:
+    """Remove every throwaway root ``suite_subprocess_env`` minted for this env.
+
+    R348 rider. This was three identical two-line pairs against
+    ``_isolated_artifact_root`` (``run_audited_suites`` and both arms of
+    ``run_gate_chunk``), and adding a second throwaway root to each of them by
+    hand is exactly the N-sites-and-the-class-has-N+1 shape R233 is filed on.
+    One function, three callers, implemented by none of them.
+    """
+    for reader in (_isolated_artifact_root, _isolated_pytest_temproot):
+        throwaway = reader(env)
+        if throwaway is None:
+            continue
+        key = os.path.normcase(os.path.abspath(str(throwaway)))
+        if key not in _MINTED_ROOTS:
+            # Inherited from a parent process that is still using it. The prefix
+            # says "a root some audit made"; only the registry says "mine".
+            continue
+        shutil.rmtree(throwaway, ignore_errors=True)
+        _MINTED_ROOTS.discard(key)
+
+
+def pytest_temproot_warning(env: Dict[str, str]) -> Optional[str]:
+    """The warning a redirected pytest temp root owes the operator, or None.
+
+    R348. A gate that silently worked around a broken host would be a gate that
+    stops reporting the host. CLAUDE.md's session-start step already says a
+    clean run prints the pinned line exactly and anything else APPENDS what is
+    abnormal; this is one of those, and it is a warning rather than an error
+    because every test really did run and really did pass.
+    """
+    redirected = _isolated_pytest_temproot(env)
+    if redirected is None:
+        return None
+    return (f"pytest's own temp root {pytest_base_temp_root()} is not usable by "
+            f"this user, so the two pytest suites ran under {redirected} "
+            f"instead. They are the gate's only users of tmp_path; left alone, "
+            f"that directory errors every test in both and the gate reads a "
+            f"green tree as a failing suite. Remove it (it may need elevation) "
+            f"or pin {PYTEST_TEMPROOT_ENV} yourself")
 
 
 def _isolated_artifact_root(env: Dict[str, str]) -> Optional[Path]:
@@ -1720,9 +1885,7 @@ def run_audited_suites(root: Path, test_env: Dict[str, str]) -> Dict[str, Any]:
                 stdout_tail = proc.stdout[-2000:]
                 stderr_tail = proc.stderr[-4000:]
     finally:
-        throwaway = _isolated_artifact_root(test_env)
-        if throwaway is not None:
-            shutil.rmtree(throwaway, ignore_errors=True)
+        cleanup_isolated_roots(test_env)
 
     return summarize_suite_results(results, stdout_tail=stdout_tail,
                                    stderr_tail=stderr_tail)
@@ -2276,9 +2439,7 @@ def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S,
             "errors_count": rec.get("errors_count", 0),
             "ok": bool(rec.get("ok")), "seconds": round(time.time() - started_at, 2),
             "fingerprint": fingerprint, "ts": now})
-        throwaway = _isolated_artifact_root(env)
-        if throwaway is not None:
-            shutil.rmtree(throwaway, ignore_errors=True)
+        cleanup_isolated_roots(env)
         state = assemble_gate(root, fingerprint)
         return {"complete": state["complete"], "reset": reset,
                 "ran_suite": suite, "state": state,
@@ -2309,9 +2470,7 @@ def gate_run(root: Path, budget: float = GATE_DEFAULT_BUDGET_S,
     except subprocess.TimeoutExpired:
         timed_out = True
     finally:
-        throwaway = _isolated_artifact_root(env)
-        if throwaway is not None:
-            shutil.rmtree(throwaway, ignore_errors=True)
+        cleanup_isolated_roots(env)
     state = assemble_gate(root, fingerprint)
     # A child that died for its OWN reason (an import error, a crash) leaves no
     # unit record and no breadcrumb, and would otherwise read as "no progress".
@@ -2397,6 +2556,17 @@ def gate_report(root: Path, allow_fetch: bool = True) -> Dict[str, Any]:
     result["errors"].extend(summary.pop("_errors"))
     result["warnings"].extend(summary.pop("_warnings"))
     result["checks"]["tests"] = summary
+    # R348. The split gate mints its redirect inside a `--gate-run` that has
+    # already exited by the time anyone reads the verdict, so the note cannot
+    # ride the env the way `--run-tests`'s does. Re-PROBE instead: the
+    # obstruction is a property of the host, not of the run, and a host still
+    # obstructed at report time is a host whose operator still needs telling.
+    if pytest_base_temp_obstruction():
+        result["warnings"].append(
+            f"pytest's own temp root {pytest_base_temp_root()} is not usable by "
+            f"this user; --gate-run redirected the two pytest suites to a "
+            f"throwaway root. Remove it (it may need elevation) or pin "
+            f"{PYTEST_TEMPROOT_ENV} yourself")
     result["passed"] = not result["errors"]
     result["summary"] = "Audit passed" if result["passed"] else "Audit failed"
     result["gate_complete"] = True

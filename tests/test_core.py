@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import csv
 import re
 import inspect
@@ -18440,6 +18441,216 @@ class InertFactorReportingTests(unittest.TestCase):
             self.assertEqual(
                 sorted(re.findall(r'"(\w+)":', block)),
                 ["allocation_certified", "selection_certified", "workflow_valid"])
+
+
+class PytestTempRootObstructionTests(unittest.TestCase):
+    """R348: a host whose pytest temp root is unusable must not read as a red tree.
+
+    Measured on Ben's machine, 2026-09-15, running CC-0's gate for the first
+    time since R338 put the two pytest suites inside it:
+    `%TEMP%/pytest-of-benja` on that host existed, was owned
+    by a principal `benja` could not read, and `tmp_path_factory.mktemp` raised
+    `PermissionError: [WinError 5]` at session-scoped fixture setup. All 131
+    tests in `tests.test_greenfield_regressions` and `tests.test_production`
+    ERRORED, and the gate printed `FAIL test suite FAILED in ... (ran 2066)`.
+    Re-run against a clean temp root, the same two suites were 131 passed: the
+    tree was green the whole time and the gate said the opposite.
+
+    Both halves are asserted here, because either alone is a defect. Without the
+    redirect the gate is unrunnable on that host; without the warning a broken
+    host hides behind a green line forever.
+    """
+
+    def _audit(self):
+        import importlib.util
+        path = Path(__file__).resolve().parent.parent / "tools" / "audit.py"
+        spec = importlib.util.spec_from_file_location("audit_temproot", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_an_absent_or_usable_root_is_not_an_obstruction(self):
+        """The redirect is opt-out by construction: an ordinary host mints
+        nothing, so its gate environment is byte-identical to R338's."""
+        audit = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            usable = Path(tmp) / "pytest-of-someone"
+            self.assertIsNone(audit.pytest_base_temp_obstruction(usable),
+                              msg="a root that does not exist yet is pytest's "
+                                  "to create, not an obstruction")
+            usable.mkdir()
+            self.assertIsNone(audit.pytest_base_temp_obstruction(usable))
+            self.assertFalse(
+                (usable / ".mlbgate_probe").exists(),
+                msg="the probe must not leave its own directory behind")
+
+    def test_an_unusable_root_is_named_with_its_reason(self):
+        """Probed through the real OSError the real code path raises, not
+        through a patched probe: an existing path that cannot be listed is
+        exactly the shape `make_numbered_dir` dies on."""
+        audit = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            blocked = Path(tmp) / "pytest-of-someone"
+            blocked.write_text("not a directory", encoding="utf-8")
+            reason = audit.pytest_base_temp_obstruction(blocked)
+            self.assertIsInstance(reason, str)
+            self.assertTrue(reason, msg="an obstruction must carry its reason")
+
+    def test_the_env_redirects_only_when_obstructed_and_never_over_a_pin(self):
+        """Note the shape of every assertion below: a BOOL is computed first and
+        asserted second, and no assertion is ever handed `os.environ` or a copy
+        of it as its container. unittest prints the container on failure, and
+        this repo's environment carries `THE_ODDS_API_KEY` and `GH_PAT` --
+        `assertNotIn(key, env)` against a real environment dumps both into the
+        suite output, the audit's `stderr_tail` and any JSON written from it.
+        Caught here by running this very test under the gate's own environment,
+        where the parent already carried the redirect this test asserts is
+        absent. CLAUDE.md: never log, echo, or write API keys.
+        """
+        audit = self._audit()
+        root = Path(__file__).resolve().parent.parent
+        base = {k: v for k, v in os.environ.items()
+                if k not in (audit.PYTEST_TEMPROOT_ENV, "MLB_DFS_ARTIFACT_ROOT")}
+        minted = []
+        try:
+            # An unobstructed host mints nothing, so the gate environment is
+            # byte-identical to R338's there.
+            with unittest.mock.patch.dict(os.environ, base, clear=True):
+                with unittest.mock.patch.object(
+                        audit, "pytest_base_temp_obstruction", return_value=None):
+                    clean = audit.suite_subprocess_env(root, deps={})
+            minted.append(clean)
+            self.assertFalse(
+                audit.PYTEST_TEMPROOT_ENV in clean,
+                msg="no obstruction must mean no redirect")
+
+            # An obstructed one mints a real directory this module owns.
+            with unittest.mock.patch.dict(os.environ, base, clear=True):
+                with unittest.mock.patch.object(
+                        audit, "pytest_base_temp_obstruction",
+                        return_value="PermissionError: Access is denied"):
+                    blocked = audit.suite_subprocess_env(root, deps={})
+            minted.append(blocked)
+            self.assertTrue(audit.PYTEST_TEMPROOT_ENV in blocked,
+                            msg="an obstructed root must be redirected")
+            self.assertTrue(Path(blocked[audit.PYTEST_TEMPROOT_ENV]).is_dir())
+
+            # An operator's pin -- or one inherited from a parent that already
+            # redirected -- is an instruction, not a default to overwrite.
+            pinned_env = dict(base)
+            pinned_env[audit.PYTEST_TEMPROOT_ENV] = "/operator/pin"
+            with unittest.mock.patch.dict(os.environ, pinned_env, clear=True):
+                with unittest.mock.patch.object(
+                        audit, "pytest_base_temp_obstruction",
+                        return_value="PermissionError: Access is denied"):
+                    pinned = audit.suite_subprocess_env(root, deps={})
+            minted.append(pinned)
+            self.assertEqual(pinned[audit.PYTEST_TEMPROOT_ENV], "/operator/pin")
+        finally:
+            for env in minted:
+                audit.cleanup_isolated_roots(env)
+
+    def test_a_redirect_owes_the_operator_a_warning_naming_the_bad_root(self):
+        audit = self._audit()
+        self.assertIsNone(audit.pytest_temproot_warning({}))
+        self.assertIsNone(
+            audit.pytest_temproot_warning(
+                {audit.PYTEST_TEMPROOT_ENV: "/operator/pin"}),
+            msg="an operator's own pin is not an abnormality to report")
+        with tempfile.TemporaryDirectory() as tmp:
+            minted = Path(tmp) / (audit.PYTEST_TEMPROOT_PREFIX + "abc")
+            minted.mkdir()
+            note = audit.pytest_temproot_warning(
+                {audit.PYTEST_TEMPROOT_ENV: str(minted)})
+            self.assertIsInstance(note, str)
+            self.assertIn(str(audit.pytest_base_temp_root()), note)
+            self.assertIn(str(minted), note)
+
+    def test_cleanup_removes_only_roots_this_process_minted(self):
+        """R233: the cleanup was three copies of one pair against a PREFIX test,
+        and a prefix cannot tell the root this process made from the one its
+        parent made -- they carry the same prefix by construction."""
+        audit = self._audit()
+        base = {k: v for k, v in os.environ.items()
+                if k not in (audit.PYTEST_TEMPROOT_ENV, "MLB_DFS_ARTIFACT_ROOT")}
+        with unittest.mock.patch.dict(os.environ, base, clear=True):
+            with unittest.mock.patch.object(
+                    audit, "pytest_base_temp_obstruction",
+                    return_value="PermissionError: Access is denied"):
+                mine = audit.suite_subprocess_env(
+                    Path(__file__).resolve().parent.parent, deps={})
+        artifacts = Path(mine["MLB_DFS_ARTIFACT_ROOT"])
+        temproot = Path(mine[audit.PYTEST_TEMPROOT_ENV])
+        self.assertTrue(artifacts.is_dir() and temproot.is_dir())
+        audit.cleanup_isolated_roots(mine)
+        self.assertFalse(artifacts.exists())
+        self.assertFalse(temproot.exists())
+
+        # Same prefixes, minted by somebody else. Left alone.
+        with tempfile.TemporaryDirectory() as tmp:
+            theirs = {
+                "MLB_DFS_ARTIFACT_ROOT": str(Path(tmp) / "mlb_dfs_audit_artifacts_x"),
+                audit.PYTEST_TEMPROOT_ENV: str(
+                    Path(tmp) / (audit.PYTEST_TEMPROOT_PREFIX + "x")),
+            }
+            for value in theirs.values():
+                Path(value).mkdir()
+            audit.cleanup_isolated_roots(theirs)
+            for value in theirs.values():
+                self.assertTrue(
+                    Path(value).exists(),
+                    msg="a root this process did not mint belongs to whoever "
+                        "did, and may still be in use by them")
+
+    def test_a_nested_run_audit_does_not_delete_the_outer_gates_roots(self):
+        """The regression this rider exists for, pinned against the production
+        function rather than against the rule in prose.
+
+        `test_run_tests_subprocess_gets_the_vendored_pythonpath` calls
+        `run_audit(root, run_tests=True)` IN PROCESS while the outer gate is
+        running, so `suite_subprocess_env` inherits the gate's two roots from
+        the environment instead of minting its own, and the cleanup then
+        rmtree'd them. Since R338 repair (4) that silently destroyed the gate's
+        `MLB_DFS_ARTIFACT_ROOT` on every `--run-tests` run -- invisibly, because
+        `run_audited_suites` re-mkdirs a per-suite subdirectory each iteration.
+        pytest's temp root has no such luck: the two PYTEST_SUITES then errored
+        all 131 of their tests at fixture setup.
+        """
+        audit = self._audit()
+        with tempfile.TemporaryDirectory() as tmp:
+            outer_art = Path(tmp) / "mlb_dfs_audit_artifacts_outer"
+            outer_tmp = Path(tmp) / (audit.PYTEST_TEMPROOT_PREFIX + "outer")
+            outer_art.mkdir()
+            outer_tmp.mkdir()
+            root = Path(tmp) / "repo"
+            (root / "tests").mkdir(parents=True)
+            (root / "tests" / "test_core.py").write_text("", encoding="utf-8")
+            fake_deps = {"required": [], "missing": [], "scipy_milp_available": True,
+                         "passed": True, "vendored_pylibs": None, "remedy": None}
+            fake_run = subprocess.CompletedProcess(
+                args=["fake"], returncode=0,
+                stdout="Ran 0 tests in 0.0s\n\nOK\n", stderr="")
+            inherited = dict(os.environ)
+            inherited["MLB_DFS_ARTIFACT_ROOT"] = str(outer_art)
+            inherited[audit.PYTEST_TEMPROOT_ENV] = str(outer_tmp)
+            patches = (
+                unittest.mock.patch.dict(os.environ, inherited, clear=True),
+                unittest.mock.patch.object(
+                    audit, "check_dependencies", return_value=fake_deps),
+                unittest.mock.patch.object(
+                    audit.subprocess, "run", return_value=fake_run),
+            )
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
+                audit.run_audit(root, run_tests=True)
+            self.assertTrue(
+                outer_art.exists(),
+                msg="a nested audit must not delete the outer gate's artifact root")
+            self.assertTrue(
+                outer_tmp.exists(),
+                msg="nor its pytest temp root, which the two pytest suites need "
+                    "to still exist when they run")
 
 
 class SplitGateTests(unittest.TestCase):
